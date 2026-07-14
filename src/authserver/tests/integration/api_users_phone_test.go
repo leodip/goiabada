@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -35,10 +36,11 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 	// Assert: Should return phone countries data
 	assert.NotEmpty(t, response.PhoneCountries)
 
-	// Verify structure of first phone country
+	// Verify structure of first phone country; calling code must be "+"-prefixed.
 	firstCountry := response.PhoneCountries[0]
 	assert.NotEmpty(t, firstCountry.UniqueId)
-	assert.NotEmpty(t, firstCountry.CallingCode)
+	assert.Truef(t, strings.HasPrefix(firstCountry.CallingCode, "+"),
+		"calling code must be +-prefixed, got %q", firstCountry.CallingCode)
 	assert.NotEmpty(t, firstCountry.Name)
 
 	// Assert: Should contain some expected countries (verify a few common ones)
@@ -50,6 +52,16 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 	// We expect at least some basic countries to be present
 	// Note: The actual UniqueIds depend on the phonecountries.Get() implementation
 	assert.True(t, len(countryMap) > 100, "Should have many countries available")
+
+	// Exact "+"-prefixed calling codes across the API boundary (the +-prefix
+	// contract for GET /phone-countries).
+	if bra, ok := countryMap["BRA_0"]; assert.True(t, ok, "BRA_0 present in response") {
+		assert.Equal(t, "+55", bra.CallingCode)
+		assert.Equal(t, "BR", bra.Alpha2)
+	}
+	if usa, ok := countryMap["USA_0"]; assert.True(t, ok, "USA_0 present in response") {
+		assert.Equal(t, "+1", usa.CallingCode)
+	}
 }
 
 func TestAPIPhoneCountriesGet_Unauthorized(t *testing.T) {
@@ -121,7 +133,8 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 	assert.Equal(t, updateReq.PhoneCountryUniqueId, updateResponse.User.PhoneNumberCountryUniqueId)
 	assert.Equal(t, updateReq.PhoneNumber, updateResponse.User.PhoneNumber)
 	assert.Equal(t, updateReq.PhoneNumberVerified, updateResponse.User.PhoneNumberVerified)
-	assert.NotEmpty(t, updateResponse.User.PhoneNumberCountryCallingCode) // Should be set based on country
+	// USA_0 must resolve to the "+"-prefixed calling code in the API response.
+	assert.Equal(t, "+1", updateResponse.User.PhoneNumberCountryCallingCode)
 
 	// Verify changes were persisted to database
 	updatedUser, err := database.GetUserById(nil, testUser.Id)
@@ -130,6 +143,8 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 	assert.Equal(t, updateReq.PhoneCountryUniqueId, updatedUser.PhoneNumberCountryUniqueId)
 	assert.Equal(t, updateReq.PhoneNumber, updatedUser.PhoneNumber)
 	assert.Equal(t, updateReq.PhoneNumberVerified, updatedUser.PhoneNumberVerified)
+	// The "+"-prefixed calling code must be persisted, not just returned.
+	assert.Equal(t, "+1", updatedUser.PhoneNumberCountryCallingCode)
 }
 
 func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {

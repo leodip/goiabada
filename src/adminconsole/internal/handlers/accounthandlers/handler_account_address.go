@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/biter777/countries"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -13,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
 )

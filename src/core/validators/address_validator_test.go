@@ -45,6 +45,26 @@ func TestValidateAddress(t *testing.T) {
 			expectedCode: i18n.ErrCodeAddressCountryInvalid,
 		},
 		{
+			name: "Lowercase alpha-2 is rejected (ByAlpha2 is upper-case only)",
+			input: ValidateAddressInput{
+				AddressCountry: "us",
+			},
+			expectedCode: i18n.ErrCodeAddressCountryInvalid,
+		},
+		{
+			name: "Removed country AN is rejected post-migration",
+			input: ValidateAddressInput{
+				AddressCountry: "AN",
+			},
+			expectedCode: i18n.ErrCodeAddressCountryInvalid,
+		},
+		{
+			name: "Valid alpha-2 (BR)",
+			input: ValidateAddressInput{
+				AddressCountry: "BR",
+			},
+		},
+		{
 			name: "Address line 1 too long",
 			input: ValidateAddressInput{
 				AddressLine1: "This address line is way too long and exceeds the maximum allowed length of sixty characters",

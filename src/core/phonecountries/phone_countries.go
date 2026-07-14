@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/biter777/countries"
+	"github.com/leodip/goiabada/core/countries"
 )
 
 type PhoneCountry struct {
@@ -18,26 +18,28 @@ type PhoneCountry struct {
 func Get() []PhoneCountry {
 	phoneCountries := []PhoneCountry{}
 
-	countries := countries.AllInfo()
-	sort.Slice(countries, func(i, j int) bool {
-		return countries[i].Name < countries[j].Name
+	allCountries := countries.AllInfo()
+	sort.Slice(allCountries, func(i, j int) bool {
+		return allCountries[i].Name < allCountries[j].Name
 	})
 
-	for _, c := range countries {
-		if len(c.CallCodes) > 5 {
-			panic(fmt.Sprintf("Unsupported: country %v has more than 5 call codes", c.Name))
+	for _, c := range allCountries {
+		if len(c.CallingCodes) > 5 {
+			panic(fmt.Sprintf("Unsupported: country %v has more than 5 calling codes", c.Name))
 		}
 
-		for i, callCode := range c.CallCodes {
-			if i < 5 {
-				phoneCountries = append(phoneCountries, PhoneCountry{
-					UniqueId:    fmt.Sprintf("%v_%v", c.Alpha3, i),
-					Alpha2:      c.Alpha2,
-					Emoji:       c.Emoji,
-					CallingCode: callCode.String(),
-					Name:        fmt.Sprintf("%v - %v (%v)", c.Emoji, c.Name, callCode.String()),
-				})
-			}
+		for i, code := range c.CallingCodes {
+			// countries.Country stores calling codes as digits without '+';
+			// prepend it so labels, the API callingCode, and the persisted
+			// User.PhoneNumberCountryCallingCode all keep the "+NN" form.
+			callingCode := "+" + code
+			phoneCountries = append(phoneCountries, PhoneCountry{
+				UniqueId:    fmt.Sprintf("%v_%v", c.Alpha3, i),
+				Alpha2:      c.Alpha2,
+				Emoji:       c.Emoji,
+				CallingCode: callingCode,
+				Name:        fmt.Sprintf("%v - %v (%v)", c.Emoji, c.Name, callingCode),
+			})
 		}
 	}
 

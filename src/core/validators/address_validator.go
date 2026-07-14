@@ -1,7 +1,7 @@
 package validators
 
 import (
-	"github.com/biter777/countries"
+	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -56,8 +56,9 @@ func (val *AddressValidator) ValidateAddress(input *ValidateAddressInput) error 
 		if len(input.AddressCountry) != 2 {
 			return i18n.NewLocalizedError(i18n.ErrCodeAddressCountryInvalid, nil)
 		}
-		country := countries.ByName(input.AddressCountry)
-		if !country.IsValid() || country.Alpha2() != input.AddressCountry {
+		// ByAlpha2 is an exact, upper-case-only lookup, so lowercase or unknown
+		// codes are rejected here.
+		if _, ok := countries.ByAlpha2(input.AddressCountry); !ok {
 			return i18n.NewLocalizedError(i18n.ErrCodeAddressCountryInvalid, nil)
 		}
 	}

@@ -19,13 +19,13 @@ import (
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/timezones"
 
-	"github.com/biter777/countries"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,8 +77,8 @@ func TestRender_AccountPhone(t *testing.T) {
 	out := render(t, "/account_phone.html", bind)
 	// html/template escapes "+" to "&#43;", so assert on the emoji + localized
 	// country name (the part the phone-500 bug and the CLDR work affect).
-	assert.Contains(t, out, "🇧🇷 - Brasil")  // curated pt-BR label
-	assert.Contains(t, out, "🇮🇹 - Itália")  // uncurated -> CLDR
+	assert.Contains(t, out, "🇧🇷 - Brasil") // curated pt-BR label
+	assert.Contains(t, out, "🇮🇹 - Itália") // uncurated -> CLDR
 }
 
 func TestRender_AccountAddress(t *testing.T) {

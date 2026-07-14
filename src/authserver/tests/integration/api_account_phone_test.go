@@ -42,7 +42,8 @@ func TestAPIAccountPhonePut_Success(t *testing.T) {
 	assert.Equal(t, reqBody.PhoneCountryUniqueId, updateResp.User.PhoneNumberCountryUniqueId)
 	assert.Equal(t, reqBody.PhoneNumber, updateResp.User.PhoneNumber)
 	assert.False(t, updateResp.User.PhoneNumberVerified)
-	assert.NotEmpty(t, updateResp.User.PhoneNumberCountryCallingCode)
+	// USA_0 must resolve to the "+"-prefixed calling code in the API response.
+	assert.Equal(t, "+1", updateResp.User.PhoneNumberCountryCallingCode)
 
 	// Verify persisted changes
 	updatedUser, err := database.GetUserById(nil, u.Id)
@@ -51,6 +52,8 @@ func TestAPIAccountPhonePut_Success(t *testing.T) {
 	assert.Equal(t, reqBody.PhoneCountryUniqueId, updatedUser.PhoneNumberCountryUniqueId)
 	assert.Equal(t, reqBody.PhoneNumber, updatedUser.PhoneNumber)
 	assert.False(t, updatedUser.PhoneNumberVerified)
+	// The "+"-prefixed calling code must be persisted, not just returned.
+	assert.Equal(t, "+1", updatedUser.PhoneNumberCountryCallingCode)
 }
 
 func TestAPIAccountPhonePut_ClearPhone(t *testing.T) {

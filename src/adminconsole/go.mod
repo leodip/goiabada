@@ -3,7 +3,6 @@ module github.com/leodip/goiabada/adminconsole
 go 1.26.4
 
 require (
-	github.com/biter777/countries v1.7.5
 	github.com/go-chi/chi/v5 v5.3.0
 	github.com/gorilla/csrf v1.7.3
 	github.com/gorilla/sessions v1.4.0

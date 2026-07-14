@@ -4,63 +4,101 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/countries"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGet(t *testing.T) {
-	phoneCountries := Get()
-
-	if len(phoneCountries) == 0 {
-		t.Error("Get() returned empty slice")
+func TestGet_CountAndUniqueness(t *testing.T) {
+	pcs := Get()
+	if len(pcs) == 0 {
+		t.Fatal("Get() returned empty slice")
 	}
 
-	assert.True(t, len(phoneCountries) > 255, "Expected at least 255 countries, found %d", len(phoneCountries))
-	assert.True(t, len(phoneCountries) < 265, "Expected at most 265 countries, found %d", len(phoneCountries))
-
-	seen := make(map[string]bool)
-	for _, pc := range phoneCountries {
-		if seen[pc.UniqueId] {
-			t.Errorf("Duplicate UniqueId found: %s", pc.UniqueId)
-		}
-		seen[pc.UniqueId] = true
+	// One entry per (country, calling code). The datahub dataset gives every
+	// country a single code except the Dominican Republic (3), so the total is
+	// 250 - 1 + 3 = 252. (biter777 had many multi-code territories; datahub
+	// collapses them — see the migration plan.)
+	total := 0
+	for _, c := range countries.AllInfo() {
+		total += len(c.CallingCodes)
 	}
+	assert.Equal(t, total, len(pcs), "one phone entry per (country, code)")
+	assert.Equal(t, 252, len(pcs), "expected 252 phone entries for the current dataset")
 
-	seen = make(map[string]bool)
-	for _, pc := range phoneCountries {
-		if seen[pc.Name] {
-			t.Errorf("Duplicate Name found: %s", pc.Name)
-		}
-		seen[pc.Name] = true
+	seenId := map[string]bool{}
+	seenName := map[string]bool{}
+	for _, pc := range pcs {
+		assert.Falsef(t, seenId[pc.UniqueId], "duplicate UniqueId %q", pc.UniqueId)
+		seenId[pc.UniqueId] = true
+		assert.Falsef(t, seenName[pc.Name], "duplicate Name %q", pc.Name)
+		seenName[pc.Name] = true
 	}
 }
 
-func TestGetSpecificCountries(t *testing.T) {
-	phoneCountries := Get()
+// TestGet_CallingCodeFormat asserts every calling code keeps the "+NN" form
+// (countries stores digits without '+'; Get must prepend it) and that the label
+// embeds the same "+NN".
+func TestGet_CallingCodeFormat(t *testing.T) {
+	for _, pc := range Get() {
+		if !strings.HasPrefix(pc.CallingCode, "+") {
+			t.Errorf("%s: CallingCode %q missing '+'", pc.UniqueId, pc.CallingCode)
+			continue
+		}
+		if strings.HasPrefix(pc.CallingCode, "++") {
+			t.Errorf("%s: CallingCode %q has a double '+'", pc.UniqueId, pc.CallingCode)
+		}
+		digits := strings.TrimPrefix(pc.CallingCode, "+")
+		if digits == "" || strings.ContainsFunc(digits, func(r rune) bool { return r < '0' || r > '9' }) {
+			t.Errorf("%s: CallingCode %q is not '+' followed by digits", pc.UniqueId, pc.CallingCode)
+		}
+		if !strings.Contains(pc.Name, pc.CallingCode) {
+			t.Errorf("%s: Name %q does not embed CallingCode %q", pc.UniqueId, pc.Name, pc.CallingCode)
+		}
+	}
+}
 
-	testCases := []struct {
-		countryName string
-		expected    int
-	}{
-		{"United States", 2}, // includes US and 'US Minor Outlying Islands'
-		{"United Kingdom", 1},
-		{"Canada", 1},
-		{"Australia", 1},
-		{"Brazil", 1},
-		{"New Zealand", 1},
-		{"Aruba", 2},              // Aruba has two call codes
-		{"Jamaica", 2},            // Jamaica has two call codes
-		{"Dominican Republic", 3}, // Dominican Republic has three call codes
+// TestGet_SpotChecks verifies specific entries by UniqueId (stable across CLDR
+// name changes), covering the migration's calling-code changes and supplements.
+func TestGet_SpotChecks(t *testing.T) {
+	byId := map[string]PhoneCountry{}
+	for _, pc := range Get() {
+		byId[pc.UniqueId] = pc
 	}
 
-	for _, tc := range testCases {
-		count := 0
-		for _, pc := range phoneCountries {
-			if strings.Contains(pc.Name, tc.countryName) {
-				count++
-			}
+	want := map[string]string{ // UniqueId -> CallingCode
+		"BRA_0": "+55",
+		"USA_0": "+1",
+		"VAT_0": "+3906", // prefix-changed (biter777 had +3906698)
+		"ABW_0": "+297",  // AW collapsed from two codes to one
+		"XKX_0": "+383",  // Kosovo supplement
+		"UMI_0": "+1",    // UM supplement
+		"DOM_0": "+1809", // Dominican Republic has three codes
+		"DOM_1": "+1829",
+		"DOM_2": "+1849",
+	}
+	for id, code := range want {
+		pc, ok := byId[id]
+		if !ok {
+			t.Errorf("%s: missing", id)
+			continue
 		}
-		if count != tc.expected {
-			t.Errorf("Expected %d entries for %s, found %d", tc.expected, tc.countryName, count)
+		assert.Equalf(t, code, pc.CallingCode, "%s calling code", id)
+	}
+
+	// Removed countries and collapsed second codes must NOT appear.
+	for _, gone := range []string{"ANT_0", "YUG_0", "ABW_1", "JAM_1", "MYT_1", "PRI_1", "BES_1"} {
+		if _, ok := byId[gone]; ok {
+			t.Errorf("%s should not exist after migration", gone)
+		}
+	}
+}
+
+// TestGet_UniqueIdFormat checks the UniqueId is "<Alpha3>_<index>".
+func TestGet_UniqueIdFormat(t *testing.T) {
+	for _, pc := range Get() {
+		parts := strings.Split(pc.UniqueId, "_")
+		if len(parts) != 2 || len(parts[0]) != 3 {
+			t.Errorf("UniqueId %q not in <Alpha3>_<index> form", pc.UniqueId)
 		}
 	}
 }
