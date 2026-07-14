@@ -132,23 +132,34 @@ func (d *SQLiteDatabase) RollbackTransaction(tx *sql.Tx) error {
 	return d.CommonDB.RollbackTransaction(tx)
 }
 
-func (d *SQLiteDatabase) Migrate() error {
+// NewMigrator builds a golang-migrate instance bound to this database and the
+// embedded migration files. Migrate delegates to it; tests use it to step to a
+// specific version (e.g. seed at 000020, then apply 000021 in isolation).
+func (d *SQLiteDatabase) NewMigrator() (*gomigrate.Migrate, error) {
 	driver, err := sqlite.WithInstance(d.DB, &sqlite.Config{})
 	if err != nil {
-		return errors.Wrap(err, "unable to create migration driver")
+		return nil, errors.Wrap(err, "unable to create migration driver")
 	}
 
 	iofs, err := iofs.New(sqliteMigrationsFs, "migrations")
 	if err != nil {
-		return errors.Wrap(err, "unable to create migration filesystem")
+		return nil, errors.Wrap(err, "unable to create migration filesystem")
 	}
 
-	migrate, err := gomigrate.NewWithInstance("iofs", iofs, "sqlite", driver)
+	migrator, err := gomigrate.NewWithInstance("iofs", iofs, "sqlite", driver)
 	if err != nil {
-		return errors.Wrap(err, "unable to create migration instance")
+		return nil, errors.Wrap(err, "unable to create migration instance")
+	}
+	return migrator, nil
+}
+
+func (d *SQLiteDatabase) Migrate() error {
+	migrator, err := d.NewMigrator()
+	if err != nil {
+		return err
 	}
 
-	err = migrate.Up()
+	err = migrator.Up()
 	if err != nil && err != gomigrate.ErrNoChange {
 		return errors.Wrap(err, "unable to migrate the database")
 	} else if err != nil && err == gomigrate.ErrNoChange {

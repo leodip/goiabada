@@ -1,0 +1,8 @@
+-- Migration 000021 down: intentional no-op.
+--
+-- The dataset migration is one-way: prefix digits were folded into
+-- phone_number, collapsed _1 identifiers cannot be reconstructed, and removed
+-- countries were cleared. There is no way to rebuild the pre-migration state
+-- from what's left.
+--
+-- If you must roll back the convention, restore from a pre-migration backup.

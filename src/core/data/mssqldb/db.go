@@ -128,25 +128,36 @@ func (d *MsSQLDatabase) RollbackTransaction(tx *sql.Tx) error {
 	return d.CommonDB.RollbackTransaction(tx)
 }
 
-func (d *MsSQLDatabase) Migrate() error {
+// NewMigrator builds a golang-migrate instance bound to this database and the
+// embedded migration files. Migrate delegates to it; tests use it to step to a
+// specific version (e.g. seed at 000020, then apply 000021 in isolation).
+func (d *MsSQLDatabase) NewMigrator() (*gomigrate.Migrate, error) {
 	driver, err := sqlserver.WithInstance(d.DB, &sqlserver.Config{
 		DatabaseName: d.dbConfig.Name,
 	})
 	if err != nil {
-		return errors.Wrap(err, "unable to create migration driver")
+		return nil, errors.Wrap(err, "unable to create migration driver")
 	}
 
 	iofs, err := iofs.New(mssqlMigrationsFs, "migrations")
 	if err != nil {
-		return errors.Wrap(err, "unable to create migration filesystem")
+		return nil, errors.Wrap(err, "unable to create migration filesystem")
 	}
 
-	migrate, err := gomigrate.NewWithInstance("iofs", iofs, "sqlserver", driver)
+	migrator, err := gomigrate.NewWithInstance("iofs", iofs, "sqlserver", driver)
 	if err != nil {
-		return errors.Wrap(err, "unable to create migration instance")
+		return nil, errors.Wrap(err, "unable to create migration instance")
+	}
+	return migrator, nil
+}
+
+func (d *MsSQLDatabase) Migrate() error {
+	migrator, err := d.NewMigrator()
+	if err != nil {
+		return err
 	}
 
-	err = migrate.Up()
+	err = migrator.Up()
 	if err != nil && err != gomigrate.ErrNoChange {
 		return errors.Wrap(err, "unable to migrate the database")
 	} else if err != nil && err == gomigrate.ErrNoChange {
