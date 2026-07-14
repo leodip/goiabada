@@ -36,10 +36,11 @@ var embeddedCatalogs embed.FS
 //go:embed reference/*/*.toml
 var embeddedReferenceFS embed.FS
 
-// EmbeddedReferenceFS exposes the embedded reference-data filesystem
-// (CLDR-derived country / timezone / phone-country labels per locale).
-// Consumed by the reference-data loaders that key dropdowns off the
-// active locale.
+// EmbeddedReferenceFS exposes the embedded reference-data filesystem. It holds
+// per-locale timezone display labels (`timezones.toml`); country and
+// phone-country names are resolved at runtime from CLDR, not from this FS.
+// Consumed by the reference-data loader that keys dropdowns off the active
+// locale. This is embedded-only and not affected by GOIABADA_I18N_OVERRIDES_DIR.
 func EmbeddedReferenceFS() fs.FS { return embeddedReferenceFS }
 
 type ctxKey int

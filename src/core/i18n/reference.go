@@ -11,11 +11,16 @@ import (
 	"golang.org/x/text/language/display"
 )
 
-// ReferenceData is the per-locale reference-data store: country names,
-// timezone display labels, phone-country labels, and so on. It is loaded
-// from `reference/<locale>/<kind>.toml` files at startup and consulted by
+// ReferenceData is the per-locale reference-data store loaded from the
+// embedded `reference/<locale>/<kind>.toml` files at startup and consulted by
 // template helpers (RefCountry, RefPhoneCountry, RefTimezone) to render
 // dropdowns in the active locale, with English fallback.
+//
+// Today only timezone labels ship as TOML (`timezones.toml`); country and
+// phone-country names are resolved at runtime from CLDR (see RefCountry /
+// RefPhoneCountry). Reference data is embedded-only and is NOT
+// runtime-overridable -- GOIABADA_I18N_OVERRIDES_DIR affects message catalogs
+// only, not this reference layer.
 type ReferenceData struct {
 	// bundles[locale][kind][key] = label
 	bundles map[string]map[string]map[string]string
@@ -104,16 +109,14 @@ func (rd *ReferenceData) lookup(locale, kind, key string) string {
 // code.
 //
 // Lookup order:
-//  1. Per-locale reference TOML hit on the alpha-2 code (a curated
-//     override, e.g. one shipped via GOIABADA_I18N_OVERRIDES_DIR).
+//  1. Per-locale reference TOML hit on the alpha-2 code. No country TOML
+//     ships today (country names come from CLDR), so this step currently
+//     never hits; it remains only so a curated `countries.toml` could be
+//     re-added later without code changes.
 //  2. CLDR country name for the active locale, via
 //     golang.org/x/text/language/display.
 //  3. fallback (typically the existing English struct field) when the
 //     code or active-locale tag is unparseable, or CLDR has no name.
-//
-// The English reference TOML is intentionally not consulted between (1)
-// and (2): CLDR already carries English names, so an active-locale CLDR
-// hit should win over a curated English override.
 func RefCountry(ctx context.Context, alpha2, fallback string) string {
 	if defaultReference != nil {
 		if v := defaultReference.lookup(LocaleTag(ctx), "countries", alpha2); v != "" {
@@ -127,8 +130,9 @@ func RefCountry(ctx context.Context, alpha2, fallback string) string {
 // ISO 3166-1 alpha-2 code, in the format "<emoji> - <country> (<code>)".
 //
 // Lookup order:
-//  1. Per-locale reference TOML hit on the alpha-2 code (a curated
-//     override for the whole label).
+//  1. Per-locale reference TOML hit on the alpha-2 code (whole label). No
+//     phone-country TOML ships today, so this step currently never hits; it
+//     remains only so a curated `phone_countries.toml` could be re-added.
 //  2. Assembled "<emoji> - <country> (<callingCode>)" with the country
 //     name rendered in the active locale via CLDR. The emoji and calling
 //     code are locale-independent and passed through verbatim.

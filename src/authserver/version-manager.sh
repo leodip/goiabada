@@ -13,6 +13,7 @@
 #   check   - Check online for newer versions of dependencies
 #   update  - Update version strings in all project files
 #   deps    - Update Go modules and npm packages
+#   generate - Regenerate committed data files (timezones, countries)
 #   all     - Run all commands in sequence (check → update → deps)
 #
 # Workflow:
@@ -697,6 +698,72 @@ cmd_deps() {
 }
 
 # =============================================================================
+# Command: generate
+# =============================================================================
+# Regenerate committed "// Code generated" data files from their upstream
+# sources. Each target has a `generate/` sub-package run with `go run .`:
+#   timezones -> src/core/timezones/timezones.go       (from IANA tzdata)
+#   countries -> src/core/countries/data_generated.go  (from datahub CSV)
+#
+# Usage: generate [timezones|countries|all]   (default: all)
+#
+# Exit status: the script omits 'set -e', so exit codes are captured
+# explicitly. An unknown target, a missing generator dir, or any `go run`
+# failure returns non-zero; for 'all', any target failing fails the whole
+# command. (Verified via documented manual checks -- see the migration plan --
+# rather than a shell-test framework, which the repo does not use.)
+
+cmd_generate() {
+    local target="${1:-all}"
+
+    local pkgs=()
+    case "$target" in
+        timezones) pkgs=("timezones") ;;
+        countries) pkgs=("countries") ;;
+        all)       pkgs=("timezones" "countries") ;;
+        *)
+            print_error "Unknown generate target: ${target}"
+            echo "Valid targets: timezones, countries, all"
+            return 1
+            ;;
+    esac
+
+    print_header "Regenerating data (${target})"
+
+    local rc=0
+    for pkg in "${pkgs[@]}"; do
+        local gen_dir="${BASE_DIR}/src/core/${pkg}/generate"
+        if [ ! -d "$gen_dir" ]; then
+            print_error "generator directory not found: ${gen_dir}"
+            rc=1
+            continue
+        fi
+
+        echo -e "\n${BOLD}Generating ${pkg}${NC}"
+        pushd "$gen_dir" > /dev/null 2>&1 || { print_error "cannot enter ${gen_dir}"; rc=1; continue; }
+
+        go run .
+        local status=$?
+        popd > /dev/null 2>&1
+
+        if [ "$status" -eq 0 ]; then
+            print_success "generated ${pkg}"
+        else
+            print_error "generate ${pkg} failed (exit ${status})"
+            rc=1
+        fi
+    done
+
+    if [ "$rc" -ne 0 ]; then
+        print_error "generate failed"
+        return 1
+    fi
+    echo ""
+    print_success "Generation complete. Review changes: git diff"
+    return 0
+}
+
+# =============================================================================
 # Command: all
 # =============================================================================
 # Run all commands in sequence
@@ -736,6 +803,7 @@ show_help() {
     echo "  check   Check online for newer versions"
     echo "  update  Update version strings in all project files"
     echo "  deps    Update Go modules and npm packages"
+    echo "  generate Regenerate committed data files (timezones, countries)"
     echo "  all     Run all commands in sequence"
     echo ""
     echo "Workflow:"
@@ -748,6 +816,7 @@ show_help() {
     echo "  $0 show          # See current versions"
     echo "  $0 check         # Check for newer versions online"
     echo "  $0 update        # Apply versions from yaml to files"
+    echo "  $0 generate      # Regenerate timezones + countries data files"
     echo ""
 }
 
@@ -774,6 +843,9 @@ case "${1:-}" in
         ;;
     deps)
         cmd_deps
+        ;;
+    generate)
+        cmd_generate "${2:-all}"
         ;;
     all)
         cmd_all

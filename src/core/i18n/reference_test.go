@@ -12,7 +12,7 @@ func TestReference_FallbackChain(t *testing.T) {
 		t.Fatalf("LoadBundle: %v", err)
 	}
 
-	// Curated English TOML ships "BR" → "Brazil": the override wins.
+	// "BR" resolves via CLDR for the active (English) locale (no country TOML ships).
 	englishCtx := attachLocale(context.Background(), defaultBundle.english, "en", false)
 	assert.Equal(t, "Brazil", RefCountry(englishCtx, "BR", "fallback"))
 
@@ -26,7 +26,7 @@ func TestReference_FallbackChain(t *testing.T) {
 	// Unparseable country code: fallback wins.
 	assert.Equal(t, "fallback", RefCountry(englishCtx, "not-a-code", "fallback"))
 
-	// No context at all: defaults to the English CLDR/TOML name.
+	// No context at all: defaults to the English CLDR name.
 	assert.Equal(t, "Brazil", RefCountry(context.Background(), "BR", "fallback"))
 }
 
@@ -36,9 +36,9 @@ func TestReference_CountryCLDR(t *testing.T) {
 	}
 	ptCtx := attachLocale(context.Background(), defaultBundle.english, "pt-BR", false)
 
-	// Curated pt-BR TOML override wins.
+	// "BR" resolves via CLDR in pt-BR (no country TOML ships).
 	assert.Equal(t, "Brasil", RefCountry(ptCtx, "BR", "Brazil"))
-	// Uncurated codes resolve via CLDR in pt-BR.
+	// Other codes resolve via CLDR in pt-BR.
 	assert.Equal(t, "Itália", RefCountry(ptCtx, "IT", "Italy"))
 	assert.Equal(t, "México", RefCountry(ptCtx, "MX", "Mexico"))
 	assert.Equal(t, "Espanha", RefCountry(ptCtx, "ES", "Spain"))
@@ -50,10 +50,11 @@ func TestReference_PhoneCountryAssembly(t *testing.T) {
 	}
 	ptCtx := attachLocale(context.Background(), defaultBundle.english, "pt-BR", false)
 
-	// Curated pt-BR TOML override wins for the whole label.
+	// Assembled from emoji + CLDR-localized name + calling code (no phone-country
+	// TOML ships), which reproduces the previously-curated pt-BR label exactly.
 	assert.Equal(t, "🇧🇷 - Brasil (+55)", RefPhoneCountry(ptCtx, "🇧🇷", "BR", "+55", "fallback"))
 
-	// Uncurated: emoji + CLDR-localized country name + calling code assembled;
+	// Same assembly path for any other code: emoji + CLDR name + calling code;
 	// emoji and calling code pass through untouched.
 	assert.Equal(t, "🇮🇹 - Itália (+39)", RefPhoneCountry(ptCtx, "🇮🇹", "IT", "+39", "🇮🇹 - Italy (+39)"))
 

@@ -1,7 +1,9 @@
-# Reference data for English — timezone display names keyed by IANA ID.
+# Reference data for English — curated timezone display labels keyed by IANA ID.
 #
-# This file's content is regenerated from CLDR by the reference-data
-# generator script; treat it as data, not as a hand-edited list.
+# Hand-maintained: only zones that warrant a friendlier label than the default
+# are listed. Zones not listed fall back to a "<country> - <zone>" label
+# assembled at runtime (see i18n.RefTimezone). There is no generator for this
+# file, and it is embedded-only (not runtime-overridable).
 
 "America/New_York" = "Eastern Time"
 "America/Sao_Paulo" = "Brasilia Time"

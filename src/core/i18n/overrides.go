@@ -21,8 +21,9 @@ import (
 // override directory must still surface from SupportedTags() so callers
 // like the locale picker see it.
 //
-// Reference-data overrides ($GOIABADA_I18N_OVERRIDES_DIR/reference/<locale>/*.toml)
-// are loaded by the reference-data loader, not by this function.
+// Only message catalogs are overridable this way. The reference-data layer
+// (country / timezone / phone-country labels) is embedded-only and is NOT
+// runtime-overridable: a `reference/` subdirectory here is ignored.
 func loadOverrideCatalogs(b *i18n.Bundle, dir string) ([]language.Tag, error) {
 	catalogsDir := filepath.Join(dir, "catalogs")
 	info, err := os.Stat(catalogsDir)
