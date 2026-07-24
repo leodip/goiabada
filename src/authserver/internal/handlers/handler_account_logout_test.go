@@ -704,7 +704,6 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 	t.Run("Successful decryption", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{}
 
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
@@ -714,7 +713,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		innerToken := "test_token"
 		jwe := encryptIDTokenHintForTest(t, innerToken, clientSecret)
 
-		result, err := decryptIDTokenHint(jwe, "test_client", database, settings)
+		result, err := decryptIDTokenHint(jwe, "test_client", database)
 
 		assert.Nil(t, err)
 		assert.Equal(t, innerToken, result)
@@ -722,11 +721,10 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 	t.Run("Invalid client", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{}
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "invalid_client").Return(nil, nil)
 
-		_, err := decryptIDTokenHint("a.b.c.d.e", "invalid_client", database, settings)
+		_, err := decryptIDTokenHint("a.b.c.d.e", "invalid_client", database)
 
 		assert.NotNil(t, err)
 		assert.Equal(t, i18n.ErrCodeLogoutInvalidClient, err.Code)
@@ -734,14 +732,13 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 	t.Run("Not a valid JWE", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{}
 
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 
-		_, err := decryptIDTokenHint("not.a.valid.jwe.token", "test_client", database, settings)
+		_, err := decryptIDTokenHint("not.a.valid.jwe.token", "test_client", database)
 
 		assert.NotNil(t, err)
 		assert.Equal(t, i18n.ErrCodeLogoutIdTokenHintDecryptFailed, err.Code)
@@ -749,7 +746,6 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 	t.Run("Decryption failure (wrong key)", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{}
 
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
@@ -759,7 +755,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		// Encrypted with a different secret than the client's.
 		jwe := encryptIDTokenHintForTest(t, "test_token", "a-different-secret")
 
-		_, err := decryptIDTokenHint(jwe, "test_client", database, settings)
+		_, err := decryptIDTokenHint(jwe, "test_client", database)
 
 		assert.NotNil(t, err)
 		assert.Equal(t, i18n.ErrCodeLogoutIdTokenHintDecryptFailed, err.Code)

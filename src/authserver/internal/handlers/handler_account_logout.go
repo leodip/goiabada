@@ -77,7 +77,7 @@ func isEncryptedIDTokenHint(hint string) bool {
 // documented in integration/endpoints.mdx and implemented in
 // encryption.DecryptIDTokenHintJWE. client_id selects which client's secret to
 // use, as required by RP-Initiated Logout for symmetrically-encrypted hints.
-func decryptIDTokenHint(idTokenHint, clientID string, database data.Database, settings *models.Settings) (string, *i18n.LocalizedError) {
+func decryptIDTokenHint(idTokenHint, clientID string, database data.Database) (string, *i18n.LocalizedError) {
 	client, err := database.GetClientByClientIdentifier(nil, clientID)
 	if err != nil || client == nil {
 		slog.Error("logout: client lookup failed", "clientId", clientID, "err", err)
@@ -284,7 +284,7 @@ func doLogoutWithIdToken(
 			return
 		}
 		var locErr *i18n.LocalizedError
-		idTokenHint, locErr = decryptIDTokenHint(idTokenHint, clientId, database, settings)
+		idTokenHint, locErr = decryptIDTokenHint(idTokenHint, clientId, database)
 		if locErr != nil {
 			renderAuthError(w, r, httpHelper, locErr)
 			return

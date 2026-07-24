@@ -483,13 +483,8 @@ func isHex40(s string) bool {
 	if len(s) != 40 {
 		return false
 	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
-			return false
-		}
-	}
-	return true
+	_, err := hex.DecodeString(s)
+	return err == nil
 }
 
 func stripBOM(b []byte) []byte {
