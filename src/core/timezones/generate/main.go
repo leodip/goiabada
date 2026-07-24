@@ -116,11 +116,14 @@ func getLatestVersion() (string, error) {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Look for the version in the HTML - pattern: tzdata2025c.tar.gz
-	re := regexp.MustCompile(`tzdata(\d{4}[a-z]?)\.tar\.gz`)
+	// Look for the version in the HTML. The "Latest version" tile links to the
+	// release page - pattern: href="/time-zones/releases/2026c"
+	re := regexp.MustCompile(`/time-zones/releases/(\d{4}[a-z]?)"`)
 	matches := re.FindSubmatch(body)
 	if len(matches) < 2 {
-		return "", fmt.Errorf("could not find tzdata version in IANA page")
+		return "", fmt.Errorf("could not find tzdata version in %s (fetched %d bytes matching none of %q) - "+
+			"the page layout has likely changed, check it and update the regex in getLatestVersion",
+			ianaPageURL, len(body), re.String())
 	}
 
 	return string(matches[1]), nil
