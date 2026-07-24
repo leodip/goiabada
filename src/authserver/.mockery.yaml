@@ -1,5 +1,10 @@
 filename: "{{.InterfaceName | snakecase}}_mock.go"
 structname: "{{.InterfaceName}}"
+template: testify
+# Emits "//go:build !production" in every generated mock, keeping testify out of
+# production builds (see build/Dockerfile-*, which build with -tags=production).
+template-data:
+  mock-build-tags: "!production"
 packages:
   github.com/leodip/goiabada/authserver/internal/handlers:
     interfaces:
@@ -59,10 +64,6 @@ packages:
         config:
           dir: "../core/user/mocks"
           pkgname: "mocks_user"
-      InputSanitizer:
-        config:
-          dir: "../core/inputsanitizer/mocks"
-          pkgname: "mocks_inputsanitizer"
       OtpSecretGenerator:
         config:
           dir: "../core/otp/mocks"

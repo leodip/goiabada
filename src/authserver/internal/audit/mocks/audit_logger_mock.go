@@ -2,6 +2,8 @@
 // github.com/vektra/mockery
 // template: testify
 
+//go:build !production
+
 package mocks_audit
 
 import (
@@ -49,7 +51,7 @@ type AuditLogger_Log_Call struct {
 // Log is a helper method to define mock.On call
 //   - auditEvent string
 //   - details map[string]interface{}
-func (_e *AuditLogger_Expecter) Log(auditEvent interface{}, details interface{}) *AuditLogger_Log_Call {
+func (_e *AuditLogger_Expecter) Log(auditEvent any, details any) *AuditLogger_Log_Call {
 	return &AuditLogger_Log_Call{Call: _e.mock.On("Log", auditEvent, details)}
 }
 
