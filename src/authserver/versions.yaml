@@ -28,9 +28,9 @@ project:
 # mockery:        Mock generator version (devcontainer)
 tools:
   go: "1.26.5"
-  tailwind: "4.3.2"
+  tailwind: "4.3.3"
   golangci-lint: "2.12.2"
-  mockery: "3.7.1"
+  mockery: "3.7.2"
 
 # -----------------------------------------------------------------------------
 # CDN Dependencies
@@ -39,5 +39,5 @@ tools:
 # daisyui:            UI component library for Tailwind
 # humanize-duration:  Human-readable duration formatting (admin console)
 cdn:
-  daisyui: "5.6.18"
+  daisyui: "5.7.0"
   humanize-duration: "3.34.0"
