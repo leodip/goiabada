@@ -91,6 +91,10 @@ func (d *CommonDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 
 func (d *CommonDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]models.User, error) {
 
+	if len(userIds) == 0 {
+		return nil, nil
+	}
+
 	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 

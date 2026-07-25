@@ -218,6 +218,112 @@ func TestUserLoadAttributes_NoAttributes(t *testing.T) {
 }
 
 // =============================================================================
+// GetUsersByIds
+//
+// The batch read behind UserSessionsLoadUsers: it resolves a whole page of
+// sessions to their users in one query. Unlike every other *ByIds reader it
+// returns a map keyed by user id rather than a slice, so it silently tolerates
+// duplicate input ids and cannot be indexed positionally.
+// =============================================================================
+
+func TestGetUsersByIds(t *testing.T) {
+	userA := createTestUser(t)
+	userB := createTestUser(t)
+	userC := createTestUser(t)
+
+	// Deliberately ask for only two of the three.
+	users, err := database.GetUsersByIds(nil, []int64{userA.Id, userC.Id})
+	if err != nil {
+		t.Fatalf("GetUsersByIds failed: %v", err)
+	}
+
+	if len(users) != 2 {
+		t.Fatalf("Expected 2 users, got %d", len(users))
+	}
+
+	// Keyed by user id, and the row is fully scanned (not just the id).
+	if users[userA.Id].Subject != userA.Subject {
+		t.Errorf("Expected user A subject %s, got %s", userA.Subject, users[userA.Id].Subject)
+	}
+	if users[userA.Id].Email != userA.Email {
+		t.Errorf("Expected user A email %s, got %s", userA.Email, users[userA.Id].Email)
+	}
+	if users[userC.Id].Subject != userC.Subject {
+		t.Errorf("Expected user C subject %s, got %s", userC.Subject, users[userC.Id].Subject)
+	}
+	if _, present := users[userB.Id]; present {
+		t.Error("User B was not requested and must not be returned")
+	}
+}
+
+func TestGetUsersByIds_UnknownIdIsSkipped(t *testing.T) {
+	user := createTestUser(t)
+
+	users, err := database.GetUsersByIds(nil, []int64{user.Id, 999999999})
+	if err != nil {
+		t.Fatalf("GetUsersByIds failed: %v", err)
+	}
+
+	if len(users) != 1 {
+		t.Fatalf("Expected only the existing user, got %d entries", len(users))
+	}
+	if _, present := users[user.Id]; !present {
+		t.Errorf("Expected user %d in the result, got %+v", user.Id, users)
+	}
+}
+
+// A repeated id must not produce a duplicate entry. This holds trivially because
+// the result is a map, but UserSessionsLoadUsers feeds it one id per session and
+// several sessions of the same user is the normal case, so pin it.
+func TestGetUsersByIds_DuplicateIdsCollapse(t *testing.T) {
+	user := createTestUser(t)
+
+	users, err := database.GetUsersByIds(nil, []int64{user.Id, user.Id})
+	if err != nil {
+		t.Fatalf("GetUsersByIds failed: %v", err)
+	}
+
+	if len(users) != 1 {
+		t.Errorf("Expected a repeated id to yield one entry, got %d", len(users))
+	}
+	if users[user.Id].Id != user.Id {
+		t.Errorf("Expected user %d in the result, got %+v", user.Id, users)
+	}
+}
+
+// An empty or nil id list must not reach the database. GetUsersByIds returns
+// early like every other *ByIds reader (GetGroupsByIds, GetClientsByIds,
+// GetPermissionsByIds, GetResourcesByIds, GetUserSessionsClientByIds and
+// GetUserSessionClientsByUserSessionIds).
+//
+// This case is reachable: the load helpers guard userSessions == nil but not
+// len(userSessions) == 0, so a caller-built empty page arrives here as an empty
+// slice. Before the guard was added it still behaved correctly, because
+// go-sqlbuilder's Cond.In emits "0 = 1" rather than an illegal "IN ()" when
+// given no values, but it cost a pointless round-trip and depended on that
+// upstream detail.
+//
+// Asserted as len()==0 rather than == nil so the test states the contract
+// callers rely on (no users came back) and not the representation.
+func TestGetUsersByIds_EmptyInput(t *testing.T) {
+	users, err := database.GetUsersByIds(nil, []int64{})
+	if err != nil {
+		t.Fatalf("GetUsersByIds(empty) failed: %v", err)
+	}
+	if len(users) != 0 {
+		t.Errorf("Expected no users for an empty id list, got %+v", users)
+	}
+
+	users, err = database.GetUsersByIds(nil, nil)
+	if err != nil {
+		t.Fatalf("GetUsersByIds(nil) failed: %v", err)
+	}
+	if len(users) != 0 {
+		t.Errorf("Expected no users for a nil id list, got %+v", users)
+	}
+}
+
+// =============================================================================
 // Group association loaders
 // =============================================================================
 
@@ -672,6 +778,121 @@ func TestGetUserSessionsClientByIds_EmptyInput(t *testing.T) {
 	result, err = database.GetUserSessionsClientByIds(nil, nil)
 	if err != nil {
 		t.Fatalf("GetUserSessionsClientByIds(nil) failed: %v", err)
+	}
+	if result != nil {
+		t.Errorf("Expected nil for a nil id list, got %+v", result)
+	}
+}
+
+// GetUserSessionClientsByUserSessionIds is the batch read behind
+// UserSessionsLoadClients. Note it selects by user_session_id, not by primary
+// key, which is what distinguishes it from GetUserSessionsClientByIds above: it
+// returns every client row of every requested session, flattened into one slice
+// that the caller re-groups by UserSessionId. So the contract that matters is
+// that rows from different sessions are all present and stay attributable.
+func TestGetUserSessionClientsByUserSessionIds(t *testing.T) {
+	user := createTestUser(t)
+	sessionA := createTestUserSession(t, user.Id)
+	sessionB := createTestUserSession(t, user.Id)
+	sessionC := createTestUserSession(t, user.Id)
+	clientA := createTestClient(t)
+	clientB := createTestClient(t)
+
+	// Two clients on session A, one on B, and one on the unrequested session C.
+	scA1 := createTestUserSessionClientWithIds(t, sessionA.Id, clientA.Id)
+	scA2 := createTestUserSessionClientWithIds(t, sessionA.Id, clientB.Id)
+	scB1 := createTestUserSessionClientWithIds(t, sessionB.Id, clientA.Id)
+	scC1 := createTestUserSessionClientWithIds(t, sessionC.Id, clientA.Id)
+
+	result, err := database.GetUserSessionClientsByUserSessionIds(nil, []int64{sessionA.Id, sessionB.Id})
+	if err != nil {
+		t.Fatalf("GetUserSessionClientsByUserSessionIds failed: %v", err)
+	}
+
+	if len(result) != 3 {
+		t.Fatalf("Expected 3 user session clients across the two sessions, got %d", len(result))
+	}
+
+	// Re-group exactly as UserSessionsLoadClients does.
+	bySession := map[int64][]int64{}
+	ids := map[int64]bool{}
+	for _, sc := range result {
+		bySession[sc.UserSessionId] = append(bySession[sc.UserSessionId], sc.Id)
+		ids[sc.Id] = true
+	}
+
+	if len(bySession[sessionA.Id]) != 2 {
+		t.Errorf("Expected 2 clients on session %d, got %d", sessionA.Id, len(bySession[sessionA.Id]))
+	}
+	if len(bySession[sessionB.Id]) != 1 {
+		t.Errorf("Expected 1 client on session %d, got %d", sessionB.Id, len(bySession[sessionB.Id]))
+	}
+	for _, want := range []int64{scA1.Id, scA2.Id, scB1.Id} {
+		if !ids[want] {
+			t.Errorf("Expected user session client %d in the result", want)
+		}
+	}
+	if ids[scC1.Id] {
+		t.Errorf("Session %d was not requested; its client %d must not be returned", sessionC.Id, scC1.Id)
+	}
+	if _, present := bySession[sessionC.Id]; present {
+		t.Errorf("Session %d was not requested and must not appear in the result", sessionC.Id)
+	}
+}
+
+// A session with no clients contributes no rows rather than an error or a
+// placeholder, which is what lets UserSessionsLoadClients leave Clients nil.
+func TestGetUserSessionClientsByUserSessionIds_SessionWithNoClients(t *testing.T) {
+	user := createTestUser(t)
+	withClient := createTestUserSession(t, user.Id)
+	withoutClient := createTestUserSession(t, user.Id)
+	client := createTestClient(t)
+	sc := createTestUserSessionClientWithIds(t, withClient.Id, client.Id)
+
+	result, err := database.GetUserSessionClientsByUserSessionIds(nil, []int64{withClient.Id, withoutClient.Id})
+	if err != nil {
+		t.Fatalf("GetUserSessionClientsByUserSessionIds failed: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Fatalf("Expected 1 user session client, got %d", len(result))
+	}
+	if result[0].Id != sc.Id {
+		t.Errorf("Expected user session client %d, got %d", sc.Id, result[0].Id)
+	}
+	if result[0].UserSessionId != withClient.Id {
+		t.Errorf("Expected the row to belong to session %d, got %d", withClient.Id, result[0].UserSessionId)
+	}
+}
+
+func TestGetUserSessionClientsByUserSessionIds_UnknownIdIsSkipped(t *testing.T) {
+	user := createTestUser(t)
+	userSession := createTestUserSession(t, user.Id)
+	client := createTestClient(t)
+	sc := createTestUserSessionClientWithIds(t, userSession.Id, client.Id)
+
+	result, err := database.GetUserSessionClientsByUserSessionIds(nil, []int64{userSession.Id, 999999999})
+	if err != nil {
+		t.Fatalf("GetUserSessionClientsByUserSessionIds failed: %v", err)
+	}
+
+	if len(result) != 1 || result[0].Id != sc.Id {
+		t.Errorf("Expected only the existing session's client %d, got %+v", sc.Id, result)
+	}
+}
+
+func TestGetUserSessionClientsByUserSessionIds_EmptyInput(t *testing.T) {
+	result, err := database.GetUserSessionClientsByUserSessionIds(nil, []int64{})
+	if err != nil {
+		t.Fatalf("GetUserSessionClientsByUserSessionIds(empty) failed: %v", err)
+	}
+	if result != nil {
+		t.Errorf("Expected nil for an empty id list, got %+v", result)
+	}
+
+	result, err = database.GetUserSessionClientsByUserSessionIds(nil, nil)
+	if err != nil {
+		t.Fatalf("GetUserSessionClientsByUserSessionIds(nil) failed: %v", err)
 	}
 	if result != nil {
 		t.Errorf("Expected nil for a nil id list, got %+v", result)

@@ -218,6 +218,29 @@ func TestUserSessionsLoadClients(t *testing.T) {
 	}
 }
 
+// Both loaders return early on a nil slice, and must also survive an empty
+// non-nil one: that guard tests userSessions == nil, so an empty page falls
+// through to the batch reader with an empty id list. Every sibling loader is
+// asserted this way (see TestUsersLoadPermissions_NilAndEmptySlices and
+// friends in load_helpers_test.go); these two were the only ones missing it.
+func TestUserSessionsLoadUsers_NilAndEmptySlices(t *testing.T) {
+	if err := database.UserSessionsLoadUsers(nil, nil); err != nil {
+		t.Errorf("UserSessionsLoadUsers(nil) should be a no-op, got: %v", err)
+	}
+	if err := database.UserSessionsLoadUsers(nil, []models.UserSession{}); err != nil {
+		t.Errorf("UserSessionsLoadUsers(empty) should be a no-op, got: %v", err)
+	}
+}
+
+func TestUserSessionsLoadClients_NilAndEmptySlices(t *testing.T) {
+	if err := database.UserSessionsLoadClients(nil, nil); err != nil {
+		t.Errorf("UserSessionsLoadClients(nil) should be a no-op, got: %v", err)
+	}
+	if err := database.UserSessionsLoadClients(nil, []models.UserSession{}); err != nil {
+		t.Errorf("UserSessionsLoadClients(empty) should be a no-op, got: %v", err)
+	}
+}
+
 func TestUserSessionLoadClients(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
