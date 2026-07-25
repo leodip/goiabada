@@ -31,8 +31,18 @@ func (h *HandlerPublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Unable to retrieve settings", http.StatusInternalServerError)
 		return
 	}
+	// GetSettingsById returns (nil, nil) when the row is absent, so this guard is
+	// what stops an unauthenticated request from panicking the handler.
+	if settings == nil {
+		http.Error(w, "Unable to retrieve settings", http.StatusInternalServerError)
+		return
+	}
 
-	// Map to public response DTO
+	// Map to public response DTO. Only the fields below may ever appear here:
+	// this endpoint needs no authentication, so the DTO is the whole boundary
+	// between an anonymous caller and the 32 fields of models.Settings, which
+	// include the legacy AES encryption key and the encrypted SMTP password.
+	// handler_public_settings_test.go fails if that boundary widens.
 	response := dtos.PublicSettingsResponse{
 		AppName:     settings.AppName,
 		UITheme:     settings.UITheme,
