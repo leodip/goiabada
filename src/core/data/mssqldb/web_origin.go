@@ -47,6 +47,14 @@ func (d *MsSQLDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin)
 		}
 	}
 
+	// The driver can defer a constraint violation to the result set rather than
+	// returning it from the query, in which case Next() simply reports no row.
+	// Without this the insert would look like a success with id 0.
+	if err := rows.Err(); err != nil {
+		webOrigin.CreatedAt = originalCreatedAt
+		return errors.Wrap(err, "unable to insert webOrigin")
+	}
+
 	return nil
 }
 

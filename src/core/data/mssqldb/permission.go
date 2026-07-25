@@ -51,6 +51,15 @@ func (d *MsSQLDatabase) CreatePermission(tx *sql.Tx, permission *models.Permissi
 		}
 	}
 
+	// The driver can defer a constraint violation to the result set rather than
+	// returning it from the query, in which case Next() simply reports no row.
+	// Without this the insert would look like a success with id 0.
+	if err := rows.Err(); err != nil {
+		permission.CreatedAt = originalCreatedAt
+		permission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert permission")
+	}
+
 	return nil
 }
 

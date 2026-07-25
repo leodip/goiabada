@@ -55,6 +55,15 @@ func (d *MsSQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *model
 		}
 	}
 
+	// The driver can defer a constraint violation to the result set rather than
+	// returning it from the query, in which case Next() simply reports no row.
+	// Without this the insert would look like a success with id 0.
+	if err := rows.Err(); err != nil {
+		groupPermission.CreatedAt = originalCreatedAt
+		groupPermission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert groupPermission")
+	}
+
 	return nil
 }
 

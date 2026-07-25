@@ -42,6 +42,15 @@ func (d *PostgresDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 		}
 	}
 
+	// The driver can defer a constraint violation to the result set rather than
+	// returning it from the query, in which case Next() simply reports no row.
+	// Without this the insert would look like a success with id 0.
+	if err := rows.Err(); err != nil {
+		user.CreatedAt = originalCreatedAt
+		user.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert user")
+	}
+
 	return nil
 }
 
