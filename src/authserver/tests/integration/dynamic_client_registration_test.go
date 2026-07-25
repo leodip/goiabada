@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestDCR_Disabled_Returns403 verifies that DCR returns 403 when feature is disabled (RFC 7591 §3)
@@ -602,19 +603,21 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 // Helper functions
 
 // makeDCRRequest makes a DCR POST request without authentication (open registration)
+// require, not assert: returning a nil response here would surface as a SIGSEGV
+// in the caller instead of the real connectivity error.
 func makeDCRRequest(t *testing.T, body api.DynamicClientRegistrationRequest) *http.Response {
 	jsonBody, err := json.Marshal(body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	url := config.GetAuthServer().BaseURL + "/connect/register"
 	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBody))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return resp
 }

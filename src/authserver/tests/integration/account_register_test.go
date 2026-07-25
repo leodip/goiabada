@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // saveAndRestoreRegSettings snapshots the registration-related settings and
@@ -66,13 +67,15 @@ func postRegister(t *testing.T, client *http.Client, email, password, confirm, c
 		"passwordConfirmation": {confirm},
 		"gorilla.csrf.Token":   {csrf},
 	}
+	// require, not assert: returning a nil response here would surface as a
+	// SIGSEGV in the caller instead of the real connectivity error.
 	req, err := http.NewRequest("POST", destUrl, strings.NewReader(formData.Encode()))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", destUrl)
 	req.Header.Set("Origin", config.GetAuthServer().BaseURL)
 	resp, err := client.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return resp
 }
 

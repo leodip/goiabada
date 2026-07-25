@@ -26,6 +26,7 @@ import (
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func createHttpClient(t *testing.T) *http.Client {
@@ -1087,18 +1088,22 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 }
 
 // makeAPIRequest makes an authenticated API request
+// The error checks below are require, not assert: a non-fatal assert would let
+// the helper return a nil *http.Response, and the caller then dereferences it,
+// turning a plain connectivity failure into a SIGSEGV that aborts the whole
+// package. require stops at the real cause.
 func makeAPIRequest(t *testing.T, method, url, accessToken string, body interface{}) *http.Response {
 	var reqBody *bytes.Reader
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		reqBody = bytes.NewReader(jsonBody)
 	} else {
 		reqBody = bytes.NewReader([]byte{})
 	}
 
 	req, err := http.NewRequest(method, url, reqBody)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	if body != nil {
@@ -1107,7 +1112,7 @@ func makeAPIRequest(t *testing.T, method, url, accessToken string, body interfac
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return resp
 }

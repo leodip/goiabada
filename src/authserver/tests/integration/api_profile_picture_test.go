@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // createTestPNGImage creates a valid PNG image with the specified dimensions
@@ -40,20 +41,22 @@ func makeMultipartRequest(t *testing.T, method, url, accessToken, fieldName stri
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 
+	// require, not assert: returning a nil response here would surface as a
+	// SIGSEGV in the caller instead of the real error.
 	part, err := writer.CreateFormFile(fieldName, fileName)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = io.Copy(part, bytes.NewReader(fileData))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_ = writer.Close()
 
 	req, err := http.NewRequest(method, url, &body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return resp
 }
