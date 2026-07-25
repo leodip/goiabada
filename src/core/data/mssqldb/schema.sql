@@ -104,16 +104,6 @@ CREATE TABLE [groups_permissions] (
     CONSTRAINT [PK_groups_permissions] PRIMARY KEY ([id])
 );
 
--- Table: http_sessions
-CREATE TABLE [http_sessions] (
-    [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2(6) NULL,
-    [updated_at] DATETIME2(6) NULL,
-    [data] NVARCHAR(MAX) NULL,
-    [expires_on] DATETIME2(6) NULL,
-    CONSTRAINT [PK_http_sessions] PRIMARY KEY ([id])
-);
-
 -- Table: key_pairs
 CREATE TABLE [key_pairs] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
@@ -234,6 +224,7 @@ CREATE TABLE [settings] (
     [audit_logs_in_console_enabled] BIT NOT NULL DEFAULT ((1)),
     [audit_logs_in_database_enabled] BIT NOT NULL DEFAULT ((1)),
     [audit_log_retention_days] INT NOT NULL DEFAULT ((180)),
+    [last_cleanup_at] DATETIME2(6) NULL,
     CONSTRAINT [PK_settings] PRIMARY KEY ([id])
 );
 
@@ -430,7 +421,6 @@ ALTER TABLE [web_origins] ADD CONSTRAINT [fk_clients_web_origins] FOREIGN KEY ([
 CREATE UNIQUE INDEX [idx_client_identifier] ON [clients] (client_identifier);
 CREATE UNIQUE INDEX [idx_code_hash] ON [codes] (code_hash);
 CREATE UNIQUE INDEX [idx_group_identifier] ON [groups] (group_identifier);
-CREATE INDEX [idx_httpsess_expires] ON [http_sessions] (expires_on);
 CREATE INDEX [idx_state] ON [key_pairs] (state);
 CREATE UNIQUE INDEX [idx_permission_identifier_resource] ON [permissions] (permission_identifier, resource_id);
 CREATE INDEX [idx_pre_reg_email] ON [pre_registrations] (email);

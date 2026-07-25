@@ -52,3 +52,7 @@ func (d *PostgresDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings)
 func (d *PostgresDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*models.Settings, error) {
 	return d.CommonDB.GetSettingsById(tx, settingsId)
 }
+
+func (d *PostgresDatabase) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
+	return d.CommonDB.TryClaimCleanupRun(tx, now, claimableBefore)
+}

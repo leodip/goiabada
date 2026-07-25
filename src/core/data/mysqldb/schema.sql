@@ -48,15 +48,6 @@ CREATE TABLE `groups` (
   UNIQUE KEY `idx_group_identifier` (`group_identifier`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `http_sessions` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `data` longtext,
-  `expires_on` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_httpsess_expires` (`expires_on`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `key_pairs` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -135,6 +126,7 @@ CREATE TABLE `settings` (
   `audit_logs_in_console_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `audit_logs_in_database_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `audit_log_retention_days` int NOT NULL DEFAULT '180',
+  `last_cleanup_at` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 

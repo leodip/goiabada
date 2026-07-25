@@ -1080,63 +1080,6 @@ func (_c *Database_CreateGroupPermission_Call) RunAndReturn(run func(tx *sql.Tx,
 	return _c
 }
 
-// CreateHttpSession provides a mock function for the type Database
-func (_mock *Database) CreateHttpSession(tx *sql.Tx, httpSession *models.HttpSession) error {
-	ret := _mock.Called(tx, httpSession)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateHttpSession")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.HttpSession) error); ok {
-		r0 = returnFunc(tx, httpSession)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// Database_CreateHttpSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateHttpSession'
-type Database_CreateHttpSession_Call struct {
-	*mock.Call
-}
-
-// CreateHttpSession is a helper method to define mock.On call
-//   - tx *sql.Tx
-//   - httpSession *models.HttpSession
-func (_e *Database_Expecter) CreateHttpSession(tx any, httpSession any) *Database_CreateHttpSession_Call {
-	return &Database_CreateHttpSession_Call{Call: _e.mock.On("CreateHttpSession", tx, httpSession)}
-}
-
-func (_c *Database_CreateHttpSession_Call) Run(run func(tx *sql.Tx, httpSession *models.HttpSession)) *Database_CreateHttpSession_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
-		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
-		}
-		var arg1 *models.HttpSession
-		if args[1] != nil {
-			arg1 = args[1].(*models.HttpSession)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_CreateHttpSession_Call) Return(err error) *Database_CreateHttpSession_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *Database_CreateHttpSession_Call) RunAndReturn(run func(tx *sql.Tx, httpSession *models.HttpSession) error) *Database_CreateHttpSession_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // CreateKeyPair provides a mock function for the type Database
 func (_mock *Database) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
 	ret := _mock.Called(tx, keyPair)
@@ -2603,114 +2546,6 @@ func (_c *Database_DeleteGroupPermission_Call) Return(err error) *Database_Delet
 }
 
 func (_c *Database_DeleteGroupPermission_Call) RunAndReturn(run func(tx *sql.Tx, groupPermissionId int64) error) *Database_DeleteGroupPermission_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// DeleteHttpSession provides a mock function for the type Database
-func (_mock *Database) DeleteHttpSession(tx *sql.Tx, httpSessionId int64) error {
-	ret := _mock.Called(tx, httpSessionId)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DeleteHttpSession")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
-		r0 = returnFunc(tx, httpSessionId)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// Database_DeleteHttpSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteHttpSession'
-type Database_DeleteHttpSession_Call struct {
-	*mock.Call
-}
-
-// DeleteHttpSession is a helper method to define mock.On call
-//   - tx *sql.Tx
-//   - httpSessionId int64
-func (_e *Database_Expecter) DeleteHttpSession(tx any, httpSessionId any) *Database_DeleteHttpSession_Call {
-	return &Database_DeleteHttpSession_Call{Call: _e.mock.On("DeleteHttpSession", tx, httpSessionId)}
-}
-
-func (_c *Database_DeleteHttpSession_Call) Run(run func(tx *sql.Tx, httpSessionId int64)) *Database_DeleteHttpSession_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
-		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
-		}
-		var arg1 int64
-		if args[1] != nil {
-			arg1 = args[1].(int64)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_DeleteHttpSession_Call) Return(err error) *Database_DeleteHttpSession_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *Database_DeleteHttpSession_Call) RunAndReturn(run func(tx *sql.Tx, httpSessionId int64) error) *Database_DeleteHttpSession_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// DeleteHttpSessionExpired provides a mock function for the type Database
-func (_mock *Database) DeleteHttpSessionExpired(tx *sql.Tx) error {
-	ret := _mock.Called(tx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DeleteHttpSessionExpired")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx) error); ok {
-		r0 = returnFunc(tx)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// Database_DeleteHttpSessionExpired_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteHttpSessionExpired'
-type Database_DeleteHttpSessionExpired_Call struct {
-	*mock.Call
-}
-
-// DeleteHttpSessionExpired is a helper method to define mock.On call
-//   - tx *sql.Tx
-func (_e *Database_Expecter) DeleteHttpSessionExpired(tx any) *Database_DeleteHttpSessionExpired_Call {
-	return &Database_DeleteHttpSessionExpired_Call{Call: _e.mock.On("DeleteHttpSessionExpired", tx)}
-}
-
-func (_c *Database_DeleteHttpSessionExpired_Call) Run(run func(tx *sql.Tx)) *Database_DeleteHttpSessionExpired_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
-		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_DeleteHttpSessionExpired_Call) Return(err error) *Database_DeleteHttpSessionExpired_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *Database_DeleteHttpSessionExpired_Call) RunAndReturn(run func(tx *sql.Tx) error) *Database_DeleteHttpSessionExpired_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -5822,74 +5657,6 @@ func (_c *Database_GetGroupsByIds_Call) Return(groups []models.Group, err error)
 }
 
 func (_c *Database_GetGroupsByIds_Call) RunAndReturn(run func(tx *sql.Tx, groupIds []int64) ([]models.Group, error)) *Database_GetGroupsByIds_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetHttpSessionById provides a mock function for the type Database
-func (_mock *Database) GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*models.HttpSession, error) {
-	ret := _mock.Called(tx, httpSessionId)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetHttpSessionById")
-	}
-
-	var r0 *models.HttpSession
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (*models.HttpSession, error)); ok {
-		return returnFunc(tx, httpSessionId)
-	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) *models.HttpSession); ok {
-		r0 = returnFunc(tx, httpSessionId)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.HttpSession)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, httpSessionId)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Database_GetHttpSessionById_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetHttpSessionById'
-type Database_GetHttpSessionById_Call struct {
-	*mock.Call
-}
-
-// GetHttpSessionById is a helper method to define mock.On call
-//   - tx *sql.Tx
-//   - httpSessionId int64
-func (_e *Database_Expecter) GetHttpSessionById(tx any, httpSessionId any) *Database_GetHttpSessionById_Call {
-	return &Database_GetHttpSessionById_Call{Call: _e.mock.On("GetHttpSessionById", tx, httpSessionId)}
-}
-
-func (_c *Database_GetHttpSessionById_Call) Run(run func(tx *sql.Tx, httpSessionId int64)) *Database_GetHttpSessionById_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
-		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
-		}
-		var arg1 int64
-		if args[1] != nil {
-			arg1 = args[1].(int64)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_GetHttpSessionById_Call) Return(httpSession *models.HttpSession, err error) *Database_GetHttpSessionById_Call {
-	_c.Call.Return(httpSession, err)
-	return _c
-}
-
-func (_c *Database_GetHttpSessionById_Call) RunAndReturn(run func(tx *sql.Tx, httpSessionId int64) (*models.HttpSession, error)) *Database_GetHttpSessionById_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -9824,6 +9591,78 @@ func (_c *Database_SearchUsersPaginated_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// TryClaimCleanupRun provides a mock function for the type Database
+func (_mock *Database) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
+	ret := _mock.Called(tx, now, claimableBefore)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryClaimCleanupRun")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Time, time.Time) (bool, error)); ok {
+		return returnFunc(tx, now, claimableBefore)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Time, time.Time) bool); ok {
+		r0 = returnFunc(tx, now, claimableBefore)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, time.Time, time.Time) error); ok {
+		r1 = returnFunc(tx, now, claimableBefore)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryClaimCleanupRun_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryClaimCleanupRun'
+type Database_TryClaimCleanupRun_Call struct {
+	*mock.Call
+}
+
+// TryClaimCleanupRun is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - now time.Time
+//   - claimableBefore time.Time
+func (_e *Database_Expecter) TryClaimCleanupRun(tx any, now any, claimableBefore any) *Database_TryClaimCleanupRun_Call {
+	return &Database_TryClaimCleanupRun_Call{Call: _e.mock.On("TryClaimCleanupRun", tx, now, claimableBefore)}
+}
+
+func (_c *Database_TryClaimCleanupRun_Call) Run(run func(tx *sql.Tx, now time.Time, claimableBefore time.Time)) *Database_TryClaimCleanupRun_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 time.Time
+		if args[1] != nil {
+			arg1 = args[1].(time.Time)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryClaimCleanupRun_Call) Return(b bool, err error) *Database_TryClaimCleanupRun_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryClaimCleanupRun_Call) RunAndReturn(run func(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)) *Database_TryClaimCleanupRun_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateClient provides a mock function for the type Database
 func (_mock *Database) UpdateClient(tx *sql.Tx, client *models.Client) error {
 	ret := _mock.Called(tx, client)
@@ -10219,63 +10058,6 @@ func (_c *Database_UpdateGroupPermission_Call) Return(err error) *Database_Updat
 }
 
 func (_c *Database_UpdateGroupPermission_Call) RunAndReturn(run func(tx *sql.Tx, groupPermission *models.GroupPermission) error) *Database_UpdateGroupPermission_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateHttpSession provides a mock function for the type Database
-func (_mock *Database) UpdateHttpSession(tx *sql.Tx, httpSession *models.HttpSession) error {
-	ret := _mock.Called(tx, httpSession)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateHttpSession")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.HttpSession) error); ok {
-		r0 = returnFunc(tx, httpSession)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// Database_UpdateHttpSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateHttpSession'
-type Database_UpdateHttpSession_Call struct {
-	*mock.Call
-}
-
-// UpdateHttpSession is a helper method to define mock.On call
-//   - tx *sql.Tx
-//   - httpSession *models.HttpSession
-func (_e *Database_Expecter) UpdateHttpSession(tx any, httpSession any) *Database_UpdateHttpSession_Call {
-	return &Database_UpdateHttpSession_Call{Call: _e.mock.On("UpdateHttpSession", tx, httpSession)}
-}
-
-func (_c *Database_UpdateHttpSession_Call) Run(run func(tx *sql.Tx, httpSession *models.HttpSession)) *Database_UpdateHttpSession_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
-		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
-		}
-		var arg1 *models.HttpSession
-		if args[1] != nil {
-			arg1 = args[1].(*models.HttpSession)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_UpdateHttpSession_Call) Return(err error) *Database_UpdateHttpSession_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *Database_UpdateHttpSession_Call) RunAndReturn(run func(tx *sql.Tx, httpSession *models.HttpSession) error) *Database_UpdateHttpSession_Call {
 	_c.Call.Return(run)
 	return _c
 }

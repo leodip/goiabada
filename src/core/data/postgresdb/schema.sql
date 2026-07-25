@@ -259,36 +259,6 @@ CREATE SEQUENCE public.groups_permissions_id_seq
 ALTER SEQUENCE public.groups_permissions_id_seq OWNED BY public.groups_permissions.id;
 
 
---
--- Name: http_sessions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.http_sessions (
-    id bigint NOT NULL,
-    created_at timestamp(6) without time zone,
-    updated_at timestamp(6) without time zone,
-    data text,
-    expires_on timestamp(6) without time zone
-);
-
-
---
--- Name: http_sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.http_sessions_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: http_sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.http_sessions_id_seq OWNED BY public.http_sessions.id;
 
 
 --
@@ -548,7 +518,8 @@ CREATE TABLE public.settings (
     include_open_id_connect_claims_in_id_token boolean DEFAULT true NOT NULL,
     audit_logs_in_console_enabled boolean DEFAULT true NOT NULL,
     audit_logs_in_database_enabled boolean DEFAULT true NOT NULL,
-    audit_log_retention_days integer DEFAULT 180 NOT NULL
+    audit_log_retention_days integer DEFAULT 180 NOT NULL,
+    last_cleanup_at timestamp(6) without time zone
 );
 
 
@@ -997,13 +968,6 @@ ALTER TABLE ONLY public.groups_permissions ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
--- Name: http_sessions id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.http_sessions ALTER COLUMN id SET DEFAULT nextval('public.http_sessions_id_seq'::regclass);
-
-
---
 -- Name: key_pairs id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1168,14 +1132,6 @@ ALTER TABLE ONLY public.groups_permissions
 
 ALTER TABLE ONLY public.groups
     ADD CONSTRAINT groups_pkey PRIMARY KEY (id);
-
-
---
--- Name: http_sessions http_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.http_sessions
-    ADD CONSTRAINT http_sessions_pkey PRIMARY KEY (id);
 
 
 --
@@ -1384,7 +1340,6 @@ CREATE UNIQUE INDEX idx_group_identifier ON public.groups USING btree (group_ide
 -- Name: idx_httpsess_expires; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_httpsess_expires ON public.http_sessions USING btree (expires_on);
 
 
 --

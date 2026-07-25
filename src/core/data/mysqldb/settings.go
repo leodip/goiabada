@@ -2,6 +2,7 @@ package mysqldb
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/leodip/goiabada/core/models"
 )
@@ -16,4 +17,8 @@ func (d *MySQLDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) er
 
 func (d *MySQLDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*models.Settings, error) {
 	return d.CommonDB.GetSettingsById(tx, settingsId)
+}
+
+func (d *MySQLDatabase) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
+	return d.CommonDB.TryClaimCleanupRun(tx, now, claimableBefore)
 }

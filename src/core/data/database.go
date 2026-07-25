@@ -104,6 +104,12 @@ type Database interface {
 	CreateSettings(tx *sql.Tx, settings *models.Settings) error
 	UpdateSettings(tx *sql.Tx, settings *models.Settings) error
 	GetSettingsById(tx *sql.Tx, settingsId int64) (*models.Settings, error)
+	// TryClaimCleanupRun atomically claims the next background cleanup run via a
+	// conditional update on settings.last_cleanup_at, and reports whether this
+	// caller won it. claimableBefore is the cutoff (pass now minus the interval).
+	// This is what keeps the cleanup single-flight across instances and puts the
+	// schedule on the wall clock instead of one process's uptime.
+	TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 
 	CreateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error
 	UpdateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error
@@ -229,12 +235,6 @@ type Database interface {
 	GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error)
 	DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error
 	UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error
-
-	CreateHttpSession(tx *sql.Tx, httpSession *models.HttpSession) error
-	UpdateHttpSession(tx *sql.Tx, httpSession *models.HttpSession) error
-	GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*models.HttpSession, error)
-	DeleteHttpSession(tx *sql.Tx, httpSessionId int64) error
-	DeleteHttpSessionExpired(tx *sql.Tx) error
 }
 
 func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error) {

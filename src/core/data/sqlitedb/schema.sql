@@ -159,13 +159,6 @@ CREATE TABLE groups_permissions (
   CONSTRAINT fk_groups_permissions_permission FOREIGN KEY (permission_id) REFERENCES permissions (id) ON DELETE CASCADE
 );
 
-CREATE TABLE http_sessions (
-  `id` integer PRIMARY KEY AUTOINCREMENT,
-  created_at DATETIME,
-  updated_at DATETIME,
-  `data` longtext,  
-  expires_on DATETIME  
-);
 
 CREATE TABLE key_pairs (
   `id` integer PRIMARY KEY AUTOINCREMENT,
@@ -312,7 +305,6 @@ CREATE INDEX `idx_middle_name` ON `users`(`middle_name`);
 CREATE INDEX `idx_family_name` ON `users`(`family_name`);
 CREATE UNIQUE INDEX `idx_code_hash` ON `codes`(`code_hash`);
 CREATE UNIQUE INDEX `idx_group_identifier` ON `groups`(`group_identifier`);
-CREATE INDEX `idx_httpsess_expires` ON `http_sessions`(`expires_on`);
 CREATE INDEX `idx_state` ON `key_pairs`(`state`);
 CREATE INDEX `idx_pre_reg_email` ON `pre_registrations`(`email`);
 CREATE UNIQUE INDEX `idx_refresh_token_jti` ON `refresh_tokens`(`refresh_token_jti`);
@@ -351,7 +343,8 @@ CREATE TABLE IF NOT EXISTS "settings" (
   resource_owner_password_credentials_enabled INTEGER NOT NULL DEFAULT 0,
   audit_logs_in_console_enabled BOOLEAN NOT NULL DEFAULT 1,
   audit_logs_in_database_enabled BOOLEAN NOT NULL DEFAULT 1,
-  audit_log_retention_days INTEGER NOT NULL DEFAULT 180
+  audit_log_retention_days INTEGER NOT NULL DEFAULT 180,
+  last_cleanup_at DATETIME
 );
 
 CREATE TABLE user_profile_pictures (

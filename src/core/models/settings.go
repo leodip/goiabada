@@ -76,4 +76,13 @@ type Settings struct {
 
 	// Number of days to retain audit logs in the database (0 = infinite retention)
 	AuditLogRetentionDays int `db:"audit_log_retention_days"`
+
+	// LastCleanupAt is when the background cleanup task last claimed a run.
+	//
+	// It is both the schedule and the cross-instance lock: an instance claims the
+	// next run with a conditional UPDATE on this column (see
+	// Database.TryClaimCleanupRun), so exactly one instance runs the cleanup per
+	// interval no matter how many are deployed, and the schedule follows wall
+	// clock rather than a single process's uptime.
+	LastCleanupAt sql.NullTime `db:"last_cleanup_at"`
 }
