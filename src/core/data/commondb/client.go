@@ -236,19 +236,28 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 	return clients, nil
 }
 
+// DeleteClient removes the client and, by ON DELETE CASCADE, every row that
+// references it. Refresh tokens are cleared explicitly first because SQL Server
+// cannot cascade them: see deleteRefreshTokensByColumn.
 func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
-		For(d.Flavor)
+	return d.inTransaction(tx, func(tx *sql.Tx) error {
+		if err := d.deleteRefreshTokensByColumn(tx, "client_id", clientId); err != nil {
+			return err
+		}
 
-	deleteBuilder := clientStruct.DeleteFrom("clients")
-	deleteBuilder.Where(deleteBuilder.Equal("id", clientId))
+		clientStruct := sqlbuilder.NewStruct(new(models.Client)).
+			For(d.Flavor)
 
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
-	if err != nil {
-		return errors.Wrap(err, "unable to delete client")
-	}
+		deleteBuilder := clientStruct.DeleteFrom("clients")
+		deleteBuilder.Where(deleteBuilder.Equal("id", clientId))
 
-	return nil
+		sql, args := deleteBuilder.Build()
+		_, err := d.ExecSql(tx, sql, args...)
+		if err != nil {
+			return errors.Wrap(err, "unable to delete client")
+		}
+
+		return nil
+	})
 }

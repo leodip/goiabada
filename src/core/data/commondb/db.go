@@ -59,6 +59,28 @@ func (d *CommonDatabase) RollbackTransaction(tx *sql.Tx) error {
 	return nil
 }
 
+// inTransaction runs fn inside a transaction: the caller's when one was supplied,
+// otherwise one of its own that it commits or rolls back. It lets a method that
+// needs several statements be atomic without forcing every caller to open a
+// transaction, and without silently splitting the work when they didn't.
+func (d *CommonDatabase) inTransaction(tx *sql.Tx, fn func(tx *sql.Tx) error) error {
+	if tx != nil {
+		return fn(tx)
+	}
+
+	ownTx, err := d.BeginTransaction()
+	if err != nil {
+		return err
+	}
+
+	if err := fn(ownTx); err != nil {
+		_ = d.RollbackTransaction(ownTx)
+		return err
+	}
+
+	return d.CommitTransaction(ownTx)
+}
+
 func (d *CommonDatabase) Log(sql string, args ...any) {
 	if d.logSQL {
 		slog.Info(fmt.Sprintf("sql: %v", sql))

@@ -279,6 +279,41 @@ func (d *CommonDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) er
 	return nil
 }
 
+// deleteRefreshTokensByColumn removes every refresh token whose given column
+// matches, used to clear a parent's tokens before deleting the parent itself.
+//
+// SQL Server cannot cascade refresh_tokens.user_id or .client_id. refresh_tokens
+// already cascades from codes, and codes cascades from both users and clients, so
+// a direct cascade would be a second delete path into the same table, which SQL
+// Server rejects as "cycles or multiple cascade paths". Its migration therefore
+// declares both foreign keys ON DELETE NO ACTION (mssqldb migration 000011), and
+// a refresh token issued without a code then blocks deletion of its user or
+// client outright:
+//
+//	The DELETE statement conflicted with the REFERENCE constraint
+//	"fk_refresh_tokens_user" ... table "dbo.refresh_tokens", column 'user_id'.
+//
+// Codeless tokens are not hypothetical: the ROPC grant creates exactly that shape
+// (TokenIssuer.generateRefreshTokenForROPC, "no Code reference"), so on SQL Server
+// any user who had used ROPC could not be deleted at all.
+//
+// This runs on every engine rather than only on SQL Server. The other three would
+// have cascaded these rows anyway, so the result is identical, and one code path
+// that all four exercise is worth more than the statement it saves.
+func (d *CommonDatabase) deleteRefreshTokensByColumn(tx *sql.Tx, column string, value int64) error {
+	deleteBuilder := d.Flavor.NewDeleteBuilder()
+	deleteBuilder.DeleteFrom("refresh_tokens")
+	deleteBuilder.Where(deleteBuilder.Equal(column, value))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.ExecSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrapf(err, "unable to delete refresh tokens by %v", column)
+	}
+
+	return nil
+}
+
 // Deletes refresh tokens that are either expired (by expires_at or max_lifetime) or revoked
 func (d *CommonDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()

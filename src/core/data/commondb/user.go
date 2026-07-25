@@ -451,19 +451,28 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	return users, count, nil
 }
 
+// DeleteUser removes the user and, by ON DELETE CASCADE, every row that
+// references it. Refresh tokens are cleared explicitly first because SQL Server
+// cannot cascade them: see deleteRefreshTokensByColumn.
 func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 
-	userStruct := sqlbuilder.NewStruct(new(models.UserSession)).
-		For(d.Flavor)
+	return d.inTransaction(tx, func(tx *sql.Tx) error {
+		if err := d.deleteRefreshTokensByColumn(tx, "user_id", userId); err != nil {
+			return err
+		}
 
-	deleteBuilder := userStruct.DeleteFrom("users")
-	deleteBuilder.Where(deleteBuilder.Equal("id", userId))
+		userStruct := sqlbuilder.NewStruct(new(models.UserSession)).
+			For(d.Flavor)
 
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
-	if err != nil {
-		return errors.Wrap(err, "unable to delete user")
-	}
+		deleteBuilder := userStruct.DeleteFrom("users")
+		deleteBuilder.Where(deleteBuilder.Equal("id", userId))
 
-	return nil
+		sql, args := deleteBuilder.Build()
+		_, err := d.ExecSql(tx, sql, args...)
+		if err != nil {
+			return errors.Wrap(err, "unable to delete user")
+		}
+
+		return nil
+	})
 }
