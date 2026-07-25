@@ -43,7 +43,7 @@ func TestUpdateKeyPair(t *testing.T) {
 	keyPair.PublicKeyASN1_DER = []byte(gofakeit.LoremIpsumSentence(40))
 	keyPair.PublicKeyJWK = []byte(gofakeit.LoremIpsumSentence(50))
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateKeyPair(nil, keyPair)
 	if err != nil {

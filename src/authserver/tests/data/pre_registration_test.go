@@ -38,7 +38,7 @@ func TestUpdatePreRegistration(t *testing.T) {
 	preReg.VerificationCodeEncrypted = []byte(gofakeit.UUID())
 	preReg.VerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdatePreRegistration(nil, preReg)
 	if err != nil {

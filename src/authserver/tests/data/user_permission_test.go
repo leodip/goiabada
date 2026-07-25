@@ -56,7 +56,7 @@ func TestUpdateUserPermission(t *testing.T) {
 	userPermission.UserId = user.Id
 	userPermission.PermissionId = permission.Id
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateUserPermission(nil, userPermission)
 	if err != nil {

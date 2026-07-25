@@ -49,7 +49,7 @@ func TestUpdateRefreshToken(t *testing.T) {
 	refreshToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true}
 	refreshToken.Revoked = true
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateRefreshToken(nil, refreshToken)
 	if err != nil {

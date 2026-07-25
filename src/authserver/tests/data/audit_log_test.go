@@ -108,7 +108,7 @@ func TestGetAuditLogsPaginated(t *testing.T) {
 		}
 		err := database.CreateAuditLog(nil, auditLog)
 		require.NoError(t, err)
-		time.Sleep(10 * time.Millisecond) // Ensure different timestamps
+		time.Sleep(timestampTick)
 	}
 
 	t.Run("Get all logs - first page", func(t *testing.T) {
@@ -179,7 +179,7 @@ func TestGetAuditLogsPaginated_Sorting(t *testing.T) {
 		}
 		err := database.CreateAuditLog(nil, auditLog)
 		require.NoError(t, err)
-		time.Sleep(10 * time.Millisecond) // Ensure different timestamps
+		time.Sleep(timestampTick)
 	}
 
 	t.Run("Logs sorted by created_at DESC", func(t *testing.T) {

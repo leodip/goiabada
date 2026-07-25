@@ -63,7 +63,7 @@ func TestUpdateClientLogo(t *testing.T) {
 	clientLogo.Logo = newLogoData
 	clientLogo.ContentType = "image/jpeg"
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateClientLogo(nil, clientLogo)
 	if err != nil {

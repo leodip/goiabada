@@ -143,7 +143,7 @@ func TestUpdateCode(t *testing.T) {
 	code.AcrLevel = "2"
 	code.AuthMethods = "password mfa"
 
-	time.Sleep(time.Millisecond * 100) // Ensure some time passes before update
+	time.Sleep(timestampTick) // Ensure some time passes before update
 
 	err := database.UpdateCode(nil, code)
 	if err != nil {

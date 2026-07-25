@@ -53,7 +53,7 @@ func TestUpdateUserAttribute(t *testing.T) {
 	attr.IncludeInIdToken = !attr.IncludeInIdToken
 	attr.IncludeInAccessToken = !attr.IncludeInAccessToken
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateUserAttribute(nil, attr)
 	if err != nil {

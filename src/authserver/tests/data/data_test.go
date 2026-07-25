@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data"
@@ -12,6 +13,19 @@ import (
 )
 
 var database data.Database
+
+// timestampTick separates two writes so their timestamps are guaranteed to
+// differ: update tests assert UpdatedAt is strictly after CreatedAt, and the
+// audit-log tests need distinct created_at values for a DESC sort to be
+// well defined.
+//
+// Both timestamps are assigned in Go, not by the database, and every engine's
+// datetime column keeps at least microsecond precision (sqlite DATETIME, mysql
+// datetime(6), postgres timestamp(6), mssql DATETIME2(6)), so a couple of
+// milliseconds is three orders of magnitude more separation than required. These
+// waits used to be 100ms each, which cost about two seconds per engine across the
+// suite for no added certainty.
+const timestampTick = 2 * time.Millisecond
 
 func TestMain(m *testing.M) {
 	slog.Info("running TestMain")

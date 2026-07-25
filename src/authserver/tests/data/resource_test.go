@@ -48,7 +48,7 @@ func TestUpdateResource(t *testing.T) {
 	resource.ResourceIdentifier = "updated_resource_identifier_" + gofakeit.LetterN(6)
 	resource.Description = "Updated Description"
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateResource(nil, resource)
 	if err != nil {

@@ -159,7 +159,7 @@ func TestUpdateClientPermission(t *testing.T) {
 	}
 
 	// Test case 1: Successfully update a client permission
-	time.Sleep(time.Millisecond * 100) // Ensure some time passes before update
+	time.Sleep(timestampTick) // Ensure some time passes before update
 	clientPermission.ClientId = newClient.Id
 	clientPermission.PermissionId = newPermission.Id
 	err = database.UpdateClientPermission(nil, clientPermission)

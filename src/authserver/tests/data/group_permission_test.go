@@ -89,7 +89,7 @@ func TestUpdateGroupPermission(t *testing.T) {
 	}
 
 	// Wait a moment to ensure UpdatedAt will be different
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	// Update the group permission
 	groupPermission.GroupId = group2.Id

@@ -202,7 +202,7 @@ func TestUpdateClient(t *testing.T) {
 	}
 
 	// Small delay to ensure time difference
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	// Update again to check if UpdatedAt changes
 	updatedClient.Description = "Description updated again"

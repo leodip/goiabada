@@ -50,7 +50,7 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession.Level2AuthConfigHasChanged = true
 	userSession.UserId = user.Id // This shouldn't change, but we'll update it to ensure it's not accidentally modified
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateUserSession(nil, userSession)
 	if err != nil {

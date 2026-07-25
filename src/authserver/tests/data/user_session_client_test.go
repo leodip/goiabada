@@ -68,7 +68,7 @@ func TestUpdateUserSessionClient(t *testing.T) {
 		LastAccessed:  time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Millisecond),
 	}
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateUserSessionClient(nil, updatedUserSessionClient)
 	if err != nil {

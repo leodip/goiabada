@@ -80,7 +80,7 @@ func TestUpdateUserProfilePicture(t *testing.T) {
 	profilePicture.Picture = newPictureData
 	profilePicture.ContentType = "image/jpeg"
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateUserProfilePicture(nil, profilePicture)
 	if err != nil {

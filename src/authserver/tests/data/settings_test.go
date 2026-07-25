@@ -93,7 +93,7 @@ func TestUpdateSettings(t *testing.T) {
 	settings.ImplicitFlowEnabled = false
 	settings.ResourceOwnerPasswordCredentialsEnabled = false
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateSettings(nil, settings)
 	if err != nil {

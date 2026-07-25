@@ -59,7 +59,7 @@ func TestUpdateUserConsent(t *testing.T) {
 	userConsent.Scope = "openid profile email"
 	userConsent.GrantedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateUserConsent(nil, userConsent)
 	if err != nil {

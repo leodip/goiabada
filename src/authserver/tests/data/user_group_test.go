@@ -53,7 +53,7 @@ func TestUpdateUserGroup(t *testing.T) {
 	userGroup.UserId = newUser.Id
 	userGroup.GroupId = newGroup.Id
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateUserGroup(nil, userGroup)
 	if err != nil {

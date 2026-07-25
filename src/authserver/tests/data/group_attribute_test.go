@@ -78,7 +78,7 @@ func TestUpdateGroupAttribute(t *testing.T) {
 	groupAttribute.IncludeInIdToken = false
 	groupAttribute.IncludeInAccessToken = true
 
-	time.Sleep(time.Millisecond * 100) // Ensure some time passes before update
+	time.Sleep(timestampTick) // Ensure some time passes before update
 
 	err := database.UpdateGroupAttribute(nil, groupAttribute)
 	if err != nil {

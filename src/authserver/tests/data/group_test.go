@@ -58,7 +58,7 @@ func TestUpdateGroup(t *testing.T) {
 	group.IncludeInAccessToken = true
 
 	// Wait a moment to ensure UpdatedAt will be different
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(timestampTick)
 
 	err := database.UpdateGroup(nil, group)
 	if err != nil {
@@ -161,76 +161,108 @@ func TestGetAllGroups(t *testing.T) {
 	}
 }
 
+// TestGetAllGroupsPaginated asserts the properties of pagination rather than the
+// contents of fixed pages, because this reader spans the whole table and every
+// other test in the package adds to it.
+//
+// It used to delete every group in the database first, to make the counts
+// predictable. That worked only because nothing runs in parallel and no later test
+// depended on a group created earlier, and it cascaded into users_groups,
+// groups_permissions and group_attributes on the way. Asserting relative to a
+// baseline needs no such wipe, and pins more than the old version did: that the
+// pages tile the table with no gap or repeat, and that the ordering the reader
+// promises actually holds.
 func TestGetAllGroupsPaginated(t *testing.T) {
-	// Clean up existing groups
-	existingGroups, _ := database.GetAllGroups(nil)
-	for _, group := range existingGroups {
-		err := database.DeleteGroup(nil, group.Id)
+	const pageSize = 10
+	const numGroups = 25
+
+	// Page size 1 is the cheapest way to read the current total.
+	_, baseline, err := database.GetAllGroupsPaginated(nil, 1, 1)
+	if err != nil {
+		t.Fatalf("Failed to read the baseline group count: %v", err)
+	}
+
+	created := make(map[string]bool, numGroups)
+	for i := 0; i < numGroups; i++ {
+		group := createTestGroup(t)
+		created[group.GroupIdentifier] = true
+		// Remove only what this test made. Unlike the old table-wide wipe this
+		// touches nothing another test owns, and it keeps the table from growing by
+		// 25 rows on every run of the three server databases, which are never reset.
+		t.Cleanup(func() { _ = database.DeleteGroup(nil, group.Id) })
+	}
+
+	expectedTotal := baseline + numGroups
+
+	// A full page, a partial last page, and the page past the end.
+	lastPage := (expectedTotal + pageSize - 1) / pageSize
+	expectedOnLastPage := expectedTotal - (lastPage-1)*pageSize
+
+	for _, tc := range []struct {
+		name     string
+		page     int
+		expected int
+	}{
+		{"first page is full", 1, pageSize},
+		{"last page holds the remainder", lastPage, expectedOnLastPage},
+		{"page past the end is empty", lastPage + 1, 0},
+	} {
+		groups, total, err := database.GetAllGroupsPaginated(nil, tc.page, pageSize)
 		if err != nil {
-			t.Fatalf("Failed to clean up existing groups: %v", err)
+			t.Fatalf("%s: failed to get page %d: %v", tc.name, tc.page, err)
+		}
+		if len(groups) != tc.expected {
+			t.Errorf("%s: expected %d groups on page %d, got %d", tc.name, tc.expected, tc.page, len(groups))
+		}
+		// The total is a property of the query, not of the page, so it must not
+		// change as the caller walks off the end.
+		if total != expectedTotal {
+			t.Errorf("%s: expected total %d on page %d, got %d", tc.name, expectedTotal, tc.page, total)
 		}
 	}
 
-	// Create a specific number of test groups
-	numGroups := 25
-	for i := 0; i < numGroups; i++ {
-		createTestGroup(t)
-	}
-
-	// Test first page
-	groups, total, err := database.GetAllGroupsPaginated(nil, 1, 10)
+	// Read everything in one page, as the reference for what the pages should tile.
+	all, total, err := database.GetAllGroupsPaginated(nil, 1, expectedTotal)
 	if err != nil {
-		t.Fatalf("Failed to get paginated groups: %v", err)
+		t.Fatalf("Failed to read all groups in one page: %v", err)
+	}
+	if total != expectedTotal || len(all) != expectedTotal {
+		t.Fatalf("Expected %d groups in one page, got %d (total reported %d)", expectedTotal, len(all), total)
 	}
 
-	if len(groups) != 10 {
-		t.Errorf("Expected 10 groups on the first page, got %d", len(groups))
+	// Every group created here comes back exactly once.
+	seen := 0
+	for _, group := range all {
+		if created[group.GroupIdentifier] {
+			seen++
+			delete(created, group.GroupIdentifier) // so a repeat is not counted twice
+		}
+	}
+	if seen != numGroups {
+		t.Errorf("Expected all %d created groups to appear exactly once, found %d", numGroups, seen)
 	}
 
-	if total != numGroups {
-		t.Errorf("Expected total to be %d, got %d", numGroups, total)
-	}
-
-	// Test second page
-	groups, total, err = database.GetAllGroupsPaginated(nil, 2, 10)
-	if err != nil {
-		t.Fatalf("Failed to get second page of paginated groups: %v", err)
-	}
-
-	if len(groups) != 10 {
-		t.Errorf("Expected 10 groups on the second page, got %d", len(groups))
-	}
-
-	if total != numGroups {
-		t.Errorf("Expected total to be %d, got %d", numGroups, total)
-	}
-
-	// Test last page
-	groups, total, err = database.GetAllGroupsPaginated(nil, 3, 10)
-	if err != nil {
-		t.Fatalf("Failed to get last page of paginated groups: %v", err)
-	}
-
-	if len(groups) != 5 {
-		t.Errorf("Expected 5 groups on the last page, got %d", len(groups))
-	}
-
-	if total != numGroups {
-		t.Errorf("Expected total to be %d, got %d", numGroups, total)
-	}
-
-	// Test page beyond total
-	groups, total, err = database.GetAllGroupsPaginated(nil, 4, 10)
-	if err != nil {
-		t.Fatalf("Failed to get page beyond total: %v", err)
-	}
-
-	if len(groups) != 0 {
-		t.Errorf("Expected 0 groups on page beyond total, got %d", len(groups))
-	}
-
-	if total != numGroups {
-		t.Errorf("Expected total to be %d, got %d", numGroups, total)
+	// The pages must tile that reference: page N holds exactly the slice the single
+	// read put at that offset, with nothing skipped or repeated at the seam.
+	//
+	// Deliberately not asserted: what the order itself should be. The reader sorts
+	// by group_identifier in the database, and the collation is not ours to assume.
+	// MySQL's default (utf8mb4_0900_ai_ci) and SQL Server's are case-insensitive
+	// while sqlite compares bytes, so a fixed expected order would be wrong on some
+	// engine no matter which one we picked. Comparing the pages against the full
+	// read tests the offset arithmetic without needing to know the collation.
+	for _, page := range []int{1, 2} {
+		groups, _, err := database.GetAllGroupsPaginated(nil, page, pageSize)
+		if err != nil {
+			t.Fatalf("Failed to get page %d: %v", page, err)
+		}
+		offset := (page - 1) * pageSize
+		for i, group := range groups {
+			if group.GroupIdentifier != all[offset+i].GroupIdentifier {
+				t.Errorf("Page %d position %d: expected %q, got %q",
+					page, i, all[offset+i].GroupIdentifier, group.GroupIdentifier)
+			}
+		}
 	}
 }
 
