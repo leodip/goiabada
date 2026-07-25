@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/timezones"
+	"github.com/pkg/errors"
 )
 
 type ProfileValidator struct {
@@ -37,24 +38,33 @@ type ValidateProfileInput struct {
 	Subject             string
 }
 
+var (
+	// nameShape allows Unicode letters, spaces, apostrophes and hyphens, 2 to 48
+	// characters. Note the literal space rather than \s: tabs, newlines and other
+	// control characters have no place in a name and would otherwise let a value
+	// span multiple lines.
+	nameShape = regexp.MustCompile(`^[\p{L} '-]{2,48}$`)
+	// nameHasLetter requires at least one letter, so a value made up entirely of
+	// spaces, apostrophes or hyphens is rejected.
+	nameHasLetter = regexp.MustCompile(`\p{L}`)
+)
+
 // ValidateName checks a name field against the shared name pattern.
 // invalidNameCode is the i18n error code returned on failure (one of
 // ErrCodeProfileGivenNameInvalid, ErrCodeProfileMiddleNameInvalid, or
 // ErrCodeProfileFamilyNameInvalid). Caller picks the right code so that
 // the localized message names the field correctly.
 //
+// An empty name is accepted: all three name fields are optional.
+//
 // i18n surface: A | C — admin user CRUD, account self-service, registration.
 func (val *ProfileValidator) ValidateName(name string, invalidNameCode string) error {
-	pattern := `^[\p{L}\s'-]{2,48}$`
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return err
+	if len(name) == 0 {
+		return nil
 	}
 
-	if len(name) > 0 {
-		if !regex.MatchString(name) {
-			return i18n.NewLocalizedError(invalidNameCode, nil)
-		}
+	if !nameShape.MatchString(name) || !nameHasLetter.MatchString(name) {
+		return i18n.NewLocalizedError(invalidNameCode, nil)
 	}
 	return nil
 }
@@ -66,6 +76,12 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		user, err := val.database.GetUserBySubject(nil, input.Subject)
 		if err != nil {
 			return err
+		}
+		// An unresolvable subject is not a validation problem the caller can show
+		// to a user: it means the request carried a stale or forged subject.
+		// Surface it as an error rather than dereferencing nil below.
+		if user == nil {
+			return errors.WithStack(errors.New("subject not found: " + input.Subject))
 		}
 
 		userByUsername, err := val.database.GetUserByUsername(nil, input.Username)
@@ -144,8 +160,12 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		if err != nil {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileDobInvalidFormat, nil)
 		}
-		// Compare dates only, not times, to avoid timezone issues
-		now := time.Now()
+		// Compare dates only, not times, to avoid timezone issues. The parsed
+		// birth date is midnight UTC, so "today" must be built from UTC
+		// components too: taking them from local time while labelling the result
+		// UTC made a birth date equal to the current UTC date look future-dated
+		// on any server behind UTC.
+		now := time.Now().UTC()
 		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 		if parsedTime.After(today) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileDobInFuture, nil)

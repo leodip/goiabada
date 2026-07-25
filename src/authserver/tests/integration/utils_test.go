@@ -972,7 +972,11 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 	var data interface{}
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		t.Fatal(err)
+		// Include the status and the body: the token endpoint renders an HTML
+		// error page on an internal failure, and the bare json error ("invalid
+		// character '<'") says nothing about what actually went wrong.
+		t.Fatalf("token endpoint did not return JSON: %v (status %d, body: %s)",
+			err, resp.StatusCode, string(body))
 	}
 
 	return data.(map[string]interface{})

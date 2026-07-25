@@ -5,6 +5,7 @@ import (
 
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/pkg/errors"
 )
 
 type EmailValidator struct {
@@ -74,6 +75,12 @@ func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error 
 	if err != nil {
 		return err
 	}
+	// An unresolvable subject is not a validation problem the caller can show to
+	// a user: it means the request carried a stale or forged subject. Surface it
+	// as an error rather than dereferencing nil below.
+	if user == nil {
+		return errors.WithStack(errors.New("subject not found: " + input.Subject))
+	}
 
 	userByEmail, err := val.database.GetUserByEmail(nil, input.Email)
 	if err != nil {
@@ -108,13 +115,22 @@ func (val *EmailValidator) ValidateEmailChange(email string, subject string) err
 	if err != nil {
 		return err
 	}
+	// An unresolvable subject is not a validation problem the caller can show to
+	// a user: it means the request carried a stale or forged subject. Surface it
+	// as an error. Guarding the comparison below with `user != nil` instead would
+	// make the whole condition false and so report the change as valid, silently
+	// skipping the uniqueness check and letting one account claim an address that
+	// belongs to another.
+	if user == nil {
+		return errors.WithStack(errors.New("subject not found: " + subject))
+	}
 
 	userByEmail, err := val.database.GetUserByEmail(nil, email)
 	if err != nil {
 		return err
 	}
 
-	if userByEmail != nil && user != nil && userByEmail.Subject != user.Subject {
+	if userByEmail != nil && userByEmail.Subject != user.Subject {
 		return i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyRegistered, nil)
 	}
 

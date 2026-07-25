@@ -247,6 +247,9 @@
   .inline-block {
     display: inline-block;
   }
+  .table {
+    display: table;
+  }
   .h-4\/5 {
     height: calc(4 / 5 * 100%);
   }

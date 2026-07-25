@@ -152,12 +152,21 @@ if ! ./build.sh 2>&1 | tee "$build_log"; then
     fail_with "Build" "$build_log"
 fi
 
+# Remove the temporary SQLite databases along with their sidecar files.
+# WAL mode leaves `<db>-wal` and `<db>-shm` next to the database, and neither is
+# matched by a `*.db` glob. Left behind, a stale WAL with no database beside it
+# makes the next run fail to open the file ("attempt to write a readonly
+# database"), so the trailing wildcard here is load-bearing.
+remove_sqlite_files() {
+    rm -f /tmp/goiabada*.db*
+}
+
 # Cleanup function to kill processes on exit
 cleanup() {
     echo "Cleaning up processes..."
     kill_processes_on_ports
     echo "Cleaning up temporary SQLite databases..."
-    rm -f /tmp/goiabada*.db
+    remove_sqlite_files
 }
 
 # Set trap to cleanup on script exit (normal or error)
@@ -356,6 +365,12 @@ fi
 if should_run_data || should_run_integration; then
     # Kill any processes on ports 19090 and 19091 before starting tests
     kill_processes_on_ports
+
+    # Start from a clean slate. The EXIT trap also does this, but a run that was
+    # killed (or that died before the trap fired) leaves SQLite files behind, and
+    # a stale database or WAL would otherwise be inherited by this run.
+    echo "Removing leftover temporary SQLite databases..."
+    remove_sqlite_files
 fi
 
 if should_run_data; then

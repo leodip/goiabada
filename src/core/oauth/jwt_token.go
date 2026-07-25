@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 )
 
@@ -92,17 +91,6 @@ func (jwt JwtToken) HasScope(scope string) bool {
 		}
 	}
 	return false
-}
-
-func (jwt JwtToken) GetAcrLevel() *enums.AcrLevel {
-	if jwt.Claims["acr"] != nil {
-		acr := jwt.Claims["acr"].(string)
-		acrLevel, err := enums.AcrLevelFromString(acr)
-		if err == nil {
-			return &acrLevel
-		}
-	}
-	return nil
 }
 
 func (jwt JwtToken) IsNonceValid(nonce string) bool {
