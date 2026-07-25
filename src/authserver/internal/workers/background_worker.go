@@ -1,62 +1,156 @@
 package workers
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
-	"sync"
+	"math/rand/v2"
 	"time"
 
 	"github.com/leodip/goiabada/core/data"
 )
 
+const (
+	// cleanupInterval is how often the cleanup task should run, in wall-clock
+	// terms. It is enforced through the settings.last_cleanup_at claim rather than
+	// by a process-local timer, so restarts no longer reset the schedule and
+	// several instances do not each run their own copy of it.
+	cleanupInterval = 12 * time.Hour
+
+	// pollInterval is how often an instance checks whether the next run is
+	// claimable. It must be well under cleanupInterval so a due run is picked up
+	// promptly, and short enough that an instance restarted just after a run does
+	// not leave the next one late.
+	pollInterval = 5 * time.Minute
+
+	// startupDelay holds the first poll back so the server can finish coming up
+	// first. Unlike the unconditional sleep this replaces, it is interruptible.
+	startupDelay = 10 * time.Second
+
+	// maxStartupJitter spreads the first poll out across instances, so replicas
+	// started together do not all contend for the claim in the same instant.
+	maxStartupJitter = 30 * time.Second
+
+	// auditLogDeleteBatchSize and auditLogDeleteMaxBatches bound how much audit
+	// history one run will delete, so a long-neglected table does not turn into a
+	// single enormous statement.
+	auditLogDeleteBatchSize  = 1000
+	auditLogDeleteMaxBatches = 100
+)
+
 type Worker struct {
 	database data.Database
-	stopChan chan struct{}
-	wg       sync.WaitGroup
+
+	// cancel and done are created by Start. cancel being nil means the worker was
+	// never started, which Stop treats as a no-op.
+	cancel context.CancelFunc
+	done   chan struct{}
 }
 
 func NewWorker(database data.Database) *Worker {
 	return &Worker{
 		database: database,
-		stopChan: make(chan struct{}),
 	}
 }
 
 func (w *Worker) Start() {
-	w.wg.Add(1)
-	go w.run()
+	ctx, cancel := context.WithCancel(context.Background())
+	w.cancel = cancel
+	w.done = make(chan struct{})
+
+	go w.run(ctx)
 	slog.Info("background worker service started")
 }
 
-func (w *Worker) Stop() {
-	close(w.stopChan)
-	w.wg.Wait()
-	slog.Info("background worker service stopped")
+// Stop signals the worker and waits, up to timeout, for it to finish.
+//
+// The wait is bounded on purpose. data.Database takes no context, so a delete
+// already in flight cannot be interrupted; without a timeout, shutdown would be
+// hostage to however long the current statement takes. Stop is also safe to call
+// more than once, and safe to call on a worker that was never started.
+func (w *Worker) Stop(timeout time.Duration) {
+	if w.cancel == nil {
+		return
+	}
+
+	w.cancel()
+
+	select {
+	case <-w.done:
+		slog.Info("background worker service stopped")
+	case <-time.After(timeout):
+		slog.Warn(fmt.Sprintf("background worker did not stop within %v; continuing shutdown", timeout))
+	}
 }
 
-func (w *Worker) run() {
-	defer w.wg.Done()
+func (w *Worker) run(ctx context.Context) {
+	defer close(w.done)
 
-	// wait 10 seconds
-	time.Sleep(10 * time.Second)
+	if !waitOrDone(ctx, startupDelay+jitter(maxStartupJitter)) {
+		return
+	}
 
-	w.performTask()
+	w.runIfClaimed(ctx)
 
-	ticker := time.NewTicker(12 * time.Hour)
+	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			w.performTask()
-		case <-w.stopChan:
+			w.runIfClaimed(ctx)
+		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-// performTask executes the main worker task
-func (w *Worker) performTask() {
+// runIfClaimed performs the cleanup only if this instance wins the claim for the
+// current interval. Every instance polls; at most one runs.
+func (w *Worker) runIfClaimed(ctx context.Context) {
+	now := time.Now().UTC()
+
+	claimed, err := w.database.TryClaimCleanupRun(nil, now, now.Add(-cleanupInterval))
+	if err != nil {
+		slog.Error(fmt.Sprintf("error claiming the cleanup run: %v", err))
+		return
+	}
+	if !claimed {
+		// Either another instance is running it, or it is not due yet.
+		return
+	}
+
+	w.performTask(ctx)
+}
+
+// waitOrDone waits for d, or returns false as soon as ctx is cancelled.
+func waitOrDone(ctx context.Context, d time.Duration) bool {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// jitter returns a random duration in [0, max).
+func jitter(max time.Duration) time.Duration {
+	if max <= 0 {
+		return 0
+	}
+	return time.Duration(rand.Int64N(int64(max)))
+}
+
+// performTask executes the main worker task.
+//
+// Each step logs its own failure and the next one still runs: this is
+// housekeeping, so one failing delete should not block the others. Cancellation
+// is checked between steps, which is the granularity shutdown gets given that the
+// individual database calls cannot be interrupted.
+func (w *Worker) performTask(ctx context.Context) {
 	slog.Info("worker task started")
 
 	err := w.database.DeleteExpiredOrRevokedRefreshTokens(nil)
@@ -66,6 +160,10 @@ func (w *Worker) performTask() {
 		slog.Info("deleted expired or revoked refresh tokens")
 	}
 
+	if cancelled(ctx) {
+		return
+	}
+
 	err = w.database.DeleteUsedCodesWithoutRefreshTokens(nil)
 	if err != nil {
 		slog.Error(fmt.Sprintf("error deleting used codes without refresh tokens: %v", err))
@@ -73,9 +171,20 @@ func (w *Worker) performTask() {
 		slog.Info("deleted used codes without refresh tokens")
 	}
 
+	if cancelled(ctx) {
+		return
+	}
+
 	settings, err := w.database.GetSettingsById(nil, 1)
 	if err != nil {
 		slog.Error(fmt.Sprintf("error getting settings: %v", err))
+		return
+	}
+	// GetSettingsById returns (nil, nil) when the row is absent. Every remaining
+	// step reads a value from settings, so there is nothing to salvage here, but
+	// it must not be dereferenced.
+	if settings == nil {
+		slog.Error("settings row not found; skipping the cleanup steps that need it")
 		return
 	}
 
@@ -86,6 +195,10 @@ func (w *Worker) performTask() {
 		slog.Info(fmt.Sprintf("deleted idle sessions (idle timeout: %d seconds)", settings.UserSessionIdleTimeoutInSeconds))
 	}
 
+	if cancelled(ctx) {
+		return
+	}
+
 	err = w.database.DeleteExpiredSessions(nil, time.Duration(settings.UserSessionMaxLifetimeInSeconds)*time.Second)
 	if err != nil {
 		slog.Error(fmt.Sprintf("error deleting expired sessions: %v", err))
@@ -93,29 +206,56 @@ func (w *Worker) performTask() {
 		slog.Info(fmt.Sprintf("deleted expired sessions (max lifetime: %d seconds)", settings.UserSessionMaxLifetimeInSeconds))
 	}
 
-	// Audit log retention cleanup (uses live settings)
-	if settings.AuditLogRetentionDays > 0 {
-		cutoff := time.Now().UTC().Add(-time.Duration(settings.AuditLogRetentionDays) * 24 * time.Hour)
-		batchSize := 1000
-		maxBatches := 100
-		totalDeleted := 0
+	if cancelled(ctx) {
+		return
+	}
 
-		for i := 0; i < maxBatches; i++ {
-			deleted, err := w.database.DeleteOldAuditLogs(nil, cutoff, batchSize)
-			if err != nil {
-				slog.Error(fmt.Sprintf("error deleting old audit logs: %v", err))
-				break
-			}
-			totalDeleted += deleted
-			if deleted < batchSize {
-				break
-			}
+	w.deleteOldAuditLogs(ctx, settings.AuditLogRetentionDays)
+
+	slog.Info("worker task completed")
+}
+
+// deleteOldAuditLogs removes audit history past the retention window, in batches.
+// Zero days means retain forever.
+func (w *Worker) deleteOldAuditLogs(ctx context.Context, retentionDays int) {
+	if retentionDays <= 0 {
+		return
+	}
+
+	cutoff := time.Now().UTC().Add(-time.Duration(retentionDays) * 24 * time.Hour)
+	totalDeleted := 0
+
+	for i := 0; i < auditLogDeleteMaxBatches; i++ {
+		// Checked per batch, not just per task: this loop is the longest running
+		// part of the cleanup, so it is where a shutdown is most likely to land.
+		if cancelled(ctx) {
+			break
 		}
 
-		if totalDeleted > 0 {
-			slog.Info(fmt.Sprintf("deleted %d audit logs older than %d days", totalDeleted, settings.AuditLogRetentionDays))
+		deleted, err := w.database.DeleteOldAuditLogs(nil, cutoff, auditLogDeleteBatchSize)
+		if err != nil {
+			slog.Error(fmt.Sprintf("error deleting old audit logs: %v", err))
+			break
+		}
+
+		totalDeleted += deleted
+		if deleted < auditLogDeleteBatchSize {
+			break
 		}
 	}
 
-	slog.Info("worker task completed")
+	if totalDeleted > 0 {
+		slog.Info(fmt.Sprintf("deleted %d audit logs older than %d days", totalDeleted, retentionDays))
+	}
+}
+
+// cancelled reports whether the worker has been asked to stop, logging once so a
+// truncated task run is visible in the log rather than looking like it silently
+// did less work.
+func cancelled(ctx context.Context) bool {
+	if ctx.Err() != nil {
+		slog.Info("worker task interrupted by shutdown")
+		return true
+	}
+	return false
 }

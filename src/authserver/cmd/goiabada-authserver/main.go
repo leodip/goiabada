@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 	_ "time/tzdata"
 
@@ -253,5 +256,13 @@ func main() {
 	r := chi.NewRouter()
 	s := server.NewServer(r, database, chunkedStore)
 
-	s.Start()
+	// The process owns the signals; the server just gets told when to stop. On
+	// SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and
+	// Start drains the listeners and stops the background worker before returning.
+	ctx, stopListeningForSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopListeningForSignals()
+
+	s.Start(ctx)
+
+	slog.Info("auth server stopped")
 }

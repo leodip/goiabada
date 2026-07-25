@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -73,7 +75,10 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 	return &s
 }
 
-func (s *Server) Start() {
+// Start brings up the listeners and blocks until ctx is cancelled or a listener
+// fails. On cancellation it drains in-flight requests and stops the worker before
+// returning, so the process can exit cleanly.
+func (s *Server) Start(ctx context.Context) {
 	s.worker.Start()
 
 	s.initMiddleware()
@@ -121,15 +126,21 @@ func (s *Server) Start() {
 
 	errChan := make(chan error, 2) // Buffer for both HTTP and HTTPS errors
 
+	// The listeners are kept so shutdown can drain them. http.ErrServerClosed is
+	// the normal result of Shutdown, so it must not be reported as a failure.
+	var httpServers []*http.Server
+
 	// Start HTTPS server if enabled
 	if httpsEnabled {
+		httpsServer := &http.Server{
+			Addr:    fmt.Sprintf("%s:%d", httpsHost, httpsPort),
+			Handler: s.router,
+		}
+		httpServers = append(httpServers, httpsServer)
 		go func() {
-			httpsServer := &http.Server{
-				Addr:    fmt.Sprintf("%s:%d", httpsHost, httpsPort),
-				Handler: s.router,
-			}
 			slog.Info(fmt.Sprintf("starting HTTPS server on %s:%d", httpsHost, httpsPort))
-			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil {
+			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil &&
+				!errors.Is(err, http.ErrServerClosed) {
 				errChan <- fmt.Errorf("HTTPS server error: %v", err)
 			}
 		}()
@@ -137,31 +148,66 @@ func (s *Server) Start() {
 
 	// Start HTTP server if enabled
 	if httpEnabled {
+		httpServer := &http.Server{
+			Addr:    fmt.Sprintf("%s:%d", httpHost, httpPort),
+			Handler: s.router,
+		}
+		httpServers = append(httpServers, httpServer)
 		go func() {
-			httpServer := &http.Server{
-				Addr:    fmt.Sprintf("%s:%d", httpHost, httpPort),
-				Handler: s.router,
-			}
 			slog.Info(fmt.Sprintf("starting HTTP server on %s:%d", httpHost, httpPort))
-			if err := httpServer.ListenAndServe(); err != nil {
+			if err := httpServer.ListenAndServe(); err != nil &&
+				!errors.Is(err, http.ErrServerClosed) {
 				errChan <- fmt.Errorf("HTTP server error: %v", err)
 			}
 		}()
 	}
 
 	// Exit if neither server is enabled
-	if !httpsEnabled && !httpEnabled {
+	if len(httpServers) == 0 {
 		slog.Error("no server configuration enabled - at least one of HTTP or HTTPS must be configured")
 		os.Exit(1)
 	}
 
-	// Wait for any server errors and exit on first error
-	for i := 0; i < cap(errChan); i++ {
-		if err := <-errChan; err != nil {
-			slog.Error(err.Error())
-			os.Exit(1)
+	select {
+	case err := <-errChan:
+		// A listener failed. Still shut down cleanly so the worker is not left
+		// holding a half-finished delete, then exit non-zero.
+		slog.Error(err.Error())
+		s.shutdown(httpServers)
+		os.Exit(1)
+	case <-ctx.Done():
+		slog.Info("shutdown signal received")
+		s.shutdown(httpServers)
+	}
+}
+
+const (
+	// httpShutdownTimeout bounds how long in-flight requests get to finish.
+	httpShutdownTimeout = 15 * time.Second
+
+	// workerStopTimeout bounds the wait for the background worker. It cannot be
+	// interrupted mid-statement (data.Database takes no context), so this is a
+	// ceiling on how long a cleanup delete may hold up shutdown.
+	workerStopTimeout = 20 * time.Second
+)
+
+// shutdown stops accepting requests first, then the background worker.
+//
+// The order matters: draining the listeners first means no new request can start
+// work that the worker's cleanup might be deleting underneath it.
+func (s *Server) shutdown(httpServers []*http.Server) {
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
+	defer cancel()
+
+	for _, httpServer := range httpServers {
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			slog.Error(fmt.Sprintf("error shutting down listener %v: %v", httpServer.Addr, err))
 		}
 	}
+	slog.Info("listeners drained")
+
+	s.worker.Stop(workerStopTimeout)
+	slog.Info("shutdown complete")
 }
 
 func (s *Server) initMiddleware() {
