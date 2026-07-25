@@ -84,6 +84,22 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 			return errors.WithStack(errors.New("subject not found: " + input.Subject))
 		}
 
+		// Username uniqueness is best-effort, and deliberately so. This is a
+		// read-then-write check with nothing to serialize it, so two concurrent
+		// profile updates can both pass and end up with the same username.
+		//
+		// There is no unique index to lean on. username is optional and every user
+		// is created with "" (UserCreator.CreateUser does not set it; a username is
+		// only ever assigned later, here), so a plain unique index would permit
+		// exactly one such row and break the second registration. Excluding the
+		// empty value needs a partial index, which MySQL does not support, so
+		// enforcing this in the schema would mean a different mechanism per engine.
+		//
+		// Tolerable because username is not an authentication key: sign-in resolves
+		// the account by email (HandleAuthPwdPost), this is the only caller of
+		// GetUserByUsername, and the one place the value escapes is the OIDC
+		// preferred_username claim, which the spec tells relying parties not to
+		// assume is unique.
 		userByUsername, err := val.database.GetUserByUsername(nil, input.Username)
 		if err != nil {
 			return err
