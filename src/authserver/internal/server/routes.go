@@ -72,7 +72,7 @@ func (s *Server) initRoutes() {
 	s.router.Get("/forgot-password", handlers.HandleForgotPasswordGet(httpHelper))
 	s.router.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", handlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender))
 	s.router.With(rateLimiter.LimitResetPwd).Get("/reset-password", handlers.HandleResetPasswordGet(httpHelper, s.database))
-	s.router.Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.database, passwordValidator))
+	s.router.With(rateLimiter.LimitResetPwd).Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.database, passwordValidator, auditLogger))
 	s.router.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper))
 	s.router.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
 	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))

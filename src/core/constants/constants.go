@@ -56,13 +56,13 @@ const (
 	AuditTokenIssuedROPCResponse = "token_issued_ropc_response"
 	// AuditROPCAuthFailed is logged when ROPC authentication fails.
 	// This includes invalid credentials, disabled users, and 2FA-blocked users.
-	AuditROPCAuthFailed           = "ropc_auth_failed"
+	AuditROPCAuthFailed = "ropc_auth_failed"
 	// AuditAuthCodeReuseDetected is logged when an authorization code is replayed
 	// at the token endpoint by an authenticated requester (correct client_id,
 	// redirect_uri, client_secret/PKCE). Per RFC 6749 Section 4.1.2 the server
 	// then revokes refresh tokens issued from that code and terminates the
 	// associated user session.
-	AuditAuthCodeReuseDetected = "auth_code_reuse_detected"
+	AuditAuthCodeReuseDetected    = "auth_code_reuse_detected"
 	AuditCreatedUser              = "created_user"
 	AuditActivatedAccount         = "activated_account"
 	AuditCreatedPreRegistration   = "created_pre_registration"
@@ -124,6 +124,7 @@ const (
 	AuditVerifiedEmail                  = "verified_email"
 	AuditSentEmailVerificationMessage   = "sent_email_verification_message"
 	AuditFailedEmailVerificationCode    = "failed_email_verification_code"
+	AuditFailedResetPasswordCode        = "failed_reset_password_code"
 	AuditVerifiedPhone                  = "verified_phone"
 	AuditSentPhoneVerificationMessage   = "sent_phone_verification_message"
 	AuditChangedPassword                = "changed_password"
@@ -181,6 +182,7 @@ var AuditEventTypes = []string{
 	AuditDynamicClientRegistration,
 	AuditEnabledOTP,
 	AuditFailedEmailVerificationCode,
+	AuditFailedResetPasswordCode,
 	AuditGeneratedEmailVerificationCode,
 	AuditLogout,
 	AuditRevokedKey,
