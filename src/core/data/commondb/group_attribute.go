@@ -90,6 +90,10 @@ func (d *CommonDatabase) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlb
 		}
 		return &groupAttribute, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -139,6 +143,10 @@ func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int
 		groupAttributes = append(groupAttributes, groupAttribute)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return groupAttributes, nil
 }
 
@@ -166,6 +174,10 @@ func (d *CommonDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) 
 			return nil, errors.Wrap(err, "unable to scan groupAttribute")
 		}
 		groupAttributes = append(groupAttributes, groupAttribute)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return groupAttributes, nil

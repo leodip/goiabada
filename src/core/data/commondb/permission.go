@@ -90,6 +90,10 @@ func (d *CommonDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuild
 		}
 		return &permission, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -133,6 +137,10 @@ func (d *CommonDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64
 			return nil, errors.Wrap(err, "unable to scan permission")
 		}
 		permissions = append(permissions, permission)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return permissions, nil
@@ -194,6 +202,10 @@ func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) 
 			return nil, errors.Wrap(err, "unable to scan permission")
 		}
 		permissions = append(permissions, permission)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return permissions, nil

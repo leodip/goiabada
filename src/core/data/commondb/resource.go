@@ -86,6 +86,10 @@ func (d *CommonDatabase) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 		}
 		return &resource, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -151,6 +155,10 @@ func (d *CommonDatabase) GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]m
 		resources = append(resources, resource)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return resources, nil
 }
 
@@ -176,6 +184,10 @@ func (d *CommonDatabase) GetAllResources(tx *sql.Tx) ([]models.Resource, error) 
 			return nil, errors.Wrap(err, "unable to scan resource")
 		}
 		resources = append(resources, resource)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return resources, nil

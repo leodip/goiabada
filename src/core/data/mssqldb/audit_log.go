@@ -138,5 +138,12 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int
 		}
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read query results")
+	}
+	if err := countRows.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read count results")
+	}
+
 	return auditLogs, total, nil
 }

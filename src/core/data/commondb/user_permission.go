@@ -94,6 +94,10 @@ func (d *CommonDatabase) getUserPermissionCommon(tx *sql.Tx, selectBuilder *sqlb
 		}
 		return &userPermission, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -143,6 +147,10 @@ func (d *CommonDatabase) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64
 		userPermissions = append(userPermissions, userPermission)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return userPermissions, nil
 }
 
@@ -170,6 +178,10 @@ func (d *CommonDatabase) GetUserPermissionsByUserId(tx *sql.Tx, userId int64) ([
 			return nil, errors.Wrap(err, "unable to scan userPermission")
 		}
 		userPermissions = append(userPermissions, userPermission)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return userPermissions, nil
@@ -252,6 +264,13 @@ func (d *CommonDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionI
 		if err != nil {
 			return nil, 0, errors.Wrap(err, "unable to scan total")
 		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read query results")
+	}
+	if err := rows2.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read count results")
 	}
 
 	return users, total, nil

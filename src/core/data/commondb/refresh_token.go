@@ -86,6 +86,10 @@ func (d *CommonDatabase) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbui
 		}
 		return &refreshToken, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -218,6 +222,10 @@ func (d *CommonDatabase) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*
 		refreshTokens = append(refreshTokens, &refreshToken)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return refreshTokens, nil
 }
 
@@ -257,6 +265,10 @@ func (d *CommonDatabase) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, session
 			return nil, errors.Wrap(err, "unable to scan refreshToken")
 		}
 		refreshTokens = append(refreshTokens, &refreshToken)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return refreshTokens, nil

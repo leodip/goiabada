@@ -94,6 +94,10 @@ func (d *CommonDatabase) getUserConsentCommon(tx *sql.Tx, selectBuilder *sqlbuil
 		}
 		return &userConsent, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -186,6 +190,10 @@ func (d *CommonDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]models
 			return nil, errors.Wrap(err, "unable to scan userConsent")
 		}
 		userConsents = append(userConsents, userConsent)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return userConsents, nil

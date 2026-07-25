@@ -90,6 +90,10 @@ func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 		}
 		return &userSession, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -188,6 +192,13 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 		if err != nil {
 			return nil, 0, errors.Wrap(err, "unable to scan total")
 		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read query results")
+	}
+	if err := rows2.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read count results")
 	}
 
 	return userSessions, total, nil
@@ -309,6 +320,10 @@ func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mo
 			return nil, errors.Wrap(err, "unable to scan userSession")
 		}
 		userSessions = append(userSessions, userSession)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return userSessions, nil

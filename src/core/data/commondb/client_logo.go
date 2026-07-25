@@ -95,6 +95,10 @@ func (d *CommonDatabase) GetClientLogoByClientId(tx *sql.Tx, clientId int64) (*m
 		}
 		return &clientLogo, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -129,5 +133,10 @@ func (d *CommonDatabase) ClientHasLogo(tx *sql.Tx, clientId int64) (bool, error)
 	}
 	defer func() { _ = rows.Close() }()
 
-	return rows.Next(), nil
+	exists := rows.Next()
+	if err := rows.Err(); err != nil {
+		return false, errors.Wrap(err, "unable to read query results")
+	}
+
+	return exists, nil
 }

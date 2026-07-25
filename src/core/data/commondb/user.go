@@ -86,6 +86,10 @@ func (d *CommonDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 		}
 		return &user, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -117,6 +121,10 @@ func (d *CommonDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]m
 			return nil, errors.Wrap(err, "unable to scan user")
 		}
 		users[user.Id] = user
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return users, nil
@@ -446,6 +454,13 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 		if err != nil {
 			return nil, 0, errors.Wrap(err, "unable to scan count")
 		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read query results")
+	}
+	if err := rows2.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read count results")
 	}
 
 	return users, count, nil

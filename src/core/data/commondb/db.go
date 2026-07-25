@@ -111,6 +111,16 @@ func (d *CommonDatabase) ExecSql(tx *sql.Tx, sql string, args ...any) (sql.Resul
 	return result, nil
 }
 
+// QuerySql runs a query and returns its rows.
+//
+// Callers must check rows.Err() once iteration stops, not only the error returned
+// here. A driver is free to report a failure through the result set rather than
+// from the query call, and in that case Next() simply returns false. Reading a
+// single row then means the caller cannot distinguish "no such row" from "the
+// query failed", and every getter here reports a missing row as (nil, nil), so
+// without the check a failed read is indistinguishable from a legitimate absence.
+// For the getters behind permission and session lookups, that is the wrong
+// direction to fail in.
 func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Rows, error) {
 	d.Log(sql, args...)
 

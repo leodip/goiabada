@@ -86,6 +86,10 @@ func (d *CommonDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *s
 		}
 		return &userSessionClient, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -151,6 +155,10 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userS
 		userSessionClients = append(userSessionClients, userSessionClient)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return userSessionClients, nil
 }
 
@@ -178,6 +186,10 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSe
 			return nil, errors.Wrap(err, "unable to scan userSessionClient")
 		}
 		userSessionClients = append(userSessionClients, userSessionClient)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return userSessionClients, nil
@@ -211,6 +223,10 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClien
 			return nil, errors.Wrap(err, "unable to scan userSessionClient")
 		}
 		userSessionClients = append(userSessionClients, userSessionClient)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return userSessionClients, nil

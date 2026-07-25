@@ -86,6 +86,10 @@ func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sql
 		}
 		return &preRegistration, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 

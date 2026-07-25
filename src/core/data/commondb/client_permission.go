@@ -94,6 +94,10 @@ func (d *CommonDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sq
 		}
 		return &clientPermission, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -154,6 +158,10 @@ func (d *CommonDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int
 			return nil, errors.Wrap(err, "unable to scan clientPermission")
 		}
 		clientPermissions = append(clientPermissions, clientPermission)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return clientPermissions, nil

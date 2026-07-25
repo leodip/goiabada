@@ -94,6 +94,10 @@ func (d *CommonDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sql
 		}
 		return &groupPermission, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -121,6 +125,10 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64)
 			return nil, errors.Wrap(err, "unable to scan groupPermission")
 		}
 		groupPermissions = append(groupPermissions, groupPermission)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return groupPermissions, nil
@@ -154,6 +162,10 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []in
 			return nil, errors.Wrap(err, "unable to scan groupPermission")
 		}
 		groupPermissions = append(groupPermissions, groupPermission)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return groupPermissions, nil

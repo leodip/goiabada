@@ -86,6 +86,10 @@ func (d *CommonDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Se
 		}
 		return &group, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -133,6 +137,10 @@ func (d *CommonDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.
 			return nil, errors.Wrap(err, "unable to scan group")
 		}
 		groups = append(groups, group)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return groups, nil
@@ -282,6 +290,10 @@ func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 		groups = append(groups, group)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return groups, nil
 }
 
@@ -336,6 +348,13 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 		if err != nil {
 			return nil, 0, errors.Wrap(err, "unable to scan count")
 		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read query results")
+	}
+	if err := rows2.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read count results")
 	}
 
 	return groups, total, nil
@@ -402,6 +421,13 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 		}
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read query results")
+	}
+	if err := rows2.Err(); err != nil {
+		return nil, 0, errors.Wrap(err, "unable to read count results")
+	}
+
 	return users, total, nil
 }
 
@@ -429,6 +455,10 @@ func (d *CommonDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, erro
 		}
 		return count, nil
 	}
+	if err := rows.Err(); err != nil {
+		return 0, errors.Wrap(err, "unable to read query results")
+	}
+
 	return 0, nil
 }
 

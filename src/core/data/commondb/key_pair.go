@@ -87,6 +87,10 @@ func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 		}
 		return &keyPair, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -128,6 +132,10 @@ func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error)
 			return nil, errors.Wrap(err, "unable to scan keyPair")
 		}
 		keyPairs = append(keyPairs, keyPair)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return keyPairs, nil

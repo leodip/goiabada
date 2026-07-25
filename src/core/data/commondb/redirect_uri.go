@@ -61,6 +61,10 @@ func (d *CommonDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuil
 		}
 		return &redirectURI, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -104,6 +108,10 @@ func (d *CommonDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) (
 			return nil, errors.Wrap(err, "unable to scan redirectURI")
 		}
 		redirectURIs = append(redirectURIs, redirectURI)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return redirectURIs, nil

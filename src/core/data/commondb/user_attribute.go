@@ -90,6 +90,10 @@ func (d *CommonDatabase) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbu
 		}
 		return &userAttribute, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -133,6 +137,10 @@ func (d *CommonDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]
 			return nil, errors.Wrap(err, "unable to scan userAttribute")
 		}
 		userAttributes = append(userAttributes, userAttribute)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return userAttributes, nil

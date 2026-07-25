@@ -61,6 +61,10 @@ func (d *CommonDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 		}
 		return &webOrigin, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -106,6 +110,10 @@ func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 		webOrigins = append(webOrigins, webOrigin)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return webOrigins, nil
 }
 
@@ -132,6 +140,10 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error
 			return nil, errors.Wrap(err, "unable to scan webOrigin")
 		}
 		webOrigins = append(webOrigins, webOrigin)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return webOrigins, nil

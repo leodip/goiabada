@@ -86,6 +86,10 @@ func (d *CommonDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 		}
 		return &client, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -181,6 +185,10 @@ func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]model
 		clients = append(clients, client)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return clients, nil
 }
 
@@ -231,6 +239,10 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 			return nil, errors.Wrap(err, "unable to scan client")
 		}
 		clients = append(clients, client)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return clients, nil

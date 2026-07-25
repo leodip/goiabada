@@ -86,6 +86,10 @@ func (d *CommonDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 		}
 		return &settings, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 

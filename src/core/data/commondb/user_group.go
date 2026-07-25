@@ -94,6 +94,10 @@ func (d *CommonDatabase) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 		}
 		return &userGroup, nil
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return nil, nil
 }
 
@@ -143,6 +147,10 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]
 		userGroups = append(userGroups, userGroup)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
 	return userGroups, nil
 }
 
@@ -170,6 +178,10 @@ func (d *CommonDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]mode
 			return nil, errors.Wrap(err, "unable to scan userGroup")
 		}
 		userGroups = append(userGroups, userGroup)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
 	}
 
 	return userGroups, nil
