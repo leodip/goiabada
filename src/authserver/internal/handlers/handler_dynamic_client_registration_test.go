@@ -78,6 +78,76 @@ func TestValidateRedirectURI(t *testing.T) {
 		// 15 are not reachable from this call site. Their own test file pins them.
 		{"http://localhost:evil/cb", true, false, "rejected by ParseRequestURI, not by the host check"},
 		{"http://127.0.0.1:80@evil.com/cb", true, false, "userinfo smuggling: the real host is evil.com"},
+
+		// --- rejected by the absolute-URI gate (RFC 6749 section 3.1.2)
+		//
+		// Keep the first one verbatim. It is the only row that fails if the absolute-URI
+		// gate is dropped, and it is the row whose absence leaks an authorization code:
+		// a scheme-relative value is emitted as a protocol-relative Location, which the
+		// user agent resolves against the current scheme. See issue #122.
+		{"//evil.example/cb", true, false, "scheme-relative: the code would go to evil.example"},
+		// Not load-bearing for the absolute-URI gate, and labelled so nobody assumes it is:
+		// with that gate removed this row still passes, because an empty scheme is neither
+		// https nor http and the confidential branch falls through to an error. Verified.
+		// Kept because it documents that the confidential branch is not exposed here.
+		{"//evil.example/cb", false, false, "scheme-relative; the confidential fallthrough would also reject it"},
+		{"//evil.example:8443/cb", true, false, "scheme-relative with a port"},
+		{"/relative/cb", true, false, "path-absolute, no scheme"},
+		{"relative/cb", true, false, "rejected by ParseRequestURI, before the absolute-URI gate"},
+
+		// Fragments. Each of these has a non-empty scheme, so each passes a scheme-only
+		// test: they are the rows that catch that mistake. They also already malfunction
+		// today, since the code is delivered to /cb%23frag rather than to the callback.
+		{"http://127.0.0.1/cb#frag", true, false, "fragment on a loopback host"},
+		{"https://app.example.com/cb#frag", false, false, "fragment on the confidential branch"},
+		{"http://127.0.0.1/cb?a=1#f", true, false, "fragment after a query"},
+		{"http://127.0.0.1/cb#", true, false, "a bare # is still a fragment component"},
+		{"http://127.0.0.1/cb%23frag", true, true, "percent-encoded %23 is not a fragment delimiter"},
+
+		// --- rejected by the character gate
+		//
+		// The excluded character must sit in the path, not the authority: ParseRequestURI
+		// rejects these characters in a host, so an authority-position row would pass for
+		// the wrong reason and would still pass with this gate deleted.
+		{"x:<svg/onload=alert(1)>", true, false, "the verified admin console payload; scheme x defeats any denylist"},
+		{"myapp://x<img/src=x/onerror=alert(1)>", true, false, "markup in the authority"},
+		{"myapp://cb\">alert", true, false, "quote"},
+		{"http://127.0.0.1/cb with space", true, false, "space"},
+		{"http://127.0.0.1/cb`x`", true, false, "backtick"},
+		{"http://127.0.0.1/cb{x}", true, false, "braces"},
+		{"http://127.0.0.1/cb|x", true, false, "pipe"},
+		{"http://127.0.0.1/cb\\x", true, false, "backslash"},
+		{"http://127.0.0.1/cb^x", true, false, "caret"},
+		// These two pin the gate's placement ahead of the client-type branches. Both fail
+		// if it is moved inside the public custom-scheme branch, and their value is
+		// invisible once the placement is right.
+		{"https://app.example.com/<svg/onload=alert(1)>", false, false, "markup on an https confidential URI"},
+		{"http://127.0.0.1/<svg/onload=alert(1)>", true, false, "markup on a loopback URI"},
+		// Retained deliberately, labelled: this is rejected by ParseRequestURI because the
+		// space is in the authority, so it is NOT a character-gate test. Do not "improve"
+		// it into one.
+		{"myapp://cb with space", true, false, "rejected by ParseRequestURI, not by the character gate"},
+
+		// --- rejected by the scheme denylist
+		{"javascript:alert(1)", true, false, "script execution; carries no excluded character"},
+		{"JavaScript:alert(1)", true, false, "scheme comparison folds case"},
+		{"vbscript:msgbox(1)", true, false, "script execution"},
+		{"file:///etc/passwd", true, false, "local file access"},
+		{"about:blank", true, false, "browser internal"},
+		{"data:text/plain,hello", true, false, "data URI; carries no excluded character"},
+		// ftp is the row that prompted extending the denylist beyond script execution: it
+		// gave a public client a callback on a remote host, which is what the loopback
+		// restriction exists to prevent.
+		{"ftp://evil.example/cb", true, false, "remote callback for a public client"},
+		{"FTP://evil.example/cb", true, false, "denylist folds case"},
+		{"ws://localhost/cb", true, false, "cannot receive an authorization response"},
+		{"chrome://settings", true, false, "browser internal"},
+		{"view-source:http://x", true, false, "browser internal navigation primitive"},
+
+		// --- accepted, deliberately, so the gates are not over-tightened
+		{"mailto:a@b.c", true, true, "nonsensical but inert; denying merely useless schemes is taste, not security"},
+		{"org.example.app.oauth://redirect", true, true, "a real private-use scheme shape"},
+		{"myapp://cb/%3Cscript%3E", true, true, "percent-encoded markup is inert; innerHTML does not decode it"},
 	}
 
 	for _, tc := range tests {

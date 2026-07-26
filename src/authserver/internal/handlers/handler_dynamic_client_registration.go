@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -218,11 +219,66 @@ func validateDCRRedirectURIs(req *api.DynamicClientRegistrationRequest) error {
 	return nil
 }
 
+// excludedURIChars are the characters RFC 3986 excludes from URIs. They must be
+// percent-encoded to appear at all, so a redirect URI carrying one literally is malformed.
+const excludedURIChars = "<>\"{}|\\^` "
+
+// deniedRedirectURISchemes are schemes a redirect URI may not use. Three groups, and the
+// reason differs per group, which is why they are commented separately rather than merged
+// into one anonymous list.
+var deniedRedirectURISchemes = map[string]bool{
+	// Script or local execution.
+	"javascript": true, "data": true, "vbscript": true,
+	"file": true, "blob": true, "about": true,
+	// Browser-internal schemes. Not app callbacks, and view-source is a navigation
+	// primitive.
+	"chrome": true, "chrome-extension": true, "moz-extension": true,
+	"view-source": true, "filesystem": true, "resource": true,
+	// Network protocols a browser cannot deliver an authorization response to. ftp is the
+	// one that matters: without it, a public client could register a remote callback, which
+	// is exactly what the loopback restriction above exists to prevent.
+	"ftp": true, "ftps": true, "ws": true, "wss": true,
+	"gopher": true, "telnet": true,
+}
+
 // validateRedirectURI validates a single redirect URI per RFC 7591 §5
 func validateRedirectURI(uri string, isPublic bool) error {
 	parsed, err := url.ParseRequestURI(uri)
 	if err != nil {
 		return fmt.Errorf("invalid redirect_uri format: %s", uri)
+	}
+
+	// RFC 6749 section 3.1.2 requires an absolute-URI (RFC 3986 section 4.3) and forbids a
+	// fragment. Both are checked by the shared predicate. Without this, "//evil.example/cb"
+	// registers cleanly and is later emitted as a protocol-relative Location, handing the
+	// authorization code to that host.
+	//
+	// This is the registration half only. Stored rows and rows added through the admin API
+	// are not re-validated, so the gate that closes every entry point belongs in
+	// ValidateClientAndRedirectURI. See issue #122.
+	if !urlutil.IsAbsoluteRedirectURI(uri) {
+		return fmt.Errorf("redirect_uri must be an absolute URI with a scheme and no fragment: %s", uri)
+	}
+
+	// Characters RFC 3986 excludes from URIs entirely. A redirect URI carrying them is
+	// malformed, and it is also how markup reaches the admin console, which renders stored
+	// redirect URIs into the page.
+	//
+	// Checked ahead of the client-type branches on purpose: an https URI on a confidential
+	// client reaches the same place, so gating this inside the custom-scheme branch would
+	// miss it.
+	if strings.ContainsAny(uri, excludedURIChars) {
+		return fmt.Errorf("redirect_uri contains characters that are not permitted in a URI: %s", uri)
+	}
+
+	// Schemes that cannot receive an authorization response, or that execute script.
+	//
+	// This denylist cannot be the primary defence and is not one: the verified markup
+	// payload used the scheme "x", which no list of names would catch. The character gate
+	// above is what stops that class. This gate stops the schemes that carry no excluded
+	// characters at all, such as javascript: and ftp:.
+	if deniedRedirectURISchemes[strings.ToLower(parsed.Scheme)] {
+		return fmt.Errorf("redirect_uri scheme is not permitted: %s", parsed.Scheme)
 	}
 
 	// For public clients (MCP use case), only allow loopback http or custom schemes.

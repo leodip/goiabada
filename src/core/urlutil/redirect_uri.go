@@ -54,6 +54,41 @@ func IsLoopbackHost(host string) bool {
 	return false
 }
 
+// IsAbsoluteRedirectURI reports whether raw satisfies RFC 6749 section 3.1.2, which requires
+// a redirect URI to be an absolute-URI as defined by RFC 3986 section 4.3:
+//
+//	absolute-URI = scheme ":" hier-part [ "?" query ]
+//
+// That production carries no fragment, and RFC 6749 states the fragment prohibition
+// explicitly as well, so both conditions are checked here.
+//
+// Two things this rejects that a scheme-only test does not. A scheme-relative value such as
+// "//evil.example/cb" is emitted verbatim as a protocol-relative Location, which the user
+// agent resolves against the current scheme, delivering the authorization code to that host.
+// And a fragment breaks the callback even when the host is legitimate: the code arrives at
+// "/cb%23frag" rather than at "/cb".
+//
+// The fragment test is on the raw string, not on url.URL.Fragment, and that is deliberate.
+// RFC 3986 makes "#" the fragment delimiter and requires it to be percent-encoded anywhere
+// else, so a literal "#" always introduces a fragment component. url.URL.Fragment cannot
+// express the difference: it is "" both for "/cb" and for "/cb#", so testing it accepts a
+// bare trailing "#", which is a fragment component per RFC 3986 and breaks the callback the
+// same way "#frag" does (the code arrives at "/cb%23"). Verified.
+//
+// url.ParseRequestURI is not interchangeable with url.Parse here either: it keeps a literal
+// "#frag" in the path and reports Fragment as empty, so a caller testing only the scheme
+// accepts "http://127.0.0.1/cb#frag". Do not "unify" the two parsers.
+//
+// A percent-encoded %23 is an ordinary character in a path, not a fragment delimiter, and
+// stays accepted. See decision 12 in docs/issue-105-dcr-loopback-host-match.md.
+func IsAbsoluteRedirectURI(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	return u.IsAbs() && !strings.Contains(raw, "#")
+}
+
 // stripPortRaw removes the port from raw's authority, operating on the raw string so that
 // no other component is normalised. Returns false if raw has no authority.
 //

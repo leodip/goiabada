@@ -337,13 +337,16 @@ implementation is how the two would drift:
 // ParseRequestURI keeps a literal "#frag" in the path and reports Fragment as empty, so a
 // scheme-only test accepts http://127.0.0.1/cb#frag. Verified. See decision 12.
 //
+// The fragment test is on the raw string rather than on url.URL.Fragment, because Fragment
+// is "" both for "/cb" and for "/cb#", so testing it accepts a bare trailing "#". Verified.
+//
 // A percent-encoded %23 is not a fragment delimiter and stays accepted.
 func IsAbsoluteRedirectURI(raw string) bool {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return false
 	}
-	return u.IsAbs() && u.Fragment == ""
+	return u.IsAbs() && !strings.Contains(raw, "#")
 }
 ```
 
@@ -705,10 +708,18 @@ what was rejected.
     `#frag` in the **path** and reports `Fragment` as empty, so
     `http://127.0.0.1/cb#frag` has a non-empty scheme and sails through, as do
     `https://app.example.com/cb#frag` and `http://127.0.0.1/cb?a=1#f`. The predicate therefore
-    parses with `url.Parse` and requires `u.IsAbs() && u.Fragment == ""`, which covers both of RFC
-    6749 section 3.1.2's requirements rather than only the first. A percent-encoded `%23` is not a
-    fragment delimiter and stays accepted (verified), which is correct: it is an ordinary encoded
-    character in a path.
+    parses with `url.Parse`.
+
+    **And `u.Fragment == ""` is also not equivalent, which only executing the table revealed.**
+    The corrected predicate was going to be `u.IsAbs() && u.Fragment == ""`. Verified wrong:
+    `url.Parse` reports `Fragment` as `""` both for `/cb` and for `/cb#`, so that test accepts
+    `http://127.0.0.1/cb#`. A bare `#` is a fragment component under RFC 3986, and it breaks the
+    callback exactly as `#frag` does, since emission escapes it and the code arrives at `/cb%23`.
+    The implemented test is therefore `u.IsAbs() && !strings.Contains(raw, "#")`: RFC 3986 makes
+    `#` the fragment delimiter and requires it to be percent-encoded anywhere else, so a literal
+    `#` always introduces a fragment and the raw-string test is the exact rule. A percent-encoded
+    `%23` stays accepted (verified), correctly, since it is an ordinary encoded character in a
+    path.
 
     **A registration gate is not sufficient, for the same reason decision 6 fixes a sink as well
     as an input.** Registration is one entry point of two: the admin endpoint
@@ -866,9 +877,14 @@ Note for anyone running this outside the devcontainer: `go build` in the contain
    **What this cannot prove:** the rare input shapes. That is step 2's job.
 
 ### Stage 2: reject malformed and executable redirect URIs
-Status: **Not started**
+Status: **Done**
 
-1. Add `IsAbsoluteRedirectURI` to `src/core/urlutil/redirect_uri.go`. Status: **Not started**
+**Verified when this landed.** `urlutil` is at 97 subtests (38 host, 38 match, 21 absolute-URI).
+The handler table is at 67, all passing. Each gate was disabled in turn to prove its rows are
+load-bearing: absolute-URI 7 rows, character 11, scheme 11. `run-tests.sh --type modules` and
+`--type integration --db sqlite` both green, the latter in full rather than filtered.
+
+1. Add `IsAbsoluteRedirectURI` to `src/core/urlutil/redirect_uri.go`. Status: **Done**
 
    `url.Parse` plus `u.IsAbs() && u.Fragment == ""`, as sketched in section 3. It lives in `core`
    beside `IsLoopbackHost` because #122 needs the identical rule at the authorization layer, and
@@ -886,7 +902,7 @@ Status: **Not started**
    encoded `%23` is not a fragment. That file owns the predicate's exhaustive table, per decision
    8, so the handler table below stays thin on this rule.
 
-2. Add the three gates to `validateRedirectURI`. Status: **Not started**
+2. Add the three gates to `validateRedirectURI`. Status: **Done**
 
    All three ahead of the `isPublic` branch, in the order shown in section 3, with
    `deniedRedirectURISchemes` as a package-level map. Placement is load-bearing per decision 4:
@@ -902,10 +918,10 @@ Status: **Not started**
    payload uses the scheme `x`. Without that note the character gate looks redundant next to a
    denylist and is a candidate for "simplification".
 
-3. Extend stage 1's table with 35 more cases. Status: **Not started**
+3. Extend stage 1's table with 36 more cases. Status: **Done**
 
    All executed against the same implementation, with both the outcome and the first rejecting
-   gate asserted. Total for the file: 66 cases, re-run in full after the predicate was corrected
+   gate asserted. Total for the file: 67 cases, re-run in full after the predicate was corrected
    to `url.Parse` plus `IsAbs()` plus `Fragment == ""` and again after the denylist was extended,
    with zero mismatches and no change to any stage 1 row.
 
@@ -924,13 +940,14 @@ Status: **Not started**
    | `http://127.0.0.1/<svg/onload=alert(1)>` | true | reject | character, **pins the placement** |
    | `myapp://cb with space` | true | reject | `ParseRequestURI`, **not** the character gate |
    | `//evil.example/cb` | true | reject | absolute-URI, **the code exfiltration case** |
-   | `//evil.example/cb` | false | reject | absolute-URI, sibling branch |
+   | `//evil.example/cb` | false | reject | absolute-URI, but see the note: not load-bearing |
    | `//evil.example:8443/cb` | true | reject | absolute-URI, with a port |
    | `/relative/cb` | true | reject | absolute-URI, path-absolute |
    | `relative/cb` | true | reject | `ParseRequestURI`, not the absolute-URI gate |
    | `http://127.0.0.1/cb#frag` | true | reject | absolute-URI, **fragment; passes a scheme-only test** |
    | `https://app.example.com/cb#frag` | false | reject | absolute-URI, fragment on the sibling branch |
    | `http://127.0.0.1/cb?a=1#f` | true | reject | absolute-URI, fragment after a query |
+   | `http://127.0.0.1/cb#` | true | reject | absolute-URI, **a bare `#` is still a fragment** |
    | `http://127.0.0.1/cb%23frag` | true | accept | none, `%23` is not a fragment delimiter |
    | `javascript:alert(1)` | true | reject | scheme, no excluded characters |
    | `JavaScript:alert(1)` | true | reject | scheme, folds case |
@@ -953,6 +970,13 @@ Status: **Not started**
    so all three passed for the wrong reason and would still pass with the character gate deleted.
    The `myapp://cb with space` row is retained deliberately, labelled as parse-rejected, so
    nobody "improves" it back into a character-gate row.
+
+   **Gate attribution is not the same as being load-bearing, and one row differs.** Each gate was
+   disabled in turn against the finished table: removing the absolute-URI gate fails 7 rows, the
+   character gate 11, the scheme gate 11. The confidential `//evil.example/cb` row is the one
+   exception, because an empty scheme is neither `https` nor `http` and the confidential branch
+   falls through to an error regardless. It is kept, labelled in the test, because it documents
+   that the confidential branch was never exposed to this.
 
    Six rows carry the weight:
 
@@ -1156,7 +1180,7 @@ Status: **Not started**
    | Command | Covers |
    |---|---|
    | `go test ./urlutil/...` in `src/core` (host) | stage 2 step 1, `IsAbsoluteRedirectURI` |
-   | `go test ./internal/handlers/...` in `src/authserver` (host) | stages 1 and 2, the 66-case table |
+   | `go test ./internal/handlers/...` in `src/authserver` (host) | stages 1 and 2, the 67-case table |
    | `go test ./...` in `src/adminconsole` (host) | stage 3 step 3, the template lint |
    | `run-tests.sh --type integration --db sqlite --run TestDCR_RedirectURI_Validation` (container) | stage 1 step 3 |
    | `run-tests.sh --type integration --db sqlite` (container) | no regressions elsewhere |

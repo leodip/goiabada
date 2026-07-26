@@ -82,6 +82,57 @@ func TestIsLoopbackHost(t *testing.T) {
 	}
 }
 
+// TestIsAbsoluteRedirectURI owns the absolute-URI rule from RFC 6749 section 3.1.2. Both
+// call sites consume it: DCR registration (#105) and, once it lands, authorization-time
+// validation (#122), so the exhaustive table lives here rather than at either caller.
+func TestIsAbsoluteRedirectURI(t *testing.T) {
+	tests := []struct {
+		uri  string
+		want bool
+	}{
+		// absolute, with an authority
+		{"http://127.0.0.1/cb", true},
+		{"http://127.0.0.1:9000/cb", true},
+		{"https://app.example.com/callback", true},
+		{"http://[::1]:9000/cb", true},
+
+		// absolute, private-use schemes for native apps
+		{"myapp://callback", true},
+		{"myapp:/cb", true},
+		{"com.example.app:/oauth", true},
+		{"org.example.app.oauth://redirect", true},
+
+		// a query is explicitly permitted by the production
+		{"http://127.0.0.1/cb?a=1", true},
+		{"http://127.0.0.1/cb?a=1&b=2", true},
+
+		// not absolute: no scheme. The first is the code-exfiltration case, since it is
+		// emitted as a protocol-relative Location.
+		{"//evil.example/cb", false},
+		{"//evil.example:8443/cb", false},
+		{"/relative/cb", false},
+		{"relative/cb", false},
+		{"", false},
+
+		// a fragment is not permitted. Each of these has a non-empty scheme, so each one
+		// passes a scheme-only test: they are the rows that catch that mistake.
+		{"http://127.0.0.1/cb#frag", false},
+		{"https://app.example.com/cb#frag", false},
+		{"http://127.0.0.1/cb?a=1#f", false},
+		{"myapp://callback#f", false},
+		{"http://127.0.0.1/cb#", false}, // an empty fragment is still a fragment delimiter
+
+		// a percent-encoded %23 is not a fragment delimiter
+		{"http://127.0.0.1/cb%23frag", true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.uri, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsAbsoluteRedirectURI(tc.uri))
+		})
+	}
+}
+
 // TestRedirectURIMatches pins that the port is the only component permitted to differ.
 // Flow gating is not covered here: RedirectURIMatches is flow agnostic and the caller owns
 // that decision (decision 12), so those cases live with the authorization validator.
