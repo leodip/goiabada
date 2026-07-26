@@ -2647,6 +2647,77 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		assert.Equal(t, refreshTokenJwt, result.RefreshTokenInfo)
 	})
 
+	t.Run("Consent is looked up once for a multi-scope refresh", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "refresh_token",
+			ClientId:     "client1",
+			RefreshToken: "valid_offline_refresh_token",
+		}
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+			ConsentRequired:          true,
+		}
+
+		futureTime := time.Now().UTC().Add(24 * time.Hour)
+		refreshTokenJwt := &oauth.JwtToken{
+			Claims: jwt.MapClaims{
+				"jti":                         "valid_offline_jti",
+				"typ":                         "Offline",
+				"offline_access_max_lifetime": float64(futureTime.Unix()),
+				"sub":                         "user123",
+			},
+		}
+
+		refreshToken := &models.RefreshToken{
+			RefreshTokenJti: "valid_offline_jti",
+			CodeId:          sql.NullInt64{Int64: 1, Valid: true},
+			Code: models.Code{
+				ClientId: 1,
+				UserId:   1,
+				Scope:    "openid profile email offline_access",
+				User: models.User{
+					Id:      1,
+					Enabled: true,
+				},
+			},
+		}
+
+		userConsent := &models.UserConsent{
+			UserId:   1,
+			ClientId: 1,
+			Scope:    "openid profile email offline_access",
+		}
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", "valid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserBySubject", mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		// The refresh carries four scopes; the consent lookup must run once, not once per scope.
+		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(userConsent, nil).Times(1)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		mockDB.AssertNumberOfCalls(t, "GetConsentByUserIdAndClientId", 1)
+	})
+
 	t.Run("Valid refresh token with reduced scope", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
