@@ -238,9 +238,11 @@ Some schemes are refused outright, either because a browser cannot deliver an au
 For loopback redirect URIs, the port flexibility described under [Loopback redirect URIs for native apps](#loopback-redirect-uris-for-native-apps) applies here too: register `http://127.0.0.1/callback` without a port and any port is accepted at authorization time.
 
 <Aside type="caution">
-Public clients registered through dynamic registration cannot use an `https` redirect URI. This is a deliberate Goiabada restriction rather than a rule from the specifications, and it is stricter than most identity providers. The reason is that Goiabada cannot verify that an anonymous registrant controls the domain it claims, so an `https` callback would be accepted purely on the registrant's word.
+Public clients registered through dynamic registration cannot use an `https` redirect URI. This is a deliberate Goiabada restriction rather than a rule from the specifications, and it is stricter than most identity providers.
 
-Two consequences follow. A browser-based single-page app cannot register itself through this endpoint at all, since it needs an `https` redirect URI. And a native app cannot use the claimed-`https` pattern that [RFC 8252 section 7.2](https://datatracker.ietf.org/doc/html/rfc8252#section-7.2) recommends, and should use a loopback or custom-scheme redirect URI instead. In both cases, register the client through the admin console rather than through dynamic registration.
+**It is a conservative policy, not a security boundary.** It does not prevent an anonymous caller from registering an attacker-controlled `https` callback: the same caller can choose a confidential `token_endpoint_auth_method` instead, register any `https` URI, and receive the generated client secret in the response. Nothing about the public-client rule closes that. The control that binds a client's identity to a user's authority is the consent screen, and for self-registered clients that is tracked in [issue #108](https://github.com/leodip/goiabada/issues/108).
+
+Two consequences follow from the restriction. A browser-based single-page app cannot register itself through this endpoint at all, since it needs an `https` redirect URI. And a native app cannot use the claimed-`https` pattern that [RFC 8252 section 7.2](https://datatracker.ietf.org/doc/html/rfc8252#section-7.2) recommends, and should use a loopback or custom-scheme redirect URI instead. In both cases, register the client through the admin console rather than through dynamic registration.
 </Aside>
 
 ### Registration endpoint

@@ -257,7 +257,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// are not re-validated, so the gate that closes every entry point belongs in
 	// ValidateClientAndRedirectURI. See issue #122.
 	if !urlutil.IsAbsoluteRedirectURI(uri) {
-		return fmt.Errorf("redirect_uri must be an absolute URI with a scheme and no fragment: %s", uri)
+		return fmt.Errorf("redirect_uri must be an absolute URI: a scheme is required, a fragment is not permitted, and percent-escapes must be well formed: %s", uri)
 	}
 
 	// Characters RFC 3986 excludes from URIs entirely. A redirect URI carrying them is

@@ -341,12 +341,22 @@ implementation is how the two would drift:
 // is "" both for "/cb" and for "/cb#", so testing it accepts a bare trailing "#". Verified.
 //
 // A percent-encoded %23 is not a fragment delimiter and stays accepted.
+//
+// This is a FORM check, not a full RFC 3986 grammar validator. See decision 13.
 func IsAbsoluteRedirectURI(raw string) bool {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return false
 	}
-	return u.IsAbs() && !strings.Contains(raw, "#")
+	if !u.IsAbs() || strings.Contains(raw, "#") {
+		return false
+	}
+	// url.Parse does not validate percent-escapes in an opaque URI, so "x:%zz" reaches
+	// here. PathUnescape errors on exactly a malformed escape and nothing else.
+	if _, err := url.PathUnescape(raw); err != nil {
+		return false
+	}
+	return true
 }
 ```
 
@@ -747,6 +757,40 @@ what was rejected.
     rejected:** doing the whole thing here, which would put an authorization-path change with its
     own error-handling and compliance questions inside a registration-validation fix.
 
+13. **`IsAbsoluteRedirectURI` is a form check, and its contract says so rather than implying
+    grammar conformance.** Status: **Decided** (added after code review)
+
+    Review asked what the predicate actually guarantees, and the honest answer was less than its
+    doc comment claimed. Verified: `x:%zz`, `x:%2`, `x:[` and `x:你好` all pass `url.Parse`,
+    `url.ParseRequestURI`, the predicate and the whole DCR validator. `net/url` does not validate
+    percent-escapes or character classes in an opaque URI, so a claim of "absolute-URI as defined
+    by RFC 3986 section 4.3" was an overclaim.
+
+    Two of the four are now rejected, and two are documented as accepted:
+
+    | Input | Verdict | Why |
+    |---|---|---|
+    | `x:%zz`, `x:%2` | rejected | RFC 3986 section 2.1 requires two hex digits after `%`, and a literal `%` to be written `%25`. `url.PathUnescape` errors on exactly this and nothing else |
+    | `x:[` | accepted, documented | `pchar` excludes a bare `[`, but rejecting it needs position-aware validation because `[` is legal in an authority (`http://[::1]/cb`) |
+    | `x:你好` | accepted, documented | RFC 3986 requires percent-encoding for non-ASCII, but rejecting it is a character-class rule with false-rejection risk |
+
+    Verified that the escape check rejects nothing legitimate: 13 forms including `%25`, `%20`,
+    `%23` and `%3C` all still pass. Five malformed-escape rows and the two documented-limit rows
+    were added to `TestIsAbsoluteRedirectURI`, which is at 32 cases and owns this rule.
+
+    **Rejected:** implementing the full RFC 3986 grammar. It would need position-aware `pchar`
+    validation, duplicates what `net/url` exists for, and carries real false-rejection risk, all to
+    exclude two shapes that no user agent would deliver an authorization response to anyway.
+    **Rejected:** renaming the function to carry the caveat. The name describes its purpose and
+    #122 cites it; the precision belongs in the doc comment, which now lists what it does not check.
+
+    The DCR error message for this gate names all three conditions rather than only the scheme and
+    fragment, since a malformed escape would otherwise be reported as a missing scheme.
+
+    **This constrains how #122 may describe its gate.** That issue must not claim RFC 3986
+    conformance from this predicate, only the absolute-form and fragment properties plus
+    well-formed escapes.
+
 ---
 
 ## 5. Implementation plan
@@ -879,7 +923,7 @@ Note for anyone running this outside the devcontainer: `go build` in the contain
 ### Stage 2: reject malformed and executable redirect URIs
 Status: **Done**
 
-**Verified when this landed.** `urlutil` is at 97 subtests (38 host, 38 match, 21 absolute-URI).
+**Verified when this landed.** `urlutil` is at 108 subtests (38 host, 38 match, 32 absolute-URI).
 The handler table is at 67, all passing. Each gate was disabled in turn to prove its rows are
 load-bearing: absolute-URI 7 rows, character 11, scheme 11. `run-tests.sh --type modules` and
 `--type integration --db sqlite` both green, the latter in full rather than filtered.
@@ -1104,7 +1148,12 @@ Status: **Done**
    - The `https` refusal for public clients is a Goiabada restriction, stricter than OIDC
      Dynamic Client Registration section 2's Native Client rule and conditioned differently,
      since `application_type` is not read. Per decision 7 it must be presented with its reason
-     (the server cannot verify a claimed domain) and with both of its costs: **a browser-based SPA
+     (the server cannot verify a claimed domain) **and with the explicit statement that it is a
+     conservative policy rather than a security boundary**, since the same anonymous caller can
+     register a confidential client with any `https` callback and receive its secret, so the rule
+     closes nothing on its own. A first draft of the docs omitted that sentence and review caught
+     it as the same overstatement decision 2 exists to prevent. Also with both of its costs: **a
+     browser-based SPA
      cannot self-register through DCR at all**, and a public native app cannot use the
      claimed-`https` pattern RFC 8252 section 7.2 recommends. Do not describe it as spec
      conformance.

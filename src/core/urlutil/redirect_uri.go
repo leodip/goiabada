@@ -54,13 +54,31 @@ func IsLoopbackHost(host string) bool {
 	return false
 }
 
-// IsAbsoluteRedirectURI reports whether raw satisfies RFC 6749 section 3.1.2, which requires
-// a redirect URI to be an absolute-URI as defined by RFC 3986 section 4.3:
+// IsAbsoluteRedirectURI reports whether raw has the form RFC 6749 section 3.1.2 requires of a
+// redirect URI: an absolute-URI per RFC 3986 section 4.3,
 //
 //	absolute-URI = scheme ":" hier-part [ "?" query ]
 //
-// That production carries no fragment, and RFC 6749 states the fragment prohibition
-// explicitly as well, so both conditions are checked here.
+// which is to say a scheme is present and no fragment follows. That production carries no
+// fragment, and RFC 6749 states the prohibition explicitly as well.
+//
+// # What this does not do
+//
+// This is a form check, not a full RFC 3986 grammar validator, and the difference is worth
+// knowing before relying on it as a compliance gate. It verifies three things: that net/url
+// can parse raw, that a scheme is present, that no fragment is present, and that every
+// percent-escape is well formed. It does NOT validate the character classes of hier-part or
+// query, so values that violate the grammar in other ways are still reported as true:
+//
+//	x:[      a gen-delim that pchar excludes outside an authority
+//	x:你好    non-ASCII, which RFC 3986 requires to be percent-encoded
+//
+// Implementing pchar properly would have to be position-aware, since "[" and "]" are legal in
+// an authority ("http://[::1]/cb"), and hand-rolled character validation is where false
+// rejections come from. Neither shape is usable as a redirect URI anyway, because no user
+// agent will deliver an authorization response to them. Callers needing true grammar
+// conformance must add it; callers needing "is this scheme-relative, relative, or
+// fragment-bearing" are served exactly.
 //
 // Two things this rejects that a scheme-only test does not. A scheme-relative value such as
 // "//evil.example/cb" is emitted verbatim as a protocol-relative Location, which the user
@@ -86,7 +104,18 @@ func IsAbsoluteRedirectURI(raw string) bool {
 	if err != nil {
 		return false
 	}
-	return u.IsAbs() && !strings.Contains(raw, "#")
+	if !u.IsAbs() || strings.Contains(raw, "#") {
+		return false
+	}
+	// url.Parse does not validate percent-escapes in an opaque URI, so "x:%zz" and "x:%2"
+	// reach here. RFC 3986 section 2.1 requires two hex digits after "%", and a literal "%"
+	// to be written "%25", so a malformed escape is unambiguously not a URI. PathUnescape
+	// errors on exactly that and on nothing else, which is why it is used rather than a
+	// hand-written scan.
+	if _, err := url.PathUnescape(raw); err != nil {
+		return false
+	}
+	return true
 }
 
 // stripPortRaw removes the port from raw's authority, operating on the raw string so that

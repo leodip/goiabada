@@ -124,6 +124,28 @@ func TestIsAbsoluteRedirectURI(t *testing.T) {
 
 		// a percent-encoded %23 is not a fragment delimiter
 		{"http://127.0.0.1/cb%23frag", true},
+
+		// well-formed escapes stay accepted, including an encoded percent and an encoded
+		// space. These are the rows that catch the escape check being over-tightened.
+		{"http://127.0.0.1/cb?q=100%25", true},
+		{"http://127.0.0.1/cb?q=a%20b", true},
+		{"myapp://cb/%3Cscript%3E", true},
+		{"x:%41", true},
+
+		// malformed escapes. url.Parse does not validate these in an opaque URI, so without
+		// the PathUnescape check they were reported as absolute URIs.
+		{"x:%zz", false},                  // not hex
+		{"x:%2", false},                   // truncated
+		{"http://127.0.0.1/cb%", false},   // bare percent
+		{"http://127.0.0.1/cb%zz", false}, // not hex, hierarchical form
+		{"myapp://cb%2", false},           // truncated, hierarchical form
+
+		// Documented limits rather than assertions of correctness: this is a form check, not
+		// a grammar validator. Both violate RFC 3986 and both are reported as absolute URIs.
+		// See the doc comment. If either becomes a problem, the fix is real pchar validation,
+		// which has to be position-aware because "[" is legal in an authority.
+		{"x:[", true},
+		{"x:你好", true},
 	}
 
 	for _, tc := range tests {
