@@ -3022,16 +3022,16 @@ func (_c *Database_DeleteResource_Call) RunAndReturn(run func(tx *sql.Tx, resour
 }
 
 // DeleteUsedCodesWithoutRefreshTokens provides a mock function for the type Database
-func (_mock *Database) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
-	ret := _mock.Called(tx)
+func (_mock *Database) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error {
+	ret := _mock.Called(tx, createdBefore)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteUsedCodesWithoutRefreshTokens")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx) error); ok {
-		r0 = returnFunc(tx)
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(tx, createdBefore)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -3045,18 +3045,24 @@ type Database_DeleteUsedCodesWithoutRefreshTokens_Call struct {
 
 // DeleteUsedCodesWithoutRefreshTokens is a helper method to define mock.On call
 //   - tx *sql.Tx
-func (_e *Database_Expecter) DeleteUsedCodesWithoutRefreshTokens(tx any) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
-	return &Database_DeleteUsedCodesWithoutRefreshTokens_Call{Call: _e.mock.On("DeleteUsedCodesWithoutRefreshTokens", tx)}
+//   - createdBefore time.Time
+func (_e *Database_Expecter) DeleteUsedCodesWithoutRefreshTokens(tx any, createdBefore any) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
+	return &Database_DeleteUsedCodesWithoutRefreshTokens_Call{Call: _e.mock.On("DeleteUsedCodesWithoutRefreshTokens", tx, createdBefore)}
 }
 
-func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) Run(run func(tx *sql.Tx)) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
+func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) Run(run func(tx *sql.Tx, createdBefore time.Time)) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *sql.Tx
 		if args[0] != nil {
 			arg0 = args[0].(*sql.Tx)
 		}
+		var arg1 time.Time
+		if args[1] != nil {
+			arg1 = args[1].(time.Time)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -3067,7 +3073,7 @@ func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) Return(err error) *
 	return _c
 }
 
-func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) RunAndReturn(run func(tx *sql.Tx) error) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
+func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) RunAndReturn(run func(tx *sql.Tx, createdBefore time.Time) error) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
 	_c.Call.Return(run)
 	return _c
 }

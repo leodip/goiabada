@@ -23,6 +23,17 @@ const (
 	// not leave the next one late.
 	pollInterval = 5 * time.Minute
 
+	// usedCodeCleanupGrace keeps the used-code sweep away from codes that are still
+	// being redeemed. The token endpoint marks a code used and only then inserts the
+	// refresh token referencing it, so during token generation a healthy code looks
+	// exactly like a dead one to that sweep, and deleting it makes the insert fail on
+	// fk_refresh_tokens_code. The client gets a 500 instead of its tokens.
+	//
+	// Codes expire after 60 seconds (token_validator.go), so anything older than that
+	// can never be redeemed and can never gain a refresh token. Five minutes is that
+	// bound with generous room for clock skew and slow signing.
+	usedCodeCleanupGrace = 5 * time.Minute
+
 	// startupDelay holds the first poll back so the server can finish coming up
 	// first. Unlike the unconditional sleep this replaces, it is interruptible.
 	startupDelay = 10 * time.Second
@@ -164,7 +175,7 @@ func (w *Worker) performTask(ctx context.Context) {
 		return
 	}
 
-	err = w.database.DeleteUsedCodesWithoutRefreshTokens(nil)
+	err = w.database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(-usedCodeCleanupGrace))
 	if err != nil {
 		slog.Error(fmt.Sprintf("error deleting used codes without refresh tokens: %v", err))
 	} else {

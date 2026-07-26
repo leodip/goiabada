@@ -65,7 +65,13 @@ type Database interface {
 	DeleteCode(tx *sql.Tx, codeId int64) error
 	CodeLoadClient(tx *sql.Tx, code *models.Code) error
 	CodeLoadUser(tx *sql.Tx, code *models.Code) error
-	DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error
+	// DeleteUsedCodesWithoutRefreshTokens reaps codes that were redeemed but never
+	// produced a refresh token. createdBefore is a required grace cutoff: only codes
+	// created before it are deleted. Without it the sweep races the token endpoint,
+	// which marks a code used and only then inserts the refresh token that references
+	// it, so a code mid-redemption matches the predicate and its deletion fails the
+	// insert with a foreign key violation.
+	DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error
 
 	CreateResource(tx *sql.Tx, resource *models.Resource) error
 	UpdateResource(tx *sql.Tx, resource *models.Resource) error

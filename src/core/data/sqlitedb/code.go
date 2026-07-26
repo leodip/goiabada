@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/leodip/goiabada/core/models"
+	"time"
 )
 
 func (d *SQLiteDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
@@ -38,6 +39,6 @@ func (d *SQLiteDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
 	return d.CommonDB.DeleteCode(tx, codeId)
 }
 
-func (d *SQLiteDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
-	return d.CommonDB.DeleteUsedCodesWithoutRefreshTokens(tx)
+func (d *SQLiteDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error {
+	return d.CommonDB.DeleteUsedCodesWithoutRefreshTokens(tx, createdBefore)
 }

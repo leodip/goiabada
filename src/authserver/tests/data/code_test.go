@@ -551,8 +551,10 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	code3 := createTestCode(t, client.Id, user.Id)
 	// code3 remains unused (Used = false by default)
 
-	// Execute the delete operation
-	err = database.DeleteUsedCodesWithoutRefreshTokens(nil)
+	// Cutoff in the future, so every code qualifies on age and these assertions keep
+	// testing what they were written to test: the used/refresh-token predicate. The age
+	// cutoff itself is covered by TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff.
+	err = database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("Failed to delete used codes without refresh tokens: %v", err)
 	}
@@ -615,8 +617,8 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 		t.Fatalf("Failed to delete expired/revoked refresh tokens: %v", err)
 	}
 
-	// Then delete used codes without valid refresh tokens
-	err = database.DeleteUsedCodesWithoutRefreshTokens(nil)
+	// Then delete used codes without valid refresh tokens. Future cutoff, as above.
+	err = database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("Failed to delete used codes without refresh tokens: %v", err)
 	}
@@ -628,5 +630,60 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	}
 	if remainingCode4 != nil {
 		t.Error("Code4 (used, expired/revoked refresh token) should have been deleted")
+	}
+}
+
+// TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff guards the race that broke CI on
+// postgres: the token endpoint marks a code used and only afterwards inserts the refresh
+// token that references it, so for the duration of token generation a healthy code sits in
+// exactly the state this sweep selects, used with no refresh token. Deleting it there makes
+// the insert fail on fk_refresh_tokens_code and the client gets a 500 instead of tokens.
+//
+// The ordering that opens the window arrived with the atomic-redemption fix (#77), which
+// moved MarkCodeAsUsed ahead of token generation. Before that the refresh token always
+// existed before the flag flipped, so the predicate could never match a live redemption.
+//
+// A code created now must therefore survive a sweep whose cutoff is in the past, which is
+// what the background worker passes. Codes expire after 60 seconds, so anything older than
+// the cutoff can no longer be redeemed and is genuinely dead.
+func TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+
+	// A code in exactly the mid-redemption state: used, no refresh token yet.
+	code := createTestCode(t, client.Id, user.Id)
+	code.Used = true
+	if err := database.UpdateCode(nil, code); err != nil {
+		t.Fatalf("Failed to mark code as used: %v", err)
+	}
+
+	// Sweep with the cutoff the worker uses. The code was created seconds ago, so it is
+	// newer than the cutoff and must be left alone.
+	cutoff := time.Now().UTC().Add(-5 * time.Minute)
+	if err := database.DeleteUsedCodesWithoutRefreshTokens(nil, cutoff); err != nil {
+		t.Fatalf("Failed to run the sweep: %v", err)
+	}
+
+	survived, err := database.GetCodeById(nil, code.Id)
+	if err != nil {
+		t.Fatalf("Error re-reading the code: %v", err)
+	}
+	if survived == nil {
+		t.Fatal("a code marked used seconds ago was deleted by the sweep; this is the " +
+			"race that fails the token exchange with a foreign key violation on " +
+			"fk_refresh_tokens_code")
+	}
+
+	// The same code once it is genuinely past the cutoff: no longer redeemable, so it can
+	// never gain a refresh token, and the sweep must reap it.
+	if err := database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(time.Hour)); err != nil {
+		t.Fatalf("Failed to run the sweep with a future cutoff: %v", err)
+	}
+	reaped, err := database.GetCodeById(nil, code.Id)
+	if err != nil {
+		t.Fatalf("Error re-reading the code: %v", err)
+	}
+	if reaped != nil {
+		t.Error("a used code older than the cutoff and with no refresh token should have been deleted")
 	}
 }

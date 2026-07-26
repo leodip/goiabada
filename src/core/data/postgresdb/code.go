@@ -90,6 +90,6 @@ func (d *PostgresDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
 	return d.CommonDB.DeleteCode(tx, codeId)
 }
 
-func (d *PostgresDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
-	return d.CommonDB.DeleteUsedCodesWithoutRefreshTokens(tx)
+func (d *PostgresDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error {
+	return d.CommonDB.DeleteUsedCodesWithoutRefreshTokens(tx, createdBefore)
 }
