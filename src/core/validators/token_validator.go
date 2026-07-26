@@ -504,22 +504,27 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, err
 		}
 
-		for _, inputScopeStr := range inputScopes {
-			// For ROPC tokens, skip consent check (ROPC bypasses consent - user providing credentials = implicit consent)
-			// For auth code flow tokens, check consent if required
-			if !isROPCToken && (client.ConsentRequired || refreshTokenType == "Offline") {
-				// check if user still consents to this scope
-				consent, err := val.database.GetConsentByUserIdAndClientId(nil, tokenUserId, tokenClientId)
-				if err != nil {
-					return nil, err
-				}
-				if consent == nil {
-					return nil,
-						customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-							"The user has either not given consent to this client or the previously granted consent has been revoked.",
-							http.StatusBadRequest)
-				}
+		// For ROPC tokens, skip consent check (ROPC bypasses consent - user providing credentials = implicit consent)
+		// For auth code flow tokens, check consent if required. The lookup arguments are loop-invariant,
+		// so fetch the consent once here instead of on every scope iteration.
+		var consent *models.UserConsent
+		consentCheckRequired := !isROPCToken && (client.ConsentRequired || refreshTokenType == "Offline")
+		if consentCheckRequired {
+			consent, err = val.database.GetConsentByUserIdAndClientId(nil, tokenUserId, tokenClientId)
+			if err != nil {
+				return nil, err
+			}
+			if consent == nil {
+				return nil,
+					customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+						"The user has either not given consent to this client or the previously granted consent has been revoked.",
+						http.StatusBadRequest)
+			}
+		}
 
+		for _, inputScopeStr := range inputScopes {
+			// check if user still consents to this scope
+			if consentCheckRequired {
 				consentScopeExists := false
 				scopesFromConsent := strings.Split(consent.Scope, " ")
 				for _, scopeFromConsent := range scopesFromConsent {
