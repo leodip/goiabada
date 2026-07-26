@@ -654,7 +654,7 @@
 "adminconsole.admin_clients.redirect_uris.requires_auth_code_suffix" = " flow is enabled."
 "adminconsole.admin_clients.redirect_uris.intro_prefix" = "We only accept "
 "adminconsole.admin_clients.redirect_uris.intro_em" = "exact matches"
-"adminconsole.admin_clients.redirect_uris.intro_suffix" = " for redirect URIs; wildcards are not permitted."
+"adminconsole.admin_clients.redirect_uris.intro_suffix" = " for redirect URIs; wildcards are not permitted. One exception: for http loopback addresses, any port is accepted on authorization code requests."
 "adminconsole.admin_clients.redirect_uris.field.uri" = "Redirect URI"
 "adminconsole.admin_clients.redirect_uris.add_button" = "Add"
 "adminconsole.admin_clients.redirect_uris.col_authorized" = "Authorized redirect URIs"

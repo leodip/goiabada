@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
+	"github.com/leodip/goiabada/core/urlutil"
 )
 
 type AuthorizeValidator struct {
@@ -149,6 +150,21 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 		}
 	}
 
+	// RFC 8252 section 7.3 port flexibility for http loopback redirect URIs is for the
+	// authorization code flow only. Without this gate the relaxation would also permit
+	// arbitrary loopback ports for implicit responses, which carry tokens directly in the
+	// fragment where PKCE cannot mitigate interception.
+	//
+	// Tested on the token sequence rather than on rtInfo's booleans: ParseResponseType
+	// ignores unrecognised values and collapses duplicates, so HasCode && !HasToken &&
+	// !HasIdToken is also true for "code foo" and "code code". And not as
+	// !rtInfo.IsImplicitFlow(), because response_type is not validated until
+	// ValidateRequest, which runs after this check, so that negative test is true for
+	// "code token" and for garbage such as "foo". See decision 12 in
+	// docs/issue-41-loopback-redirect-uri.md.
+	responseTypes := strings.Fields(input.ResponseType)
+	allowLoopbackPortFlexibility := len(responseTypes) == 1 && responseTypes[0] == "code"
+
 	if len(input.RedirectURI) == 0 {
 		return customerrors.NewErrorDetail("", "The redirect_uri parameter is missing.")
 	}
@@ -162,6 +178,13 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 	for _, r := range client.RedirectURIs {
 		if input.RedirectURI == r.URI {
 			clientHasRedirectURI = true
+			break
+		}
+		// Registered first, requested second: the scheme and host gates read the
+		// registered side.
+		if allowLoopbackPortFlexibility && urlutil.RedirectURIMatches(r.URI, input.RedirectURI) {
+			clientHasRedirectURI = true
+			break
 		}
 	}
 	if !clientHasRedirectURI {

@@ -631,7 +631,7 @@
 "adminconsole.admin_clients.redirect_uris.requires_auth_code_suffix" = " está habilitado."
 "adminconsole.admin_clients.redirect_uris.intro_prefix" = "Aceitamos apenas "
 "adminconsole.admin_clients.redirect_uris.intro_em" = "correspondências exatas"
-"adminconsole.admin_clients.redirect_uris.intro_suffix" = " para URIs de redirecionamento; curingas não são permitidos."
+"adminconsole.admin_clients.redirect_uris.intro_suffix" = " para URIs de redirecionamento; curingas não são permitidos. Uma exceção: para endereços de loopback http, qualquer porta é aceita em solicitações de código de autorização."
 "adminconsole.admin_clients.redirect_uris.field.uri" = "URI de redirecionamento"
 "adminconsole.admin_clients.redirect_uris.add_button" = "Adicionar"
 "adminconsole.admin_clients.redirect_uris.col_authorized" = "URIs de redirecionamento autorizadas"

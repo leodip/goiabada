@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateScopes(t *testing.T) {
@@ -165,45 +166,142 @@ func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	client := &models.Client{
-		Enabled:                  true,
-		AuthorizationCodeEnabled: true,
+	// The exhaustive loopback matching tables live with the helper in core/urlutil. These
+	// cases cover only what a pure-function test cannot: that the validator is wired to it,
+	// and that the flow gate holds. See docs/issue-41-loopback-redirect-uri.md, stage 2.
+	tests := []struct {
+		name         string
+		registered   string
+		requested    string
+		responseType string
+	}{
+		{
+			name:       "exact match",
+			registered: "http://example.com",
+			requested:  "http://example.com",
+		},
+		{
+			name:         "http loopback accepts any port on a code request",
+			registered:   "http://127.0.0.1/cb",
+			requested:    "http://127.0.0.1:54321/cb",
+			responseType: "code",
+		},
 	}
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(client, nil)
-	mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
-		client := args.Get(1).(*models.Client)
-		client.RedirectURIs = []models.RedirectURI{{URI: "http://example.com"}}
-	}).Return(nil)
 
-	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			validator := NewAuthorizeValidator(mockDB)
 
-	assert.NoError(t, err)
+			client := &models.Client{
+				Enabled:                  true,
+				AuthorizationCodeEnabled: true,
+			}
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(client, nil)
+			mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
+				client := args.Get(1).(*models.Client)
+				client.RedirectURIs = []models.RedirectURI{{URI: tc.registered}}
+			}).Return(nil)
+
+			input := ValidateClientAndRedirectURIInput{
+				ClientId:     "valid-client",
+				RedirectURI:  tc.requested,
+				ResponseType: tc.responseType,
+			}
+			err := validator.ValidateClientAndRedirectURI(&input)
+
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	client := &models.Client{
-		Enabled:                  true,
-		AuthorizationCodeEnabled: true,
+	tests := []struct {
+		name         string
+		registered   string
+		requested    string
+		responseType string
+	}{
+		{
+			name:       "unregistered URI",
+			registered: "http://example.com",
+			requested:  "http://invalid.com",
+		},
+		{
+			// Must differ only in port. Pairing it with an unrelated requested URI would
+			// pass even if the scheme and host gates were deleted.
+			name:         "port flexibility is not granted to non-loopback hosts",
+			registered:   "https://example.com/cb",
+			requested:    "https://example.com:8443/cb",
+			responseType: "code",
+		},
+		{
+			name:         "implicit, token",
+			registered:   "http://127.0.0.1/cb",
+			requested:    "http://127.0.0.1:54321/cb",
+			responseType: "token",
+		},
+		{
+			name:         "implicit, id_token",
+			registered:   "http://127.0.0.1/cb",
+			requested:    "http://127.0.0.1:54321/cb",
+			responseType: "id_token",
+		},
+		{
+			// Rejected by ValidateRequest later, so this asserts that *this* function does
+			// not grant flexibility on a parameter it has not validated.
+			name:         "hybrid on an unvalidated parameter",
+			registered:   "http://127.0.0.1/cb",
+			requested:    "http://127.0.0.1:54321/cb",
+			responseType: "code token",
+		},
+		{
+			// "code foo" and "code code" are accepted as valid by ValidateRequest, which
+			// counts recognised flags and reaches 1. The token-sequence gate is the only
+			// thing standing between them and port flexibility.
+			name:         "unrecognised token alongside code",
+			registered:   "http://127.0.0.1/cb",
+			requested:    "http://127.0.0.1:54321/cb",
+			responseType: "code foo",
+		},
+		{
+			name:         "duplicate code token",
+			registered:   "http://127.0.0.1/cb",
+			requested:    "http://127.0.0.1:54321/cb",
+			responseType: "code code",
+		},
 	}
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(client, nil)
-	mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
-		client := args.Get(1).(*models.Client)
-		client.RedirectURIs = []models.RedirectURI{{URI: "http://example.com"}}
-	}).Return(nil)
 
-	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: "http://invalid.com"}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			validator := NewAuthorizeValidator(mockDB)
 
-	assert.Error(t, err)
-	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", customErr.GetDescription())
+			client := &models.Client{
+				Enabled:                  true,
+				AuthorizationCodeEnabled: true,
+			}
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(client, nil)
+			mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
+				client := args.Get(1).(*models.Client)
+				client.RedirectURIs = []models.RedirectURI{{URI: tc.registered}}
+			}).Return(nil)
+
+			input := ValidateClientAndRedirectURIInput{
+				ClientId:     "valid-client",
+				RedirectURI:  tc.requested,
+				ResponseType: tc.responseType,
+			}
+			err := validator.ValidateClientAndRedirectURI(&input)
+
+			// require, not assert: on a regression err is nil, and the type assertion
+			// below would panic and take the remaining rows down with it.
+			require.Error(t, err)
+			customErr, ok := err.(*customerrors.ErrorDetail)
+			require.True(t, ok)
+			assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", customErr.GetDescription())
+		})
+	}
 }
 
 func TestValidateRequest_InvalidResponseType(t *testing.T) {

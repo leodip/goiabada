@@ -134,7 +134,31 @@ In the Authorization code flow with PKCE, the client application specifies a red
 
 After the user grants or denies permission, the authorization server redirects the user back to this specified URI.
 
-It's necessary to pre-configure this URI in the client, and only exact matches are accepted (no wildcards).
+It's necessary to pre-configure this URI in the client, and only exact matches are accepted (no wildcards). The single exception is the port of an http loopback address, described below.
+
+### Loopback redirect URIs for native apps
+
+A native or desktop app receives its callback on a temporary HTTP server bound to a port the operating system assigns at startup. The app cannot know that port when the client is registered, so [RFC 8252](https://datatracker.ietf.org/doc/html/rfc8252#section-7.3) requires the authorization server to accept any port on a loopback redirect URI.
+
+Register the URI without a port:
+
+```
+http://127.0.0.1/callback
+```
+
+Any port is then accepted at authorization time, so `http://127.0.0.1:54321/callback` matches. The loopback hosts are `127.0.0.1`, `::1` (written as `http://[::1]/callback`) and `localhost`.
+
+**The port is the only component that may differ.** Scheme, host, path, query and fragment are still compared byte for byte, including character case and percent-encoding. The code is delivered to the port the client actually requested, and that same URI must be presented at the token endpoint.
+
+Three limits apply:
+
+- **`http` only.** An `https` loopback URI still requires an exact match, since RFC 8252 defines loopback redirects as using `http`.
+- **`response_type=code` only.** The implicit flow gets no port flexibility, because it returns tokens directly in the redirect and interception cannot be mitigated.
+- **PKCE is required for public native clients.** Port flexibility widens the set of local ports that may receive an authorization code, and PKCE is what makes an intercepted code useless. Enable it globally under **Settings** → **General** → *PKCE required for authorization code flow*, or per client under the client's **OAuth2 flows** page. See [PKCE](/concepts/pkce/).
+
+<Aside type="caution">
+Prefer the IP literals `127.0.0.1` and `::1` over `localhost`. [RFC 8252 section 8.3](https://datatracker.ietf.org/doc/html/rfc8252#section-8.3) marks the `localhost` hostname NOT RECOMMENDED: resolving the name is not guaranteed to reach the loopback interface, and binding a server by hostname can inadvertently listen on a non-loopback interface, exposing the callback to the network. Goiabada accepts `localhost` as a convenience, not as a recommendation.
+</Aside>
 
 ## Web origins
 
