@@ -278,7 +278,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// above is what stops that class. This gate stops the schemes that carry no excluded
 	// characters at all, such as javascript: and ftp:.
 	if deniedRedirectURISchemes[strings.ToLower(parsed.Scheme)] {
-		return fmt.Errorf("redirect_uri scheme is not permitted: %s", parsed.Scheme)
+		return fmt.Errorf("redirect_uri scheme %q is not permitted: %s", parsed.Scheme, uri)
 	}
 
 	// For public clients (MCP use case), only allow loopback http or custom schemes.
@@ -292,7 +292,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 			if urlutil.IsLoopbackHost(parsed.Host) {
 				return nil
 			}
-			return fmt.Errorf("public clients can only use http redirect_uris on the loopback hosts 127.0.0.1, [::1] or localhost")
+			return fmt.Errorf("public clients can only use http redirect_uris on the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
 		}
 
 		// Allow custom schemes (native apps)
@@ -301,7 +301,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 		}
 
 		// Reject HTTPS for public clients registered via DCR
-		return fmt.Errorf("public clients registered via DCR cannot use https redirect_uris (security restriction)")
+		return fmt.Errorf("public clients registered via DCR cannot use https redirect_uris (security restriction): %s", uri)
 	}
 
 	// For confidential clients, allow HTTPS or loopback http. Same exact-host comparison as
@@ -314,12 +314,12 @@ func validateRedirectURI(uri string, isPublic bool) error {
 		if urlutil.IsLoopbackHost(parsed.Host) {
 			return nil
 		}
-		return fmt.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost")
+		return fmt.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
 	}
 
 	// Custom schemes are for public clients only, which is what this branch not accepting
 	// them means. The message used to offer "custom scheme" here, which was never true.
-	return fmt.Errorf("confidential clients must use an https redirect_uri, or http on a loopback host")
+	return fmt.Errorf("confidential clients must use an https redirect_uri, or http on a loopback host: %s", uri)
 }
 
 // generateDCRClientIdentifier generates unique client identifier (RFC 7591 §3.2.1)

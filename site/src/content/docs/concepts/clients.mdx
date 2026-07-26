@@ -156,6 +156,8 @@ Three limits apply:
 - **`response_type=code` only.** The implicit flow gets no port flexibility, because it returns tokens directly in the redirect and interception cannot be mitigated.
 - **PKCE is required for public native clients.** Port flexibility widens the set of local ports that may receive an authorization code, and PKCE is what makes an intercepted code useless. Enable it globally under **Settings** → **General** → *PKCE required for authorization code flow*, or per client under the client's **OAuth2 flows** page. See [PKCE](/concepts/pkce/).
 
+If the client registers itself through [dynamic client registration](#dynamic-client-registration-rfc-7591) rather than being created in the admin console, additional restrictions apply to its redirect URIs. See [Redirect URI rules](#redirect-uri-rules).
+
 <Aside type="caution">
 Prefer the IP literals `127.0.0.1` and `::1` over `localhost`. [RFC 8252 section 8.3](https://datatracker.ietf.org/doc/html/rfc8252#section-8.3) marks the `localhost` hostname NOT RECOMMENDED: resolving the name is not guaranteed to reach the loopback interface, and binding a server by hostname can inadvertently listen on a non-loopback interface, exposing the callback to the network. Goiabada accepts `localhost` as a convenience, not as a recommendation.
 </Aside>
@@ -214,6 +216,32 @@ When enabled, any application can register as a client. Consider these security 
 - **Monitor registrations** - Regularly audit newly registered clients in the admin console
 - **Review client metadata** - Check redirect URIs and other metadata of self-registered clients
 - **Disable untrusted clients** - Clients can be disabled through the admin console if needed
+
+### Redirect URI rules
+
+Dynamic registration validates redirect URIs more strictly than the admin console does, because the caller is anonymous. What is accepted depends on whether the client is public, which is determined by `token_endpoint_auth_method`:
+
+| Client type | Allowed | Not allowed |
+|---|---|---|
+| Public (`token_endpoint_auth_method: none`) | `http` on `127.0.0.1`, `::1` or `localhost`, with any port; custom schemes such as `myapp://callback` | `https`; `http` on any other host |
+| Confidential (any other auth method) | `https` on any host; `http` on the three loopback hosts | custom schemes; `http` on any other host |
+
+Four rules apply to both client types:
+
+- **The host is matched exactly**, after case folding. A host that merely starts with a loopback name, such as `localhost.attacker.com`, is not a loopback host and is rejected.
+- **The URI must be absolute**, with a scheme, per [RFC 6749 section 3.1.2](https://datatracker.ietf.org/doc/html/rfc6749#section-3.1.2). Values like `//example.com/callback` and `/callback` are rejected.
+- **A fragment is not permitted**, per the same section. `http://127.0.0.1/callback#done` is rejected. A percent-encoded `%23` is not a fragment and is fine.
+- **Characters that cannot appear in a URI are rejected**, namely `<`, `>`, `"`, `{`, `}`, `|`, `\`, `^`, backtick and space. Percent-encode them if you genuinely need them.
+
+Some schemes are refused outright, either because a browser cannot deliver an authorization response to them or because they can execute script: `javascript`, `data`, `vbscript`, `file`, `blob`, `about`, `chrome`, `chrome-extension`, `moz-extension`, `view-source`, `filesystem`, `resource`, `ftp`, `ftps`, `ws`, `wss`, `gopher` and `telnet`.
+
+For loopback redirect URIs, the port flexibility described under [Loopback redirect URIs for native apps](#loopback-redirect-uris-for-native-apps) applies here too: register `http://127.0.0.1/callback` without a port and any port is accepted at authorization time.
+
+<Aside type="caution">
+Public clients registered through dynamic registration cannot use an `https` redirect URI. This is a deliberate Goiabada restriction rather than a rule from the specifications, and it is stricter than most identity providers. The reason is that Goiabada cannot verify that an anonymous registrant controls the domain it claims, so an `https` callback would be accepted purely on the registrant's word.
+
+Two consequences follow. A browser-based single-page app cannot register itself through this endpoint at all, since it needs an `https` redirect URI. And a native app cannot use the claimed-`https` pattern that [RFC 8252 section 7.2](https://datatracker.ietf.org/doc/html/rfc8252#section-7.2) recommends, and should use a loopback or custom-scheme redirect URI instead. In both cases, register the client through the admin console rather than through dynamic registration.
+</Aside>
 
 ### Registration endpoint
 

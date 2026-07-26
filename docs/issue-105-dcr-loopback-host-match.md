@@ -1078,10 +1078,10 @@ rather than only the display.
    after it, so it is the cheapest proof that both halves were changed.
 
 ### Stage 4: document the rules and fix the messages
-Status: **Not started**
+Status: **Done**
 
 1. Add a `### Redirect URI rules` subsection to the DCR section of
-   `site/src/content/docs/concepts/clients.mdx`. Status: **Not started**
+   `site/src/content/docs/concepts/clients.mdx`. Status: **Done**
 
    After "Security considerations" (`:209`) and before "Registration endpoint" (`:220`). Nothing
    there documents redirect URI validation today, so this is new material rather than a
@@ -1110,58 +1110,65 @@ Status: **Not started**
      conformance.
    - Confidential clients cannot use custom schemes, which today's error message contradicts.
 
-2. Cross-link the loopback subsection at `clients.mdx:139`. Status: **Not started**
+2. Cross-link the loopback subsection at `clients.mdx:139`. Status: **Done**
+
+   Linked in both directions: the new DCR subsection points at the loopback section for port
+   flexibility, and the loopback section points at the DCR rules for the extra restrictions that
+   apply to self-registered clients.
 
    #41 added `### Loopback redirect URIs for native apps` under `## Redirect URIs`, which
    carries the port-flexibility rule. A native app developer arriving at the DCR section needs
    it, and it is currently a separate island.
 
-3. Rewrite the error messages. Status: **In progress**
+3. Rewrite the error messages. Status: **Done**
 
    Per decision 9. The three pre-existing messages were rewritten in **stage 1** rather than here,
    because they sit on the exact lines that stage changed and splitting them would have meant
    touching the same statements twice. Done: both loopback messages now name all three hosts, and
    the confidential fallthrough no longer offers custom schemes it rejects.
 
-   Remaining for this step: the two new messages introduced by stage 2 (absolute-URI and
-   character), so that all five read consistently. These are quoted verbatim to the registrant at
-   `:56`.
+   Completed here for the messages stage 2 introduced (absolute-URI, character, scheme). One
+   consistency change beyond what was specified: every validator message now ends with the
+   offending URI. The three new gates named it and the four older messages did not, which matters
+   because a registration request may carry several redirect URIs and the error identifies only
+   one of them. All are quoted verbatim to the registrant at `:56`.
 
-4. Add the release note. Status: **Not started**
+4. Add the release note. Status: **Done** (drafted here; publishing is a release-time action)
+
+   **There is no CHANGELOG in the repo.** Verified: release notes are published as GitHub Release
+   bodies, in the style `- **Title** ([#N](link)):` followed by the explanation, under `### Features` and
+   `### Bug Fixes` headings (see v1.5.1 and v1.5.2). So this text cannot be committed anywhere
+   useful; it goes into the next release body, which is the maintainer's action at tag time.
 
    Drafted here rather than left to the writer, because decision 2 constrains what it may claim
-   and decision 1 constrains what it must include. Use as is, or edit in place:
+   and decision 1 constrains what it must include. Written in the house style:
 
-   > **Dynamic Client Registration: redirect URI validation tightened**
+   > ### Bug Fixes
    >
-   > The `http` loopback rule for redirect URIs registered through `POST /connect/register`
-   > compared the host with a prefix match, so any host beginning with `localhost`, `127.0.0.1` or
-   > `[::1]` was accepted, including `localhost.attacker.com`. The comparison is now exact, and
-   > `localhost`, `127.0.0.1` and `::1` are the only accepted loopback hosts. Host comparison is
-   > case-insensitive, so `LOCALHOST` is now accepted where it previously was not.
+   > - **Redirect URI validation for dynamic client registration**
+   >   ([#105](https://github.com/leodip/goiabada/issues/105)): the loopback rule for `http`
+   >   redirect URIs compared the host with a prefix match, so any host beginning with `localhost`,
+   >   `127.0.0.1` or `[::1]` was accepted, including `localhost.attacker.com`. The comparison is
+   >   now exact against `localhost`, `127.0.0.1` and `::1`, and is case-insensitive, so `LOCALHOST`
+   >   is now accepted where it previously was not. Registration additionally rejects redirect URIs
+   >   that are not absolute (`//example.com/cb`, `/cb`), that carry a fragment
+   >   (`http://127.0.0.1/cb#frag`, which never worked since the code was delivered to `/cb%23frag`),
+   >   that contain characters RFC 3986 excludes from URIs, or that use a scheme which cannot receive
+   >   an authorization response or can execute script (`javascript`, `data`, `vbscript`, `file`,
+   >   `blob`, `about`, `chrome`, `chrome-extension`, `moz-extension`, `view-source`, `filesystem`,
+   >   `resource`, `ftp`, `ftps`, `ws`, `wss`, `gopher`, `telnet`). Custom private-use schemes such
+   >   as `myapp://callback` are unaffected; Android `intent://…#Intent;…` URIs are now rejected by
+   >   the fragment rule. Per RFC 6749 §3.1.2.
    >
-   > Registration also now rejects three further classes of redirect URI, all of which were
-   > previously accepted:
+   > - **Admin console renders redirect URIs and web origins as text**
+   >   ([#105](https://github.com/leodip/goiabada/issues/105)): both pages wrote stored values into
+   >   the page with `innerHTML`, so markup in a value was parsed rather than displayed. They also
+   >   read the value back with `innerHTML` when deleting a row, which meant deleting a redirect URI
+   >   containing `&` silently did nothing. Both sides now use `textContent`.
    >
-   > - values that are not absolute URIs, such as `//example.com/cb` and `/cb`, per RFC 6749
-   >   section 3.1.2
-   > - values carrying a fragment, such as `http://127.0.0.1/cb#frag`, also per RFC 6749 section
-   >   3.1.2. These never worked: the authorization code was delivered to `/cb%23frag`
-   > - values whose scheme cannot receive an authorization response or can execute script,
-   >   including `javascript`, `data`, `vbscript`, `file`, `blob`, `about`, `chrome`,
-   >   `chrome-extension`, `moz-extension`, `view-source`, `filesystem`, `resource`, `ftp`, `ftps`,
-   >   `ws`, `wss`, `gopher` and `telnet`
-   >
-   > Android-style `intent://…#Intent;…` redirect URIs are rejected by the fragment rule. Custom
-   > private-use schemes such as `myapp://callback` and `com.example.app:/oauth` are unaffected.
-   >
-   > The admin console no longer renders stored redirect URIs and web origins as markup. This also
-   > repairs deletion of a redirect URI containing `&`, which previously did nothing.
-   >
-   > **Action required if you enabled Dynamic Client Registration before this release.** Existing
-   > rows are not re-validated, and there is no automatic cleanup, so a redirect URI registered
-   > through the old prefix match remains usable. If DCR has never been enabled in your
-   > deployment, there is nothing to check. Otherwise list the `http` redirect URIs:
+   > **If you enabled Dynamic Client Registration before this release**, existing redirect URIs are
+   > not re-validated and there is no automatic cleanup, so a URI registered through the old prefix
+   > match remains usable. If DCR has never been enabled, there is nothing to check. Otherwise:
    >
    > ```sql
    > SELECT c.client_identifier, r.uri
@@ -1170,21 +1177,21 @@ Status: **Not started**
    > WHERE LOWER(r.uri) LIKE 'http://%';
    > ```
    >
-   > `LOWER` matters: the stored value keeps the scheme as it was sent, so `HTTP://` rows exist and
-   > a case-sensitive comparison would miss them. Review any host that is not `localhost`,
-   > `127.0.0.1` or `::1`. Before deleting a redirect URI, identify who owns the client:
-   > re-registration issues a **new** client ID and secret rather than repairing the existing
-   > client, and removing the callback breaks that client's authorization flow immediately.
+   > `LOWER` matters: the stored value keeps the scheme as it was sent, so `HTTP://` rows exist and a
+   > case-sensitive comparison would miss them. Review any host that is not `localhost`, `127.0.0.1`
+   > or `::1`. Before deleting one, identify who owns the client: re-registering issues a **new**
+   > client ID and secret rather than repairing the existing client, and removing the callback breaks
+   > that client's authorization flow immediately.
    >
-   > This change removes one route to an attacker-controlled callback. It does not by itself
-   > prevent an anonymous caller from registering a client with a callback it controls, since a
-   > confidential registration may use any `https` host by design. The control for that is the
-   > consent screen, tracked in #108.
+   > This removes one route to an attacker-controlled callback. It does not by itself stop an
+   > anonymous caller registering a client with a callback it controls, since a confidential
+   > registration may use any `https` host by design. The control for that is the consent screen,
+   > tracked in [#108](https://github.com/leodip/goiabada/issues/108).
 
-   The final paragraph is required, not optional. Per decision 2, a release note implying this
-   closes DCR phishing would be wrong.
+   The final paragraph is required, not optional. Per decision 2, a release note implying this closes
+   DCR phishing would be wrong.
 
-5. Verify. Status: **Not started**
+5. Verify. Status: **Done**, with two stated exceptions
 
    | Command | Covers |
    |---|---|
@@ -1196,10 +1203,16 @@ Status: **Not started**
    | Manual: register the payload through DCR, open the client's redirect URIs page as an administrator | stage 3, the only evidence the sink fix works |
    | Manual: add, display and delete a redirect URI containing `&` | stage 3 step 4, the writer and reader round trip |
 
-   Integration on sqlite alone is sufficient: nothing here touches a query or the schema.
-   `core/communication.TestSendEmail` fails on the host with `lookup mailpit: no such host` and
-   passes in the container; pre-existing and environmental.
+   Everything above was run in `goiabada-devcontainer-1`, per the maintainer's instruction, not on
+   the host. All green. Integration on sqlite alone is sufficient: nothing here touches a query or
+   the schema.
 
-   The docs site cannot be built here. There is no `node`, `npm` or `site/node_modules` on the
-   host or in the devcontainer, so the mdx edit rests on being plain markdown plus components
-   already imported in that file.
+   **Two things this did not verify, both stated rather than glossed.** The docs site was not
+   built: there is no `node`, `npm` or `site/node_modules` on the host or in the devcontainer, so
+   the mdx edit rests on being plain markdown plus `<Aside>`, which that file already imports. And
+   stage 3 step 4 remains open, since proving the sink fix end to end needs a running admin console.
+
+   Unrelated pre-existing findings, deliberately untouched: `src/core/i18n/error_codes.go` and
+   `src/core/i18n/middleware_test.go` are not `gofmt` clean, and the test run regenerates
+   `src/authserver/web/static/main.css` with two utility classes unrelated to this work, so it was
+   left unstaged.
