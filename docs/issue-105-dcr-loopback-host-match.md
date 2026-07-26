@@ -1045,7 +1045,7 @@ load-bearing: absolute-URI 7 rows, character 11, scheme 11. `run-tests.sh --type
    that, see stage 3 step 3.
 
 ### Stage 3: stop the admin console rendering redirect URIs as markup
-Status: **In progress** (steps 1 to 3 done, step 4 needs a running admin console)
+Status: **Done**
 
 Independent of stages 1 and 2. It fixes the sink rather than the source, so it holds even for
 URIs that arrive through the unvalidated admin endpoint.
@@ -1109,11 +1109,24 @@ rather than only the display.
    changed, not that changing it is sufficient. The evidence for sufficiency is the manual
    reproduction recorded in section 1, and re-verifying it after the change is a manual step.
 
-4. Manually verify deletion, not only display. Status: **Not started**
+4. Manually verify deletion, not only display. Status: **Done**
 
-   **Left for the maintainer, because it needs the admin console running** (`make server`), which
-   the automated suites do not start. The evidence gathered so far is the browser round trip in
-   decision 6's table, which replicates the template's exact write and read but not the real page.
+   Run by the maintainer against a real admin console, since no automated suite starts one. Both
+   halves of decision 6 confirmed on the `test` client's redirect URIs page:
+
+   - **Display and deletion.** `http://127.0.0.1:9000/cb?a=1&b=2` rendered with the `&` intact
+     rather than as `&amp;`, and the trash icon removed the row immediately, which persisted across
+     a save and reload. That is the case that silently did nothing before this stage, so it
+     confirms both that deletion still works and that the pre-existing bug is fixed. A URI without
+     an `&` would have proved neither.
+   - **The injection.** `x:<svg onload=alert(document.domain)>` was stored through the admin API,
+     which applies no validation, then rendered as literal text with **no alert firing** across a
+     save and a full page reload. Before this stage that reload executed script in a session
+     holding `authserver:manage`.
+
+   The second case can no longer be reached through DCR at all, since stage 2 rejects it at
+   registration. The admin path is the only remaining way to plant such a row, which is precisely
+   why decision 6 fixed the sink rather than relying on input validation.
 
    Because step 3's lint cannot exercise the round trip, and because the round trip is where the
    writer-only change would have broken: add a redirect URI containing `&` (for example
