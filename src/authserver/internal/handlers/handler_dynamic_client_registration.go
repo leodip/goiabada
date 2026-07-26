@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/urlutil"
 )
 
 // HandleDynamicClientRegistrationPost implements RFC 7591 §3 Client Registration Endpoint
@@ -225,20 +225,18 @@ func validateRedirectURI(uri string, isPublic bool) error {
 		return fmt.Errorf("invalid redirect_uri format: %s", uri)
 	}
 
-	// For public clients (MCP use case), only allow localhost or custom schemes
-	// This prevents phishing attacks via DCR
+	// For public clients (MCP use case), only allow loopback http or custom schemes.
+	//
+	// The host comparison is exact, via the shared predicate in core/urlutil. It used to be
+	// a strings.HasPrefix test, which accepted any host merely starting with a loopback
+	// name, localhost.attacker.com included. See issue #105.
 	if isPublic {
-		// Allow localhost HTTP (MCP use case)
+		// Allow loopback HTTP (MCP use case)
 		if parsed.Scheme == "http" {
-			if strings.HasPrefix(parsed.Host, "localhost") ||
-				strings.HasPrefix(parsed.Host, "127.0.0.1") ||
-				strings.HasPrefix(parsed.Host, "[::1]") ||
-				strings.HasPrefix(parsed.Host, "localhost:") ||
-				strings.HasPrefix(parsed.Host, "127.0.0.1:") ||
-				strings.HasPrefix(parsed.Host, "[::1]:") {
+			if urlutil.IsLoopbackHost(parsed.Host) {
 				return nil
 			}
-			return fmt.Errorf("public clients can only use localhost for http redirect_uris")
+			return fmt.Errorf("public clients can only use http redirect_uris on the loopback hosts 127.0.0.1, [::1] or localhost")
 		}
 
 		// Allow custom schemes (native apps)
@@ -250,24 +248,22 @@ func validateRedirectURI(uri string, isPublic bool) error {
 		return fmt.Errorf("public clients registered via DCR cannot use https redirect_uris (security restriction)")
 	}
 
-	// For confidential clients, allow HTTPS or localhost
+	// For confidential clients, allow HTTPS or loopback http. Same exact-host comparison as
+	// the public branch above: the prefix bug was duplicated across both.
 	if parsed.Scheme == "https" {
 		return nil
 	}
 
 	if parsed.Scheme == "http" {
-		if strings.HasPrefix(parsed.Host, "localhost") ||
-			strings.HasPrefix(parsed.Host, "127.0.0.1") ||
-			strings.HasPrefix(parsed.Host, "[::1]") ||
-			strings.HasPrefix(parsed.Host, "localhost:") ||
-			strings.HasPrefix(parsed.Host, "127.0.0.1:") ||
-			strings.HasPrefix(parsed.Host, "[::1]:") {
+		if urlutil.IsLoopbackHost(parsed.Host) {
 			return nil
 		}
-		return fmt.Errorf("http redirect_uris must use localhost")
+		return fmt.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost")
 	}
 
-	return fmt.Errorf("redirect_uri must use https, localhost http, or custom scheme")
+	// Custom schemes are for public clients only, which is what this branch not accepting
+	// them means. The message used to offer "custom scheme" here, which was never true.
+	return fmt.Errorf("confidential clients must use an https redirect_uri, or http on a loopback host")
 }
 
 // generateDCRClientIdentifier generates unique client identifier (RFC 7591 §3.2.1)

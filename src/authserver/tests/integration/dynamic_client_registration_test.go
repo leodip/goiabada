@@ -255,6 +255,29 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  api.DCRErrorInvalidRedirectURI,
 		},
+		// Issue #105: the loopback host check was a prefix match, so any host merely
+		// starting with a loopback name was accepted. Both client types are covered here
+		// because the defect was duplicated across the two branches.
+		//
+		// Deliberately thin: the exhaustive table lives with the function itself, in
+		// internal/handlers/handler_dynamic_client_registration_test.go. These two rows
+		// prove only that the HTTP endpoint reaches it.
+		{
+			name:           "Public client - host with a loopback prefix rejected",
+			authMethod:     "none",
+			redirectURIs:   []string{"http://localhost.attacker.com/callback"},
+			grantTypes:     []string{"authorization_code"},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  api.DCRErrorInvalidRedirectURI,
+		},
+		{
+			name:           "Confidential client - host with a loopback prefix rejected",
+			authMethod:     "client_secret_post",
+			redirectURIs:   []string{"http://localhost.attacker.com/callback"},
+			grantTypes:     []string{"authorization_code"},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  api.DCRErrorInvalidRedirectURI,
+		},
 		{
 			name:           "Missing redirect_uris for authorization_code",
 			authMethod:     "client_secret_post",
