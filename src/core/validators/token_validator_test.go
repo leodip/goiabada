@@ -2870,6 +2870,90 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
 	})
 
+	t.Run("Refresh token with a scope missing from the consent", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			UserSessionIdleTimeoutInSeconds: 3600,
+			UserSessionMaxLifetimeInSeconds: 86400,
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "refresh_token",
+			ClientId:     "client1",
+			RefreshToken: "partial_consent_refresh_token",
+		}
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+			ConsentRequired:          true,
+		}
+
+		refreshTokenJwt := &oauth.JwtToken{
+			Claims: jwt.MapClaims{
+				"jti": "partial_consent_jti",
+				"typ": "Refresh",
+				"sub": "user123",
+			},
+		}
+
+		refreshToken := &models.RefreshToken{
+			RefreshTokenJti:   "partial_consent_jti",
+			SessionIdentifier: "test_session",
+			CodeId:            sql.NullInt64{Int64: 1, Valid: true},
+			Code: models.Code{
+				ClientId: 1,
+				UserId:   1,
+				Scope:    "openid profile email",
+				User: models.User{
+					Id:      1,
+					Enabled: true,
+				},
+			},
+		}
+
+		userSession := &models.UserSession{
+			SessionIdentifier: "test_session",
+			Started:           time.Now().UTC().Add(-30 * time.Minute),
+			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
+		}
+
+		// The user consented to openid and profile, but no longer to email.
+		userConsent := &models.UserConsent{
+			UserId:   1,
+			ClientId: 1,
+			Scope:    "openid profile",
+		}
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", "partial_consent_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, "partial_consent_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		assert.Error(t, err)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Contains(t, customErr.GetDescription(), "The user has not consented to the 'email' permission")
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+	})
+
 	t.Run("Refresh token with revoked user permission", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
