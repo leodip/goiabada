@@ -86,7 +86,10 @@
                 const cell1 = row.insertCell(0);
                 const cell2 = row.insertCell(1);
                 cell1.className = "p-1 font-mono text-sm align-middle";
-                cell1.innerHTML = uri;
+                // textContent, not innerHTML: a web origin is data. Same change as the
+                // redirect URIs page, see issue #105. deleteWebOrigin must read it back
+                // with textContent for the same reason.
+                cell1.textContent = uri;
 
                 cell2.className = "p-1 text-right";
                 cell2.innerHTML = getTrashCanMarkup("", "deleteWebOrigin(event, this);", "");
@@ -138,7 +141,10 @@
     function deleteWebOrigin(evt, elem) {
         evt.preventDefault();
         const row = elem.parentNode.parentNode;
-        const webOrigin = row.getElementsByTagName("td")[0].innerHTML;
+        // Must match how the cell was written, above. See the note in
+        // admin_clients_redirect_uris.html: reading innerHTML re-serialises the value, so
+        // anything containing "&" or markup never matched and deletion did nothing.
+        const webOrigin = row.getElementsByTagName("td")[0].textContent;
         const index = webOrigins.indexOf(webOrigin);
         if (index > -1) {
             webOrigins.splice(index, 1);

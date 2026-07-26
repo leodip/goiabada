@@ -1001,7 +1001,7 @@ load-bearing: absolute-URI 7 rows, character 11, scheme 11. `run-tests.sh --type
    that, see stage 3 step 3.
 
 ### Stage 3: stop the admin console rendering redirect URIs as markup
-Status: **Not started**
+Status: **In progress** (steps 1 to 3 done, step 4 needs a running admin console)
 
 Independent of stages 1 and 2. It fixes the sink rather than the source, so it holds even for
 URIs that arrive through the unvalidated admin endpoint.
@@ -1029,19 +1029,24 @@ sides fixes that pre-existing bug as a side effect, which is a further argument 
 rather than only the display.
 
 1. Change the writer and reader in
-   `src/adminconsole/web/template/admin_clients_redirect_uris.html`. Status: **Not started**
+   `src/adminconsole/web/template/admin_clients_redirect_uris.html`. Status: **Done**
 
    `cell1.innerHTML = uri` becomes `cell1.textContent = uri` at `:89`, and the read at `:139`
    becomes `...getElementsByTagName("td")[0].textContent`. The adjacent
    `cell2.innerHTML = getTrashCanMarkup(...)` at `:92` legitimately renders markup and stays.
 
 2. Change the writer and reader in
-   `src/adminconsole/web/template/admin_clients_web_origins.html`. Status: **Not started**
+   `src/adminconsole/web/template/admin_clients_web_origins.html`. Status: **Done**
 
    Same two edits, at `:89` and `:141`. Not anonymously reachable, since DCR never creates web
    origins, but included per decision 6 so the two files do not diverge.
 
-3. Add a lint case to `src/adminconsole/web/template_lint_test.go`. Status: **Not started**
+3. Add a lint case to `src/adminconsole/web/template_lint_test.go`. Status: **Done**
+
+   Landed as `TestTemplates_RedirectURIAndWebOriginCellsAreText`. It bans `innerHTML = uri` and
+   `getElementsByTagName("td")[0].innerHTML` in the two guarded files, and asserts it actually
+   visited both, so renaming a file cannot silently reduce it to a no-op. Proved non-vacuous by
+   reverting each side in turn and by renaming one file: all three fail the lint.
 
    That file already walks every template via `walkHTMLTemplates` and asserts patterns, and each
    existing case is written as a guard against a specific past bug
@@ -1061,6 +1066,10 @@ rather than only the display.
    reproduction recorded in section 1, and re-verifying it after the change is a manual step.
 
 4. Manually verify deletion, not only display. Status: **Not started**
+
+   **Left for the maintainer, because it needs the admin console running** (`make server`), which
+   the automated suites do not start. The evidence gathered so far is the browser round trip in
+   decision 6's table, which replicates the template's exact write and read but not the real page.
 
    Because step 3's lint cannot exercise the round trip, and because the round trip is where the
    writer-only change would have broken: add a redirect URI containing `&` (for example

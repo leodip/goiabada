@@ -86,7 +86,10 @@
                 const cell1 = row.insertCell(0);
                 const cell2 = row.insertCell(1);
                 cell1.className = "p-1 font-mono text-sm align-middle";
-                cell1.innerHTML = uri;
+                // textContent, not innerHTML: a redirect URI is data, and innerHTML would
+                // parse markup in it. See issue #105. deleteRedirectURI must read it back
+                // with textContent for the same reason.
+                cell1.textContent = uri;
 
                 cell2.className = "p-1 text-right";
                 cell2.innerHTML = getTrashCanMarkup("", "deleteRedirectURI(event, this);", "");
@@ -136,7 +139,10 @@
     function deleteRedirectURI(evt, elem) {
         evt.preventDefault();
         const row = elem.parentNode.parentNode;
-        const redirectURI = row.getElementsByTagName("td")[0].innerHTML;
+        // Must match how the cell was written, above. Reading innerHTML returns a
+        // re-serialised, entity-escaped string, so "?a=1&b=2" came back as "?a=1&amp;b=2"
+        // and indexOf never found it: deletion silently did nothing.
+        const redirectURI = row.getElementsByTagName("td")[0].textContent;
         const index = redirectURIs.indexOf(redirectURI);
         if (index > -1) {
             redirectURIs.splice(index, 1);
