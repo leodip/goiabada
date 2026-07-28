@@ -1436,14 +1436,17 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			ClientCredentialsEnabled: true,
 			IsPublic:                 false,
 			ClientSecretEncrypted:    clientSecretEncrypted,
-			Permissions:              []models.Permission{{PermissionIdentifier: "permission"}},
+			// Ids are load-bearing: ownership is decided by resource-scoped permission id,
+			// so a fixture leaving them zero matches every other zero and passes whether the
+			// check is right, wrong, or absent. Do not tidy these back to bare identifiers.
+			Permissions: []models.Permission{{Id: 10, PermissionIdentifier: "permission", ResourceId: 1}},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid_client").Return(client, nil)
 		mockDB.On("ClientLoadPermissions", mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "resource").Return(&models.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "permission"}}, nil)
+		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return([]models.Permission{{Id: 10, PermissionIdentifier: "permission", ResourceId: 1}}, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -1518,7 +1521,11 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			ClientCredentialsEnabled: true,
 			IsPublic:                 false,
 			ClientSecretEncrypted:    clientSecretEncrypted,
-			Permissions:              []models.Permission{{PermissionIdentifier: "read"}, {PermissionIdentifier: "write"}},
+			// Ids are load-bearing, see "Valid client credentials request" above.
+			Permissions: []models.Permission{
+				{Id: 10, PermissionIdentifier: "read", ResourceId: 1},
+				{Id: 20, PermissionIdentifier: "write", ResourceId: 2},
+			},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid_client").Return(client, nil)
@@ -1526,8 +1533,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "resource1").Return(&models.Resource{Id: 1, ResourceIdentifier: "resource1"}, nil)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "resource2").Return(&models.Resource{Id: 2, ResourceIdentifier: "resource2"}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "read"}}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(2)).Return([]models.Permission{{PermissionIdentifier: "write"}}, nil)
+		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return([]models.Permission{{Id: 10, PermissionIdentifier: "read", ResourceId: 1}}, nil)
+		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(2)).Return([]models.Permission{{Id: 20, PermissionIdentifier: "write", ResourceId: 2}}, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -1778,7 +1785,12 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			ClientCredentialsEnabled: true,
 			IsPublic:                 false,
 			ClientSecretEncrypted:    clientSecretEncrypted,
-			Permissions:              []models.Permission{{PermissionIdentifier: "read"}, {PermissionIdentifier: "write"}, {PermissionIdentifier: "delete"}},
+			// Ids are load-bearing, see "Valid client credentials request" above.
+			Permissions: []models.Permission{
+				{Id: 10, PermissionIdentifier: "read", ResourceId: 1},
+				{Id: 20, PermissionIdentifier: "write", ResourceId: 2},
+				{Id: 30, PermissionIdentifier: "delete", ResourceId: 3},
+			},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid_client").Return(client, nil)
@@ -1787,9 +1799,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "resource1").Return(&models.Resource{Id: 1, ResourceIdentifier: "resource1"}, nil)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "resource2").Return(&models.Resource{Id: 2, ResourceIdentifier: "resource2"}, nil)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "resource3").Return(&models.Resource{Id: 3, ResourceIdentifier: "resource3"}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "read"}}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(2)).Return([]models.Permission{{PermissionIdentifier: "write"}}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(3)).Return([]models.Permission{{PermissionIdentifier: "delete"}}, nil)
+		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return([]models.Permission{{Id: 10, PermissionIdentifier: "read", ResourceId: 1}}, nil)
+		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(2)).Return([]models.Permission{{Id: 20, PermissionIdentifier: "write", ResourceId: 2}}, nil)
+		mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(3)).Return([]models.Permission{{Id: 30, PermissionIdentifier: "delete", ResourceId: 3}}, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -1797,6 +1809,345 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		assert.NotNil(t, result)
 		assert.Equal(t, "resource1:read resource2:write resource3:delete", result.Scope)
 	})
+
+	// --- Resource-scoped permission ownership (#104) ---------------------------------
+	//
+	// permission_identifier is unique per resource, never globally, and the
+	// docs steer users toward generic names ("read", "write", "manage"). The ownership
+	// check used to compare the bare identifier against client.Permissions, which
+	// ClientLoadPermissions populates across EVERY resource, so holding "read" on one
+	// resource conveyed "read" on all of them, and holding "manage" on a custom
+	// resource conveyed "authserver:manage" and with it the whole Admin API.
+	//
+	// The fixture below is built so identifier and id diverge: "read" exists on three
+	// resources under three different ids, and "manage" on two. A test whose fixture
+	// leaves ids at zero cannot tell the fixed code from the broken code.
+	var (
+		billingRead      = models.Permission{Id: 10, PermissionIdentifier: "read", ResourceId: 1}
+		billingManage    = models.Permission{Id: 12, PermissionIdentifier: "manage", ResourceId: 1}
+		reportsRead      = models.Permission{Id: 20, PermissionIdentifier: "read", ResourceId: 2}
+		archiveRead      = models.Permission{Id: 30, PermissionIdentifier: "read", ResourceId: 3}
+		authserverManage = models.Permission{Id: 40, PermissionIdentifier: "manage", ResourceId: 4}
+	)
+
+	ccSecretEncrypted, _ := encryption.EncryptData("valid_secret")
+
+	// Registered with .Maybe() because each case reaches only the lookups its own
+	// scope string requires, and the assertion that matters is the outcome rather
+	// than the call set. The two error-propagation subtests below register their own.
+	registerCatalog := func(mockDB *mocks_data.Database) {
+		for _, r := range []struct {
+			identifier string
+			id         int64
+			perms      []models.Permission
+		}{
+			{"billing-api", 1, []models.Permission{billingRead, billingManage}},
+			{"reports-api", 2, []models.Permission{reportsRead}},
+			{"archive-api", 3, []models.Permission{archiveRead}},
+			{"authserver", 4, []models.Permission{authserverManage}},
+		} {
+			mockDB.On("GetResourceByResourceIdentifier", mock.Anything, r.identifier).
+				Return(&models.Resource{Id: r.id, ResourceIdentifier: r.identifier}, nil).Maybe()
+			mockDB.On("GetPermissionsByResourceId", mock.Anything, r.id).Return(r.perms, nil).Maybe()
+		}
+		// Anything not in the catalog resolves to nil, exercising the not-found branch.
+		for _, unknown := range []string{"nope-api", ""} {
+			mockDB.On("GetResourceByResourceIdentifier", mock.Anything, unknown).Return(nil, nil).Maybe()
+		}
+	}
+
+	// runCC drives one client credentials request against the catalog above.
+	// wantCode == "" means the request must be accepted with scope wantScope.
+	runCC := func(t *testing.T, clientPerms []models.Permission, scope, wantCode, wantDesc, wantScope string) {
+		t.Helper()
+
+		mockDB := mocks_data.NewDatabase(t)
+		validator := NewTokenValidator(mockDB, mocks_oauth.NewTokenParser(t), mocks_user.NewPermissionChecker(t))
+
+		client := &models.Client{
+			ClientIdentifier:         "cc_client",
+			Enabled:                  true,
+			ClientCredentialsEnabled: true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    ccSecretEncrypted,
+			Permissions:              clientPerms,
+		}
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "cc_client").Return(client, nil)
+		mockDB.On("ClientLoadPermissions", mock.Anything, client).Return(nil)
+		mockDB.On("PermissionsLoadResources", mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
+		registerCatalog(mockDB)
+
+		result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			GrantType:    "client_credentials",
+			ClientId:     "cc_client",
+			ClientSecret: "valid_secret",
+			Scope:        scope,
+		})
+
+		if wantCode == "" {
+			assert.NoError(t, err)
+			if assert.NotNil(t, result) {
+				assert.Equal(t, wantScope, result.Scope)
+			}
+			return
+		}
+
+		assert.Nil(t, result)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		if !assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+			return
+		}
+		assert.Equal(t, wantCode, customErr.GetCode())
+		assert.Contains(t, customErr.GetDescription(), wantDesc)
+	}
+
+	ownershipCases := []struct {
+		name        string
+		clientPerms []models.Permission
+		scope       string
+		wantCode    string
+		wantDesc    string
+		wantScope   string
+	}{
+		// The load-bearing pair. These two vary ONLY the resource, holding the
+		// permission identifier, the client and the grant fixed, so nothing but the
+		// ownership check can account for the difference in outcome. The first alone
+		// would also pass against an implementation that over-rejected everything.
+		{
+			name:        "cross-resource read is denied",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "reports-api:read",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Permission to access scope 'reports-api:read' is not granted to the client.",
+		},
+		{
+			name:        "same-resource read is allowed",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "billing-api:read",
+			wantScope:   "billing-api:read",
+		},
+		{
+			name:        "cross-resource read is denied in the other direction",
+			clientPerms: []models.Permission{reportsRead},
+			scope:       "billing-api:read",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Permission to access scope 'billing-api:read' is not granted to the client.",
+		},
+		{
+			name:        "holding the identifier on two other resources does not help",
+			clientPerms: []models.Permission{billingRead, archiveRead},
+			scope:       "reports-api:read",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Permission to access scope 'reports-api:read' is not granted to the client.",
+		},
+		// These two differ only in ordering. A short-circuit that accepted the whole
+		// request on the first granted scope would pass one and fail the other.
+		{
+			name:        "a denied scope after a granted one is still denied",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "billing-api:read reports-api:read",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Permission to access scope 'reports-api:read' is not granted to the client.",
+		},
+		{
+			name:        "a denied scope before a granted one is still denied",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "reports-api:read billing-api:read",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Permission to access scope 'reports-api:read' is not granted to the client.",
+		},
+		// The escalation the issue is really about: "manage" on a custom resource must
+		// not reach the built-in "manage" on the system authserver resource, which is
+		// full Admin API access.
+		{
+			name:        "custom manage does not reach authserver manage",
+			clientPerms: []models.Permission{billingManage},
+			scope:       "authserver:manage",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Permission to access scope 'authserver:manage' is not granted to the client.",
+		},
+		{
+			// Not redundant with "same-resource read is allowed": this is the grant
+			// administrative tooling depends on, and it stops the case above passing
+			// for the wrong reason.
+			name:        "a genuine authserver manage grant still works",
+			clientPerms: []models.Permission{authserverManage},
+			scope:       "authserver:manage",
+			wantScope:   "authserver:manage",
+		},
+		// Deduping (added in a later stage) must not be able to launder a denied
+		// scope. Diverges from the old behaviour for two independent reasons at once,
+		// so keep it even if deduping is ever reverted.
+		{
+			name:        "a repeated cross-resource scope is denied",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "reports-api:read reports-api:read",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Permission to access scope 'reports-api:read' is not granted to the client.",
+		},
+		// Paths that return before ownership is decided. These do not change
+		// behaviour; they pin every early exit now that ownership depends on ids
+		// resolved from the requested resource.
+		{
+			name:        "unknown resource",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "nope-api:read",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Could not find a resource with identifier 'nope-api'",
+		},
+		{
+			name:        "permission does not exist on the requested resource",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "billing-api:delete",
+			wantCode:    "invalid_scope",
+			wantDesc:    "doesn't grant the 'delete' permission",
+		},
+		{
+			name:        "client holds no permissions at all",
+			clientPerms: nil,
+			scope:       "billing-api:read",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Permission to access scope 'billing-api:read' is not granted to the client.",
+		},
+		{
+			name:        "too many colon-separated parts",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "billing-api:read:extra",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Invalid scope format",
+		},
+		{
+			name:        "empty permission part",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "billing-api:",
+			wantCode:    "invalid_scope",
+			wantDesc:    "doesn't grant the '' permission",
+		},
+		{
+			name:        "empty resource part",
+			clientPerms: []models.Permission{billingRead},
+			scope:       ":read",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Could not find a resource with identifier ''",
+		},
+		{
+			name:        "only colons",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "::",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Invalid scope format",
+		},
+		{
+			name:        "no colon at all",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "billing-api",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Invalid scope format",
+		},
+		{
+			name:        "openid is rejected for this grant",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "openid",
+			wantCode:    "invalid_request",
+			wantDesc:    "are not supported in the client credentials flow",
+		},
+		{
+			name:        "offline_access is rejected for this grant",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "offline_access",
+			wantCode:    "invalid_request",
+			wantDesc:    "are not supported in the client credentials flow",
+		},
+		{
+			name:        "an OIDC scope alongside a granted one is still rejected",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "openid billing-api:read",
+			wantCode:    "invalid_request",
+			wantDesc:    "are not supported in the client credentials flow",
+		},
+		// The next two look inconsistent and are correct. IsIdTokenScope is an exact
+		// slices.Contains, so "OPENID" is not recognized as an OIDC scope and falls
+		// through to the format check; IsOfflineAccessScope uses strings.EqualFold, so
+		// "OFFLINE_ACCESS" is recognized. Keep both: they document a real asymmetry
+		// between two adjacent helpers that otherwise reads as a typo.
+		{
+			name:        "uppercase OPENID falls through to the format check",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "OPENID",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Invalid scope format",
+		},
+		{
+			name:        "uppercase OFFLINE_ACCESS is recognized and rejected",
+			clientPerms: []models.Permission{billingRead},
+			scope:       "OFFLINE_ACCESS",
+			wantCode:    "invalid_request",
+			wantDesc:    "are not supported in the client credentials flow",
+		},
+	}
+
+	for _, tc := range ownershipCases {
+		t.Run(tc.name, func(t *testing.T) {
+			runCC(t, tc.clientPerms, tc.scope, tc.wantCode, tc.wantDesc, tc.wantScope)
+		})
+	}
+
+	// A database failure must propagate as an error (a 500), not be swallowed into an
+	// invalid_scope denial. The two are indistinguishable to a caller reading only the
+	// status code, and a swallowed error would silently deny legitimate requests.
+	for _, tc := range []struct {
+		name  string
+		setup func(*mocks_data.Database)
+	}{
+		{
+			name: "GetResourceByResourceIdentifier error propagates",
+			setup: func(mockDB *mocks_data.Database) {
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "billing-api").
+					Return(nil, errors.New("database is down"))
+			},
+		},
+		{
+			name: "GetPermissionsByResourceId error propagates",
+			setup: func(mockDB *mocks_data.Database) {
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "billing-api").
+					Return(&models.Resource{Id: 1, ResourceIdentifier: "billing-api"}, nil)
+				mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).
+					Return(nil, errors.New("database is down"))
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			validator := NewTokenValidator(mockDB, mocks_oauth.NewTokenParser(t), mocks_user.NewPermissionChecker(t))
+
+			client := &models.Client{
+				ClientIdentifier:         "cc_client",
+				Enabled:                  true,
+				ClientCredentialsEnabled: true,
+				IsPublic:                 false,
+				ClientSecretEncrypted:    ccSecretEncrypted,
+				Permissions:              []models.Permission{billingRead},
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "cc_client").Return(client, nil)
+			mockDB.On("ClientLoadPermissions", mock.Anything, client).Return(nil)
+			mockDB.On("PermissionsLoadResources", mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
+			tc.setup(mockDB)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:    "client_credentials",
+				ClientId:     "cc_client",
+				ClientSecret: "valid_secret",
+				Scope:        "billing-api:read",
+			})
+
+			assert.Nil(t, result)
+			assert.EqualError(t, err, "database is down")
+			_, isErrorDetail := err.(*customerrors.ErrorDetail)
+			assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
+		})
+	}
 }
 
 func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
@@ -389,4 +390,170 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 	// Ensure the other scope is not present in the returned scope
 	unrequestedScope := fmt.Sprintf("%s:%s", resourceBIdentifier, permissionBIdentifier)
 	assert.NotContains(t, scope, unrequestedScope, "Returned scope should not contain the unrequested scope")
+}
+
+// TestToken_ClientCred_CrossResourcePermissionCollision covers #104: permission
+// identifiers are scoped to their resource, so a grant on one resource must convey
+// nothing about a same-named permission on another. Before the fix the ownership check
+// compared only the bare identifier against the client's permissions across every
+// resource, so the denied leg below returned a token.
+//
+// Both resources deliberately define the SAME permission identifier. The client is
+// granted resource A's permission only.
+func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	// One permission identifier, defined on two different resources.
+	sharedPermissionIdentifier := "read-product-" + gofakeit.LetterN(8)
+
+	resourceAIdentifier := "billing-api-" + gofakeit.LetterN(8)
+	resourceA := createResourceWithId(t, resourceAIdentifier)
+	permissionA := createPermissionWithId(t, resourceA.Id, sharedPermissionIdentifier)
+
+	resourceBIdentifier := "reports-api-" + gofakeit.LetterN(8)
+	resourceB := createResourceWithId(t, resourceBIdentifier)
+	createPermissionWithId(t, resourceB.Id, sharedPermissionIdentifier)
+
+	// The client holds resource A's permission and nothing else.
+	err = database.CreateClientPermission(nil, &models.ClientPermission{
+		ClientId:     client.Id,
+		PermissionId: permissionA.Id,
+	})
+	assert.NoError(t, err)
+
+	scopeA := fmt.Sprintf("%s:%s", resourceAIdentifier, sharedPermissionIdentifier)
+	scopeB := fmt.Sprintf("%s:%s", resourceBIdentifier, sharedPermissionIdentifier)
+
+	// Denied leg: same permission identifier, different resource. Client credentials
+	// consumes no one-shot resource, so the two legs may run in either order.
+	t.Run("the same identifier on an ungranted resource is denied", func(t *testing.T) {
+		httpClient := createHttpClient(t)
+		data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+			"grant_type":    {"client_credentials"},
+			"client_id":     {client.ClientIdentifier},
+			"client_secret": {clientSecret},
+			"scope":         {scopeB},
+		})
+
+		assert.Equal(t, "invalid_scope", data["error"])
+		assert.Equal(t,
+			fmt.Sprintf("Permission to access scope '%s' is not granted to the client.", scopeB),
+			data["error_description"])
+		assert.Nil(t, data["access_token"], "no token may be issued for an ungranted resource")
+	})
+
+	// Granted leg: the positive control. Without it the test above would also pass
+	// against an implementation that rejected everything.
+	t.Run("the granted resource still works", func(t *testing.T) {
+		httpClient := createHttpClient(t)
+		data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+			"grant_type":    {"client_credentials"},
+			"client_id":     {client.ClientIdentifier},
+			"client_secret": {clientSecret},
+			"scope":         {scopeA},
+		})
+
+		assert.NotNil(t, data["access_token"])
+		scope, ok := data["scope"].(string)
+		assert.True(t, ok, "scope should be a string")
+		assert.Equal(t, scopeA, scope)
+	})
+}
+
+// TestToken_ClientCred_AuthServerScopeNotReachableByCollision is the escalation case
+// from #104, against the REAL authserver resource and its real built-in "manage"
+// permission as seeded at startup, rather than a fixture that resembles them.
+//
+// "manage" is exactly the kind of generic identifier the docs encourage on a custom
+// resource, and authserver:manage is full Admin API access. Before the fix, a client
+// holding <custom>:manage received a token carrying authserver:manage.
+func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	// A custom resource whose permission identifier collides with the built-in one.
+	customResourceIdentifier := "billing-api-" + gofakeit.LetterN(8)
+	customResource := createResourceWithId(t, customResourceIdentifier)
+	customManage := createPermissionWithId(t, customResource.Id, constants.ManagePermissionIdentifier)
+
+	err = database.CreateClientPermission(nil, &models.ClientPermission{
+		ClientId:     client.Id,
+		PermissionId: customManage.Id,
+	})
+	assert.NoError(t, err)
+
+	// Confirm the collision really exists against the seeded authserver resource,
+	// otherwise this test could pass because there was nothing to collide with.
+	authserverResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	assert.NoError(t, err)
+	assert.NotNil(t, authserverResource)
+	authserverPermissions, err := database.GetPermissionsByResourceId(nil, authserverResource.Id)
+	assert.NoError(t, err)
+	foundBuiltInManage := false
+	for _, perm := range authserverPermissions {
+		if perm.PermissionIdentifier == constants.ManagePermissionIdentifier {
+			foundBuiltInManage = true
+			assert.NotEqual(t, customManage.Id, perm.Id,
+				"the fixture must be two distinct permission rows sharing one identifier")
+			break
+		}
+	}
+	assert.True(t, foundBuiltInManage,
+		"the authserver resource must define the built-in 'manage' permission for this test to mean anything")
+
+	escalatedScope := constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier
+
+	httpClient := createHttpClient(t)
+	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"scope":         {escalatedScope},
+	})
+
+	assert.Equal(t, "invalid_scope", data["error"])
+	assert.Equal(t,
+		fmt.Sprintf("Permission to access scope '%s' is not granted to the client.", escalatedScope),
+		data["error_description"])
+	assert.Nil(t, data["access_token"], "an admin-capable token must not be issued")
+
+	// The client's genuine grant is unaffected.
+	genuineScope := fmt.Sprintf("%s:%s", customResourceIdentifier, constants.ManagePermissionIdentifier)
+	data = postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"scope":         {genuineScope},
+	})
+	assert.NotNil(t, data["access_token"])
+	assert.Equal(t, genuineScope, data["scope"])
 }

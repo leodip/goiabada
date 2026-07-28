@@ -720,23 +720,33 @@ func (val *TokenValidator) validateClientCredentialsScopes(scope string, client 
 			return err
 		}
 
-		permissionExists := false
-		for _, perm := range permissions {
-			if perm.PermissionIdentifier == parts[1] {
-				permissionExists = true
+		// Resolve the requested permission ON THIS RESOURCE. `permissions` is already
+		// narrowed to parts[0] by the query above, and (permission_identifier, resource_id)
+		// is unique on every supported engine via idx_permission_identifier_resource, so at
+		// most one row here can match.
+		var requestedPermission *models.Permission
+		for i := range permissions {
+			if permissions[i].PermissionIdentifier == parts[1] {
+				requestedPermission = &permissions[i]
 				break
 			}
 		}
 
-		if !permissionExists {
+		if requestedPermission == nil {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, parts[0], parts[1]),
 				http.StatusBadRequest)
 		}
 
+		// Compare the resource-scoped permission id, never the bare identifier.
+		// client.Permissions is loaded by ClientLoadPermissions across EVERY resource, so a
+		// bare identifier comparison here matched any permission the client held anywhere: a
+		// client granted "billing-api:read" was handed "reports-api:read", and one granted
+		// "<custom>:manage" was handed "authserver:manage" and with it the whole Admin
+		// API (#104).
 		clientHasPermission := false
 		for _, perm := range client.Permissions {
-			if perm.PermissionIdentifier == parts[1] {
+			if perm.Id == requestedPermission.Id {
 				clientHasPermission = true
 				break
 			}
