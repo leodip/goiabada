@@ -24,6 +24,20 @@ The resulting scope will be: `product-api:delete-product`
 
 This scope can then be requested in authorization requests and will appear in access tokens, allowing fine-grained access control to your APIs and resources.
 
+### Permission identifiers are scoped to their resource
+
+A permission identifier only has meaning within the resource it belongs to. Two resources can each
+define a permission called `read`, and those are **two distinct permissions**: granting one conveys
+nothing about the other.
+
+So if you have `product-api:read` and `reports-api:read`, a client or user granted
+`product-api:read` cannot use `reports-api:read`. You must grant each one separately.
+
+This is worth knowing because reusing short identifiers like `read`, `write` and `delete` across
+resources is normal and expected, and it is what makes the resource half of the scope load-bearing
+rather than decorative. It applies to the `authserver` resource too: a `manage` permission you
+create on your own resource is unrelated to the built-in `authserver:manage`.
+
 ## System-level resource
 
 The `authserver` resource is a **system-level resource** used internally by Goiabada. It has special protections:

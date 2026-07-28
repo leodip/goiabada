@@ -920,6 +920,11 @@ func (val *TokenValidator) validateROPCScopes(scope string, user *models.User) (
 				http.StatusBadRequest)
 		}
 
+		// An explicitly requested resource scope is retained in the grant. Unlike the authorize
+		// endpoint, this function has no guard against requesting authserver:userinfo directly, so
+		// a user who holds that permission can put it here deliberately rather than having it
+		// injected. The refresh path relies on that distinction; see the injected-userinfo exception
+		// in ValidateTokenRequest.
 		validatedScopes = append(validatedScopes, scopeStr)
 	}
 
