@@ -104,6 +104,71 @@ func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) ht
 	}
 }
 
+// RequireUserBoundToken rejects bearer tokens that do not represent an authenticated
+// user. Endpoints behind this guard resolve the acting user from the `sub` claim, and
+// for a client_credentials token `sub` is the CLIENT identifier, not a user subject
+// (token_issuer.go GenerateTokenResponseForClientCred). A client whose identifier
+// happened to equal a user's subject could therefore act as that user: a 36-character
+// UUID is a valid client identifier whenever its first hex digit is a-f.
+//
+// Neither existing guard catches this. RequireBearerTokenScope checks only the scope
+// string, and RequireValidSession deliberately passes through tokens with no `sid`.
+//
+// The discriminator is the `auth_time` claim, NOT `sid`. `sid` is conditional: it is set
+// only when a session exists, so ROPC tokens issued without a browser session have none
+// and requiring it would break them. `auth_time` is set unconditionally by
+// generateAccessTokenCore, the single generator every user access token passes through
+// (authorization code, authorization code refresh, implicit, ROPC, ROPC refresh), while
+// the client_credentials claim set is built separately and never contains it.
+//
+// Presence only, never the value. That is safe because JwtAuthorizationHeaderToContext
+// stores a token in this context key only after DecodeAndValidateTokenString succeeds, so
+// claims reaching here are server-issued and cannot be forged. It is also necessary: on
+// the ROPC refresh path the value is wrong (createTokenInputFromROPC passes `now`, so a
+// refreshed token reports the refresh moment as the authentication moment), a pre-existing
+// defect this guard neither depends on nor fixes.
+//
+// This is a dependency, not an assumption: if a future change ever puts an unvalidated
+// token into ContextKeyBearerToken, this guard weakens with it. And if a sixth user-token
+// path is ever added that bypasses generateAccessTokenCore, this guard silently locks it
+// out of these endpoints. It fails closed, which is the right direction for a guard whose
+// job is to establish that a user is present.
+func RequireUserBoundToken() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Mirrors RequireBearerTokenScope exactly, so this guard introduces no new
+			// response shapes for the two "no usable token" cases.
+			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
+			if bearerTokenValue == nil {
+				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized, true)
+				return
+			}
+
+			jwtToken, ok := bearerTokenValue.(oauth.JwtToken)
+			if !ok {
+				emitAuthError(w, "INVALID_TOKEN_FORMAT", "Invalid token format.", http.StatusUnauthorized, true)
+				return
+			}
+
+			if _, hasAuthTime := jwtToken.Claims["auth_time"]; !hasAuthTime {
+				slog.Warn("rejecting bearer token on a user-context endpoint: no auth_time claim, so the token was not issued for a user",
+					"sub", jwtToken.GetStringClaim("sub"))
+				// RFC 6750 §3.1 defines only invalid_request, invalid_token and
+				// insufficient_scope, none of which means "wrong token type". emitAuthError
+				// maps every bearer 403 to insufficient_scope, which keeps the
+				// WWW-Authenticate header conformant; the JSON ErrorCode carries the precise
+				// reason, which is how every other guard in this file distinguishes its cases.
+				emitAuthError(w, "USER_CONTEXT_REQUIRED",
+					"This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted.",
+					http.StatusForbidden, true)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // RequireValidSession rejects bearer tokens whose `sid` claim no longer
 // resolves to an active, non-expired UserSession. This closes the gap left
 // open by stateless JWT access tokens: when an authorization code is replayed

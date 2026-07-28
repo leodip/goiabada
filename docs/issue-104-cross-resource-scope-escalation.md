@@ -12,6 +12,13 @@ the dead `AuditROPCAuthFailed` constant. None is a gate in either direction: #12
 of code this spec leaves correct, and #125 and #126 concern a claim value and an audit constant
 that neither vulnerability here depends on.
 
+**Found during verification and fixed here rather than filed:** ROPC refresh tokens could not be
+redeemed at all when the token requested `openid`, because the server re-validated a scope it had
+injected itself. Section 3.6, decision 19, stage 7. It is in this spec because stage 6's test
+cannot pass without either this fix or a workaround that misrepresents what the test exercises.
+Note the contrast with #125, which also concerns refreshed ROPC tokens: that one is a wrong
+`auth_time` **value** and is still deferred, while this one made the grant unusable.
+
 **Note on this spec's relationship to the issue.** The issue's diagnosis, its cited mechanism
 and its recommended fix are all correct, and this spec adopts them. Verification added four
 things the issue does not contain: the escalation reaches full Admin API access rather than a
@@ -27,9 +34,12 @@ of this spec departed from it, comparing a set of permission ids rather than the
 one, on a false premise about which engines enforce `(permission_identifier, resource_id)`
 uniqueness. The answer is all four. Decision 18 records the correction and everything it touched.
 
-**This spec therefore covers two vulnerabilities.** Stage 6 is independent of stages 1 through
-5 and could land in either order. It is included here rather than filed separately because the
-release note cannot describe `authserver:manage-account` accurately without it.
+**This spec therefore covers two vulnerabilities and one functional defect.** Stage 6 is
+independent of stages 1 through 5 and could land in either order. It is included here rather than
+filed separately because the release note cannot describe `authserver:manage-account` accurately
+without it. Stage 7 fixes a ROPC refresh defect found while writing stage 6's tests, where the
+server rejects a scope it injected itself; it is in this spec rather than a separate issue because
+stage 6's test currently carries a workaround for it that stage 7 removes.
 
 ---
 
@@ -314,6 +324,10 @@ Independently: endpoints that act on a user resolved from `sub`, namely `/api/v1
 regardless of its scopes, so a client identifier that happens to equal a user's subject conveys
 nothing.
 
+Independently again: a ROPC refresh token can be redeemed. The server never rejects a refresh
+because of a scope it injected into the token itself, and this holds for refresh tokens already
+issued before the fix as well as new ones.
+
 ### Out of scope
 
 - **Unifying the four scope-handling sites into one helper.** `authorize_validator.go:51`,
@@ -340,6 +354,10 @@ nothing.
   stage 6's discriminator, and independent of both vulnerabilities here. Stage 6 reads the
   claim's presence and never its value, so it is unaffected. Filed as
   [#125](https://github.com/leodip/goiabada/issues/125).
+- ~~**ROPC refresh rejects a scope the server injected itself.**~~ **Moved into scope**, see
+  section 3.6, decision 19 and stage 7. Found while writing stage 6 step 4, where it blocked the
+  ROPC refresh case outright. It is fixed here rather than filed separately because stage 6's
+  test carries a workaround for it that only stage 7 can remove.
 - **The dead `AuditROPCAuthFailed` constant.** Declared and listed but logged by nothing. Filed
   as [#126](https://github.com/leodip/goiabada/issues/126), which deliberately does not
   presuppose that wiring it up is the right answer.
@@ -352,9 +370,10 @@ nothing.
 
 ## 3. Proposed solution
 
-Five changes. Sections 3.1 through 3.4 address the scope escalation, in decreasing order of
+Six changes. Sections 3.1 through 3.4 address the scope escalation, in decreasing order of
 importance, and 3.1 is the security fix and stands alone. Section 3.5 addresses the separate
-user-context vulnerability and is independent of the other four.
+user-context vulnerability and is independent of the other four. Section 3.6 fixes an unrelated
+ROPC refresh defect and is independent of everything else here.
 
 ### 3.1 Compare the resource-scoped permission ID
 
@@ -635,14 +654,115 @@ Applied at `routes.go:78-79` (`/userinfo`, both methods) and the `/api/v1/accoun
 `:304-308`, after the existing scope check so that an insufficient-scope caller still gets the
 403 it gets today.
 
+### 3.6 Stop ROPC refresh rejecting a scope the server injected
+
+**The defect.** A ROPC token that requested `openid` cannot be refreshed at all, unless the user
+separately holds `authserver:userinfo`. Executed: the refresh returns `invalid_grant`, "Scope
+'authserver:userinfo' is not recognized. The user does not have the 'authserver:userinfo'
+permission."
+
+Three pieces combine:
+
+1. `generateAccessTokenCore` appends `authserver:userinfo` to the scope whenever an OIDC scope is
+   present (`token_issuer.go:697-704`), so the issued token can reach `/userinfo`. It returns that
+   **post-injection** scope to its caller.
+2. `GenerateTokenResponseForROPC:1135` passes that returned scope, not the validated
+   `input.Scope`, to `generateRefreshTokenForROPC`, which stores it in `RefreshToken.Scope`.
+3. On refresh, the validator re-checks every non-OIDC scope against the user's grants
+   (`token_validator.go:547-557`). For ROPC it reads `refreshToken.Scope` (`:396`); for the
+   authorization code grant it reads `refreshToken.Code.Scope` (`:417`), which is pre-injection.
+
+So the server injects a scope, records it as though the user had been granted it, then refuses to
+refresh because the user was never granted it.
+
+**Why only ROPC breaks.** The authorization code path stores an equally polluted
+`RefreshToken.Scope` (`:147` passes `scopeFromAccessToken` too), but nothing reads it: the
+validator consults `Code.Scope` instead. ROPC has no `Code` row, so `RefreshToken.Scope` plays
+that role and the pollution becomes load-bearing.
+
+**Why it went unnoticed.** No test redeems a ROPC refresh token. The four ROPC tests that mention
+refresh assert only that `refresh_token` is non-empty (`ropc_flow_test.go:102`, `:144`, `:457`,
+`:637`). Requesting `openid` is the normal case for ROPC, so this is not an edge case.
+
+**The only workaround is absurd.** An operator has to grant every affected user the built-in
+`authserver:userinfo` permission, for a scope the server is already appending to their tokens
+unconditionally. That does work, which is why stage 6's ROPC test carries exactly that grant until
+stage 7 removes it, but it means configuring a permission to satisfy a check the server should
+never have applied.
+
+**Two changes, each with its own reason**, per decision 19:
+
+```go
+// 1. token_issuer.go:1135 — record what was granted, not what was decorated.
+//    input.Scope is validateResult.Scope, the output of validateROPCScopes.
+refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(
+    settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
+```
+
+```go
+// 2. token_validator.go:547 — never re-check a scope the server injected.
+//
+// Conditioned on the stored scope carrying an OIDC scope, because that is EXACTLY when the
+// server injects (token_issuer.go:670-676 sets addUserInfoScope only inside
+// `if oidc.IsIdTokenScope(s)`). Unconditional would be wrong: see below.
+storedScopeHasOidcScope := false
+for _, s := range strings.Split(tokenScope, " ") {
+    if oidc.IsIdTokenScope(s) {
+        storedScopeHasOidcScope = true
+        break
+    }
+}
+// ... then, inside the per-scope loop:
+if !oidc.IsIdTokenScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) &&
+    !(storedScopeHasOidcScope && inputScopeStr == userInfoScope) {
+```
+
+The first fixes newly issued refresh tokens and aligns ROPC with the authorization code grant's
+data model. The second fixes refresh tokens **already issued and stored**, which the first cannot
+reach: offline refresh tokens can live for weeks, so without it every existing ROPC refresh token
+stays broken until it expires.
+
+**Why the exclusion must be conditional, and this corrects an earlier draft.** That draft skipped
+`authserver:userinfo` unconditionally and claimed the change granted nothing new. Both were wrong,
+and the reason is that ROPC can carry this scope for a second, unrelated reason. Unlike
+`/auth/authorize`, `validateROPCScopes` has **no guard against requesting `authserver:userinfo`
+explicitly** (verified: the userinfo rejection exists only in `authorize_validator.go`). So a ROPC
+request for `scope=authserver:userinfo` alone succeeds whenever the user genuinely holds that
+permission, and because no OIDC scope is present nothing is injected. The stored scope is then
+exactly `authserver:userinfo`, representing a real user grant.
+
+Skipping the re-check unconditionally would mean that for such a token, **revoking the user's
+`authserver:userinfo` permission never takes effect on refresh**. The re-check is the mechanism by
+which revocation reaches an outstanding refresh token, so that is a genuine loss, narrow but real.
+Conditioning on the presence of an OIDC scope reproduces the injection condition exactly, so the
+skip never applies to an explicitly granted scope **without** an OIDC scope, which is the case
+where revocation has to keep working. It does still apply when an explicit grant sits alongside an
+OIDC scope, because the two are indistinguishable in the stored record; see the residual case
+below, where it costs nothing.
+
+**The privilege claim, restated correctly.** For a stored scope containing an OIDC scope, skipping
+the re-check grants nothing: `authserver:userinfo` is appended to every such token regardless of
+what the user holds, so re-validating it against user grants is a category error. That argument
+does **not** extend to a stored scope without an OIDC scope, which is why the condition exists.
+
+**One residual case, harmless and worth recording.** A user who explicitly requested
+`openid authserver:userinfo` while holding the permission produces a stored scope indistinguishable
+from the injected case, because the injection is idempotent
+(`if !slices.Contains(scopes, userInfoScopeStr)`). Revocation therefore will not bite on refresh
+for that token. This is harmless for the reason above: the token carries `openid`, so it would
+receive `authserver:userinfo` anyway. The information needed to separate the two cases was never
+recorded, and inventing it is not worth a schema change for a scope that is granted implicitly to
+every OIDC-scoped token.
+
 ### Why this is safe
 
 **The security fix can only tighten.** Every request it newly rejects is one where the client
 does not hold the requested permission on the requested resource. No client holding a genuine
 grant sees any change, because a genuine grant is a `clients_permissions` row pointing at exactly
 the permission the resolve step found. There is no input for which the new code accepts something
-the old code rejected. Executed across 38 cases, 7 change outcome and all 7 change from accept to
-reject.
+the old code rejected. Measured against the implemented code: 7 unit cases change outcome, and all
+7 change from accept to reject. Confirmed by reverting the ownership check to the bare-identifier
+form and re-running, which fails exactly those 7 and no others.
 
 That holds for the single-id form because the resolve step runs against a list already narrowed
 to the requested resource, on which the requested identifier can appear at most once. An earlier
@@ -652,7 +772,9 @@ rested on a false premise about the schema.
 **The normalization grants nothing that was not already grantable.** It newly accepts scope
 strings that differ from an already-accepted one by whitespace or a repeated scope alone, which
 changes how a request is written and never which `resource:permission` pairs are checked.
-Executed across the same 38 cases, 9 change outcome this way.
+9 cases are expected to change outcome this way. **Predicted, not measured**: stage 2 is not
+implemented, and the harness that produced this figure is withdrawn, per the "Case execution" note
+in section 5. Confirm the count when stage 2 lands.
 
 Decision 15 is what makes that claim hold. Without it, a scope of `"   "` would normalize to
 empty, fall into the all-permissions branch at `:295`, and turn a rejected malformed request
@@ -660,7 +782,8 @@ into a token carrying every permission the client holds. That grants nothing the
 not obtain by omitting `scope` entirely, so it is not an escalation, but it converts an
 accidentally malformed least-privilege request into a maximal one, which is not a property to
 give away in a security fix. With the rejection in place, three further cases change outcome and
-all three stay rejections, differing only in producing a message that names the problem.
+all three stay rejections, differing only in producing a message that names the problem. Predicted
+on the same basis as the 9 above.
 
 The two sets overlap in exactly one case, a duplicated scope that is also cross-resource
 (`reports-api:read reports-api:read` against a client holding only `billing-api:read`). It
@@ -854,6 +977,7 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
     **Consequence to accept knowingly:** stage 6 ships a fix for a vulnerability whose details
     reach the public for the first time in the release note. Operators learn of it and of its
     remedy simultaneously, with no window in which the flaw is described but unpatched.
+
 
 12. **The denial event covers any grant type, keyed on `invalid_scope`.** Status: **Decided**
 
@@ -1062,13 +1186,81 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
     regression case that carries it. The 7 accept-to-reject unit cases and both integration tests
     involve no twins and were re-run against the amended code.
 
+19. **Fix the ROPC refresh defect in this spec, at both the issuer and the validator.**
+    Status: **Decided** (2026-07-27)
+
+    Section 3.6 has the mechanism. Two changes: stop storing the post-injection scope on the ROPC
+    refresh token (`token_issuer.go:1135`), and stop re-checking the injected
+    `authserver:userinfo` against the user's grants on refresh (`token_validator.go:547`),
+    **conditioned on the stored scope carrying an OIDC scope**.
+
+    **Why in this spec rather than a separate issue**, unlike #125 and #126 which were both
+    deferred. Stage 6's ROPC refresh test cannot pass without either this fix or a workaround, and
+    the workaround is a grant of `authserver:userinfo` to the test user that misrepresents what
+    the test is exercising. Shipping stage 6 with that workaround, plus an unscheduled issue
+    describing why it is there, is worse than fixing a two-line defect in the same release. This
+    is the same reasoning decision 17 applied to the user-context gap.
+
+    **Rejected: the validator change alone.** It fixes both new and existing tokens and is enough
+    to close the bug. But it leaves the ROPC refresh row recording a scope the user was never
+    granted, which is the thing that made this bug possible, and it leaves ROPC's data model
+    diverging from the authorization code grant's for no reason.
+
+    **Rejected: the issuer change alone.** It is the more principled half, but it only fixes
+    refresh tokens issued after deployment. Offline refresh tokens can live for weeks, so every
+    ROPC refresh token already in a deployed database would stay broken until expiry, and the
+    release note would have to tell operators to have their users re-authenticate. The validator
+    change makes the fix retroactive.
+
+    **Rejected: dropping the injection instead**, so `authserver:userinfo` never enters the scope
+    string and nothing downstream needs to know about it. That is arguably the real root cause,
+    but it changes what `/userinfo` accepts for **every** grant and every existing token, since
+    `RequireBearerTokenScope` matches the scope claim. That is a much larger blast radius than the
+    defect warrants, and it would break every currently valid user token's `/userinfo` access.
+
+    **Rejected, having previously been adopted: an unconditional exclusion.** An earlier draft
+    skipped `authserver:userinfo` in the re-check regardless of the rest of the stored scope, and
+    asserted the change granted nothing new. `validateROPCScopes` has no guard against requesting
+    that scope explicitly, so a ROPC token can carry it as a genuine user grant with no OIDC scope
+    and no injection. Skipping unconditionally would mean revoking that user's permission never
+    takes effect on refresh, which is exactly the loss the re-check exists to prevent. Section 3.6
+    has the corrected reasoning and the one residual case that remains, which is harmless.
+    Surfaced by code review, not by the case table, because no case in that table had a stored
+    scope without an OIDC scope.
+
+    **Consequence to note, and it applies only to the injected case.** After the issuer change,
+    `RefreshToken.Scope` records `validateResult.Scope`, so it contains `authserver:userinfo` only
+    when the original request asked for it. Two outcomes, and an earlier draft of this decision
+    described the first as though it were both:
+
+    - Original request did **not** include it (the normal case, e.g. `scope=openid`, where the
+      scope was injected). The stored scope no longer carries it, so a refresh explicitly
+      requesting `scope=authserver:userinfo` is now rejected by the down-scope check at `:488` as
+      outside the original grant. Nothing is lost, because the scope is re-injected into the new
+      access token regardless.
+    - Original request **did** include it explicitly, and the user held the permission.
+      `validateROPCScopes` returns explicitly requested resource scopes in its output
+      (`:846`), so the stored scope still contains it and a refresh requesting it still succeeds
+      while the user retains the permission. **Unchanged by this stage.**
+
+    That earlier draft also justified the rejection by noting the scope cannot be requested at
+    `/auth/authorize`. That is true but irrelevant here: `/auth/authorize` is not on the ROPC path,
+    and it is precisely because `validateROPCScopes` has no equivalent guard that the second
+    outcome above exists at all.
+
+    **Not a privilege change**, per section 3.6: the scope is appended to every user token
+    carrying an OIDC scope, so declining to re-validate it grants nothing new.
+
 ---
 
 ## 5. Implementation plan
 
 Stages are independently reviewable and land as separate commits. Stage 1 stands alone and is
 the only one that closes the **#104** vulnerability. Stage 6 closes the separate user-context
-vulnerability and is likewise self-contained; neither depends on the other.
+vulnerability and is likewise self-contained; neither depends on the other. Stage 7 fixes the
+unrelated ROPC refresh defect and is self-contained too, with one ordering note: it removes a
+workaround that stage 6's test carries, so it must land after stage 6 or the two must be
+reconciled by hand.
 
 **Where tests can run.** Unit tests run anywhere with `go test`. Everything under
 `src/authserver/tests/integration/` requires the dev container
@@ -1076,22 +1268,36 @@ vulnerability and is likewise self-contained; neither depends on the other.
 no tailwindcss and cannot resolve the database hostnames. A green local `go test` proves
 nothing about stages whose tests are integration-level.
 
-**Case execution.** Every case below was run against a throwaway implementation of the proposed
-logic before being written down. 38 cases, 38 pass, 19 behave differently before and after the
-change. The whole table was re-run from scratch three times, after decision 9 changed the
-sketch, after decision 10 added deduping, and after decision 15 added the provided-but-empty
-rejection. The counts here are from the final run, not carried forward from any earlier one.
+**Case execution.** The tables below were originally validated against a throwaway harness, run
+before any code existed, which reported 38 cases passing with 19 diverging before and after the
+change.
 
-Of the 19 divergences: 7 are the security fix, all accept to reject; 9 are whitespace or
-duplicate normalization, none changing which `resource:permission` pairs are checked; and 3 are
-the whitespace-only rejection.
+**Those harness counts are withdrawn and are not carried forward.** The harness modelled the
+**set-based** ownership check that decision 18 subsequently reversed, so its pass count cannot
+describe the implemented single-id code. Whether any individual harness case would now fail is not
+determinable: the harness was a throwaway from an earlier session and no longer exists, so nothing
+here should be read as a claim either way. The two twin cases it may have covered are gone from the
+suite regardless, per decision 18.
 
-**The harness models the client credentials path only**, so read those three carefully. Within
-client credentials all three stay rejections and merely gain a message that names the problem.
-The same input on **ROPC** is an accept-to-reject change, because `validateROPCScopes:772-775`
-skips empty tokens and `:839-841` returns `"openid"` today. That case is not in the 19, it is
-covered by the handler table in stage 2 step 3, and it is the only accept-to-reject change the
-normalization work introduces.
+What replaces them is the real suite, which is stronger evidence because it runs against the
+shipped code rather than a model of it:
+
+- **Stage 1, measured.** 36 subtests in `TestValidateTokenRequest_ClientCredentials`, all passing.
+  Exactly 7 fail when the ownership check is reverted to the bare-identifier form, all 7
+  accept-to-reject. Two integration tests, both failing against the reverted form. See stage 1's
+  status block.
+- **Stage 2, still predicted.** The 9 whitespace-or-duplicate normalization divergences and the 3
+  whitespace-only rejections below have **not** been executed against real code, because stage 2 is
+  not implemented. Treat those numbers as the design's intent, to be confirmed when stage 2 lands,
+  and update this block then rather than inheriting the figures.
+
+**The withdrawn harness modelled the client credentials path only**, which is why the three
+whitespace-only cases need reading carefully when stage 2 is implemented. Within client credentials
+all three stay rejections and merely gain a message that names the problem. The same input on
+**ROPC** is an accept-to-reject change, because `validateROPCScopes:772-775` skips empty tokens and
+`:839-841` returns `"openid"` today. That case sits outside the three, it is covered by the handler
+table in stage 2 step 3, and it is the only accept-to-reject change the normalization work
+introduces.
 
 ### Stage 1: the security fix
 Status: **Done** (2026-07-27)
@@ -1502,6 +1708,39 @@ Status: **Not started**
    > use the Admin API with `authserver:manage-users`, which is designed for that and is
    > unaffected by this change.
    >
+   > **Also fixed: ROPC refresh tokens could not be redeemed.** Unrelated to the two issues above
+   > and not a security fix, but it lands in the same release.
+   >
+   > A token obtained through the password grant (ROPC) requesting `openid` could not be
+   > refreshed. The refresh returned `invalid_grant`, "Scope 'authserver:userinfo' is not
+   > recognized. The user does not have the 'authserver:userinfo' permission." The server appends
+   > `authserver:userinfo` to any token carrying an OIDC scope so that the token can call
+   > `/userinfo`, recorded that appended scope on the refresh token as though the user had been
+   > granted it, and then refused the refresh because the user never was. Requesting `openid` is
+   > the normal case, so this affected essentially every ROPC integration using refresh tokens.
+   >
+   > **No action needed, and this is not a breaking change.** Refresh tokens issued *before* this
+   > release are fixed too: the server no longer re-validates a scope it injected itself, so
+   > existing tokens start working without re-authentication. The reissued access token continues
+   > to carry `authserver:userinfo`, so `/userinfo` access is unchanged.
+   >
+   > **If you granted users the built-in `authserver:userinfo` permission as a workaround**, you
+   > can remove it, provided your ROPC requests include an OIDC scope such as `openid`. That is
+   > the normal case and the one this bug affected. Keep the grant only if your integration
+   > requests `authserver:userinfo` **explicitly and without any OIDC scope**: the server then has
+   > no way to tell an injected scope from one you deliberately granted, so it still checks the
+   > permission, which is what keeps revoking that permission effective.
+   >
+   > One narrow behaviour change, and it affects a single combination. If your original ROPC
+   > request did **not** ask for `authserver:userinfo` (so the server added it for you) and your
+   > *refresh* request passes `scope=authserver:userinfo` explicitly, that refresh now returns
+   > `invalid_grant`, because the scope is no longer part of the recorded grant. Drop it from the
+   > refresh request: it is still added to the new access token automatically, so you lose nothing.
+   >
+   > If your original request asked for `authserver:userinfo` explicitly and the user holds that
+   > permission, nothing changes: the scope stays part of the recorded grant and refresh continues
+   > to work as before.
+   >
    > **Checking your exposure.** This lists clients holding a permission whose identifier also
    > exists on another resource, with the scopes they could previously have reached. There is no
    > single portable form, because `client_credentials_enabled` is a real boolean on PostgreSQL
@@ -1670,16 +1909,30 @@ Status: **Not started**
    for next time.
 
 ### Stage 6: require a user-bound token on user-context endpoints
-Status: **Not started**
+Status: **Done** (2026-07-27)
 
 **No dependency on stages 1 through 5.** This closes a separate gap and could land first. It is
 numbered last only because the scope fix is the issue's subject. Per decision 17.
 
-1. Add `RequireUserBoundToken` middleware. Status: **Not started**
+**Verified by execution.** Three experiments, each run against the real server:
+
+1. **The guard removed from both route groups.** All three rejection cases fail and all five
+   acceptance cases still pass. The failing case returns 200 and the response body is the victim
+   user's full profile with `"email":"...@attacker.example.com"`, so the vulnerability is
+   reproduced rather than argued.
+2. **The discriminator switched to `sid`.** Exactly the two ROPC cases fail; the other six pass.
+   That is what makes those two cases pin the `auth_time` choice rather than restate it.
+3. **The guard as written.** All eight cases pass, on SQLite, PostgreSQL, MySQL and SQL Server.
+
+Full suite green on SQLite (1972 passing). The ordering requirement in step 2 is confirmed by the
+suite rather than by inspection: the 11 `createClientCredentialsTokenWithScope` call sites in
+`api_account*_test.go` still see `INSUFFICIENT_SCOPE`, because the scope check runs first.
+
+1. Add `RequireUserBoundToken` middleware. Status: **Done**
    `src/authserver/internal/middleware/api_auth.go`, alongside the existing guards. Rejects any
    bearer token with no `auth_time` claim, 403, distinct error code, per section 3.5.
 
-2. Apply it to both route groups. Status: **Not started**
+2. Apply it to both route groups. Status: **Done**
    `routes.go:78-79` for `GET` and `POST /userinfo`, and the `/api/v1/account` group at
    `:304-308`. Place it **after** `RequireBearerTokenScope`, so an insufficient-scope caller
    still receives the 403 it receives today. Ordering is load-bearing: putting it first would
@@ -1689,8 +1942,10 @@ numbered last only because the scope fix is the issue's subject. Per decision 17
    `api_account*_test.go` are the ones hitting a route group this step touches. The rest target
    Admin API routes and are unaffected either way.
 
-3. Unit-test the middleware. Status: **Not started**
-   `middleware` package. Four cases, asserting the exact contract in section 3.5: a token
+3. Unit-test the middleware. Status: **Done**
+   `middleware` package. **Five** cases, one more than this step originally specified: a zero
+   `auth_time` was added to pin that the guard reads presence and never the value. Asserting the
+   exact contract in section 3.5: a token
    carrying `auth_time` passes through; a token without it yields 403 with `ErrorCode`
    `USER_CONTEXT_REQUIRED` and a `WWW-Authenticate` header; no bearer token in context yields
    401 `ACCESS_TOKEN_REQUIRED`; a non-`JwtToken` context value yields 401
@@ -1720,7 +1975,7 @@ numbered last only because the scope fix is the issue's subject. Per decision 17
    it needs. **If a sixth user-token path is ever added that bypasses
    `generateAccessTokenCore`, this guard silently locks it out of both endpoints.**
 
-4. Integration-test the asymmetry and the impersonation path. Status: **Not started**
+4. Integration-test the asymmetry and the impersonation path. Status: **Done**
    `src/authserver/tests/integration/`. Eight cases: three rejections and five acceptances, the
    latter covering every path that produces a user access token.
 
@@ -1765,3 +2020,90 @@ numbered last only because the scope fix is the issue's subject. Per decision 17
 
    Asserting the email is unchanged, not merely that the status is 403, matters because a guard
    placed after the mutation would still return an error.
+
+### Stage 7: let a ROPC refresh token actually be redeemed
+Status: **Not started**
+
+**Depends on stage 6 only for a cleanup.** The fix itself is independent, but step 3 removes a
+workaround that stage 6 step 4 introduced, so landing this first means reconciling that by hand.
+Per decision 19.
+
+**Read step 3 before writing any test.** The two changes are **not** jointly necessary for the
+obvious case: either one alone makes a newly issued `openid` ROPC refresh succeed. Step 1 stores a
+clean `openid`, which the re-check skips as an OIDC scope; step 2 tolerates the polluted record.
+So the natural end-to-end test pins neither change individually, and each needs its own assertion.
+An earlier draft of this stage claimed the stage 6 case "passes only once both are in", which is
+false and would have shipped two changes with one test's worth of evidence.
+
+1. Record the granted scope on the ROPC refresh token. Status: **Not started**
+   `token_issuer.go:1135`, pass `input.Scope` rather than `scopeFromAccessToken` to
+   `generateRefreshTokenForROPC`, per section 3.6. `input.Scope` is `validateResult.Scope`, the
+   output of `validateROPCScopes`, verified at `handler_token.go:239-246`.
+
+   **Do not "fix" the authorization code path at `:147` to match.** It passes the post-injection
+   scope too, but nothing reads `RefreshToken.Scope` for that grant: the validator uses
+   `refreshToken.Code.Scope` (`:417`). Changing it would be an untested behaviour change to a
+   working path. Note it in a comment instead, so the asymmetry does not read as an oversight.
+
+2. Stop re-validating the injected scope against user grants. Status: **Not started**
+   `token_validator.go:547`, exclude `authserver:userinfo` from the per-scope user-permission
+   re-check **only when the stored scope also carries an OIDC scope**, per section 3.6.
+
+   **The condition is load-bearing and must carry a comment saying so.** Unconditional would let a
+   revoked, explicitly granted `authserver:userinfo` survive refresh, because `validateROPCScopes`
+   permits requesting that scope directly. The condition reproduces the injection condition at
+   `token_issuer.go:670-676` exactly. Step 5's negative control is what holds this in place.
+
+   **This is what makes the fix retroactive**, and the comment must say so too: step 1 alone leaves
+   every ROPC refresh token already in a deployed database broken until it expires. Build the scope
+   string from `constants.AuthServerResourceIdentifier` and
+   `constants.UserinfoPermissionIdentifier` rather than a literal, matching
+   `authorize_validator.go` and `token_issuer.go:699`.
+
+3. Remove the workaround from stage 6's ROPC helper. Status: **Not started**
+   `user_bound_token_test.go`, `userAccessTokenViaROPC` currently grants the test user
+   `authserver:userinfo` as well as `authserver:manage-account`, with a comment pointing at this
+   defect. Drop the `userinfo` grant and the comment.
+
+   With the grant removed, the `sessionless ROPC refresh token` case fails against unfixed code
+   with `invalid_grant`, "Scope 'authserver:userinfo' is not recognized", and passes once **either**
+   step 1 or step 2 is in. That makes it a regression guard for the defect as a whole and for
+   neither change individually. Steps 4 and 5 are what separate them. Verify by reverting each step
+   on its own and confirming this case passes both times, which is the opposite of what an earlier
+   draft of this stage asserted.
+
+4. Assert the refresh token records the granted scope, which pins step 1. Status: **Not started**
+   `ropc_flow_test.go`. Request `openid` **and nothing else**, then assert on the issued refresh
+   token that its scope is exactly `openid`, with no `authserver:userinfo`. Read it from the
+   decoded refresh token's `scope` claim, and additionally from the persisted
+   `RefreshToken.Scope` row via `database`, since the row is what the validator actually consults.
+
+   Then redeem it and assert a new access token comes back, and that the **new access token's**
+   `scope` claim still contains `authserver:userinfo` because `generateAccessTokenCore` re-injects
+   it. That pair is the whole point of step 1: the scope leaves the refresh token **record**
+   without leaving the issued token.
+
+   Requesting only `openid` matters: it is the normal ROPC case, it needs no permission grants at
+   all, and it is precisely the case that was broken. A test that also requested a resource scope
+   could pass for the wrong reason if the user happened to hold it.
+
+   This case fails against step 2 applied alone, since the polluted scope would still be recorded.
+
+5. Unit-test the validator exclusion, both directions, which pins step 2. Status: **Not started**
+   `token_validator_test.go`. Two ROPC refresh cases, hand-building the stored refresh token so
+   they can express states step 1 no longer produces. This is the only layer that can: after step 1
+   no newly issued token has a polluted scope, so an integration test cannot construct the legacy
+   case without writing a refresh token row directly.
+
+   | Stored `RefreshToken.Scope` | User holds `authserver:userinfo` | Expected |
+   |---|---|---|
+   | `openid authserver:userinfo` (legacy, injected) | no | refresh **succeeds** |
+   | `authserver:userinfo` alone (explicitly granted) | no | refresh **rejected**, `invalid_grant` |
+
+   **The second row is the negative control and is not optional.** It is the only thing standing
+   between this fix and the revocation hole decision 19 rejects, and it fails against the
+   unconditional exclusion an earlier draft specified. Its stored scope deliberately carries no
+   OIDC scope, which is the state no case in the section 3 table covered and the reason the
+   over-broad version looked correct.
+
+   The first row is the retroactive half from step 2, and it fails against step 1 applied alone.

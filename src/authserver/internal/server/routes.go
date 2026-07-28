@@ -75,8 +75,11 @@ func (s *Server) initRoutes() {
 	s.router.With(rateLimiter.LimitResetPwd).Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.database, passwordValidator, auditLogger))
 	s.router.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper))
 	s.router.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
-	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
-	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	// RequireUserBoundToken comes AFTER the scope check so an insufficient-scope caller still
+	// receives the 403 it receives today. GET and POST are separate registrations: a guard added
+	// to only one of them leaves the other reachable.
+	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 	s.router.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	s.router.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
@@ -305,6 +308,10 @@ func (s *Server) initRoutes() {
 		r.Use(middleware.APIDebugMiddleware())
 		r.Use(authHeaderToContext)
 		r.Use(middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier))
+		// After the scope check, so an insufficient-scope caller still receives the 403 it
+		// receives today. These handlers resolve the acting user from `sub`, which is the
+		// client identifier on a client_credentials token, so the token type must be gated.
+		r.Use(middleware.RequireUserBoundToken())
 		r.Use(middleware.RequireValidSession(s.database))
 
 		r.Get("/profile", apihandlers.HandleAPIAccountProfileGet(s.database))

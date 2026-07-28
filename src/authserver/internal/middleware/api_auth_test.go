@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
@@ -1111,6 +1113,132 @@ func TestRequireValidSession(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 		assert.True(t, strings.Contains(rr.Body.String(), "Session has been terminated"))
+	})
+}
+
+// TestRequireUserBoundToken covers the second vulnerability in #104: /userinfo and the
+// Account API resolve the acting user from `sub`, which is the CLIENT identifier on a
+// client_credentials token, and neither existing guard rejects that token type.
+//
+// The asymmetry this guard rests on is that every user access token carries auth_time
+// (set unconditionally by generateAccessTokenCore) and the client_credentials claim set
+// never does. That asymmetry is asserted end to end by the integration tests; these cases
+// assert the guard's own contract.
+func TestRequireUserBoundToken(t *testing.T) {
+	// Assert the ErrorCode and not merely the status, since all three failure modes here
+	// would otherwise be indistinguishable to a caller.
+	decodeErrorCode := func(t *testing.T, rr *httptest.ResponseRecorder) string {
+		t.Helper()
+		var body api.ErrorResponse
+		err := json.Unmarshal(rr.Body.Bytes(), &body)
+		assert.NoError(t, err, "response body should be the standard error envelope")
+		return body.ErrorCode
+	}
+
+	t.Run("passes a token carrying auth_time", func(t *testing.T) {
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sub":       "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+				"scope":     "authserver:manage-account",
+				"auth_time": float64(time.Now().Unix()),
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, token))
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})).ServeHTTP(rr, req)
+
+		assert.True(t, nextCalled, "a user-bound token must reach the handler")
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("rejects a client credentials token, which has no auth_time", func(t *testing.T) {
+		// Exactly the claim set GenerateTokenResponseForClientCred produces: sub is the
+		// client identifier, and the scope required by the route is present. Only the
+		// absence of auth_time distinguishes it.
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sub":   "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+				"scope": "authserver:manage-account",
+				"typ":   "Bearer",
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, token))
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})).ServeHTTP(rr, req)
+
+		assert.False(t, nextCalled, "the handler must not run: it would resolve a user from sub")
+		assert.Equal(t, http.StatusForbidden, rr.Code)
+		assert.Equal(t, "USER_CONTEXT_REQUIRED", decodeErrorCode(t, rr))
+		// RFC 6750 §3.1 has no code for "wrong token type", so the 403 reuses
+		// insufficient_scope in the header while ErrorCode carries the precise reason.
+		assert.Contains(t, rr.Header().Get("WWW-Authenticate"), `error="insufficient_scope"`)
+	})
+
+	t.Run("rejects when no bearer token is in context", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})).ServeHTTP(rr, req)
+
+		assert.False(t, nextCalled)
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Equal(t, "ACCESS_TOKEN_REQUIRED", decodeErrorCode(t, rr))
+		assert.Contains(t, rr.Header().Get("WWW-Authenticate"), `error="invalid_token"`)
+	})
+
+	t.Run("rejects when the context value is not a JwtToken", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, "not-a-token"))
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})).ServeHTTP(rr, req)
+
+		assert.False(t, nextCalled)
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Equal(t, "INVALID_TOKEN_FORMAT", decodeErrorCode(t, rr))
+	})
+
+	t.Run("a zero auth_time is present and therefore accepted", func(t *testing.T) {
+		// The guard reads presence, never the value, and this pins that deliberately. On the
+		// ROPC refresh path the value is already wrong (it reports the refresh moment), so a
+		// guard that validated the value would be asserting a property the issuer does not
+		// currently hold.
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sub":       "some-user-subject",
+				"auth_time": float64(0),
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, token))
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})).ServeHTTP(rr, req)
+
+		assert.True(t, nextCalled)
+		assert.Equal(t, http.StatusOK, rr.Code)
 	})
 }
 
