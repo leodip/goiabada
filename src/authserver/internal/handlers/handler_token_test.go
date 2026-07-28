@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -988,4 +989,225 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	database.AssertNotCalled(t, "BeginTransaction")
 	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+}
+
+// TestNormalizeScope is the exhaustive table for the helper, which is a pure string function, so
+// every other layer's scope tests can stay thin.
+//
+// The last three rows are what step 3's wiring tests build on: normalizeScope cannot distinguish a
+// whitespace-only scope from an omitted one, and does not try to. Both yield "", and the CALLER
+// separates them by also looking at the raw value.
+func TestNormalizeScope(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"collapses a double space", "billing-api:read  billing-api:write", "billing-api:read billing-api:write"},
+		{"collapses a tab", "billing-api:read\tbilling-api:write", "billing-api:read billing-api:write"},
+		{"collapses a newline", "billing-api:read\nbilling-api:write", "billing-api:read billing-api:write"},
+		{"trims leading", " billing-api:read", "billing-api:read"},
+		{"trims trailing", "billing-api:read ", "billing-api:read"},
+		{"trims both", "  billing-api:read  ", "billing-api:read"},
+		{"trims and collapses mixed whitespace", " billing-api:read \t  billing-api:write\t", "billing-api:read billing-api:write"},
+		{"drops an exact duplicate", "billing-api:read billing-api:read", "billing-api:read"},
+		{"drops a later duplicate, preserving first-occurrence order", "billing-api:read billing-api:write billing-api:read", "billing-api:read billing-api:write"},
+		{"spaces only becomes empty", "   ", ""},
+		{"tab only becomes empty", "\t", ""},
+		{"empty stays empty", "", ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, normalizeScope(tc.input))
+		})
+	}
+}
+
+// TestGrantTypeConsumesScope pins which grant types the provided-but-empty rejection applies to.
+// The authorization_code row is the one that matters: it never reads the scope parameter, so
+// rejecting on it would break a valid token exchange.
+func TestGrantTypeConsumesScope(t *testing.T) {
+	testCases := []struct {
+		grantType string
+		want      bool
+	}{
+		{"client_credentials", true},
+		{"refresh_token", true},
+		{"password", true},
+		{"authorization_code", false},
+		{"", false},
+		{"urn:ietf:params:oauth:grant-type:device_code", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.grantType, func(t *testing.T) {
+			assert.Equal(t, tc.want, grantTypeConsumesScope(tc.grantType))
+		})
+	}
+}
+
+// TestHandleTokenPost_ScopeNormalizationWiring is step 3 of the normalization work: it proves the
+// handler actually calls normalizeScope and passes its OUTPUT to the validator, which the pure
+// unit table above cannot show.
+//
+// The validator is mocked with mock.MatchedBy so the scope it receives is captured rather than
+// merely type-checked. Every accepting row returns a validation error afterwards, because what is
+// under test is the input handed over, not what happens next.
+func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
+	// omittedScope distinguishes "no scope parameter in the form" from "scope=<something>".
+	const omittedScope = "\x00omitted\x00"
+
+	testCases := []struct {
+		name      string
+		grantType string
+		rawScope  string
+		// wantScope is what the validator must receive. Only read when wantValidatorCalled.
+		wantScope           string
+		wantValidatorCalled bool
+	}{
+		{
+			name:                "tab-separated scopes are collapsed",
+			grantType:           "client_credentials",
+			rawScope:            "billing-api:read\tbilling-api:write",
+			wantScope:           "billing-api:read billing-api:write",
+			wantValidatorCalled: true,
+		},
+		{
+			name:                "surrounding whitespace is trimmed",
+			grantType:           "client_credentials",
+			rawScope:            "  billing-api:read  ",
+			wantScope:           "billing-api:read",
+			wantValidatorCalled: true,
+		},
+		{
+			name:                "a duplicate scope is dropped",
+			grantType:           "client_credentials",
+			rawScope:            "billing-api:read billing-api:read",
+			wantScope:           "billing-api:read",
+			wantValidatorCalled: true,
+		},
+		{
+			name:                "whitespace-only is rejected before the validator, client credentials",
+			grantType:           "client_credentials",
+			rawScope:            "   ",
+			wantValidatorCalled: false,
+		},
+		{
+			name:                "whitespace-only is rejected before the validator, refresh",
+			grantType:           "refresh_token",
+			rawScope:            "   ",
+			wantValidatorCalled: false,
+		},
+		{
+			// Accept-to-reject change. ROPC currently treats a whitespace-only scope as absent and
+			// issues an "openid" token, so this row is the one behaviour regression the
+			// normalization work introduces, on a deprecated grant receiving malformed input.
+			name:                "whitespace-only is rejected before the validator, ROPC",
+			grantType:           "password",
+			rawScope:            "   ",
+			wantValidatorCalled: false,
+		},
+		{
+			// LOAD-BEARING: fails if someone applies the rejection to every grant type. The
+			// authorization code grant never reads the scope parameter, so a malformed one must be
+			// ignored rather than break an otherwise valid exchange.
+			name:                "whitespace-only is ignored for the authorization code grant",
+			grantType:           "authorization_code",
+			rawScope:            "   ",
+			wantScope:           "",
+			wantValidatorCalled: true,
+		},
+		{
+			// LOAD-BEARING: fails if someone implements the rejection as "empty scope is invalid"
+			// rather than "provided-but-empty is invalid". An omitted scope must still reach the
+			// validator as "", which is what selects the client credentials all-permissions branch.
+			name:                "an omitted scope still reaches the validator as empty",
+			grantType:           "client_credentials",
+			rawScope:            omittedScope,
+			wantScope:           "",
+			wantValidatorCalled: true,
+		},
+		{
+			// LOAD-BEARING, and distinct from the row above: this one encodes an explicitly empty
+			// `scope=` in the form body, which is a DIFFERENT wire format from omitting the
+			// parameter even though PostForm.Get returns "" for both. Verified: Set("scope", "")
+			// encodes as `scope=`, where Has("scope") is true and Get("scope") is "".
+			//
+			// Decision 15 and the release note both promise `scope=` keeps working, because plenty
+			// of HTTP clients serialize empty values and rejecting them would break integrations
+			// for no security gain. Switching the rejection's presence test to PostForm.Has would
+			// honour omission while newly rejecting this, and the row above would not notice. Do
+			// not merge these two rows.
+			name:                "an explicitly empty scope= is treated as omitted",
+			grantType:           "client_credentials",
+			rawScope:            "",
+			wantScope:           "",
+			wantValidatorCalled: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			userSessionManager := mocks_users.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			tokenValidator := mocks_validators.NewTokenValidator(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+
+			form := url.Values{"grant_type": {tc.grantType}, "client_id": {"test_client"}}
+			if tc.rawScope != omittedScope {
+				form.Set("scope", tc.rawScope)
+			}
+
+			req, _ := http.NewRequest("POST", "/token", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rr := httptest.NewRecorder()
+
+			if tc.wantValidatorCalled {
+				// Capture what the handler passed. Returning an error keeps the test focused on
+				// the input rather than on downstream token issuance.
+				validationError := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+					"stop here", http.StatusBadRequest)
+				tokenValidator.On("ValidateTokenRequest", req.Context(), mock.MatchedBy(
+					func(input *validators.ValidateTokenRequestInput) bool {
+						return input.Scope == tc.wantScope
+					})).Return(nil, validationError).Once()
+				httpHelper.On("JsonError", rr, req, validationError).Return()
+
+				handler.ServeHTTP(rr, req)
+
+				// AssertExpectations is what proves the scope matched: an input whose Scope differed
+				// would not satisfy MatchedBy, so the expectation would go unmet.
+				tokenValidator.AssertExpectations(t)
+				httpHelper.AssertExpectations(t)
+				return
+			}
+
+			// Rejected before the validator runs. mocks_validators.NewTokenValidator(t) fails the
+			// test if ValidateTokenRequest is called with no expectation registered, so registering
+			// none is the assertion that it was not reached.
+			var rejection *customerrors.ErrorDetail
+			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+				detail, ok := err.(*customerrors.ErrorDetail)
+				if !ok {
+					return false
+				}
+				rejection = detail
+				return true
+			})).Return()
+
+			handler.ServeHTTP(rr, req)
+
+			httpHelper.AssertExpectations(t)
+			if assert.NotNil(t, rejection, "the handler should have rejected the request") {
+				assert.Equal(t, "invalid_scope", rejection.GetCode())
+				assert.Equal(t, http.StatusBadRequest, rejection.GetHttpStatusCode())
+				assert.Contains(t, rejection.GetDescription(), "provided but contains no scopes")
+			}
+		})
+	}
 }

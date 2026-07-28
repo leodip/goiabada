@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"log/slog"
 	"net/http"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/leodip/goiabada/core/constants"
@@ -36,14 +38,56 @@ func HandleTokenPost(
 			return
 		}
 
+		grantType := r.PostForm.Get("grant_type")
+
+		// Normalize the scope HERE, at the entry point, and not inside the validator. The
+		// placement is load-bearing in both directions:
+		//
+		//   - It must run before token_validator.go's `len(input.Scope) == 0` test, which is what
+		//     selects the client credentials "no scope given, grant everything the client holds"
+		//     branch. Normalizing after that test means a scope of "   " has non-zero length,
+		//     skips the branch, then trims to empty inside validateClientCredentialsScopes and
+		//     hits its early return, so the ownership loop never runs at all. That yields a 500
+		//     from the issuer rather than the 400 the request deserves.
+		//   - It must run before that same test for the opposite reason too: normalizing "   " to
+		//     "" WOULD select the all-permissions branch, turning an accidentally malformed
+		//     least-privilege request into a maximal one. The rejection below is what stops that.
+		//
+		// So the normalization and the rejection belong together, upstream of the validator.
+		// Moving either into the validator reopens one of the two holes.
+		rawScope := r.PostForm.Get("scope")
+		normalizedScope := normalizeScope(rawScope)
+
+		// A scope that was provided but contains nothing is rejected rather than treated as
+		// omitted, for the grant types that read it. Note `rawScope != ""`: PostForm.Get cannot
+		// distinguish `scope=` from an absent parameter, and an explicitly empty `scope=` is
+		// already accepted today as "omitted", so whitespace-only is the only input in this
+		// category. Plenty of clients serialize empty values, and newly rejecting them would break
+		// working integrations for no security gain.
+		//
+		// Deliberately NOT audited: this runs before the client is authenticated, so emitting an
+		// audit event here would record an unverified, caller-chosen client_id and let anyone
+		// manufacture log rows against a legitimate client.
+		//
+		// The message is grant-neutral by necessity. It fires for three grant types whose
+		// omitted-scope behaviour differs (client credentials grants everything the client holds,
+		// refresh preserves the original token's scope, ROPC defaults to "openid"), so naming any
+		// one of those would be wrong for the other two.
+		if rawScope != "" && normalizedScope == "" && grantTypeConsumesScope(grantType) {
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				"The 'scope' parameter was provided but contains no scopes. Either omit it entirely or supply one or more scopes separated by spaces.",
+				http.StatusBadRequest))
+			return
+		}
+
 		input := validators.ValidateTokenRequestInput{
-			GrantType:    r.PostForm.Get("grant_type"),
+			GrantType:    grantType,
 			Code:         r.PostForm.Get("code"),
 			RedirectURI:  r.PostForm.Get("redirect_uri"),
 			CodeVerifier: r.PostForm.Get("code_verifier"),
 			ClientId:     clientId,
 			ClientSecret: clientSecret,
-			Scope:        r.PostForm.Get("scope"),
+			Scope:        normalizedScope,
 			RefreshToken: r.PostForm.Get("refresh_token"),
 			// ROPC parameters (RFC 6749 Section 4.3)
 			Username:      r.PostForm.Get("username"),
@@ -418,4 +462,65 @@ func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool) 
 	}
 
 	return credentials[:colonIdx], credentials[colonIdx+1:], true
+}
+
+// scopeWhitespaceRegex matches any run of whitespace, so runs collapse to a single space.
+// Package-level so it compiles once rather than per request.
+var scopeWhitespaceRegex = regexp.MustCompile(`\s+`)
+
+// normalizeScope canonicalizes a raw `scope` form value: trim, collapse internal whitespace runs
+// to single spaces, and drop duplicates preserving first-occurrence order.
+//
+// This is the same operation AuthContext.SetScope (core/oauth/auth_context.go) already applies on
+// the authorize path, so with this in place all four of the codebase's scope-handling sites agree.
+//
+// What motivates it: the token endpoint used to collapse whitespace onto a LOCAL copy and never
+// assign it back, so the caller's raw string was carried onward. A client separating scopes with a
+// tab therefore passed scope validation, which collapses whitespace before checking, and then hit a
+// **500**: the issuer re-parses the scope, splits it on spaces alone, and the whole tab-joined
+// string arrives as one element whose colon-split yields three parts rather than two
+// (token_issuer.go). Refresh had the same shape and the same outcome. Verified by reverting this
+// normalization and re-running the end-to-end tests, which fail with server_error.
+//
+// So the defect cost functionality rather than security. Note it did NOT produce a token whose
+// scopes silently match nothing: the issuer rejected first. Do not restate that older claim, which
+// this project's spec made twice before it was measured.
+//
+// Deduplication is a consistency fix rather than a correctness one, since HasScope matches the
+// first occurrence and a repeated scope is inert.
+//
+// Callers must handle the "provided but normalizes to empty" case themselves; see the call site in
+// HandleTokenPost. Returning "" for whitespace-only input is deliberate, so that case is
+// distinguishable.
+func normalizeScope(scope string) string {
+	collapsed := scopeWhitespaceRegex.ReplaceAllString(strings.TrimSpace(scope), " ")
+	if collapsed == "" {
+		return ""
+	}
+
+	unique := make([]string, 0, strings.Count(collapsed, " ")+1)
+	for _, scopeStr := range strings.Split(collapsed, " ") {
+		if scopeStr == "" || slices.Contains(unique, scopeStr) {
+			continue
+		}
+		unique = append(unique, scopeStr)
+	}
+
+	return strings.Join(unique, " ")
+}
+
+// grantTypeConsumesScope reports whether a grant type reads the `scope` request parameter.
+//
+// Verified against every use of ValidateTokenRequestInput.Scope in the validator: client
+// credentials, refresh and ROPC read it; the authorization code grant never does, because the
+// scope comes from the stored code. RFC 6749 §4.1.3 does not define `scope` on that request in the
+// first place, so rejecting a malformed one there would break an otherwise valid token exchange
+// for no benefit.
+func grantTypeConsumesScope(grantType string) bool {
+	switch grantType {
+	case "client_credentials", "refresh_token", "password":
+		return true
+	default:
+		return false
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -376,4 +377,61 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 	assert.NoError(t, err)
 	_ = resp2.Body.Close()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
+}
+
+// TestToken_Refresh_TabSeparatedDownScopeIsNormalized is step 5 of the scope normalization work.
+//
+// Refresh had the identical shape as the client credentials defect: token_validator.go collapsed
+// whitespace into a LOCAL variable for the subset comparison and then carried the caller's raw
+// input.Scope onward, where the issuer re-parsed it and failed with a **500**. Measured by reverting
+// the handler to pass the raw scope, where this test fails with server_error. No token was reissued
+// carrying unmatchable scopes; the issuer rejected first.
+//
+// Deliberately thin, because normalizeScope's exhaustive table lives in the handlers package; this
+// asserts only that refresh benefits from the shared helper.
+func TestToken_Refresh_TabSeparatedDownScopeIsNormalized(t *testing.T) {
+	clientSecret := gofakeit.LetterN(32)
+
+	// Not offline_access: it routes the flow through /auth/consent, which createAuthCode does not
+	// walk, and the auth code grant returns a refresh token with these scopes anyway.
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	first := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	})
+
+	refreshToken, ok := first["refresh_token"].(string)
+	assert.True(t, ok, "expected a refresh token: %v", first)
+
+	// Down-scope to a subset of the original grant, separated by a TAB.
+	refreshed := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"refresh_token": {refreshToken},
+		"scope":         {"openid\tprofile"},
+	})
+
+	assert.Nil(t, refreshed["error"], "the refresh should succeed: %v", refreshed)
+
+	newAccessToken, ok := refreshed["access_token"].(string)
+	assert.True(t, ok, "expected a reissued access token: %v", refreshed)
+
+	claims := decodeJWTPayload(t, newAccessToken)
+	scopeClaim, ok := claims["scope"].(string)
+	assert.True(t, ok, "the reissued token should carry a scope claim")
+	assert.NotContains(t, scopeClaim, "\t", "the scope claim must be space-separated")
+
+	// Matched with production's own matcher, not string equality: before the fix the claim was the
+	// raw "openid\tprofile" and HasScope, which splits on spaces only, matched neither.
+	jwtToken := oauth.JwtToken{Claims: claims}
+	assert.True(t, jwtToken.HasScope("openid"), "HasScope should match openid in %q", scopeClaim)
+	assert.True(t, jwtToken.HasScope("profile"), "HasScope should match profile in %q", scopeClaim)
 }

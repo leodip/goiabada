@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -556,4 +557,81 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	})
 	assert.NotNil(t, data["access_token"])
 	assert.Equal(t, genuineScope, data["scope"])
+}
+
+// TestToken_ClientCred_TabSeparatedScopeIsNormalized is the end-to-end half of the scope
+// normalization work, and the only step that shows the defect is actually fixed.
+//
+// The token endpoint used to collapse whitespace onto a local copy and never assign it back, so the
+// caller's raw string was carried onward. A tab-separated request passed scope validation, which
+// collapses whitespace before checking, and then failed with a **500**: the issuer re-parses the
+// scope, splits on spaces alone, and the tab-joined string arrives as one element whose colon-split
+// yields three parts. Measured by reverting the handler to pass the raw scope, where this test fails
+// with server_error and the server logs `invalid scope: <the tab-joined string>`.
+//
+// So no token was issued with silently unmatchable scopes; the issuer rejected first.
+//
+// Asserting string equality on the response alone would not prove the fix, because the assertion
+// and the bug could share the same expectation. So this drives the real HasScope, the same matcher
+// the Admin API middleware uses, over the claim as decoded from the issued token.
+func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	resourceIdentifier := "billing-api-" + gofakeit.LetterN(8)
+	resource := createResourceWithId(t, resourceIdentifier)
+	readPermission := createPermissionWithId(t, resource.Id, "read-"+gofakeit.LetterN(6))
+	writePermission := createPermissionWithId(t, resource.Id, "write-"+gofakeit.LetterN(6))
+
+	for _, permission := range []*models.Permission{readPermission, writePermission} {
+		err = database.CreateClientPermission(nil, &models.ClientPermission{
+			ClientId:     client.Id,
+			PermissionId: permission.Id,
+		})
+		assert.NoError(t, err)
+	}
+
+	readScope := resourceIdentifier + ":" + readPermission.PermissionIdentifier
+	writeScope := resourceIdentifier + ":" + writePermission.PermissionIdentifier
+
+	// A TAB between two genuinely granted scopes.
+	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"scope":         {readScope + "\t" + writeScope},
+	})
+
+	assert.Nil(t, data["error"], "the request should succeed: %v", data)
+
+	responseScope, ok := data["scope"].(string)
+	assert.True(t, ok, "scope should be a string")
+	assert.Equal(t, readScope+" "+writeScope, responseScope,
+		"the response scope should be space-separated")
+	assert.NotContains(t, responseScope, "\t")
+
+	accessToken, ok := data["access_token"].(string)
+	assert.True(t, ok)
+
+	// The claim as the client receives it, matched with production's own matcher.
+	claims := decodeJWTPayload(t, accessToken)
+	jwtToken := oauth.JwtToken{Claims: claims}
+	assert.True(t, jwtToken.HasScope(readScope),
+		"HasScope must match %q in claim %q", readScope, claims["scope"])
+	assert.True(t, jwtToken.HasScope(writeScope),
+		"HasScope must match %q in claim %q", writeScope, claims["scope"])
 }

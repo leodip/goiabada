@@ -240,13 +240,35 @@ Executed against `HasScope`:
 | `"billing-api:read  billing-api:write"` | true, the empty element is inert |
 | `"billing-api:read\tbilling-api:write"` | **false** |
 
-A client separating scopes with a tab passes validation, receives a token, and every scope in
-it is unmatchable by resource servers and by the Admin API middleware alike. Refresh has the
-same shape: `:472` collapses into a local `inputScopeSanitized` for the subset comparison, then
-`:497` puts raw `input.Scope` into the new token. This fails closed and costs functionality,
-not security.
+The table above is accurate about `HasScope`, but the outcome an earlier draft drew from it was
+not. That draft said a client separating scopes with a tab "passes validation, receives a token,
+and every scope in it is unmatchable by resource servers and by the Admin API middleware alike."
+**It never receives a token.** Executed against the real server, before the stage 2 fix, with two
+genuinely granted scopes separated by a tab: the request returns **500**, and the server logs
+`invalid scope: billing-api-x:read-y<TAB>billing-api-x:write-z`. The validator does pass, because
+it collapses whitespace locally. The **issuer** then rejects: `GenerateTokenResponseForClientCred`
+splits the raw scope on spaces alone, so the whole tab-joined string is one element, splitting it
+on `:` yields three parts rather than two, and `token_issuer.go:367` errors out. Refresh has both
+the same defect shape (`:472` collapses into a local `inputScopeSanitized`, then `:497` puts raw
+`input.Scope` into the new token) **and** the same outcome, verified the same way: 500, not a token.
 
-**Leading and trailing whitespace produces an unactionable error.** `handler_token.go:46`
+So the defect costs functionality and nothing else, which is what the earlier draft concluded, but
+by a blunter route: an unusable 500 rather than a token whose scopes silently match nothing.
+
+**This is the second instance of one mistake in this spec, so it is worth naming.** Section 3.2 made
+the same claim about a whitespace-only scope, and was corrected the same way: the request 500s at the
+issuer rather than yielding a token. Both times the reasoning stopped at `ValidateTokenRequest`
+returning the string and did not follow it into the issuer, which parses the scope **again** and
+rejects what the validator tolerated.
+
+**Before asserting that any scope string reaches a token, trace it through
+`generateAccessTokenCore` and `GenerateTokenResponseForClientCred`, both of which re-parse it.**
+Decision 19 is the counter-example worth reading alongside this: it also traced a scope past the
+validator, but into the refresh token's stored record rather than into an issued token, and that
+claim held up under measurement. The lesson is not "such claims are always wrong", it is that the
+issuer is a second gate and the trace has to reach it.
+
+**Leading and trailing whitespace produces an unactionable error.** `handler_token.go` (pre-stage-2)
 passes `r.PostForm.Get("scope")` untrimmed, and the collapse does not trim. Executed:
 `"billing-api:read "` tokenizes to `["billing-api:read", ""]`, and the empty token yields
 `invalid_scope: Invalid scope format: ''`, which names nothing the caller can act on. Of the
@@ -264,7 +286,7 @@ matches the first occurrence, but it is the same divergence pattern. Addressed b
 
 **Scope handling at `:295-305` is downstream of the handler.** The no-scope expansion builds
 its scope server-side from `client.Permissions` after the handler has run, so any normalization
-applied at `handler_token.go:46` does not reach it. In practice this is inert, because the
+applied at `handler_token.go:58-59` does not reach it. In practice this is inert, because the
 expansion iterates distinct permission rows resolved through `GetPermissionsByIds`, so it
 cannot emit a duplicate even though `clients_permissions` carries no unique constraint on
 `(client_id, permission_id)` on any engine. Recorded so nobody later assumes handler-level
@@ -289,7 +311,7 @@ a live bug.
 container.
 
 **Successful issuance is not forensically useful.** `AuditTokenIssuedClientCredentialsResponse`
-(`handler_token.go:138`) logs `clientId` and nothing else. There is no record of which scopes
+(`handler_token.go:182`) logs `clientId` and nothing else. There is no record of which scopes
 were issued to whom, so exploitation before the fix cannot be reconstructed from the audit log.
 
 ---
@@ -424,7 +446,7 @@ at `token_clientcred_test.go:230-241`, and the distinction is worth keeping on i
 ### 3.2 Normalize the scope once, at the handler
 
 ```go
-// handler_token.go:46
+// handler_token.go:58-59 and :90 (post-stage-2)
 Scope: normalizeScope(r.PostForm.Get("scope")),
 ```
 
@@ -466,7 +488,7 @@ carries `"   "` through to `GenerateTokenResponseForClientCred`.
 **What that does not do is issue a token, and an earlier draft of this spec claimed it did.**
 Executed against the issuer's `aud` derivation (`token_issuer.go:361-381`): `"   "` splits into
 four empty strings, each fails the `len(parts) != 2` check at `:367`, so the issuer returns
-`invalid scope: ` and `handler_token.go:133-136` turns it into a **500**. An empty string
+`invalid scope: ` and `handler_token.go:176-179` turns it into a **500**. An empty string
 reaching the same code trips `:376` instead, "unable to generate an access token without an
 audience". Either way no token is minted, so the natural-looking placement converts a 400 into
 a 500, not a rejection into an unchecked scope claim.
@@ -499,10 +521,10 @@ is called out in decision 15 rather than buried here.
 
 ### 3.3 Audit
 
-Add `"scope": validateResult.Scope` to the existing payload at `handler_token.go:138`.
+Add `"scope": validateResult.Scope` to the existing payload at `handler_token.go:182`.
 
 **Note the key naming.** The success payload logs `"clientId": validateResult.Client.Id`
-(`:139`), the numeric primary key. The denial event cannot use that key, because
+(`:183`), the numeric primary key. The denial event cannot use that key, because
 `ValidateTokenRequest` returns `(nil, err)` on failure and discards the client model it
 resolved. The client has at least been **looked up** by then, and on the client credentials path
 it has also been authenticated (`:250-283`, before scope validation at `:307`); the handler
@@ -519,7 +541,7 @@ Add one audit event for any token request denied over scope, keyed on the error 
 than the grant type:
 
 ```go
-// inside the existing if err != nil block at handler_token.go:55
+// inside the existing if err != nil block at handler_token.go:99
 if detail, ok := err.(*customerrors.ErrorDetail); ok && detail.GetCode() == "invalid_scope" {
     auditLogger.Log(constants.AuditTokenScopeDenied, map[string]interface{}{
         "clientIdentifier": input.ClientId,   // string, not the numeric id
@@ -772,18 +794,20 @@ rested on a false premise about the schema.
 **The normalization grants nothing that was not already grantable.** It newly accepts scope
 strings that differ from an already-accepted one by whitespace or a repeated scope alone, which
 changes how a request is written and never which `resource:permission` pairs are checked.
-9 cases are expected to change outcome this way. **Predicted, not measured**: stage 2 is not
-implemented, and the harness that produced this figure is withdrawn, per the "Case execution" note
-in section 5. Confirm the count when stage 2 lands.
+Measured after implementation, in place of the withdrawn harness figure: on both the client
+credentials and the refresh path a tab-separated scope went from a **500** to an issued token whose
+claim `HasScope` matches. Trimming and deduplication are pinned at the handler and helper layers
+rather than end to end. Stage 2's status block has the detail.
 
 Decision 15 is what makes that claim hold. Without it, a scope of `"   "` would normalize to
 empty, fall into the all-permissions branch at `:295`, and turn a rejected malformed request
 into a token carrying every permission the client holds. That grants nothing the client could
 not obtain by omitting `scope` entirely, so it is not an escalation, but it converts an
 accidentally malformed least-privilege request into a maximal one, which is not a property to
-give away in a security fix. With the rejection in place, three further cases change outcome and
-all three stay rejections, differing only in producing a message that names the problem. Predicted
-on the same basis as the 9 above.
+give away in a security fix. With the rejection in place, a whitespace-only scope stays rejected on
+the two grants that already rejected it, gaining a message that names the problem, and becomes
+rejected on ROPC, which previously treated it as absent. Pinned by the handler-wiring table rather
+than counted.
 
 The two sets overlap in exactly one case, a duplicated scope that is also cross-resource
 (`reports-api:read reports-api:read` against a client holding only `billing-api:read`). It
@@ -878,7 +902,7 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
    `:189`, and **logged by nothing**. It is dead, and it is now tracked separately as
    [#126](https://github.com/leodip/goiabada/issues/126).
 
-   The real precedents are `AuditAuthCodeReuseDetected` (`handler_token.go:283`) and
+   The real precedents are `AuditAuthCodeReuseDetected` (`handler_token.go:327`) and
    `AuditUserDisabled` (`:73`), both emitted when a token request is denied. So this event is
    not the project's first of its kind, and both existing ones fire only after the request has
    been authenticated, which is the same standard decision 12 applies.
@@ -912,8 +936,13 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
 
    Discovered while executing the case table: two cases failed against decision 5 as written,
    which surfaced that the collapse at `:688-691` operates on a local copy and never reaches
-   `input.Scope`. Trimming alone leaves a tab-separated request producing a token whose every
-   scope is unmatchable by `HasScope`.
+   `input.Scope`. Trimming alone leaves a tab-separated request broken.
+
+   **The original wording here said "producing a token whose every scope is unmatchable by
+   `HasScope`", which stage 2 measured and disproved.** The issuer re-parses the scope and rejects
+   it, so the request returns a **500** instead. Section 1 has the measurement and the general
+   lesson. The decision itself is unaffected: trimming alone leaves the request broken either way,
+   and full normalization is what fixes it.
 
    **Rejected:** keeping decision 5 as agreed and filing the tab case separately. Same single
    site, same one-line change, and it fixes the identical defect in refresh down-scoping at
@@ -1286,10 +1315,11 @@ shipped code rather than a model of it:
   Exactly 7 fail when the ownership check is reverted to the bare-identifier form, all 7
   accept-to-reject. Two integration tests, both failing against the reverted form. See stage 1's
   status block.
-- **Stage 2, still predicted.** The 9 whitespace-or-duplicate normalization divergences and the 3
-  whitespace-only rejections below have **not** been executed against real code, because stage 2 is
-  not implemented. Treat those numbers as the design's intent, to be confirmed when stage 2 lands,
-  and update this block then rather than inheriting the figures.
+- **Stage 2, measured.** Implemented on 2026-07-28. The harness's 9 normalization and 3
+  whitespace-only figures were **not** reconstructed, deliberately: the harness is gone and a
+  per-case census was never what mattered. Stage 2's status block records the behaviours that were
+  verified instead, each at the layer that can execute it, including the two end-to-end changes that
+  fail when the handler is reverted to pass the raw scope.
 
 **The withdrawn harness modelled the client credentials path only**, which is why the three
 whitespace-only cases need reading carefully when stage 2 is implemented. Within client credentials
@@ -1450,9 +1480,30 @@ forward from the first attempt.
    after this fix the token cannot be obtained, so it is not testable from this direction.
 
 ### Stage 2: normalize the scope at the handler
-Status: **Not started**
+Status: **Done** (2026-07-28)
 
-1. Normalize in `handler_token.go:46`. Status: **Not started**
+**Measured, replacing this stage's predicted figures.** The withdrawn harness put 9 divergences on
+normalization and 3 on the whitespace-only rejection. Those numbers are not reconstructed here: the
+harness is gone, and a per-case census was never the point. What was verified instead, by reverting
+the handler to pass the raw scope and re-running:
+
+| Behaviour | Before | After |
+|---|---|---|
+| client credentials, two granted scopes tab-separated | **500**, server logs `invalid scope: <the tab-joined string>` | token issued, claim space-separated and matchable by `HasScope` |
+| refresh, tab-separated down-scope | **500**, same shape | token reissued, claim space-separated and matchable |
+
+Both were previously believed to yield a token with unmatchable scopes; they yield a 500. Section 1
+carries the correction and the general lesson.
+
+Trimming, deduplication and the whitespace-only rejection are pinned at the layer each belongs to
+rather than end to end: `normalizeScope`'s 12-row table for the string behaviour, and the 9-row
+handler-wiring table for what the validator receives and for which grant types the rejection fires.
+The ROPC accept-to-reject change is asserted at the handler, where the rejection lives, not through
+full ROPC issuance.
+
+Full suite green on SQLite (1979 passing).
+
+1. Normalize in `handler_token.go`, now at `:58-59` (normalize) and `:90` (pass it on). Status: **Done**
    `normalizeScope` and `grantTypeConsumesScope` are unexported helpers in package `handlers`,
    alongside the call site, which is what lets step 2 test them directly.
    Trim, then collapse whitespace runs, per section 3.2. **Add a comment stating why this lives
@@ -1466,7 +1517,9 @@ Status: **Not started**
    fail there with `invalid_scope: Invalid scope format: ''`. The three steps that follow put
    each table at the layer that can actually execute it.
 
-2. Unit-test `normalizeScope` directly. Status: **Not started**
+2. Unit-test `normalizeScope` directly. Status: **Done**
+   Added as `TestNormalizeScope` in `handler_token_test.go`, plus `TestGrantTypeConsumesScope`
+   covering which grant types the rejection applies to.
    A pure string-to-string function, so this table is exhaustive here and thin everywhere else.
    All executed.
 
@@ -1491,9 +1544,11 @@ Status: **Not started**
    **What this layer cannot prove:** that anything calls `normalizeScope`, or that the handler
    passes its output rather than the raw form.
 
-3. Test the handler wiring. Status: **Not started**
-   `handler_token_test.go`, which already mocks the validator at `:67` with
-   `mock.AnythingOfType("*validators.ValidateTokenRequestInput")`. Replace that with
+3. Test the handler wiring. Status: **Done**
+   Added as `TestHandleTokenPost_ScopeNormalizationWiring`, **9** rows: the 8 specified here plus an
+   explicitly empty `scope=` case added by code review, see below.
+   `handler_token_test.go`, which already mocked the validator with
+   `mock.AnythingOfType("*validators.ValidateTokenRequestInput")`. That is replaced with
    `mock.MatchedBy` to capture what the handler actually passed.
 
    | Grant type | Raw form `scope` | Assertion |
@@ -1505,14 +1560,27 @@ Status: **Not started**
    | refresh_token | `"   "` | validator not called, same rejection |
    | ROPC | `"   "` | validator not called, same rejection. **Accept-to-reject change, pins decision 15** |
    | authorization_code | `"   "` | validator **is** called, request proceeds. Pins the exclusion in decision 15 |
-   | client_credentials | omitted entirely | validator receives `""`, no rejection |
+   | client_credentials | omitted entirely, no `scope` key in the form | validator receives `""`, no rejection |
+   | client_credentials | `scope=`, an explicitly empty value | validator receives `""`, no rejection |
 
-   The last two rows are the load-bearing pair. The authorization code row fails if someone
-   applies the rejection to every grant type, and the omitted row fails if someone implements
-   the rejection as "empty scope is invalid" rather than "provided-but-empty is invalid". Both
-   failures are silent otherwise.
+   **Three rows are load-bearing, each against a different plausible wrong implementation, and each
+   fails silently without its row.** The last two are NOT redundant and must not be merged.
 
-4. Assert the issued claim end to end. Status: **Not started**
+   - The **authorization_code** row fails if someone applies the rejection to every grant type. That
+     grant never reads the scope parameter, so rejecting on it would break a valid exchange.
+   - The **omitted** row fails if someone implements the rejection as "empty scope is invalid"
+     rather than "provided-but-empty is invalid". An omitted scope must still reach the validator as
+     `""`, which is what selects the client credentials all-permissions branch.
+   - The **`scope=`** row is the only one that detects a switch of the presence test to
+     `r.PostForm.Has("scope")`. `Has` distinguishes the two wire formats where `Get` does not, so
+     that switch would honour omission while newly rejecting `scope=`, and the omitted row would not
+     notice. Decision 15 and the release note both promise `scope=` keeps working, because HTTP
+     clients commonly serialize empty values. Verified: `url.Values.Set("scope", "")` encodes as
+     `scope=`, where `Has` is true and `Get` is `""`; and applying the `Has` switch fails this row
+     and only this row.
+
+4. Assert the issued claim end to end. Status: **Done**
+   Added as `TestToken_ClientCred_TabSeparatedScopeIsNormalized`. Fails against the raw-scope handler.
    `token_clientcred_test.go`. One test: request two granted scopes separated by a tab, assert
    the response `scope` is space-separated, and assert the decoded access token's `scope` claim
    satisfies `HasScope` for both. Deliberately thin, since step 2 owns the exhaustive table.
@@ -1522,7 +1590,9 @@ Status: **Not started**
    a matchable claim. Asserting string equality alone would not do it, because the assertion and
    the bug would share the same wrong expectation.
 
-5. Add one refresh_token case. Status: **Not started**
+5. Add one refresh_token case. Status: **Done**
+   Added as `TestToken_Refresh_TabSeparatedDownScopeIsNormalized`. Also fails against the raw-scope
+   handler.
    A down-scope request separated by a tab, asserting the reissued token's `scope` claim is
    space-separated and matchable. Deliberately thin: `:472` and `:497` share the defect but the
    normalization is owned by step 2, so this asserts only that refresh benefits from it. Pins
@@ -1532,7 +1602,7 @@ Status: **Not started**
 ### Stage 3: audit
 Status: **Not started**
 
-1. Add `"scope": validateResult.Scope` at `handler_token.go:138`. Status: **Not started**
+1. Add `"scope": validateResult.Scope` at `handler_token.go:182`. Status: **Not started**
    Nothing asserts this payload's shape, verified. `details` is JSON-marshalled into a `TEXT`
    column (`sqlitedb/schema.sql:374`), so there is no width constraint.
 
@@ -2080,7 +2150,7 @@ SQL Server.
 1. Record the granted scope on the ROPC refresh token. Status: **Done**
    `token_issuer.go:1135`, pass `input.Scope` rather than `scopeFromAccessToken` to
    `generateRefreshTokenForROPC`, per section 3.6. `input.Scope` is `validateResult.Scope`, the
-   output of `validateROPCScopes`, verified at `handler_token.go:239-246`.
+   output of `validateROPCScopes`, verified at `handler_token.go:283-290`.
 
    **Do not "fix" the authorization code path at `:147` to match.** It passes the post-injection
    scope too, but nothing reads `RefreshToken.Scope` for that grant: the validator uses
