@@ -12,6 +12,18 @@ the dead `AuditROPCAuthFailed` constant. None is a gate in either direction: #12
 of code this spec leaves correct, and #125 and #126 concern a claim value and an audit constant
 that neither vulnerability here depends on.
 
+**On the line numbers in this spec.** They are re-verified as of 2026-07-28, after stages 1, 2, 3
+and 7 landed. Those stages shifted `token_validator.go`, `handler_token.go` and `token_issuer.go`
+substantially: the client credentials scope validator moved from `:682` to `:733`, and every branch
+inside it moved by 40 to 60 lines. A citation sweep was needed because the stale numbers had come to
+point at plausible but unrelated code, which makes a recorded verification actively misleading rather
+than merely imprecise.
+
+**Expect them to drift again.** Stage 4 edits `token_validator.go:295-305` and will move everything
+below it. When a number looks wrong, locate the anchor by its quoted error message or symbol name,
+which this spec gives alongside nearly every citation, and prefer that over the number. If you land
+here after a stage, re-sweep rather than patching the one number you noticed.
+
 **Found during verification and fixed here rather than filed:** ROPC refresh tokens could not be
 redeemed at all when the token requested `openid`, because the server re-validated a scope it had
 injected itself. Section 3.6, decision 19, stage 7. It is in this spec because stage 6's test
@@ -47,7 +59,7 @@ stage 6's test carried a workaround for it that stage 7 removed.
 
 ### The bug
 
-`validateClientCredentialsScopes` (`src/core/validators/token_validator.go:682-752`) decides
+`validateClientCredentialsScopes` (`src/core/validators/token_validator.go:733-818`) decides
 whether a client may receive a requested `resource:permission` scope. It runs two checks per
 scope. The first confirms the permission exists on the named resource, the second confirms the
 client holds it.
@@ -55,7 +67,7 @@ client holds it.
 The second check discards the resource:
 
 ```go
-// token_validator.go:737-743
+// token_validator.go:798-804
 clientHasPermission := false
 for _, perm := range client.Permissions {
     if perm.PermissionIdentifier == parts[1] {   // parts[0], the resource, is never consulted
@@ -70,12 +82,12 @@ for _, perm := range client.Permissions {
 `GetPermissionsByIds` across every resource. So the loop matches any permission the client
 holds anywhere, on nothing but the bare identifier.
 
-The existence check immediately above (`:723-729`) is correct: it iterates
+The existence check immediately above (`:778-784`) is correct: it iterates
 `GetPermissionsByResourceId(nil, res.Id)`, a list already narrowed to the requested resource.
 The resource-scoped `models.Permission` the ownership check needs is therefore already in hand
 at that point, exactly as the issue says. Only the ownership check drops it.
 
-The issue cites `:731-743` and `:702-729`. The actual blocks are `:737-743` and `:708-735`.
+The issue cites `:731-743` and `:702-729`. The actual blocks are `:798-804` and `:759-790`.
 
 **The validator is the only gate.** `GenerateTokenResponseForClientCred`
 (`src/core/oauth/token_issuer.go:328-337`) copies the validated scope string into the token
@@ -128,13 +140,13 @@ custom resource.
 
 The Admin API authorizes from the token's `scope` claim and nothing else.
 `RequireBearerTokenScope` and `RequireBearerTokenScopeAnyOf`
-(`src/authserver/internal/middleware/api_auth.go:40-99`) call
+(`src/authserver/internal/middleware/api_auth.go:40-105`) call
 `jwtToken.HasScope(...)`, which is an exact string match over the space-split claim
 (`src/core/oauth/jwt_token.go:81-94`). The session gate in front of it does not apply to this
 token type:
 
 ```go
-// api_auth.go:138-142
+// api_auth.go:203-207
 sid := jwtToken.GetStringClaim("sid")
 if sid == "" {
     // Non-session-bound token (client_credentials, ROPC): no session to check.
@@ -171,7 +183,7 @@ user, err := database.GetUserBySubject(nil, subject)
 For a client credentials token, `sub` is the **client identifier**
 (`src/core/oauth/token_issuer.go:356`), not a user subject. Neither route guard catches this:
 `RequireBearerTokenScope` checks only the scope string, and `RequireValidSession` explicitly
-passes through tokens with no `sid` (`api_auth.go:138-142`).
+passes through tokens with no `sid` (`api_auth.go:203-207`).
 
 **A UUID is a valid client identifier.** The validator is
 `^[a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$` with a 38 character maximum and no doubled separators
@@ -187,7 +199,7 @@ So a client whose identifier equals a user's subject, holding `authserver:manage
 **The `/userinfo` half of this discloses nothing, and the spec should not imply otherwise.**
 Every claim beyond `sub` is gated on the token carrying an OIDC scope,
 `jwtToken.HasScope("profile")` and siblings (`handler_userinfo.go:86` onward), and
-`validateClientCredentialsScopes:695-699` rejects every OIDC scope outright for this grant. A
+`validateClientCredentialsScopes:746-750` rejects every OIDC scope outright for this grant. A
 client credentials token can therefore only ever carry `authserver:userinfo`, so `/userinfo`
 returns `sub` alone (`:78`), which is the identifier the caller already supplied. The material
 impersonation impact is the Account API.
@@ -216,8 +228,8 @@ Every other identifier comparison in the codebase was checked. None share the de
 
 | Site | Verdict |
 |---|---|
-| `token_validator.go:725` (existence check) | correct, list narrowed by `GetPermissionsByResourceId` |
-| `token_validator.go:813` (ROPC existence) | correct, same narrowing |
+| `token_validator.go:780` (existence check) | correct, list narrowed by `GetPermissionsByResourceId` |
+| `token_validator.go:874` (ROPC existence) | correct, same narrowing |
 | ROPC ownership, via `UserHasScopePermission` | correct, compares `Id` (`src/core/user/permission_checker.go:81`) |
 | `authorize_validator.go:106` (auth code) | correct, existence-only against the resource's own list |
 | `user_creator.go:55` | correct, iterates the `authserver` resource's own permissions |
@@ -229,7 +241,7 @@ exactly as the issue states.
 
 ### Secondary findings from verification
 
-**Scope normalization is computed and thrown away.** `validateClientCredentialsScopes:688-691`
+**Scope normalization is computed and thrown away.** `validateClientCredentialsScopes:740-743`
 collapses whitespace onto a **local** copy of `scope`. `input.Scope` is never reassigned, so
 `:314` returns the caller's raw string and that is what reaches the token's `scope` claim.
 Executed against `HasScope`:
@@ -273,14 +285,14 @@ passes `r.PostForm.Get("scope")` untrimmed, and the collapse does not trim. Exec
 `"billing-api:read "` tokenizes to `["billing-api:read", ""]`, and the empty token yields
 `invalid_scope: Invalid scope format: ''`, which names nothing the caller can act on. Of the
 four scope-handling sites, `authorize_validator.go:53-54` trims the whole string and
-`validateROPCScopes:772-775` trims per token and skips empties, while
+`validateROPCScopes:833-836` trims per token and skips empties, while
 `validateClientCredentialsScopes` and refresh down-scoping do neither.
 
 **Duplicate scopes are preserved, except on the authorize path.** `AuthContext.SetScope`
 (`src/core/oauth/auth_context.go:56-71`) collapses whitespace, drops duplicates preserving
 first-occurrence order, trims, and assigns the result back to `ac.Scope`. None of the three
 token endpoint paths dedupe: client credentials preserves duplicates, refresh preserves them at
-`:497`, ROPC preserves them at `:836`. So `scope=api:read api:read` yields a token claim of
+`:497`, ROPC preserves them at `:897`. So `scope=api:read api:read` yields a token claim of
 `"api:read api:read"`. Unlike the whitespace defect this breaks nothing, since `HasScope`
 matches the first occurrence, but it is the same divergence pattern. Addressed by decision 10.
 
@@ -310,8 +322,8 @@ a live bug.
 `TestToken_ClientCred_NoScopesGiven` (`token_clientcred_test.go:260`), which needs the dev
 container.
 
-**Successful issuance is not forensically useful.** `AuditTokenIssuedClientCredentialsResponse`
-(`handler_token.go:182`) logs `clientId` and nothing else. There is no record of which scopes
+**Successful issuance is not forensically useful.** Fixed by stage 3, forward-looking only. `AuditTokenIssuedClientCredentialsResponse`
+(`handler_token.go:222`) logs `clientId` and nothing else. There is no record of which scopes
 were issued to whom, so exploitation before the fix cannot be reconstructed from the audit log.
 
 ---
@@ -326,19 +338,31 @@ particular, a grant on a custom resource never yields any `authserver:*` scope.
 Secondarily: the scope string a client sends is normalized once, so the claim in the issued
 token is always matchable by `HasScope` and is free of duplicates, and a non-empty raw scope
 that normalizes to empty is rejected rather than silently promoted to "all permissions";
-every `invalid_scope` returned by the two scope validators, which is every scope denial reached
-**after** the applicable principal has authenticated, leaves an audit record; and a successful
-client credentials request records which scopes were issued.
+every `invalid_scope` returned by the two scope validators leaves an audit record; and a
+successful client credentials request records which scopes were issued.
 
-That boundary is drawn on **where the denial happens**, not on what kind of denial it is, and
-the spec says so rather than dressing it up. It therefore includes authenticated
-malformed-format requests (`:703` and `:786`) alongside genuine ownership denials. Two denials
-sit outside it for unrelated reasons: the handler rejection runs before authentication, and the
-refresh down-scope denial at `:488` is a real authorization denial that the error taxonomy
-cannot isolate. Section 3.3 enumerates all three.
+**That boundary is mechanical, not semantic, and the spec says so rather than dressing it up.**
+Two conditions define it, neither about what kind of denial occurred. The failure must return
+`invalid_scope`, which inside the validator only the two scope validators do. And it must reach the
+single call site, which sits after `ValidateTokenRequest` and so after authentication.
+
+An earlier version of this paragraph glossed that as "every scope denial reached after the
+applicable principal has authenticated". **That is false**: the OIDC-scope rejection at `:747` and
+the refresh down-scope denial at `:488` are both post-authentication too, verified (`:747` runs
+inside `validateClientCredentialsScopes`, called at `:307`, after the client secret check at
+`:250-283`; `:488` follows the refresh path's own check at `:323-341`). They are excluded by the
+error code, not by position.
+
+So coverage includes six authenticated malformed-format and unknown-resource failures (`:754`,
+`:764`, `:787`, `:847`, `:861`, `:881`) alongside the two genuine ownership denials (`:807`,
+`:892`). Three denials sit outside it, for **two different mechanical reasons**: the handler's
+provided-but-empty rejection because it fires **before** authentication, and `:747` and `:488`
+because they return `invalid_request` and `invalid_grant`, codes the taxonomy cannot isolate from
+unrelated failures. `:488` is itself a real authorization denial, so the coverage fails to match the
+semantic category in both directions. Section 3.3 enumerates all three.
 
 The two scope denials that do **not** return `invalid_scope`, the OIDC-scope rejection at
-`token_validator.go:696` and refresh down-scope rejection at `:488`, are outside this goal by
+`token_validator.go:747` and refresh down-scope rejection at `:488`, are outside this goal by
 decision 12.
 
 Independently: endpoints that act on a user resolved from `sub`, namely `/api/v1/account/*` and
@@ -353,7 +377,7 @@ issued before the fix as well as new ones.
 ### Out of scope
 
 - **Unifying the four scope-handling sites into one helper.** `authorize_validator.go:51`,
-  `validateClientCredentialsScopes:682`, `validateROPCScopes:759` and the refresh down-scoping
+  `validateClientCredentialsScopes:733`, `validateROPCScopes:820` and the refresh down-scoping
   block at `:469-498` all tokenize scopes with near-identical code, and the first three share a
   resolve step that could return the resource-scoped `*models.Permission` once, leaving each
   caller to apply only its own ownership rule. This is the structural root cause of this issue:
@@ -482,13 +506,13 @@ than a gap.
 `validateClientCredentialsScopes` instead opens a hole. With `scope="   "`, the
 `len(input.Scope) == 0` test at `:295` runs first and sees three characters, so the
 all-permissions branch is skipped. The validator then trims to empty, hits its own early return
-at `:684-686`, and returns nil **without executing the ownership loop at all**. Line `:314`
+at `:735-737`, and returns nil **without executing the ownership loop at all**. Line `:314`
 carries `"   "` through to `GenerateTokenResponseForClientCred`.
 
 **What that does not do is issue a token, and an earlier draft of this spec claimed it did.**
 Executed against the issuer's `aud` derivation (`token_issuer.go:361-381`): `"   "` splits into
 four empty strings, each fails the `len(parts) != 2` check at `:367`, so the issuer returns
-`invalid scope: ` and `handler_token.go:176-179` turns it into a **500**. An empty string
+`invalid scope: ` and `handler_token.go:216-219` turns it into a **500**. An empty string
 reaching the same code trips `:376` instead, "unable to generate an access token without an
 audience". Either way no token is minted, so the natural-looking placement converts a 400 into
 a 500, not a rejection into an unchecked scope claim.
@@ -502,7 +526,7 @@ vulnerability that does not exist would mislead exactly the reader it is written
 
 **Which grant types the provided-but-empty rejection applies to.** Only those that consume
 `input.Scope`, verified by grepping every use: client credentials (`:295`, `:302`, `:304`,
-`:307`, `:314`), refresh (`:469`, `:472`, `:496`, `:497`) and ROPC (`:666`). The authorization
+`:307`, `:314`), refresh (`:469`, `:472`, `:496`, `:497`) and ROPC (`:717`). The authorization
 code grant **never reads `input.Scope`**, since the scope comes from the stored code, so
 rejecting on it would break an otherwise valid token exchange for no benefit. RFC 6749 section
 4.1.3 does not define `scope` on that request in the first place.
@@ -513,7 +537,7 @@ What the rejection changes per grant type, all executed:
 |---|---|---|
 | client_credentials | `invalid_scope: Invalid scope format: ''` | `invalid_scope`, with a message naming the actual problem |
 | refresh_token | `invalid_grant: Scope '' is not recognized` | same rejection, clearer message |
-| ROPC | **accepted**, `validateROPCScopes:772-775` skips empties and `:839-841` returns `"openid"` | rejected |
+| ROPC | **accepted**, `validateROPCScopes:833-836` skips empties and `:900-902` returns `"openid"` | rejected |
 | authorization_code | ignored entirely | ignored entirely, unchanged |
 
 ROPC is the only accept-to-reject change, on a deprecated grant receiving malformed input. It
@@ -521,15 +545,15 @@ is called out in decision 15 rather than buried here.
 
 ### 3.3 Audit
 
-Add `"scope": validateResult.Scope` to the existing payload at `handler_token.go:182`.
+Add `"scope": validateResult.Scope` to the existing payload at `handler_token.go:222`.
 
 **Note the key naming.** The success payload logs `"clientId": validateResult.Client.Id`
-(`:183`), the numeric primary key. The denial event cannot use that key, because
+(`:223`), the numeric primary key. The denial event cannot use that key, because
 `ValidateTokenRequest` returns `(nil, err)` on failure and discards the client model it
 resolved. The client has at least been **looked up** by then, and on the client credentials path
 it has also been authenticated (`:250-283`, before scope validation at `:307`); the handler
 simply never receives the model. On the ROPC path a public client is never authenticated at all,
-per `:599`. So the denial event carries `clientIdentifier`, the string from the form, and the
+per `:650`. So the denial event carries `clientIdentifier`, the string from the form, and the
 two events do not put different types behind the same key in one log stream. What that string
 attests to varies by grant type, which decision 12 spells out.
 
@@ -557,12 +581,12 @@ decision 15 adds one at the handler. Eight are audited, three deliberately are n
 | Path | Branch | Code | Covered |
 |---|---|---|---|
 | handler | decision 15, non-empty scope normalizing to empty | `invalid_scope` | **no**, see below |
-| client credentials | `:696` OIDC scope requested | `invalid_request` | **no** |
-| client credentials | `:703` malformed pair | `invalid_scope` | yes |
-| client credentials | `:713` unknown resource | `invalid_scope` | yes |
-| client credentials | `:732` permission not on resource | `invalid_scope` | yes |
-| client credentials | `:746` not granted to client | `invalid_scope` | yes |
-| ROPC | `:786`, `:800`, `:820`, `:831` | `invalid_scope` | yes |
+| client credentials | `:747` OIDC scope requested | `invalid_request` | **no** |
+| client credentials | `:754` malformed pair | `invalid_scope` | yes |
+| client credentials | `:764` unknown resource | `invalid_scope` | yes |
+| client credentials | `:787` permission not on resource | `invalid_scope` | yes |
+| client credentials | `:807` not granted to client | `invalid_scope` | yes |
+| ROPC | `:847`, `:861`, `:881`, `:892` | `invalid_scope` | yes |
 | refresh | `:488` down-scope outside the original grant | `invalid_grant` | **no** |
 
 Inside the token validator, `invalid_scope` is returned only by the two scope validators, so the
@@ -579,22 +603,31 @@ with rows naming a legitimate client. The event exists to surface a caller reach
 it was not granted, and an unauthenticated, spoofable row is not that signal; it actively
 degrades it.
 
-The branch is also the wrong *kind* of event. A whitespace-only scope is malformed input, not an
-authorization decision, which is precisely the ground on which `:696` is already excluded below.
-Auditing one and not the other was inconsistent.
+**Being pre-authentication is the whole reason, and no semantic argument supports it.** An earlier
+version of this passage added that a whitespace-only scope "is malformed input, not an authorization
+decision, which is precisely the ground on which `:747` is already excluded". Both halves were
+wrong. This event deliberately covers six authenticated malformed-format and unknown-resource
+branches, so malformed input is plainly not the wrong *kind* of event for it. And `:747` is excluded
+because it returns `invalid_request`, which the predicate cannot isolate, not because of what it
+means.
 
-So the goal in section 2 is worded around authorization denials rather than around the
-`invalid_scope` string, and the accounting is eight of eleven.
+So the goal in section 2 is worded around **authenticated** `invalid_scope` failures, meaning
+those returned by the two scope validators, rather than around the bare `invalid_scope` string
+that the earlier draft used. The qualifier that does the work is *where* the failure happens, not
+what kind it is: it is what excludes the pre-authentication handler branch. The accounting is eight
+of eleven.
 
-**Three branches are deliberately outside it, and the goal in section 2 is worded to match.**
-`:696`, a client credentials request for `openid` or `offline_access`, returns
+**Three branches are deliberately outside it, and section 2 enumerates all three to match.**
+`:747`, a client credentials request for `openid` or `offline_access`, returns
 `invalid_request`, which the file uses twelve times. The refresh down-scope denial at `:488`
 returns `invalid_grant`, used 22 times for everything from "Client is disabled" (`:94`) to
 "Code is invalid" (`:142`). Neither is isolatable by code, so covering them means threading a
 typed error through the validator.
 
-`:696` is no loss: a client asking for `openid` on client credentials has misread the docs, and
-that tells you nothing about a caller reaching for access it was not granted.
+`:747` is little loss: a client asking for `openid` on client credentials has misread the docs. Note
+this is a **cost** assessment, not the reason for the exclusion, which is purely that
+`invalid_request` cannot be isolated. And it is a soft argument, because the event does log six other
+misconfiguration-shaped branches; if `:747` were isolatable there would be no case for dropping it.
 
 **`:488` is a genuine loss and should be recorded as one.** A client asking to refresh with a
 scope outside its original grant is reaching for access it does not have, which is precisely the
@@ -604,8 +637,8 @@ taxonomy, and if `:488` ever gains a typed error, this event should cover it.
 
 **The boundary is therefore positional, not semantic, and the spec should not pretend
 otherwise.** "Every `invalid_scope` from the two scope validators" is what the predicate
-actually implements. It happens to include authenticated malformed-format requests at `:703`
-and `:786`, which are not authorization decisions in any strict sense. Calling all eight
+actually implements. It happens to include authenticated malformed-format requests at `:754`
+and `:847`, which are not authorization decisions in any strict sense. Calling all eight
 "authorization denials" would be a tidier story and a false one. See decision 12.
 
 ### 3.4 Drop the redundant re-lookup
@@ -688,10 +721,10 @@ Three pieces combine:
 1. `generateAccessTokenCore` appends `authserver:userinfo` to the scope whenever an OIDC scope is
    present (`token_issuer.go:697-704`), so the issued token can reach `/userinfo`. It returns that
    **post-injection** scope to its caller.
-2. `GenerateTokenResponseForROPC:1135` passes that returned scope, not the validated
+2. `GenerateTokenResponseForROPC:1148` passes that returned scope, not the validated
    `input.Scope`, to `generateRefreshTokenForROPC`, which stores it in `RefreshToken.Scope`.
 3. On refresh, the validator re-checks every non-OIDC scope against the user's grants
-   (`token_validator.go:547-557`). For ROPC it reads `refreshToken.Scope` (`:396`); for the
+   (`token_validator.go:597-606`). For ROPC it reads `refreshToken.Scope` (`:396`); for the
    authorization code grant it reads `refreshToken.Code.Scope` (`:417`), which is pre-injection.
 
 So the server injects a scope, records it as though the user had been granted it, then refuses to
@@ -715,14 +748,14 @@ never have applied.
 **Two changes, each with its own reason**, per decision 19:
 
 ```go
-// 1. token_issuer.go:1135 — record what was granted, not what was decorated.
+// 1. token_issuer.go:1148 — record what was granted, not what was decorated.
 //    input.Scope is validateResult.Scope, the output of validateROPCScopes.
 refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(
     settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 ```
 
 ```go
-// 2. token_validator.go:547 — never re-check a scope the server injected.
+// 2. token_validator.go:597 — never re-check a scope the server injected.
 //
 // Conditioned on the stored scope carrying an OIDC scope, because that is EXACTLY when the
 // server injects (token_issuer.go:670-676 sets addUserInfoScope only inside
@@ -891,19 +924,23 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
 
 6. **Both audit changes.** Status: **Decided**
 
-   The `scope` field on the success payload, and a new event covering scope denials that are
-   authorization decisions, across client credentials and ROPC. Decision 12 fixes the exact
+   The `scope` field on the success payload, and a new event covering every **authenticated**
+   `invalid_scope` failure from the two scope validators, across client credentials and ROPC.
+   That is a positional boundary, not a semantic one: it includes malformed-format and
+   unknown-resource failures, and only two of the eight branches it covers are authorization
+   decisions. An earlier version of this decision said "scope denials that are authorization
+   decisions", which section 3.3 already warned against. Decision 12 fixes the exact
    boundary; the phrasing here is deliberately not "every client credentials scope failure",
    which an earlier draft said and which was never true, since the OIDC-scope rejection at
-   `:696` is excluded.
+   `:747` is excluded.
 
    **The precedent an earlier draft cited does not exist, though others do.** That draft named
-   `AuditROPCAuthFailed`, which is declared at `constants.go:59`, listed in `AuditEventTypes` at
-   `:189`, and **logged by nothing**. It is dead, and it is now tracked separately as
+   `AuditROPCAuthFailed`, which is declared at `constants.go:84`, listed in `AuditEventTypes` at
+   `:214`, and **logged by nothing**. It is dead, and it is now tracked separately as
    [#126](https://github.com/leodip/goiabada/issues/126).
 
-   The real precedents are `AuditAuthCodeReuseDetected` (`handler_token.go:327`) and
-   `AuditUserDisabled` (`:73`), both emitted when a token request is denied. So this event is
+   The real precedents are `AuditAuthCodeReuseDetected` (`handler_token.go:371`) and
+   `AuditUserDisabled` (`:117`), both emitted when a token request is denied. So this event is
    not the project's first of its kind, and both existing ones fire only after the request has
    been authenticated, which is the same standard decision 12 applies.
 
@@ -935,7 +972,7 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
    is established once at the entry point and flows into both validation and the token claim.
 
    Discovered while executing the case table: two cases failed against decision 5 as written,
-   which surfaced that the collapse at `:688-691` operates on a local copy and never reaches
+   which surfaced that the collapse at `:740-743` operates on a local copy and never reaches
    `input.Scope`. Trimming alone leaves a tab-separated request broken.
 
    **The original wording here said "producing a token whose every scope is unmatchable by
@@ -959,7 +996,7 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
     server splitting on spaces sees the scope twice and behaves identically. This is chosen for
     consistency, not correctness, and it is the same one function at the same one site that
     decision 9 already introduces. Refresh and ROPC inherit it at no extra cost, both having
-    preserved duplicates until now (`:497` and `:836`).
+    preserved duplicates until now (`:497` and `:897`).
 
     **Rejected:** trim and collapse only, leaving `authorize` as the sole path that dedupes.
     Defensible on the grounds that the change should touch only what was broken, but it leaves
@@ -1018,7 +1055,7 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
 
     **The boundary is positional, not semantic.** It is "every `invalid_scope` from the two
     scope validators", which is a predicate the code can actually express. That includes
-    authenticated malformed-format requests (`:703`, `:786`) that are not authorization
+    authenticated malformed-format requests (`:754`, `:847`) that are not authorization
     decisions, and excludes the refresh down-scope denial at `:488` that is one. An earlier
     draft of this decision described all eight as authorization decisions, which was a tidier
     description than the truth.
@@ -1026,7 +1063,7 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
     **That principal is not always the client, and the payload should not be read as if it
     were.** Client credentials authenticates the client itself (`:250-283`), so a row from that
     grant does attest to the named client. ROPC authenticates the **user**, and authenticates
-    the client only when it is confidential: `if !client.IsPublic` at `:599` gates the whole
+    the client only when it is confidential: `if !client.IsPublic` at `:650` gates the whole
     secret check. For a public ROPC client, `clientIdentifier` in the payload is request context
     supplied by the caller, not proof that the named client's operator made the request. The
     row is still worth having, since the user behind it did authenticate, but an operator
@@ -1034,28 +1071,47 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
 
     **Rejected:** gating on client credentials only, which would leave ROPC scope probing
     unlogged despite being the identical signal, at no saving. Also rejected: a typed
-    scope-validation error covering all nine branches, which is the only way to reach `:696`
-    (`invalid_request`, twelve uses) and `:488` (`invalid_grant`, 22 uses). Both excluded
-    branches are misconfiguration signals rather than authorization probes, so the typed error
-    would buy noise rather than coverage.
+    scope-validation error covering all nine branches, which is the only way to reach `:747`
+    (`invalid_request`, twelve uses) and `:488` (`invalid_grant`, 22 uses). The cost of that
+    threading is not repaid by `:747`, which is a docs misread.
+
+    **It is not free with respect to `:488`, and an earlier version of this decision said both
+    excluded branches were "misconfiguration signals rather than authorization probes".** That
+    contradicts section 3.3, which records `:488` as a genuine loss: a client refreshing with a
+    scope outside its original grant is reaching for access it does not have, which is exactly this
+    event's signal. The typed error is still declined, on the cost of threading it through the
+    validator for one branch, but the tradeoff should be stated as a real loss rather than argued
+    away.
 
     **Rejected, having previously been adopted:** a second call site at the decision 15
     rejection. It fires before client authentication, so it would write an attacker-chosen
     `client_id` into the audit log unauthenticated, letting anyone manufacture rows implicating
     a legitimate client. That degrades the exact signal the event exists to provide. It is also
-    malformed input rather than an authorization decision, the same ground on which `:696` is
-    excluded, so auditing one and not the other was inconsistent.
+    pre-authentication, which is the entire reason. An earlier version of this decision also
+    called it "malformed input rather than an authorization decision, the same ground on which
+    `:747` is excluded". That reasoning was wrong twice over: the event covers six authenticated
+    malformed-format and unknown-resource branches, and `:747` is excluded by its `invalid_request`
+    code rather than by its meaning. Coverage is decided by the error code and the call site's
+    position, and by nothing else.
 
     **Two corrections against earlier drafts of this spec.** One claimed nine of nine and "all
-    five client credentials branches"; `:696` returns `invalid_request`, so it was never
+    five client credentials branches"; `:747` returns `invalid_request`, so it was never
     covered. Another added the second call site described above. Section 2's goal is now worded
-    around authorization denials rather than around the `invalid_scope` string, which is what
+    around **authenticated** `invalid_scope` failures rather than around the bare `invalid_scope`
+    string, which is what
     let both errors look correct.
 
 13. **`AuditTokenScopeDenied = "token_scope_denied"`.** Status: **Decided**
 
     Grant-agnostic, as decision 12 requires. Sorts immediately after the five `token_issued_*`
-    events, so filtering `token_*` yields the whole token endpoint including denials.
+    events, so a `token_*` filter groups token issuance with scope denials.
+
+    **That is not the whole token endpoint, and an earlier version of this decision said it was.**
+    `HandleTokenPost` also emits `user_disabled`, `bumped_user_session` and
+    `auth_code_reuse_detected`, none of which carry the prefix, verified by grepping every
+    `auditLogger.Log` call in the handler. The naming choice still stands on the narrower ground:
+    grouping denials with issuance is worth having, and the alternatives in the rejected list sort
+    away from both.
 
     **Rejected:** `invalid_scope_requested`, which mirrors the OAuth error code and correlates
     nicely with what the client saw, but sorts away from every related event. Also rejected:
@@ -1121,7 +1177,7 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
     **Two consequences, both deliberate.** The authorization code grant is excluded, because it
     never reads `input.Scope` (verified against every use of that field), so rejecting on it
     would break a valid token exchange for no benefit. And ROPC changes from accept to reject:
-    it currently returns `"openid"` for a whitespace-only scope via `:772-775` and `:839-841`.
+    it currently returns `"openid"` for a whitespace-only scope via `:833-836` and `:900-902`.
     That is the only accept-to-reject change in the normalization work, on a deprecated grant
     receiving malformed input.
 
@@ -1219,8 +1275,8 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
     Status: **Decided** (2026-07-27)
 
     Section 3.6 has the mechanism. Two changes: stop storing the post-injection scope on the ROPC
-    refresh token (`token_issuer.go:1135`), and stop re-checking the injected
-    `authserver:userinfo` against the user's grants on refresh (`token_validator.go:547`),
+    refresh token (`token_issuer.go:1148`), and stop re-checking the injected
+    `authserver:userinfo` against the user's grants on refresh (`token_validator.go:597`),
     **conditioned on the stored scope carrying an OIDC scope**.
 
     **Why in this spec rather than a separate issue**, unlike #125 and #126 which were both
@@ -1269,7 +1325,7 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
       access token regardless.
     - Original request **did** include it explicitly, and the user held the permission.
       `validateROPCScopes` returns explicitly requested resource scopes in its output
-      (`:846`), so the stored scope still contains it and a refresh requesting it still succeeds
+      (`:897`), so the stored scope still contains it and a refresh requesting it still succeeds
       while the user retains the permission. **Unchanged by this stage.**
 
     That earlier draft also justified the rejection by noting the scope cannot be requested at
@@ -1324,8 +1380,8 @@ shipped code rather than a model of it:
 **The withdrawn harness modelled the client credentials path only**, which is why the three
 whitespace-only cases need reading carefully when stage 2 is implemented. Within client credentials
 all three stay rejections and merely gain a message that names the problem. The same input on
-**ROPC** is an accept-to-reject change, because `validateROPCScopes:772-775` skips empty tokens and
-`:839-841` returns `"openid"` today. That case sits outside the three, it is covered by the handler
+**ROPC** is an accept-to-reject change, because `validateROPCScopes:833-836` skips empty tokens and
+`:900-902` returns `"openid"` today. That case sits outside the three, it is covered by the handler
 table in stage 2 step 3, and it is the only accept-to-reject change the normalization work
 introduces.
 
@@ -1350,7 +1406,7 @@ paragraph above is the verification of the amended code, re-run after the change
 forward from the first attempt.
 
 1. Resolve the requested permission on the resource and compare its id. Status: **Done**
-   `src/core/validators/token_validator.go:723-743`, per section 3.1, which is the issue's own
+   `src/core/validators/token_validator.go:778-808`, per section 3.1, which is the issue's own
    recommendation. Keep both loops and both error messages.
 
 2. Give the three vacuous fixtures distinct non-zero IDs. Status: **Done**
@@ -1368,12 +1424,12 @@ forward from the first attempt.
 
    | # | Client holds | Requests | Expected | Rejected by | Current code |
    |---|---|---|---|---|---|
-   | 1 | `billing-api:read` | `reports-api:read` | `invalid_scope`, "is not granted to the client" | ownership loop `:737` | **accepts** |
+   | 1 | `billing-api:read` | `reports-api:read` | `invalid_scope`, "is not granted to the client" | ownership loop `:800` | **accepts** |
    | 2 | `billing-api:read` | `billing-api:read` | accept, scope `billing-api:read` | n/a, positive control | accepts |
-   | 3 | `reports-api:read` | `billing-api:read` | `invalid_scope`, "is not granted to the client" | ownership loop `:737` | **accepts** |
-   | 4 | `billing-api:read`, `archive-api:read` | `reports-api:read` | `invalid_scope`, "is not granted to the client" | ownership loop `:737` | **accepts** |
-   | 5 | `billing-api:read` | `billing-api:read reports-api:read` | `invalid_scope` naming `reports-api:read` | ownership loop `:737` | **accepts both** |
-   | 6 | `billing-api:read` | `reports-api:read billing-api:read` | `invalid_scope` naming `reports-api:read` | ownership loop `:737` | **accepts both** |
+   | 3 | `reports-api:read` | `billing-api:read` | `invalid_scope`, "is not granted to the client" | ownership loop `:800` | **accepts** |
+   | 4 | `billing-api:read`, `archive-api:read` | `reports-api:read` | `invalid_scope`, "is not granted to the client" | ownership loop `:800` | **accepts** |
+   | 5 | `billing-api:read` | `billing-api:read reports-api:read` | `invalid_scope` naming `reports-api:read` | ownership loop `:800` | **accepts both** |
+   | 6 | `billing-api:read` | `reports-api:read billing-api:read` | `invalid_scope` naming `reports-api:read` | ownership loop `:800` | **accepts both** |
 
    Cases 1 and 2 are the load-bearing pair: they vary **only** the resource, holding the
    permission identifier, the client and the grant fixed, so nothing but the ownership check can
@@ -1451,7 +1507,7 @@ forward from the first attempt.
 
 6. Add `TestToken_ClientCred_CrossResourcePermissionCollision`. Status: **Done**
    `src/authserver/tests/integration/token_clientcred_test.go`, modelled on
-   `TestToken_ClientCred_SpecificScope:326`, which already does the create-resource,
+   `TestToken_ClientCred_SpecificScope:328`, which already does the create-resource,
    create-permission, grant sequence explicitly. The helpers are `createResourceWithId` and
    `createPermissionWithId` (`utils_test.go:228, 251`).
 
@@ -1476,7 +1532,7 @@ forward from the first attempt.
    thing against a fixture that merely resembles it.
 
    **What no test here proves:** that the Admin API would have honoured the escalated token.
-   That is established by reading `api_auth.go:57`, `:138-142` and `jwt_token.go:81-94`, and
+   That is established by reading `api_auth.go:58`, `:203-207` and `jwt_token.go:81-94`, and
    after this fix the token cannot be obtained, so it is not testable from this direction.
 
 ### Stage 2: normalize the scope at the handler
@@ -1600,13 +1656,32 @@ Full suite green on SQLite (1979 passing).
 
 
 ### Stage 3: audit
-Status: **Not started**
+Status: **Done** (2026-07-28)
 
-1. Add `"scope": validateResult.Scope` at `handler_token.go:182`. Status: **Not started**
+**Every claim in this stage was checked by breaking it.** The plan asserts that misses "fail
+loudly" and that two test rows guard specific wrong implementations; all five were verified by
+making the mistake and re-running:
+
+| Deliberate mistake | Result |
+|---|---|
+| `expectedCount` left at 91 | `TestAuditEventTypes_Count` **fails** |
+| entry omitted from `allAuditConstants` | `TestAuditEventTypes_MatchesConstants` **fails** |
+| entry omitted from the `AuditEventTypes` slice | `_Count` **and** `_MatchesConstants` both fail |
+| predicate gated on `GrantType == "client_credentials"` | only the **ROPC** denial row fails |
+| a second call site at the provided-but-empty rejection | the no-event row fails, **and** three stage 2 wiring rows fail with it |
+
+The last row is better than the plan predicted. The plan said a second call site "passes every row
+but the third"; in fact stage 2's three whitespace-only wiring rows register no audit expectation
+either, so `mocks_audit.NewAuditLogger(t)` fails them too. Four independent tests object, not one.
+
+Full suite green on SQLite (1980 passing).
+
+1. Add `"scope": validateResult.Scope` at `handler_token.go:222`. Status: **Done**
    Nothing asserts this payload's shape, verified. `details` is JSON-marshalled into a `TEXT`
    column (`sqlitedb/schema.sql:374`), so there is no width constraint.
 
-2. Add the denial event. Status: **Not started**
+2. Add the denial event. Status: **Done**
+   All four places updated; each verified to fail loudly if missed, per the table above.
    Constant `AuditTokenScopeDenied = "token_scope_denied"` in
    `src/core/constants/constants.go`, per decision 13. Logged at the handler for any grant type
    whose validation failed with code `invalid_scope`, per decision 12 and the sketch in
@@ -1623,7 +1698,7 @@ Status: **Not started**
    | Requirement | Detail |
    |---|---|
    | the constant | `src/core/constants/constants.go` |
-   | `AuditEventTypes` slice | insert between `AuditTokenIssuedROPCResponse` (`constants.go:200`) and `AuditUpdatedAuditLogsSettings` (`:201`) |
+   | `AuditEventTypes` slice | insert between `AuditTokenIssuedROPCResponse` and `AuditUpdatedAuditLogsSettings`, now `constants.go:225` and `:227` with the new entry between them |
    | `allAuditConstants` | a **second**, separately maintained list inside `constants_test.go:120`, checked by `TestAuditEventTypes_MatchesConstants:118` |
    | `expectedCount` | bump from 91 to 92 at `constants_test.go:65` |
 
@@ -1631,7 +1706,8 @@ Status: **Not started**
    constant identifiers, which is why the insertion point is among the `token_issued_*` entries
    rather than where the identifier would sort.
 
-3. Assert the denial event fires. Status: **Not started**
+3. Assert the denial event fires. Status: **Done**
+   Added as `TestHandleTokenPost_ScopeDenialAudit`, all four cases.
    Extend the handler-level tests. Four cases:
 
    | Request | Assertion |
@@ -1678,6 +1754,26 @@ Status: **Not started**
 
 ### Stage 5: documentation and release note
 Status: **Not started**
+
+0. Convert recurring bare line citations to symbol anchors. Status: **Not started**
+   This spec cites roughly 200 line numbers into `token_validator.go`, `handler_token.go`,
+   `token_issuer.go` and `api_auth.go`. Stages 1, 2, 3 and 7 shifted all four, and each stage's
+   review round found citations that had come to point at plausible but unrelated code, which makes
+   a recorded verification actively misleading rather than merely imprecise. One citation drifted
+   twice inside a single stage: `:846` for the `validatedScopes` append, correct when written, then
+   moved to `:897` by later edits in the same stage.
+
+   Replace the recurring ones with the form the spec already uses in places,
+   `validateROPCScopes` plus the quoted error message, which does not drift and **is mechanically
+   checkable**. Bare `:NNN` shorthand is not: its file context lives in the surrounding prose, so
+   attributing each citation to a file needs reading rather than matching. That is why no sweep so
+   far has been exhaustive, and why the ones performed were reported as covering only the anchors
+   named in them.
+
+   **Deliberately scheduled here, after stage 4, not earlier.** Stage 4 edits
+   `token_validator.go:295-305` and will move most of that file again, so doing this during stage 3
+   would have produced a large docs diff that immediately needed another sweep. Waiting until
+   production layout has stabilized means one conversion instead of two.
 
 1. Add the per-resource sentence to the docs. Status: **Not started**
    `site/src/content/docs/concepts/resources-permissions.mdx`, near the scope format section at
@@ -1939,7 +2035,7 @@ Status: **Not started**
    > **This shows which clients could have exploited the flaw, not which ones did.** Successful
    > token issuance did not previously record the scopes granted, so there is no audit data to
    > reconstruct past exploitation from. This release adds the scope to the issuance audit record
-   > and adds a `token_scope_denied` event for scope requests denied on authorization grounds,
+   > and adds a `token_scope_denied` event for authenticated requests that fail scope validation,
    > both going forward only. For any row reaching `authserver:manage`, `authserver:manage-users`,
    > `authserver:manage-clients` or `authserver:manage-settings`, rotate that client's secret and
    > review recent administrative changes through whatever other logging you have.
@@ -2037,7 +2133,7 @@ suite rather than by inspection: the 11 `createClientCredentialsTokenWithScope` 
    | authorization code | `generateAccessToken:162` |
    | authorization code refresh | `GenerateTokenResponseForRefresh:454` calls `generateAccessToken` |
    | implicit | `generateImplicitAccessToken:1024` |
-   | ROPC | `generateROPCAccessToken:1151` |
+   | ROPC | `generateROPCAccessToken:1164` |
    | ROPC refresh | `GenerateTokenResponseForRefreshROPC:556` calls `generateROPCAccessToken` |
 
    The client credentials claim set (`:353-382`) is built separately and never sets it. So the
@@ -2148,9 +2244,9 @@ Full suite green on SQLite (1974 passing). ROPC and user-bound tests pass on Pos
 SQL Server.
 
 1. Record the granted scope on the ROPC refresh token. Status: **Done**
-   `token_issuer.go:1135`, pass `input.Scope` rather than `scopeFromAccessToken` to
+   `token_issuer.go:1148`, pass `input.Scope` rather than `scopeFromAccessToken` to
    `generateRefreshTokenForROPC`, per section 3.6. `input.Scope` is `validateResult.Scope`, the
-   output of `validateROPCScopes`, verified at `handler_token.go:283-290`.
+   output of `validateROPCScopes`, verified at `handler_token.go:327-334`.
 
    **Do not "fix" the authorization code path at `:147` to match.** It passes the post-injection
    scope too, but nothing reads `RefreshToken.Scope` for that grant: the validator uses
@@ -2158,7 +2254,7 @@ SQL Server.
    working path. Note it in a comment instead, so the asymmetry does not read as an oversight.
 
 2. Stop re-validating the injected scope against user grants. Status: **Done**
-   `token_validator.go:547`, exclude `authserver:userinfo` from the per-scope user-permission
+   `token_validator.go:597`, exclude `authserver:userinfo` from the per-scope user-permission
    re-check **only when the stored scope also carries an OIDC scope**, per section 3.6.
 
    **The condition is load-bearing and must carry a comment saying so.** Unconditional would let a

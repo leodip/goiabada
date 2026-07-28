@@ -62,7 +62,7 @@ func TestAuditEventTypes_NonEmpty(t *testing.T) {
 
 // TestAuditEventTypes_Count acts as a drift guard - update expected count when adding/removing audit events
 func TestAuditEventTypes_Count(t *testing.T) {
-	expectedCount := 91
+	expectedCount := 92
 	actualCount := len(AuditEventTypes)
 
 	require.Equal(t, expectedCount, actualCount,
@@ -172,6 +172,7 @@ func TestAuditEventTypes_MatchesConstants(t *testing.T) {
 		AuditTokenIssuedImplicitResponse,
 		AuditTokenIssuedRefreshTokenResponse,
 		AuditTokenIssuedROPCResponse,
+		AuditTokenScopeDenied,
 		AuditUpdatedAuditLogsSettings,
 		AuditUpdatedClientAuthentication,
 		AuditUpdatedClientLogo,

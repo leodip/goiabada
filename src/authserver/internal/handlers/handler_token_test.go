@@ -1211,3 +1211,149 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 		})
 	}
 }
+
+// TestHandleTokenPost_ScopeDenialAudit covers the audit half of the #104 work.
+//
+// Before this, a successful client credentials issuance logged only clientId, so there was no
+// record of which scopes were granted to whom, and a denial logged nothing at all. Exploitation of
+// the cross-resource escalation therefore cannot be reconstructed for any period before the fix.
+//
+// Deliberately thin on WHICH requests are denied, since stage 1's validator table owns that. What
+// these four cases pin is that a denial reaches the audit logger, that the predicate is not gated on
+// grant type, and that there is exactly one call site.
+func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
+	newHandler := func(t *testing.T) (*mocks_handlerhelpers.HttpHelper, *mocks_validators.TokenValidator,
+		*mocks_oauth.TokenIssuer, *mocks_audit.AuditLogger, http.HandlerFunc) {
+		t.Helper()
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		return httpHelper, tokenValidator, tokenIssuer, auditLogger,
+			HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+	}
+
+	// Rows 1 and 2 differ ONLY in grant type. Row 2 fails if a GrantType check is ever added to the
+	// predicate, which would leave ROPC scope probing unlogged despite being the identical signal.
+	for _, tc := range []struct {
+		name      string
+		grantType string
+		form      string
+		wantScope string
+	}{
+		{
+			name:      "client credentials scope denial is audited",
+			grantType: "client_credentials",
+			form:      "grant_type=client_credentials&client_id=test_client&client_secret=s&scope=reports-api:read",
+			wantScope: "reports-api:read",
+		},
+		{
+			name:      "ROPC scope denial is audited too",
+			grantType: "password",
+			form:      "grant_type=password&client_id=test_client&username=u&password=p&scope=reports-api:read",
+			wantScope: "reports-api:read",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper, tokenValidator, _, auditLogger, handler := newHandler(t)
+
+			req, _ := http.NewRequest("POST", "/token", strings.NewReader(tc.form))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rr := httptest.NewRecorder()
+
+			denial := customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				"Permission to access scope 'reports-api:read' is not granted to the client.",
+				http.StatusBadRequest)
+			tokenValidator.On("ValidateTokenRequest", req.Context(),
+				mock.AnythingOfType("*validators.ValidateTokenRequestInput")).Return(nil, denial)
+
+			auditLogger.On("Log", constants.AuditTokenScopeDenied, mock.MatchedBy(
+				func(details map[string]interface{}) bool {
+					return details["clientIdentifier"] == "test_client" &&
+						details["grantType"] == tc.grantType &&
+						details["scope"] == tc.wantScope
+				})).Return()
+
+			httpHelper.On("JsonError", rr, req, denial).Return()
+
+			handler.ServeHTTP(rr, req)
+
+			auditLogger.AssertExpectations(t)
+			httpHelper.AssertExpectations(t)
+		})
+	}
+
+	// Row 3 asserts the ABSENCE of an event, which looks like an oversight and is not: it is the
+	// guard against reintroducing an unauthenticated audit row. The provided-but-empty rejection
+	// fires before the client is authenticated, so auditing it would let anyone forge rows against a
+	// legitimate client. A second call site there passes every other row and fails only this one.
+	t.Run("the provided-but-empty rejection emits no audit event", func(t *testing.T) {
+		httpHelper, tokenValidator, _, auditLogger, handler := newHandler(t)
+
+		form := url.Values{
+			"grant_type": {"client_credentials"},
+			"client_id":  {"test_client"},
+			"scope":      {"   "},
+		}
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		var rejection *customerrors.ErrorDetail
+		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			detail, ok := err.(*customerrors.ErrorDetail)
+			if !ok {
+				return false
+			}
+			rejection = detail
+			return true
+		})).Return()
+
+		// No auditLogger expectation is registered, and none is registered on the validator either.
+		// mocks_audit.NewAuditLogger(t) fails the test if Log is called without a matching
+		// expectation, so registering nothing IS the assertion.
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		tokenValidator.AssertNotCalled(t, "ValidateTokenRequest", mock.Anything, mock.Anything)
+		if assert.NotNil(t, rejection) {
+			assert.Equal(t, "invalid_scope", rejection.GetCode())
+		}
+	})
+
+	// Row 4: the forensic field on the success path. Nothing asserted this payload's shape before.
+	t.Run("successful issuance records the scope", func(t *testing.T) {
+		httpHelper, tokenValidator, tokenIssuer, auditLogger, handler := newHandler(t)
+
+		form := "grant_type=client_credentials&client_id=test_client&client_secret=s&scope=billing-api:read"
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		mockClient := &models.Client{Id: 42, ClientIdentifier: "test_client"}
+		tokenValidator.On("ValidateTokenRequest", req.Context(),
+			mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+			Return(&validators.ValidateTokenRequestResult{Client: mockClient, Scope: "billing-api:read"}, nil)
+
+		tokenResponse := &oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer", ExpiresIn: 3600}
+		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), mockClient, "billing-api:read").
+			Return(tokenResponse, nil)
+
+		auditLogger.On("Log", constants.AuditTokenIssuedClientCredentialsResponse, mock.MatchedBy(
+			func(details map[string]interface{}) bool {
+				clientId, ok := details["clientId"].(int64)
+				return ok && clientId == mockClient.Id && details["scope"] == "billing-api:read"
+			})).Return()
+
+		httpHelper.On("EncodeJson", rr, req, tokenResponse).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		auditLogger.AssertExpectations(t)
+		tokenIssuer.AssertExpectations(t)
+		httpHelper.AssertExpectations(t)
+	})
+}

@@ -54,6 +54,31 @@ const (
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 	AuditTokenIssuedROPCResponse = "token_issued_ropc_response"
+	// AuditTokenScopeDenied is logged when a token request fails scope validation, on any grant
+	// type. Emitted from a single call site in HandleTokenPost, after ValidateTokenRequest has
+	// failed with an invalid_scope error, so every row follows a successful authentication of
+	// whichever principal that grant authenticates.
+	//
+	// Not every row is an authorization denial. The predicate covers every authenticated
+	// invalid_scope failure, of which only "not granted to the client" and "the user does not
+	// have permission" are authorization decisions; malformed format and unknown resource or
+	// permission usually mean a misconfigured client. See the call site for the full accounting,
+	// including the one genuine authorization denial this event misses.
+	//
+	// The name is deliberately grant-agnostic and sorts immediately after the five
+	// token_issued_* events, so a token_* filter groups token issuance with scope denials. That
+	// is NOT the whole token endpoint: it also emits user_disabled, bumped_user_session and
+	// auth_code_reuse_detected, none of which carry the prefix.
+	//
+	// The payload carries clientIdentifier, the string from the request, rather than the numeric
+	// clientId the issuance events use: the validator returns (nil, err) on failure and discards
+	// the client model it resolved. What that string attests to varies by grant. Client
+	// credentials authenticates the client itself, so the row does attest to the named client.
+	// ROPC authenticates the USER, and the client only when it is confidential, so for a public
+	// ROPC client the identifier is caller-supplied request context rather than proof that the
+	// named client made the request. The row is still worth having, because the user behind it
+	// did authenticate.
+	AuditTokenScopeDenied = "token_scope_denied"
 	// AuditROPCAuthFailed is logged when ROPC authentication fails.
 	// This includes invalid credentials, disabled users, and 2FA-blocked users.
 	AuditROPCAuthFailed = "ropc_auth_failed"
@@ -198,6 +223,7 @@ var AuditEventTypes = []string{
 	AuditTokenIssuedImplicitResponse,
 	AuditTokenIssuedRefreshTokenResponse,
 	AuditTokenIssuedROPCResponse,
+	AuditTokenScopeDenied,
 	AuditUpdatedAuditLogsSettings,
 	AuditUpdatedClientAuthentication,
 	AuditUpdatedClientLogo,

@@ -118,6 +118,46 @@ func HandleTokenPost(
 					"clientId": input.ClientId,
 				})
 			}
+
+			// Record scope validation failures, on any grant type. Nothing recorded them before.
+			//
+			// **What this is and is not.** It is every authenticated invalid_scope failure from the
+			// two scope validators, which is a POSITIONAL boundary, not a semantic one. Only two of
+			// the eight branches it covers are authorization denials in any strict sense: "not
+			// granted to the client" and "the user does not have permission". The rest are malformed
+			// format and unknown resource or permission, which usually mean a misconfigured client
+			// rather than a caller probing for access it was not granted. So read a row as "a
+			// request that got past authentication and then asked for a scope the server would not
+			// give", and check the message before treating it as an authorization probe.
+			//
+			// Keyed on the error code rather than the grant type, deliberately: within the validator
+			// invalid_scope is returned only by the two scope validators, so the predicate cannot
+			// pick up unrelated failures and stays correct if either gains another branch. It covers
+			// eight of the eleven scope denial branches. Three are outside it: the client credentials
+			// OIDC-scope rejection returns invalid_request, the refresh down-scope denial returns
+			// invalid_grant (a code used for 22 unrelated failures, so it cannot be isolated), and
+			// the provided-but-empty rejection above fires before authentication. Note the refresh
+			// down-scope denial IS a genuine authorization denial and is missed: the error taxonomy
+			// cannot isolate it, so this event's coverage does not line up with the semantic
+			// category in either direction.
+			//
+			// THIS IS THE ONLY CALL SITE, and adding a second at the provided-but-empty rejection is
+			// the obvious-looking completeness fix and is wrong: that branch runs before the client
+			// is authenticated, so it would write a caller-chosen client_id into the audit log and
+			// let anyone manufacture rows implicating a legitimate client. That degrades the exact
+			// signal this event exists to provide. A handler test asserts the ABSENCE of an event
+			// there; if it fails, do not "fix" it by adding the call.
+			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.GetCode() == "invalid_scope" {
+				auditLogger.Log(constants.AuditTokenScopeDenied, map[string]interface{}{
+					// clientIdentifier, the string from the request, not the numeric clientId the
+					// issuance events use: the validator discards the client model on failure. See
+					// the constant's doc comment for what this attests to per grant type.
+					"clientIdentifier": input.ClientId,
+					"grantType":        input.GrantType,
+					"scope":            input.Scope,
+				})
+			}
+
 			httpHelper.JsonError(w, r, err)
 			return
 		}
@@ -181,6 +221,10 @@ func HandleTokenPost(
 
 			auditLogger.Log(constants.AuditTokenIssuedClientCredentialsResponse, map[string]interface{}{
 				"clientId": validateResult.Client.Id,
+				// Which scopes were issued, to whom. Absent before, which is why exploitation of
+				// the #104 cross-resource escalation cannot be reconstructed from the audit log for
+				// any period before this release. Forward-looking only.
+				"scope": validateResult.Scope,
 			})
 
 			w.Header().Set("Cache-Control", "no-store")
