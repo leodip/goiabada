@@ -1,9 +1,14 @@
 # Issue 104: client_credentials scope check ignores the resource
 
 **Issue:** [#104](https://github.com/leodip/goiabada/issues/104)
-**Issue state:** open (labels: bug, security)
+**Issue state:** open (labels: bug, security), still with no comments as of the last sync
 **Spec written:** 2026-07-26
-**Last synced:** 2026-07-26 (the issue has no comments)
+**Last synced:** 2026-07-28, re-checked via `gh issue view 104`
+**Implementation:** all seven stages complete, `f2558d6`..`8b4c6c2` on `main`, **not pushed**. The
+only outstanding work is publishing the release note in section 5 stage 5, which is a release-time
+action, and build-verifying the `.mdx` addition once a node toolchain is available.
+**Issue not yet updated.** Nothing has been posted to #104 and it has not been closed, because the
+commits are local. See the note at the end of section 5 for what a comment should say.
 **Filed from this spec's verification:** [#124](https://github.com/leodip/goiabada/issues/124),
 the shared `resource:permission` resolver that removes the structural root cause, see
 decision 14. [#125](https://github.com/leodip/goiabada/issues/125), refreshed ROPC tokens
@@ -2565,3 +2570,35 @@ SQL Server.
    over-broad version looked correct.
 
    The first row is the retroactive half from step 2, and it fails against step 1 applied alone.
+
+---
+
+## 6. Updating issue #104
+
+Nothing has been posted to the issue and it has not been closed. The commits are local, so any
+"fixed in X" comment would point at refs no one else can resolve. **Post after pushing, not before.**
+
+**What the issue does not currently know**, and what a comment should therefore carry:
+
+- **The escalation reaches the Admin API.** The issue frames the impact as a sibling resource. In
+  fact `manage`, `admin-read`, `manage-users`, `manage-clients` and `manage-settings` are built-in
+  permissions on the system `authserver` resource, so a client granted `<custom>:manage` could obtain
+  `authserver:manage` and full `/api/v1/admin` access. That changes the severity assessment, and it is
+  the single most useful thing to add.
+- **The issue's recommended fix is what shipped**, comparing the resource-scoped permission id. An
+  earlier draft of this spec departed from it on a false premise about engine uniqueness constraints;
+  decision 18 records the reversal. The issue was right.
+- **Its line citations have drifted**, both from the day it was filed (`:731-743` was already a few
+  lines off) and from the four stages since. Anyone reading it against current code should use
+  section 0's anchors.
+- **Three further defects were found while verifying it** and are fixed in the same series: ROPC
+  refresh tokens could not be redeemed at all when the token requested `openid`, the token endpoint
+  discarded its own scope normalization, and the no-scope expansion carried a reachable nil
+  dereference.
+
+**One thing to decide before posting.** The second vulnerability, user impersonation via `sub`, has
+never been public. Decision 11 declined an advisory and planned for its details to appear first in the
+release note. Describing it in a comment on #104 is equivalent exposure, arriving at the same time as
+the fix, so it is defensible, but it is a disclosure choice rather than a documentation one and should
+be made deliberately. The alternative is to keep #104's comment to the scope escalation and let the
+release note carry the impersonation fix.
