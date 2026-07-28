@@ -498,6 +498,36 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 		inputScopes := strings.Split(scopes, " ")
 
+		// Both values are loop-invariant, so compute them once rather than per scope. They gate
+		// the injected-userinfo exception in the permission re-check below; see the comment there
+		// for why the OIDC-scope condition is required rather than skipping the scope outright.
+		//
+		// Derived from tokenScope, the ORIGINAL grant, not from `scopes`, which is what this
+		// request asked for. The two differ only when the caller down-scopes, and then the choice
+		// decides one case: a legacy grant of `openid authserver:userinfo` refreshed with
+		// `scope=authserver:userinfo`. Using tokenScope sees the openid and treats the userinfo
+		// scope as injected, so the permission check is skipped and the refresh succeeds. Using
+		// `scopes` would see no OIDC scope and apply the check, rejecting it.
+		//
+		// tokenScope is right because the capability is already unconditional for this grant: a
+		// refresh of the full scope injects authserver:userinfo into the new access token whatever
+		// the user holds, so refusing the narrower request would deny a subset of what the same
+		// token can have for the asking. Whether the scope was injected is a property of the
+		// grant, and the grant is tokenScope.
+		//
+		// Pinned by the "legacy grant down-scoped to bare userinfo" case in
+		// TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope, which is the only test
+		// that can tell the two sources apart: in every other case `scopes` == tokenScope.
+		userInfoScope := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier,
+			constants.UserinfoPermissionIdentifier)
+		storedScopeHasOidcScope := false
+		for _, storedScopeStr := range strings.Split(tokenScope, " ") {
+			if oidc.IsIdTokenScope(storedScopeStr) {
+				storedScopeHasOidcScope = true
+				break
+			}
+		}
+
 		sub := refreshTokenInfo.GetStringClaim("sub")
 		user, err := val.database.GetUserBySubject(nil, sub)
 		if err != nil {
@@ -544,7 +574,28 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			}
 
 			// check if user still has permission to the scope
-			if !oidc.IsIdTokenScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) {
+			//
+			// The injected userinfo scope is skipped: generateAccessTokenCore appends
+			// authserver:userinfo to any token carrying an OIDC scope so the token can reach
+			// /userinfo, so it is a server grant rather than a user permission and re-checking it
+			// against the user's permissions is a category error. Before this, an ROPC refresh
+			// token recording that appended scope could never be redeemed unless the user had
+			// separately been granted the built-in permission.
+			//
+			// storedScopeHasOidcScope is what keeps this narrow, and it is load-bearing.
+			// validateROPCScopes has no guard against requesting authserver:userinfo explicitly
+			// (unlike the authorize endpoint), so the scope can also be a genuine user grant. It
+			// is only ever injected when an OIDC scope is present, so gating on that reproduces
+			// the injection condition and leaves an explicit grant that stands alone still
+			// subject to the check, which is what keeps revoking that permission effective.
+			//
+			// Deliberately unfixable residual case: an explicit grant alongside an OIDC scope is
+			// indistinguishable from an injected one, because the injection is idempotent. Such a
+			// token skips the check, which costs nothing, since it carries an OIDC scope and would
+			// therefore receive authserver:userinfo regardless of what the user holds.
+			isInjectedUserInfoScope := storedScopeHasOidcScope && inputScopeStr == userInfoScope
+			if !oidc.IsIdTokenScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) &&
+				!isInjectedUserInfoScope {
 				userHasPermission, err := val.permissionChecker.UserHasScopePermission(user.Id, inputScopeStr)
 				if err != nil {
 					return nil, err

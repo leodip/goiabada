@@ -39,7 +39,7 @@ independent of stages 1 through 5 and could land in either order. It is included
 filed separately because the release note cannot describe `authserver:manage-account` accurately
 without it. Stage 7 fixes a ROPC refresh defect found while writing stage 6's tests, where the
 server rejects a scope it injected itself; it is in this spec rather than a separate issue because
-stage 6's test currently carries a workaround for it that stage 7 removes.
+stage 6's test carried a workaround for it that stage 7 removed.
 
 ---
 
@@ -356,8 +356,8 @@ issued before the fix as well as new ones.
   [#125](https://github.com/leodip/goiabada/issues/125).
 - ~~**ROPC refresh rejects a scope the server injected itself.**~~ **Moved into scope**, see
   section 3.6, decision 19 and stage 7. Found while writing stage 6 step 4, where it blocked the
-  ROPC refresh case outright. It is fixed here rather than filed separately because stage 6's
-  test carries a workaround for it that only stage 7 can remove.
+  ROPC refresh case outright. It was fixed here rather than filed separately because stage 6's
+  test carried a workaround for it that only stage 7 could remove.
 - **The dead `AuditROPCAuthFailed` constant.** Declared and listed but logged by nothing. Filed
   as [#126](https://github.com/leodip/goiabada/issues/126), which deliberately does not
   presuppose that wiring it up is the right answer.
@@ -687,7 +687,7 @@ refresh assert only that `refresh_token` is non-empty (`ropc_flow_test.go:102`, 
 **The only workaround is absurd.** An operator has to grant every affected user the built-in
 `authserver:userinfo` permission, for a scope the server is already appending to their tokens
 unconditionally. That does work, which is why stage 6's ROPC test carries exactly that grant until
-stage 7 removes it, but it means configuring a permission to satisfy a check the server should
+stage 7 removed it, but it meant configuring a permission to satisfy a check the server should
 never have applied.
 
 **Two changes, each with its own reason**, per decision 19:
@@ -2022,11 +2022,11 @@ suite rather than by inspection: the 11 `createClientCredentialsTokenWithScope` 
    placed after the mutation would still return an error.
 
 ### Stage 7: let a ROPC refresh token actually be redeemed
-Status: **Not started**
+Status: **Done** (2026-07-28)
 
-**Depends on stage 6 only for a cleanup.** The fix itself is independent, but step 3 removes a
-workaround that stage 6 step 4 introduced, so landing this first means reconciling that by hand.
-Per decision 19.
+**Depended on stage 6 only for a cleanup.** The fix itself is independent, but step 3 removed a
+workaround that stage 6 step 4 introduced, so landing this stage first would have meant reconciling
+that by hand. It landed after stage 6, so it did not arise. Per decision 19.
 
 **Read step 3 before writing any test.** The two changes are **not** jointly necessary for the
 obvious case: either one alone makes a newly issued `openid` ROPC refresh succeed. Step 1 stores a
@@ -2035,7 +2035,49 @@ So the natural end-to-end test pins neither change individually, and each needs 
 An earlier draft of this stage claimed the stage 6 case "passes only once both are in", which is
 false and would have shipped two changes with one test's worth of evidence.
 
-1. Record the granted scope on the ROPC refresh token. Status: **Not started**
+**Verified by five experiments, which is what the point above demands.** Each was run against the
+real code, and together they show every test pins the change it is supposed to and nothing else.
+The unit rows are step 5's, abbreviated here: **U1** legacy grant with the request omitted, **U2**
+the explicit-only negative control, **U3** legacy grant down-scoped to bare userinfo. The
+integration column is `TestROPC_RefreshToken_OpenIdOnly` and stage 6's `sessionless ROPC refresh
+token`. Every cell below was executed, including the ones that pass.
+
+| Experiment | U1 | U2 | U3 | Integration |
+|---|---|---|---|---|
+| Step 1 reverted, issuer stores the decorated scope | pass | pass | pass | `OpenIdOnly` **fails**, stage 6 passes |
+| Step 2 reverted, exception removed entirely | **FAIL** | pass | **FAIL** | both pass |
+| Exclusion made **unconditional**, the variant decision 19 rejects | pass | **FAIL** | pass | both pass |
+| Both steps reverted | **FAIL** | pass | **FAIL** | **both fail** |
+| OIDC condition taken from the request instead of the grant | pass | pass | **FAIL** | both pass |
+
+Read the columns rather than the rows, because that is where each claim lives:
+
+- **When the validator exception is absent, U1 and U3 fail together**, which is rows 2 and 4. Both
+  express a legacy grant, so both depend on that exception, and neither depends on the issuer
+  change: the unit tests hand-build the stored scope and so bypass issuance entirely. That is why
+  row 1 leaves all three green. They are **not** interchangeable in general, and row 5 is the
+  counterexample: U3 fails there alone, which is the next bullet's point.
+- **U2 fails only in row 3.** It is the negative control from review finding 1, and the only thing
+  standing between this fix and a revocation hole.
+- **U3 fails only in rows 2, 4 and 5.** Row 5 is what makes it more than a duplicate of U1: it is
+  the sole test that distinguishes deriving the OIDC condition from the grant rather than from the
+  request.
+- **The integration column moves only with the issuer change**, rows 1 and 4, because after step 1
+  no newly issued refresh token records the injected scope, so nothing downstream has anything to
+  re-check.
+
+Rows 1 and 2 jointly are the point the withdrawn "passes only once both are in" wording was
+reaching for and got wrong: neither change alone satisfies the whole set, but each is pinned by its
+own test rather than by one shared assertion.
+
+**An earlier version of this matrix described the unit outcomes as "both unit cases" and "the
+legacy case", singular**, having been measured before U3 existed and not re-run when it was added.
+Every cell above is from a re-run with all three rows present.
+
+Full suite green on SQLite (1974 passing). ROPC and user-bound tests pass on PostgreSQL, MySQL and
+SQL Server.
+
+1. Record the granted scope on the ROPC refresh token. Status: **Done**
    `token_issuer.go:1135`, pass `input.Scope` rather than `scopeFromAccessToken` to
    `generateRefreshTokenForROPC`, per section 3.6. `input.Scope` is `validateResult.Scope`, the
    output of `validateROPCScopes`, verified at `handler_token.go:239-246`.
@@ -2045,7 +2087,7 @@ false and would have shipped two changes with one test's worth of evidence.
    `refreshToken.Code.Scope` (`:417`). Changing it would be an untested behaviour change to a
    working path. Note it in a comment instead, so the asymmetry does not read as an oversight.
 
-2. Stop re-validating the injected scope against user grants. Status: **Not started**
+2. Stop re-validating the injected scope against user grants. Status: **Done**
    `token_validator.go:547`, exclude `authserver:userinfo` from the per-scope user-permission
    re-check **only when the stored scope also carries an OIDC scope**, per section 3.6.
 
@@ -2060,10 +2102,11 @@ false and would have shipped two changes with one test's worth of evidence.
    `constants.UserinfoPermissionIdentifier` rather than a literal, matching
    `authorize_validator.go` and `token_issuer.go:699`.
 
-3. Remove the workaround from stage 6's ROPC helper. Status: **Not started**
-   `user_bound_token_test.go`, `userAccessTokenViaROPC` currently grants the test user
+3. Remove the workaround from stage 6's ROPC helper. Status: **Done**
+   `user_bound_token_test.go`, `userAccessTokenViaROPC` granted the test user
    `authserver:userinfo` as well as `authserver:manage-account`, with a comment pointing at this
-   defect. Drop the `userinfo` grant and the comment.
+   defect. The `userinfo` grant and that comment are gone; the helper now carries a comment saying
+   its **absence** is load-bearing and must not be restored to silence a failure.
 
    With the grant removed, the `sessionless ROPC refresh token` case fails against unfixed code
    with `invalid_grant`, "Scope 'authserver:userinfo' is not recognized", and passes once **either**
@@ -2072,7 +2115,8 @@ false and would have shipped two changes with one test's worth of evidence.
    on its own and confirming this case passes both times, which is the opposite of what an earlier
    draft of this stage asserted.
 
-4. Assert the refresh token records the granted scope, which pins step 1. Status: **Not started**
+4. Assert the refresh token records the granted scope, which pins step 1. Status: **Done**
+   Added as `TestROPC_RefreshToken_OpenIdOnly` in `ropc_flow_test.go`.
    `ropc_flow_test.go`. Request `openid` **and nothing else**, then assert on the issued refresh
    token that its scope is exactly `openid`, with no `authserver:userinfo`. Read it from the
    decoded refresh token's `scope` claim, and additionally from the persisted
@@ -2089,16 +2133,33 @@ false and would have shipped two changes with one test's worth of evidence.
 
    This case fails against step 2 applied alone, since the polluted scope would still be recorded.
 
-5. Unit-test the validator exclusion, both directions, which pins step 2. Status: **Not started**
-   `token_validator_test.go`. Two ROPC refresh cases, hand-building the stored refresh token so
-   they can express states step 1 no longer produces. This is the only layer that can: after step 1
-   no newly issued token has a polluted scope, so an integration test cannot construct the legacy
-   case without writing a refresh token row directly.
+5. Unit-test the validator exclusion, both directions, which pins step 2. Status: **Done**
+   Added as `TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope`, the first ROPC
+   refresh unit test in the file.
+   `token_validator_test.go`. **Three** ROPC refresh cases, one more than this step originally
+   specified, hand-building the stored refresh token so they can express states step 1 no longer
+   produces. This is the only layer that can: after step 1 no newly issued token has a polluted
+   scope, so an integration test cannot construct the legacy case without writing a refresh token
+   row directly. In every row the user holds **no** permissions.
 
-   | Stored `RefreshToken.Scope` | User holds `authserver:userinfo` | Expected |
+   | Stored `RefreshToken.Scope` | Requested `scope` | Expected |
    |---|---|---|
-   | `openid authserver:userinfo` (legacy, injected) | no | refresh **succeeds** |
-   | `authserver:userinfo` alone (explicitly granted) | no | refresh **rejected**, `invalid_grant` |
+   | `openid authserver:userinfo` (legacy, injected) | omitted | refresh **succeeds** |
+   | `authserver:userinfo` alone (explicitly granted) | omitted | refresh **rejected**, `invalid_grant` |
+   | `openid authserver:userinfo` (legacy, injected) | `authserver:userinfo` | refresh **succeeds** |
+
+   **The third row was added by code review and pins something the other two cannot: which scope
+   the OIDC-scope condition is derived from.** The implementation reads `tokenScope`, the original
+   grant, and not the request's scope; the two coincide in every case where the request is omitted,
+   so the first two rows are blind to the choice. Here they disagree, the grant carrying `openid`
+   and the request not. Deriving the condition from the request would reject this row. Executed:
+   switching the source to the request's scope fails this row and only this row.
+
+   Succeeding is the right outcome, because refreshing the full scope would inject
+   `authserver:userinfo` into the new access token whatever the user holds, so rejecting the
+   narrower request would deny a subset of what the same token can have for the asking. The comment
+   at the derivation says this; an earlier version of that comment claimed the opposite behaviour,
+   that `tokenScope` was the stricter choice, which was backwards.
 
    **The second row is the negative control and is not optional.** It is the only thing standing
    between this fix and the revocation hole decision 19 rejects, and it fails against the

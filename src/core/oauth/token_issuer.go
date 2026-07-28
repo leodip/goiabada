@@ -1132,7 +1132,20 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 	}
 
 	// Generate refresh token with direct UserId/ClientId (no Code entity needed)
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(settings, input, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, nil)
+	//
+	// input.Scope, NOT scopeFromAccessToken. The access token's scope has been decorated by
+	// generateAccessTokenCore, which appends authserver:userinfo whenever an OIDC scope is
+	// present. input.Scope is the validated grant (validateResult.Scope, the output of
+	// validateROPCScopes), and the grant is what a refresh token must record: on refresh the
+	// validator re-checks every non-OIDC scope in this field against the user's permissions, so
+	// storing the decorated scope made the server reject a scope it had injected itself, and an
+	// ROPC token requesting `openid` could not be refreshed at all.
+	//
+	// The authorization code path at :147 passes its decorated scope for the same field and is
+	// deliberately left alone: nothing reads RefreshToken.Scope for that grant, because the
+	// validator consults refreshToken.Code.Scope instead (token_validator.go). Changing it would
+	// be an untested behaviour change to a working path.
+	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}

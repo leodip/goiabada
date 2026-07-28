@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -4608,4 +4609,148 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	assert.Equal(t, "invalid_scope", customErr.GetCode())
 	assert.Contains(t, customErr.GetDescription(), "does not have permission")
 	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+// TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope covers the ROPC refresh defect
+// fixed alongside #104: generateAccessTokenCore appends authserver:userinfo to any token carrying
+// an OIDC scope, and the refresh path used to re-check that appended scope against the user's
+// permissions, so the server rejected a scope it had injected itself.
+//
+// These cases hand-build the stored refresh token, which is the only way to express them. After
+// the issuer fix no newly issued ROPC refresh token records the injected scope, so the first case
+// below is reachable in production only for tokens issued BEFORE the fix, and an integration test
+// cannot construct it without writing a refresh token row directly.
+func TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope(t *testing.T) {
+	userInfoScope := constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier
+
+	testCases := []struct {
+		name string
+		// storedScope is RefreshToken.Scope, which for ROPC is what the validator re-checks.
+		storedScope string
+		// requestedScope is the refresh request's `scope` parameter. Empty means omitted, in which
+		// case the validator falls back to storedScope and the two sources it could derive the
+		// OIDC-scope condition from are identical. Only a down-scoping request tells them apart.
+		requestedScope string
+		wantAccepted   bool
+	}{
+		{
+			// A legacy token: the user asked for openid, the server appended the userinfo scope
+			// and recorded it. The user holds no permissions, which before the fix was enough to
+			// make this fail. Must now succeed, and that is what makes the fix retroactive.
+			name:         "injected alongside an OIDC scope is not re-checked",
+			storedScope:  "openid " + userInfoScope,
+			wantAccepted: true,
+		},
+		{
+			// THE NEGATIVE CONTROL, and the reason the exception is conditional rather than
+			// blanket. validateROPCScopes has no guard against requesting authserver:userinfo
+			// explicitly, so this scope can be a genuine user grant. With no OIDC scope present
+			// nothing was injected, so the permission must still be checked, otherwise revoking it
+			// would never take effect on refresh. Do not "simplify" the exception to an
+			// unconditional skip: this case is the only thing standing in the way.
+			name:         "explicitly granted without an OIDC scope is still re-checked",
+			storedScope:  userInfoScope,
+			wantAccepted: false,
+		},
+		{
+			// THE ONLY CASE THAT PINS THE CHOICE OF SOURCE for the OIDC-scope condition, which is
+			// tokenScope (the original grant) rather than the request's scope. Here they disagree:
+			// the grant carries openid, the request does not.
+			//
+			// Expected to SUCCEED. The grant was OIDC-scoped, so its userinfo scope is injected and
+			// unpoliced; refreshing the full scope would inject it into the new access token
+			// whatever the user holds, so denying this narrower request would refuse a subset of
+			// what the same token can have for the asking.
+			//
+			// Deriving the condition from the request instead would see no OIDC scope, apply the
+			// permission check and reject. The other two rows cannot detect that, because in both
+			// the request is omitted and the two sources coincide.
+			name:           "legacy grant down-scoped to bare userinfo is not re-checked",
+			storedScope:    "openid " + userInfoScope,
+			requestedScope: userInfoScope,
+			wantAccepted:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			mockTokenParser := mocks_oauth.NewTokenParser(t)
+			mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+			input := &ValidateTokenRequestInput{
+				GrantType:    "refresh_token",
+				ClientId:     "ropc_client",
+				RefreshToken: "ropc_refresh_token",
+				Scope:        tc.requestedScope,
+			}
+
+			client := &models.Client{
+				Id:                       1,
+				ClientIdentifier:         "ropc_client",
+				Enabled:                  true,
+				AuthorizationCodeEnabled: true,
+				IsPublic:                 true,
+			}
+
+			// ROPC refresh tokens are always "Offline": there is no browser session.
+			refreshTokenJwt := &oauth.JwtToken{
+				Claims: jwt.MapClaims{
+					"jti":                         "ropc_jti",
+					"typ":                         "Offline",
+					"sub":                         "ropc_user_subject",
+					"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
+				},
+			}
+
+			user := models.User{Id: 7, Enabled: true}
+
+			// CodeId invalid is what marks this a ROPC token (isROPCToken := !refreshToken.CodeId.Valid),
+			// which is why the validator reads RefreshToken.Scope rather than Code.Scope.
+			refreshToken := &models.RefreshToken{
+				RefreshTokenJti: "ropc_jti",
+				CodeId:          sql.NullInt64{Valid: false},
+				UserId:          sql.NullInt64{Int64: 7, Valid: true},
+				ClientId:        sql.NullInt64{Int64: 1, Valid: true},
+				Scope:           tc.storedScope,
+				User:            user,
+				Client:          *client,
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc_client").Return(client, nil)
+			mockTokenParser.On("DecodeAndValidateTokenString", "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
+				Return(refreshTokenJwt, nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
+			mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+			mockDB.On("GetUserBySubject", mock.Anything, "ropc_user_subject").Return(&user, nil)
+
+			// The user holds nothing. In the accepted case the scope must never be looked up at
+			// all, so no UserHasScopePermission expectation is registered: mocks_user.NewPermissionChecker(t)
+			// fails the test if an unexpected call is made, which is what proves the skip happened.
+			if !tc.wantAccepted {
+				mockPermissionChecker.On("UserHasScopePermission", int64(7), userInfoScope).Return(false, nil)
+			}
+
+			result, err := validator.ValidateTokenRequest(ctx, input)
+
+			if tc.wantAccepted {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				return
+			}
+
+			assert.Nil(t, result)
+			customErr, ok := err.(*customerrors.ErrorDetail)
+			if !assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+				return
+			}
+			assert.Equal(t, "invalid_grant", customErr.GetCode())
+			assert.Contains(t, customErr.GetDescription(),
+				fmt.Sprintf("The user does not have the '%v' permission", userInfoScope))
+		})
+	}
 }

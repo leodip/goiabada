@@ -350,27 +350,23 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 	err = database.UpdateUser(nil, user)
 	require.NoError(t, err)
 
-	// ROPC checks the USER holds each requested resource permission.
+	// ROPC checks the USER holds each requested resource permission, so manage-account has to be
+	// granted. Nothing else: the user must NOT hold authserver:userinfo.
 	//
-	// manage-account is what the test needs. userinfo is granted only to work around a
-	// pre-existing ROPC refresh defect, and stage 7 of the issue-104 spec removes this grant
-	// along with the defect: generateAccessTokenCore appends authserver:userinfo
-	// to the token whenever an OIDC scope is present, the ROPC refresh token row stores that
-	// post-injection scope, and on refresh the validator re-checks every non-OIDC scope in it
-	// against the user's grants (token_validator.go:547-557, reading refreshToken.Scope for
-	// ROPC where the auth code path reads refreshToken.Code.Scope, which is pre-injection).
-	// So a ROPC token carrying openid cannot be refreshed unless the user separately holds
-	// authserver:userinfo. Without this grant the refresh returns invalid_grant, "Scope
-	// 'authserver:userinfo' is not recognized", before any endpoint this spec touches is
-	// reached. Unrelated to the user-bound-token guard.
+	// That absence is load-bearing rather than incidental. This helper used to grant it too, to
+	// work around the refresh defect where the server re-validated the authserver:userinfo scope
+	// it injects itself against the user's permissions. With the defect fixed, the grant is gone,
+	// and its absence is what makes the "sessionless ROPC refresh token" case exercise the fix.
+	// Do not add it back to make a failure go away: a failure here means the injected-scope
+	// exception has regressed.
 	authserverResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	permissions, err := database.GetPermissionsByResourceId(nil, authserverResource.Id)
 	require.NoError(t, err)
 	for i := range permissions {
-		switch permissions[i].PermissionIdentifier {
-		case constants.ManageAccountPermissionIdentifier, constants.UserinfoPermissionIdentifier:
+		if permissions[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
 			assignPermissionToUser(t, user.Id, permissions[i].Id)
+			break
 		}
 	}
 
