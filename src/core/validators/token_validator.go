@@ -293,13 +293,39 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		if len(input.Scope) == 0 {
-			// no scope was passed, let's include all possible permissions
+			// No scope was passed, so grant every permission the client holds.
+			//
+			// perm.Resource is already populated: PermissionsLoadResources ran immediately above.
+			// This used to call GetResourceByResourceIdentifier(nil, perm.Resource.ResourceIdentifier)
+			// and then use res.ResourceIdentifier, the very string it had just passed in, which was
+			// one database round-trip per granted permission per request for a value already in hand.
+			//
+			// No empty-identifier guard on perm.Resource, deliberately, and NOT because the state is
+			// unreachable. Resource is a value field, so there is no nil to check; a map miss in
+			// PermissionsLoadResources silently leaves it zero-valued, with ResourceIdentifier == "".
+			//
+			// That state IS reachable. The two loads above are separate non-transactional queries,
+			// so a resource deleted between them leaves this loop holding permission rows that the
+			// database has already cascade-deleted, and GetResourcesByIds finds nothing for them.
+			// ON DELETE CASCADE does not help: the cascade happens in the database while these rows
+			// are already in memory.
+			//
+			// No guard is needed because the path fails closed. A zero-valued resource yields the
+			// scope ":<permission>", which validateClientCredentialsScopes below rejects with
+			// invalid_scope, "Could not find a resource with identifier ''". Verified by executing
+			// that fixture: a 400 naming the problem, which is the right outcome for a request whose
+			// grant vanished mid-flight.
+			//
+			// The old code did NOT fail closed here: it passed that empty identifier to
+			// GetResourceByResourceIdentifier, got nil back, and dereferenced it. Also verified by
+			// execution, which panics with a nil pointer dereference. Removing the round-trip removed
+			// a latent panic in that race, not merely a wasted query.
+			//
+			// Note the scopes built here are resource-qualified, which matters more since the
+			// ownership check became resource-scoped: a client holding "read" on two resources gets
+			// both "a:read" and "b:read", not one of them twice.
 			for _, perm := range client.Permissions {
-				res, err := val.database.GetResourceByResourceIdentifier(nil, perm.Resource.ResourceIdentifier)
-				if err != nil {
-					return nil, err
-				}
-				input.Scope = input.Scope + " " + res.ResourceIdentifier + ":" + perm.PermissionIdentifier
+				input.Scope = input.Scope + " " + perm.Resource.ResourceIdentifier + ":" + perm.PermissionIdentifier
 			}
 			input.Scope = strings.TrimSpace(input.Scope)
 		}

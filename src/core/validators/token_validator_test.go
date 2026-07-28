@@ -4754,3 +4754,105 @@ func TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope(t *testing
 		})
 	}
 }
+
+// TestValidateTokenRequest_ClientCredentials_NoScopeGiven covers the "no scope was passed, grant
+// everything the client holds" expansion, which had no unit coverage at all: of the client
+// credentials cases above, none omits Scope. It was exercised only by an integration test.
+//
+// It also pins the removal of a redundant database round-trip. The expansion used to call
+// GetResourceByResourceIdentifier for each granted permission and then use the identifier it had
+// just passed in, even though PermissionsLoadResources had already populated perm.Resource.
+//
+// **The pin is the call COUNT, not the absence of a stub.** The issue-104 spec said the new cases
+// "must not stub GetResourceByResourceIdentifier", which is wrong: validateClientCredentialsScopes
+// runs on the expanded scope immediately afterwards and looks up each resource itself. So the stub
+// is required, and .Once() is what makes the test fail if the expansion looks anything up: before
+// the removal each resource was fetched twice per request, once expanding and once validating.
+func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
+	billingResource := models.Resource{Id: 1, ResourceIdentifier: "billing-api"}
+	reportsResource := models.Resource{Id: 2, ResourceIdentifier: "reports-api"}
+
+	billingRead := models.Permission{Id: 10, PermissionIdentifier: "read", ResourceId: 1, Resource: billingResource}
+	reportsRead := models.Permission{Id: 20, PermissionIdentifier: "read", ResourceId: 2, Resource: reportsResource}
+
+	testCases := []struct {
+		name string
+		// clientPerms carry a populated Resource, as PermissionsLoadResources would leave them.
+		clientPerms []models.Permission
+		wantScope   string
+		// resourcesLookedUp is what the VALIDATION step then resolves, each expected exactly once.
+		resourcesLookedUp []models.Resource
+	}{
+		{
+			// Also confirms the expansion is resource-qualified: a client holding "read" on two
+			// resources gets both "billing-api:read" and "reports-api:read", not one of them twice.
+			// That distinction started mattering when the ownership check became resource-scoped.
+			name:              "the same permission identifier on two resources yields both scopes",
+			clientPerms:       []models.Permission{billingRead, reportsRead},
+			wantScope:         "billing-api:read reports-api:read",
+			resourcesLookedUp: []models.Resource{billingResource, reportsResource},
+		},
+		{
+			// Empty scope short-circuits validateClientCredentialsScopes, so nothing is looked up.
+			name:              "a client holding nothing yields an empty scope",
+			clientPerms:       nil,
+			wantScope:         "",
+			resourcesLookedUp: nil,
+		},
+		{
+			name:              "a single grant yields a single scope",
+			clientPerms:       []models.Permission{billingRead},
+			wantScope:         "billing-api:read",
+			resourcesLookedUp: []models.Resource{billingResource},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			validator := NewTokenValidator(mockDB, mocks_oauth.NewTokenParser(t), mocks_user.NewPermissionChecker(t))
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+			clientSecretEncrypted, _ := encryption.EncryptData("valid_secret")
+			client := &models.Client{
+				ClientIdentifier:         "cc_client",
+				Enabled:                  true,
+				ClientCredentialsEnabled: true,
+				IsPublic:                 false,
+				ClientSecretEncrypted:    clientSecretEncrypted,
+				Permissions:              tc.clientPerms,
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "cc_client").Return(client, nil)
+			mockDB.On("ClientLoadPermissions", mock.Anything, client).Return(nil)
+			mockDB.On("PermissionsLoadResources", mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
+
+			// .Once() is the assertion. Two calls per resource means the expansion is looking
+			// resources up again instead of using the association already loaded above.
+			for i := range tc.resourcesLookedUp {
+				res := tc.resourcesLookedUp[i]
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, res.ResourceIdentifier).
+					Return(&res, nil).Once()
+				var perms []models.Permission
+				for _, p := range tc.clientPerms {
+					if p.ResourceId == res.Id {
+						perms = append(perms, p)
+					}
+				}
+				mockDB.On("GetPermissionsByResourceId", mock.Anything, res.Id).Return(perms, nil).Once()
+			}
+
+			// Scope deliberately omitted, which is what selects the expansion branch.
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:    "client_credentials",
+				ClientId:     "cc_client",
+				ClientSecret: "valid_secret",
+			})
+
+			assert.NoError(t, err)
+			if assert.NotNil(t, result) {
+				assert.Equal(t, tc.wantScope, result.Scope)
+			}
+		})
+	}
+}

@@ -308,12 +308,27 @@ normalization covers every path that can set `input.Scope`.
 `GetResourceByResourceIdentifier(nil, perm.Resource.ResourceIdentifier)` and then uses
 `res.ResourceIdentifier`, the string it just passed in. `PermissionsLoadResources` ran at
 `:290`. This is one DB round-trip per granted permission, per request. `res` is dereferenced
-without a nil check at `:302`, and `PermissionsLoadResources` does assign a zero-valued
-`Resource` on a map miss without erroring
-(`src/core/data/commondb/permission.go:171`), so the shape of a nil deref exists. Reaching it
-requires an orphaned permission, and `ON DELETE CASCADE` holds on all four engines with SQLite
-setting and then verifying `PRAGMA foreign_keys` (`src/core/data/sqlitedb/db.go:59, 82`). Not
-a live bug.
+without a nil check at `:302`, and `PermissionsLoadResources` assigns a zero-valued `Resource` on a
+map miss without erroring (`src/core/data/commondb/permission.go:171`), leaving
+`ResourceIdentifier == ""`. The old code then passed that empty string to
+`GetResourceByResourceIdentifier`, which returns `nil`, and dereferenced it.
+
+**An earlier version of this finding called that "not a live bug", on the grounds that reaching it
+needs an orphaned permission and `ON DELETE CASCADE` holds on all four engines. That argument is
+wrong.** The cascade runs in the database; these permission rows are already in memory.
+`ClientLoadPermissions` and `PermissionsLoadResources` are separate **non-transactional** queries
+(`tx` is nil at both call sites), so a resource deleted between them leaves the loop holding rows the
+database has since cascade-deleted, and the resource lookup finds nothing for them. Narrow, but a
+real panic rather than an impossible one.
+
+**Both halves executed, not argued.** Against a fixture whose permission carries a zero-valued
+`Resource`: the old code panics with `invalid memory address or nil pointer dereference`, and the
+stage 4 code returns `invalid_scope`, "Invalid scope: ':read'. Could not find a resource with
+identifier ''", a 400. So the removal converted a panic into a naming error.
+
+**Both the round-trip and that deref are gone as of stage 4**, which removed the call rather than
+guarding it, and in doing so turned a potential panic into a 400: a zero-valued resource now yields
+the scope `":<permission>"`, which validation rejects with `invalid_scope`.
 
 **Three existing unit tests would pass vacuously after the fix.** See decision 2.
 
@@ -392,8 +407,10 @@ issued before the fix as well as new ones.
 - **Retroactive detection of exploitation.** Impossible, and the release note must say so. No
   scope was ever recorded on issuance, so there is no data to reconstruct from. Decision 8
   fixes this going forward only.
-- **Hardening the unchecked `res` at `:302`.** Unreachable behind FK cascade, and decision 7
-  removes the call entirely rather than guarding it.
+- **Hardening the unchecked `res` at `:302`.** Decision 7 removes the call entirely rather than
+  guarding it, which is why no hardening is needed. Note the reason is **not** that the state is
+  unreachable: an earlier version of this entry said "unreachable behind FK cascade", which is wrong
+  for the reason section 1 now records. Removing the call is what makes the path fail closed.
 - **The wrong `auth_time` on refreshed ROPC tokens.** `createTokenInputFromROPC:916` passes
   `now`, so a token issued by `GenerateTokenResponseForRefreshROPC` reports the refresh moment
   as the authentication moment. A real defect in an OIDC claim's meaning, found while choosing
@@ -681,8 +698,10 @@ type or range. That is safe because `JwtAuthorizationHeaderToContext` calls
 `DecodeAndValidateTokenString(tokenStr, nil, true)` (`core/middleware/middleware_jwt.go:104`)
 and only stores the token in context when signature validation succeeds, so claims reaching this
 middleware are server-issued and cannot be forged. A malformed `auth_time` is therefore not a
-reachable state, and adding a numeric check would be dead code of the kind decisions 2 and 7
-already rejected. **This is a dependency, not an assumption:** if a future change ever puts an
+reachable state, and adding a numeric check would be dead code of the kind decision 2 rejected in
+turning down an `Id == 0` guard. **Decision 7 is deliberately not cited alongside it**, though an
+earlier version of this sentence did: that guard was rejected because the path fails closed without
+it, not because its state is unreachable. The state there is reachable, per section 1. **This is a dependency, not an assumption:** if a future change ever puts an
 unverified token into that context key, this guard weakens with it.
 
 **Why `auth_time` and not `sid`.** `sid` is conditional: it is set only when a session exists
@@ -949,11 +968,26 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
    an event for the ownership denial only, which would leave "resource not found" and
    "permission not recognized" silent and make the trail arbitrary.
 
-7. **Clean up `:295-305`, no orphan guard, and add the missing unit coverage.** Status: **Decided**
+7. **Clean up `:295-305`, no empty-identifier guard, and add the missing unit coverage.**
+   Status: **Decided** (reasoning corrected 2026-07-28)
 
-   The redundant round-trip goes. The unchecked `res` is not guarded, for the same reason
-   decision 2 rejects the `Id == 0` guard: applying the principle in one place and not the
-   other would be worse than either choice alone.
+   The redundant round-trip goes, and no guard replaces it.
+
+   **The original reasoning here was that this parallels decision 2's rejection of an `Id == 0`
+   guard, both being dead code for unreachable states. That parallel is false.** `Id == 0` really is
+   unreachable: every path loads permissions from autoincrement primary keys, so no real row carries
+   it. A zero-valued `perm.Resource` is **reachable**, via a resource deleted between the two
+   non-transactional loads, per section 1.
+
+   The correct reason is that removing the call makes the path fail closed on its own. A zero-valued
+   resource yields the scope `":<permission>"`, which `validateClientCredentialsScopes` rejects with
+   `invalid_scope`. A guard would turn that 400 into a differently-worded 400. The old code, by
+   contrast, dereferenced a nil resource in that race, so the removal fixes a latent panic rather
+   than declining to guard an impossibility.
+
+   Also note the terminology: `models.Permission.Resource` is a **value** field, so there is no nil
+   to guard. Earlier drafts of this spec said "nil guard" and "orphan guard"; the state is a
+   zero-valued struct with an empty identifier.
 
    **Rejected:** leaving `:295-305` alone as adjacent scope. The counterargument is real, that a
    reviewer bisecting later would rather see the escalation fix by itself, which is why it is a
@@ -1263,9 +1297,17 @@ the handler and ownership is checked afterwards, per scope, on the deduplicated 
     importantly, communicates to every future reader that multiple matching rows are a legitimate
     state when they are not. Teaching the wrong cardinality is the larger cost.
 
-    This is also consistent with decisions 2 and 7, which reject an `Id == 0` guard and an orphan
-    guard on the same ground: do not write code for states the data model forbids. Applying that
-    principle to a `slices.Contains` and not to those two guards would have been arbitrary.
+    This is also consistent with decision 2, which rejects an `Id == 0` guard on the same ground: do
+    not write code for states the data model forbids. `Id == 0` is unreachable because every path
+    loads permissions from autoincrement primary keys, and duplicate same-identifier rows on one
+    resource are unreachable because every engine enforces the unique index, so applying the
+    principle to one and not the other would have been arbitrary.
+
+    **Decision 7 was originally cited here too, and no longer is.** Its guard was rejected for a
+    different reason: the zero-valued `Resource` state it would have guarded is **reachable**, via a
+    resource deleted between two non-transactional loads, and the guard is unnecessary only because
+    the path fails closed downstream. Grouping the three together made the data-model argument look
+    broader than it is.
 
     **Not reversed by this decision:** the fix itself, which was already correct, and every
     regression case that carries it. The 7 accept-to-reject unit cases and both integration tests
@@ -1726,15 +1768,21 @@ Full suite green on SQLite (1980 passing).
    will fail the test if an unexpected `Log` call is made.
 
 ### Stage 4: drop the redundant re-lookup
-Status: **Not started**
+Status: **Done** (2026-07-28)
 
-1. Use the loaded association at `:295-305`. Status: **Not started**
+Full suite green on SQLite (1981 passing). Removing the lookup broke no existing test, which
+confirms this plan's claim that no unit case reached the expansion branch.
+
+1. Use the loaded association at `:295-305`. Status: **Done**
    `perm.Resource.ResourceIdentifier` directly, dropping the `GetResourceByResourceIdentifier`
-   call and with it the unchecked deref at `:302`. No orphan guard, per decision 7.
+   call and with it the unchecked deref at `:302`. No empty-identifier guard, per decision 7, and
+   the comment says why so the next reader does not add one: the state is reachable through a
+   concurrent-deletion race, but the path now fails closed with `invalid_scope`, and the removal
+   turned what had been a nil dereference in that race into a 400.
 
-2. Add the missing unit coverage for the no-scope branch. Status: **Not started**
-   `token_validator_test.go`. No client credentials unit case currently omits `Scope`, so this
-   branch has never been unit tested. Three cases, executed:
+2. Add the missing unit coverage for the no-scope branch. Status: **Done**
+   Added as `TestValidateTokenRequest_ClientCredentials_NoScopeGiven`. No client credentials unit
+   case omitted `Scope` before, so this branch had never been unit tested. Three cases:
 
    | Client holds | Expected resulting scope |
    |---|---|
@@ -1742,11 +1790,17 @@ Status: **Not started**
    | nothing | empty |
    | `billing-api:read` only | `billing-api:read` |
 
-   Removing the lookup breaks no existing mock expectation, verified: no unit test stubs
-   `GetResourceByResourceIdentifier` for this path, because no unit test reaches this path. The
-   new cases must **not** stub it either, and with `mocks_data.NewDatabase(t)` asserting that
-   every registered expectation was met, a stub left behind would fail the test. That failure is
-   the signal that the round-trip is really gone.
+   **This step's instruction was wrong and the implementation deliberately departs from it.** The
+   plan said the new cases "must **not** stub `GetResourceByResourceIdentifier`", on the reasoning
+   that an unmet expectation would then prove the round-trip was gone. But
+   `validateClientCredentialsScopes` runs on the expanded scope immediately afterwards and looks up
+   each resource itself, at what is now `:772`. So the stub is **required**, and its absence would
+   simply fail the test for an unrelated reason.
+
+   The working pin is the call **count**: each resource's stub is registered `.Once()`, because
+   before the removal every resource was fetched twice per request, once expanding and once
+   validating. Verified by restoring the round-trip, which fails exactly the two cases that look
+   resources up and correctly leaves the empty-client case passing.
 
    The first row also confirms the expansion is resource-qualified, so a client holding `read`
    on two resources gets both scopes rather than one twice. Under stage 1's fix that
