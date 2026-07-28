@@ -176,14 +176,26 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		if err != nil {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileDobInvalidFormat, nil)
 		}
-		// Compare dates only, not times, to avoid timezone issues. The parsed
-		// birth date is midnight UTC, so "today" must be built from UTC
-		// components too: taking them from local time while labelling the result
-		// UTC made a birth date equal to the current UTC date look future-dated
-		// on any server behind UTC.
+		// Compare dates only, not times. The parsed birth date is midnight UTC, so
+		// "today" is built from UTC components too: taking them from local time while
+		// labelling the result UTC made a birth date equal to the current UTC date
+		// look future-dated on any server behind UTC.
+		//
+		// A one-day tolerance on top of that, because the date arrives with no
+		// timezone and the server cannot know the user's. Offsets run from UTC-12 to
+		// UTC+14, so the user's local date is at most one day ahead of the UTC date
+		// and at most one day behind it. Anchoring strictly to UTC fixed the
+		// behind-UTC direction and broke the ahead-of-UTC one: a user in UTC+14
+		// entering their own local date would be told it is in the future.
+		//
+		// So the rule is "reject only what cannot be today anywhere". One day ahead
+		// of UTC is somebody's today and is accepted; two days ahead is nobody's and
+		// is not. For a date of birth that costs nothing, since the check exists to
+		// catch obvious nonsense rather than to police the boundary by an hour.
 		now := time.Now().UTC()
-		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-		if parsedTime.After(today) {
+		todayUTC := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		latestDateThatCouldBeToday := todayUTC.AddDate(0, 0, 1)
+		if parsedTime.After(latestDateThatCouldBeToday) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileDobInFuture, nil)
 		}
 	}

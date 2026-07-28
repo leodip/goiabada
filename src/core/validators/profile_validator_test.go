@@ -584,14 +584,59 @@ func TestValidateProfile_DateOfBirthFormat(t *testing.T) {
 	}
 }
 
+// Two days ahead of UTC, not one. One day ahead is deliberately accepted now: with no
+// timezone on the input the server cannot tell "tomorrow" from "today in UTC+14".
+//
+// This test used to use one day ahead and assert rejection, while
+// TestValidateProfile_DateOfBirthLocalTodayIsAccepted asserted the same string was
+// accepted. During the hour each day when the local and UTC dates differ those are the
+// identical input with opposite expectations, so no implementation could satisfy both.
+// TestValidateProfile_DateOfBirthTimezoneToleranceBoundary pins the resolution without
+// depending on the clock.
 func TestValidateProfile_DateOfBirthInTheFuture(t *testing.T) {
 	validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-	tomorrow := time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02")
+	dayAfterTomorrow := time.Now().UTC().AddDate(0, 0, 2).Format("2006-01-02")
 
-	err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: tomorrow})
+	err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: dayAfterTomorrow})
 
 	assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileDobInFuture)
+}
+
+// The tolerance boundary, expressed as offsets from the UTC date, so it holds at every
+// hour and in every server timezone. The three tests around this one derive their input
+// from time.Now() and therefore only exercise the interesting case for part of the day,
+// which is why the original bug stayed hidden for three days and then failed in CI.
+func TestValidateProfile_DateOfBirthTimezoneToleranceBoundary(t *testing.T) {
+	utcNow := time.Now().UTC()
+
+	testCases := []struct {
+		name       string
+		daysAhead  int
+		wantReject bool
+	}{
+		{"the UTC date itself is accepted", 0, false},
+		// Somebody's today, at any positive offset up to UTC+14.
+		{"one day ahead of UTC is accepted", 1, false},
+		// Nobody's today: offsets stop at UTC+14, so this cannot be a local date.
+		{"two days ahead of UTC is rejected", 2, true},
+		{"a year ahead is rejected", 365, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			validator := NewProfileValidator(mocks_data.NewDatabase(t))
+			date := utcNow.AddDate(0, 0, tc.daysAhead).Format("2006-01-02")
+
+			err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: date})
+
+			if tc.wantReject {
+				assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileDobInFuture)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
 }
 
 // The comparison is date-only and anchored in UTC, so the current UTC date is
