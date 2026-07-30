@@ -727,7 +727,19 @@ it.
    struct. RP-initiated logout reads `sid` from the `id_token_hint` and requires it to match
    (`handler_account_logout.go`), so dropping `sid` there would break logout for every offline-grant
    client. The change is scoped to access-token generation only; ID tokens on **auth-code** grants
-   keep `sid` unchanged. ROPC ID tokens never carried one, since no session exists (finding 20).
+   keep `sid` unchanged.
+
+   > **Corrected during stage 2.** This decision previously claimed ROPC ID tokens "never carried
+   > one, since no session exists". That was false, and the reason it was false is a live leak, found
+   > by stage 2 review finding 2. `MiddlewareSessionIdentifier` is mounted globally with
+   > `router.Use`, so a
+   > browser cookie's session identifier reaches `/auth/token`; the handler copied it into
+   > `ROPCGrantInput` and the shared ROPC input builder forwarded it into ID-token generation. A
+   > password grant for one user, made while the browser was logged in as another, therefore received
+   > an ID token carrying the **other user's** session identifier. Fixed structurally in stage 2 by
+   > removing the field from `ROPCGrantInput`, so ROPC is sessionless by construction rather than by
+   > convention. Nothing needed it: ROPC refresh tokens are always `Offline` type and store a max
+   > lifetime, and the refresh path already hard-coded it empty.
 
    **Why this shape.** ROPC access tokens already carry no `sid`, because no session exists, and
    ROPC grants are always `typ=Offline`. So omitting `sid` for auth-code offline grants collapses
@@ -1176,7 +1188,8 @@ Lookup error is a 500, consistent with `middleware/fail-closed`; a nil user is a
 `generateAccessTokenCore` omits `sid` when the grant is offline. The predicate reads the **grant's**
 offline-ness, never the request's: `code.Scope` on initial exchange,
 `RefreshToken.RefreshTokenType == "Offline"` on refresh. ID tokens on auth-code grants keep `sid`
-unchanged, or RP-initiated logout breaks; ROPC ID tokens never had one. Per decision 9.
+unchanged, or RP-initiated logout breaks. ROPC ID tokens are now structurally sidless: before stage
+2 they could inherit whatever browser session accompanied the request. Per decision 9.
 
 ### 4.9 One audit event
 
@@ -1495,39 +1508,40 @@ Tests: **data tests only, dev container, all four engines.**
    pass on all four engines, zero failures, with mssql healthy at 0.54% CPU throughout.
 
 ### Stage 2: generation stamping at issuance, and the offline `sid` fix
-Status: **Not started**
+Status: **Done**
 
 Tests: **unit tests only, host.** They cannot show that a real JWT round-trips the claim; stage 5's
 integration tests do that.
 
 1. `JwtToken.GetIntClaim(name) (int64, bool)` in `src/core/oauth/jwt_token.go`.
-   Status: **Not started**
+   Status: **Done**
    Mirrors `GetTimeClaim`'s `float64` assertion, and additionally rejects non-integral, negative and
    beyond-exact-range values. Decision 15 records why an `int` assertion would have rejected every
    well-formed token. Its contract is the conventional one, reporting only whether a **present** claim
    parsed; distinguishing absent from malformed is the middleware's job via a raw map presence check,
    following the `auth_time` idiom already in `RequireUserBoundToken` (finding 22).
 2. `AuthContext.AuthStateGeneration`, captured at password verification and inherited from the reused
-   session on the SSO path. Status: **Not started**
+   session on the SSO path. Status: **Done**
    The SSO half is decision 11(d): `AuthStateLevel1ExistingSession` never reaches the password
    handler, so reading the current user there would launder an old ceremony forward.
 3. Stamp code creation (`CodeIssuer`) and session creation (`StartNewUserSession`) from the
-   `AuthContext` value. Status: **Not started**
+   `AuthContext` value. Status: **Done**
 4. Stamp refresh-token creation in both `generateRefreshToken` and `generateRefreshTokenForROPC`, and
-   make rotation copy the **parent refresh token's** value. Status: **Not started**
+   make rotation copy the **parent refresh token's** value. Status: **Done**
    Rule 5 of decision 11. Never the user's current value.
 5. Emit the `auth_state_generation` claim on user access tokens, sourced per decision 13.
-   Status: **Not started**
+   Status: **Done**
    `AuthContext` for implicit, the `Code` for an initial exchange, the **`User` snapshot from password
    validation** for initial ROPC issuance, and the parent `RefreshToken` for both refresh paths. Never
    a freshly loaded `User`, never a refresh token's joined `Code`. The ROPC clause is finding 23;
    `ROPCGrantInput` already carries `validateResult.User`, and the user must not be reloaded between
    validation and stamping.
-6. Omit `sid` from access tokens on offline grants. Status: **Not started**
+6. Omit `sid` from access tokens on offline grants. Status: **Done**
    Predicate reads the grant: `code.Scope` on initial exchange,
    `RefreshToken.RefreshTokenType == "Offline"` on refresh (decision 9). ID tokens on auth-code grants
-   keep `sid`; ROPC ID tokens never had one.
-7. Unit tests. Status: **Not started**
+   keep `sid`. ROPC ID tokens are structurally sidless as of stage 2; before it they could inherit
+   the browser's session identifier.
+7. Unit tests. Status: **Done**
    **Exhaustive owner of the `sid`-emission table** (6 rows, executed): initial session-bound emits;
    initial with `offline_access` does not; initial with an empty session identifier does not; refresh
    on `typ=Refresh` emits; refresh on `typ=Offline` does not; and **refresh on an offline grant whose
@@ -1548,10 +1562,13 @@ integration tests do that.
    `(0, false)`; and an absent claim also returns `(0, false)`, which is why the middleware checks map
    presence **before** calling it. That last row is the one that would otherwise reject every legacy
    token, so its expected tuple is the load-bearing assertion in the table rather than a formality.
-   Also extend `handler_auth_pwd_test.go` and `handler_auth_level1_test.go` thinly, one case each,
-   asserting only that the `AuthContext` carries a generation and that SSO inherits it from the
-   session. Deliberately thin: stage 2 step 7's tables own the logic.
-8. Unit tests for the generation actually persisted on new rows. Status: **Not started**
+   Also extend `handler_auth_pwd_test.go` and `handler_authorize_test.go` thinly, asserting only
+   that the `AuthContext` carries a generation and that both session-reuse paths inherit it from the
+   session. `handler_authorize_test.go` is the correct owner: an earlier draft named
+   `handler_auth_level1_test.go`, but `handler_auth_level1.go` never touches the generation, and
+   both session-reuse sites live in `handler_authorize.go`. Deliberately thin: stage 2's tables own
+   the logic.
+8. Unit tests for the generation actually persisted on new rows. Status: **Done**
    **Exhaustive owner of the persisted-state stamping table** (6 rows, executed), added by finding 28.
    Steps 3 to 5 above stamp `codes`, `user_sessions` and `refresh_tokens`, and nothing else in the plan
    would notice if a stamp were silently omitted: the validator tests of stage 3 build
@@ -1581,6 +1598,117 @@ integration tests do that.
    The rotation row is a **three-way** conflict on purpose, so a wrong read of either the code or the
    user is caught rather than only one of them.
 
+   **As built.** `JwtToken.GetIntClaim` in `jwt_token.go` with a `maxSafeFloat64Int` bound of 2^53-1;
+   `AuthContext.AuthStateGeneration` populated at three sites (password verification in
+   `handler_auth_pwd.go`, and both session-reuse paths in `handler_authorize.go`); `CodeIssuer`
+   stamps the code; `StartNewUserSession` gained an `authStateGeneration` parameter and stamps the
+   session; both refresh-token generators stamp from the right source; `TokenGenerationInput` gained
+   `AuthStateGeneration` and `GrantIsOffline`, and `generateAccessTokenCore` emits the claim and
+   gates `sid` on them. Tests: `TestAccessToken_SidEmission` (6 rows),
+   `TestAccessToken_GenerationProvenance` (6 rows), `TestPersistedGeneration_Stamping` (5 rows in
+   `core/oauth`), `TestStartNewUserSession_StampsAuthStateGeneration` (the session row, in
+   `core/user`), `TestGetIntClaim` (14 rows), plus the thin `AuthContext` cases.
+
+   Six things worth knowing, all contained inside steps:
+
+   1. **`generateAccessToken` and `generateROPCAccessToken` now take the parent refresh token**,
+      nil on an initial issuance. That is what makes decision 13 expressible: on a refresh, the code
+      is the wrong source for both the generation and the offline flag, since the code's generation
+      can lag a promoted token's and its scope can differ from the request's. It mirrors
+      `generateRefreshToken`, which already took the parent the same way.
+   2. **`GrantIsOffline` is a field on the input rather than the builders clearing
+      `SessionIdentifier`.** Clearing it would have stripped `sid` from the ID token too, because
+      `createTokenInputFromCode` feeds both, and RP-initiated logout matches on the ID token's `sid`.
+      That is the trap decision 9 records, and this is the shape that avoids it.
+   3. **`grantIsOffline` is shared with `generateRefreshToken`'s type branch**, which previously
+      inlined the same condition. Now the access token's `sid` decision and the refresh token's type
+      cannot disagree about what "offline" means. The `"Offline"` and `"Refresh"` literals became
+      named constants for the same reason.
+   4. **The thin SSO case went into `handler_authorize_test.go`, not `handler_auth_level1_test.go`
+      as the plan said.** The plan misplaced it: session reuse populates the `AuthContext` in
+      `handler_authorize.go`, and `handler_auth_level1.go` never touches the generation.
+   5. **Two pre-existing assertions were reversed, deliberately.**
+      `TestGenerateTokenResponseForAuthCode_FullOpenIDConnect` and `..._ClientOverrideAndCustomScope`
+      both asserted `sid` on an access token whose scope includes `offline_access`, which is exactly
+      the behaviour decision 9 changes. They now assert its absence, with the reason in-line so the
+      reversal does not read as a mistake. Their ID-token `sid` assertions are untouched.
+   6. **Signature changes rippled into existing tests and mocks.** `StartNewUserSession` gained a
+      parameter, so the `UserSessionManager` mock was regenerated and eight call sites plus three
+      mock expectations were updated; `generateAccessToken` gained one, so four call sites in
+      `token_issuer_test.go` were updated with a nil parent, which is correct since all four exercise
+      the initial exchange.
+
+   **Verified to have teeth.** Removing the code stamp and making auth-code rotation read the code
+   instead of the parent both fail `TestPersistedGeneration_Stamping` with the intended message, the
+   second proving the three-way conflict (parent 7, code 3, user 9) earns its keep. Both restored.
+
+   **Review round on this stage.** Four findings, all valid. One of them was a live security bug.
+
+   1. **The public offline-refresh test was passing for the wrong reason.**
+      `TestGenerateTokenResponseForRefresh_Offline_NoIdToken` built its "offline" parent without a
+      `RefreshTokenType`, and an empty type is classified session-bound, so a test named for the
+      offline case exercised the session-bound one and its `sid` assertion passed vacuously. Setting
+      the type immediately flipped it. That test and `TestGenerateTokenResponseForRefreshROPC` now
+      also assert generation provenance at the **public entry point**, on both the access token and
+      the captured child refresh token. The helper tables passed even if a wrapper stopped forwarding
+      its parent, so this is the seam they could not reach.
+   2. **ROPC could carry an unrelated browser session identifier.** `MiddlewareSessionIdentifier` is
+      mounted globally, so a cookie's session reaches `/auth/token`; the handler forwarded it into
+      `ROPCGrantInput` and it landed in the ID token. A password grant for one user made while the
+      browser was logged in as another received an ID token with the **other user's** session
+      identifier. Fixed structurally by removing the field, so it cannot be reintroduced by an eager
+      caller, and decision 9's supporting text was corrected since it had asserted the opposite.
+      Coverage is split deliberately, and neither half proves the other:
+      `TestHandleTokenPost_ROPC_IgnoresBrowserSession` puts a session identifier in the request
+      context and proves the **handler does not forward it**, with the issuer mocked; the issuer tests
+      prove **neither generated token carries a `sid`**, asserted on the ID token as well as the
+      access token, and on the initial grant as well as the refresh, since the ID token is where the
+      leak actually was. Twelve existing ROPC fixtures already set the
+      field to `""` with the comment "ROPC tokens don't use sessions", which is what made the leak
+      invisible.
+   3. **Four provenance seams stopped short of the production handoff.** The helper tables proved
+      behaviour only after the right argument arrived. Fixed with nonzero conflicting values at each
+      existing seam: the new-session handler cases now carry generation 7 so they cannot pass against
+      a hard-coded zero; the implicit handler asserts the value reaches `ImplicitGrantInput`; the
+      prompt=none path, a separate session-reuse site, asserts inheritance from the session (7) rather
+      than the user (9); and the two initial-ROPC rows, which were functionally identical, collapsed
+      into one, with the handler boundary they were trying to reach pinned by the test in finding 2
+      instead.
+   4. **The `float64` bound was one value too permissive.** It allowed 2^53, which is representable
+      but ambiguous after JSON parsing, since 2^53+1 rounds to the same value. Changed to 2^53-1 with
+      a boundary row rejecting 2^53 exactly, and one accepting 2^53-1. That row is also what
+      reconciles the count: the table was 12 rows against a documented 13, and is now 14.
+
+   A second round found four more, all valid, about coverage and documentation rather than logic. The ROPC
+   **child** refresh token's provenance was unasserted: `CreateRefreshToken` was mocked with
+   `mock.Anything` and never captured, so a regression forwarding the parent to the access token but
+   not to `generateRefreshTokenForROPC` would have passed, and the laundering would have surfaced only
+   on the *next* refresh. The child is now captured and asserted. Section 4 still repeated the
+   pre-fix ROPC claim in three places, now saying ROPC ID tokens are structurally sidless as of stage
+   2 and could previously inherit the browser's. The handler test's comment overstated its reach,
+   since the issuer is mocked there; it now says it proves the handoff only, with the token contents
+   proven separately. And three documentation drifts were corrected: the row count, the constant's
+   name, and a reference to a "finding 31" that does not exist.
+
+   One thing I got wrong while narrowing that comment, corrected in a third round: I reported that the
+   **initial** ROPC path had no `sid` assertion on either token and that I had filled a gap. It did
+   have them, as `assert.Nil` on both claims with the comment "ROPC tokens don't have session
+   identifiers", and they would have caught the actual leak, since a leaked identifier is a non-nil
+   string. My search had been for `func TestGenerateTokenResponseForROPC(`, with a literal
+   parenthesis, but the function is `..._BasicOpenIDScope`; the pattern matched nothing and I read the
+   empty result as "no assertions exist" rather than "the search was malformed". The `NotContains`
+   form was kept because it distinguishes absent from present-and-nil and reads as the intent, and the
+   now-redundant `assert.Nil` lines were removed. No coverage was added by that change.
+
+   Verified to have teeth: reverting the bound to 2^53 fails the new boundary row; correcting the
+   offline parent's type immediately failed the old `sid` assertion, which is how the vacuous test was
+   confirmed rather than assumed; and making ROPC rotation read the reloaded user instead of the parent
+   fails the new child assertion with 9 against an expected 7.
+
+   **Tests: unit only, as planned.** All three modules build and vet clean. Module tests green in the
+   container, including `core/communication` forced with `-count=1`. Data tests re-run green on sqlite
+   to confirm stage 1a and 1b still pass. No integration tests: the claim's round trip and its
+   enforcement are stage 3 and stage 5.
 ### Stage 3: enforcement at validation
 Status: **Not started**
 
@@ -1941,7 +2069,8 @@ consequence for the safety section).
     cloned-cookie and OTP analysis; decision 5's broad "no half-applied state" is narrowed where it is
     stated rather than only later; decision 7 shows `preservedSessionIdentifier` as `""` and carries the
     generation fields; decision 8's result struct gains `OldGeneration` and `NewGeneration`; the ID
-    token claim now says auth-code grants, since ROPC ID tokens never carried a `sid`; decision 11's
+    token claim now says auth-code grants, since ROPC ID tokens are structurally sidless as of stage
+    2 (they could previously inherit the browser's, which stage 2 fixed); decision 11's
     invariant acknowledges the explicit preserved-session promotion exception; and the audit
     generation fields are unambiguous now that every remaining reason advances the generation.
 
