@@ -1254,9 +1254,22 @@ not a pass-through.
 
 ## 5. Implementation plan
 
-Six stages. Each is one review, one test run and one commit, and all six land as a single PR per the
-`Delivery` line in the metadata. Stage 1 first is not preference: every later stage reads columns and
-methods it creates.
+Seven stages. Each is one review, one test run and one commit, and all seven land as a single PR per
+the `Delivery` line in the metadata. Stage 1a first is not preference: every later stage reads columns
+and methods it creates.
+
+Stage 1 was **split into 1a and 1b at the user's request during implementation**, because as a single
+stage it was about thirty new functions, eight migration files, four snapshots, four models, a mock
+regeneration and tests across five files, which is more than one sitting can review. The seam is
+schema and models against methods and mocks. The split is lettered rather than renumbered so that
+every "stage 2 step 7" style citation elsewhere in this document stays valid.
+
+Note the seam is **not** exactly steps 1 and 2 against steps 3 to 6, which would have left the first
+half with no tests at all and broken this section's own rule that every stage names a tier it
+exercises. The schema and model tests, the migration assertions and the `dont-update` tag assertions,
+move into 1a with the thing they test. Those are self-contained: `InsertInto` writes `dont-update`
+fields, verified, so 1a can create a row with a nonzero generation and assert a full-row update leaves
+it alone, without needing 1b's promotion methods.
 
 **Test tiers and where they run.** Unit tests run on the host with `go test`. **Data and integration
 tests do not**: they need `goiabada-devcontainer-1` up, driven by `docker exec` with the repo at
@@ -1281,11 +1294,11 @@ have rejected every well-formed token (decision 15), a later run added the initi
 from finding 23 and corrected a sweep expectation that contradicted the sketch's own output
 (finding 27), and the final run added the persisted-state stamping table from finding 28.
 
-### Stage 1: data layer, models, migration and mocks
+### Stage 1a: schema and models
 Status: **Not started**
 
-Tests: **data tests only, dev container, all four engines.** No unit tests here; there is no logic
-above the query layer yet.
+Tests: **data tests only, dev container, all four engines.** No unit tests; there is no logic here,
+only columns and struct tags.
 
 1. Migration `000024` for sqlite, mysql, postgres and mssql. Status: **Not started**
    Adds `auth_state_generation` to `users`, `user_sessions`, `codes` and `refresh_tokens`, each
@@ -1298,14 +1311,33 @@ above the query layer yet.
    On `models.User`, `models.UserSession`, `models.Code` and `models.RefreshToken`. Verified this is
    the right mechanism: all four `Update*` methods build with
    `WithoutTag("pk").WithoutTag("dont-update")` while `InsertInto` uses only `WithoutTag("pk")`, so
-   the field is written at creation and immutable thereafter except through step 4's methods
+   the field is written at creation and immutable thereafter except through stage 1b step 2's methods
    (decision 11(b)).
-3. `GetRefreshTokensByUserId(tx, userId)` on the `Database` interface, one `commondb`
+3. Data tests for the schema and the tags. Status: **Not started**
+   A migration test in the style of `migration_000021_countries_test.go` asserts pre-existing rows land
+   at generation 0 on every engine, **and that each expected index exists afterwards**. The index
+   assertion is not redundant: every behavioural query test stays green with an index accidentally
+   omitted, so nothing else in the suite would notice. It needs a per-engine index-listing helper,
+   since the four engines expose indexes differently (`sqlite_master` / `PRAGMA index_list`,
+   `SHOW INDEX`, `pg_indexes`, `sys.indexes`).
+   The `dont-update` tag is pinned on **all four** models, not three: `user_test.go`, `code_test.go`,
+   `user_session_test.go` and `refresh_token_test.go` each create a row with a nonzero
+   `auth_state_generation`, perform a full-row `Update*` with a stale model, and assert the value did
+   **not** change. Those are the rows that pin decision 11(b) and would silently pass if the tag were
+   dropped. They work without stage 1b because `InsertInto` builds with `WithoutTag("pk")` only, so a
+   `dont-update` field is written on creation.
+
+### Stage 1b: data-layer methods, mocks and query tests
+Status: **Not started**
+
+Tests: **data tests only, dev container, all four engines.**
+
+1. `GetRefreshTokensByUserId(tx, userId)` on the `Database` interface, one `commondb`
    implementation, four delegating wrappers. Status: **Not started**
    Two `UNION ALL` branches, one joining `codes` on `codes.user_id` and one selecting on
    `refresh_tokens.user_id` (decision 1, finding 6). Carries the invariant comment: every refresh
    token reaches its user through one of those two columns and nothing else.
-4. Narrow write methods. Status: **Not started**
+2. Narrow write methods. Status: **Not started**
    `IncrementUserAuthStateGeneration(tx, userId) (int64, error)` returning the new value;
    `PromoteUserSessionGeneration(tx, sessionId, gen)`; `PromoteRefreshTokenGenerations(tx, ids, gen)`;
    `SetUserPasswordHash(tx, userId, hash)` clearing the forgot-password fields in the same statement;
@@ -1315,9 +1347,9 @@ above the query layer yet.
    enabled endpoint also serves `Enabled = true`, and leaving that on the full-row update would keep
    the clobbering defect alive in half of it. The disable direction's return gates stage 5's
    revocation.
-5. Regenerate `src/core/data/mocks/database_mock.go` with mockery (`src/core/.mockery.yaml`).
+3. Regenerate `src/core/data/mocks/database_mock.go` with mockery (`src/core/.mockery.yaml`).
    Status: **Not started**
-6. Data tests in `src/authserver/tests/data/`. Status: **Not started**
+4. Data tests in `src/authserver/tests/data/`. Status: **Not started**
    This is the exhaustive owner of the query's shape coverage; later stages test consumers thinly and
    say so. `refresh_token_test.go` gains a `GetRefreshTokensByUserId` table enumerating every linkage
    shape adversarially: session-bound with a live session; offline with a live session; **offline
@@ -1326,7 +1358,7 @@ above the query layer yet.
    belonging to a **different** user, which must not be returned; and the empty result for a user with
    no tokens. The different-user row is the negative case that fails for the right reason: it varies
    only the user id, so it cannot pass with the predicate removed.
-   Every narrow method from step 4 is exercised here, on all four engines, not only the enabled one:
+   Every narrow method from step 2 is exercised here, on all four engines, not only the enabled one:
    `TrySetUserEnabled` returns true exactly once across two identical calls in **each** direction, and
    false when `expected` does not match; `IncrementUserAuthStateGeneration` called twice returns
    successive values, which pins monotonicity; `PromoteRefreshTokenGenerations` changes only the named
@@ -1335,14 +1367,7 @@ above the query layer yet.
    the builder, so this row is a real hazard rather than a formality;
    `PromoteUserSessionGeneration` changes only the named session; and `SetUserPasswordHash` clears the
    forgot-password fields without touching any other column.
-   The `dont-update` tag is pinned on **all four** models, not three: `user_test.go`,
-   `code_test.go`, `user_session_test.go` and `refresh_token_test.go` each assert that a full-row
-   `Update*` performed with a stale model does **not** change `auth_state_generation`. Those are the
-   rows that pin decision 11(b) and would silently pass if the tag were dropped.
-   A migration test in the style of `migration_000021_countries_test.go` asserts pre-existing rows
-   land at generation 0 on every engine, **and that each expected index exists afterwards**. The index
-   assertion is not redundant: every behavioural query test stays green with an index accidentally
-   omitted, so nothing else in the suite would notice.
+   The migration and `dont-update` assertions are **stage 1a's**, not repeated here.
 
 ### Stage 2: generation stamping at issuance, and the offline `sid` fix
 Status: **Not started**
@@ -1405,7 +1430,7 @@ integration tests do that.
    **Exhaustive owner of the persisted-state stamping table** (6 rows, executed), added by finding 28.
    Steps 3 to 5 above stamp `codes`, `user_sessions` and `refresh_tokens`, and nothing else in the plan
    would notice if a stamp were silently omitted: the validator tests of stage 3 build
-   `models.Code{AuthStateGeneration: N}` fixtures directly and never traverse issuance, and stage 1's
+   `models.Code{AuthStateGeneration: N}` fixtures directly and never traverse issuance, and stage 1b's
    data tests exercise the narrow methods rather than the issuers.
 
    The failure that omission produces is severe and quiet. A missing stamp leaves the row at the column
@@ -1492,7 +1517,7 @@ Tests: **unit tests only, host.**
    Decision 8.
 2. `RevokeUserAuthState(db, tx, userId, exceptSid) (RevocationResult, error)`.
    Status: **Not started**
-   Increments the generation, sweeps via stage 1 step 3, and when `exceptSid != ""` additionally
+   Increments the generation, sweeps via stage 1b step 1, and when `exceptSid != ""` additionally
    queries `GetRefreshTokensBySessionIdentifier(tx, exceptSid)` to build the preserved id set,
    because an offline row's own `session_identifier` is empty and its originating sid lives only on
    the `codes` row (finding 3).
@@ -1523,7 +1548,7 @@ stage whose integration tests show the advertised behaviour actually happening.
 
 1. `AuditRevokedUserAuthState` in `src/core/constants/constants.go`, added to both the constant block
    and `AuditEventTypes` (`constants/audit-list`). Status: **Not started**
-2. Wire the four sites, each opening a transaction and using stage 1's narrow writes.
+2. Wire the four sites, each opening a transaction and using stage 1b's narrow writes.
    Status: **Not started**
    `reset/password-write`, `account-pwd/write` (passing the caller's `sid` as `exceptSid`),
    `admin-pwd/write`, and `admin-enabled/write` where **both** directions go through
@@ -1802,7 +1827,7 @@ consequence for the safety section).
     `UpdateUser` and decision 14's clobbering defect would have survived in half the endpoint.
 
     Resolved by replacing it with one conditional method covering both directions,
-    `TrySetUserEnabled(tx, userId, expected, desired)`, in decision 14 and stage 1 step 4. Also
+    `TrySetUserEnabled(tx, userId, expected, desired)`, in decision 14 and stage 1b step 2. Also
     clarified in decision 14 and stage 5 step 2 that "enable does neither" means no revocation and no
     new revocation event, while the endpoint's existing `AuditUpdatedUserDetails` fires unchanged in
     both directions.
@@ -1892,7 +1917,7 @@ consequence for the safety section).
     provenance, `sid` emission, claim parsing and `AuthContext` capture, but nothing asserted what
     generation lands on a newly created `codes`, `user_sessions` or `refresh_tokens` row. Confirmed
     nothing else would have caught it: stage 3's validator tests build
-    `models.Code{AuthStateGeneration: N}` fixtures directly and never traverse issuance, and stage 1's
+    `models.Code{AuthStateGeneration: N}` fixtures directly and never traverse issuance, and stage 1b's
     data tests exercise the narrow methods rather than the issuers.
 
     The failure mode is severe and silent. A missing stamp leaves the row at the column default of 0,
