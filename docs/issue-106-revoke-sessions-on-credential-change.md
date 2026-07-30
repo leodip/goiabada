@@ -1295,25 +1295,25 @@ from finding 23 and corrected a sweep expectation that contradicted the sketch's
 (finding 27), and the final run added the persisted-state stamping table from finding 28.
 
 ### Stage 1a: schema and models
-Status: **Not started**
+Status: **Done**
 
 Tests: **data tests only, dev container, all four engines.** No unit tests; there is no logic here,
 only columns and struct tags.
 
-1. Migration `000024` for sqlite, mysql, postgres and mssql. Status: **Not started**
+1. Migration `000024` for sqlite, mysql, postgres and mssql. Status: **Done**
    Adds `auth_state_generation` to `users`, `user_sessions`, `codes` and `refresh_tokens`, each
    `NOT NULL DEFAULT 0` so existing rows migrate to generation 0 (decision 11). Adds only the indexes
    each engine lacks, per decision 10's table: `codes.user_id`, `codes.session_identifier`,
    `refresh_tokens.code_id`, `refresh_tokens.user_id` (sqlite only) and `user_sessions.user_id`.
    Column types per engine follow the existing convention, and the documentation-only
    `schema.sql` snapshots are updated in the same step since they have drifted before.
-2. Model fields, each tagged `fieldtag:"dont-update"`. Status: **Not started**
+2. Model fields, each tagged `fieldtag:"dont-update"`. Status: **Done**
    On `models.User`, `models.UserSession`, `models.Code` and `models.RefreshToken`. Verified this is
    the right mechanism: all four `Update*` methods build with
    `WithoutTag("pk").WithoutTag("dont-update")` while `InsertInto` uses only `WithoutTag("pk")`, so
    the field is written at creation and immutable thereafter except through stage 1b step 2's methods
    (decision 11(b)).
-3. Data tests for the schema and the tags. Status: **Not started**
+3. Data tests for the schema and the tags. Status: **Done**
    A migration test in the style of `migration_000021_countries_test.go` asserts pre-existing rows land
    at generation 0 on every engine, **and that each expected index exists afterwards**. The index
    assertion is not redundant: every behavioural query test stays green with an index accidentally
@@ -1326,6 +1326,59 @@ only columns and struct tags.
    **not** change. Those are the rows that pin decision 11(b) and would silently pass if the tag were
    dropped. They work without stage 1b because `InsertInto` builds with `WithoutTag("pk")` only, so a
    `dont-update` field is written on creation.
+
+   **As built.** Migration files at `000024_add_auth_state_generation.{up,down}.sql` in all four
+   `migrations/` directories, snapshots updated in all four `schema.sql` files, model fields visible at
+   the `AuthStateGeneration` declaration in `models.User`, `models.UserSession`, `models.Code` and
+   `models.RefreshToken`, tests in `migration_000024_auth_state_generation_test.go` plus
+   `TestUpdateUser_DoesNotClobberAuthStateGeneration` and its three siblings.
+
+   Five things worth knowing that the plan did not anticipate, all contained inside this step:
+
+   1. **mssql needs named default constraints.** Probed empirically against the running SQL Server:
+      `ALTER TABLE ... DROP COLUMN` is refused while a default constraint depends on the column
+      ("failed because one or more objects access this column"). So 000024 names each default and the
+      down migration drops them by name. The existing mssql down migrations 000004 and 000017 do a bare
+      `DROP COLUMN` on defaulted columns and would therefore fail; pre-existing, left alone.
+   2. **A down/up round trip was added to the migration test**, which the plan did not list. Nothing
+      else in the suite ever executes a down migration: `Migrate()` only calls `Up()`, and the other
+      migrator test starts from an empty database so its `Migrate(20)` goes *up*. Without this case my
+      own down migration would have been unverified, and it is what proves point 1.
+   3. **The migration test reads the generation with raw SQL**, not `GetUserById`. The pre-migration
+      seed has to use raw SQL (the Go model already references the column), which leaves nullable string
+      columns as SQL NULL, and the model scanner cannot map those into Go strings. The model mapping is
+      covered by the four `dont-update` tests instead.
+   4. **`TestMigration000021_CountryData` had to be fixed.** It seeded via `CreateUser` at schema
+      version 20, so the new column broke it with `Unknown column 'auth_state_generation'`. Changed to
+      `Up()` then `Force(20)`, which moves the version marker without touching the schema. That is the
+      same trick the test already used for its own idempotency check, and 000021 is data-only, so it
+      still applies the transformation to pre-migration data.
+   5. **The tag assertions were verified to have teeth.** Removing `fieldtag:"dont-update"` from
+      `models.User` makes `TestUpdateUser_DoesNotClobberAuthStateGeneration` fail with
+      "UpdateUser regressed auth_state_generation to 0, want 7". Restored afterwards.
+
+   **Review round on this stage.** One finding, valid: the migration test proved the generation-0
+   backfill for `users` only, while the four tag tests create rows with an explicit generation of 7 and
+   so never exercise the default at all. A `DEFAULT 1` typo on `user_sessions`, `codes` or
+   `refresh_tokens` would therefore have passed the entire suite and invalidated existing
+   authentication state on deployment.
+
+   Resolved by asserting each of the four columns is `NOT NULL` with a default of 0, on every engine,
+   rather than by seeding a full pre-migration user, client, session, code and refresh-token graph. The
+   reasoning: the `ALTER ... DEFAULT 0` backfill is a property of the engine and the seeded `users` row
+   already proves this engine applies it, so what remained to catch was a per-column DDL typo, which is
+   exactly what the declared default reports. It costs four one-statement metadata queries instead of a
+   raw-SQL fixture carrying forty-odd `NOT NULL` columns with per-dialect datetime and boolean literals,
+   which is its own bug surface. The reviewer named the graph seed as the strongest evidence and this as
+   a reasonable lower-noise compromise; this is the compromise, taken deliberately.
+
+   Verified to have teeth on two engines rather than one: injecting `DEFAULT 1` on `codes` fails with
+   `codes.auth_state_generation must default to 0, got "1"` on sqlite **and** on mssql, the latter
+   confirming the normalisation genuinely parses `((0))` rather than passing by accident.
+
+   Also corrected in that round: `TestMigration000021_CountryData`'s opening comment now says it runs
+   000021 against the schema at head with the version marker forced to 20, rather than implying it runs
+   against the version-20 schema.
 
 ### Stage 1b: data-layer methods, mocks and query tests
 Status: **Not started**
