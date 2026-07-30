@@ -48,8 +48,15 @@ func (u *UserSessionManager) HasValidUserSession(ctx context.Context, userSessio
 	return isValid
 }
 
+// StartNewUserSession creates a session for a completed authentication ceremony.
+//
+// authStateGeneration comes from the AuthContext, so it is the generation the ceremony
+// authenticated under rather than the user's current value. A ceremony that began before
+// a credential change therefore produces a session on the superseded generation, which
+// is rejected rather than silently carried forward (#106 decision 11).
 func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId int64, clientId int64, authMethods string, acrLevel string) (*models.UserSession, error) {
+	userId int64, clientId int64, authMethods string, acrLevel string,
+	authStateGeneration int64) (*models.UserSession, error) {
 
 	utcNow := time.Now().UTC()
 
@@ -70,6 +77,8 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		DeviceName:        useragent.GetDeviceName(r),
 		DeviceType:        useragent.GetDeviceType(r),
 		DeviceOS:          useragent.GetDeviceOS(r),
+
+		AuthStateGeneration: authStateGeneration,
 	}
 
 	userSession.Clients = append(userSession.Clients, models.UserSessionClient{

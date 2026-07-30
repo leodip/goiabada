@@ -175,6 +175,8 @@ func handleImplicitFlow(
 		SessionIdentifier: sessionIdentifier,
 		Nonce:             authContext.Nonce,
 		AuthenticatedAt:   authenticatedAt,
+
+		AuthStateGeneration: authContext.AuthStateGeneration,
 	}
 
 	tokenResponse, err := tokenIssuer.GenerateTokenResponseForImplicit(r.Context(), implicitInput, issueAccessToken, issueIdToken)

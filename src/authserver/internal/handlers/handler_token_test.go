@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1356,4 +1359,67 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		tokenIssuer.AssertExpectations(t)
 		httpHelper.AssertExpectations(t)
 	})
+}
+
+// TestHandleTokenPost_ROPC_IgnoresBrowserSession pins that the HANDLER never forwards a
+// session identifier from the request into a password grant.
+//
+// Scope note: the token issuer is mocked here, so this proves the handoff and nothing about
+// the tokens themselves. That neither generated token carries a sid is proven separately, in
+// core/oauth's TestGenerateTokenResponseForROPC and TestGenerateTokenResponseForRefreshROPC.
+// Neither half substitutes for the other.
+//
+// This closes a real leak rather than guarding a hypothetical. MiddlewareSessionIdentifier
+// is mounted globally with router.Use, so a browser cookie's session lands in the request
+// context even on /auth/token. The handler used to copy that into ROPCGrantInput, and the
+// shared ROPC input builder forwarded it into ID-token generation. A password grant for
+// user B, made while the browser happened to be logged in as user A, therefore received an
+// ID token carrying A's session identifier.
+//
+// The fix was structural: ROPCGrantInput no longer has the field, so this test asserts the
+// handler builds an input the type cannot even express a session on, with a session
+// identifier deliberately present in the context to prove it is ignored rather than merely
+// absent (#106).
+func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	userSessionManager := mocks_users.NewUserSessionManager(t)
+	database := mocks_data.NewDatabase(t)
+	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+	tokenValidator := mocks_validators.NewTokenValidator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+
+	form := "grant_type=password&client_id=test_client&username=u&password=p&scope=openid"
+	req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	// A DIFFERENT user's browser session, present exactly as the global middleware would
+	// leave it. Nothing in a password grant may consume this.
+	req = req.WithContext(context.WithValue(req.Context(),
+		constants.ContextKeySessionIdentifier, "some-other-users-browser-session"))
+	rr := httptest.NewRecorder()
+
+	client := &models.Client{Id: 1, ClientIdentifier: "test_client"}
+	user := &models.User{Id: 42, Subject: uuid.New(), AuthStateGeneration: 7}
+
+	tokenValidator.On("ValidateTokenRequest", mock.Anything,
+		mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+		Return(&validators.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
+
+	var captured *oauth.ROPCGrantInput
+	tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { captured = args.Get(1).(*oauth.ROPCGrantInput) }).
+		Return(&oauth.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
+
+	auditLogger.On("Log", constants.AuditTokenIssuedROPCResponse, mock.Anything).Return()
+	httpHelper.On("EncodeJson", rr, mock.Anything, mock.Anything).Return()
+
+	handler.ServeHTTP(rr, req)
+
+	require.NotNil(t, captured, "GenerateTokenResponseForROPC was never called")
+	assert.Equal(t, client, captured.Client)
+	assert.Equal(t, user, captured.User)
+	// The generation travels on the validated User snapshot, which is what the issuer stamps
+	// initial ROPC tokens from (#106 decision 13).
+	assert.EqualValues(t, 7, captured.User.AuthStateGeneration)
 }

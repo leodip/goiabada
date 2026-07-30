@@ -234,6 +234,11 @@ func HandleAuthPwdPost(
 		})
 
 		authContext.UserId = user.Id
+		// Capture the generation the credentials were verified against. If a credential
+		// change lands while the rest of this ceremony completes, the code it eventually
+		// issues carries this older value and is rejected at redemption, which is the
+		// intended direction (#106 decision 11 rule 1).
+		authContext.AuthStateGeneration = user.AuthStateGeneration
 		authContext.AddAuthMethod(enums.AuthMethodPassword.String())
 		// Mark that real authentication occurred — used by handler_auth_completed
 		// to decide whether to refresh the session's AuthTime.

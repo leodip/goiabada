@@ -238,7 +238,11 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			State:        "test-state",
 			Nonce:        "test-nonce",
 			AcrLevel:     "urn:goiabada:pwd",
-			AuthMethods:  "pwd",
+			// Nonzero so the matcher below pins that the handler carries this into
+			// ImplicitGrantInput rather than leaving it at the zero value (#106
+			// decision 13: implicit's only possible source is the AuthContext).
+			AuthStateGeneration: 7,
+			AuthMethods:         "pwd",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -267,7 +271,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			Scope:       "openid",
 		}
 		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *oauth.ImplicitGrantInput) bool {
-			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Scope == "openid"
+			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Scope == "openid" &&
+				input.AuthStateGeneration == 7
 		}), true, false).Return(tokenResponse, nil)
 
 		// Mock audit logging
@@ -322,7 +327,11 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			State:        "test-state",
 			Nonce:        "test-nonce",
 			AcrLevel:     "urn:goiabada:pwd",
-			AuthMethods:  "pwd",
+			// Nonzero so the matcher below pins that the handler carries this into
+			// ImplicitGrantInput rather than leaving it at the zero value (#106
+			// decision 13: implicit's only possible source is the AuthContext).
+			AuthStateGeneration: 7,
+			AuthMethods:         "pwd",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -398,7 +407,11 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			State:        "test-state",
 			Nonce:        "test-nonce",
 			AcrLevel:     "urn:goiabada:pwd",
-			AuthMethods:  "pwd",
+			// Nonzero so the matcher below pins that the handler carries this into
+			// ImplicitGrantInput rather than leaving it at the zero value (#106
+			// decision 13: implicit's only possible source is the AuthContext).
+			AuthStateGeneration: 7,
+			AuthMethods:         "pwd",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 

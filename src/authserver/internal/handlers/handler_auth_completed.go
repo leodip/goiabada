@@ -122,7 +122,8 @@ func HandleAuthCompletedGet(
 		} else {
 			// start new session
 			newSession, err := userSessionManager.StartNewUserSession(
-				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String())
+				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String(),
+				authContext.AuthStateGeneration)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

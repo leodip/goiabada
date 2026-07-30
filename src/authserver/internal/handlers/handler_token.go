@@ -318,17 +318,16 @@ func HandleTokenPost(
 			// RFC 6749 Section 4.3 - Resource Owner Password Credentials Grant
 			// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 
-			// Get session identifier for normal refresh tokens (if available)
-			sessionIdentifier := ""
-			if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-				sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-			}
-
+			// No session identifier is read here on purpose. MiddlewareSessionIdentifier is
+			// mounted globally, so a browser cookie's session lands in the request context
+			// even on the token endpoint, and forwarding it made a password grant for one
+			// user carry another user's session identifier in its ID token whenever the
+			// browser was logged in as somebody else. ROPC is a direct credential exchange
+			// with no session of its own (#106).
 			ropcInput := &oauth.ROPCGrantInput{
-				Client:            validateResult.Client,
-				User:              validateResult.User,
-				Scope:             validateResult.Scope,
-				SessionIdentifier: sessionIdentifier,
+				Client: validateResult.Client,
+				User:   validateResult.User,
+				Scope:  validateResult.Scope,
 			}
 
 			tokenResp, err := tokenIssuer.GenerateTokenResponseForROPC(r.Context(), ropcInput)

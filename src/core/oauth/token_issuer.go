@@ -43,6 +43,14 @@ type GenerateTokenForRefreshInput struct {
 
 // TokenGenerationInput contains all data needed to generate access/id tokens
 // regardless of the OAuth flow being used (auth code, implicit, ROPC).
+// Refresh token types, as stored in refresh_tokens.refresh_token_type and emitted as the
+// refresh token's typ claim. Named so the branch that chooses the type and the branches
+// that later read it cannot drift apart.
+const (
+	offlineRefreshTokenType = "Offline"
+	sessionRefreshTokenType = "Refresh"
+)
+
 type TokenGenerationInput struct {
 	// User and Client (always required)
 	User   *models.User
@@ -60,6 +68,18 @@ type TokenGenerationInput struct {
 	SessionIdentifier string // Empty means don't include "sid" claim
 	Nonce             string // Empty means don't include "nonce" claim
 	AccessToken       string // For id_token: if non-empty, include "at_hash" claim (implicit flow)
+
+	// AuthStateGeneration is the generation of the credential that authorized THIS
+	// issuance, never the user's current value. Callers set it explicitly, because the
+	// correct source differs per flow and reading the convenient one is the bug decision
+	// 13 of #106 exists to prevent.
+	AuthStateGeneration int64
+	// GrantIsOffline suppresses the sid claim on ACCESS tokens only. An offline grant
+	// outlives the browser session by design, so binding its access tokens to a session
+	// identifier the middleware will later fail to resolve breaks exactly the use case
+	// offline_access exists for (#106 decision 9). ID tokens keep sid regardless, because
+	// RP-initiated logout matches on it.
+	GrantIsOffline bool
 }
 
 // GenerateTokenForRefreshROPCInput is the input for refreshing ROPC tokens.
@@ -124,7 +144,8 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 		return nil, err
 	}
 
-	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier)
+	// nil parent: this is the initial code exchange, so the code is the authorizing credential.
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -154,12 +175,38 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 	return &tokenResponse, nil
 }
 
+// generateAccessToken builds an access token for the authorization code flow.
+//
+// parentRefreshToken is nil on the initial code exchange and set when refreshing. It
+// decides both the generation and whether the grant is offline, and it has to: on a
+// refresh the code is the wrong source for either. Its generation can lag the token's
+// (the token may have been promoted while the code was not), and its scope can differ
+// from the request's, since a caller may down-scope offline_access away without the
+// grant ceasing to be offline (#106 decisions 9 and 13).
 func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *models.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
+	parentRefreshToken *models.RefreshToken) (string, string, error) {
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
+
+	if parentRefreshToken == nil {
+		input.AuthStateGeneration = code.AuthStateGeneration
+		input.GrantIsOffline = grantIsOffline(code.Scope, code.SessionIdentifier)
+	} else {
+		input.AuthStateGeneration = parentRefreshToken.AuthStateGeneration
+		input.GrantIsOffline = parentRefreshToken.RefreshTokenType == offlineRefreshTokenType
+	}
+
 	return t.generateAccessTokenCore(settings, input, now, signingKey, keyIdentifier)
+}
+
+// grantIsOffline reports whether an authorization-code grant is offline, from the
+// AUTHORIZED scope rather than whatever a later request asked for. Mirrors the branch
+// generateRefreshToken uses to choose the token type, so the two cannot disagree.
+func grantIsOffline(authorizedScope string, sessionIdentifier string) bool {
+	return slices.Contains(strings.Split(authorizedScope, " "), oidc.OfflineAccessScope) ||
+		sessionIdentifier == ""
 }
 
 func (t *TokenIssuer) generateIdToken(settings *models.Settings, code *models.Code, scope string,
@@ -183,15 +230,13 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 	claims["aud"] = settings.Issuer
 	claims["sub"] = code.User.Subject
 
-	scopes := strings.Split(scope, " ")
-
-	// Use Offline type if:
-	// 1. offline_access scope is requested, OR
-	// 2. No session identifier exists (e.g., ROPC flow which doesn't create browser sessions)
-	// In both cases, the refresh token cannot be bound to a user session
-	if slices.Contains(scopes, oidc.OfflineAccessScope) || code.SessionIdentifier == "" {
+	// Use Offline type if the offline_access scope was granted, or if no session identifier
+	// exists (e.g. ROPC, which creates no browser session). In both cases the refresh token
+	// cannot be bound to a user session. Shared with the access token's sid decision through
+	// grantIsOffline, so the two cannot disagree about what "offline" means.
+	if grantIsOffline(scope, code.SessionIdentifier) {
 		// offline refresh token (not related to user session)
-		claims["typ"] = "Offline"
+		claims["typ"] = offlineRefreshTokenType
 
 		exp, err := t.getRefreshTokenExpiration("Offline", now, settings, &code.Client)
 		if err != nil {
@@ -217,7 +262,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 
 	} else {
 		// normal refresh token (associated with user session)
-		claims["typ"] = "Refresh"
+		claims["typ"] = sessionRefreshTokenType
 		claims["sid"] = code.SessionIdentifier
 
 		exp, err := t.getRefreshTokenExpiration("Refresh", now, settings, &code.Client)
@@ -252,9 +297,14 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 	if refreshToken != nil {
 		refreshTokenEntity.PreviousRefreshTokenJti = refreshToken.RefreshTokenJti
 		refreshTokenEntity.FirstRefreshTokenJti = refreshToken.FirstRefreshTokenJti
+		// Copied from the PARENT, never re-read from the code or the user. The parent may
+		// have been promoted while the code was not, and reading the user's current value
+		// would let an old grant launder itself into a new generation (#106 rule 5).
+		refreshTokenEntity.AuthStateGeneration = refreshToken.AuthStateGeneration
 	} else {
 		// first refresh token issued
 		refreshTokenEntity.FirstRefreshTokenJti = jti
+		refreshTokenEntity.AuthStateGeneration = code.AuthStateGeneration
 	}
 
 	// Store either max lifetime (for Offline type) or session identifier (for Refresh type)
@@ -451,7 +501,8 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 		return nil, err
 	}
 
-	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
+	// The PARENT refresh token is the authorizing credential here, not the code.
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -545,15 +596,15 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 
 	// Create ROPCGrantInput for token generation
 	ropcInput := &ROPCGrantInput{
-		Client:            &input.RefreshToken.Client,
-		User:              &input.RefreshToken.User,
-		Scope:             scopeToUse,
-		SessionIdentifier: "", // ROPC doesn't use sessions
+		Client: &input.RefreshToken.Client,
+		User:   &input.RefreshToken.User,
+		Scope:  scopeToUse,
 	}
 
 	// access_token -----------------------------------------------------------------------
 
-	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier)
+	// The parent refresh token authorizes this, not the reloaded user.
+	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -653,9 +704,10 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 	claims["jti"] = uuid.New().String()
 	claims["acr"] = input.AcrLevel
 	claims["amr"] = input.AuthMethods
+	claims["auth_state_generation"] = input.AuthStateGeneration
 
-	// Optional sid claim
-	if len(input.SessionIdentifier) > 0 {
+	// Optional sid claim, suppressed for offline grants: see GrantIsOffline.
+	if len(input.SessionIdentifier) > 0 && !input.GrantIsOffline {
 		claims["sid"] = input.SessionIdentifier
 	}
 
@@ -900,6 +952,11 @@ func (t *TokenIssuer) createTokenInputFromImplicit(input *ImplicitGrantInput) *T
 		AuthenticatedAt:   input.AuthenticatedAt,
 		SessionIdentifier: input.SessionIdentifier,
 		Nonce:             input.Nonce,
+
+		AuthStateGeneration: input.AuthStateGeneration,
+		// Implicit is always session-bound: there is no refresh token, so nothing outlives
+		// the session and sid stays on the access token.
+		GrantIsOffline: false,
 	}
 }
 
@@ -914,8 +971,8 @@ func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput, now time.T
 		AcrLevel:          "urn:goiabada:pwd", // ROPC is always password-only
 		AuthMethods:       []string{"pwd"},    // ROPC is always password method
 		AuthenticatedAt:   now,                // ROPC auth happens at token request time
-		SessionIdentifier: input.SessionIdentifier,
-		Nonce:             "", // ROPC doesn't use nonce
+		SessionIdentifier: "",                 // ROPC is sessionless: see ROPCGrantInput
+		Nonce:             "",                 // ROPC doesn't use nonce
 	}
 }
 
@@ -930,6 +987,9 @@ type ImplicitGrantInput struct {
 	SessionIdentifier string
 	Nonce             string
 	AuthenticatedAt   time.Time
+	// AuthStateGeneration comes from the AuthContext. Implicit issues no refresh token,
+	// so this ceremony's own generation is the only possible source (#106 decision 13).
+	AuthStateGeneration int64
 }
 
 // ImplicitGrantResponse contains the tokens generated for implicit flow.
@@ -1045,11 +1105,20 @@ func (t *TokenIssuer) calculateAtHash(accessToken string) string {
 // ROPCGrantInput contains the parameters needed to generate tokens for ROPC flow.
 // RFC 6749 Section 4.3 - Resource Owner Password Credentials Grant
 // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
+// ROPCGrantInput carries the parameters for a password grant.
+//
+// There is deliberately NO session identifier here. ROPC has no browser session: the
+// grant is a direct credential exchange. A field used to exist, populated from whatever
+// session cookie happened to accompany the request, and it reached the ID token, so a
+// password grant for one user could be handed an ID token carrying a DIFFERENT user's
+// session identifier whenever the browser was logged in as somebody else. Nothing needed
+// it: ROPC refresh tokens are always Offline type and store a max lifetime rather than a
+// session identifier, and the refresh path already hard-coded it empty. Removed rather
+// than defaulted, so it cannot be reintroduced by an eager caller (#106).
 type ROPCGrantInput struct {
-	Client            *models.Client
-	User              *models.User
-	Scope             string
-	SessionIdentifier string // For normal refresh token linkage (optional, can be empty for offline tokens)
+	Client *models.Client
+	User   *models.User
+	Scope  string
 }
 
 // ROPCGrantResponse contains the tokens generated for ROPC flow.
@@ -1114,7 +1183,8 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 	}
 
 	// Generate access token
-	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier)
+	// nil parent: initial password grant, so the validated User snapshot is the source.
+	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1156,11 +1226,29 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 }
 
 // generateROPCAccessToken creates an access token for ROPC flow.
+// generateROPCAccessToken builds an access token for the ROPC flow.
+//
+// parentRefreshToken is nil on the initial password grant, where the generation comes from
+// the User snapshot the password validation returned, and set when refreshing, where it
+// comes from the parent token. The distinction matters because the refresh path reloads
+// the user: reading that reloaded user would stamp a grant authenticated under an older
+// generation with the current one, laundering it forward (#106 decision 13).
+//
+// ROPC grants are always offline, so no access token here ever carries sid.
 func (t *TokenIssuer) generateROPCAccessToken(settings *models.Settings, input *ROPCGrantInput, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
+	parentRefreshToken *models.RefreshToken) (string, string, error) {
 
 	tokenInput := t.createTokenInputFromROPC(input, now)
 	tokenInput.Scope = scope // Use the provided scope
+	tokenInput.GrantIsOffline = true
+
+	if parentRefreshToken == nil {
+		tokenInput.AuthStateGeneration = input.User.AuthStateGeneration
+	} else {
+		tokenInput.AuthStateGeneration = parentRefreshToken.AuthStateGeneration
+	}
+
 	return t.generateAccessTokenCore(settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
@@ -1191,7 +1279,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, inp
 
 	// ROPC tokens are always "Offline" type since there's no browser session
 	// (The user authenticates directly with username/password via API)
-	claims["typ"] = "Offline"
+	claims["typ"] = offlineRefreshTokenType
 
 	exp, err := t.getRefreshTokenExpiration("Offline", now, settings, input.Client)
 	if err != nil {
@@ -1229,9 +1317,15 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, inp
 	if previousRefreshToken != nil {
 		refreshTokenEntity.PreviousRefreshTokenJti = previousRefreshToken.RefreshTokenJti
 		refreshTokenEntity.FirstRefreshTokenJti = previousRefreshToken.FirstRefreshTokenJti
+		// From the PARENT. The refresh path reloads the user, so reading input.User here
+		// would stamp the current generation onto a grant authenticated under an older one
+		// (#106 rule 5 and decision 13).
+		refreshTokenEntity.AuthStateGeneration = previousRefreshToken.AuthStateGeneration
 	} else {
 		// first refresh token issued
 		refreshTokenEntity.FirstRefreshTokenJti = jti
+		// The User snapshot the password validation returned, not a reload.
+		refreshTokenEntity.AuthStateGeneration = input.User.AuthStateGeneration
 	}
 
 	err = t.database.CreateRefreshToken(nil, refreshTokenEntity)

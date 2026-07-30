@@ -421,6 +421,9 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			Email:        "test@example.com",
 			PasswordHash: passwordHash,
 			Enabled:      true,
+			// Nonzero so the assertion below cannot pass on the zero value if the
+			// capture were dropped (#106 decision 11 rule 1).
+			AuthStateGeneration: 7,
 		}
 		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(user, nil)
 
@@ -435,7 +438,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			return ac.UserId == 1 &&
 				ac.AuthState == oauth.AuthStateLevel1PasswordCompleted &&
 				ac.AuthMethods == enums.AuthMethodPassword.String() &&
-				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero()
+				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
+				// Captured from the user whose credentials were just verified. Thin on
+				// purpose: token_issuer_auth_state_generation_test.go owns the tables.
+				ac.AuthStateGeneration == 7
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

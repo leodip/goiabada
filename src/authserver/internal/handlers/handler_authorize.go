@@ -345,6 +345,10 @@ func HandleAuthorizeGet(
 			authContext.UserId = userSession.UserId
 			authContext.AcrLevel = userSession.AcrLevel
 			authContext.AuthMethods = userSession.AuthMethods
+			// Inherited from the SESSION, never read from the user. This path never reaches
+			// the password handler, and reading the user's current generation here would
+			// launder an old session into a newer generation (#106 decision 11(d)).
+			authContext.AuthStateGeneration = userSession.AuthStateGeneration
 			authContext.AuthState = oauth.AuthStateLevel1ExistingSession
 			err = authHelper.SaveAuthContext(w, r, &authContext)
 			if err != nil {
@@ -515,6 +519,9 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	authContext.UserId = userSession.UserId
 	authContext.AuthMethods = userSession.AuthMethods
 	authContext.AcrLevel = userSession.AcrLevel
+	// Same rule as the interactive SSO path above: the generation comes from the session
+	// being reused, not from the user (#106 decision 11(d)).
+	authContext.AuthStateGeneration = userSession.AuthStateGeneration
 	authContext.SetScope(effectiveScope)
 
 	// Preserve the original session's auth_time for the token

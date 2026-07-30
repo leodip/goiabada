@@ -98,7 +98,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	captured := m.expectSuccessfulPersist(123, nil)
 
 	before := time.Now().UTC()
-	result, err := m.manager.StartNewUserSession(recorder, req, 123, 7, "pwd otp", enums.AcrLevel2Mandatory.String())
+	result, err := m.manager.StartNewUserSession(recorder, req, 123, 7, "pwd otp", enums.AcrLevel2Mandatory.String(), 0)
 	after := time.Now().UTC()
 
 	assert.NoError(t, err)
@@ -157,7 +157,7 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 	m.store.On("Get", mock.Anything, testSessionName).Return(m.session, nil).Once()
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
 
-	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String())
+	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
 
 	assert.NoError(t, err)
 	assert.Len(t, result.Clients, 1)
@@ -179,7 +179,7 @@ func TestStartNewUserSession_WritesIdentifierIntoTheCookieSession(t *testing.T) 
 
 	m.expectSuccessfulPersist(123, nil)
 
-	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String())
+	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, result.SessionIdentifier, m.session.Values[constants.SessionKeySessionIdentifier])
@@ -213,7 +213,7 @@ func TestStartNewUserSession_IpAddressExtraction(t *testing.T) {
 			m.expectSuccessfulPersist(123, nil)
 
 			result, err := m.manager.StartNewUserSession(
-				httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String())
+				httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantIp, result.IpAddress)
@@ -245,7 +245,7 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 	m.db.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String())
+		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
 
 	assert.NoError(t, err)
 }
@@ -299,7 +299,7 @@ func TestStartNewUserSession_KeepsSessionsFromOtherDevicesOrIps(t *testing.T) {
 
 			_, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-				123, 7, "pwd", enums.AcrLevel1.String())
+				123, 7, "pwd", enums.AcrLevel1.String(), 0)
 
 			assert.NoError(t, err)
 		})
@@ -340,7 +340,7 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String())
+		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
 
 	assert.NoError(t, err)
 }
@@ -456,7 +456,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 
 			result, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-				123, 7, "pwd", enums.AcrLevel1.String())
+				123, 7, "pwd", enums.AcrLevel1.String(), 0)
 
 			assert.Error(t, err)
 			assert.Nil(t, result, "no session may be returned alongside an error")
@@ -479,7 +479,7 @@ func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", enums.AcrLevel1.String())
+		123, 7, "pwd", enums.AcrLevel1.String(), 0)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to get the session")
@@ -500,4 +500,30 @@ func TestNewUserSessionManager_StoresItsDependencies(t *testing.T) {
 	assert.Same(t, db, manager.database)
 	assert.Same(t, store, manager.sessionStore)
 	assert.Equal(t, "some-session", manager.sessionName)
+}
+
+// TestStartNewUserSession_StampsAuthStateGeneration is the session row of #106's
+// persisted-state stamping table (finding 28). It asserts the generation written onto the
+// model handed to CreateUserSession.
+//
+// The value comes from the AuthContext, which captured it when the ceremony authenticated,
+// and NOT from the user's current value. A ceremony that began before a credential change
+// must therefore produce a session on the superseded generation, which is then rejected,
+// rather than one silently carried past the boundary that change established.
+//
+// 7 is deliberately nonzero: written with 0 this test would coincide with the column
+// default and pass even if the assignment were missing entirely.
+func TestStartNewUserSession_StampsAuthStateGeneration(t *testing.T) {
+	m := newStartSessionMocks(t)
+	captured := m.expectSuccessfulPersist(123, nil)
+
+	_, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		123, 7, "pwd", enums.AcrLevel1.String(), 7)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
+		assert.EqualValues(t, 7, (*captured).AuthStateGeneration,
+			"the session must carry the generation the ceremony authenticated under")
+	}
 }

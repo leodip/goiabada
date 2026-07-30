@@ -217,6 +217,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			UserId:      1,
 			Scope:       "openid profile",
 			AuthMethods: "pwd",
+			// Nonzero so the StartNewUserSession expectation below pins that the handler
+			// forwards THIS value. With 0 the assertion would also pass against a
+			// hard-coded zero (#106 decision 11).
+			AuthStateGeneration: 7,
 		}
 
 		sessionIdentifier := "new-test-session"
@@ -251,7 +255,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: enums.AcrLevel1.String(),
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String()).Return(newUserSession, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7)).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
@@ -580,6 +584,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			UserId:      1,
 			Scope:       "openid profile",
 			AuthMethods: "pwd",
+			// Nonzero so the StartNewUserSession expectation below pins that the handler
+			// forwards THIS value. With 0 the assertion would also pass against a
+			// hard-coded zero (#106 decision 11).
+			AuthStateGeneration: 7,
 		}
 
 		sessionIdentifier := "new-test-session"
@@ -611,7 +619,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: enums.AcrLevel1.String(),
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String()).Return(newUserSession, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7)).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
@@ -661,6 +669,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			UserId:      1,
 			Scope:       "openid profile offline_access",
 			AuthMethods: "pwd",
+			// Nonzero for the same reason as the other cases: it pins that the handler
+			// forwards this value rather than a hard-coded zero (#106).
+			AuthStateGeneration: 7,
 		}
 
 		sessionIdentifier := "new-test-session"
@@ -692,7 +703,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: enums.AcrLevel1.String(),
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String()).Return(newUserSession, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7)).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 

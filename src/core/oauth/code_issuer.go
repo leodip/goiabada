@@ -87,6 +87,10 @@ func (ci *CodeIssuer) CreateAuthCode(input *CreateCodeInput) (*models.Code, erro
 		AuthMethods:         input.AuthMethods,
 		SessionIdentifier:   input.SessionIdentifier,
 		Used:                false,
+		// From the AuthContext, which captured it when this ceremony authenticated.
+		// Redemption compares it against the user's current value, so a code issued by a
+		// ceremony that straddled a credential change is rejected (#106 decision 11).
+		AuthStateGeneration: input.AuthStateGeneration,
 	}
 
 	err = ci.database.CreateCode(nil, code)

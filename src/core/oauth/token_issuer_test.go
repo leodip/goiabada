@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func getTestPrivateKey(t *testing.T) []byte {
@@ -221,7 +222,12 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
-	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
+	// This grant includes offline_access, so its ACCESS token deliberately carries no sid:
+	// an offline grant outlives the browser session, and binding its access tokens to a
+	// session identifier the middleware will later fail to resolve is the defect #106
+	// decision 9 fixes. The ID token above keeps sid, because RP-initiated logout matches
+	// on it. Reversed from asserting presence; see TestAccessToken_SidEmission for the table.
+	assert.NotContains(t, accessClaims, "sid")
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
@@ -682,7 +688,12 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
-	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
+	// This grant includes offline_access, so its ACCESS token deliberately carries no sid:
+	// an offline grant outlives the browser session, and binding its access tokens to a
+	// session identifier the middleware will later fail to resolve is the defect #106
+	// decision 9 fixes. The ID token above keeps sid, because RP-initiated logout matches
+	// on it. Reversed from asserting presence; see TestAccessToken_SidEmission for the table.
+	assert.NotContains(t, accessClaims, "sid")
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
@@ -882,7 +893,7 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id")
+	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 	assert.Equal(t, "openid profile email authserver:userinfo", scope)
@@ -961,7 +972,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id")
+	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 	assert.Equal(t, "resource1:read resource2:write", scope)
@@ -1056,7 +1067,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id")
+	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 	assert.Equal(t, "openid profile email groups attributes authserver:userinfo", scope)
@@ -1147,7 +1158,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	_, _, err = tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id")
+	_, _, err = tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope")
 }
@@ -2288,6 +2299,14 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 		FirstRefreshTokenJti: "first-jti-offline",
 		MaxLifetime:          sql.NullTime{Time: now.Add(48 * time.Hour), Valid: true},
 		Scope:                "openid profile offline_access",
+		// Set explicitly. Without it this fixture was an empty string, which production
+		// classifies as session-bound, so a test named for the offline case was exercising
+		// the session-bound one and its sid assertion passed for the wrong reason.
+		RefreshTokenType: offlineRefreshTokenType,
+		// Deliberately conflicting with the code's generation below, so this public entry
+		// point proves the parent is forwarded rather than the code being re-read (#106
+		// decision 13). The direct helper tables pass even if the wrapper stops forwarding.
+		AuthStateGeneration: 7,
 	}
 
 	refreshTokenInfo := &JwtToken{
@@ -2350,7 +2369,15 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
-	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
+	// Reversed: the parent is genuinely Offline now, so no sid. An offline grant outlives
+	// the browser session, and this is the public entry point proving the suppression is
+	// wired through GenerateTokenResponseForRefresh and not only in the helper (#106
+	// decision 9).
+	assert.NotContains(t, accessClaims, "sid")
+	// Provenance at the public entry point: the PARENT is at 7 while the code stays at its
+	// own value, so this fails if the wrapper stops forwarding the parent and the code gets
+	// re-read (#106 decision 13).
+	assert.EqualValues(t, 7, accessClaims["auth_state_generation"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 	assert.Equal(t, "resource1:write offline_access", accessClaims["scope"])
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
@@ -2386,6 +2413,9 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.Equal(t, refreshToken.FirstRefreshTokenJti, capturedRefreshToken.FirstRefreshTokenJti)
 	assert.Equal(t, refreshToken.RefreshTokenJti, capturedRefreshToken.PreviousRefreshTokenJti)
 	assert.Equal(t, "Offline", capturedRefreshToken.RefreshTokenType)
+	// The CHILD token inherits the parent's generation, not the code's. Same reason as the
+	// access-token assertion above: this is the seam the helper tables cannot reach.
+	assert.EqualValues(t, 7, capturedRefreshToken.AuthStateGeneration)
 	assert.Equal(t, "openid profile offline_access", capturedRefreshToken.Scope) // Original scope preserved
 	assert.Empty(t, capturedRefreshToken.SessionIdentifier)
 	assert.False(t, capturedRefreshToken.Revoked)
@@ -2969,14 +2999,14 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 
 	// Request with offline_access scope - should NOT result in refresh token for implicit flow
 	input := &ImplicitGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid offline_access",
-		AcrLevel:          "urn:goiabada:pwd",
-		AuthMethods:       "pwd",
-		SessionIdentifier: "session-123",
-		Nonce:             "nonce-123",
-		AuthenticatedAt:   time.Now().UTC(),
+		Client:      client,
+		User:        user,
+		Scope:       "openid offline_access",
+		AcrLevel:    "urn:goiabada:pwd",
+		AuthMethods: "pwd",
+
+		Nonce:           "nonce-123",
+		AuthenticatedAt: time.Now().UTC(),
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, false)
@@ -3264,10 +3294,9 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid",
-		SessionIdentifier: "", // ROPC tokens don't use sessions
+		Client: client,
+		User:   user,
+		Scope:  "openid",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -3286,7 +3315,11 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	assert.Equal(t, sub.String(), accessClaims["sub"])
 	assert.Equal(t, "urn:goiabada:pwd", accessClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, accessClaims["amr"])
-	assert.Nil(t, accessClaims["sid"]) // ROPC tokens don't have session identifiers
+	// ROPC is sessionless, on BOTH tokens. This replaced an assert.Nil on the same claim:
+	// equivalent in what it catches, since a leaked identifier is a non-nil string, but it
+	// distinguishes "absent" from "present and nil" and reads as the intent rather than as a
+	// value check (#106).
+	assert.NotContains(t, accessClaims, "sid")
 
 	// Verify id_token claims
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
@@ -3294,7 +3327,9 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	assert.Equal(t, sub.String(), idClaims["sub"])
 	assert.Equal(t, "urn:goiabada:pwd", idClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, idClaims["amr"])
-	assert.Nil(t, idClaims["sid"]) // ROPC tokens don't have session identifiers
+	// The ID token is where the browser session used to leak, so this is the assertion that
+	// matters most on this path. Also replaced an equivalent assert.Nil.
+	assert.NotContains(t, idClaims, "sid", "a ROPC ID token must never carry a session identifier")
 	// Note: at_hash is not included in ROPC id_token generation as it's not required by the spec for this flow
 
 	mockDB.AssertExpectations(t)
@@ -3357,10 +3392,9 @@ func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid offline_access",
-		SessionIdentifier: "", // ROPC tokens don't use sessions
+		Client: client,
+		User:   user,
+		Scope:  "openid offline_access",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -3440,10 +3474,9 @@ func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid profile",
-		SessionIdentifier: "",
+		Client: client,
+		User:   user,
+		Scope:  "openid profile",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -3518,10 +3551,9 @@ func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid email",
-		SessionIdentifier: "",
+		Client: client,
+		User:   user,
+		Scope:  "openid email",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -3593,10 +3625,9 @@ func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid myapi:read myapi:write",
-		SessionIdentifier: "",
+		Client: client,
+		User:   user,
+		Scope:  "openid myapi:read myapi:write",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -3680,10 +3711,9 @@ func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid groups",
-		SessionIdentifier: "",
+		Client: client,
+		User:   user,
+		Scope:  "openid groups",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -3762,10 +3792,9 @@ func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "myapi:read",
-		SessionIdentifier: "",
+		Client: client,
+		User:   user,
+		Scope:  "myapi:read",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -3809,10 +3838,9 @@ func TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey(t *testing.T) 
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(nil, fmt.Errorf("database connection error"))
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid",
-		SessionIdentifier: "test-session-123",
+		Client: client,
+		User:   user,
+		Scope:  "openid",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -3878,10 +3906,9 @@ func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testin
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(fmt.Errorf("refresh token creation failed"))
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid",
-		SessionIdentifier: "",
+		Client: client,
+		User:   user,
+		Scope:  "openid",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -3949,10 +3976,9 @@ func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid",
-		SessionIdentifier: "",
+		Client: client,
+		User:   user,
+		Scope:  "openid",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -4020,10 +4046,9 @@ func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
-		Client:            client,
-		User:              user,
-		Scope:             "openid",
-		SessionIdentifier: "",
+		Client: client,
+		User:   user,
+		Scope:  "openid",
 	}
 
 	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -4259,10 +4284,9 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
 
 		input := &ROPCGrantInput{
-			Client:            client,
-			User:              user,
-			Scope:             "openid",
-			SessionIdentifier: "",
+			Client: client,
+			User:   user,
+			Scope:  "openid",
 		}
 
 		response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
@@ -4438,8 +4462,7 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 			Subject: userSubject,
 			Email:   "ropc@example.com",
 		},
-		Scope:             "openid email",
-		SessionIdentifier: "ropc-session",
+		Scope: "openid email",
 	}
 
 	input := tokenIssuer.createTokenInputFromROPC(ropcInput, now)
@@ -4451,7 +4474,11 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 	assert.Equal(t, "urn:goiabada:pwd", input.AcrLevel)
 	assert.Equal(t, []string{"pwd"}, input.AuthMethods)
 	assert.Equal(t, now, input.AuthenticatedAt)
-	assert.Equal(t, ropcInput.SessionIdentifier, input.SessionIdentifier)
+	// Reversed deliberately. This used to assert the session identifier was forwarded from
+	// ROPCGrantInput, which is how a password grant could be handed an ID token carrying an
+	// unrelated browser session's identifier. ROPC is sessionless now and the field is gone,
+	// so the only correct expectation is empty (#106).
+	assert.Empty(t, input.SessionIdentifier, "ROPC tokens must never carry a session identifier")
 	assert.Empty(t, input.Nonce) // ROPC doesn't use nonce
 }
 
@@ -4607,12 +4634,11 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 			Client: &models.Client{
 				ClientIdentifier: "test-client",
 			},
-			Scope:             "resource:read",
-			AcrLevel:          "urn:goiabada:pwd",
-			AuthMethods:       []string{"pwd"},
-			AuthenticatedAt:   now,
-			Nonce:             "",
-			SessionIdentifier: "",
+			Scope:           "resource:read",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+			Nonce:           "",
 		}
 
 		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
@@ -4800,9 +4826,16 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 		Scope:                "openid email resource:read",
 		RefreshTokenType:     "Offline",
 		MaxLifetime:          sql.NullTime{Time: now.Add(86400 * time.Second), Valid: true},
-		User:                 *user,
-		Client:               *client,
+		// Deliberately conflicting with the user below, who is set to 9. The ROPC refresh
+		// path RELOADS the user, so reading that reloaded user would stamp a grant
+		// authenticated at 7 with 9 and launder it forward. This is the public entry point
+		// proving the wrapper forwards the parent (#106 decision 13); the helper table
+		// passes even if it stops.
+		AuthStateGeneration: 7,
+		User:                *user,
+		Client:              *client,
 	}
+	refreshToken.User.AuthStateGeneration = 9
 
 	// Set up mocks
 	mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
@@ -4814,7 +4847,12 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	var capturedChild *models.RefreshToken
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
+		Run(func(args mock.Arguments) {
+			capturedChild = args.Get(1).(*models.RefreshToken)
+		}).
+		Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	input := &GenerateTokenForRefreshROPCInput{
@@ -4836,11 +4874,26 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 	assert.Equal(t, userSubject.String(), accessClaims["sub"])
 	assert.Equal(t, "urn:goiabada:pwd", accessClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, accessClaims["amr"])
+	// From the parent (7), not the reloaded user (9).
+	assert.EqualValues(t, 7, accessClaims["auth_state_generation"])
+	// ROPC is sessionless, so no sid on either token.
+	assert.NotContains(t, accessClaims, "sid")
 
 	// Verify id token claims
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, userSubject.String(), idClaims["sub"])
 	assert.Equal(t, "ropc-client", idClaims["aud"])
+	assert.NotContains(t, idClaims, "sid", "a ROPC ID token must never carry a session identifier")
+
+	// The CHILD refresh token must inherit the parent's generation too. Without this, a
+	// regression that forwards the parent to generateROPCAccessToken but not to
+	// generateRefreshTokenForROPC would pass: the access token would read 7 while the new
+	// refresh token silently took the reloaded user's 9 and laundered the grant forward on
+	// the NEXT refresh. Mirrors the auth-code offline test, which captures its child for the
+	// same reason.
+	require.NotNil(t, capturedChild, "CreateRefreshToken was never called")
+	assert.EqualValues(t, 7, capturedChild.AuthStateGeneration,
+		"the child refresh token must inherit the parent's generation, not the reloaded user's")
 
 	mockDB.AssertExpectations(t)
 }

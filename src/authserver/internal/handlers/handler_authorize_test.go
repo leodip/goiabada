@@ -81,9 +81,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:     1,
 			UserId: 123,
+			// Deliberately conflicting and nonzero: the SESSION is at 7 while the user it
+			// belongs to is at 9. The AuthContext must inherit 7, because reading the
+			// user's current value here would launder an old ceremony into the generation a
+			// later credential change established (#106 decision 11(d)).
+			AuthStateGeneration: 7,
 			User: models.User{
-				Id:      123,
-				Enabled: true,
+				Id:                  123,
+				Enabled:             true,
+				AuthStateGeneration: 9,
 			},
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
@@ -95,7 +101,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateLevel1ExistingSession &&
 				ac.UserId == 123 &&
 				ac.AcrLevel == userSession.AcrLevel &&
-				ac.AuthMethods == userSession.AuthMethods
+				ac.AuthMethods == userSession.AuthMethods &&
+				// From the session, not the user. Thin on purpose: the tables live in
+				// token_issuer_auth_state_generation_test.go.
+				ac.AuthStateGeneration == 7
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -1782,16 +1791,26 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject.String() && ac.Prompt == "none"
 		})).Return(nil)
+		// The silent-issue path sets the AuthContext again just before code issuance; this
+		// is the assertion that it inherits the session's generation and not the user's.
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.UserId == 789 && ac.AuthStateGeneration == 7
+		})).Return(nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      789,
 			AcrLevel:    enums.AcrLevel1.String(),
 			AuthMethods: "pwd",
+			// Session at 7, user at 9. The prompt=none path is a SEPARATE session-reuse
+			// site from the interactive one, and it must inherit from the session too, or a
+			// silent re-issue would launder an old ceremony forward (#106 decision 11(d)).
+			AuthStateGeneration: 7,
 			User: models.User{
-				Id:      789,
-				Enabled: true,
-				Subject: userSubject,
+				Id:                  789,
+				Enabled:             true,
+				Subject:             userSubject,
+				AuthStateGeneration: 9,
 			},
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-789").Return(userSession, nil)

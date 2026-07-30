@@ -47,6 +47,12 @@ type AuthContext struct {
 	Prompt                        string     // Normalized prompt values (space-delimited, deduplicated)
 	AuthenticatedAt               *time.Time // Optional: override for auth_time in code issuance (used by prompt=none)
 	IdTokenHintSub                string     // sub claim from id_token_hint (empty if no hint provided)
+	// AuthStateGeneration is the user's authentication generation as it stood when this
+	// ceremony authenticated. Captured from the user at password verification, or
+	// inherited from the reused session on the SSO path, and NEVER read from the current
+	// user mid-ceremony: doing that would launder a ceremony that began before a
+	// credential change into the generation that change established (#106 decision 11).
+	AuthStateGeneration int64
 	// UILocales carries the OIDC ui_locales hint as captured on /auth/authorize,
 	// preserving the RP's stated preference across the multi-step auth flow.
 	// Sanitized before storage (BCP 47 shape filter, capped at 10 tags / 256 bytes).
