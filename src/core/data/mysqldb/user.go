@@ -77,3 +77,15 @@ func (d *MySQLDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int,
 func (d *MySQLDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 	return d.CommonDB.DeleteUser(tx, userId)
 }
+
+func (d *MySQLDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId int64) (int64, error) {
+	return d.CommonDB.IncrementUserAuthStateGeneration(tx, userId)
+}
+
+func (d *MySQLDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error {
+	return d.CommonDB.SetUserPasswordHash(tx, userId, passwordHash)
+}
+
+func (d *MySQLDatabase) TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {
+	return d.CommonDB.TrySetUserEnabled(tx, userId, expected, desired)
+}

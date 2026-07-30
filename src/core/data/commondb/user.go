@@ -491,3 +491,158 @@ func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 		return nil
 	})
 }
+
+// IncrementUserAuthStateGeneration advances the user's authentication generation and
+// returns the new value.
+//
+// This is the security boundary for #106: credentials authenticated under generation N
+// cannot create or use authentication state once the user reaches N+1.
+//
+// **tx is required.** The increment and the read-back are two statements, because no
+// single syntax for both increments-and-returns is portable across all four supported
+// engines. Outside a transaction another increment can land between them, and this
+// caller would then return the OTHER caller's generation and stamp it on the session and
+// tokens it is preserving, which would leave them valid past the boundary the other
+// credential change just established. A nil tx is refused rather than documented against,
+// since every caller already owns a transaction: the credential write, the increment and
+// the revocation sweep are one atomic unit by design.
+//
+// Deliberately not part of UpdateUser. auth_state_generation is tagged dont-update
+// because every credential handler loads the whole user and writes it back, so leaving
+// it in the ordinary update set would let a request holding a stale model silently
+// regress the boundary.
+func (d *CommonDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId int64) (int64, error) {
+
+	if userId == 0 {
+		return 0, errors.WithStack(errors.New("can't increment the auth state generation of user with id 0"))
+	}
+	if tx == nil {
+		return 0, errors.WithStack(errors.New("incrementing the auth state generation requires a transaction: the increment and the read-back must not be separable"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		"auth_state_generation = auth_state_generation + 1",
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(ub.Equal("id", userId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to increment user auth state generation")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to get rows affected when incrementing user auth state generation")
+	}
+	if rowsAffected != 1 {
+		return 0, errors.WithStack(errors.New("user not found when incrementing auth state generation"))
+	}
+
+	// Read back rather than computing the successor in Go: the increment happened in the
+	// database, so this is the value that actually landed.
+	sb := d.Flavor.NewSelectBuilder()
+	sb.Select("auth_state_generation").From("users")
+	sb.Where(sb.Equal("id", userId))
+	query, args = sb.BuildWithFlavor(d.Flavor)
+
+	var generation int64
+	rows, err := d.QuerySql(tx, query, args...)
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to read back user auth state generation")
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		return 0, errors.WithStack(errors.New("user vanished while incrementing auth state generation"))
+	}
+	if err := rows.Scan(&generation); err != nil {
+		return 0, errors.Wrap(err, "unable to scan user auth state generation")
+	}
+
+	return generation, nil
+}
+
+// SetUserPasswordHash writes a new password hash and clears any outstanding
+// forgot-password code in the same statement, so a reset cannot leave a usable code
+// behind.
+//
+// Narrow rather than going through UpdateUser, which writes every non-tagged column:
+// a credential handler that loaded the user before a concurrent admin disable would
+// otherwise write Enabled back as it was and silently re-enable the account. (#106)
+func (d *CommonDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error {
+
+	if userId == 0 {
+		return errors.WithStack(errors.New("can't set the password hash of user with id 0"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	// The two clears are raw SQL rather than Assign(..., nil). sqlbuilder sends an
+	// untyped Go nil as a parameter, and the SQL Server driver types it as nvarchar,
+	// which it then refuses to convert implicitly to varbinary(max):
+	// "Implicit conversion from data type nvarchar to varbinary(max) is not allowed".
+	// A literal NULL has no parameter type to get wrong and is portable across all four
+	// engines.
+	ub.Set(
+		ub.Assign("password_hash", passwordHash),
+		"forgot_password_code_encrypted = NULL",
+		"forgot_password_code_issued_at = NULL",
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(ub.Equal("id", userId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	_, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to set user password hash")
+	}
+
+	return nil
+}
+
+// TrySetUserEnabled flips enabled from expected to desired, reporting whether this
+// call is the one that made the transition. A false return means the row was already
+// in the desired state (or the user does not exist), which callers treat as "nothing
+// to do" rather than an error.
+//
+// Compare-and-set for the same reason MarkCodeAsUsed is: a read-then-unconditional-write
+// lets two concurrent requests both believe they performed the transition. The disable
+// direction's return is what gates the revocation sweep, so a second disable of an
+// already-disabled account does not sweep or audit again.
+//
+// Covers both directions on purpose. The endpoint behind it serves enable as well as
+// disable, and leaving enable on the full-row UpdateUser would keep the clobbering
+// problem alive in half of it. (#106)
+func (d *CommonDatabase) TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {
+
+	if userId == 0 {
+		return false, errors.WithStack(errors.New("can't set enabled on user with id 0"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("enabled", desired),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("enabled", expected),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to set user enabled")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "unable to get rows affected when setting user enabled")
+	}
+
+	return rowsAffected == 1, nil
+}

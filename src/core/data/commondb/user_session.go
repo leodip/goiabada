@@ -379,3 +379,45 @@ func (d *CommonDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Dura
 
 	return nil
 }
+
+// PromoteUserSessionGeneration moves one session to a new authentication generation.
+//
+// Narrow on purpose: auth_state_generation is tagged dont-update, so it is excluded
+// from UpdateUserSession and can only be changed here. That matters most for the
+// session this promotion exists to serve: BumpUserSession writes the whole row on
+// every request, so if the column were in the ordinary update set the first bump after
+// a password change would undo the promotion and sign the user out. (#106)
+func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+
+	if userSessionId == 0 {
+		return errors.WithStack(errors.New("can't promote the generation of user session with id 0"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("user_sessions")
+	ub.Set(
+		ub.Assign("auth_state_generation", generation),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(ub.Equal("id", userSessionId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to promote user session generation")
+	}
+
+	// A promotion that matched nothing is an error, not a no-op. The caller is
+	// preserving one session and its refresh tokens together; silently promoting the
+	// tokens while the session was never promoted leaves that preservation half
+	// applied, so the session is rejected on the next request while its tokens live on.
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "unable to get rows affected when promoting user session generation")
+	}
+	if rowsAffected != 1 {
+		return errors.WithStack(errors.New("user session not found when promoting its auth state generation"))
+	}
+
+	return nil
+}

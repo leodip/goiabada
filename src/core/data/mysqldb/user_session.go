@@ -58,3 +58,7 @@ func (d *MySQLDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration
 func (d *MySQLDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error {
 	return d.CommonDB.DeleteExpiredSessions(tx, maxLifetime)
 }
+
+func (d *MySQLDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+	return d.CommonDB.PromoteUserSessionGeneration(tx, userSessionId, generation)
+}

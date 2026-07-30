@@ -348,3 +348,102 @@ func (d *CommonDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
 
 	return nil
 }
+
+// GetRefreshTokensByUserId returns every refresh token belonging to a user, whatever
+// shape links it to them.
+//
+// The invariant this rests on: a refresh token reaches its user through
+// codes.user_id (authorization code flow, where refresh_tokens.code_id is set) or
+// through refresh_tokens.user_id (ROPC, where code_id is null), and through nothing
+// else. If a fifth issuance shape is ever added, the data test enumerating shapes is
+// what should fail.
+//
+// Built as two UNION ALL branches rather than one join with an OR across the two
+// tables. The shapes are mutually exclusive, so the union cannot produce duplicates,
+// and each branch can use its own index where the OR would defeat both. (#106)
+func (d *CommonDatabase) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error) {
+
+	if userId == 0 {
+		return nil, nil
+	}
+
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+		For(d.Flavor)
+
+	// Authorization code flow: the user is on the code, not the token.
+	viaCode := refreshTokenStruct.SelectFrom("refresh_tokens")
+	viaCode.JoinWithOption(sqlbuilder.InnerJoin, "codes", "codes.id = refresh_tokens.code_id")
+	viaCode.Where(viaCode.Equal("codes.user_id", userId))
+
+	// ROPC: the user is on the token itself and there is no code at all.
+	direct := refreshTokenStruct.SelectFrom("refresh_tokens")
+	direct.Where(direct.Equal("refresh_tokens.user_id", userId))
+
+	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var refreshTokens []*models.RefreshToken
+	for rows.Next() {
+		var refreshToken models.RefreshToken
+		addr := refreshTokenStruct.Addr(&refreshToken)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan refreshToken")
+		}
+		refreshTokens = append(refreshTokens, &refreshToken)
+	}
+	// Without this a mid-stream failure would return a PARTIAL token set as success,
+	// and the caller would commit a revocation sweep that missed rows it never saw.
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
+	return refreshTokens, nil
+}
+
+// PromoteRefreshTokenGenerations moves the named refresh tokens to a new
+// authentication generation, skipping any that are already revoked.
+//
+// Narrow on purpose: auth_state_generation is tagged dont-update, so it is excluded
+// from UpdateRefreshToken and can only be changed here. Used by the self-service
+// password-change path, which preserves the caller's own session and therefore has to
+// carry that session's surviving tokens forward rather than leaving them behind on the
+// superseded generation. (#106)
+//
+// An empty id list is a no-op. That is not a formality: an empty IN () is a syntax
+// error on some engines and matches everything on others, so it is handled here rather
+// than left to the builder.
+func (d *CommonDatabase) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
+
+	if len(refreshTokenIds) == 0 {
+		return nil
+	}
+
+	ids := make([]interface{}, 0, len(refreshTokenIds))
+	for _, id := range refreshTokenIds {
+		ids = append(ids, id)
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("refresh_tokens")
+	ub.Set(
+		ub.Assign("auth_state_generation", generation),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.In("id", ids...),
+		ub.Equal("revoked", false),
+	)
+
+	sql, args := ub.BuildWithFlavor(d.Flavor)
+	_, err := d.ExecSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to promote refresh token generations")
+	}
+
+	return nil
+}

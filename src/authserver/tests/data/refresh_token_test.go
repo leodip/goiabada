@@ -649,3 +649,230 @@ func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Error("the rest of the update must still apply, Revoked = false")
 	}
 }
+
+// TestGetRefreshTokensByUserId is the exhaustive owner of this query's linkage-shape
+// coverage (#106 decision 1). Later stages test their consumers thinly and say so.
+//
+// The shapes exist because a refresh token reaches its user two different ways: through
+// codes.user_id for the authorization code flow, and directly through
+// refresh_tokens.user_id for ROPC, where there is no code at all. The query is two
+// UNION ALL branches over those two columns, so every shape below has to be enumerated
+// or a whole class of token escapes revocation.
+//
+// The row that matters most is the offline token whose session row has been DELETED.
+// That is the stolen-laptop case: at seeded defaults a session is reaped after two hours
+// while an offline refresh token lives a year, so it is the normal resting state of an
+// offline grant rather than an edge case, and it is exactly what the issue's own
+// session-walk proposal could not reach.
+func TestGetRefreshTokensByUserId(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+	otherUser := createTestUser(t)
+
+	newCode := func(sessionId string) *models.Code {
+		code := &models.Code{
+			ClientId:            client.Id,
+			UserId:              user.Id,
+			Code:                "code_" + gofakeit.LetterN(8),
+			CodeHash:            "hash_" + gofakeit.LetterN(8),
+			CodeChallenge:       sql.NullString{String: "chal_" + gofakeit.LetterN(8), Valid: true},
+			CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+			RedirectURI:         "https://example.com/callback",
+			Scope:               "openid",
+			IpAddress:           "127.0.0.1",
+			UserAgent:           "test",
+			ResponseMode:        "query",
+			AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+			SessionIdentifier:   sessionId,
+			AcrLevel:            "1",
+			AuthMethods:         "pwd",
+			Used:                true,
+		}
+		if err := database.CreateCode(nil, code); err != nil {
+			t.Fatalf("Failed to create code: %v", err)
+		}
+		return code
+	}
+
+	newToken := func(rt *models.RefreshToken) *models.RefreshToken {
+		rt.RefreshTokenJti = gofakeit.UUID()
+		rt.Scope = "openid"
+		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
+		rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
+		if err := database.CreateRefreshToken(nil, rt); err != nil {
+			t.Fatalf("Failed to create refresh token: %v", err)
+		}
+		return rt
+	}
+
+	// Shape 1: session-bound, session still alive.
+	liveSession := createTestUserSession(t, user.Id)
+	boundCode := newCode(liveSession.SessionIdentifier)
+	sessionBound := newToken(&models.RefreshToken{
+		CodeId:            sql.NullInt64{Int64: boundCode.Id, Valid: true},
+		SessionIdentifier: liveSession.SessionIdentifier,
+		RefreshTokenType:  "Refresh",
+	})
+
+	// Shape 2: offline, session still alive. Offline rows carry no session identifier of
+	// their own; theirs lives on the code.
+	offlineLiveCode := newCode(liveSession.SessionIdentifier)
+	offlineLive := newToken(&models.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: offlineLiveCode.Id, Valid: true},
+		RefreshTokenType: "Offline",
+		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+	})
+
+	// Shape 3: offline whose session row is GONE. The decisive row.
+	reapedSession := createTestUserSession(t, user.Id)
+	reapedCode := newCode(reapedSession.SessionIdentifier)
+	offlineReaped := newToken(&models.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: reapedCode.Id, Valid: true},
+		RefreshTokenType: "Offline",
+		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+	})
+	if err := database.DeleteUserSession(nil, reapedSession.Id); err != nil {
+		t.Fatalf("Failed to delete the session being reaped: %v", err)
+	}
+
+	// Shape 4: ROPC, linked straight to the user with no code.
+	ropc := newToken(&models.RefreshToken{
+		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		RefreshTokenType: "Offline",
+		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+	})
+
+	// Negative: a token belonging to somebody else, in both linkage shapes. These vary
+	// only the user, so neither can pass with the predicate removed.
+	otherCode := &models.Code{
+		ClientId: client.Id, UserId: otherUser.Id,
+		Code: "code_o_" + gofakeit.LetterN(8), CodeHash: "hash_o_" + gofakeit.LetterN(8),
+		CodeChallenge: sql.NullString{String: "chal_o", Valid: true}, CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+		RedirectURI: "https://example.com/callback", Scope: "openid", IpAddress: "127.0.0.1",
+		UserAgent: "test", ResponseMode: "query",
+		AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
+		SessionIdentifier: "sess_o_" + gofakeit.LetterN(8), AcrLevel: "1", AuthMethods: "pwd", Used: true,
+	}
+	if err := database.CreateCode(nil, otherCode); err != nil {
+		t.Fatalf("Failed to create the other user's code: %v", err)
+	}
+	otherViaCode := newToken(&models.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: otherCode.Id, Valid: true},
+		RefreshTokenType: "Refresh",
+	})
+	otherDirect := newToken(&models.RefreshToken{
+		UserId:           sql.NullInt64{Int64: otherUser.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		RefreshTokenType: "Offline",
+	})
+
+	got, err := database.GetRefreshTokensByUserId(nil, user.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserId failed: %v", err)
+	}
+
+	found := make(map[int64]bool, len(got))
+	for _, rt := range got {
+		found[rt.Id] = true
+	}
+
+	for _, want := range []struct {
+		label string
+		id    int64
+	}{
+		{"session-bound with a live session", sessionBound.Id},
+		{"offline with a live session", offlineLive.Id},
+		{"offline whose session row was reaped", offlineReaped.Id},
+		{"ROPC linked directly to the user", ropc.Id},
+	} {
+		if !found[want.id] {
+			t.Errorf("missing shape: %s (id %d)", want.label, want.id)
+		}
+	}
+
+	for _, unwanted := range []struct {
+		label string
+		id    int64
+	}{
+		{"another user's token via a code", otherViaCode.Id},
+		{"another user's ROPC token", otherDirect.Id},
+	} {
+		if found[unwanted.id] {
+			t.Errorf("returned a token that is not this user's: %s (id %d)", unwanted.label, unwanted.id)
+		}
+	}
+
+	// The union must not double-count: an auth-code token matches only the first branch.
+	if len(got) != 4 {
+		t.Errorf("expected exactly 4 tokens for this user, got %d (duplicates from the UNION ALL?)", len(got))
+	}
+}
+
+// TestGetRefreshTokensByUserId_NoTokens covers the empty result, and the zero-id guard.
+func TestGetRefreshTokensByUserId_NoTokens(t *testing.T) {
+	user := createTestUser(t)
+
+	got, err := database.GetRefreshTokensByUserId(nil, user.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserId failed: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for a fresh user, got %d", len(got))
+	}
+
+	got, err = database.GetRefreshTokensByUserId(nil, 0)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserId(0) should not error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for user id 0, got %d", len(got))
+	}
+}
+
+// TestPromoteRefreshTokenGenerations checks that promotion touches only the named rows,
+// skips already-revoked ones, and treats an empty id list as a no-op.
+//
+// The empty-list row is not a formality: an empty IN () is a syntax error on some engines
+// and matches every row on others, so without the guard this would either fail loudly or
+// silently promote the entire table.
+func TestPromoteRefreshTokenGenerations(t *testing.T) {
+	named := createTestRefreshToken(t)
+	unnamed := createTestRefreshToken(t)
+	revoked := createTestRefreshToken(t)
+
+	revoked.Revoked = true
+	if err := database.UpdateRefreshToken(nil, revoked); err != nil {
+		t.Fatalf("Failed to revoke a token: %v", err)
+	}
+
+	if err := database.PromoteRefreshTokenGenerations(nil, []int64{named.Id, revoked.Id}, 7); err != nil {
+		t.Fatalf("PromoteRefreshTokenGenerations failed: %v", err)
+	}
+
+	reload := func(id int64) *models.RefreshToken {
+		rt, err := database.GetRefreshTokenById(nil, id)
+		if err != nil {
+			t.Fatalf("Failed to reload refresh token %d: %v", id, err)
+		}
+		return rt
+	}
+
+	if got := reload(named.Id).AuthStateGeneration; got != 7 {
+		t.Errorf("named token generation = %d, want 7", got)
+	}
+	if got := reload(unnamed.Id).AuthStateGeneration; got != 0 {
+		t.Errorf("unnamed token generation = %d, want 0 (promotion must not touch it)", got)
+	}
+	if got := reload(revoked.Id).AuthStateGeneration; got != 0 {
+		t.Errorf("revoked token generation = %d, want 0 (already-revoked tokens are skipped)", got)
+	}
+
+	// Empty list: no error, and nothing changes.
+	if err := database.PromoteRefreshTokenGenerations(nil, nil, 9); err != nil {
+		t.Fatalf("PromoteRefreshTokenGenerations with an empty list must be a no-op, got: %v", err)
+	}
+	if got := reload(unnamed.Id).AuthStateGeneration; got != 0 {
+		t.Errorf("after an empty promotion, unnamed generation = %d, want 0", got)
+	}
+}

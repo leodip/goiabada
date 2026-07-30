@@ -867,3 +867,46 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Error("the rest of the update must still apply, Level2AuthConfigHasChanged = false")
 	}
 }
+
+// TestPromoteUserSessionGeneration checks promotion touches only the named session.
+//
+// This is the method that keeps the self-service password-change exception working: the
+// caller's own session is carried forward to the new generation while every other session
+// is deleted, so getting the scope wrong here would either sign the caller out or leave
+// another device on the superseded generation still working (#106).
+func TestPromoteUserSessionGeneration(t *testing.T) {
+	user := createTestUser(t)
+	named := createTestUserSession(t, user.Id)
+	unnamed := createTestUserSession(t, user.Id)
+
+	if err := database.PromoteUserSessionGeneration(nil, named.Id, 7); err != nil {
+		t.Fatalf("PromoteUserSessionGeneration failed: %v", err)
+	}
+
+	reload := func(id int64) *models.UserSession {
+		us, err := database.GetUserSessionById(nil, id)
+		if err != nil {
+			t.Fatalf("Failed to reload user session %d: %v", id, err)
+		}
+		return us
+	}
+
+	if got := reload(named.Id).AuthStateGeneration; got != 7 {
+		t.Errorf("named session generation = %d, want 7", got)
+	}
+	if got := reload(unnamed.Id).AuthStateGeneration; got != 0 {
+		t.Errorf("unnamed session generation = %d, want 0 (promotion must not touch it)", got)
+	}
+
+	if err := database.PromoteUserSessionGeneration(nil, 0, 7); err == nil {
+		t.Error("expected an error promoting the generation of user session id 0")
+	}
+
+	// A nonzero id that does not exist must also error rather than silently succeeding.
+	// The caller preserves a session and its refresh tokens together, so a promotion
+	// that matched nothing would leave that half applied: the tokens promoted, the
+	// session not, and the session then rejected on its next request.
+	if err := database.PromoteUserSessionGeneration(nil, unnamed.Id+1_000_000, 7); err == nil {
+		t.Error("expected an error promoting the generation of an unknown user session id")
+	}
+}

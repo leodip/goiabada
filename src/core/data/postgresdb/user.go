@@ -121,3 +121,15 @@ func (d *PostgresDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page i
 func (d *PostgresDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 	return d.CommonDB.DeleteUser(tx, userId)
 }
+
+func (d *PostgresDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId int64) (int64, error) {
+	return d.CommonDB.IncrementUserAuthStateGeneration(tx, userId)
+}
+
+func (d *PostgresDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error {
+	return d.CommonDB.SetUserPasswordHash(tx, userId, passwordHash)
+}
+
+func (d *PostgresDatabase) TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {
+	return d.CommonDB.TrySetUserEnabled(tx, userId, expected, desired)
+}

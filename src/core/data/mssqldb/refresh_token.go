@@ -98,3 +98,11 @@ func (d *MsSQLDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.Re
 func (d *MsSQLDatabase) RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	return d.CommonDB.RefreshTokenLoadClient(tx, refreshToken)
 }
+
+func (d *MsSQLDatabase) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error) {
+	return d.CommonDB.GetRefreshTokensByUserId(tx, userId)
+}
+
+func (d *MsSQLDatabase) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
+	return d.CommonDB.PromoteRefreshTokenGenerations(tx, refreshTokenIds, generation)
+}

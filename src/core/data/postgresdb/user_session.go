@@ -105,3 +105,7 @@ func (d *PostgresDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Durat
 func (d *PostgresDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error {
 	return d.CommonDB.DeleteExpiredSessions(tx, maxLifetime)
 }
+
+func (d *PostgresDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+	return d.CommonDB.PromoteUserSessionGeneration(tx, userSessionId, generation)
+}

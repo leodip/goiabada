@@ -429,3 +429,181 @@ func TestUpdateUser_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Errorf("the rest of the update must still apply, GivenName = %q", after.GivenName)
 	}
 }
+
+// TestIncrementUserAuthStateGeneration pins that the counter is monotonic and returns the
+// value that actually landed. Two calls must yield 1 then 2, never the same number twice:
+// the increment is a single statement so concurrent credential changes cannot both read
+// the same value and write the same successor (#106).
+func TestIncrementUserAuthStateGeneration(t *testing.T) {
+	user := createTestUser(t)
+
+	// Through a transaction, which the method requires. The increment and its read-back
+	// are two statements, so outside one a concurrent increment could land between them
+	// and this caller would be handed the other caller's generation.
+	tx := beginTx(t)
+
+	first, err := database.IncrementUserAuthStateGeneration(tx, user.Id)
+	if err != nil {
+		t.Fatalf("first increment failed: %v", err)
+	}
+	if first != 1 {
+		t.Errorf("first increment returned %d, want 1", first)
+	}
+
+	second, err := database.IncrementUserAuthStateGeneration(tx, user.Id)
+	if err != nil {
+		t.Fatalf("second increment failed: %v", err)
+	}
+	if second != 2 {
+		t.Errorf("second increment returned %d, want 2 (is the counter monotonic?)", second)
+	}
+
+	if err := database.CommitTransaction(tx); err != nil {
+		t.Fatalf("CommitTransaction failed: %v", err)
+	}
+
+	reloaded, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if reloaded.AuthStateGeneration != 2 {
+		t.Errorf("persisted generation = %d, want 2", reloaded.AuthStateGeneration)
+	}
+
+	// A nil transaction is refused rather than quietly allowed. Keep this: without it
+	// the test would endorse exactly the unsafe usage the method exists to prevent.
+	if _, err := database.IncrementUserAuthStateGeneration(nil, user.Id); err == nil {
+		t.Error("expected an error incrementing the generation without a transaction")
+	}
+
+	tx2 := beginTx(t)
+	if _, err := database.IncrementUserAuthStateGeneration(tx2, 0); err == nil {
+		t.Error("expected an error incrementing the generation of user id 0")
+	}
+}
+
+// TestSetUserPasswordHash checks the hash is written, the outstanding forgot-password code
+// is cleared in the same statement, and no other column is touched.
+//
+// Clearing the code matters: a reset that left a usable code behind would let the same
+// link be replayed. Not touching other columns is the point of the method existing at all,
+// since the full-row UpdateUser is what lets a concurrent admin disable be undone (#106).
+func TestSetUserPasswordHash(t *testing.T) {
+	user := createTestUser(t)
+	user.Enabled = true
+	user.ForgotPasswordCodeEncrypted = []byte("PENDINGRESETCODE")
+	user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
+	if err := database.UpdateUser(nil, user); err != nil {
+		t.Fatalf("Failed to seed a pending reset code: %v", err)
+	}
+
+	before, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+
+	if err := database.SetUserPasswordHash(nil, user.Id, "newhash"); err != nil {
+		t.Fatalf("SetUserPasswordHash failed: %v", err)
+	}
+
+	after, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+
+	if after.PasswordHash != "newhash" {
+		t.Errorf("PasswordHash = %q, want %q", after.PasswordHash, "newhash")
+	}
+	if len(after.ForgotPasswordCodeEncrypted) != 0 {
+		t.Error("the forgot-password code must be cleared in the same statement")
+	}
+	if after.ForgotPasswordCodeIssuedAt.Valid {
+		t.Error("the forgot-password issued-at must be cleared in the same statement")
+	}
+	if after.Enabled != before.Enabled {
+		t.Errorf("Enabled changed from %v to %v; this method must touch nothing else", before.Enabled, after.Enabled)
+	}
+	if after.Email != before.Email || after.GivenName != before.GivenName {
+		t.Error("unrelated profile columns changed; this method must touch nothing else")
+	}
+
+	if err := database.SetUserPasswordHash(nil, 0, "x"); err == nil {
+		t.Error("expected an error setting the password hash of user id 0")
+	}
+}
+
+// TestTrySetUserEnabled pins the compare-and-set in both directions. The disable
+// direction's return value is what gates the revocation sweep in a later stage, so
+// "returns true exactly once" is the property that stops a second disable of an
+// already-disabled account sweeping and auditing again (#106).
+func TestTrySetUserEnabled(t *testing.T) {
+	user := createTestUser(t)
+	user.Enabled = true
+	if err := database.UpdateUser(nil, user); err != nil {
+		t.Fatalf("Failed to enable the test user: %v", err)
+	}
+
+	// Disable: the first call transitions, the second does not.
+	first, err := database.TrySetUserEnabled(nil, user.Id, true, false)
+	if err != nil {
+		t.Fatalf("first disable failed: %v", err)
+	}
+	if !first {
+		t.Error("first disable should report the transition")
+	}
+
+	second, err := database.TrySetUserEnabled(nil, user.Id, true, false)
+	if err != nil {
+		t.Fatalf("second disable failed: %v", err)
+	}
+	if second {
+		t.Error("second disable must report false; the account was already disabled")
+	}
+
+	reloaded, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if reloaded.Enabled {
+		t.Error("user should be disabled")
+	}
+
+	// Enable: same property in the other direction. This is why the method covers both
+	// rather than being a TryDisableUser, so enabling does not fall back to a full-row
+	// update that could clobber a concurrent password change.
+	firstEnable, err := database.TrySetUserEnabled(nil, user.Id, false, true)
+	if err != nil {
+		t.Fatalf("first enable failed: %v", err)
+	}
+	if !firstEnable {
+		t.Error("first enable should report the transition")
+	}
+
+	secondEnable, err := database.TrySetUserEnabled(nil, user.Id, false, true)
+	if err != nil {
+		t.Fatalf("second enable failed: %v", err)
+	}
+	if secondEnable {
+		t.Error("second enable must report false; the account was already enabled")
+	}
+
+	// A mismatched expectation is a no-op, not an error.
+	mismatch, err := database.TrySetUserEnabled(nil, user.Id, false, false)
+	if err != nil {
+		t.Fatalf("mismatched expectation should not error: %v", err)
+	}
+	if mismatch {
+		t.Error("a mismatched expected value must report false")
+	}
+	reloaded, err = database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if !reloaded.Enabled {
+		t.Error("a mismatched expectation must leave the row alone")
+	}
+
+	if _, err := database.TrySetUserEnabled(nil, 0, true, false); err == nil {
+		t.Error("expected an error setting enabled on user id 0")
+	}
+}

@@ -48,6 +48,24 @@ type Database interface {
 	GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error)
 	SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error)
 	DeleteUser(tx *sql.Tx, userId int64) error
+	// IncrementUserAuthStateGeneration advances the user's authentication generation
+	// and returns the new value. Separate from UpdateUser because the column is tagged
+	// dont-update: every credential handler writes the whole user back, so an ordinary
+	// update would let a stale model regress the boundary (#106).
+	//
+	// tx is REQUIRED and a nil transaction is rejected. The increment and the read-back
+	// cannot be one statement portably across the four engines, so outside a
+	// transaction a concurrent increment can land between them and this caller would
+	// return the other caller's generation.
+	IncrementUserAuthStateGeneration(tx *sql.Tx, userId int64) (int64, error)
+	// SetUserPasswordHash writes a password hash and clears any outstanding
+	// forgot-password code in the same statement. Narrow rather than a full-row
+	// update, so a concurrent admin disable cannot be undone by it (#106).
+	SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error
+	// TrySetUserEnabled flips enabled from expected to desired, reporting whether this
+	// call made the transition. Compare-and-set for the same reason MarkCodeAsUsed is.
+	// The disable direction's return gates the revocation sweep (#106).
+	TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
 	UserLoadGroups(tx *sql.Tx, user *models.User) error
 	UsersLoadGroups(tx *sql.Tx, users []models.User) error
 	UserLoadPermissions(tx *sql.Tx, user *models.User) error
@@ -176,6 +194,12 @@ type Database interface {
 	GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error)
 	GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]models.UserSession, error)
 	DeleteUserSession(tx *sql.Tx, userSessionId int64) error
+	// PromoteUserSessionGeneration moves one session to a new authentication
+	// generation. Narrow because BumpUserSession writes the whole row on every
+	// request and would otherwise undo the promotion (#106). Errors if no row matched:
+	// a caller preserving a session and its tokens together must not have half of that
+	// silently succeed.
+	PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error
 	UserSessionLoadUser(tx *sql.Tx, userSession *models.UserSession) error
 	UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserSession) error
 	UserSessionLoadClients(tx *sql.Tx, userSession *models.UserSession) error
@@ -227,6 +251,15 @@ type Database interface {
 	GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error)
 	GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)
+	// GetRefreshTokensByUserId returns every refresh token belonging to a user,
+	// through either linkage shape: codes.user_id for the authorization code flow and
+	// refresh_tokens.user_id for ROPC. GetRefreshTokensBySessionIdentifier cannot
+	// substitute for it, because that query joins through codes and so excludes ROPC
+	// rows, and because it needs a live session row to supply the identifier (#106).
+	GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error)
+	// PromoteRefreshTokenGenerations moves the named, unrevoked refresh tokens to a
+	// new authentication generation. An empty id list is a no-op (#106).
+	PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error
 	DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error
 	RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error
 	RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error

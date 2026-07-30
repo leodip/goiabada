@@ -6551,6 +6551,74 @@ func (_c *Database_GetRefreshTokensBySessionIdentifier_Call) RunAndReturn(run fu
 	return _c
 }
 
+// GetRefreshTokensByUserId provides a mock function for the type Database
+func (_mock *Database) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error) {
+	ret := _mock.Called(tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRefreshTokensByUserId")
+	}
+
+	var r0 []*models.RefreshToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) ([]*models.RefreshToken, error)); ok {
+		return returnFunc(tx, userId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) []*models.RefreshToken); ok {
+		r0 = returnFunc(tx, userId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.RefreshToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, userId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetRefreshTokensByUserId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRefreshTokensByUserId'
+type Database_GetRefreshTokensByUserId_Call struct {
+	*mock.Call
+}
+
+// GetRefreshTokensByUserId is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) GetRefreshTokensByUserId(tx any, userId any) *Database_GetRefreshTokensByUserId_Call {
+	return &Database_GetRefreshTokensByUserId_Call{Call: _e.mock.On("GetRefreshTokensByUserId", tx, userId)}
+}
+
+func (_c *Database_GetRefreshTokensByUserId_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_GetRefreshTokensByUserId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByUserId_Call) Return(refreshTokens []*models.RefreshToken, err error) *Database_GetRefreshTokensByUserId_Call {
+	_c.Call.Return(refreshTokens, err)
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByUserId_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensByUserId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetResourceById provides a mock function for the type Database
 func (_mock *Database) GetResourceById(tx *sql.Tx, resourceId int64) (*models.Resource, error) {
 	ret := _mock.Called(tx, resourceId)
@@ -8946,6 +9014,72 @@ func (_c *Database_GroupsLoadPermissions_Call) RunAndReturn(run func(tx *sql.Tx,
 	return _c
 }
 
+// IncrementUserAuthStateGeneration provides a mock function for the type Database
+func (_mock *Database) IncrementUserAuthStateGeneration(tx *sql.Tx, userId int64) (int64, error) {
+	ret := _mock.Called(tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IncrementUserAuthStateGeneration")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (int64, error)); ok {
+		return returnFunc(tx, userId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) int64); ok {
+		r0 = returnFunc(tx, userId)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, userId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_IncrementUserAuthStateGeneration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IncrementUserAuthStateGeneration'
+type Database_IncrementUserAuthStateGeneration_Call struct {
+	*mock.Call
+}
+
+// IncrementUserAuthStateGeneration is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) IncrementUserAuthStateGeneration(tx any, userId any) *Database_IncrementUserAuthStateGeneration_Call {
+	return &Database_IncrementUserAuthStateGeneration_Call{Call: _e.mock.On("IncrementUserAuthStateGeneration", tx, userId)}
+}
+
+func (_c *Database_IncrementUserAuthStateGeneration_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_IncrementUserAuthStateGeneration_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_IncrementUserAuthStateGeneration_Call) Return(n int64, err error) *Database_IncrementUserAuthStateGeneration_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_IncrementUserAuthStateGeneration_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) (int64, error)) *Database_IncrementUserAuthStateGeneration_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsEmpty provides a mock function for the type Database
 func (_mock *Database) IsEmpty() (bool, error) {
 	ret := _mock.Called()
@@ -9162,6 +9296,132 @@ func (_c *Database_PermissionsLoadResources_Call) Return(err error) *Database_Pe
 }
 
 func (_c *Database_PermissionsLoadResources_Call) RunAndReturn(run func(tx *sql.Tx, permissions []models.Permission) error) *Database_PermissionsLoadResources_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PromoteRefreshTokenGenerations provides a mock function for the type Database
+func (_mock *Database) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
+	ret := _mock.Called(tx, refreshTokenIds, generation)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PromoteRefreshTokenGenerations")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, []int64, int64) error); ok {
+		r0 = returnFunc(tx, refreshTokenIds, generation)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_PromoteRefreshTokenGenerations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PromoteRefreshTokenGenerations'
+type Database_PromoteRefreshTokenGenerations_Call struct {
+	*mock.Call
+}
+
+// PromoteRefreshTokenGenerations is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - refreshTokenIds []int64
+//   - generation int64
+func (_e *Database_Expecter) PromoteRefreshTokenGenerations(tx any, refreshTokenIds any, generation any) *Database_PromoteRefreshTokenGenerations_Call {
+	return &Database_PromoteRefreshTokenGenerations_Call{Call: _e.mock.On("PromoteRefreshTokenGenerations", tx, refreshTokenIds, generation)}
+}
+
+func (_c *Database_PromoteRefreshTokenGenerations_Call) Run(run func(tx *sql.Tx, refreshTokenIds []int64, generation int64)) *Database_PromoteRefreshTokenGenerations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 []int64
+		if args[1] != nil {
+			arg1 = args[1].([]int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_PromoteRefreshTokenGenerations_Call) Return(err error) *Database_PromoteRefreshTokenGenerations_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_PromoteRefreshTokenGenerations_Call) RunAndReturn(run func(tx *sql.Tx, refreshTokenIds []int64, generation int64) error) *Database_PromoteRefreshTokenGenerations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PromoteUserSessionGeneration provides a mock function for the type Database
+func (_mock *Database) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+	ret := _mock.Called(tx, userSessionId, generation)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PromoteUserSessionGeneration")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, int64) error); ok {
+		r0 = returnFunc(tx, userSessionId, generation)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_PromoteUserSessionGeneration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PromoteUserSessionGeneration'
+type Database_PromoteUserSessionGeneration_Call struct {
+	*mock.Call
+}
+
+// PromoteUserSessionGeneration is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userSessionId int64
+//   - generation int64
+func (_e *Database_Expecter) PromoteUserSessionGeneration(tx any, userSessionId any, generation any) *Database_PromoteUserSessionGeneration_Call {
+	return &Database_PromoteUserSessionGeneration_Call{Call: _e.mock.On("PromoteUserSessionGeneration", tx, userSessionId, generation)}
+}
+
+func (_c *Database_PromoteUserSessionGeneration_Call) Run(run func(tx *sql.Tx, userSessionId int64, generation int64)) *Database_PromoteUserSessionGeneration_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_PromoteUserSessionGeneration_Call) Return(err error) *Database_PromoteUserSessionGeneration_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_PromoteUserSessionGeneration_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionGeneration_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -9597,6 +9857,69 @@ func (_c *Database_SearchUsersPaginated_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// SetUserPasswordHash provides a mock function for the type Database
+func (_mock *Database) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error {
+	ret := _mock.Called(tx, userId, passwordHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetUserPasswordHash")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, string) error); ok {
+		r0 = returnFunc(tx, userId, passwordHash)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_SetUserPasswordHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserPasswordHash'
+type Database_SetUserPasswordHash_Call struct {
+	*mock.Call
+}
+
+// SetUserPasswordHash is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+//   - passwordHash string
+func (_e *Database_Expecter) SetUserPasswordHash(tx any, userId any, passwordHash any) *Database_SetUserPasswordHash_Call {
+	return &Database_SetUserPasswordHash_Call{Call: _e.mock.On("SetUserPasswordHash", tx, userId, passwordHash)}
+}
+
+func (_c *Database_SetUserPasswordHash_Call) Run(run func(tx *sql.Tx, userId int64, passwordHash string)) *Database_SetUserPasswordHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetUserPasswordHash_Call) Return(err error) *Database_SetUserPasswordHash_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_SetUserPasswordHash_Call) RunAndReturn(run func(tx *sql.Tx, userId int64, passwordHash string) error) *Database_SetUserPasswordHash_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TryClaimCleanupRun provides a mock function for the type Database
 func (_mock *Database) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
 	ret := _mock.Called(tx, now, claimableBefore)
@@ -9665,6 +9988,84 @@ func (_c *Database_TryClaimCleanupRun_Call) Return(b bool, err error) *Database_
 }
 
 func (_c *Database_TryClaimCleanupRun_Call) RunAndReturn(run func(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)) *Database_TryClaimCleanupRun_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TrySetUserEnabled provides a mock function for the type Database
+func (_mock *Database) TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {
+	ret := _mock.Called(tx, userId, expected, desired)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TrySetUserEnabled")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, bool, bool) (bool, error)); ok {
+		return returnFunc(tx, userId, expected, desired)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, bool, bool) bool); ok {
+		r0 = returnFunc(tx, userId, expected, desired)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64, bool, bool) error); ok {
+		r1 = returnFunc(tx, userId, expected, desired)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TrySetUserEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TrySetUserEnabled'
+type Database_TrySetUserEnabled_Call struct {
+	*mock.Call
+}
+
+// TrySetUserEnabled is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+//   - expected bool
+//   - desired bool
+func (_e *Database_Expecter) TrySetUserEnabled(tx any, userId any, expected any, desired any) *Database_TrySetUserEnabled_Call {
+	return &Database_TrySetUserEnabled_Call{Call: _e.mock.On("TrySetUserEnabled", tx, userId, expected, desired)}
+}
+
+func (_c *Database_TrySetUserEnabled_Call) Run(run func(tx *sql.Tx, userId int64, expected bool, desired bool)) *Database_TrySetUserEnabled_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TrySetUserEnabled_Call) Return(b bool, err error) *Database_TrySetUserEnabled_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TrySetUserEnabled_Call) RunAndReturn(run func(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)) *Database_TrySetUserEnabled_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -48,3 +48,11 @@ func (d *SQLiteDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.R
 func (d *SQLiteDatabase) RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	return d.CommonDB.RefreshTokenLoadClient(tx, refreshToken)
 }
+
+func (d *SQLiteDatabase) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error) {
+	return d.CommonDB.GetRefreshTokensByUserId(tx, userId)
+}
+
+func (d *SQLiteDatabase) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
+	return d.CommonDB.PromoteRefreshTokenGenerations(tx, refreshTokenIds, generation)
+}
