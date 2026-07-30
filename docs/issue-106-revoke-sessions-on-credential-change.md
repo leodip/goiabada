@@ -1381,16 +1381,16 @@ only columns and struct tags.
    against the version-20 schema.
 
 ### Stage 1b: data-layer methods, mocks and query tests
-Status: **Not started**
+Status: **Done**
 
 Tests: **data tests only, dev container, all four engines.**
 
 1. `GetRefreshTokensByUserId(tx, userId)` on the `Database` interface, one `commondb`
-   implementation, four delegating wrappers. Status: **Not started**
+   implementation, four delegating wrappers. Status: **Done**
    Two `UNION ALL` branches, one joining `codes` on `codes.user_id` and one selecting on
    `refresh_tokens.user_id` (decision 1, finding 6). Carries the invariant comment: every refresh
    token reaches its user through one of those two columns and nothing else.
-2. Narrow write methods. Status: **Not started**
+2. Narrow write methods. Status: **Done**
    `IncrementUserAuthStateGeneration(tx, userId) (int64, error)` returning the new value;
    `PromoteUserSessionGeneration(tx, sessionId, gen)`; `PromoteRefreshTokenGenerations(tx, ids, gen)`;
    `SetUserPasswordHash(tx, userId, hash)` clearing the forgot-password fields in the same statement;
@@ -1401,8 +1401,8 @@ Tests: **data tests only, dev container, all four engines.**
    the clobbering defect alive in half of it. The disable direction's return gates stage 5's
    revocation.
 3. Regenerate `src/core/data/mocks/database_mock.go` with mockery (`src/core/.mockery.yaml`).
-   Status: **Not started**
-4. Data tests in `src/authserver/tests/data/`. Status: **Not started**
+   Status: **Done**
+4. Data tests in `src/authserver/tests/data/`. Status: **Done**
    This is the exhaustive owner of the query's shape coverage; later stages test consumers thinly and
    say so. `refresh_token_test.go` gains a `GetRefreshTokensByUserId` table enumerating every linkage
    shape adversarially: session-bound with a live session; offline with a live session; **offline
@@ -1421,6 +1421,78 @@ Tests: **data tests only, dev container, all four engines.**
    `PromoteUserSessionGeneration` changes only the named session; and `SetUserPasswordHash` clears the
    forgot-password fields without touching any other column.
    The migration and `dont-update` assertions are **stage 1a's**, not repeated here.
+
+   **As built.** `GetRefreshTokensByUserId` and `PromoteRefreshTokenGenerations` in
+   `commondb/refresh_token.go`; `IncrementUserAuthStateGeneration`, `SetUserPasswordHash` and
+   `TrySetUserEnabled` in `commondb/user.go`; `PromoteUserSessionGeneration` in
+   `commondb/user_session.go`; six declarations on the `Database` interface; 24 delegating wrappers
+   across the four engine packages; `database_mock.go` regenerated (+401 lines). Tests:
+   `TestGetRefreshTokensByUserId`, `TestGetRefreshTokensByUserId_NoTokens`,
+   `TestPromoteRefreshTokenGenerations`, `TestIncrementUserAuthStateGeneration`,
+   `TestSetUserPasswordHash`, `TestTrySetUserEnabled`, `TestPromoteUserSessionGeneration`.
+
+   Two things the plan did not anticipate, both contained inside steps:
+
+   1. **`Assign(col, nil)` is not portable.** `SetUserPasswordHash` has to clear
+      `forgot_password_code_encrypted` and `forgot_password_code_issued_at`, and passing a Go
+      `nil` through sqlbuilder sends an untyped parameter that the SQL Server driver types as
+      `nvarchar`, which it then refuses to convert to `varbinary(max)`:
+      *"Implicit conversion from data type nvarchar to varbinary(max) is not allowed."* Caught by
+      the four-engine data tests, passing on the other three. Replaced with literal
+      `column = NULL` fragments, which have no parameter type to get wrong.
+   2. **`IncrementUserAuthStateGeneration` reads the new value back** rather than computing the
+      successor in Go, since the increment happens in the database and the read-back is the value
+      that actually landed. It also treats a zero `rowsAffected` as an error, because a caller
+      asking to advance a boundary for a user that does not exist should not receive a silent 0.
+
+   **Verified on all four engines**: sqlite 265 pass, mysql 267, postgres 267, mssql 266, zero
+   failures throughout, and the seven new tests pass on every engine.
+
+   Getting mssql there needed an environment diagnosis, recorded here because the symptom pointed
+   somewhere misleading. The full suite first hung for 9m49s in the pre-existing
+   `TestRefreshTokenLoadClient` and was killed by Go's 600s test-binary timeout, which reads like a
+   deadlock in that test. It was not: `docker stats` showed the server spinning at 294% CPU with no
+   OOM kill, and its log carried `Error: 701 ... There is insufficient system memory in resource
+   pool 'default'`, each occurrence immediately following an
+   `[DBMgr::EnqueueDbFileDeletes] ... goiabada_mig_*.mdf` line. That is the isolated-database
+   migration helper: it creates and drops a real database per call, SQL Server does not promptly
+   return the committed memory, and the 4GiB container pool ran out after this session's repeated
+   runs. No disk leakage (`/var/opt/mssql/data/` had no leftover files) and no leaked databases.
+   `docker restart` cleared it: CPU to 0.43%, a query that had been timing out past 100 seconds
+   answered in 0.046s. The lesson for later stages is to iterate on sqlite and widen to `--db all`
+   once, rather than looping four-engine runs.
+
+   **Review round on this stage.** Three findings, all valid, all inside step boundaries.
+
+   1. **`GetRefreshTokensByUserId` did not check `rows.Err()`.** A mid-stream failure would have
+      returned a partial token set as success, and the caller would have committed a revocation
+      sweep that missed rows it never saw. Both sibling queries (`GetRefreshTokensByCodeId` and
+      `GetRefreshTokensBySessionIdentifier`) already had the check, so this was a consistency break
+      as well as a correctness one. Added, matching their wording. **Untested**, stated plainly: the
+      failure path needs a mid-iteration database fault, which the data tests have no harness to
+      inject, so this rests on inspection and on matching the neighbours.
+   2. **`IncrementUserAuthStateGeneration` now requires a transaction** and rejects a nil one. The
+      increment and the read-back are two statements, because no single syntax for both
+      increments-and-returns is portable across all four supported engines. Outside a transaction, a
+      concurrent
+      increment can land between them and the caller returns the *other* caller's generation, then
+      stamps it on the session and tokens it is preserving, leaving them valid past the boundary the
+      other credential change had just established. The test previously used `nil` and therefore
+      endorsed exactly that unsafe usage; it now goes through `beginTx(t)` and asserts a nil
+      transaction is refused. Decision 5 already has every caller owning a transaction, so this
+      tightens the contract to match the design rather than constraining it.
+   3. **`PromoteUserSessionGeneration` now requires exactly one affected row.** It previously ignored
+      `RowsAffected`, so promoting a session that does not exist succeeded silently. That would leave
+      decision 4's preservation half applied: the tokens promoted, the session not, and the session
+      then rejected on its next request. A nonzero unknown-id case was added alongside the zero-id
+      one.
+
+      Note `PromoteRefreshTokenGenerations` deliberately does **not** get the same check: it skips
+      already-revoked rows by design, so a row count below the id count is expected there.
+
+   Both new guards were verified to have teeth: neutralising each makes its test fail with the
+   intended message, and both were restored. Re-run after the corrections: the twelve affected tests
+   pass on all four engines, zero failures, with mssql healthy at 0.54% CPU throughout.
 
 ### Stage 2: generation stamping at issuance, and the offline `sid` fix
 Status: **Not started**
