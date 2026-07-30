@@ -16,9 +16,14 @@ import (
 // TestMigration000021_CountryData exercises the data migration that moves stored
 // user phone-country and address-country values from the biter777 dataset to the
 // datahub dataset. It runs against an ISOLATED database of the configured dialect
-// (see migration_testdb_helper.go): migrate to 000020, seed pre-migration rows
-// covering every branch of the state hierarchy, apply 000021, and assert. Then it
-// re-applies 000021 (Force back to 20) to prove idempotency / restart-safety.
+// (see migration_testdb_helper.go): bring the schema to head, force the version
+// marker back to 000020, seed pre-migration rows covering every branch of the state
+// hierarchy, run 000021 against them, and assert. Then it re-runs 000021 (forcing the
+// marker back again) to prove idempotency / restart-safety.
+//
+// Note the schema is at HEAD throughout; only the version marker moves. 000021 is
+// data-only, so the schema it runs against is irrelevant to what it transforms, and
+// seeding through the models requires columns that later migrations added.
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
@@ -26,9 +31,18 @@ import (
 func TestMigration000021_CountryData(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	// Bring the isolated DB to exactly 000020 (pre-000021 schema == current
-	// schema; 000021 is data-only).
-	require.NoError(t, h.Migrator.Migrate(20), "migrate to 000020")
+	// Bring the schema all the way up, then move only the version MARKER back to
+	// 000020 so 000021 re-runs against seeded data.
+	//
+	// This used to be a plain Migrate(20). That worked while the pre-000021 schema
+	// and the current schema were identical, but 000024 (#106) added
+	// auth_state_generation to users, so the Go model now references a column that
+	// does not exist at version 20 and the CreateUser calls below fail with
+	// "Unknown column". Force changes the marker without touching the schema, which
+	// is exactly the trick the idempotency check at the end of this test already
+	// used, so 000021's data transformation is still applied to pre-migration data.
+	require.NoError(t, h.Migrator.Up(), "migrate to head")
+	require.NoError(t, h.Migrator.Force(20), "force marker to 000020")
 
 	fixtures := migration000021Fixtures()
 

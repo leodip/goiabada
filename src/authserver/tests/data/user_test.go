@@ -375,3 +375,57 @@ func compareUsers(t *testing.T, expected, actual *models.User) {
 		t.Errorf("ForgotPasswordCodeIssuedAt mismatch: expected %v, got %v", expected.ForgotPasswordCodeIssuedAt, actual.ForgotPasswordCodeIssuedAt)
 	}
 }
+
+// TestUpdateUser_DoesNotClobberAuthStateGeneration pins decision 11(b) of #106.
+//
+// AuthStateGeneration is tagged fieldtag:"dont-update", so it is written on insert
+// and an ordinary full-row UpdateUser must leave it alone. That matters because
+// every credential handler loads the whole user and writes it back: without the
+// tag, a request holding a model read before an increment would silently regress
+// the generation and let a superseded credential work again.
+//
+// Keep this test. With the tag dropped the code still compiles and every other
+// test still passes; the only symptom is a security boundary quietly ceasing to
+// hold. The value 7 is deliberately nonzero, since 0 is the column default and a
+// test written with 0 would pass with the field never assigned at all.
+func TestUpdateUser_DoesNotClobberAuthStateGeneration(t *testing.T) {
+	user := createTestUser(t)
+	user.AuthStateGeneration = 7
+	// Re-created rather than updated: writing it is exactly what UpdateUser must
+	// not do, so the nonzero value has to arrive through an insert.
+	user.Id = 0
+	user.Subject = uuid.New()
+	user.Username = "gen_" + gofakeit.LetterN(8)
+	user.Email = gofakeit.LetterN(8) + "@example.com"
+	if err := database.CreateUser(nil, user); err != nil {
+		t.Fatalf("Failed to create user with a generation: %v", err)
+	}
+
+	created, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload created user: %v", err)
+	}
+	if created.AuthStateGeneration != 7 {
+		t.Fatalf("CreateUser must persist auth_state_generation, got %d want 7",
+			created.AuthStateGeneration)
+	}
+
+	// A stale model, carrying the pre-increment value, must not pull it back down.
+	created.AuthStateGeneration = 0
+	created.GivenName = "Changed"
+	if err := database.UpdateUser(nil, created); err != nil {
+		t.Fatalf("Failed to update user: %v", err)
+	}
+
+	after, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload updated user: %v", err)
+	}
+	if after.AuthStateGeneration != 7 {
+		t.Errorf("UpdateUser regressed auth_state_generation to %d, want 7 (is the dont-update tag missing?)",
+			after.AuthStateGeneration)
+	}
+	if after.GivenName != "Changed" {
+		t.Errorf("the rest of the update must still apply, GivenName = %q", after.GivenName)
+	}
+}

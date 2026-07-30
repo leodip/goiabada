@@ -100,7 +100,8 @@ CREATE TABLE users (
   otp_enabled numeric NOT NULL,
   forgot_password_code_encrypted BLOB,
   forgot_password_code_issued_at DATETIME
-, phone_number_country_uniqueid TEXT, phone_number_country_callingcode TEXT);
+, phone_number_country_uniqueid TEXT, phone_number_country_callingcode TEXT
+, auth_state_generation INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE codes (
   `id` integer PRIMARY KEY AUTOINCREMENT,
@@ -123,6 +124,7 @@ CREATE TABLE codes (
   acr_level TEXT NOT NULL,
   auth_methods TEXT NOT NULL,
   used numeric NOT NULL,  
+  auth_state_generation INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT fk_codes_client FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
   CONSTRAINT fk_codes_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
@@ -209,6 +211,7 @@ CREATE TABLE refresh_tokens (
   expires_at DATETIME,
   max_lifetime DATETIME,
   revoked numeric NOT NULL,
+  auth_state_generation INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT fk_refresh_tokens_code FOREIGN KEY (code_id) REFERENCES codes (id) ON DELETE CASCADE,
   CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT fk_refresh_tokens_client FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE
@@ -253,6 +256,7 @@ CREATE TABLE user_sessions (
   device_type TEXT NOT NULL,
   device_os TEXT NOT NULL,
   user_id INTEGER NOT NULL, level2_auth_config_has_changed INTEGER NOT NULL DEFAULT 0,  
+  auth_state_generation INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
@@ -375,3 +379,8 @@ CREATE TABLE audit_logs (
 );
 CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 CREATE INDEX idx_audit_logs_audit_event ON audit_logs(audit_event);
+CREATE INDEX `idx_codes_user_id` ON `codes`(`user_id`);
+CREATE INDEX `idx_codes_session_identifier` ON `codes`(`session_identifier`);
+CREATE INDEX `idx_refresh_tokens_code_id` ON `refresh_tokens`(`code_id`);
+CREATE INDEX `idx_refresh_tokens_user_id` ON `refresh_tokens`(`user_id`);
+CREATE INDEX `idx_user_sessions_user_id` ON `user_sessions`(`user_id`);

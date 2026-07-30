@@ -135,7 +135,8 @@ CREATE TABLE public.codes (
     session_identifier character varying(64) NOT NULL,
     acr_level character varying(128) NOT NULL,
     auth_methods character varying(64) NOT NULL,
-    used boolean NOT NULL
+    used boolean NOT NULL,
+    auth_state_generation bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -417,7 +418,8 @@ CREATE TABLE public.refresh_tokens (
     issued_at timestamp(6) without time zone,
     expires_at timestamp(6) without time zone,
     max_lifetime timestamp(6) without time zone,
-    revoked boolean NOT NULL
+    revoked boolean NOT NULL,
+    auth_state_generation bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -742,6 +744,7 @@ CREATE TABLE public.user_sessions (
     device_type character varying(32) NOT NULL,
     device_os character varying(64) NOT NULL,
     level2_auth_config_has_changed boolean NOT NULL,
+    auth_state_generation bigint DEFAULT 0 NOT NULL,
     user_id bigint NOT NULL
 );
 
@@ -807,7 +810,8 @@ CREATE TABLE public.users (
     otp_secret_encrypted bytea,
     otp_enabled boolean NOT NULL,
     forgot_password_code_encrypted bytea,
-    forgot_password_code_issued_at timestamp(6) without time zone
+    forgot_password_code_issued_at timestamp(6) without time zone,
+    auth_state_generation bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -1431,6 +1435,10 @@ CREATE INDEX idx_audit_logs_created_at ON public.audit_logs USING btree (created
 --
 
 CREATE INDEX idx_audit_logs_audit_event ON public.audit_logs USING btree (audit_event);
+CREATE INDEX idx_codes_user_id ON codes(user_id);
+CREATE INDEX idx_codes_session_identifier ON codes(session_identifier);
+CREATE INDEX idx_refresh_tokens_code_id ON refresh_tokens(code_id);
+CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
 
 
 --

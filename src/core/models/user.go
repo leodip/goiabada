@@ -10,47 +10,54 @@ import (
 )
 
 type User struct {
-	Id                                   int64           `db:"id" fieldtag:"pk"`
-	CreatedAt                            sql.NullTime    `db:"created_at" fieldtag:"dont-update"`
-	UpdatedAt                            sql.NullTime    `db:"updated_at"`
-	Enabled                              bool            `db:"enabled"`
-	Subject                              uuid.UUID       `db:"subject"`
-	Username                             string          `db:"username"`
-	GivenName                            string          `db:"given_name"`
-	MiddleName                           string          `db:"middle_name"`
-	FamilyName                           string          `db:"family_name"`
-	Nickname                             string          `db:"nickname"`
-	Website                              string          `db:"website"`
-	Gender                               string          `db:"gender"`
-	Email                                string          `db:"email"`
-	EmailVerified                        bool            `db:"email_verified"`
-	EmailVerificationCodeEncrypted       []byte          `db:"email_verification_code_encrypted"`
-	EmailVerificationCodeIssuedAt        sql.NullTime    `db:"email_verification_code_issued_at"`
-	ZoneInfoCountryName                  string          `db:"zone_info_country_name"`
-	ZoneInfo                             string          `db:"zone_info"`
-	Locale                               string          `db:"locale"`
-	BirthDate                            sql.NullTime    `db:"birth_date"`
-	PhoneNumberCountryUniqueId           string          `db:"phone_number_country_uniqueid"`
-	PhoneNumberCountryCallingCode        string          `db:"phone_number_country_callingcode"`
-	PhoneNumber                          string          `db:"phone_number"`
-	PhoneNumberVerified                  bool            `db:"phone_number_verified"`
-	PhoneNumberVerificationCodeEncrypted []byte          `db:"phone_number_verification_code_encrypted"`
-	PhoneNumberVerificationCodeIssuedAt  sql.NullTime    `db:"phone_number_verification_code_issued_at"`
-	AddressLine1                         string          `db:"address_line1"`
-	AddressLine2                         string          `db:"address_line2"`
-	AddressLocality                      string          `db:"address_locality"`
-	AddressRegion                        string          `db:"address_region"`
-	AddressPostalCode                    string          `db:"address_postal_code"`
-	AddressCountry                       string          `db:"address_country"`
-	PasswordHash                         string          `db:"password_hash"`
-	OTPSecret                            string          `db:"otp_secret"`
-	OTPSecretEncrypted                   []byte          `db:"otp_secret_encrypted"`
-	OTPEnabled                           bool            `db:"otp_enabled"`
-	ForgotPasswordCodeEncrypted          []byte          `db:"forgot_password_code_encrypted"`
-	ForgotPasswordCodeIssuedAt           sql.NullTime    `db:"forgot_password_code_issued_at"`
-	Groups                               []Group         `db:"-"`
-	Permissions                          []Permission    `db:"-"`
-	Attributes                           []UserAttribute `db:"-"`
+	Id                                   int64        `db:"id" fieldtag:"pk"`
+	CreatedAt                            sql.NullTime `db:"created_at" fieldtag:"dont-update"`
+	UpdatedAt                            sql.NullTime `db:"updated_at"`
+	Enabled                              bool         `db:"enabled"`
+	Subject                              uuid.UUID    `db:"subject"`
+	Username                             string       `db:"username"`
+	GivenName                            string       `db:"given_name"`
+	MiddleName                           string       `db:"middle_name"`
+	FamilyName                           string       `db:"family_name"`
+	Nickname                             string       `db:"nickname"`
+	Website                              string       `db:"website"`
+	Gender                               string       `db:"gender"`
+	Email                                string       `db:"email"`
+	EmailVerified                        bool         `db:"email_verified"`
+	EmailVerificationCodeEncrypted       []byte       `db:"email_verification_code_encrypted"`
+	EmailVerificationCodeIssuedAt        sql.NullTime `db:"email_verification_code_issued_at"`
+	ZoneInfoCountryName                  string       `db:"zone_info_country_name"`
+	ZoneInfo                             string       `db:"zone_info"`
+	Locale                               string       `db:"locale"`
+	BirthDate                            sql.NullTime `db:"birth_date"`
+	PhoneNumberCountryUniqueId           string       `db:"phone_number_country_uniqueid"`
+	PhoneNumberCountryCallingCode        string       `db:"phone_number_country_callingcode"`
+	PhoneNumber                          string       `db:"phone_number"`
+	PhoneNumberVerified                  bool         `db:"phone_number_verified"`
+	PhoneNumberVerificationCodeEncrypted []byte       `db:"phone_number_verification_code_encrypted"`
+	PhoneNumberVerificationCodeIssuedAt  sql.NullTime `db:"phone_number_verification_code_issued_at"`
+	AddressLine1                         string       `db:"address_line1"`
+	AddressLine2                         string       `db:"address_line2"`
+	AddressLocality                      string       `db:"address_locality"`
+	AddressRegion                        string       `db:"address_region"`
+	AddressPostalCode                    string       `db:"address_postal_code"`
+	AddressCountry                       string       `db:"address_country"`
+	PasswordHash                         string       `db:"password_hash"`
+	OTPSecret                            string       `db:"otp_secret"`
+	OTPSecretEncrypted                   []byte       `db:"otp_secret_encrypted"`
+	OTPEnabled                           bool         `db:"otp_enabled"`
+	ForgotPasswordCodeEncrypted          []byte       `db:"forgot_password_code_encrypted"`
+	ForgotPasswordCodeIssuedAt           sql.NullTime `db:"forgot_password_code_issued_at"`
+	// AuthStateGeneration is the authoritative per-user authentication generation:
+	// credentials authenticated under generation N cannot create or use
+	// authentication state once the user advances to N+1. Tagged dont-update because
+	// every credential handler loads the whole user and writes it back, so leaving it
+	// in the ordinary update set would let a stale model regress it. It advances only
+	// through IncrementUserAuthStateGeneration (#106).
+	AuthStateGeneration int64           `db:"auth_state_generation" fieldtag:"dont-update"`
+	Groups              []Group         `db:"-"`
+	Permissions         []Permission    `db:"-"`
+	Attributes          []UserAttribute `db:"-"`
 }
 
 // SetOTPSecret encrypts the TOTP seed at rest (AES-256-GCM, via the process

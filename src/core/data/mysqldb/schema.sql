@@ -169,6 +169,7 @@ CREATE TABLE `users` (
   `otp_enabled` tinyint(1) NOT NULL,
   `forgot_password_code_encrypted` longblob,
   `forgot_password_code_issued_at` datetime(6) DEFAULT NULL,
+  `auth_state_generation` bigint NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_subject` (`subject`),
   UNIQUE KEY `idx_email` (`email`),
@@ -280,6 +281,7 @@ CREATE TABLE `user_sessions` (
   `device_type` varchar(32) NOT NULL,
   `device_os` varchar(64) NOT NULL,
   `level2_auth_config_has_changed` tinyint(1) NOT NULL,
+  `auth_state_generation` bigint NOT NULL DEFAULT 0,
   `user_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_session_identifier` (`session_identifier`),
@@ -346,11 +348,13 @@ CREATE TABLE `codes` (
   `acr_level` varchar(128) NOT NULL,
   `auth_methods` varchar(64) NOT NULL,
   `used` tinyint(1) NOT NULL,
+  `auth_state_generation` bigint NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_code_hash` (`code_hash`),
   KEY `fk_codes_client` (`client_id`),
   KEY `fk_codes_user` (`user_id`),
   CONSTRAINT `fk_codes_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  KEY `idx_codes_session_identifier` (`session_identifier`),
   CONSTRAINT `fk_codes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -429,6 +433,7 @@ CREATE TABLE `refresh_tokens` (
   `expires_at` datetime(6) DEFAULT NULL,
   `max_lifetime` datetime(6) DEFAULT NULL,
   `revoked` tinyint(1) NOT NULL,
+  `auth_state_generation` bigint NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_refresh_token_jti` (`refresh_token_jti`),
   KEY `fk_refresh_tokens_code` (`code_id`),

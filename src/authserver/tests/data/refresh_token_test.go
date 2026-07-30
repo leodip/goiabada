@@ -603,3 +603,49 @@ func TestDeleteExpiredOrRevokedRefreshTokens(t *testing.T) {
 		t.Error("Revoked token was not deleted")
 	}
 }
+
+// TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration pins decision 11(b) of
+// #106 for refresh tokens. See TestUpdateUser_DoesNotClobberAuthStateGeneration for
+// why the tag matters and why the value is deliberately nonzero.
+//
+// This is the case with the tightest race: the refresh endpoint marks the presented
+// token revoked with a full-row update while a credential change may be promoting
+// that same token's siblings. Without the tag, the update would write back the
+// generation the model was read with.
+func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
+	refreshToken := createTestRefreshToken(t)
+
+	refreshToken.AuthStateGeneration = 7
+	refreshToken.Id = 0
+	refreshToken.RefreshTokenJti = gofakeit.UUID()
+	if err := database.CreateRefreshToken(nil, refreshToken); err != nil {
+		t.Fatalf("Failed to create refresh token with a generation: %v", err)
+	}
+
+	created, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload created refresh token: %v", err)
+	}
+	if created.AuthStateGeneration != 7 {
+		t.Fatalf("CreateRefreshToken must persist auth_state_generation, got %d want 7",
+			created.AuthStateGeneration)
+	}
+
+	created.AuthStateGeneration = 0
+	created.Revoked = true
+	if err := database.UpdateRefreshToken(nil, created); err != nil {
+		t.Fatalf("Failed to update refresh token: %v", err)
+	}
+
+	after, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload updated refresh token: %v", err)
+	}
+	if after.AuthStateGeneration != 7 {
+		t.Errorf("UpdateRefreshToken regressed auth_state_generation to %d, want 7 (is the dont-update tag missing?)",
+			after.AuthStateGeneration)
+	}
+	if !after.Revoked {
+		t.Error("the rest of the update must still apply, Revoked = false")
+	}
+}

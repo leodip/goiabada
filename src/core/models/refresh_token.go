@@ -22,4 +22,11 @@ type RefreshToken struct {
 	ExpiresAt               sql.NullTime  `db:"expires_at"`
 	MaxLifetime             sql.NullTime  `db:"max_lifetime"`
 	Revoked                 bool          `db:"revoked"`
+	// AuthStateGeneration records the generation this token's grant was authenticated
+	// under. Rotation copies it from the PARENT token, never from the user's current
+	// value, so an old grant cannot launder itself forward. Refresh validation reads
+	// it from this row rather than from the joined Code, which is what lets a
+	// preserved session's promoted tokens keep working. Tagged dont-update so an
+	// ordinary full-row UpdateRefreshToken cannot regress it (#106).
+	AuthStateGeneration int64 `db:"auth_state_generation" fieldtag:"dont-update"`
 }

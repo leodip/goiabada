@@ -6,23 +6,28 @@ import (
 )
 
 type UserSession struct {
-	Id                         int64               `db:"id" fieldtag:"pk"`
-	CreatedAt                  sql.NullTime        `db:"created_at" fieldtag:"dont-update"`
-	UpdatedAt                  sql.NullTime        `db:"updated_at"`
-	SessionIdentifier          string              `db:"session_identifier"`
-	Started                    time.Time           `db:"started"`
-	LastAccessed               time.Time           `db:"last_accessed"`
-	AuthMethods                string              `db:"auth_methods"`
-	AcrLevel                   string              `db:"acr_level"`
-	AuthTime                   time.Time           `db:"auth_time"`
-	IpAddress                  string              `db:"ip_address"`
-	DeviceName                 string              `db:"device_name"`
-	DeviceType                 string              `db:"device_type"`
-	DeviceOS                   string              `db:"device_os"`
-	Level2AuthConfigHasChanged bool                `db:"level2_auth_config_has_changed"`
-	UserId                     int64               `db:"user_id"`
-	User                       User                `db:"-"`
-	Clients                    []UserSessionClient `db:"-"`
+	Id                         int64        `db:"id" fieldtag:"pk"`
+	CreatedAt                  sql.NullTime `db:"created_at" fieldtag:"dont-update"`
+	UpdatedAt                  sql.NullTime `db:"updated_at"`
+	SessionIdentifier          string       `db:"session_identifier"`
+	Started                    time.Time    `db:"started"`
+	LastAccessed               time.Time    `db:"last_accessed"`
+	AuthMethods                string       `db:"auth_methods"`
+	AcrLevel                   string       `db:"acr_level"`
+	AuthTime                   time.Time    `db:"auth_time"`
+	IpAddress                  string       `db:"ip_address"`
+	DeviceName                 string       `db:"device_name"`
+	DeviceType                 string       `db:"device_type"`
+	DeviceOS                   string       `db:"device_os"`
+	Level2AuthConfigHasChanged bool         `db:"level2_auth_config_has_changed"`
+	// AuthStateGeneration records the user's generation when this session was
+	// created. Tagged dont-update so an ordinary full-row UpdateUserSession cannot
+	// regress it: it is written on insert and afterwards only by
+	// PromoteUserSessionGeneration (#106).
+	AuthStateGeneration int64               `db:"auth_state_generation" fieldtag:"dont-update"`
+	UserId              int64               `db:"user_id"`
+	User                User                `db:"-"`
+	Clients             []UserSessionClient `db:"-"`
 }
 
 func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) bool {

@@ -66,6 +66,7 @@ CREATE TABLE [codes] (
     [acr_level] NVARCHAR(128) NOT NULL,
     [auth_methods] NVARCHAR(64) NOT NULL,
     [used] BIT NOT NULL,
+    [auth_state_generation] BIGINT NOT NULL CONSTRAINT [df_codes_auth_state_generation] DEFAULT 0,
     CONSTRAINT [PK_codes] PRIMARY KEY ([id])
 );
 
@@ -170,6 +171,7 @@ CREATE TABLE [refresh_tokens] (
     [expires_at] DATETIME2(6) NULL,
     [max_lifetime] DATETIME2(6) NULL,
     [revoked] BIT NOT NULL,
+    [auth_state_generation] BIGINT NOT NULL CONSTRAINT [df_refresh_tokens_auth_state_generation] DEFAULT 0,
     CONSTRAINT [PK_refresh_tokens] PRIMARY KEY ([id])
 );
 
@@ -314,6 +316,7 @@ CREATE TABLE [user_sessions] (
     [device_type] NVARCHAR(32) NOT NULL,
     [device_os] NVARCHAR(64) NOT NULL,
     [level2_auth_config_has_changed] BIT NOT NULL,
+    [auth_state_generation] BIGINT NOT NULL CONSTRAINT [df_user_sessions_auth_state_generation] DEFAULT 0,
     [user_id] BIGINT NOT NULL,
     CONSTRAINT [PK_user_sessions] PRIMARY KEY ([id])
 );
@@ -358,6 +361,7 @@ CREATE TABLE [users] (
     [otp_enabled] BIT NOT NULL,
     [forgot_password_code_encrypted] VARBINARY(MAX) NULL,
     [forgot_password_code_issued_at] DATETIME2(6) NULL,
+    [auth_state_generation] BIGINT NOT NULL CONSTRAINT [df_users_auth_state_generation] DEFAULT 0,
     CONSTRAINT [PK_users] PRIMARY KEY ([id])
 );
 
@@ -437,3 +441,7 @@ CREATE INDEX [idx_given_name] ON [users] (given_name);
 CREATE INDEX [idx_middle_name] ON [users] (middle_name);
 CREATE UNIQUE INDEX [idx_subject] ON [users] (subject);
 CREATE INDEX [idx_username] ON [users] (username);
+CREATE INDEX [idx_codes_user_id] ON [dbo].[codes] ([user_id]);
+CREATE INDEX [idx_codes_session_identifier] ON [dbo].[codes] ([session_identifier]);
+CREATE INDEX [idx_refresh_tokens_code_id] ON [dbo].[refresh_tokens] ([code_id]);
+CREATE INDEX [idx_user_sessions_user_id] ON [dbo].[user_sessions] ([user_id]);

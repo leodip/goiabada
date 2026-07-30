@@ -29,4 +29,9 @@ type Code struct {
 	AcrLevel            string         `db:"acr_level"`
 	AuthMethods         string         `db:"auth_methods"`
 	Used                bool           `db:"used"`
+	// AuthStateGeneration records the user's generation when this code was issued,
+	// inherited from the AuthContext. Redemption rejects a mismatch against the
+	// user's current value. Tagged dont-update so an ordinary full-row UpdateCode
+	// cannot regress it (#106).
+	AuthStateGeneration int64 `db:"auth_state_generation" fieldtag:"dont-update"`
 }

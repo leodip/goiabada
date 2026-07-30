@@ -820,3 +820,50 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		t.Error("Very old session client was not deleted")
 	}
 }
+
+// TestUpdateUserSession_DoesNotClobberAuthStateGeneration pins decision 11(b) of
+// #106 for sessions. See TestUpdateUser_DoesNotClobberAuthStateGeneration for why
+// the tag matters and why the value is deliberately nonzero.
+//
+// The session case is the one that keeps decision 4 working: a self-service password
+// change promotes the caller's session to the new generation, and BumpUserSession
+// writes the whole row on every request afterwards. Without the tag, the first bump
+// would undo the promotion and sign the user out.
+func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
+	user := createTestUser(t)
+	userSession := createTestUserSession(t, user.Id)
+
+	userSession.AuthStateGeneration = 7
+	userSession.Id = 0
+	userSession.SessionIdentifier = gofakeit.UUID()
+	if err := database.CreateUserSession(nil, userSession); err != nil {
+		t.Fatalf("Failed to create user session with a generation: %v", err)
+	}
+
+	created, err := database.GetUserSessionById(nil, userSession.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload created user session: %v", err)
+	}
+	if created.AuthStateGeneration != 7 {
+		t.Fatalf("CreateUserSession must persist auth_state_generation, got %d want 7",
+			created.AuthStateGeneration)
+	}
+
+	created.AuthStateGeneration = 0
+	created.Level2AuthConfigHasChanged = true
+	if err := database.UpdateUserSession(nil, created); err != nil {
+		t.Fatalf("Failed to update user session: %v", err)
+	}
+
+	after, err := database.GetUserSessionById(nil, userSession.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload updated user session: %v", err)
+	}
+	if after.AuthStateGeneration != 7 {
+		t.Errorf("UpdateUserSession regressed auth_state_generation to %d, want 7 (is the dont-update tag missing?)",
+			after.AuthStateGeneration)
+	}
+	if !after.Level2AuthConfigHasChanged {
+		t.Error("the rest of the update must still apply, Level2AuthConfigHasChanged = false")
+	}
+}

@@ -687,3 +687,46 @@ func TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff(t *testing.T) {
 		t.Error("a used code older than the cutoff and with no refresh token should have been deleted")
 	}
 }
+
+// TestUpdateCode_DoesNotClobberAuthStateGeneration pins decision 11(b) of #106 for
+// codes. See TestUpdateUser_DoesNotClobberAuthStateGeneration for why the tag
+// matters and why the value is deliberately nonzero.
+func TestUpdateCode_DoesNotClobberAuthStateGeneration(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+	code := createTestCode(t, client.Id, user.Id)
+
+	code.AuthStateGeneration = 7
+	code.Id = 0
+	code.CodeHash = "genhash_" + gofakeit.LetterN(8)
+	if err := database.CreateCode(nil, code); err != nil {
+		t.Fatalf("Failed to create code with a generation: %v", err)
+	}
+
+	created, err := database.GetCodeById(nil, code.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload created code: %v", err)
+	}
+	if created.AuthStateGeneration != 7 {
+		t.Fatalf("CreateCode must persist auth_state_generation, got %d want 7",
+			created.AuthStateGeneration)
+	}
+
+	created.AuthStateGeneration = 0
+	created.Used = true
+	if err := database.UpdateCode(nil, created); err != nil {
+		t.Fatalf("Failed to update code: %v", err)
+	}
+
+	after, err := database.GetCodeById(nil, code.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload updated code: %v", err)
+	}
+	if after.AuthStateGeneration != 7 {
+		t.Errorf("UpdateCode regressed auth_state_generation to %d, want 7 (is the dont-update tag missing?)",
+			after.AuthStateGeneration)
+	}
+	if !after.Used {
+		t.Error("the rest of the update must still apply, Used = false")
+	}
+}
