@@ -18,15 +18,15 @@ blocks this issue, and this issue blocks none of them.
 
 | Label | File | Function | Locate by | Note |
 |---|---|---|---|---|
-| `reset/password-write` | `src/authserver/internal/handlers/handler_reset_password.go` | `HandleResetPasswordPost` | `user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}` | site 1, the forgot-password reset |
+| `reset/password-write` | `src/authserver/internal/handlers/handler_reset_password.go` | `HandleResetPasswordPost` | `result, err := RevokeUserAuthStateTx(database, user.Id, "", func(tx *sql.Tx) error {` | site 1, the forgot-password reset, wired by stage 5 |
 | `reset/success-render` | `src/authserver/internal/handlers/handler_reset_password.go` | `HandleResetPasswordPost` | `"passwordReset":       true,` | the success path, which emits no audit event |
 | `reset/audit-failure-only` | `src/authserver/internal/handlers/handler_reset_password.go` | `auditFailedResetPasswordCode` | `constants.AuditFailedResetPasswordCode` | the only audit event this file emits |
-| `account-pwd/write` | `src/authserver/internal/handlers/apihandlers/handler_api_account_password.go` | `HandleAPIAccountPasswordPut` | `user.PasswordHash = passwordHash` | site 2, self-service change |
+| `account-pwd/write` | `src/authserver/internal/handlers/apihandlers/handler_api_account_password.go` | `HandleAPIAccountPasswordPut` | `exceptSid := strings.TrimSpace(jwtToken.GetStringClaim("sid"))` | site 2, the only one passing exceptSid |
 | `account-pwd/audit` | `src/authserver/internal/handlers/apihandlers/handler_api_account_password.go` | `HandleAPIAccountPasswordPut` | `constants.AuditChangedPassword` | the only emitter of this event |
 | `account-pwd/subject` | `src/authserver/internal/handlers/apihandlers/handler_api_account_password.go` | `HandleAPIAccountPasswordPut` | `subject := jwtToken.GetStringClaim("sub")` | the validated token is in hand here |
-| `admin-enabled/write` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserEnabledPut` | `user.Enabled = req.Enabled` | site 3, admin disable |
+| `admin-enabled/write` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserEnabledPut` | `transitioned, err := database.TrySetUserEnabled(tx, userId, true, false)` | site 3, the compare-and-set the sweep is conditional on |
 | `admin-enabled/audit` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserEnabledPut` | `constants.AuditUpdatedUserDetails` | disable is audited as a generic detail update |
-| `admin-pwd/write` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserPasswordPut` | `user.PasswordHash = passwordHash` | site 4, missed by the issue |
+| `admin-pwd/write` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserPasswordPut` | `result, err := handlers.RevokeUserAuthStateTx(database, user.Id, "", func(tx *sql.Tx) error {` | site 4, missed by the issue |
 | `admin-pwd/audit` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserPasswordPut` | `constants.AuditUpdatedUserAuthentication` | |
 | `middleware/sid-passthrough` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `// Offline grant or ROPC: no session to defer to, so the token's own` | was the unchecked pass-through; stage 3 closed it, the label is kept because settled prose cites it |
 | `middleware/authtime-discriminator` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `if _, hasAuthTime := jwtToken.Claims["auth_time"]; !hasAuthTime {` | the client_credentials gate, added by stage 3 |
@@ -42,6 +42,17 @@ blocks this issue, and this issue blocks none of them.
 | `revoke/user-scoped` | `src/authserver/internal/handlers/revocation.go` | `RevokeUserAuthState` | `func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid string) (RevocationResult, error) {` | stage 4's entry point |
 | `revoke/preserved-set` | `src/authserver/internal/handlers/revocation.go` | `RevokeUserAuthState` | `preservedTokens, err := db.GetRefreshTokensBySessionIdentifier(tx, exceptSid)` | finding 3, the sid-scoped query the preserved set requires |
 | `revoke/result-struct` | `src/authserver/internal/handlers/revocation.go` | `n/a` | `type RevocationResult struct {` | maps onto decision 7's audit payload |
+| `revoke/tx-wrapper` | `src/authserver/internal/handlers/revocation.go` | `RevokeUserAuthStateTx` | `func RevokeUserAuthStateTx(db data.Database, userId int64, exceptSid string,` | one transaction discipline for three of the four sites |
+| `revoke/audit-emitter` | `src/authserver/internal/handlers/revocation.go` | `LogRevokedUserAuthState` | `func LogRevokedUserAuthState(auditLogger AuditLogger, userId int64, reason string,` | one payload shape for all four sites |
+| `revoke/reasons` | `src/authserver/internal/handlers/revocation.go` | `n/a` | `RevocationReasonPasswordReset    = "password_reset"` | decision 7's four reasons |
+| `constants/revoke-event` | `src/core/constants/constants.go` | `n/a` | `AuditRevokedUserAuthState           = "revoked_user_auth_state"` | the new event |
+| `test/disable-conditionality` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud_test.go` | `n/a` | `func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {` | findings 4 and 21, the four-row matrix |
+| `test/audit-payload` | `src/authserver/internal/handlers/apihandlers/handler_api_account_password_test.go` | `n/a` | `func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {` | the field-by-field payload assertion |
+| `test/tx-failure-matrix` | `src/authserver/internal/handlers/handler_reset_password_test.go` | `n/a` | `func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {` | finding 26, three failure points; two roll back, the commit one does not (finding 36) |
+| `test/integration-generation-roundtrip` | `src/authserver/tests/integration/credential_change_revocation_test.go` | `n/a` | `func TestCredentialChange_GenerationRoundTripsThroughTheToken(t *testing.T) {` | finding 25, the end-to-end mechanism |
+| `test/integration-residual` | `src/authserver/tests/integration/credential_change_revocation_test.go` | `n/a` | `func TestCredentialChange_ResidualRacingChildIsFailClosed(t *testing.T) {` | decision 16's residual, pinned fail-closed |
+| `test/integration-second-device` | `src/authserver/tests/integration/credential_change_revocation_test.go` | `secondSessionFor` | `httpClient := createHttpClientWithUserAgent(t,` | finding 35, a real second session for the same user |
+| `test/integration-ropc-child` | `src/authserver/tests/integration/credential_change_revocation_test.go` | `TestCredentialChange_ROPCGrantStopsRefreshing` | `require.False(t, childRow.Revoked, "the child must be unspent before the reset")` | finding 34, what makes the case non-vacuous |
 | `test/revoke-sweep` | `src/authserver/internal/handlers/revocation_test.go` | `n/a` | `func TestRevokeUserAuthState_PreservingASession(t *testing.T) {` | owns the sweep table |
 | `revoke/conditional-teardown` | `src/authserver/internal/handlers/handler_token.go` | `revokeOnAuthCodeReuse` | `if code.SessionIdentifier != "" && len(revokedJtis) > 0 {` | teardown is conditional, load-bearing for #77 |
 | `revoke/audit-reuse` | `src/authserver/internal/handlers/handler_token.go` | `revokeAndAuditAuthCodeReuse` | `"revokedRefreshTokenJtis": revokedJtis,` | the audit shape the issue asks us to copy |
@@ -1996,15 +2007,21 @@ begin-transaction failure test and the concurrent-double-spend test are all gree
 teardown and its comment (`revoke/conditional-teardown`) are untouched.
 
 ### Stage 5: the four call sites, the audit event, and end-to-end tests
-Status: **Not started**
+Status: **Done**
 
 Tests: **unit tests on the host, plus integration tests in the dev container.** This is the only
 stage whose integration tests show the advertised behaviour actually happening.
 
 1. `AuditRevokedUserAuthState` in `src/core/constants/constants.go`, added to both the constant block
-   and `AuditEventTypes` (`constants/audit-list`). Status: **Not started**
+   and `AuditEventTypes` (`constants/audit-list`). Status: **Done**
+   `constants/revoke-event`. Three existing guards in `constants_test.go` also had to be updated,
+   which the plan did not anticipate: the manually maintained `allAuditConstants` list, the
+   `expectedCount` drift guard (92 to 93), and the critical-events list, which this event belongs in
+   because a forced logout leaving no trace is the failure it guards against.
 2. Wire the four sites, each opening a transaction and using stage 1b's narrow writes.
-   Status: **Not started**
+   Status: **Done**
+   `reset/password-write`, `account-pwd/write`, `admin-enabled/write`, `admin-pwd/write`, plus
+   `revoke/tx-wrapper`, `revoke/audit-emitter` and `revoke/reasons`.
    `reset/password-write`, `account-pwd/write` (passing the caller's `sid` as `exceptSid`),
    `admin-pwd/write`, and `admin-enabled/write` where **both** directions go through
    `TrySetUserEnabled` and revocation runs only when the disable direction reports a transition, so
@@ -2012,7 +2029,8 @@ stage whose integration tests show the advertised behaviour actually happening.
    no new revocation event, and the endpoint's existing `AuditUpdatedUserDetails`
    (`admin-enabled/audit`) fires unchanged in both directions. The new event fires after commit, on
    success only.
-3. Unit tests for the handlers. Status: **Not started**
+3. Unit tests for the handlers. Status: **Done**
+   `test/disable-conditionality`, `test/audit-payload`, `test/tx-failure-matrix`.
    `handler_reset_password_test.go` exists and gains cases; `handler_api_account_password_test.go`
    and `handler_api_users_crud_test.go` **do not exist and must be created**, which is a finding from
    the test-landscape sweep rather than an oversight. Thin at this layer, one case per site asserting
@@ -2025,11 +2043,17 @@ stage whose integration tests show the advertised behaviour actually happening.
    credential write succeeds, `RevokeUserAuthState` then fails (once during discovery, once during
    revocation), and the test asserts the transaction is rolled back, not committed, a 500 is returned,
    and **the new revocation event is not emitted**. A second case makes the commit itself fail and
-   asserts the same about the audit. `test/token-reuse-500` is the precedent for this shape.
+   asserts the same about the audit. Narrowed by finding 36: the commit-failure case asserts the
+   handler's response and the absence of an audit event, and deliberately does **not** claim the
+   write was undone, which no mock can establish and `database/sql` does not guarantee. `test/token-reuse-500` is the precedent for this shape.
    One case asserts the **audit payload** field by field: `reason`, `oldGeneration`, `newGeneration`,
    `terminatedSessionIdentifiers`, `revokedRefreshTokenJtis` and `preservedSessionIdentifier`,
    including that the last is `""` rather than absent on the three sites that preserve nothing.
-4. Integration tests in `src/authserver/tests/integration/`. Status: **Not started**
+4. Integration tests in `src/authserver/tests/integration/`. Status: **Done**
+   `test/integration-generation-roundtrip`, `test/integration-residual`,
+   `test/integration-second-device`, `test/integration-ropc-child`. **Ten** cases, all four engines:
+   the nine planned, plus `TestCredentialChange_AnotherUserIsUnaffected`, which finding 35 separated
+   out of the preservation case.
    Following `session_bearer_revocation_test.go` (`test/integration-bearer-revocation`) for shape and
    `setUserPassword` (`test/integration-set-password-helper`) for fixtures. Thin by design, one case
    per property, because enumerating shapes here is what stages 1 to 4 are for:
@@ -2060,6 +2084,92 @@ stage whose integration tests show the advertised behaviour actually happening.
    from a black-box test is not practical here, and the generation boundary is what makes the race
    safe by construction rather than by timing. The provenance rows in stage 2 step 7 are the closest
    proxy, since they assert a racing grant emits its own generation rather than the user's.
+   Narrowed during implementation: the race's **outcome** is now pinned by
+   `test/integration-residual`, which reconstructs the racing child's exact row state, unrevoked and
+   one generation behind, and asserts the refresh is refused. What stays uncovered is the
+   interleaving itself, which #131 owns.
+
+**As built.** Eight things differ from the wording above.
+
+1. **Two shared helpers rather than four open-coded transaction blocks.** `revoke/tx-wrapper` takes
+   the narrow write as a callback and owns begin, write, sweep, commit and the deferred rollback;
+   `revoke/audit-emitter` owns the payload. The plan said "each opens a transaction", which four
+   copies of the same 25 lines would satisfy literally. Centralising it was worth it because the
+   rollback discipline is precisely what the review asked to be sure of, and one implementation is
+   one thing to get right and one thing to test. On error the wrapper returns the **zero**
+   `RevocationResult`, so a caller that mistakenly audits on the error path cannot emit
+   half-truthful lists.
+2. **`admin-enabled/write` opens its transaction inline instead.** It is the one site whose sweep is
+   conditional on its own write, and the wrapper's contract is "write then always sweep". Threading
+   a skip through it would have put a behaviour switch into a primitive three other sites share,
+   which is what decision 8 rejected. A first attempt used a sentinel error to abandon the
+   transaction from inside the callback; it worked and read badly, so the site now has a small local
+   closure with its own tightly scoped deferred rollback.
+3. **The enabling direction also goes through `TrySetUserEnabled`**, outside a transaction since
+   there is no sweep to be atomic with. Finding 21 required the narrow write in both directions; the
+   transaction is only needed where the sweep is.
+4. **`constants_test.go` needed three updates**, recorded under step 1. Worth noting the count guard
+   fired exactly as designed.
+5. **A pre-existing integration fixture had to change, and it was the change working.**
+   `setUserPasswordForOTP` set its user's password through the **admin API**, which stage 5 turned
+   into a credential change, so it revoked the session behind the access token those same tests then
+   used: all eight `TestAPIAccountOTPPut_*` cases failed with "Session has been terminated". The
+   fixture now writes the hash directly, since the subject of those tests is the OTP endpoint and
+   the password is setup that must not have side effects of its own. The helper carries a comment
+   saying not to restore the admin API call, because doing so looks like a simplification and
+   silently reintroduces eight failures. **This is the clearest evidence in the whole change that
+   the mechanism works on a path nobody wrote a test for.**
+6. **One planned integration assertion was wrong and is now scoped honestly.** A test was written
+   claiming to prove that rotation's full-row write cannot regress a promoted generation. Removing
+   the `dont-update` tag left it **passing**, because rotation loads the parent AFTER the sweep
+   promoted it and therefore writes the promoted value back either way. The property is real but
+   belongs to the data tests, which do catch that sabotage and run on all four engines
+   (`TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration` and its three siblings). The test was
+   renamed to `TestCredentialChange_PreservedFamilyKeepsRotating` and now asserts what it can: that
+   a preserved family remains usable and its rotated child is usable in turn, which is the
+   user-visible consequence of decision 4. The file header records the mistake so the claim is not
+   made again.
+
+**Teeth verified by sabotage.** Unit tier, four runs: sweeping unconditionally on disable fails only
+the already-disabled row; revoking on enable fails both enable rows; emitting the audit event before
+the commit fails the commit-failure variant and every success path; dropping the deferred rollback
+fails every path that expects it.
+
+Integration tier, three runs. Skipping the promotion of preserved refresh tokens fails both
+preservation cases. Skipping the generation increment fails four cases: the two that assert the
+increment directly, the round-trip case, and the residual case. It does **not** fail the ROPC case,
+which is honest rather than a gap: a ROPC token is caught by revocation as well as by generation, so
+that case does not depend on the increment. And removing `dont-update` fails no integration test at
+all, which is what exposed item 6 above.
+
+7. **Round 6 corrected two integration tests that proved less than they claimed** (findings 34 and
+   35) and **narrowed the commit-failure contract** (finding 36). Both test defects were of the same
+   kind, a case that passes for a reason other than the one it names, and both are recorded in full
+   in section 6 rather than summarised here. The second turned up a product behaviour worth knowing
+   about outside this issue: `StartNewUserSession` deletes same-user sessions sharing device and IP,
+   so two sessions for one user cannot be created from one test process without varying the
+   `User-Agent`.
+8. **A tenth integration case was added**, `TestCredentialChange_AnotherUserIsUnaffected`, holding
+   the cross-user isolation assertion that finding 35 separated out from the preservation case.
+
+**Test tiers that actually ran, in the order they ran.** The chronology matters, because the last
+thing to run was not the widest thing to run.
+
+1. **Before round 6**, the full unfiltered suite via `./run-tests.sh`: build, internal, core,
+   adminconsole, data on all four engines, integration on all four engines. Zero failures in every
+   phase. That run is what caught the eight `TestAPIAccountOTPPut_*` fixture failures described in
+   item 5 above.
+2. **After round 6's corrections** to two integration tests and the commit-failure wording, the
+   affected integration cases re-ran on **all four engines** under the filter
+   `TestCredentialChange_|TestAPIAccountOTP|TestROPC_|TestUserBoundToken_`: 39 passes per engine,
+   zero failures, including all ten `TestCredentialChange_*` cases on each. Unit tests re-ran in
+   full on the host.
+
+So the current revision has full four-engine coverage of everything it touched, and **not** a fresh
+unfiltered run of the whole suite. The review agreed the filtered scope was sufficient, since the
+round 6 changes were confined to two test functions plus one new test-local helper and did not touch
+shared fixtures. Anyone doubting that should re-run `./run-tests.sh` with no filter rather than infer
+it from this note.
 
 ### Stage 6: documentation
 Status: **Not started**
@@ -2504,3 +2614,82 @@ consequence for the safety section).
     Also corrected in the wording throughout: "millisecond window" became "narrow concurrency
     window", and the recovery is described as **requiring re-authentication** rather than
     self-healing, since rotation already revoked the parent and the client cannot retry with it.
+
+34. **The ROPC reset integration test passed by reusing an already-spent token.** Round 6, raised
+    against stage 5's implementation. Status: **Resolved**
+
+    Valid, and the same vacuity class as the stage 2 offline-refresh test caught by finding 14's
+    round. The test rotated the ROPC family to establish that refreshing worked, then presented the
+    **rotated parent** after the reset. Rotation had already revoked that parent, so `invalid_grant`
+    was guaranteed regardless of what the reset did. Confirmed the mechanism: `refreshROPCToken`
+    (`user_bound_token_test.go`) returns only the access token and discards the child.
+
+    Resolved by doing the rotation inline so the child is captured, asserting the child's row is
+    **unrevoked** before the reset, and presenting the child afterwards.
+
+    Verified by the reviewer's own criterion, which is the only sabotage that settles it: with the
+    reset's `RevokeUserAuthStateTx` call replaced by a bare password write, the test now **fails**,
+    where the old version would have passed. Two narrower sabotages do not settle it and are worth
+    recording so nobody reads them as sufficient: removing only the revocation, or only the
+    increment, each leaves the test passing, because a ROPC token is caught by either mechanism
+    independently. That is a property of the assertion being disjunctive, not a gap.
+
+35. **"Another device for the same user" was actually another user.** Round 6. Status: **Resolved**
+
+    Valid. The test called `createUserAccessTokenWithScope`, which creates a fresh user, so it
+    proved only that an unrelated user is unaffected: a far weaker property that would hold even if
+    the sweep were scoped to a single session. My own comment in the test admitted it was a
+    different user, which is worse than the bug: the code said what it was doing and the test's name
+    and purpose said otherwise.
+
+    Resolved with `secondSessionFor`, which logs the SAME user in through a separate cookie jar, and
+    asserts the two `sid` values differ so an accidental SSO onto the one session cannot pass. The
+    test now asserts both halves: the caller's session and its offline family survive, and the same
+    user's other session is deleted and its bearer rejected with "Session has been terminated". The
+    cross-user assertion was kept as its own case, `TestCredentialChange_AnotherUserIsUnaffected`,
+    since the sweep being per user is worth pinning somewhere.
+
+    **A product behaviour was discovered doing this, and it is why the fix is not a two-line change.**
+    `StartNewUserSession` deletes other sessions of the same user that share device name, type, OS
+    **and IP address**. Two logins from one test process share all four, so the second login
+    silently deleted the first and the test would have been asserting against a session that no
+    longer existed. The second client therefore sets a distinct `User-Agent` through a transport
+    wrapper, which changes the recorded device and makes it a genuinely different device. The
+    requirement is stated in the helper's comment, because a later reader removing the odd-looking
+    `User-Agent` would reintroduce a test that passes for the wrong reason.
+
+    Teeth verified both ways, with distinct failure messages: preserving every session instead of
+    only the excepted one fails the termination half, and ignoring `exceptSid` fails the
+    preservation half.
+
+36. **The commit-failure rollback guarantee was overstated.** Round 6. Status: **Resolved**
+
+    Valid. `RevokeUserAuthStateTx`'s doc comment said "any failure rolls back, via the deferred
+    rollback, including a failure of the commit itself". `database/sql` provides no such guarantee:
+    once Commit has been attempted the transaction is finished, and a returned error can represent
+    an outcome unknown to the client, including a connection lost after the server committed
+    successfully. A subsequent Rollback cannot undo that. The mock-based test made the stronger
+    claim look testable by modelling Commit failing and Rollback succeeding.
+
+    The code pattern is conventional and unchanged, per the review. What changed is the contract,
+    now stated in three parts wherever it appears:
+
+    - failures **before** the commit are rolled back atomically;
+    - a reported commit failure returns 500 and emits **no** success audit event;
+    - the durable outcome of that commit is **indeterminate** and may in fact have applied.
+
+    So a 500 from these endpoints must not be read as "nothing happened". The consequence is
+    bounded and asymmetric in the safe direction: the user may end up revoked with no audit record
+    of it, which is fail-closed on the security side and a gap on the forensic side. Recorded as an
+    accepted limitation rather than fixed, because closing it needs a transactional outbox or a
+    distinct "commit outcome unknown" event. Neither is in scope for #106, and neither is warranted
+    by the failure mode: audit completeness during an ambiguous commit is not a stated requirement
+    of this issue.
+
+    Corrected in four places: the helper's doc comment, the commit-failure test case (which now
+    says what it asserts and what it cannot), stage 5 step 3 in this plan, and the **name** of the
+    test function. It was `..._RevocationFailureRollsBack`, which promised rollback for all three
+    variants and so contradicted this finding from inside the file it applies to; it is now
+    `..._TransactionFailureHandling`. Its closing assertion was reworded too: it says the success
+    template is not rendered, so the caller is not told the operation succeeded, and no longer
+    claims the password "did not" change, which on an ambiguous commit may be false.
