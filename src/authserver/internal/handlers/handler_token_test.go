@@ -1423,3 +1423,44 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 	// initial ROPC tokens from (#106 decision 13).
 	assert.EqualValues(t, 7, captured.User.AuthStateGeneration)
 }
+
+// TestHandleTokenPost_SupersededRefreshTokenIsSurfaced is the handler-layer smoke case for
+// the generation boundary (#106 stage 3). Deliberately thin: the comparison logic is owned
+// exhaustively by TestValidateTokenRequest_AuthStateGeneration in the validator package, and
+// the validator is a mock here, so this can only show that the handler passes the rejection
+// through to the client rather than swallowing it or turning it into a 500.
+//
+// It also pins that neither audit branch fires. The generation rejection is invalid_grant,
+// which is not ErrUserDisabled and not invalid_scope, so a superseded refresh token must not
+// be recorded as either. Stage 5 adds the event that does cover this.
+func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	userSessionManager := mocks_users.NewUserSessionManager(t)
+	database := mocks_data.NewDatabase(t)
+	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+	tokenValidator := mocks_validators.NewTokenValidator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+
+	formData := "grant_type=refresh_token&refresh_token=superseded&client_id=test_client"
+	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	// The exact error the validator's two refresh branches return on a generation mismatch.
+	supersededErr := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		"The refresh token is invalid because it was superseded.", http.StatusBadRequest)
+
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+		Return(nil, supersededErr)
+
+	httpHelper.On("JsonError", rr, req, supersededErr).Return().Once()
+
+	handler.ServeHTTP(rr, req)
+
+	httpHelper.AssertExpectations(t)
+	tokenValidator.AssertExpectations(t)
+	httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+}

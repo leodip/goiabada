@@ -73,6 +73,13 @@ type ValidateTokenRequestResult struct {
 	User *models.User
 }
 
+// invalidGenerationMessage is returned when a refresh token's authentication generation
+// no longer matches its user's. Deliberately identical in shape to the other invalid_grant
+// refusals: a client cannot act on the distinction, and spelling out that a credential
+// change superseded the grant would tell an attacker holding a stolen token exactly what
+// happened (#106).
+const invalidGenerationMessage = "The refresh token is invalid because it was superseded."
+
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
 
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
@@ -172,6 +179,19 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if !wasReused {
 			if !codeEntity.User.Enabled {
 				return nil, customerrors.ErrUserDisabled
+			}
+
+			// The generation boundary (#106). A code carries the generation its ceremony
+			// authenticated under, so a code issued before a credential change no longer
+			// matches and cannot be redeemed. That covers both an outstanding code and a
+			// ceremony that straddled the change, neither of which the revocation sweep can
+			// reach: the sweep can only act on rows that exist when it runs.
+			//
+			// Inside the !wasReused guard for the same reason as the checks around it: on
+			// reuse the revocation signal must not be masked by a different rejection.
+			if codeEntity.AuthStateGeneration != codeEntity.User.AuthStateGeneration {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					"Code is invalid.", http.StatusBadRequest)
 			}
 
 			const authCodeExpirationInSeconds = 60
@@ -426,6 +446,12 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 					"The user account is disabled.",
 					http.StatusBadRequest)
 			}
+
+			// Read from the TOKEN row, not from any joined record (#106 decision 11(a)).
+			if refreshToken.AuthStateGeneration != refreshToken.User.AuthStateGeneration {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					invalidGenerationMessage, http.StatusBadRequest)
+			}
 		} else {
 			// Auth code flow refresh token - load Code and User from Code
 			err = val.database.RefreshTokenLoadCode(nil, refreshToken)
@@ -446,6 +472,16 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"The user account is disabled.",
 					http.StatusBadRequest)
+			}
+
+			// refreshToken.AuthStateGeneration, NOT refreshToken.Code.AuthStateGeneration.
+			// The two legitimately differ: a self-service password change promotes the
+			// preserved session's tokens to the new generation while their codes stay on the
+			// old one, so reading the code here would reject exactly the tokens decision 4
+			// exists to keep working (#106 decision 11(a)).
+			if refreshToken.AuthStateGeneration != refreshToken.Code.User.AuthStateGeneration {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					invalidGenerationMessage, http.StatusBadRequest)
 			}
 		}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -891,6 +892,8 @@ func TestRequireValidSession(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
 		now := time.Now().UTC()
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-abc").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-abc",
@@ -900,8 +903,9 @@ func TestRequireValidSession(t *testing.T) {
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"sid": "sid-abc",
-				"sub": "user-1",
+				"sid":       "sid-abc",
+				"auth_time": float64(1),
+				"sub":       "user-1",
 			},
 		}
 
@@ -925,12 +929,16 @@ func TestRequireValidSession(t *testing.T) {
 	t.Run("returns 401 invalid_token when session has been deleted", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-deleted").
 			Return(nil, nil)
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"sid": "sid-deleted",
+				"sid":       "sid-deleted",
+				"auth_time": float64(1),
+				"sub":       "user-1",
 			},
 		}
 
@@ -957,6 +965,8 @@ func TestRequireValidSession(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
 		now := time.Now().UTC()
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-expired").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-expired",
@@ -966,7 +976,9 @@ func TestRequireValidSession(t *testing.T) {
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"sid": "sid-expired",
+				"sid":       "sid-expired",
+				"auth_time": float64(1),
+				"sub":       "user-1",
 			},
 		}
 
@@ -996,6 +1008,8 @@ func TestRequireValidSession(t *testing.T) {
 		// JWT past us, so we fail closed with a 500.
 		mockDB := mocks_data.NewDatabase(t)
 
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-no-settings").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-no-settings",
@@ -1005,7 +1019,9 @@ func TestRequireValidSession(t *testing.T) {
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"sid": "sid-no-settings",
+				"sid":       "sid-no-settings",
+				"auth_time": float64(1),
+				"sub":       "user-1",
 			},
 		}
 
@@ -1030,6 +1046,8 @@ func TestRequireValidSession(t *testing.T) {
 	t.Run("returns 500 when settings is wrong type in context", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-bad-settings").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-bad-settings",
@@ -1039,7 +1057,9 @@ func TestRequireValidSession(t *testing.T) {
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"sid": "sid-bad-settings",
+				"sid":       "sid-bad-settings",
+				"auth_time": float64(1),
+				"sub":       "user-1",
 			},
 		}
 
@@ -1064,12 +1084,16 @@ func TestRequireValidSession(t *testing.T) {
 	t.Run("returns 500 when database lookup fails", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-boom").
 			Return(nil, errors.New("connection refused"))
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"sid": "sid-boom",
+				"sid":       "sid-boom",
+				"auth_time": float64(1),
+				"sub":       "user-1",
 			},
 		}
 
@@ -1094,12 +1118,16 @@ func TestRequireValidSession(t *testing.T) {
 	t.Run("body matches WWW-Authenticate description on rejection", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-x").
 			Return(nil, nil)
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"sid": "sid-x",
+				"sid":       "sid-x",
+				"auth_time": float64(1),
+				"sub":       "user-1",
 			},
 		}
 
@@ -1124,6 +1152,342 @@ func TestRequireValidSession(t *testing.T) {
 // (set unconditionally by generateAccessTokenCore) and the client_credentials claim set
 // never does. That asymmetry is asserted end to end by the integration tests; these cases
 // assert the guard's own contract.
+// TestRequireValidSession_Table is the exhaustive owner of the middleware decision table
+// for #106. The hand-written subtests above cover the pre-existing session behaviour; this
+// covers the full matrix once the Enabled and generation checks are in play.
+//
+// Every negative row varies exactly ONE field from a passing row, so none of them can pass
+// with its gate removed. The gate each row is meant to hit is named in its label.
+//
+// Two rows will look wrong to a reader and must not be "cleaned up":
+//
+//   - "session-bound, stale token generation claim is IGNORED" pins the asymmetry of
+//     decision 11(c). A sid-bearing token defers to its SESSION's generation, because a
+//     self-service password change promotes the preserved session forward while the access
+//     tokens already issued from it still carry the old value. Also checking the claim would
+//     sign that caller out, which decision 4 exists to prevent.
+//   - "sid-less, absent claim passes while the user is at 0" is what keeps access tokens
+//     issued before this feature shipped working. Deleting it would let a change silently
+//     invalidate every legacy token at deploy time.
+func TestRequireValidSession_Table(t *testing.T) {
+	const sid = "sid-table"
+
+	type sessionSpec struct {
+		missing    bool
+		lookupErrs bool
+		generation int64
+		expired    bool
+	}
+
+	tests := []struct {
+		label      string
+		noBearer   bool
+		wrongType  bool
+		claims     map[string]interface{}
+		noSettings bool
+		userErrs   bool
+		userNil    bool
+		userState  *models.User
+		session    *sessionSpec
+		wantStatus int
+		wantNext   bool
+	}{
+		// Pass-through gates: nothing to enforce, so no database call at all.
+		{label: "no bearer token in context", noBearer: true, wantStatus: http.StatusOK, wantNext: true},
+		{label: "bearer value is not a JwtToken", wrongType: true, wantStatus: http.StatusOK, wantNext: true},
+		{
+			label:      "no auth_time: the client_credentials gate",
+			claims:     map[string]interface{}{"sub": "some-client"},
+			wantStatus: http.StatusOK, wantNext: true,
+		},
+
+		// Subject gate.
+		{
+			label:      "empty sub",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": ""},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label:      "whitespace-only sub",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "   "},
+			wantStatus: http.StatusUnauthorized,
+		},
+
+		// User gate, fail-closed.
+		{
+			label:      "user lookup errors",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u"},
+			userErrs:   true,
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			label:      "subject does not resolve to a user",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u"},
+			userNil:    true,
+			wantStatus: http.StatusUnauthorized,
+		},
+		// The sibling-branch audit: a disabled user must be rejected on BOTH branches, not
+		// only the one that happened to be written first.
+		{
+			label:      "disabled user, sid-less branch",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u"},
+			userState:  &models.User{Id: 1, Enabled: false},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label:      "disabled user, session-bound branch",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			userState:  &models.User{Id: 1, Enabled: false},
+			wantStatus: http.StatusUnauthorized,
+		},
+
+		// Session-bound branch.
+		{
+			label:      "session-bound, everything current",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			session:    &sessionSpec{},
+			wantStatus: http.StatusOK, wantNext: true,
+		},
+		{
+			label:      "session terminated",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			session:    &sessionSpec{missing: true},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label:      "session lookup errors",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			session:    &sessionSpec{lookupErrs: true},
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			label:      "settings missing from context",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			session:    &sessionSpec{},
+			noSettings: true,
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			label:      "session expired past its idle timeout",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			session:    &sessionSpec{expired: true},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label:      "session generation behind the user's",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			session:    &sessionSpec{generation: 0},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label:      "session promoted to match the user",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			session:    &sessionSpec{generation: 1},
+			wantStatus: http.StatusOK, wantNext: true,
+		},
+		{
+			// KEEP. Reverses the intuitive reading: see the note above the function.
+			label: "session-bound, stale token generation claim is IGNORED",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid,
+				"auth_state_generation": float64(0)},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			session:    &sessionSpec{generation: 1},
+			wantStatus: http.StatusOK, wantNext: true,
+		},
+		{
+			label: "session-bound, malformed token generation claim is IGNORED",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid,
+				"auth_state_generation": "not-a-number"},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			session:    &sessionSpec{generation: 1},
+			wantStatus: http.StatusOK, wantNext: true,
+		},
+
+		// Sid-less branch: offline grants and ROPC, where the token's own claim decides.
+		{
+			label: "sid-less, claim matches",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": float64(3)},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 3},
+			wantStatus: http.StatusOK, wantNext: true,
+		},
+		{
+			label: "sid-less, claim behind",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": float64(2)},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 3},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label: "sid-less, claim ahead",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": float64(4)},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 3},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			// KEEP. The legacy-token row: see the note above the function.
+			label:      "sid-less, absent claim passes while the user is at 0",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u"},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			wantStatus: http.StatusOK, wantNext: true,
+		},
+		{
+			label:      "sid-less, absent claim rejected once the user has advanced",
+			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u"},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label: "sid-less, explicit float64 zero while the user is at 0",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": float64(0)},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			wantStatus: http.StatusOK, wantNext: true,
+		},
+
+		// Malformed claim shapes, each rejected. A malformed claim must never be read as 0,
+		// or a forged-looking token would inherit the legacy-token exemption.
+		{
+			label: "sid-less, malformed claim: string",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": "0"},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label: "sid-less, malformed claim: bool",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": true},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label: "sid-less, malformed claim: nil",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": nil},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label: "sid-less, malformed claim: non-integral",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": float64(1.5)},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label: "sid-less, malformed claim: negative",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": float64(-1)},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			label: "sid-less, malformed claim: beyond exact float64 integer range",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": float64(1<<53) + 2},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			// KEEP, and do not "tidy" the -1 away as an impossible value. This row exists
+			// because an earlier version of tokenGeneration returned -1 in band to mean
+			// malformed, then compared it with the persisted generation like any other
+			// value. auth_state_generation is a signed BIGINT/INTEGER on all four engines
+			// with no nonnegative constraint, so a user row CAN hold -1, and such a user
+			// accepted every malformed claim. The helper now reports validity separately
+			// and callers reject on !ok before comparing, which is what this row pins.
+			// It is the only row where malformed input meets a stored value that a
+			// sentinel could collide with.
+			label: "sid-less, malformed claim cannot collide with a persisted -1",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
+				"auth_state_generation": "-1"},
+			userState:  &models.User{Id: 1, Enabled: true, AuthStateGeneration: -1},
+			wantStatus: http.StatusUnauthorized,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.label, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			now := time.Now().UTC()
+
+			if !tc.noBearer && !tc.wrongType && tc.claims["auth_time"] != nil &&
+				strings.TrimSpace(fmt.Sprint(tc.claims["sub"])) != "" {
+				switch {
+				case tc.userErrs:
+					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+						Return(nil, assert.AnError)
+				case tc.userNil:
+					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).Return(nil, nil)
+				default:
+					user := tc.userState
+					if user == nil {
+						user = &models.User{Id: 1, Enabled: true}
+					}
+					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).Return(user, nil)
+				}
+			}
+
+			if tc.session != nil {
+				switch {
+				case tc.session.lookupErrs:
+					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+						Return(nil, assert.AnError)
+				case tc.session.missing:
+					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+						Return(nil, nil)
+				default:
+					lastAccessed := now.Add(-5 * time.Minute)
+					if tc.session.expired {
+						// Past the 3600s idle timeout the harness puts in context.
+						lastAccessed = now.Add(-2 * time.Hour)
+					}
+					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+						Return(&models.UserSession{
+							Id:                  9,
+							SessionIdentifier:   sid,
+							Started:             now.Add(-1 * time.Hour),
+							LastAccessed:        lastAccessed,
+							AuthStateGeneration: tc.session.generation,
+						}, nil)
+				}
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			switch {
+			case tc.noBearer:
+				// nothing in context
+			case tc.wrongType:
+				req = req.WithContext(context.WithValue(req.Context(),
+					constants.ContextKeyBearerToken, "not-a-jwt"))
+			default:
+				req = req.WithContext(context.WithValue(req.Context(),
+					constants.ContextKeyBearerToken, oauth.JwtToken{Claims: tc.claims}))
+			}
+			if !tc.noSettings {
+				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+					&models.Settings{
+						UserSessionIdleTimeoutInSeconds: 3600,
+						UserSessionMaxLifetimeInSeconds: 86400,
+					}))
+			}
+
+			rr := httptest.NewRecorder()
+			nextCalled := false
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { nextCalled = true })
+
+			RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+			assert.Equal(t, tc.wantStatus, rr.Code, "status")
+			assert.Equal(t, tc.wantNext, nextCalled, "next handler called")
+		})
+	}
+}
+
 func TestRequireUserBoundToken(t *testing.T) {
 	// Assert the ErrorCode and not merely the status, since all three failure modes here
 	// would otherwise be indistinguishable to a caller.

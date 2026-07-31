@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -169,18 +170,41 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 	}
 }
 
-// RequireValidSession rejects bearer tokens whose `sid` claim no longer
-// resolves to an active, non-expired UserSession. This closes the gap left
-// open by stateless JWT access tokens: when an authorization code is replayed
-// (RFC 6749 §4.1.2) we delete the underlying UserSession, but the JWT itself
-// remains cryptographically valid until expiry. This middleware checks the
-// session each request, so a deleted session immediately invalidates every
-// linked access token.
+// RequireValidSession rejects bearer tokens that no longer represent live, current
+// authentication state.
 //
-// Tokens without a `sid` claim (client_credentials, ROPC) pass through
-// unchanged. The middleware also passes through if the request has no bearer
-// token at all: enforcement of "must be authenticated" belongs to a scope
-// middleware that runs alongside this one.
+// Three things are checked, and which of them apply depends on the token:
+//
+//  1. The account is still enabled. Verified that NO handler under /api/v1/account/*
+//     checks this for itself, so without it a disabled user keeps working access for the
+//     remainder of their access token's lifetime (#106 decision 6).
+//  2. For a token carrying a `sid`, the session still exists and is within its idle and
+//     max-lifetime bounds. This is what makes deleting a session take effect immediately
+//     despite the JWT remaining cryptographically valid.
+//  3. The authentication generation still matches. This is the boundary that survives a
+//     credential change: a token authenticated under generation N stops working once the
+//     user advances to N+1 (#106 decision 11).
+//
+// The generation check is deliberately ASYMMETRIC, and it looks wrong until you know why:
+//
+//   - With a `sid`, the SESSION's generation decides and the token's own claim is IGNORED.
+//     That is what lets a self-service password change preserve the caller's own session:
+//     the session is promoted forward while the access tokens already issued from it still
+//     carry the old value. Checking the claim too would sign that caller out, which is the
+//     thing decision 4 exists to avoid.
+//   - Without one (offline grants and ROPC), the token's own claim decides, since there is
+//     no session to defer to.
+//
+// A token with no generation claim at all reads as generation 0, which is what keeps access
+// tokens issued before this feature shipped working until their user's generation first
+// advances (#106 decision 15). Presence is tested against the raw claim map rather than
+// through GetIntClaim, because that accessor cannot distinguish absent from malformed and
+// conflating the two would reject every legacy token.
+//
+// Tokens with no `auth_time` claim pass through untouched: that is the client_credentials
+// discriminator, and such a token has no user to check anything about. The middleware also
+// passes through when the request has no bearer token at all, since enforcing "must be
+// authenticated" belongs to a scope middleware running alongside this one.
 //
 // Reads constants.ContextKeyBearerToken (set by JwtAuthorizationHeaderToContext),
 // not ContextKeyValidatedToken, so it works regardless of whether a scope
@@ -200,9 +224,51 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 				return
 			}
 
+			// auth_time, not sid, is the "this is a user token" discriminator. sid is
+			// conditional: ROPC and offline grants have none, so requiring it would let
+			// exactly those tokens past every check below.
+			if _, hasAuthTime := jwtToken.Claims["auth_time"]; !hasAuthTime {
+				// client_credentials: no user, nothing to enforce.
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			sub := strings.TrimSpace(jwtToken.GetStringClaim("sub"))
+			if sub == "" {
+				slog.Warn("rejecting bearer token: user token has no sub claim")
+				rejectInvalidToken(w, "Invalid token subject")
+				return
+			}
+
+			user, err := database.GetUserBySubject(nil, sub)
+			if err != nil {
+				slog.Error("failed to look up user for bearer token validation", "err", err)
+				emitAuthError(w, "INTERNAL_ERROR", "Internal server error.", http.StatusInternalServerError, false)
+				return
+			}
+			if user == nil {
+				slog.Warn("rejecting bearer token: subject does not resolve to a user")
+				rejectInvalidToken(w, "Session has been terminated")
+				return
+			}
+			if !user.Enabled {
+				slog.Warn("rejecting bearer token: user account is disabled", "userId", user.Id)
+				rejectInvalidToken(w, "Session has been terminated")
+				return
+			}
+
 			sid := jwtToken.GetStringClaim("sid")
 			if sid == "" {
-				// Non-session-bound token (client_credentials, ROPC): no session to check.
+				// Offline grant or ROPC: no session to defer to, so the token's own
+				// generation claim decides. A malformed claim is rejected on !ok, before
+				// the comparison, so it can never collide with a stored generation.
+				generation, ok := tokenGeneration(jwtToken)
+				if !ok || generation != user.AuthStateGeneration {
+					slog.Warn("rejecting bearer token: superseded authentication generation",
+						"userId", user.Id)
+					rejectInvalidToken(w, "Session has been terminated")
+					return
+				}
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -240,9 +306,39 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 				return
 			}
 
+			// The SESSION's generation, not the token's. See the asymmetry note above: the
+			// token's own claim is deliberately not consulted on this branch.
+			if session.AuthStateGeneration != user.AuthStateGeneration {
+				slog.Warn("rejecting bearer token: session is on a superseded authentication generation",
+					"sid", sid, "sessionId", session.Id, "userId", user.Id)
+				rejectInvalidToken(w, "Session has been terminated")
+				return
+			}
+
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// tokenGeneration reads a token's authentication generation, reporting validity as a second
+// return value rather than in band.
+//
+// An ABSENT claim is generation 0, and valid. That is what keeps access tokens issued before
+// this feature shipped working until their user's generation first advances (#106 decision
+// 15). Presence is tested against the raw claim map because GetIntClaim reports only whether
+// a PRESENT claim parsed, so it returns (0, false) for both absent and malformed; conflating
+// them would reject every legacy token.
+//
+// A malformed claim is (0, false), and callers must reject on !ok BEFORE comparing. Do not
+// reintroduce an in-band sentinel such as -1: `auth_state_generation` is a signed
+// BIGINT/INTEGER on all four engines with no nonnegative constraint, so any sentinel value a
+// caller might compare against is also a value a user row can legitimately hold, and a user
+// sitting on it would accept every malformed claim.
+func tokenGeneration(jwtToken oauth.JwtToken) (int64, bool) {
+	if _, present := jwtToken.Claims["auth_state_generation"]; !present {
+		return 0, true
+	}
+	return jwtToken.GetIntClaim("auth_state_generation")
 }
 
 // rejectInvalidToken sends an RFC 6750 §3 compliant 401 Unauthorized for the

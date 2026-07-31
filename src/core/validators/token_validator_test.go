@@ -4856,3 +4856,232 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateTokenRequest_AuthStateGeneration covers the three places the generation
+// boundary is enforced during validation (#106 stage 3). Each is an independent branch, and
+// each negative pairs with a matching-generation case so it varies exactly one field.
+//
+// The auth-code refresh case is the important one. It gives the refresh token and its
+// joined code DIFFERENT generations, which is the only assertion that can distinguish
+// decision 11(a) from its opposite: reading the code there would reject exactly the tokens
+// a self-service password change promoted, which is what decision 4 exists to preserve.
+func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
+	t.Run("authorization code redemption", func(t *testing.T) {
+		for _, tc := range []struct {
+			name           string
+			codeGeneration int64
+			userGeneration int64
+			wantAccepted   bool
+		}{
+			{"matching generation is redeemable", 3, 3, true},
+			// Varies only the code's generation. A code issued before a credential change
+			// cannot be redeemed after it, which is what covers an outstanding code and a
+			// ceremony that straddled the change. Neither is reachable by the revocation
+			// sweep, since the sweep only sees rows that exist when it runs.
+			{"superseded code is rejected", 3, 4, false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				mockDB := mocks_data.NewDatabase(t)
+				mockTokenParser := mocks_oauth.NewTokenParser(t)
+				mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+				client := &models.Client{
+					Id: 1, ClientIdentifier: "test_client", Enabled: true,
+					AuthorizationCodeEnabled: true, IsPublic: true,
+				}
+				code := &models.Code{
+					Id: 5, ClientId: 1, UserId: 7,
+					RedirectURI:         "https://example.com/cb",
+					Scope:               "openid",
+					CreatedAt:           sql.NullTime{Time: time.Now().UTC(), Valid: true},
+					AuthStateGeneration: tc.codeGeneration,
+					Client:              *client,
+					User:                models.User{Id: 7, Enabled: true, AuthStateGeneration: tc.userGeneration},
+				}
+
+				mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+				mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
+				// No-ops: Client and User are already populated on the fixture above, and the
+				// loaders are what the validator calls before reaching the generation check.
+				mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+				mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+
+				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+					GrantType:   "authorization_code",
+					ClientId:    "test_client",
+					Code:        "the-code",
+					RedirectURI: "https://example.com/cb",
+				})
+
+				if tc.wantAccepted {
+					assert.NoError(t, err)
+					assert.NotNil(t, result)
+					return
+				}
+				assert.Nil(t, result)
+				customErr, ok := err.(*customerrors.ErrorDetail)
+				if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+					assert.Equal(t, "invalid_grant", customErr.GetCode())
+				}
+			})
+		}
+	})
+
+	t.Run("auth code refresh reads the token row, not the joined code", func(t *testing.T) {
+		for _, tc := range []struct {
+			name            string
+			tokenGeneration int64
+			codeGeneration  int64
+			userGeneration  int64
+			wantAccepted    bool
+		}{
+			{
+				// THE ROW THAT PINS decision 11(a). The token was promoted to 4 while its
+				// code stayed at 3, which is exactly the state a self-service password
+				// change leaves the preserved session in. Reading the code would reject it.
+				name:            "promoted token whose code lags is accepted",
+				tokenGeneration: 4, codeGeneration: 3, userGeneration: 4, wantAccepted: true,
+			},
+			{
+				// Varies only the token's generation from the row above.
+				name:            "superseded token is rejected even though its code matches",
+				tokenGeneration: 3, codeGeneration: 4, userGeneration: 4, wantAccepted: false,
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				mockDB := mocks_data.NewDatabase(t)
+				mockTokenParser := mocks_oauth.NewTokenParser(t)
+				mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+					UserSessionIdleTimeoutInSeconds: 3600,
+					UserSessionMaxLifetimeInSeconds: 86400,
+				})
+
+				client := &models.Client{
+					Id: 1, ClientIdentifier: "test_client", Enabled: true,
+					AuthorizationCodeEnabled: true, IsPublic: true,
+				}
+				user := models.User{Id: 7, Enabled: true, AuthStateGeneration: tc.userGeneration}
+				refreshToken := &models.RefreshToken{
+					RefreshTokenJti:     "the-jti",
+					CodeId:              sql.NullInt64{Int64: 5, Valid: true},
+					SessionIdentifier:   "sid-1",
+					AuthStateGeneration: tc.tokenGeneration,
+					Code: models.Code{
+						Id: 5, ClientId: 1, UserId: 7, Scope: "openid",
+						SessionIdentifier:   "sid-1",
+						AuthStateGeneration: tc.codeGeneration,
+						User:                user,
+					},
+				}
+
+				mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+				mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+					Return(&oauth.JwtToken{Claims: jwt.MapClaims{
+						"jti": "the-jti", "typ": "Refresh", "sub": "user_subject",
+					}}, nil)
+				mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
+				mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
+				mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+
+				if tc.wantAccepted {
+					now := time.Now().UTC()
+					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
+						Return(&models.UserSession{
+							Id: 9, SessionIdentifier: "sid-1",
+							Started: now.Add(-10 * time.Minute), LastAccessed: now,
+						}, nil)
+					mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil)
+				}
+
+				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+					GrantType:    "refresh_token",
+					ClientId:     "test_client",
+					RefreshToken: "the-refresh-token",
+				})
+
+				if tc.wantAccepted {
+					assert.NoError(t, err)
+					assert.NotNil(t, result)
+					return
+				}
+				assert.Nil(t, result)
+				customErr, ok := err.(*customerrors.ErrorDetail)
+				if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+					assert.Equal(t, "invalid_grant", customErr.GetCode())
+				}
+			})
+		}
+	})
+
+	t.Run("ROPC refresh", func(t *testing.T) {
+		// An independent branch: isROPCToken splits on CodeId being invalid, so a single
+		// "one refresh case" would have left this uncovered entirely.
+		for _, tc := range []struct {
+			name            string
+			tokenGeneration int64
+			userGeneration  int64
+			wantAccepted    bool
+		}{
+			{"matching generation is refreshable", 3, 3, true},
+			{"superseded token is rejected", 3, 4, false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				mockDB := mocks_data.NewDatabase(t)
+				mockTokenParser := mocks_oauth.NewTokenParser(t)
+				mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+				client := &models.Client{
+					Id: 1, ClientIdentifier: "ropc_client", Enabled: true,
+					AuthorizationCodeEnabled: true, IsPublic: true,
+				}
+				user := models.User{Id: 7, Enabled: true, AuthStateGeneration: tc.userGeneration}
+				refreshToken := &models.RefreshToken{
+					RefreshTokenJti:     "ropc_jti",
+					CodeId:              sql.NullInt64{Valid: false},
+					UserId:              sql.NullInt64{Int64: 7, Valid: true},
+					ClientId:            sql.NullInt64{Int64: 1, Valid: true},
+					Scope:               "openid",
+					AuthStateGeneration: tc.tokenGeneration,
+					User:                user,
+					Client:              *client,
+				}
+
+				mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc_client").Return(client, nil)
+				mockTokenParser.On("DecodeAndValidateTokenString", "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
+					Return(&oauth.JwtToken{Claims: jwt.MapClaims{
+						"jti": "ropc_jti", "typ": "Offline", "sub": "ropc_user_subject",
+						"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
+					}}, nil)
+				mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
+				mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
+				mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+				if tc.wantAccepted {
+					mockDB.On("GetUserBySubject", mock.Anything, "ropc_user_subject").Return(&user, nil)
+				}
+
+				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+					GrantType:    "refresh_token",
+					ClientId:     "ropc_client",
+					RefreshToken: "ropc_refresh_token",
+				})
+
+				if tc.wantAccepted {
+					assert.NoError(t, err)
+					assert.NotNil(t, result)
+					return
+				}
+				assert.Nil(t, result)
+				customErr, ok := err.(*customerrors.ErrorDetail)
+				if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+					assert.Equal(t, "invalid_grant", customErr.GetCode())
+				}
+			})
+		}
+	})
+}
