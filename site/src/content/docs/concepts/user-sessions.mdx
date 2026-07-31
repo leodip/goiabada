@@ -3,6 +3,8 @@ title: User sessions
 description: Session management and single sign-on (SSO) functionality.
 ---
 
+import { Aside } from '@astrojs/starlight/components';
+
 User sessions facilitate the single sign-on (SSO) functionality of Goiabada. Once a user logs in, a new session starts. If they try to log in again and their session is still good, they don't need to go through the authentication process again.
 
 ## Session configuration
@@ -20,6 +22,38 @@ A user session is "bumped" (receives a new `last_accessed` timestamp) in two sit
 
 1. When a new authorization request completes
 2. When a refresh token associated with the session is used to request a new access token
+
+## Credential changes and live sessions
+
+When a user's credentials change, their existing sessions and refresh tokens stop being usable. This applies to:
+
+| Action | Effect |
+| ------ | ------ |
+| A user resets a forgotten password | All of that user's sessions are terminated and all of their refresh tokens are revoked |
+| A user changes their own password | Same, except the session they are doing it from, which is preserved |
+| An administrator sets a user's password | All of that user's sessions are terminated and all of their refresh tokens are revoked |
+| An administrator disables a user | Same. Re-enabling the account does not restore the old sessions |
+
+This covers every kind of grant, including offline refresh tokens whose browser session has already expired, and tokens obtained through the resource owner password credentials flow. An authorization code that was issued but not yet redeemed also stops being redeemable.
+
+Each of these writes a `revoked_user_auth_state` entry to the [audit log](/concepts/audit-log/), recording which sessions were terminated and which refresh tokens were revoked.
+
+<Aside type="note">
+A user changing their own password normally stays signed in on the client they are using. If a token refresh happens at the same moment as the change, that client may still be asked to sign in again.
+</Aside>
+
+### What this does not cover
+
+Access tokens are self-contained and are not checked against a database by the applications that consume them, so a credential change cannot reach one that has already been issued:
+
+- Goiabada's **own** endpoints, `/userinfo` and the account and admin APIs, reject a token from a superseded session on the very next request.
+- A **third-party resource server** validating an access token by signature alone has no way to know, and will keep accepting that token until it expires.
+
+This is inherent to stateless tokens rather than a limitation of the revocation itself. It is the main reason to keep access tokens short-lived: the default expiration is 5 minutes, and that value is the upper bound on how long a revoked user's access token can still be accepted elsewhere. If you have raised **Token expiration** substantially, you have widened that window.
+
+<Aside type="caution">
+If your resource servers must reject access immediately after a credential change, they need to verify the token against Goiabada on each request rather than relying on signature validation alone.
+</Aside>
 
 ## Forcing re-authentication
 

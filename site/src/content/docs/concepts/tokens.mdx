@@ -53,6 +53,22 @@ According to [OIDC Core 5.4](https://openid.net/specs/openid-connect-core-1_0.ht
 
 For more details on this feature and when to use it, see [OIDC claims in tokens](/concepts/openid-connect/#oidc-claims-in-tokens).
 
+## Claims in access tokens
+
+Two claims in access tokens are worth knowing about when you validate tokens yourself.
+
+### The `sid` claim is conditional
+
+An access token carries a `sid` (session identifier) claim only when the grant it came from is tied to a user session. Access tokens issued for an `offline_access` grant, or through the resource owner password credentials flow, carry **no** `sid`, because those grants deliberately outlive the browser session that started them.
+
+Do not treat a missing `sid` as an invalid token, and do not require it when validating. ID tokens on authorization code grants still carry `sid`, which is what [RP-initiated logout](/integration/endpoints/#authlogout-get-or-post) matches on.
+
+### The `auth_state_generation` claim is reserved
+
+Access tokens carry an `auth_state_generation` claim, an integer that Goiabada uses internally to tell whether a token was issued before the user's credentials last changed. See [credential changes and live sessions](/concepts/user-sessions/#credential-changes-and-live-sessions).
+
+Treat it as **opaque and reserved**. Do not parse it, compare it between tokens, or build logic on its value: it is an implementation detail whose meaning may change, and it is not a version number you can reason about.
+
 ## Refresh tokens
 
 Refresh tokens are used in the authorization code flow with PKCE (the client credentials flow doesn't use refresh tokens).
@@ -71,8 +87,10 @@ Normal tokens are linked to the user session. They can be used to get a new acce
 
 Offline refresh tokens are not linked to a user session. They can be used to obtain a new access token even when the user is not actively using the application.
 
-- Their expiration time is long (defaults to 30 days)
+- They are governed by two limits, both configurable on **Settings → Tokens**: an idle timeout (defaults to 30 days) and a maximum lifetime (defaults to 1 year)
 - Useful for background tasks or applications that need to access resources on behalf of users without their immediate interaction
+
+Because an offline refresh token can remain usable for a long time, and keeps working after the browser session that created it has gone, it is the grant most worth thinking about when a user's credentials change. See [credential changes and live sessions](/concepts/user-sessions/#credential-changes-and-live-sessions).
 
 ### Requesting offline tokens
 
