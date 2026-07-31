@@ -9,8 +9,10 @@
 **Related:** #127 (closed, not planned) proposed an authorization-grant refactor to precede this;
 deferred after review, so this change proceeds on the current schema. #128 (open) covers
 refresh-token replay containment. #129 (open) covers durable session termination, split out of this
-issue by finding 15. #130 (open) is the `NOT IN` cleanup bug found while designing decision 12. None
-of them blocks this issue, and this issue blocks none of them.
+issue by finding 15. #130 (open) is the `NOT IN` cleanup bug found while designing decision 12.
+#131 (open) covers durable coordination between refresh rotation and user-scoped generation changes,
+filed from decision 16 during stage 4 and cross-referencing #128 as related machinery. None of them
+blocks this issue, and this issue blocks none of them.
 
 ## 0. Code anchors
 
@@ -35,7 +37,12 @@ of them blocks this issue, and this issue blocks none of them.
 | `middleware/session-lookup` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `session, err := database.GetUserSessionBySessionIdentifier(nil, sid)` | the session is loaded here, and carries UserId |
 | `middleware/session-validity` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `if !session.IsValid(settings.UserSessionIdleTimeoutInSeconds` | idle and max-lifetime bounds, no user check |
 | `middleware/fail-closed` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `// Fail closed: without settings we cannot enforce idle/max-lifetime` | the precedent for failing closed on a lookup problem |
-| `revoke/family` | `src/authserver/internal/handlers/handler_token.go` | `revokeOnAuthCodeReuse` | `revokedJtis := make([]string, 0, len(refreshTokens))` | the template the issue points at |
+| `revoke/family` | `src/authserver/internal/handlers/revocation.go` | `revokeRefreshTokens` | `revokedJtis := make([]string, 0, len(tokens))` | the loop, extracted by stage 4; was the template the issue points at |
+| `revoke/primitive-call` | `src/authserver/internal/handlers/handler_token.go` | `revokeOnAuthCodeReuse` | `revokedJtis, err := revokeRefreshTokens(database, tx, refreshTokens)` | what the loop became, #77's body otherwise unchanged |
+| `revoke/user-scoped` | `src/authserver/internal/handlers/revocation.go` | `RevokeUserAuthState` | `func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid string) (RevocationResult, error) {` | stage 4's entry point |
+| `revoke/preserved-set` | `src/authserver/internal/handlers/revocation.go` | `RevokeUserAuthState` | `preservedTokens, err := db.GetRefreshTokensBySessionIdentifier(tx, exceptSid)` | finding 3, the sid-scoped query the preserved set requires |
+| `revoke/result-struct` | `src/authserver/internal/handlers/revocation.go` | `n/a` | `type RevocationResult struct {` | maps onto decision 7's audit payload |
+| `test/revoke-sweep` | `src/authserver/internal/handlers/revocation_test.go` | `n/a` | `func TestRevokeUserAuthState_PreservingASession(t *testing.T) {` | owns the sweep table |
 | `revoke/conditional-teardown` | `src/authserver/internal/handlers/handler_token.go` | `revokeOnAuthCodeReuse` | `if code.SessionIdentifier != "" && len(revokedJtis) > 0 {` | teardown is conditional, load-bearing for #77 |
 | `revoke/audit-reuse` | `src/authserver/internal/handlers/handler_token.go` | `revokeAndAuditAuthCodeReuse` | `"revokedRefreshTokenJtis": revokedJtis,` | the audit shape the issue asks us to copy |
 | `token/revoked-enforcement` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `if refreshToken.Revoked {` | the only place `Revoked` is read |
@@ -471,6 +478,12 @@ it.
    access-token expiry and the user is bounced anyway, which quietly defeats the exception. A test
    pins this by asserting the preserved session's refresh tokens are still unrevoked.
 
+   **The promise covers the state visible to the sweep's transaction, and not a refresh rotating
+   concurrently outside it.** Narrowed by finding 33: rotation does not join the sweep's
+   transaction, so a child token it commits outside that transaction's view keeps the previous
+   generation and is rejected on next use. Accepted as a documented residual, decision 16, tracked
+   in #131.
+
    **This is a product choice with an accepted risk, not a free one.** Corrected by finding 10; an
    earlier version of this decision claimed the exception "costs nothing", which is wrong in two
    concrete ways.
@@ -650,7 +663,9 @@ it.
    type RevocationResult struct {
        TerminatedSessionIdentifiers []string
        RevokedRefreshTokenJtis      []string
-       PreservedSessionIdentifier   string   // "" when nothing was preserved, never null
+       PreservedSessionIdentifier   string   // the exempted grant origin, "" if the sweep
+                                             // was unconditional; does NOT assert a session
+                                             // row survived (finding 32). Never null.
        OldGeneration                int64
        NewGeneration                int64
    }
@@ -1036,6 +1051,63 @@ it.
     `if _, hasAuthTime := jwtToken.Claims["auth_time"]; !hasAuthTime`. So the generic accessor stays
     unsurprising and the tri-state lives at the one call site that needs it.
 
+
+16. **The racing-refresh residual on the preserved session is accepted and tracked separately.**
+    Status: **Decided**, raised during stage 4 implementation (finding 33).
+
+    > Accept the fail-closed preserved-session race as a documented residual of #106. The helper
+    > preserves matching state visible to its transaction; a refresh rotating concurrently outside
+    > that transaction may return a child stamped with the previous generation, forcing
+    > re-authentication. This does not weaken credential invalidation. Track durable coordination
+    > between rotation and user-scoped generation changes in **#131**, cross-referenced to #128 as
+    > related machinery.
+
+    **Why not fix it here.** #106's security objective is met either way: no superseded credential
+    survives, and the failure is availability and UX for the one session this change intentionally
+    preserves. Pulling transactional refresh rotation into #106 would substantially expand an
+    already large change.
+
+    **Why #131 rather than leaving it to #128.** #128 proposes compare-and-set rotation and family
+    containment, but explicitly leaves open whether stronger persistent coordination is required,
+    and says #106 should remain independent. A compare-and-set on the parent refresh-token row does
+    not by itself order rotation against a user-scoped sweep that touches a different set of rows,
+    so #128 landing does not automatically satisfy this. Calling #128 "the durable fix" overstates
+    it; the residual needs its own acceptance criteria, which #131 carries.
+
+    **The mechanism.** Rotation loads the parent during validation, marks it revoked with
+    `UpdateRefreshToken(nil, ...)`, and the issuer stamps the child from that in-memory parent, all
+    outside any transaction, so the window spans an entire token issuance including JWT signing. A
+    child committed outside what the sweep's transaction can see is neither revoked nor promoted, so
+    it keeps generation N while the user moves to N+1.
+
+    **Cost to the user.** The refresh call succeeds, so the failure is deferred rather than visible.
+    The new refresh token is rejected on next use, and the parent is already revoked, so that grant
+    is dead and the client **requires re-authentication**; it is not self-healing, since the parent
+    cannot be retried. The access token returned alongside it differs by grant: a session-bound one
+    still works, because the middleware defers to the session's generation and the session was
+    promoted, while an **offline** one is rejected immediately, because the sid-less branch reads the
+    token's own claim. Fail-closed throughout, with no path to accepting a superseded credential.
+    Reaching the state requires a refresh landing in a narrow concurrency window during the user's
+    own password change.
+
+    **The query ordering mitigation, and its limit.** Stage 4 queries user-scoped discovery before
+    sid-scoped discovery. On an engine with per-statement read views this makes one sub-case
+    harmless: a child committed between the two queries is absent from the first, so it is never
+    swept, and present in the second, so it is promoted. The reverse order revokes the user's own
+    newly issued token.
+
+    **That mitigation is not portable**, corrected by the round 5 review. PostgreSQL and SQL Server
+    default to READ COMMITTED and behave as described. MySQL/InnoDB defaults to REPEATABLE READ,
+    where consistent reads in one transaction share the snapshot established by the first read, so
+    the child is not necessarily visible to the second query. The outcome there is the residual under
+    **either** order, since an invisible child is neither swept nor promoted; what the ordering rules
+    out on the per-statement engines is the strictly worse outcome of actively revoking the child.
+    SQLite serializes writers, which excludes much of the interleaving. So the ordering is retained
+    because it is never worse, not because it closes the case. The unit test asserts the recorded
+    call order and therefore proves ordering, **not** cross-engine visibility, which is untested here
+    and is acceptance criterion 5 of #131.
+
+
 ## 4. Proposed solution
 
 A durable per-user boundary plus a physical sweep. The boundary is the security mechanism; the sweep
@@ -1117,7 +1189,9 @@ func revokeRefreshTokens(db data.Database, tx *sql.Tx,
 type RevocationResult struct {
     TerminatedSessionIdentifiers []string
     RevokedRefreshTokenJtis      []string
-    PreservedSessionIdentifier   string   // "" when nothing was preserved, never null
+    PreservedSessionIdentifier   string   // the exempted grant origin, "" if the sweep was
+                                          // unconditional; does NOT assert a session row
+                                          // survived (finding 32). Never null.
     OldGeneration                int64
     NewGeneration                int64
 }
@@ -1217,7 +1291,11 @@ After a credential change, per credential type:
 | Access token, third-party RS | valid until expiry | valid until expiry | valid until expiry |
 
 Except, in every column, the one session preserved by decision 4 on self-service password change,
-which is promoted rather than revoked.
+which is promoted rather than revoked. With one qualification on the racing-refresh row: a
+replacement inserted by a refresh that rotates outside the sweep's transaction is **not** promoted,
+because the sweep cannot see it. It keeps the old generation and is rejected on next use, which is
+fail-closed but means the preserved session's newest token can be lost. Decision 16 accepts that as
+a residual and #131 tracks the durable fix.
 
 The third-party row is inherent to stateless JWTs and is out of scope. So is session termination,
 which #129 covers: ending a session still revokes nothing today.
@@ -1814,22 +1892,31 @@ real database agrees.
    sabotaged too, by routing the error to `InternalServerError`, and failed as intended.
 
 ### Stage 4: the revocation helper
-Status: **Not started**
+Status: **Done**
 
 Tests: **unit tests only, host.**
 
 1. Extract `revokeRefreshTokens(db, tx, tokens) ([]string, error)` and have
-   `revokeOnAuthCodeReuse` call it. Status: **Not started**
+   `revokeOnAuthCodeReuse` call it. Status: **Done**
+   `revoke/family` for the extracted loop, `revoke/primitive-call` for the call that replaced it.
    Its doc comment states the contract #77 depends on: return only the JTIs this call transitioned.
    Decision 8.
 2. `RevokeUserAuthState(db, tx, userId, exceptSid) (RevocationResult, error)`.
-   Status: **Not started**
+   Status: **Done**
+   `revoke/user-scoped`, `revoke/preserved-set` and `revoke/result-struct`. Rejects a nil `tx` at
+   entry (finding 31) and derives `OldGeneration` from the increment rather than a prior read
+   (finding 30). The **user-scoped query runs before the sid-scoped one**, which is load-bearing
+   rather than incidental: a child token committed between them is then absent from the sweep and
+   promoted by the sid-scoped query, where the reverse order revokes the user's own newly issued
+   token (finding 33). Engine-dependent and not a fix: under MySQL/InnoDB's default REPEATABLE READ
+   both reads can share one snapshot, so the child is invisible to both queries and the order is
+   moot. Kept because it is never worse. The residual is decision 16, tracked in #131.
    Increments the generation, sweeps via stage 1b step 1, and when `exceptSid != ""` additionally
    queries `GetRefreshTokensBySessionIdentifier(tx, exceptSid)` to build the preserved id set,
    because an offline row's own `session_identifier` is empty and its originating sid lives only on
    the `codes` row (finding 3).
-3. Unit tests. Status: **Not started**
-   **Exhaustive owner of the sweep table**, executed. With `exceptSid` set: a session-bound token on
+3. Unit tests. Status: **Done**
+   `test/revoke-sweep`. **Exhaustive owner of the sweep table**, executed. With `exceptSid` set: a session-bound token on
    the preserved session is promoted; **an offline token on the preserved session is promoted**, which
    is the row that fails against any implementation deriving the preserved set from the returned rows;
    a token on another session is revoked; an already-revoked token is neither revoked again nor
@@ -1846,6 +1933,67 @@ Tests: **unit tests only, host.**
    `handler_token_test.go`'s existing reuse tests, including `test/token-reuse-500`, must pass
    **unmodified**. That is the evidence step 1 changed no behaviour, and it is the only check that
    #77's conditional teardown still holds.
+
+**As built.** Four things the plan did not specify, and one deliberate omission.
+
+1. **`OldGeneration` is derived as `newGeneration - 1`.** The plan named the field without saying
+   where it comes from, and `IncrementUserAuthStateGeneration` returns only the new value. This
+   first shipped as a `GetUserById` before the increment, on the reasoning that the audit event
+   should attest to a stored value; finding 30 showed that reasoning inverted. An ordinary `SELECT`
+   is not a locking read, so under contention the pre-read reports a generation this call never
+   moved away from, while `new - 1` is exact by construction. The claimed **unknown-user** benefit
+   was also already covered: the increment requires `rowsAffected == 1` and errors otherwise.
+2. **`PromoteRefreshTokenGenerations` is called even when the preserved set is empty**, with
+   `[]int64{}`. Not guarded, because the data method documents the empty list as a no-op and returns
+   before building SQL, so a guard would duplicate a decision that already lives in one place. The
+   revoke-everything test asserts the call arguments rather than its absence, which pins "nothing was
+   promoted" just as precisely.
+3. **An already-revoked token in the preserved set is not filtered in Go.**
+   `PromoteRefreshTokenGenerations` carries `revoked = false` in its `WHERE`, so a revoked row stays
+   revoked. Stated in a comment at the call site, since the alternative is a Go-side filter that can
+   drift from the SQL one.
+4. **A fifth test the plan did not list: `exceptSid` naming a session with no row.** Reachable in
+   normal operation rather than hypothetical: `worker/idle-session-reap` deletes idle sessions while
+   offline refresh tokens outlive them, so a self-service password change can legitimately preserve
+   tokens with no session left to promote. The helper exempts the tokens, logs a warning, and reports
+   `PreservedSessionIdentifier` as `exceptSid`, because the exemption was applied and an audit record
+   saying otherwise cannot explain why those JTIs are absent from the revoked list. It first reported
+   `""` here, which finding 32 showed contradicted the field's own contract. Without this case the
+   reasonable-looking alternative, erroring out, would have looked equally correct.
+5. **The helper rejects a nil `tx` at entry, and the tests pass a real one.** This too changed
+   under review. It originally documented the transaction as required and left the rejection to
+   `IncrementUserAuthStateGeneration`, with the unit tests passing `nil`; finding 31 pointed out that
+   the atomicity contract is the helper's own, and that those tests were exercising a shape
+   production never runs. The tests now use an opaque non-nil `&sql.Tx{}` and one case asserts the
+   rejection. They still prove the call sequence rather than that a real transaction wrapped it,
+   which is what stage 5's call sites own.
+
+**Teeth verified by sabotage**, five runs, each restored and re-verified.
+
+- Deriving the preserved set from the user-scoped rows (`rt.SessionIdentifier == exceptSid`) fails
+  both preserved-set tests. Checked the failure reason rather than only the failure: the offline
+  token is passed to `UpdateRefreshToken`, which the strict mock rejects, and the promotion never
+  happens. This is the finding-3 bug, and it is the sabotage that matters most, because that
+  implementation is the one a reader would write from the signature alone.
+- Returning the partial JTI list on a mid-loop error fails the mid-loop test.
+- Dropping the already-revoked `continue` fails four cases across both files.
+- Not reading the stored old generation fails both sweep tests.
+- Deleting the preserved session along with the rest fails the preserving test.
+- Neutralising the nil-`tx` guard fails the transaction test.
+- Restoring the pre-read for `OldGeneration` fails five tests.
+- Reporting `""` when the preserved session row is gone fails the reaped-session test.
+- Reversing the two discovery queries fails the between-queries test. Worth recording that this
+  sabotage **initially passed**, which showed the test had no teeth: a mock returns the same rows
+  whenever it is called, so it cannot represent a commit landing between two queries, and every
+  behavioural assertion held under either order. The test now asserts the recorded call order
+  directly, and only then did the sabotage fail. That same limitation is why the test proves
+  ordering and not visibility, which is criterion 5 of #131 rather than something this tier can
+  reach.
+
+The existing reuse tests pass **unmodified**, which is the evidence step 1 changed no behaviour:
+`git diff` shows no change to `handler_token_test.go`, and `test/token-reuse-500`, the
+begin-transaction failure test and the concurrent-double-spend test are all green. #77's conditional
+teardown and its comment (`revoke/conditional-teardown`) are untouched.
 
 ### Stage 5: the four call sites, the audit event, and end-to-end tests
 Status: **Not started**
@@ -2269,3 +2417,90 @@ consequence for the safety section).
     so it isolates this defect and nothing else. An alternative fix, adding a nonnegative `CHECK`
     constraint across four engines, was not taken: it would make the sentinel safe rather than
     removing the class, and it needs a fifth migration for a value normal operation never produces.
+
+30. **`OldGeneration` was read with a racy, non-locking `SELECT`.** Round 5, raised against stage 4's
+    implementation. Status: **Resolved**
+
+    Valid on both counts. The helper read `GetUserById` before incrementing, which is an ordinary
+    read and not a locking one, so a concurrent revocation committing between the read and the
+    increment made the reported pair wrong: A reads 3, B increments and commits 4, A's
+    `auth_state_generation + 1` lands 5, and A reports 3 to 5 while having invalidated 4.
+
+    The justification I recorded for the pre-read was also wrong. Verified that
+    `IncrementUserAuthStateGeneration` already requires `rowsAffected == 1` and returns "user not
+    found when incrementing auth state generation" otherwise, so the unknown-user path it claimed to
+    add was already covered.
+
+    Resolved by deriving `OldGeneration = newGeneration - 1` and dropping the read entirely. Exact
+    because the operation is defined as exactly +1, and by construction it names the generation this
+    increment moved away from, which is what a pre-read fails to do under contention. The rejected
+    alternative was changing the data method to return both values; it is equally correct but costs
+    a signature change across four engines for information the caller can already derive.
+
+    Two tests cover it: an increment returning 9 must report 8 and not the stored value a pre-read
+    would have seen, asserting `GetUserById` is never called, and the unknown-user case now asserts
+    the increment's own error propagates and that no sweep follows it.
+
+31. **The required transaction was documented but not enforced.** Round 5. Status: **Resolved**
+
+    Valid. The doc comment said the transaction was required, and the actual rejection lived in
+    `IncrementUserAuthStateGeneration`. Two problems with that: the helper's atomicity contract
+    spans an increment plus a multi-table sweep, so it is the helper's own precondition rather than
+    something a nested call happens to care about, and every unit test was passing `nil` and
+    therefore exercising a shape production never runs.
+
+    Resolved with a `tx == nil` rejection at entry, and the tests now pass an opaque non-nil
+    `&sql.Tx{}` throughout, plus one case asserting the rejection and that no database call is
+    attempted.
+
+32. **The missing-session result contradicted its own field contract.** Round 5. Status: **Resolved**
+
+    Valid. When `exceptSid` named a session whose row had been reaped, the helper still exempted
+    that grant's refresh tokens from the sweep but reported `PreservedSessionIdentifier` as `""`,
+    while the field's own comment said `""` means nothing was preserved. Tokens were preserved, so
+    the result contradicted itself, and worse, the audit record was left unable to explain why those
+    JTIs were absent from the revoked list.
+
+    Resolved per the review's recommendation: the field now reports `exceptSid` whenever the
+    exemption was applied, and its documentation says it identifies the exempted **grant origin**
+    rather than asserting a session row survived. Decision 8 and section 4.5 were updated to match,
+    since the old wording is what the implementation had faithfully followed.
+
+33. **A refresh racing the sweep can still defeat decision 4's preservation promise.** Round 5.
+    Status: **Resolved**
+
+    Valid, and confirmed independently rather than taken on assertion. Refresh rotation reads the
+    parent during validation, marks it revoked with `UpdateRefreshToken(nil, ...)` outside any
+    transaction, and the issuer stamps the child from that in-memory parent, so the window spans an
+    entire token issuance including JWT signing rather than being a microsecond.
+
+    Verified while checking it that the rotation's full-row write does **not** clobber the helper's
+    promotion, because `auth_state_generation` is tagged `dont-update`, so stage 1a's tagging holds
+    here.
+
+    Resolved as **decision 16**: accepted as a fail-closed documented residual, with durable
+    coordination tracked in **#131**, filed with five acceptance criteria. Decision 4's promise is
+    narrowed to the state visible to the sweep's transaction, and the blanket exception under the
+    containment matrix is qualified on the racing-refresh row, which is what overclaimed.
+
+    Two of my own claims were corrected in the course of resolving it.
+
+    **#128 is not the durable fix.** I presented it as such. It proposes compare-and-set rotation and
+    family containment, but leaves open whether stronger persistent coordination is required and says
+    #106 should remain independent, and a CAS on the parent refresh-token row does not order rotation
+    against a sweep touching a different set of rows. Hence a separate issue with its own criteria
+    rather than a cross-reference.
+
+    **The query-ordering mitigation is not portable.** I claimed ordering closes the
+    between-queries sub-case. That holds only where each statement takes a fresh read view.
+    MySQL/InnoDB defaults to REPEATABLE READ, where consistent reads in one transaction share the
+    snapshot established by the first read, so a child committed between the two queries is not
+    necessarily visible to the second. It follows that on MySQL the outcome is the residual under
+    either order, since an invisible child is neither swept nor promoted, and what the ordering rules
+    out on the per-statement engines is the strictly worse outcome of actively revoking the user's own
+    newly issued token. The ordering is kept because it is never worse. The call-order test proves
+    ordering only; cross-engine visibility is untested here and is criterion 5 of #131.
+
+    Also corrected in the wording throughout: "millisecond window" became "narrow concurrency
+    window", and the recovery is described as **requiring re-authentication** rather than
+    self-healing, since rotation already revoked the parent and the client cannot retry with it.
