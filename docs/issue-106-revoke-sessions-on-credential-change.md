@@ -1,7 +1,7 @@
 # Issue 106: password reset, password change and account disable do not invalidate live sessions or refresh tokens
 
 **Issue:** [#106](https://github.com/leodip/goiabada/issues/106)
-**Issue state:** open (labels: bug, security)
+**Issue state:** closed as completed on 2026-07-31 (labels: bug, security)
 **Spec written:** 2026-07-29
 **Last synced:** 2026-07-29 (no comments on the issue)
 **Document status:** CLOSED. This is the finished record, not a working document. It is complete as
