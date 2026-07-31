@@ -2167,11 +2167,15 @@ thing to run was not the widest thing to run.
    zero failures, including all ten `TestCredentialChange_*` cases on each. Unit tests re-ran in
    full on the host.
 
-So the current revision has full four-engine coverage of everything it touched, and **not** a fresh
-unfiltered run of the whole suite. The review agreed the filtered scope was sufficient, since the
-round 6 changes were confined to two test functions plus one new test-local helper and did not touch
-shared fixtures. Anyone doubting that should re-run `./run-tests.sh` with no filter rather than infer
-it from this note.
+3. **At the final pre-push review**, after stage 6, the full unfiltered suite ran again on all four
+   engines. Zero failures in every phase, with all ten `TestCredentialChange_*` cases passing on each
+   engine. So the state being pushed has had an unfiltered four-engine run of its own, and the
+   filtered run in step 2 is no longer the last word on it.
+
+Between steps 2 and 3 the current revision had four-engine coverage of everything it touched but not
+a fresh unfiltered run; step 3 closed that. Recorded rather than smoothed over, because "the tests
+passed" and "the tests passed on exactly this revision" are different claims and only the second one
+is worth anything before a push.
 
 ### Stage 6: documentation
 Status: **Done**
