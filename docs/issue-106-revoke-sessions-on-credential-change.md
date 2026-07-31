@@ -53,6 +53,8 @@ blocks this issue, and this issue blocks none of them.
 | `test/integration-residual` | `src/authserver/tests/integration/credential_change_revocation_test.go` | `n/a` | `func TestCredentialChange_ResidualRacingChildIsFailClosed(t *testing.T) {` | decision 16's residual, pinned fail-closed |
 | `test/integration-second-device` | `src/authserver/tests/integration/credential_change_revocation_test.go` | `secondSessionFor` | `httpClient := createHttpClientWithUserAgent(t,` | finding 35, a real second session for the same user |
 | `test/integration-ropc-child` | `src/authserver/tests/integration/credential_change_revocation_test.go` | `TestCredentialChange_ROPCGrantStopsRefreshing` | `require.False(t, childRow.Revoked, "the child must be unspent before the reset")` | finding 34, what makes the case non-vacuous |
+| `docs/access-token-claims` | `site/src/content/docs/concepts/tokens.mdx` | `n/a` | `## Claims in access tokens` | stage 6 step 1 |
+| `docs/credential-changes` | `site/src/content/docs/concepts/user-sessions.mdx` | `n/a` | `## Credential changes and live sessions` | stage 6 step 2, the link target from tokens.mdx |
 | `test/revoke-sweep` | `src/authserver/internal/handlers/revocation_test.go` | `n/a` | `func TestRevokeUserAuthState_PreservingASession(t *testing.T) {` | owns the sweep table |
 | `revoke/conditional-teardown` | `src/authserver/internal/handlers/handler_token.go` | `revokeOnAuthCodeReuse` | `if code.SessionIdentifier != "" && len(revokedJtis) > 0 {` | teardown is conditional, load-bearing for #77 |
 | `revoke/audit-reuse` | `src/authserver/internal/handlers/handler_token.go` | `revokeAndAuditAuthCodeReuse` | `"revokedRefreshTokenJtis": revokedJtis,` | the audit shape the issue asks us to copy |
@@ -2172,16 +2174,18 @@ shared fixtures. Anyone doubting that should re-run `./run-tests.sh` with no fil
 it from this note.
 
 ### Stage 6: documentation
-Status: **Not started**
+Status: **Done**
 
 Tests: none. Prose only.
 
-1. Document the access-token contract change. Status: **Not started**
+1. Document the access-token contract change. Status: **Done**
+   `docs/access-token-claims`.
    `site/src/content/docs/concepts/tokens.mdx` documents ID token claims but not access token claims,
    so this adds a short access-token section covering two observable facts: access tokens on
    `offline_access` grants do not carry `sid`, and access tokens carry an `auth_state_generation`
    claim that integrators should treat as opaque and reserved.
-2. Note the credential-invalidation behaviour where sessions are described. Status: **Not started**
+2. Note the credential-invalidation behaviour where sessions are described. Status: **Done**
+   `docs/credential-changes`.
    `site/src/content/docs/concepts/user-sessions.mdx` currently documents only the timeout settings.
    Verified nothing there is falsified by this change, so this is an addition rather than a
    correction: a password reset, password change or account disable terminates that user's sessions
@@ -2192,6 +2196,38 @@ Tests: none. Prose only.
    until it expires, which is why a short `TokenExpirationInSeconds` matters. No audit-log doc change is
    needed, since `concepts/audit-log.mdx` deliberately points at `constants.go` rather than enumerating
    event identifiers.
+
+**As built.** Three things differ from the wording above.
+
+1. **The user-visible consequence of decision 16 is stated, in one sentence, without the mechanism.**
+   Not in the plan, added on review instruction. Without it "a user changing their own password stays
+   signed in" overpromises, since a refresh racing the change can require re-authentication. The
+   wording deliberately carries no implementation detail and no issue number: user docs should not
+   send a reader to a tracker to understand a caveat about their own login. It reads "if a token
+   refresh happens at the same moment as the change, that client may still be asked to sign in
+   again."
+2. **A pre-existing documentation inaccuracy was corrected, because the new section would otherwise
+   undercut it.** `tokens.mdx` said an offline refresh token's "expiration time is long (defaults to
+   30 days)". 30 days is the **idle timeout**; the **maximum lifetime** defaults to a year
+   (`seed/offline-max-lifetime`). Omitting the year is exactly what makes an offline grant sound less
+   consequential than it is, and this change's whole point is that such a grant outlives everything
+   else. Both limits are now named. Not falsified by this change, so it is a correction of scope
+   rather than of accuracy, and it is called out here rather than folded in silently.
+3. **Two cross-links were added between the pages**, so the access-token claims section and the
+   credential-change section each lead to the other. `tokens.mdx` also links `sid` to the
+   RP-initiated logout section, since "ID tokens still carry sid, and logout matches on it" is the
+   one place a reader might otherwise conclude the claim was removed outright.
+
+**Verified by building the site**, which the repo's test runner does not do. `npm install` then
+`npm run build` in `site/`: 42 pages, no errors. Confirmed in the generated HTML that
+`id="credential-changes-and-live-sessions"` and `id="authlogout-get-or-post"` exist and that all
+three of the new outbound links point at them, so none of the cross-references is dead. Both `Aside`
+blocks render, which also confirms the import that `user-sessions.mdx` previously did not need. The
+`node_modules`, `dist` and `.astro` directories were removed afterwards; they are gitignored in any
+case.
+
+**Tests: none, as planned.** Prose only, no Go code touched, so no suite needed re-running. The site
+build is the only verification this stage admits, and it is not part of `./run-tests.sh`.
 
 ## 6. Plan review findings
 
