@@ -131,12 +131,16 @@ func HandleAPIUserPasswordPut(
 			return
 		}
 
-		// Update user
-		user.PasswordHash = passwordHash
-		user.ForgotPasswordCodeEncrypted = nil
-		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
-
-		err = database.UpdateUser(nil, user)
+		// The fourth site, unmentioned by the issue (#106 decision 2). An admin setting
+		// someone else's password revokes everything with no exceptSid: the admin's own
+		// session is unaffected because it belongs to a different user, and the target's
+		// sessions are exactly what must go.
+		//
+		// Narrow write, not a full-row UpdateUser: the model was loaded before validation, so
+		// writing every column back would undo a concurrent disable (decision 14).
+		result, err := handlers.RevokeUserAuthStateTx(database, user.Id, "", func(tx *sql.Tx) error {
+			return database.SetUserPasswordHash(tx, user.Id, passwordHash)
+		})
 		if err != nil {
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return
@@ -149,11 +153,13 @@ func HandleAPIUserPasswordPut(
 			loggedInUser = jwtToken.GetStringClaim("sub")
 		}
 
-		// Log audit event
+		// Both events, after commit. The pre-existing one is unchanged (decision 7).
 		auditLogger.Log(constants.AuditUpdatedUserAuthentication, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})
+		handlers.LogRevokedUserAuthState(auditLogger, user.Id,
+			handlers.RevocationReasonAdminPasswordSet, loggedInUser, result)
 
 		// Get the updated user to return
 		updatedUser, err := database.GetUserById(nil, userId)
@@ -505,16 +511,6 @@ func HandleAPIUserEnabledPut(
 			return
 		}
 
-		// Update only the enabled field
-		user.Enabled = req.Enabled
-
-		// Update user in database
-		err = database.UpdateUser(nil, user)
-		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
-			return
-		}
-
 		// Get logged in user from access token
 		jwtToken, ok := middleware.GetValidatedToken(r)
 		var loggedInUser string
@@ -522,11 +518,78 @@ func HandleAPIUserEnabledPut(
 			loggedInUser = jwtToken.GetStringClaim("sub")
 		}
 
-		// Log audit event
+		// This endpoint serves BOTH directions, so the write is a compare-and-set and the
+		// revocation is conditional on it (#106 findings 4 and 21, decision 14).
+		//
+		// Only the enabled-to-disabled transition revokes. Enabling must not, since there is
+		// no credential change to invalidate, and re-disabling an already-disabled account
+		// must not either: it would advance the generation and evict sessions that a previous
+		// disable already dealt with, so a repeated request would not be idempotent.
+		// TrySetUserEnabled reports whether it actually flipped the row, and that report is
+		// the condition. Both directions use it, so neither stays on the full-row UpdateUser
+		// that decision 14 rules out.
+		// The transaction is opened here rather than through RevokeUserAuthStateTx, because
+		// this is the one site whose sweep is conditional on its own write, and the helper's
+		// contract is "write then always sweep". Threading a skip through it would put a
+		// behaviour switch in a primitive three other sites share, which is what decision 8
+		// rejected.
+		disableWithRevocation := func() (handlers.RevocationResult, bool, error) {
+			tx, err := database.BeginTransaction()
+			if err != nil {
+				return handlers.RevocationResult{}, false, err
+			}
+			defer database.RollbackTransaction(tx) //nolint:errcheck
+
+			transitioned, err := database.TrySetUserEnabled(tx, userId, true, false)
+			if err != nil {
+				return handlers.RevocationResult{}, false, err
+			}
+			if !transitioned {
+				// Already disabled. Nothing was written, so there is nothing to commit and
+				// nothing to sweep; the deferred rollback discards the empty transaction.
+				return handlers.RevocationResult{}, false, nil
+			}
+
+			result, err := handlers.RevokeUserAuthState(database, tx, userId, "")
+			if err != nil {
+				return handlers.RevocationResult{}, false, err
+			}
+			if err := database.CommitTransaction(tx); err != nil {
+				return handlers.RevocationResult{}, false, err
+			}
+			return result, true, nil
+		}
+
+		var result handlers.RevocationResult
+		transitioned := false
+
+		if req.Enabled {
+			// Enabling. Narrow write, no revocation, no new event. Uses the same
+			// compare-and-set so this direction does not stay on the full-row UpdateUser.
+			if _, err = database.TrySetUserEnabled(nil, userId, false, true); err != nil {
+				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			result, transitioned, err = disableWithRevocation()
+			if err != nil {
+				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Unchanged in both directions, per decision 7: the endpoint's existing event still
+		// fires for every successful request, including the ones that revoke nothing.
 		auditLogger.Log(constants.AuditUpdatedUserDetails, map[string]interface{}{
 			"userId":       userId,
 			"loggedInUser": loggedInUser,
 		})
+
+		// Only on a real disable transition, and only after its commit.
+		if transitioned {
+			handlers.LogRevokedUserAuthState(auditLogger, userId,
+				handlers.RevocationReasonAccountDisabled, loggedInUser, result)
+		}
 
 		// Get the updated user to return
 		updatedUser, err := database.GetUserById(nil, userId)

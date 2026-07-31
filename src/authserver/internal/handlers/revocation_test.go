@@ -471,3 +471,28 @@ func TestRevokeRefreshTokens(t *testing.T) {
 		assert.Nil(t, jtis)
 	})
 }
+
+// stubRevocationSweepTx registers every database call RevokeUserAuthStateTx makes for a user
+// with no live sessions and no refresh tokens, which is the shape a HANDLER test wants: it
+// exercises the wiring without restating the sweep table this file already owns exhaustively.
+//
+// Note it stubs RollbackTransaction as well as CommitTransaction. The deferred rollback runs on
+// the success path too, where it is a no-op against a committed transaction, and a test that
+// omits it fails on the strict mock.
+//
+// It also proves the transaction is real: BeginTransaction returns a non-nil tx, so every
+// nested call is asserted to receive that exact pointer. A nil one would be rejected by
+// RevokeUserAuthState's precondition.
+func stubRevocationSweepTx(database *mocks_data.Database, userId int64, newGeneration int64) {
+	database.On("BeginTransaction").Return(revokeTx, nil).Once()
+	database.On("IncrementUserAuthStateGeneration", revokeTx, userId).
+		Return(newGeneration, nil).Once()
+	database.On("GetRefreshTokensByUserId", revokeTx, userId).
+		Return([]*models.RefreshToken{}, nil).Once()
+	database.On("PromoteRefreshTokenGenerations", revokeTx, []int64{}, newGeneration).
+		Return(nil).Once()
+	database.On("GetUserSessionsByUserId", revokeTx, userId).
+		Return([]models.UserSession{}, nil).Once()
+	database.On("CommitTransaction", revokeTx).Return(nil).Once()
+	database.On("RollbackTransaction", revokeTx).Return(nil).Once()
+}

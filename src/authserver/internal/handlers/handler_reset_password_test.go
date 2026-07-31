@@ -586,10 +586,14 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 	passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
 	database.On("GetUserByEmail", (*sql.Tx)(nil), "test@example.com").Return(user, nil).Once()
 
-	var saved *models.User
-	database.On("UpdateUser", (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
-		saved = args.Get(1).(*models.User)
-	}).Return(nil).Once()
+	var savedHash string
+	database.On("SetUserPasswordHash", revokeTx, int64(1), mock.Anything).
+		Run(func(args mock.Arguments) {
+			savedHash = args.Get(2).(string)
+		}).Return(nil).Once()
+	stubRevocationSweepTx(database, 1, 4)
+
+	auditLogger.On("Log", constants.AuditRevokedUserAuthState, mock.Anything).Return().Once()
 
 	httpHelper.On("RenderTemplate",
 		mock.Anything,
@@ -609,14 +613,16 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 	httpHelper.AssertExpectations(t)
 	database.AssertExpectations(t)
 
-	assert.NotNil(t, saved)
-	assert.NotEqual(t, "the-previous-hash", saved.PasswordHash, "the password hash must be replaced")
-	assert.True(t, hashutil.VerifyPasswordHash(saved.PasswordHash, newPassword),
+	assert.NotEmpty(t, savedHash)
+	assert.NotEqual(t, "the-previous-hash", savedHash, "the password hash must be replaced")
+	assert.True(t, hashutil.VerifyPasswordHash(savedHash, newPassword),
 		"the stored hash must verify against the new password")
 
-	// The code is single use: both halves are cleared so it cannot be replayed.
-	assert.Nil(t, saved.ForgotPasswordCodeEncrypted, "the reset code must be cleared")
-	assert.False(t, saved.ForgotPasswordCodeIssuedAt.Valid, "the issued timestamp must be cleared")
+	// The reset code is still single use, but clearing it is no longer this handler's job: it
+	// moved into SetUserPasswordHash, which nulls both halves in the same statement (#106
+	// decision 14, so a stale in-memory user cannot write them back). The four-engine data
+	// tests own that assertion now, which is why it is not restated here.
+	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything)
 }
 
 // The lifetime boundary: just inside is accepted, just outside is refused.
@@ -645,7 +651,9 @@ func TestHandleResetPasswordPost_LifetimeBoundary(t *testing.T) {
 		passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
 		database.On("GetUserByEmail", (*sql.Tx)(nil), "test@example.com").
 			Return(newUser(forgotPasswordCodeLifetime-30*time.Second), nil).Once()
-		database.On("UpdateUser", (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+		database.On("SetUserPasswordHash", revokeTx, int64(1), mock.Anything).Return(nil).Once()
+		stubRevocationSweepTx(database, 1, 4)
+		auditLogger.On("Log", constants.AuditRevokedUserAuthState, mock.Anything).Return().Once()
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything).Return(nil).Once()
 
@@ -676,6 +684,9 @@ func TestHandleResetPasswordPost_LifetimeBoundary(t *testing.T) {
 	})
 }
 
+// TestHandleResetPasswordPost_UpdateUserFails: the credential write itself fails inside the
+// transaction. The sweep must never start, the transaction must roll back rather than commit, and
+// no audit event may be emitted (#106 finding 26).
 func TestHandleResetPasswordPost_UpdateUserFails(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
@@ -695,7 +706,10 @@ func TestHandleResetPasswordPost_UpdateUserFails(t *testing.T) {
 
 	passwordValidator.On("ValidatePassword", mock.Anything, "Str0ngP4ss!").Return(nil).Once()
 	database.On("GetUserByEmail", (*sql.Tx)(nil), "test@example.com").Return(user, nil).Once()
-	database.On("UpdateUser", (*sql.Tx)(nil), mock.Anything).Return(errors.New("update failed")).Once()
+	database.On("BeginTransaction").Return(revokeTx, nil).Once()
+	database.On("SetUserPasswordHash", revokeTx, int64(1), mock.Anything).
+		Return(errors.New("update failed")).Once()
+	database.On("RollbackTransaction", revokeTx).Return(nil).Once()
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 	handler := HandleResetPasswordPost(httpHelper, database, passwordValidator, auditLogger)
@@ -703,6 +717,135 @@ func TestHandleResetPasswordPost_UpdateUserFails(t *testing.T) {
 		postResetRequest(code, "test@example.com", "Str0ngP4ss!", "Str0ngP4ss!"))
 
 	httpHelper.AssertExpectations(t)
+	database.AssertExpectations(t)
+
+	// Rolled back, not committed. The strict mock already fails on an unstubbed call, so these
+	// restate the two that matter most explicitly, because a passing test here with a silently
+	// committed transaction would be the worst outcome: a changed password with the old
+	// sessions intact.
+	database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+}
+
+// TestHandleResetPasswordPost_TransactionFailureHandling: the credential write succeeds and
+// something after it fails, which is the case finding 26 singles out because it is the one where a
+// partially applied change is possible. Two variants failing at each of the sweep's two phases,
+// and a third where the commit itself fails.
+//
+// Named for transaction FAILURE HANDLING rather than for rolling back, deliberately: only the first
+// two variants roll back, and a name promising rollback for all three would contradict finding 36
+// from inside the file it applies to.
+//
+// WHAT THE FIRST TWO PROVE: nothing is left half applied, because the deferred rollback discards
+// the transaction, and no audit event claims a revocation that did not survive.
+//
+// WHAT THE THIRD PROVES, AND WHAT IT CANNOT. The commit-failure row asserts the HANDLER's
+// behaviour: a 500 to the caller and no audit event. It does NOT establish that the transaction
+// did not durably commit, and no mock could. `database/sql` gives no such guarantee: a Commit
+// returning an error may mean the server committed and the client never found out, and the
+// rollback this test stubs as succeeding cannot undo that. The mock models
+// "Commit fails, Rollback succeeds" because that is the shape the code takes, not because the
+// pair implies the write was undone. See the contract note on RevokeUserAuthStateTx.
+func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
+	const code = "123456"
+	const newPassword = "Str0ngP4ss!"
+
+	for _, tc := range []struct {
+		label string
+		// arrange registers the sweep calls up to and including the failure.
+		arrange func(database *mocks_data.Database)
+	}{
+		{
+			// Discovery phase: nothing has been swept yet, but the generation HAS been
+			// advanced, so a commit here would lock the user out of every session while
+			// leaving refresh tokens unrevoked.
+			label: "sweep fails during discovery",
+			arrange: func(database *mocks_data.Database) {
+				database.On("IncrementUserAuthStateGeneration", revokeTx, int64(1)).
+					Return(int64(4), nil).Once()
+				database.On("GetRefreshTokensByUserId", revokeTx, int64(1)).
+					Return(nil, errors.New("discovery failed")).Once()
+			},
+		},
+		{
+			// Revocation phase: one token is already written revoked. A commit here would
+			// revoke a subset, which is the half-applied state decision 5 exists to prevent.
+			label: "sweep fails midway through revocation",
+			arrange: func(database *mocks_data.Database) {
+				first := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+				second := &models.RefreshToken{Id: 2, RefreshTokenJti: "rt-2"}
+				database.On("IncrementUserAuthStateGeneration", revokeTx, int64(1)).
+					Return(int64(4), nil).Once()
+				database.On("GetRefreshTokensByUserId", revokeTx, int64(1)).
+					Return([]*models.RefreshToken{first, second}, nil).Once()
+				database.On("UpdateRefreshToken", revokeTx, first).Return(nil).Once()
+				database.On("UpdateRefreshToken", revokeTx, second).
+					Return(errors.New("revoke failed")).Once()
+			},
+		},
+		{
+			// The commit itself fails. Everything succeeded up to that point, so this is the
+			// variant most likely to emit a false audit record. The durable outcome here is
+			// indeterminate by nature; what is asserted is the handler's response and the
+			// absence of an audit event, not that the write was undone.
+			label: "commit fails after a complete sweep",
+			arrange: func(database *mocks_data.Database) {
+				database.On("IncrementUserAuthStateGeneration", revokeTx, int64(1)).
+					Return(int64(4), nil).Once()
+				database.On("GetRefreshTokensByUserId", revokeTx, int64(1)).
+					Return([]*models.RefreshToken{}, nil).Once()
+				database.On("PromoteRefreshTokenGenerations", revokeTx, []int64{}, int64(4)).
+					Return(nil).Once()
+				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
+					Return([]models.UserSession{}, nil).Once()
+				database.On("CommitTransaction", revokeTx).
+					Return(errors.New("commit failed")).Once()
+			},
+		},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			database := mocks_data.NewDatabase(t)
+			passwordValidator := mocks_validators.NewPasswordValidator(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			encryptedCode, err := encryption.EncryptData(code)
+			assert.NoError(t, err)
+			user := &models.User{
+				Id:                          1,
+				Email:                       "test@example.com",
+				ForgotPasswordCodeEncrypted: encryptedCode,
+				ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			}
+
+			passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+			database.On("GetUserByEmail", (*sql.Tx)(nil), "test@example.com").Return(user, nil).Once()
+			database.On("BeginTransaction").Return(revokeTx, nil).Once()
+			database.On("SetUserPasswordHash", revokeTx, int64(1), mock.Anything).Return(nil).Once()
+			tc.arrange(database)
+			database.On("RollbackTransaction", revokeTx).Return(nil).Once()
+			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
+				Return().Once()
+
+			handler := HandleResetPasswordPost(httpHelper, database, passwordValidator, auditLogger)
+			handler.ServeHTTP(httptest.NewRecorder(),
+				postResetRequest(code, "test@example.com", newPassword, newPassword))
+
+			httpHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+
+			// No audit event at all, on any of the three. This is the assertion that matters:
+			// AuditLogger.Log takes no transaction, so an event emitted here would be a
+			// permanent record of a revocation the caller was told had failed (decision 5).
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+			// And the success template is never rendered, so the caller is not told the
+			// operation succeeded. This says nothing about the durable outcome: on the
+			// commit-failure variant the write may in fact have applied (finding 36).
+			httpHelper.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything,
+				mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }
 
 // isForgotPasswordCodeExpired is the single rule both handlers consult, so it is

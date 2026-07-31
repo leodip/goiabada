@@ -62,7 +62,7 @@ func TestAuditEventTypes_NonEmpty(t *testing.T) {
 
 // TestAuditEventTypes_Count acts as a drift guard - update expected count when adding/removing audit events
 func TestAuditEventTypes_Count(t *testing.T) {
-	expectedCount := 92
+	expectedCount := 93
 	actualCount := len(AuditEventTypes)
 
 	require.Equal(t, expectedCount, actualCount,
@@ -94,6 +94,10 @@ func TestAuditEventTypes_ContainsCriticalEvents(t *testing.T) {
 		AuditRotatedKeys,
 		AuditRevokedKey,
 		AuditDynamicClientRegistration,
+		// Records that a credential change invalidated a user's live authentication state
+		// (#106). Security-relevant in the same class as key revocation: if this event ever
+		// stopped being emitted, a forced logout would leave no trace.
+		AuditRevokedUserAuthState,
 	}
 
 	for _, critical := range criticalEvents {
@@ -161,6 +165,7 @@ func TestAuditEventTypes_MatchesConstants(t *testing.T) {
 		AuditLogout,
 		AuditROPCAuthFailed,
 		AuditRevokedKey,
+		AuditRevokedUserAuthState,
 		AuditRotatedKeys,
 		AuditSavedConsent,
 		AuditSentEmailVerificationMessage,

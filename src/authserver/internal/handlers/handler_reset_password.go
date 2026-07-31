@@ -254,14 +254,25 @@ func HandleResetPasswordPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user.PasswordHash = passwordHash
-		user.ForgotPasswordCodeEncrypted = nil
-		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
-		err = database.UpdateUser(nil, user)
+		// The write is narrow (SetUserPasswordHash, which also clears the reset code) rather
+		// than a full-row UpdateUser: this handler holds a user model loaded before the
+		// password was validated, so writing every column back would undo a concurrent admin
+		// disable (#106 decision 14).
+		//
+		// Reset revokes everything, with no exceptSid: whoever is resetting a forgotten
+		// password is not necessarily the person holding the live sessions, which is the
+		// stolen-laptop case this issue exists for.
+		result, err := RevokeUserAuthStateTx(database, user.Id, "", func(tx *sql.Tx) error {
+			return database.SetUserPasswordHash(tx, user.Id, passwordHash)
+		})
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
+
+		// After commit, per decision 5. This is also the first audit event this handler emits
+		// on SUCCESS: until now it logged only failures (auditFailedResetPasswordCode).
+		LogRevokedUserAuthState(auditLogger, user.Id, RevocationReasonPasswordReset, "", result)
 
 		bind := map[string]interface{}{
 			"passwordReset":       true,

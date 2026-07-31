@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log/slog"
 
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/pkg/errors"
@@ -202,4 +203,93 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 	}
 
 	return result, nil
+}
+
+// Reasons for AuditRevokedUserAuthState, one per credential site (#106 decision 7). Constants
+// rather than inline strings so the four sites cannot drift and a log consumer has something to
+// match against.
+const (
+	RevocationReasonPasswordReset    = "password_reset"
+	RevocationReasonPasswordChange   = "password_change"
+	RevocationReasonAdminPasswordSet = "admin_password_set"
+	RevocationReasonAccountDisabled  = "account_disabled"
+)
+
+// RevokeUserAuthStateTx runs a narrow credential write and the revocation sweep inside ONE
+// transaction and commits it, returning the result for the caller to audit AFTER the commit.
+//
+// It exists so the four credential sites cannot each get the transaction discipline subtly
+// wrong. Three properties are easy to lose when this is open-coded four times, and all three
+// are what the tests assert:
+//
+//   - the credential write and the sweep are in the same transaction, so a user can never end
+//     up with a new password while their old sessions survive, nor a bumped generation with an
+//     unchanged password;
+//   - any failure BEFORE the commit is rolled back atomically, via the deferred rollback;
+//   - the audit event is the CALLER's job and happens after this returns successfully, because
+//     AuditLogger.Log takes no transaction and a logged revocation that then rolled back would
+//     be a false record (decision 5).
+//
+// On any error the returned result is the zero value rather than a partially populated one, so
+// a caller that mistakenly audits on the error path cannot emit half-truthful lists.
+//
+// WHAT A COMMIT FAILURE DOES AND DOES NOT GUARANTEE. The deferred rollback covers failures
+// before the commit only. `database/sql` gives no guarantee about a Commit that returns an
+// error: the transaction is finished either way, and the error can mean the server committed
+// and the client never learned of it, for instance a connection lost after the server's commit
+// succeeded. A rollback afterwards cannot undo that. So the honest contract is:
+//
+//   - a reported commit failure returns 500 to the caller and emits NO success audit event;
+//   - the durable outcome of that commit is INDETERMINATE, and may in fact have applied.
+//
+// A caller must therefore not read "500" as "nothing happened". The consequence is bounded: the
+// user may be left revoked without an audit record of it, which is fail-closed on the security
+// side and a gap on the forensic side. Closing that gap needs a transactional outbox or a
+// distinct "commit outcome unknown" event, not a rollback, and neither is in scope for #106
+// (decision 5, finding 36).
+func RevokeUserAuthStateTx(db data.Database, userId int64, exceptSid string,
+	write func(tx *sql.Tx) error) (RevocationResult, error) {
+
+	tx, err := db.BeginTransaction()
+	if err != nil {
+		return RevocationResult{}, err
+	}
+	defer db.RollbackTransaction(tx) //nolint:errcheck
+
+	if err := write(tx); err != nil {
+		return RevocationResult{}, err
+	}
+
+	result, err := RevokeUserAuthState(db, tx, userId, exceptSid)
+	if err != nil {
+		return RevocationResult{}, err
+	}
+
+	if err := db.CommitTransaction(tx); err != nil {
+		return RevocationResult{}, err
+	}
+	return result, nil
+}
+
+// LogRevokedUserAuthState emits AuditRevokedUserAuthState. One function rather than four
+// literals, so the payload cannot differ between sites and there is a single place to assert
+// its shape field by field.
+//
+// Call this only after RevokeUserAuthStateTx returned without error.
+func LogRevokedUserAuthState(auditLogger AuditLogger, userId int64, reason string,
+	loggedInUser string, result RevocationResult) {
+
+	auditLogger.Log(constants.AuditRevokedUserAuthState, map[string]interface{}{
+		"userId":       userId,
+		"reason":       reason,
+		"loggedInUser": loggedInUser,
+		// Always present, and always a list rather than null: RevocationResult initialises
+		// both slices, so an action that swept nothing logs [] (finding 8).
+		"terminatedSessionIdentifiers": result.TerminatedSessionIdentifiers,
+		"revokedRefreshTokenJtis":      result.RevokedRefreshTokenJtis,
+		// "" on the three sites that preserve nothing, never absent.
+		"preservedSessionIdentifier": result.PreservedSessionIdentifier,
+		"oldGeneration":              result.OldGeneration,
+		"newGeneration":              result.NewGeneration,
+	})
 }

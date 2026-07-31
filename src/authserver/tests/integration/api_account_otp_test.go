@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"fmt"
-
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -18,19 +16,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// helper to set a user's password to a known value (reused pattern)
+// setUserPasswordForOTP gives a user a known password, so the OTP endpoint's password check can be
+// satisfied. It writes the hash directly.
+//
+// DO NOT change this back to the admin API (PUT /api/v1/admin/users/{id}/password). It used to do
+// that, and #106 made it a credential change: setting a password now advances the user's
+// authentication generation, terminates their sessions and revokes their refresh tokens. Since
+// every caller below already holds an access token for THIS user, going through that endpoint
+// invalidates the very token the test is about to use, and all eight OTP cases fail with "Session
+// has been terminated". That was the change working correctly, not a regression.
+//
+// The subject of these tests is the OTP endpoint, so the password is fixture setup and must not
+// have side effects of its own.
 func setUserPasswordForOTP(t *testing.T, userId int64, newPassword string) {
 	t.Helper()
-	// Use admin API to set user password (does not require current password)
-	adminToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" +
-		fmt.Sprintf("%d", userId) + "/password"
-	resp := makeAPIRequest(t, "PUT", url, adminToken, api.UpdateUserPasswordRequest{NewPassword: newPassword})
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("failed to set user password via admin API, status=%d body=%s", resp.StatusCode, string(body))
+
+	user, err := database.GetUserById(nil, userId)
+	assert.NoError(t, err)
+	if user == nil {
+		t.Fatalf("user %d not found", userId)
 	}
+
+	hash, err := hashutil.HashPassword(newPassword)
+	assert.NoError(t, err)
+	user.PasswordHash = hash
+	err = database.UpdateUser(nil, user)
+	assert.NoError(t, err)
 
 	// Verify password persisted and matches
 	u2, err := database.GetUserById(nil, userId)

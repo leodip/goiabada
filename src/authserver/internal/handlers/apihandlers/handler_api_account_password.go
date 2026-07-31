@@ -82,20 +82,37 @@ func HandleAPIAccountPasswordPut(
 			return
 		}
 
-		user.PasswordHash = passwordHash
-		user.ForgotPasswordCodeEncrypted = nil
-		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
+		// The ONE site that preserves a session (#106 decision 4): the user changing their own
+		// password should not be logged out of the client they are doing it from. exceptSid
+		// comes from the validated token's own sid claim, so it cannot be chosen by the caller.
+		//
+		// It is empty for a bearer that carries no sid, which after decision 9 means any
+		// offline or ROPC access token. That is correct rather than a gap: such a token proves
+		// no live session to preserve, so the change revokes everything, which is the
+		// conservative direction.
+		exceptSid := strings.TrimSpace(jwtToken.GetStringClaim("sid"))
 
-		if err := database.UpdateUser(nil, user); err != nil {
+		// Narrow write, not a full-row UpdateUser: the user model was loaded before the
+		// password was validated, so writing every column back would undo a concurrent admin
+		// disable (decision 14).
+		result, err := handlers.RevokeUserAuthStateTx(database, user.Id, exceptSid,
+			func(tx *sql.Tx) error {
+				return database.SetUserPasswordHash(tx, user.Id, passwordHash)
+			})
+		if err != nil {
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return
 		}
 
-		// Audit
+		// Both events, after commit. The pre-existing one is unchanged, per decision 7: every
+		// existing event stays exactly as it is, and the revocation gets its own so revocations
+		// are queryable as a class rather than spread across four generic event types.
 		auditLogger.Log(constants.AuditChangedPassword, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})
+		handlers.LogRevokedUserAuthState(auditLogger, user.Id,
+			handlers.RevocationReasonPasswordChange, subject, result)
 
 		// Response
 		resp := api.UpdateUserResponse{User: *api.ToUserResponse(user)}
