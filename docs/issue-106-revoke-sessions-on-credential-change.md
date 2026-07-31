@@ -26,7 +26,12 @@ of them blocks this issue, and this issue blocks none of them.
 | `admin-enabled/audit` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserEnabledPut` | `constants.AuditUpdatedUserDetails` | disable is audited as a generic detail update |
 | `admin-pwd/write` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserPasswordPut` | `user.PasswordHash = passwordHash` | site 4, missed by the issue |
 | `admin-pwd/audit` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserPasswordPut` | `constants.AuditUpdatedUserAuthentication` | |
-| `middleware/sid-passthrough` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `// Non-session-bound token (client_credentials, ROPC): no session to check.` | the gate that lets a sid-less token past unchecked |
+| `middleware/sid-passthrough` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `// Offline grant or ROPC: no session to defer to, so the token's own` | was the unchecked pass-through; stage 3 closed it, the label is kept because settled prose cites it |
+| `middleware/authtime-discriminator` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `if _, hasAuthTime := jwtToken.Claims["auth_time"]; !hasAuthTime {` | the client_credentials gate, added by stage 3 |
+| `middleware/generation-asymmetry` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `// The SESSION's generation, not the token's. See the asymmetry note above` | decision 11(c), the session-bound half |
+| `validator/generation-message` | `src/core/validators/token_validator.go` | `n/a` | `const invalidGenerationMessage =` | shared by both refresh branches |
+| `validator/generation-authcode-refresh` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `if refreshToken.AuthStateGeneration != refreshToken.Code.User.AuthStateGeneration {` | decision 11(a), reads the token row not the code row |
+| `test/validator-generation` | `src/core/validators/token_validator_test.go` | `n/a` | `func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {` | owns the validator's three branches |
 | `middleware/session-lookup` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `session, err := database.GetUserSessionBySessionIdentifier(nil, sid)` | the session is loaded here, and carries UserId |
 | `middleware/session-validity` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `if !session.IsValid(settings.UserSessionIdleTimeoutInSeconds` | idle and max-lifetime bounds, no user check |
 | `middleware/fail-closed` | `src/authserver/internal/middleware/api_auth.go` | `RequireValidSession` | `// Fail closed: without settings we cannot enforce idle/max-lifetime` | the precedent for failing closed on a lookup problem |
@@ -1710,26 +1715,37 @@ integration tests do that.
    to confirm stage 1a and 1b still pass. No integration tests: the claim's round trip and its
    enforcement are stage 3 and stage 5.
 ### Stage 3: enforcement at validation
-Status: **Not started**
+Status: **Done**
 
 Tests: **unit tests only, host.** Mock-backed, so they prove the branch conditions and not that the
 real database agrees.
 
-1. Code redemption rejects a generation mismatch. Status: **Not started**
+1. Code redemption rejects a generation mismatch. Status: **Done**
    In `ValidateTokenRequest`'s `authorization_code` case, alongside the existing
    `codeEntity.User.Enabled` check.
+   As built: inside the existing `if !wasReused` guard, which is where that `Enabled` check
+   lives (`validator/refresh-enabled-authcode` is the refresh-branch sibling). Same placement
+   rationale as the checks around it: on reuse the revocation signal must not be masked by a
+   different rejection. Returns the existing `"Code is invalid."` message rather than a new
+   one, so a mismatch is indistinguishable from an unknown code to the client.
 2. Both refresh branches reject a generation mismatch, reading the value from the
-   **`refresh_tokens` row**. Status: **Not started**
+   **`refresh_tokens` row**. Status: **Done**
+   `validator/generation-authcode-refresh` for the auth-code branch, and the ROPC branch
+   immediately above `validator/refresh-enabled-ropc`. Both return the shared
+   `validator/generation-message`.
    Decision 11(a). Reading the joined `codes` row instead would reject the preserved session's
    promoted tokens, which is exactly the bug this wording exists to prevent.
-3. `RequireValidSession` gains the `Enabled` and generation checks. Status: **Not started**
+3. `RequireValidSession` gains the `Enabled` and generation checks. Status: **Done**
+   `middleware/authtime-discriminator`, `middleware/sid-passthrough` (the branch that gate used
+   to let past unchecked) and `middleware/generation-asymmetry`.
    Resolve the user by `sub` when `auth_time` is present, rejecting empty `sub`; reject when not
    enabled (decision 6); then the asymmetric generation check of decision 11(c): with a `sid`, the
    live session's generation decides and the token's own claim is **ignored**; without one, the
    token's claim decides, an absent claim reading as 0 (decision 15). Lookup errors are 500, per
    `middleware/fail-closed`.
-4. Unit tests. Status: **Not started**
-   **Exhaustive owner of the middleware table**: 30 rows, all executed. Extend
+4. Unit tests. Status: **Done**
+   **Exhaustive owner of the middleware table**: 31 rows, all executed (30 as planned, plus the
+   sentinel-collision row that finding 29 required). Extend
    `TestRequireValidSession` (`test/middleware-valid-session`) rather than adding a parallel suite, so
    the existing harness and mock setup are inherited. Rows, with the gate each negative case is meant
    to hit: pass-through for no bearer token, a non-`JwtToken` value, and a token with no `auth_time`
@@ -1758,6 +1774,44 @@ real database agrees.
    assertion that can distinguish decision 11(a) from its opposite.
    `handler_token_test.go` keeps one thin smoke case confirming the handler surfaces the rejection.
    Deliberately thin at that layer: the validator tests own the comparison logic.
+
+**As built.** Five things differ from the wording above, none of them a design change.
+
+0. **`tokenGeneration` returns `(int64, bool)`, not a bare `int64`.** The first implementation
+   used an in-band `-1` to mean "malformed" and then compared it with the persisted generation
+   like any other value, on the reasoning that no real generation could equal `-1`. That
+   reasoning was wrong and finding 29 caught it: the column is a signed `BIGINT`/`INTEGER` on
+   all four engines with no nonnegative constraint, so a user row can hold `-1`, and that user
+   would have accepted every malformed claim. The caller now rejects on `!ok` before comparing.
+   Row 31 of the table pins it, and it is the only row that fails if the sentinel is
+   reinstated.
+
+1. **The 30-row table went into a sibling function, not into `TestRequireValidSession`.** The
+   plan said to extend that suite so the harness is inherited. Its nine existing subtests are
+   hand-written `t.Run` blocks, each building its own mocks, so there was no table to add rows
+   to: extending it literally meant 30 more hand-written blocks. The table is
+   `TestRequireValidSession_Table` in the same file, so it does inherit the package, the
+   imports, the mock constructors and the `settingsInCtx` helper, which is the part that
+   mattered. `test/middleware-valid-session` still anchors the original suite.
+2. **Seven of those nine existing subtests needed patching**, which the plan did not
+   anticipate. Each now carries `auth_time` and `sub` claims plus a `.Maybe()`
+   `GetUserBySubject` stub, because the new discriminator means a token without `auth_time`
+   no longer reaches the session logic those subtests exist to exercise. The one subtest
+   deliberately left unpatched is "passes through when token has no sid claim
+   (client_credentials/ROPC)": it has no `auth_time`, so it now genuinely exercises the
+   client_credentials gate, and its "no DB calls expected" assertion is stronger than before.
+3. **The redemption test needed `CodeLoadClient` and `CodeLoadUser` no-op stubs.** The
+   validator calls both before reaching the generation check, and the fixture populates
+   `Client` and `User` inline.
+4. **Guards verified by sabotage**, four runs, each restored and re-verified afterwards.
+   Gutting the redemption check fails only `superseded_code_is_rejected`; gutting the ROPC
+   check fails only its own negative; gutting the auth-code refresh check fails only its own
+   negative. The fourth is the one worth recording: **reversing decision 11(a)**, so the
+   comparison reads `refreshToken.Code.AuthStateGeneration` instead of
+   `refreshToken.AuthStateGeneration`, fails the "promoted token whose code lags is accepted"
+   row. That row is the only thing in the suite that can tell the two readings apart, so if it
+   ever looks like a redundant positive case, this is why it is not. The handler smoke case was
+   sabotaged too, by routing the error to `InternalServerError`, and failed as intended.
 
 ### Stage 4: the revocation helper
 Status: **Not started**
@@ -2187,3 +2241,31 @@ consequence for the safety section).
     passes with the assignment missing, and the correct and incorrect sources are given **different**
     values, because equal ones make a wrong read indistinguishable. The rotation row uses a three-way
     conflict (parent 7, code 3, user 9) so a wrong read of either alternative is caught.
+
+29. **`tokenGeneration` used an in-band `-1` sentinel that a user row can legitimately hold.**
+    Round 5, raised against stage 3's implementation. Status: **Resolved**
+
+    Valid, and a genuine fail-closed defect rather than a style objection. The helper returned `-1`
+    for a malformed claim and the caller then compared it with the persisted generation like any
+    other value, on the recorded reasoning that "no generation can equal -1". Verified that
+    reasoning is false on all four engines: `auth_state_generation` is `BIGINT`/`INTEGER`, signed,
+    with no `CHECK` constraint and only a `DEFAULT 0`, so `-1` is storable. A user row sitting on
+    `-1` would have accepted **every** malformed generation claim on the sid-less branch, which is
+    the branch covering offline and ROPC access tokens, exactly the long-lived ones the generation
+    boundary exists to contain.
+
+    Reaching that state requires a direct write rather than normal operation, since
+    `IncrementUserAuthStateGeneration` only ever increments from 0. That lowers the likelihood but
+    does not make the check sound, and a guard whose correctness rests on an unenforced range
+    invariant is the kind that quietly stops holding.
+
+    Resolved in stage 3 step 3: the helper now returns `(int64, bool)` and the caller rejects on
+    `!ok` before comparing, so no token-derived value is ever compared against stored state without
+    having been validated first. Recorded as item 0 of the stage's as-built note, with the doc
+    comment naming the constraint so the sentinel is not reintroduced as a simplification.
+
+    Stage 3 step 4 gains a 31st row, malformed claim against a persisted `-1`, expecting 401.
+    Verified it has teeth by reinstating the sentinel: it is the **only** row of the 31 that fails,
+    so it isolates this defect and nothing else. An alternative fix, adding a nonnegative `CHECK`
+    constraint across four engines, was not taken: it would make the sentinel safe rather than
+    removing the class, and it needs a fifth migration for a value normal operation never produces.
