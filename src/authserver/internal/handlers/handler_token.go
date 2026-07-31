@@ -410,16 +410,9 @@ func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string,
 		return nil, err
 	}
 
-	revokedJtis := make([]string, 0, len(refreshTokens))
-	for _, rt := range refreshTokens {
-		if rt.Revoked {
-			continue
-		}
-		rt.Revoked = true
-		if err := database.UpdateRefreshToken(tx, rt); err != nil {
-			return nil, err
-		}
-		revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
+	revokedJtis, err := revokeRefreshTokens(database, tx, refreshTokens)
+	if err != nil {
+		return nil, err
 	}
 
 	// Tear down the session only when we actually revoked tokens issued from the
