@@ -4,7 +4,19 @@
 **Issue state:** open (labels: bug, security)
 **Spec written:** 2026-07-29
 **Last synced:** 2026-07-29 (no comments on the issue)
+**Document status:** CLOSED. This is the finished record, not a working document. It is complete as
+of the implementation date above and is not expected to change again. Later work on the residuals it
+names belongs in #128, #129, #130 and #131, not here. If code it cites moves, re-sweep section 0
+rather than rewriting the reasoning: the decisions and findings are a record of what was decided and
+why, including the six places where a review corrected me, and those are worth more intact than
+tidied.
 **Plan approved:** 2026-07-30 (through finding 28)
+**Implementation complete:** 2026-07-31. All six stages `Done`, all 16 decisions `Decided`, all 36
+review findings `Resolved` (none `Withdrawn`), nothing left `Open`. Verified by a full unfiltered
+`./run-tests.sh` on all four database engines at the final pre-push review: zero failures across
+build, unit, data and integration, plus a clean docs site build. Eighteen commits: the spec, a stage
+split, a code and a document commit for each of the six stages, the final verification record, and
+this closing stamp.
 **Delivery:** lands as a single PR, staged internally for review rather than split across issues.
 **Related:** #127 (closed, not planned) proposed an authorization-grant refactor to precede this;
 deferred after review, so this change proceeds on the current schema. #128 (open) covers
