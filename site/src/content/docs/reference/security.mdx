@@ -35,7 +35,8 @@ Goiabada includes several built-in security features:
 ### Token security
 
 - **Short-lived access tokens** - Default 5-minute expiration to limit exposure
-- **Refresh token rotation** - Each refresh token can only be used once
+- **Refresh token rotation** - Each refresh token can only be used once, enforced atomically, so two simultaneous requests presenting the same token yield at most one new token set
+- **Replay containment** - Presenting a refresh token that rotation already retired revokes the rest of that token's rotation family: its successor and any further descendants still live when containment runs. A `refresh_token_replay_detected` [audit event](/concepts/audit-log/) is recorded whenever that revokes at least one. See [refresh token replay](/concepts/tokens/#refresh-token-replay)
 - **Signed JWTs** - All tokens are cryptographically signed
 
 ### Cookie security

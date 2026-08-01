@@ -106,6 +106,45 @@ Upon each usage of a refresh token, the refresh token passed to the `/auth/token
 
 In other words, a refresh token is a one-time-use token; once used, it must be substituted with the new refresh token obtained from the response.
 
+Single use is enforced atomically. Across concurrent requests presenting the same refresh token, **at most one** can receive a token set; two can never succeed. If the token is live and issuance succeeds, one wins and the rest are refused with `invalid_grant`. If it was already retired, or issuance fails, none succeeds.
+
+### What your client must do
+
 <Aside type="caution">
-Your client application must store the new refresh token from each response and use it for the next request. Attempting to reuse an old refresh token will fail and may invalidate the entire token chain for security reasons.
+Serialize your refresh requests, and **atomically** persist the refresh token from each successful response in place of the old one before using the rest of that response.
+
+Presenting a refresh token that rotation has already retired revokes **the family's live tokens**, including the one your application is currently using, and the user has to authorize again. That happens whether the retired token was replayed by an attacker or by your own client.
+</Aside>
+
+Two shapes cause this by accident:
+
+- **Parallel refreshes.** Two threads, tabs or instances notice the access token has expired and each presents the same refresh token. One wins. Whether the other is quietly refused or treated as a replay depends on whether its database lookup saw the token as still live, which is not something either side can control. Refresh through a single shared path instead.
+- **Retrying after a lost response.** The server rotated the token and the response never arrived. Retrying with the old token presents a retired one. Persist the new token before acting on the response, and treat a lost response as "reauthorize", not "retry".
+
+## Refresh token replay
+
+When a refresh token that rotation has already retired is presented again, Goiabada revokes every member of that token's **rotation family** that is still live and committed at the moment containment runs. In practice that is the successor issued when the presented token was rotated, plus any further descendants of the same original grant. The presented token itself is already retired, which is what identified it as a replay.
+
+One case is not covered: a token minted by a rotation that commits immediately after containment has run is not reached by it. That token still works, and using it rotates it in the ordinary way, so the family can keep rotating until a retired member of it is presented again or the surviving chain expires.
+
+This follows the strict rotation model in [RFC 9700 section 4.14.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.14.2), which is explicit that the server cannot identify which presenter is legitimate. Goiabada therefore treats a retired token coming back as reason to invalidate the chain, without claiming to know that the token was copied: a delayed request from your own client produces exactly the same signal. Leaving the chain alive instead would mean that someone who did steal a refresh token and lost the race to use it could simply wait and keep rotating, while the legitimate user is the one locked out.
+
+**What containment does not touch.** Only the rotation family is revoked. The browser session survives, other clients the user is signed in to are unaffected, and other grants belonging to the same user keep working, including a separate grant created from the same browser session. A refresh token replay implicates one grant's client-side storage, not the sign-in itself.
+
+Access tokens already issued are **not** revoked. They are short-lived signed JWTs with no revocation list, so containment stops the next rotation rather than cutting short an access token already handed out. This is the main reason to keep access token lifetimes short.
+
+The incident is recorded as a `refresh_token_replay_detected` [audit event](/concepts/audit-log/) **when containment actually revokes at least one live member**. A repeated presentation that finds no live committed family member changes nothing and emits no event, so one incident does not produce a row per attempt. A repeat that does find one, such as a child committed after the earlier containment, revokes it and is recorded. The payload carries the presented token's `jti`, the family identifier, how many tokens were revoked, the client and user involved, and which flow created the grant. It never contains the refresh token itself.
+
+The event does not by itself prove an attack: a client that refreshes in parallel can trigger it, which is one more reason to serialize.
+
+### Storage
+
+Revoked refresh token rows are retained until the token itself expires, rather than being deleted as soon as they are revoked. The stored row is what lets the server recognise a replayed token at all; deleting it early means a replay is refused but the live family is never contained.
+
+This makes the `refresh_tokens` table grow with refresh frequency and your configured lifetimes. With the default 30-day offline idle timeout, a grant refreshed every five minutes accumulates roughly 8,600 rows before the oldest start ageing out. Background cleanup runs every 12 hours and deletes a row only once its expiration or maximum lifetime has passed.
+
+Worth monitoring if you issue many long-lived offline grants that refresh frequently. Both the offline idle timeout and the maximum lifetime are configurable on **Settings → Tokens**, but only whichever of the two actually bounds your grants affects the count: lowering a maximum lifetime that never binds changes nothing. Reduce the effective retention lifetime and the retained rows fall with it.
+
+<Aside type="caution">
+If you import refresh tokens from another system, populate `expires_at`. A row with both `expires_at` and `max_lifetime` empty is never reaped by the background cleanup, because neither comparison can decide it has expired, and removing such rows needs an explicit operator action.
 </Aside>
