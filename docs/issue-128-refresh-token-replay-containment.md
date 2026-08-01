@@ -69,7 +69,7 @@
 | `test/handler-refresh-loser` | `src/authserver/internal/handlers/handler_token_test.go` | `TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses` | `database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), racedToken.Id).Return(false, nil)` | added by stage 3 |
 | `test/refresh-concurrent` | `src/authserver/tests/integration/token_refresh_concurrent_test.go` | `TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce` | `at most one family member may be left live after the race` | added by stage 3; the weaker assertion is deliberate |
 | `docs/security-single-use` | `site/src/content/docs/reference/security.mdx` | `n/a` | `**Refresh token rotation** - Each refresh token can only be used once` | overstated before stage 3; rewritten by stage 6 |
-| `docs/tokens-chain-claim` | `site/src/content/docs/concepts/tokens.mdx` | `n/a` | `Attempting to reuse an old refresh token will fail and may invalidate the entire token chain for security reasons.` | asserts containment that arrives in stage 4; rewritten by stage 6 |
+| `docs/tokens-chain-claim` | `site/src/content/docs/concepts/tokens.mdx` | `n/a` | `## Refresh token replay` | said "may invalidate the entire token chain" until stage 6 replaced it with this section |
 | `schema/refresh-tokens-sqlite` | `src/core/data/sqlitedb/schema.sql` | `n/a` | `first_refresh_token_jti TEXT NOT NULL,` | the column, no index on it before stage 1 |
 | `migration/family-index` | `src/core/data/sqlitedb/migrations/000025_add_refresh_token_family_index.up.sql` | `n/a` | `CREATE INDEX idx_refresh_tokens_first_refresh_token_jti` | added by stage 1; three siblings under the other engines |
 | `test/migration-000025` | `src/authserver/tests/data/migration_000025_family_index_test.go` | `TestMigration000025_RefreshTokenFamilyIndex` | `control index idx_refresh_token_jti is UNIQUE on every engine` | added by stage 1 |
@@ -1459,23 +1459,73 @@ Six things worth knowing, all contained inside these steps:
    500 page.
 
 ### Stage 6: documentation
-Status: **Not started**
+Status: **Done**
 
 Tests: none. No tier covers prose. Verify with `npm run build` in `site/`.
 
-1. Correct `docs/security-single-use`. Status: **Not started**
+1. Correct `docs/security-single-use`. Status: **Done**
    "Each refresh token can only be used once" becomes true only after stage 3, so this is the
    sentence the change earns rather than one it breaks.
-2. Correct `docs/tokens-chain-claim` and add the client contract. Status: **Not started**
+2. Correct `docs/tokens-chain-claim` and add the client contract. Status: **Done**
    The existing "may invalidate the entire token chain" becomes accurate after stage 4. Add
    decision 9's contract explicitly: serialize refreshes, atomically replace the stored token
    from each successful response, and expect that parallel refreshes or a retry presenting a
    retired token can revoke the family and require fresh authorization. This is the
    user-visible consequence of the strict policy and it must not live only in this document.
-3. Document the retention cost from decision 4. Status: **Not started**
+3. Document the retention cost from decision 4. Status: **Done**
    Revoked rows are retained until token expiry, so `refresh_tokens` grows with refresh
    frequency and the configured offline idle timeout. Operator-facing, with the default
    30-day timeout named.
+
+**As built.** Two bullets rewritten on the security reference page and the whole rotation
+section of the tokens page replaced, gaining a client-contract subsection, a new
+`## Refresh token replay` section and a `### Storage` subsection.
+
+Six things worth knowing, all contained inside these steps:
+
+1. **The vague sentence was replaced, not repaired.** `docs/tokens-chain-claim` said reuse
+   "may invalidate the entire token chain", which was false when written and, once stage 4
+   landed, understated: it is not "may", it is "does". The replacement states it definitely
+   and says what the family is.
+2. **The client contract is stated as a requirement with the two accidental triggers named.**
+   Parallel refreshes and a retry after a lost response, each with what to do instead.
+   Parallel refresh is described honestly: whether the losing request is quietly refused or
+   treated as a replay depends on whether its lookup saw the token live, and neither side
+   controls that. Saying only "reuse fails" would leave a reader thinking a retry is safe.
+3. **A note the plan did not ask for: the audit event does not prove an attack.** Under the
+   strict policy a client refreshing in parallel can trigger it, and an operator reading the
+   log needs to know that before treating every row as a compromise.
+4. **Five accuracy corrections from review, all in the prose.** The first draft said
+   "exactly one" request succeeds, which is wrong when the token was already retired or
+   issuance fails, so it now says at most one and qualifies the race to a token that was
+   live when the requests arrived. The client contract regained the decided word
+   "atomically". The containment description counted the presented token among the live
+   members it revokes, when that token is by definition already retired, and omitted the
+   #132 residual entirely; both are now stated, on both pages. The rationale claimed
+   "evidence that a token has been copied", which overstates what the server knows, since a
+   delayed request from the same client produces the identical signal, so it now follows
+   RFC 9700's own framing that the server cannot identify which presenter is legitimate.
+   The audit paragraph gained decision 2's gate, that the event is emitted only when
+   containment revokes at least one live member. And the storage section gained decision
+   10's operator contract, that imports must populate `expires_at` because a row with both
+   expiry fields empty is never reaped, plus honest tuning advice: lowering a maximum
+   lifetime that never binds changes nothing, so it is the effective retention lifetime that
+   matters.
+5. **Two consistency corrections in a second review round.** The atomicity sentence had
+   been made self-contradicting by the previous round: it limited the scenario to a token
+   "still live" and then explained that zero can succeed because it was already retired. It
+   now states the invariant first (at most one across concurrent presentations, two never)
+   and splits the two situations. And the #132 residual made two later sentences wrong. The
+   surviving child does not stay usable "until it is itself replayed": its first use rotates
+   it normally, so the family keeps rotating until a retired member is presented again or
+   the surviving chain expires. And a repeated presentation is not unconditionally a no-op,
+   since a child that committed after the earlier containment is live and does get revoked
+   and recorded; the no-op claim is now conditioned on finding no live committed member.
+6. **The site build needed dependencies installed first.** `site/node_modules` was absent, so
+   `npm run build` failed with "astro: command not found" until `npm ci` ran. It builds on the
+   host, not in the dev container, which has no `npm`. 42 pages, no errors. The
+   `@astrojs/sitemap` warning about a missing `site` option is pre-existing and unrelated.
+   `node_modules/` and `dist/` are gitignored and are not in the commit.
 
 ## 6. Plan review findings
 
