@@ -239,10 +239,47 @@ func HandleTokenPost(
 					"This refresh token has been revoked.", http.StatusBadRequest))
 				return
 			}
-			refreshToken.Revoked = true
-			err = database.UpdateRefreshToken(nil, refreshToken)
+			// Atomically claim the row before minting anything. Until this landed the
+			// handler read Revoked during request validation and then wrote
+			// unconditionally, so two presentations of one refresh token could both
+			// observe revoked = false and each mint a token set (#128).
+			//
+			// A false return does NOT mean specifically "another rotation claimed it".
+			// It means the row is no longer live, which a concurrent rotation, a
+			// concurrent security revocation such as RevokeUserAuthState, or the row
+			// having been deleted all produce.
+			//
+			// Refusing without any family cascade follows from that AMBIGUITY, not from
+			// the three cases being individually harmless. One of them is a concurrent
+			// rotation whose freshly minted child a cascade would destroy, and nothing
+			// here can tell which case this is, so containment must not fire. Same
+			// reasoning as the authorization code path's lost claim (#77): it protects
+			// the requests whose lookup preceded the winning claim, so a legitimate
+			// double-submit does not tear down the winner's in-flight mint.
+			//
+			// A credential-change revocation is genuinely benign here, since it advanced
+			// the user's generation and the validator rejects the whole family before
+			// this handler runs. A DELETED row is an accepted residual: deletion is
+			// row-scoped and says nothing about descendants, so live family members can
+			// outlive their deleted ancestor without being contained on this path.
+			// Containment still fires on the next replay presented against any surviving
+			// member, because that request reads its own row revoked.
+			//
+			// It does not protect EVERY concurrent duplicate. One whose lookup lands
+			// after the winner's claim reads the row already revoked and takes the
+			// branch above instead. That is the strict rotation policy, chosen
+			// deliberately: the server cannot tell a delayed legitimate duplicate from
+			// a malicious replay from the token and the row alone.
+			claimed, err := database.MarkRefreshTokenAsRevoked(nil, refreshToken.Id)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			if !claimed {
+				slog.Debug("refresh_token: token was no longer live at claim time, rejecting",
+					"refreshTokenId", refreshToken.Id)
+				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					"This refresh token has been revoked.", http.StatusBadRequest))
 				return
 			}
 

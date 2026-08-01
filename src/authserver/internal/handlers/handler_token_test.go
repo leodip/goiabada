@@ -296,7 +296,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.AssertExpectations(t)
 	})
 
-	t.Run("Refresh_token UpdateRefreshToken gives error", func(t *testing.T) {
+	t.Run("Refresh_token MarkRefreshTokenAsRevoked gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -320,11 +320,11 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
-		database.On("UpdateRefreshToken", (*sql.Tx)(nil), mock.AnythingOfType("*models.RefreshToken")).
-			Return(customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to update refresh token", http.StatusInternalServerError))
+		database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), int64(1)).
+			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to claim refresh token", http.StatusInternalServerError))
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return strings.Contains(err.Error(), "Failed to update refresh token")
+			return strings.Contains(err.Error(), "Failed to claim refresh token")
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -360,8 +360,8 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
-		database.On("UpdateRefreshToken", (*sql.Tx)(nil), mock.AnythingOfType("*models.RefreshToken")).
-			Return(nil)
+		database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), int64(1)).
+			Return(true, nil)
 
 		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*oauth.GenerateTokenForRefreshInput")).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
@@ -419,8 +419,8 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
-		database.On("UpdateRefreshToken", (*sql.Tx)(nil), mock.AnythingOfType("*models.RefreshToken")).
-			Return(nil)
+		database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), int64(1)).
+			Return(true, nil)
 
 		mockTokenResponse := &oauth.TokenResponse{
 			AccessToken:  "new_access_token",
@@ -500,8 +500,8 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
-		database.On("UpdateRefreshToken", (*sql.Tx)(nil), mock.AnythingOfType("*models.RefreshToken")).
-			Return(nil)
+		database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), int64(1)).
+			Return(true, nil)
 
 		mockTokenResponse := &oauth.TokenResponse{
 			AccessToken:  "new_access_token",
@@ -991,6 +991,75 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "BeginTransaction")
 	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+}
+
+// TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses pins the branch a refresh
+// request takes when its validation read saw the token live but the compare-and-set
+// then failed: refuse, and do NOT run the family cascade (#128).
+//
+// The two negative assertions are the test. Without them it would pass under the
+// design decision 1 rejected, which cascades on the compare-and-set's false return.
+// That version tears down the winner's freshly minted child, because a false return
+// means only "the row was no longer live when this statement ran" and so merges the
+// concurrent loser with the sequential replayer.
+//
+// What it does NOT prove: the inter-request ordering that produced this state. A mocked
+// unit test fixes the state the handler reads and asserts the resulting branch; no
+// mocked test can establish that one HTTP request really arrived before another. Its
+// sibling for the other branch is the already-revoked subtest inside TestHandleTokenPost.
+func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	userSessionManager := mocks_users.NewUserSessionManager(t)
+	database := mocks_data.NewDatabase(t)
+	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+	tokenValidator := mocks_validators.NewTokenValidator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+
+	formData := "grant_type=refresh_token&refresh_token=raced"
+	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	// Revoked=false is the whole point: the validation read saw a live token, so this
+	// request is a compare-and-set loser rather than a replay.
+	racedToken := &models.RefreshToken{
+		Id:                   42,
+		Revoked:              false,
+		RefreshTokenJti:      "jti-raced",
+		FirstRefreshTokenJti: "jti-family",
+	}
+	validationResult := &validators.ValidateTokenRequestResult{
+		RefreshToken: racedToken,
+		CodeEntity:   &models.Code{Id: 1},
+	}
+
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+		Return(validationResult, nil)
+
+	// This request loses the race: the row stopped being live between the validation
+	// read and the claim.
+	database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), racedToken.Id).Return(false, nil)
+
+	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		detail, ok := err.(*customerrors.ErrorDetail)
+		return ok && detail.GetCode() == "invalid_grant"
+	})).Return().Once()
+
+	handler.ServeHTTP(rr, req)
+
+	httpHelper.AssertExpectations(t)
+	tokenValidator.AssertExpectations(t)
+	database.AssertExpectations(t)
+
+	// The loser must not mint tokens, must not cascade over the family, and must not
+	// audit anything.
+	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
+	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything)
+	userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }
 
