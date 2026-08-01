@@ -586,7 +586,9 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 		t.Error("Code3 (unused) should not have been deleted")
 	}
 
-	// Additional Test Case: Delete code with expired/revoked refresh token
+	// Additional Test Case: Delete code whose refresh token has expired.
+	// The token below is also revoked, but that is incidental: since #128 the sweep
+	// deletes it solely because it is past both expires_at and max_lifetime.
 	code4 := createTestCode(t, client.Id, user.Id)
 	code4.Used = true
 	err = database.UpdateCode(nil, code4)
@@ -594,7 +596,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 		t.Fatalf("Failed to update code4 as used: %v", err)
 	}
 
-	// Create expired and revoked refresh token for code4
+	// Create an expired refresh token for code4 (revoked too, which no longer matters)
 	revokedRefreshToken := &models.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: code4.Id, Valid: true},
 		RefreshTokenJti:   "test_jti_" + gofakeit.LetterN(6),
@@ -611,10 +613,10 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 		t.Fatalf("Failed to create revoked refresh token: %v", err)
 	}
 
-	// Delete expired/revoked refresh tokens first
-	err = database.DeleteExpiredOrRevokedRefreshTokens(nil)
+	// Delete expired refresh tokens first
+	err = database.DeleteExpiredRefreshTokens(nil)
 	if err != nil {
-		t.Fatalf("Failed to delete expired/revoked refresh tokens: %v", err)
+		t.Fatalf("Failed to delete expired refresh tokens: %v", err)
 	}
 
 	// Then delete used codes without valid refresh tokens. Future cutoff, as above.
@@ -629,7 +631,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 		t.Fatalf("Error checking code4: %v", err)
 	}
 	if remainingCode4 != nil {
-		t.Error("Code4 (used, expired/revoked refresh token) should have been deleted")
+		t.Error("Code4 (used, expired refresh token) should have been deleted")
 	}
 }
 

@@ -95,8 +95,8 @@ func (d *MsSQLDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) err
 	return d.CommonDB.DeleteRefreshToken(tx, refreshTokenId)
 }
 
-func (d *MsSQLDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
-	return d.CommonDB.DeleteExpiredOrRevokedRefreshTokens(tx)
+func (d *MsSQLDatabase) DeleteExpiredRefreshTokens(tx *sql.Tx) error {
+	return d.CommonDB.DeleteExpiredRefreshTokens(tx)
 }
 
 func (d *MsSQLDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error {

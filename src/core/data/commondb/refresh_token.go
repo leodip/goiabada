@@ -425,8 +425,31 @@ func (d *CommonDatabase) deleteRefreshTokensByColumn(tx *sql.Tx, column string, 
 	return nil
 }
 
-// Deletes refresh tokens that are either expired (by expires_at or max_lifetime) or revoked
-func (d *CommonDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
+// DeleteExpiredRefreshTokens deletes refresh tokens the protocol can no longer accept,
+// by expires_at or max_lifetime. Being revoked is NOT a reason to delete a row.
+//
+// It used to be, and that erased the replay-detection signal on the cleanup worker's
+// schedule: once a revoked row is gone, presenting its token finds nothing, so the replay
+// is refused but never detected and the live family is never contained (#128). RFC 9700
+// Section 4.14.2 requires rotation to retain enough relationship information for an
+// invalidated token to reveal a breach.
+//
+// Retention therefore coincides with the interval in which detection is possible. An
+// expired token is rejected by the JWT expiration check before its row is ever read, so
+// keeping the row past that point buys nothing, and deleting it before that point destroys
+// the only evidence linking the presented token to its live descendants.
+//
+// A revoked row with both timestamps NULL is deliberately NOT reaped, even though the old
+// predicate deleted it. No issuer creates one, so it can only come from legacy or imported
+// data, and the row is the detection signal: a signed token whose imported row lacks
+// expiry columns can still carry an unexpired exp. There is also no principled deletion
+// time to compute, since the database lacks the information, and a method by this name
+// must not delete rows it cannot show are expired. Removing such rows is left to an
+// explicit operator action.
+//
+// The storage cost is accepted: with the default 30-day offline idle timeout, a grant
+// rotated every five minutes retains roughly 8,640 detection-relevant revoked rows.
+func (d *CommonDatabase) DeleteExpiredRefreshTokens(tx *sql.Tx) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()
 	deleteBuilder.DeleteFrom("refresh_tokens")
 
@@ -435,14 +458,13 @@ func (d *CommonDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
 		deleteBuilder.Or(
 			deleteBuilder.LessThan("expires_at", now),
 			deleteBuilder.LessThan("max_lifetime", now),
-			deleteBuilder.Equal("revoked", true),
 		),
 	)
 
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete expired/revoked refresh tokens")
+		return errors.Wrap(err, "unable to delete expired refresh tokens")
 	}
 
 	return nil

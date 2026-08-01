@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
@@ -760,4 +761,39 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Equal(t, "This refresh token has been revoked.", data["error_description"])
+}
+
+// TestToken_Refresh_MissingRowIsInvalidGrant pins that a validly signed, unexpired
+// refresh token whose row is gone returns 400 invalid_grant, not 500 (#128).
+//
+// It used to return a plain error, which JsonError maps to server_error with a 500.
+// RFC 6749 Section 5.2 classifies an invalid, expired or revoked refresh token as
+// invalid_grant, and a client cannot act on a 500 the way it can act on invalid_grant:
+// one says "retry later, the server is broken", the other says "reauthorize".
+//
+// The row is deleted DIRECTLY rather than by waiting for a sweep. That is deliberate and
+// is a consequence of the retention change in the same stage: DeleteExpiredRefreshTokens
+// no longer removes an unexpired row for any reason, so constructing the state is now the
+// only way to reach it. In production it arrives through user deletion, a referential
+// cascade or a database restore.
+func TestToken_Refresh_MissingRowIsInvalidGrant(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	refreshToken := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
+		code.Code, code.RedirectURI, "code-verifier")
+
+	row := refreshTokenRowByJti(t, refreshToken)
+	require.NoError(t, database.DeleteRefreshToken(nil, row.Id))
+
+	gone, err := database.GetRefreshTokenByJti(nil, refreshTokenJti(t, refreshToken))
+	require.NoError(t, err)
+	require.Nil(t, gone, "the fixture must actually remove the row")
+
+	status, body := replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, refreshToken)
+	assertRefusedAsInvalidGrant(t, status, body, "a signed refresh token with no row")
+
+	// The message must not reveal that the row was missing: that would distinguish a
+	// never-issued JTI from a revoked one.
+	assert.NotContains(t, body["error_description"], "database")
 }

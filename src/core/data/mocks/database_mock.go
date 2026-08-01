@@ -2271,12 +2271,12 @@ func (_c *Database_DeleteCode_Call) RunAndReturn(run func(tx *sql.Tx, codeId int
 	return _c
 }
 
-// DeleteExpiredOrRevokedRefreshTokens provides a mock function for the type Database
-func (_mock *Database) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
+// DeleteExpiredRefreshTokens provides a mock function for the type Database
+func (_mock *Database) DeleteExpiredRefreshTokens(tx *sql.Tx) error {
 	ret := _mock.Called(tx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for DeleteExpiredOrRevokedRefreshTokens")
+		panic("no return value specified for DeleteExpiredRefreshTokens")
 	}
 
 	var r0 error
@@ -2288,18 +2288,18 @@ func (_mock *Database) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
 	return r0
 }
 
-// Database_DeleteExpiredOrRevokedRefreshTokens_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteExpiredOrRevokedRefreshTokens'
-type Database_DeleteExpiredOrRevokedRefreshTokens_Call struct {
+// Database_DeleteExpiredRefreshTokens_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteExpiredRefreshTokens'
+type Database_DeleteExpiredRefreshTokens_Call struct {
 	*mock.Call
 }
 
-// DeleteExpiredOrRevokedRefreshTokens is a helper method to define mock.On call
+// DeleteExpiredRefreshTokens is a helper method to define mock.On call
 //   - tx *sql.Tx
-func (_e *Database_Expecter) DeleteExpiredOrRevokedRefreshTokens(tx any) *Database_DeleteExpiredOrRevokedRefreshTokens_Call {
-	return &Database_DeleteExpiredOrRevokedRefreshTokens_Call{Call: _e.mock.On("DeleteExpiredOrRevokedRefreshTokens", tx)}
+func (_e *Database_Expecter) DeleteExpiredRefreshTokens(tx any) *Database_DeleteExpiredRefreshTokens_Call {
+	return &Database_DeleteExpiredRefreshTokens_Call{Call: _e.mock.On("DeleteExpiredRefreshTokens", tx)}
 }
 
-func (_c *Database_DeleteExpiredOrRevokedRefreshTokens_Call) Run(run func(tx *sql.Tx)) *Database_DeleteExpiredOrRevokedRefreshTokens_Call {
+func (_c *Database_DeleteExpiredRefreshTokens_Call) Run(run func(tx *sql.Tx)) *Database_DeleteExpiredRefreshTokens_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *sql.Tx
 		if args[0] != nil {
@@ -2312,12 +2312,12 @@ func (_c *Database_DeleteExpiredOrRevokedRefreshTokens_Call) Run(run func(tx *sq
 	return _c
 }
 
-func (_c *Database_DeleteExpiredOrRevokedRefreshTokens_Call) Return(err error) *Database_DeleteExpiredOrRevokedRefreshTokens_Call {
+func (_c *Database_DeleteExpiredRefreshTokens_Call) Return(err error) *Database_DeleteExpiredRefreshTokens_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *Database_DeleteExpiredOrRevokedRefreshTokens_Call) RunAndReturn(run func(tx *sql.Tx) error) *Database_DeleteExpiredOrRevokedRefreshTokens_Call {
+func (_c *Database_DeleteExpiredRefreshTokens_Call) RunAndReturn(run func(tx *sql.Tx) error) *Database_DeleteExpiredRefreshTokens_Call {
 	_c.Call.Return(run)
 	return _c
 }

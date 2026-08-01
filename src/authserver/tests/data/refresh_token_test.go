@@ -516,91 +516,106 @@ func TestGetRefreshTokensBySessionIdentifier_RejectsEmpty(t *testing.T) {
 	}
 }
 
-func TestDeleteExpiredOrRevokedRefreshTokens(t *testing.T) {
-	// Create a set of test refresh tokens with different states
+// TestDeleteExpiredRefreshTokens is the exhaustive table for the cleanup predicate,
+// which after #128 is exactly `expires_at < now OR max_lifetime < now`. There is no
+// third disjunct.
+//
+// TWO ROWS DELIBERATELY REVERSE THE BEHAVIOUR THIS TEST ASSERTED BEFORE, and both are
+// marked below. Do not "correct" them back. Being revoked used to be a reason to delete
+// a row, and that erased the replay-detection signal on the cleanup worker's schedule:
+// once the row is gone a replay is refused but never detected, and its live family is
+// never contained. Retention now coincides with the interval in which detection is
+// possible, since an expired token is rejected by the JWT check before its row is read.
+func TestDeleteExpiredRefreshTokens(t *testing.T) {
+	past := sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true}
+	future := sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true}
+	farFuture := sql.NullTime{Time: time.Now().UTC().Add(48 * time.Hour), Valid: true}
+	absent := sql.NullTime{}
 
-	// 1. Valid token (should not be deleted)
-	validToken := createTestRefreshToken(t)
-	validToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true}
-	validToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(48 * time.Hour), Valid: true}
-	validToken.Revoked = false
-	err := database.UpdateRefreshToken(nil, validToken)
-	if err != nil {
-		t.Fatalf("Failed to update valid token: %v", err)
-	}
-
-	// 2. Expired token based on ExpiresAt (should be deleted)
-	expiredToken := createTestRefreshToken(t)
-	expiredToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true}
-	expiredToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(48 * time.Hour), Valid: true}
-	expiredToken.Revoked = false
-	err = database.UpdateRefreshToken(nil, expiredToken)
-	if err != nil {
-		t.Fatalf("Failed to update expired token: %v", err)
-	}
-
-	// 3. Expired token based on MaxLifetime (should be deleted)
-	maxLifetimeExpiredToken := createTestRefreshToken(t)
-	maxLifetimeExpiredToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true}
-	maxLifetimeExpiredToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true}
-	maxLifetimeExpiredToken.Revoked = false
-	err = database.UpdateRefreshToken(nil, maxLifetimeExpiredToken)
-	if err != nil {
-		t.Fatalf("Failed to update max lifetime expired token: %v", err)
-	}
-
-	// 4. Revoked token (should be deleted)
-	revokedToken := createTestRefreshToken(t)
-	revokedToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true}
-	revokedToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(48 * time.Hour), Valid: true}
-	revokedToken.Revoked = true
-	err = database.UpdateRefreshToken(nil, revokedToken)
-	if err != nil {
-		t.Fatalf("Failed to update revoked token: %v", err)
-	}
-
-	// Execute the deletion
-	err = database.DeleteExpiredOrRevokedRefreshTokens(nil)
-	if err != nil {
-		t.Fatalf("Failed to delete expired or revoked refresh tokens: %v", err)
-	}
-
-	// Verify the results
-
-	// 1. Valid token should still exist
-	validTokenCheck, err := database.GetRefreshTokenById(nil, validToken.Id)
-	if err != nil {
-		t.Fatalf("Error checking valid token: %v", err)
-	}
-	if validTokenCheck == nil {
-		t.Error("Valid token was incorrectly deleted")
-	}
-
-	// 2. Expired token should be deleted
-	expiredTokenCheck, err := database.GetRefreshTokenById(nil, expiredToken.Id)
-	if err != nil {
-		t.Fatalf("Error checking expired token: %v", err)
-	}
-	if expiredTokenCheck != nil {
-		t.Error("Expired token was not deleted")
-	}
-
-	// 3. MaxLifetime expired token should be deleted
-	maxLifetimeExpiredTokenCheck, err := database.GetRefreshTokenById(nil, maxLifetimeExpiredToken.Id)
-	if err != nil {
-		t.Fatalf("Error checking max lifetime expired token: %v", err)
-	}
-	if maxLifetimeExpiredTokenCheck != nil {
-		t.Error("MaxLifetime expired token was not deleted")
+	testCases := []struct {
+		name        string
+		revoked     bool
+		expiresAt   sql.NullTime
+		maxLifetime sql.NullTime
+		wantKept    bool
+		why         string
+	}{
+		{
+			name: "revoked but unexpired", revoked: true, expiresAt: future, maxLifetime: farFuture,
+			wantKept: true,
+			why:      "KEEP THIS ROW: it reverses the old behaviour and is the whole of the retention change",
+		},
+		{
+			name: "revoked and past expires_at", revoked: true, expiresAt: past, maxLifetime: farFuture,
+			wantKept: false,
+			why:      "expired, so no longer presentable and no longer worth retaining",
+		},
+		{
+			name: "revoked, unexpired, past max_lifetime", revoked: true, expiresAt: future, maxLifetime: past,
+			wantKept: false,
+			why:      "the offline branch of the predicate",
+		},
+		{
+			name: "live and past expires_at", revoked: false, expiresAt: past, maxLifetime: farFuture,
+			wantKept: false,
+			why:      "unchanged by #128",
+		},
+		{
+			name: "live and unexpired", revoked: false, expiresAt: future, maxLifetime: farFuture,
+			wantKept: true,
+			why:      "unchanged by #128",
+		},
+		{
+			name: "live, unexpired, NULL max_lifetime", revoked: false, expiresAt: future, maxLifetime: absent,
+			wantKept: true,
+			why:      "NULL < now must not delete a session-bound row, which never sets max_lifetime",
+		},
+		{
+			name: "live, past expires_at, NULL max_lifetime", revoked: false, expiresAt: past, maxLifetime: absent,
+			wantKept: false,
+			why:      "the same NULL asymmetry in the other direction: one disjunct still matches",
+		},
+		{
+			name: "revoked with both timestamps NULL", revoked: true, expiresAt: absent, maxLifetime: absent,
+			wantKept: true,
+			why: "KEEP THIS ROW: it also reverses the old behaviour. Both comparisons yield NULL, " +
+				"so the sweep can never reap it. No issuer creates such a row, so it means legacy or " +
+				"imported data, and the row is the detection signal: an imported row with no expiry " +
+				"columns can still back a signed token with an unexpired exp. Deleting it would " +
+				"recreate the exact defect retention exists to fix, and there is no principled " +
+				"deletion time to compute from the row. Operator cleanup, not this sweep, removes it",
+		},
 	}
 
-	// 4. Revoked token should be deleted
-	revokedTokenCheck, err := database.GetRefreshTokenById(nil, revokedToken.Id)
-	if err != nil {
-		t.Fatalf("Error checking revoked token: %v", err)
+	ids := make([]int64, len(testCases))
+	for i, tc := range testCases {
+		rt := createTestRefreshToken(t)
+		rt.Revoked = tc.revoked
+		rt.ExpiresAt = tc.expiresAt
+		rt.MaxLifetime = tc.maxLifetime
+		if err := database.UpdateRefreshToken(nil, rt); err != nil {
+			t.Fatalf("failed to seed %q: %v", tc.name, err)
+		}
+		ids[i] = rt.Id
 	}
-	if revokedTokenCheck != nil {
-		t.Error("Revoked token was not deleted")
+
+	// One sweep for the whole table: the cases must not be able to influence each other
+	// through repeated deletes.
+	if err := database.DeleteExpiredRefreshTokens(nil); err != nil {
+		t.Fatalf("DeleteExpiredRefreshTokens failed: %v", err)
+	}
+
+	for i, tc := range testCases {
+		row, err := database.GetRefreshTokenById(nil, ids[i])
+		if err != nil {
+			t.Fatalf("error checking %q: %v", tc.name, err)
+		}
+		if tc.wantKept && row == nil {
+			t.Errorf("%q was deleted but must be retained (%s)", tc.name, tc.why)
+		}
+		if !tc.wantKept && row != nil {
+			t.Errorf("%q was retained but must be deleted (%s)", tc.name, tc.why)
+		}
 	}
 }
 

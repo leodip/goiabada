@@ -45,8 +45,8 @@ func (d *SQLiteDatabase) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, session
 func (d *SQLiteDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error {
 	return d.CommonDB.DeleteRefreshToken(tx, refreshTokenId)
 }
-func (d *SQLiteDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
-	return d.CommonDB.DeleteExpiredOrRevokedRefreshTokens(tx)
+func (d *SQLiteDatabase) DeleteExpiredRefreshTokens(tx *sql.Tx) error {
+	return d.CommonDB.DeleteExpiredRefreshTokens(tx)
 }
 
 func (d *SQLiteDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error {

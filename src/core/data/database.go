@@ -275,7 +275,12 @@ type Database interface {
 	RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error
 	RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error
 	RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error
-	DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error
+	// DeleteExpiredRefreshTokens deletes refresh tokens the protocol can no longer
+	// accept, by expires_at or max_lifetime. Being revoked is NOT a reason to delete
+	// a row: a revoked row is the replay-detection signal, and reaping it early means
+	// a replay is refused but never detected and its live family never contained
+	// (#128, RFC 9700 Section 4.14.2).
+	DeleteExpiredRefreshTokens(tx *sql.Tx) error
 
 	CreateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error
 	UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error

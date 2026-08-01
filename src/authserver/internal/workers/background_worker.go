@@ -164,11 +164,13 @@ func jitter(max time.Duration) time.Duration {
 func (w *Worker) performTask(ctx context.Context) {
 	slog.Info("worker task started")
 
-	err := w.database.DeleteExpiredOrRevokedRefreshTokens(nil)
+	// Revoked rows are deliberately NOT swept here. They are the replay-detection
+	// signal, retained until the token itself expires (#128).
+	err := w.database.DeleteExpiredRefreshTokens(nil)
 	if err != nil {
-		slog.Error(fmt.Sprintf("error deleting expired or revoked refresh tokens: %v", err))
+		slog.Error(fmt.Sprintf("error deleting expired refresh tokens: %v", err))
 	} else {
-		slog.Info("deleted expired or revoked refresh tokens")
+		slog.Info("deleted expired refresh tokens")
 	}
 
 	if cancelled(ctx) {

@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
@@ -2416,7 +2417,19 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "the refresh token is invalid because it does not exist in the database")
+
+		// UPDATED DELIBERATELY, not a stale assertion: this used to be a plain error,
+		// which JsonError maps to a 500. A validly signed refresh token with no row is
+		// an invalid grant, not a server fault (RFC 6749 Section 5.2, #128).
+		detail, ok := err.(*customerrors.ErrorDetail)
+		require.Truef(t, ok, "a missing refresh token row must be an ErrorDetail, got %T", err)
+		assert.Equal(t, "invalid_grant", detail.GetCode())
+		assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+
+		// The message must NOT reveal that the row was missing, since that would
+		// distinguish a never-issued JTI from a revoked one.
+		assert.Equal(t, "The refresh token is invalid.", detail.GetDescription())
+		assert.NotContains(t, detail.GetDescription(), "database")
 	})
 
 	t.Run("Refresh token with mismatched client", func(t *testing.T) {
@@ -5084,4 +5097,72 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup pins the ordering that
+// bounds replay containment's horizon: an expired refresh token is refused by the JWT
+// expiration check BEFORE its row is ever read (#128).
+//
+// This lives at the unit tier deliberately, and cannot be moved to integration. An
+// integration test observes only the HTTP response, which is an identical 400
+// invalid_grant whether or not the lookup ran, so it would pass with the ordering
+// reversed. Only a mocked database can assert that GetRefreshTokenByJti was never
+// called.
+//
+// The LOAD-BEARING assertion is the literal `true` in the DecodeAndValidateTokenString
+// expectation, which is the expiration check itself. Confirmed by mutation: changing that
+// argument to false fails this test on the unmatched expectation. Without it the server
+// would accept expired refresh tokens outright.
+//
+// The AssertNotCalled is weaker than it looks, and worth being honest about. The ordering
+// is already forced structurally, since the lookup key is the jti claim read out of the
+// parsed token, so the lookup cannot precede the parse. It is kept as a guard against a
+// future rewrite that finds the row some other way, not as the thing that proves the
+// current ordering.
+//
+// Why the ordering matters: containment fires on the persisted revoked flag, so if an
+// expired token could reach the lookup it could still trigger a family cascade long after
+// the protocol stopped accepting it. The horizon is bounded and protocol-defined instead.
+func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "refresh_token",
+		ClientId:     "client1",
+		RefreshToken: "expired_refresh_token",
+	}
+
+	client := &models.Client{
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 true,
+	}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+
+	// withExpirationCheck = true is what makes the parser reject an expired token.
+	mockTokenParser.On("DecodeAndValidateTokenString", "expired_refresh_token", (*rsa.PublicKey)(nil), true).
+		Return(nil, errors.New("token has invalid claims: token is expired")).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	require.Error(t, err)
+
+	detail, ok := err.(*customerrors.ErrorDetail)
+	require.Truef(t, ok, "an expired refresh token must be an ErrorDetail, got %T", err)
+	assert.Equal(t, "invalid_grant", detail.GetCode())
+	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+
+	// Structurally redundant today, kept as a guard. See the doc comment.
+	mockDB.AssertNotCalled(t, "GetRefreshTokenByJti", mock.Anything, mock.Anything)
+
+	mockDB.AssertExpectations(t)
+	mockTokenParser.AssertExpectations(t)
 }

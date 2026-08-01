@@ -416,7 +416,20 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, err
 		}
 		if refreshToken == nil {
-			return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not exist in the database"))
+			// A validly signed, unexpired refresh token with no row. RFC 6749 Section 5.2
+			// classifies an invalid, expired or revoked refresh token as invalid_grant, so
+			// this is a 400 rather than the 500 a plain error would produce through
+			// JsonError's fallback mapping (#128).
+			//
+			// Retention (DeleteExpiredRefreshTokens) makes this rare but cannot remove it:
+			// user deletion, referential cascades and database restores all leave a signed
+			// token with no row.
+			//
+			// The message stays generic and does NOT say the row was missing. A caller
+			// cannot be told apart from an attacker here, and distinguishing "no such row"
+			// from "revoked" would confirm which JTIs were ever issued.
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				"The refresh token is invalid.", http.StatusBadRequest)
 		}
 
 		// Determine if this is an auth code flow token (with CodeId) or ROPC token (with UserId/ClientId)
