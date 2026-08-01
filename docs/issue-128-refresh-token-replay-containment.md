@@ -26,6 +26,11 @@
 | `data/delete-expired-or-revoked` | `src/core/data/commondb/refresh_token.go` | `DeleteExpiredOrRevokedRefreshTokens` | `unable to delete expired/revoked refresh tokens` | deletes every revoked row with no grace |
 | `data/iface-mark-code-as-used` | `src/core/data/database.go` | `n/a` | `MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error)` | interface declaration to mirror |
 | `data/iface-refresh-by-code` | `src/core/data/database.go` | `n/a` | `GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)` | where a family query would be declared |
+| `data/mark-refresh-token-revoked` | `src/core/data/commondb/refresh_token.go` | `MarkRefreshTokenAsRevoked` | `// MarkRefreshTokenAsRevoked atomically transitions a refresh token from live to` | added by stage 2; the defect 1 compare-and-set |
+| `data/revoke-refresh-token-family` | `src/core/data/commondb/refresh_token.go` | `RevokeRefreshTokenFamily` | `// RevokeRefreshTokenFamily revokes every currently live member of one rotation family` | added by stage 2; the defect 2 cascade |
+| `data/iface-refresh-family` | `src/core/data/database.go` | `n/a` | `RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error)` | added by stage 2; its sibling sits directly above |
+| `test/data-mark-refresh-revoked` | `src/authserver/tests/data/refresh_token_test.go` | `TestMarkRefreshTokenAsRevoked` | `MarkRefreshTokenAsRevoked(0) must return an error` | added by stage 2 |
+| `test/data-revoke-family` | `src/authserver/tests/data/refresh_token_test.go` | `TestRevokeRefreshTokenFamily` | `two families on one browser session` | added by stage 2 |
 | `model/refresh-token-family-jti` | `src/core/models/refresh_token.go` | `n/a` | `FirstRefreshTokenJti` | the family identity, written but never read |
 | `model/refresh-token-generation` | `src/core/models/refresh_token.go` | `n/a` | `// AuthStateGeneration records the generation this token's grant was authenticated` | the #106 column and its dont-update tag |
 | `issuer/refresh-family-carry` | `src/core/oauth/token_issuer.go` | `generateRefreshToken` | `refreshTokenEntity.FirstRefreshTokenJti = refreshToken.FirstRefreshTokenJti` | family carried forward on auth-code rotation |
@@ -830,8 +835,11 @@ RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
 ```
 
 `MarkRefreshTokenAsRevoked` mirrors `data/mark-code-as-used` including its zero-id guard, and
-sets only `revoked` and `updated_at`, so it cannot regress `auth_state_generation` the way a
-full-row update would (the hazard `model/refresh-token-generation` records).
+writes only `revoked` and `updated_at`, so it cannot touch `auth_state_generation` at all.
+That is an independent guarantee rather than a repair of `data/update-refresh-token`, which
+already excludes the column through its `dont-update` tag
+(`model/refresh-token-generation`). Stating it in the statement means the boundary does not
+rest on a struct tag a future full-row writer might not honour.
 `RevokeRefreshTokenFamily` returns an error on an empty family identifier. Note this is a
 stronger contract than the neighbouring guards, not the same one:
 `data/refresh-tokens-by-session` returns an empty result for an empty key. On a revocation
@@ -997,38 +1005,47 @@ Tests: data tier only, dev container, all four engines.
       `CREATE INDEX` to their trailing index block, and sqlite's block is backtick-quoted while
       postgres's is not. This is the divergence the step anticipated, landing in the snapshots
       rather than in the migrations.
-   5. **The PostgreSQL branch bounds its ordinal by `indnkeyatts`**, added during review of this
-      stage. `pg_index.indkey` holds INCLUDE columns after the key ones, so without the bound
+   5. **The PostgreSQL branch bounds its key-column position by `indnkeyatts`**, added during
+      review of this stage. `pg_index.indkey` holds INCLUDE columns after the key ones, so without the bound
       that branch would have reported payload columns as key columns, contradicting both
       `indexShape.Columns`'s stated contract and the mssql branch's `is_included_column` filter.
       It does not affect this stage's index, which has no INCLUDE columns, so it is hardening
       for later callers rather than a fix to a wrong result here.
+   6. **Corrected during stage 2's review, after this stage was committed.** That comment
+      originally used the bare word "ordinal", which Tailwind's scanner treats as a candidate
+      for its `.ordinal` utility, so the next `build.sh` emitted 29 unrelated lines into
+      `web/static/main.css`. Reported here first as pre-existing drift, which was wrong: this
+      stage caused it. The word is now "position", and a rebuild leaves `main.css` clean. Worth
+      knowing generally: Tailwind scans Go source in this repo, so a comment can change the
+      generated stylesheet.
 
 ### Stage 2: the two new data-layer methods
-Status: **Not started**
+Status: **Done**
 
 Tests: data tier in the container for behaviour, host unit tests for compilation after the
 mock regeneration.
 
 1. Add `MarkRefreshTokenAsRevoked(tx, refreshTokenId) (bool, error)` to `commondb`, the
    `Database` interface next to `data/iface-mark-code-as-used`, and the four engine
-   delegations. Status: **Not started**
+   delegations. Status: **Done** (`data/mark-refresh-token-revoked`)
    Conditional `UPDATE ... SET revoked = true, updated_at = ? WHERE id = ? AND revoked =
    false`, returning `rowsAffected == 1`. Mirrors `data/mark-code-as-used` including its
-   zero-id error guard. Sets only the two columns, so it cannot regress
-   `auth_state_generation` the way a full-row `data/update-refresh-token` would.
-2. Add `RevokeRefreshTokenFamily(tx, firstRefreshTokenJti) (int64, error)`. Status: **Not started**
+   zero-id error guard. Writes only the two columns, so it cannot touch
+   `auth_state_generation` at all. Independent of `data/update-refresh-token`, which
+   already excludes that column through its `dont-update` tag rather than by its predicate.
+2. Add `RevokeRefreshTokenFamily(tx, firstRefreshTokenJti) (int64, error)`.
+   Status: **Done** (`data/revoke-refresh-token-family`, `data/iface-refresh-family`)
    `UPDATE ... SET revoked = true, updated_at = ? WHERE first_refresh_token_jti = ? AND
    revoked = false`, returning `RowsAffected`. Errors on an empty identifier. Per decision 7.
 3. Regenerate `src/core/data/mocks/database_mock.go` from `src/core/.mockery.yaml`.
-   Status: **Not started**
+   Status: **Done**
    Not optional and not cosmetic: every package that constructs `mocks_data.Database` fails to
    compile against an interface with unimplemented methods. Verify by running the host unit
    tiers, which is what this step's "tests" are. Note this is **not** the only regeneration:
    stage 5 renames a third interface method and must regenerate again, since the mock produced
    here still carries `DeleteExpiredOrRevokedRefreshTokens`.
 4. Extend `src/authserver/tests/data/refresh_token_test.go` with
-   `TestMarkRefreshTokenAsRevoked`. Status: **Not started**
+   `TestMarkRefreshTokenAsRevoked`. Status: **Done** (`test/data-mark-refresh-revoked`)
    Modelled on `test/data-mark-code-as-used`.
 
    | Case | Expected | Why it fails for that reason |
@@ -1042,7 +1059,7 @@ mock regeneration.
    The id-`0` row must assert an **error**. Executed: the bare SQL returns 0 rows for id 0, so
    an assertion of `false` would pass with the guard deleted and would be indistinguishable
    from the non-existent-id row. The guard is the only thing under test there.
-5. Add `TestRevokeRefreshTokenFamily` to the same file. Status: **Not started**
+5. Add `TestRevokeRefreshTokenFamily` to the same file. Status: **Done** (`test/data-revoke-family`)
    Fixtures follow `test/data-refresh-by-session` and `test/data-promote-generations`.
 
    | Case | Expected count | Pins |
@@ -1057,9 +1074,9 @@ mock regeneration.
 
    The empty-identifier row must assert an **error**, and this is the trap worth naming. No
    production row has an empty `first_refresh_token_jti`, so asserting "revokes nothing" would
-   pass with the guard deleted: it would be the benign instance of the class. Executed with the
-   guard removed and rows deliberately seeded with an empty family id, the statement revoked
-   **2 of 3** rows, which is what the guard exists to prevent.
+   pass with the guard deleted: it would be the benign instance of the class. Confirmed against
+   the implementation by deleting the guard and re-running: the statement revoked the seeded
+   empty-family row and returned a nonzero count, which is what the guard exists to prevent.
 
    This table is the exhaustive owner of the family predicate's semantics. The handler tests in
    stages 3 and 4 are deliberately thin on it and assert only that the handler calls it and
@@ -1068,6 +1085,42 @@ mock regeneration.
    **What this tier cannot prove:** that anything calls either method, and that the three
    non-SQLite engines agree. The first is stages 3 and 4; the second is why this tier runs
    `--db all`.
+
+   **As built.** Both methods in `commondb/refresh_token.go`, declared on the `Database`
+   interface directly under `UpdateRefreshToken`, delegated by all four engine types, and
+   the mock regenerated. Tests appended to `refresh_token_test.go`: the two flat tests
+   listed above plus `TestMarkRefreshTokenAsRevoked_DoesNotClobberAuthStateGeneration`.
+
+   Four things worth knowing, all contained inside these steps:
+
+   1. **Both guards were verified by deleting them**, not by reading the code. With the
+      id-zero guard removed, `MarkRefreshTokenAsRevoked(nil, 0)` returns `(false, nil)` and
+      the test fails; with the empty-identifier guard removed,
+      `RevokeRefreshTokenFamily(nil, "")` revoked the seeded row and returned a nonzero
+      count, and both of that case's assertions fail. This is the check the plan called for
+      on the empty-identifier row, since asserting "revokes nothing" there would have been
+      the benign instance of the class. The guards were restored and the suite re-run.
+   2. **A generation test was added that the plan did not list**,
+      `TestMarkRefreshTokenAsRevoked_DoesNotClobberAuthStateGeneration`. It promotes a row to
+      generation 5, claims it, and asserts the generation survived.
+      It records an **independent** contract for the narrow writer, and review corrected the
+      rationale first written here: rewriting the claim as `UpdateRefreshToken` with a stale
+      model would **not** regress the column, because that path already excludes it through
+      the field's `dont-update` tag, which
+      `TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration` already covers. The value of
+      this test is that the guarantee then holds from the statement's own column list rather
+      than from a struct tag a future full-row writer might not honour. The same false
+      rationale appeared in the method's doc comment, the test's doc comment and section 4,
+      and was corrected in all three.
+   3. **`TestRevokeRefreshTokenFamily` uses subtests**, one per row of the table, because
+      each case needs its own client, user, code and family and the shared test database is
+      not reset between them. `refresh_token_test.go` had no subtests before; the package
+      does use them (`unknown_id_test.go`, `load_helpers_test.go`).
+   4. **Two fixture helpers were needed.** `seedFamilyToken` takes a `familyTokenSpec` so a
+      case can choose the family identifier, the linkage shape and the revoked state;
+      `createTestRefreshToken` fixes all three and leaves `first_refresh_token_jti` empty.
+      `seedCodeOnSession` exists because `createTestCode` generates its own session
+      identifier, and the decision 3 case needs two codes deliberately sharing one.
 
 ### Stage 3: atomic single use (defect 1)
 Status: **Not started**
