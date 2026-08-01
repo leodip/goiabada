@@ -1439,6 +1439,7 @@ CREATE INDEX idx_codes_user_id ON codes(user_id);
 CREATE INDEX idx_codes_session_identifier ON codes(session_identifier);
 CREATE INDEX idx_refresh_tokens_code_id ON refresh_tokens(code_id);
 CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX idx_refresh_tokens_first_refresh_token_jti ON refresh_tokens(first_refresh_token_jti);
 
 
 --

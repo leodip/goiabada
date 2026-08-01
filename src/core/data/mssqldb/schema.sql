@@ -445,3 +445,4 @@ CREATE INDEX [idx_codes_user_id] ON [dbo].[codes] ([user_id]);
 CREATE INDEX [idx_codes_session_identifier] ON [dbo].[codes] ([session_identifier]);
 CREATE INDEX [idx_refresh_tokens_code_id] ON [dbo].[refresh_tokens] ([code_id]);
 CREATE INDEX [idx_user_sessions_user_id] ON [dbo].[user_sessions] ([user_id]);
+CREATE INDEX [idx_refresh_tokens_first_refresh_token_jti] ON [dbo].[refresh_tokens] ([first_refresh_token_jti]);

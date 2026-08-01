@@ -111,6 +111,89 @@ func newIsolated(t *testing.T, db migratable, sqlDB *sql.DB) *isolatedDB {
 	return &isolatedDB{DB: db, SQL: sqlDB, Migrator: m}
 }
 
+// indexShape is one index as the engine's catalog reports it. Exists is derived from
+// Columns rather than counted separately: an index with no key columns is not a thing
+// any of the four engines can produce.
+type indexShape struct {
+	Exists  bool
+	Unique  bool
+	Columns []string // key columns, in index order
+}
+
+// describeIndex reads an index's uniqueness and key columns from the configured
+// dialect's catalog. It exists because asserting only that an index NAME is present
+// lets a wrongly built index pass: created on the wrong column, or created UNIQUE on
+// a column that is deliberately repeated, both of which are the failures worth
+// catching.
+//
+// Every query normalises uniqueness to '1' or '0' in SQL rather than in Go. The
+// polarity is not consistent across the catalogs (MySQL reports NON_UNIQUE, which is
+// 0 for a unique index) and the types are not either (a PostgreSQL boolean, a SQL
+// Server bit, a SQLite integer), so resolving both at the source keeps one meaning
+// on the Go side.
+func describeIndex(t *testing.T, h *isolatedDB, table, index string) indexShape {
+	t.Helper()
+
+	var q string
+	switch dbType() {
+	case "mysql":
+		q = fmt.Sprintf(`SELECT COLUMN_NAME, CASE WHEN NON_UNIQUE = 0 THEN '1' ELSE '0' END
+			FROM information_schema.statistics
+			WHERE table_schema = DATABASE() AND table_name = '%s' AND index_name = '%s'
+			ORDER BY SEQ_IN_INDEX`, table, index)
+	case "postgres":
+		// indkey is an int2vector of column numbers; unnesting it WITH ORDINALITY is
+		// what preserves the index's own column order. indkey holds INCLUDE columns
+		// after the key ones, so the ordinal is bounded by indnkeyatts to keep this
+		// branch reporting key columns only, which is what the mssql branch's
+		// is_included_column filter does and what Columns is documented to hold.
+		q = fmt.Sprintf(`SELECT a.attname, CASE WHEN ix.indisunique THEN '1' ELSE '0' END
+			FROM pg_index ix
+			JOIN pg_class i ON i.oid = ix.indexrelid
+			JOIN pg_class tb ON tb.oid = ix.indrelid
+			JOIN unnest(ix.indkey::smallint[]) WITH ORDINALITY AS k(attnum, ord) ON true
+			JOIN pg_attribute a ON a.attrelid = tb.oid AND a.attnum = k.attnum
+			WHERE tb.relname = '%s' AND i.relname = '%s'
+			  AND k.ord <= ix.indnkeyatts
+			ORDER BY k.ord`, table, index)
+	case "mssql":
+		// is_included_column = 0 keeps INCLUDE columns out: they are payload, not key
+		// columns, and they carry key_ordinal 0.
+		q = fmt.Sprintf(`SELECT c.name, CASE WHEN i.is_unique = 1 THEN '1' ELSE '0' END
+			FROM sys.indexes i
+			JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+			JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+			WHERE i.object_id = OBJECT_ID('dbo.%s') AND i.name = '%s'
+			  AND ic.is_included_column = 0
+			ORDER BY ic.key_ordinal`, table, index)
+	default: // sqlite
+		// The comma join is required: pragma_index_info takes its argument from the
+		// row to its left, which SQLite only allows for table-valued functions in
+		// that position.
+		q = fmt.Sprintf(`SELECT ii.name, CASE WHEN il."unique" = 1 THEN '1' ELSE '0' END
+			FROM pragma_index_list('%s') AS il, pragma_index_info(il.name) AS ii
+			WHERE il.name = '%s'
+			ORDER BY ii.seqno`, table, index)
+	}
+
+	rows, err := h.SQL.Query(q)
+	require.NoErrorf(t, err, "index catalog lookup: %s on %s", index, table)
+	defer func() { _ = rows.Close() }()
+
+	shape := indexShape{}
+	for rows.Next() {
+		var col, uniqueFlag string
+		require.NoErrorf(t, rows.Scan(&col, &uniqueFlag),
+			"scan index catalog row: %s on %s", index, table)
+		shape.Columns = append(shape.Columns, col)
+		shape.Unique = uniqueFlag == "1"
+	}
+	require.NoErrorf(t, rows.Err(), "iterate index catalog: %s on %s", index, table)
+
+	shape.Exists = len(shape.Columns) > 0
+	return shape
+}
+
 func dropMySQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=UTC",
 		cfg.Username, cfg.Password, cfg.Host, cfg.Port)

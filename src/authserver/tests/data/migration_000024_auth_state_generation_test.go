@@ -228,26 +228,12 @@ func assertExpectedIndexes000024(t *testing.T, h *isolatedDB, phase string) {
 	}
 }
 
+// index000024Exists asks only whether the index is present, which is all this
+// migration needs: 000024 adds indexes to cover columns the revocation sweep filters
+// on, and any index on the right column serves that. The per-dialect catalog queries
+// live in describeIndex (migration_testdb_helper.go), which also reports column
+// membership and uniqueness for callers that need them, such as the 000025 test.
 func index000024Exists(t *testing.T, h *isolatedDB, table, index string) bool {
 	t.Helper()
-
-	var q string
-	switch dbType() {
-	case "mysql":
-		q = fmt.Sprintf(`SELECT COUNT(*) FROM information_schema.statistics
-			WHERE table_schema = DATABASE() AND table_name = '%s' AND index_name = '%s'`, table, index)
-	case "postgres":
-		q = fmt.Sprintf(`SELECT COUNT(*) FROM pg_indexes
-			WHERE tablename = '%s' AND indexname = '%s'`, table, index)
-	case "mssql":
-		q = fmt.Sprintf(`SELECT COUNT(*) FROM sys.indexes
-			WHERE name = '%s' AND object_id = OBJECT_ID('dbo.%s')`, index, table)
-	default: // sqlite
-		q = fmt.Sprintf(`SELECT COUNT(*) FROM sqlite_master
-			WHERE type = 'index' AND name = '%s' AND tbl_name = '%s'`, index, table)
-	}
-
-	var n int
-	require.NoError(t, h.SQL.QueryRow(q).Scan(&n), "index lookup: %s on %s", index, table)
-	return n > 0
+	return describeIndex(t, h, table, index).Exists
 }
