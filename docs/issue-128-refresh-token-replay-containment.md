@@ -24,7 +24,7 @@
 | `data/refresh-tokens-by-session` | `src/core/data/commondb/refresh_token.go` | `GetRefreshTokensBySessionIdentifier` | `// GetRefreshTokensBySessionIdentifier returns every refresh token whose` | joins codes, so it needs a join the family query will not |
 | `data/refresh-tokens-by-user` | `src/core/data/commondb/refresh_token.go` | `GetRefreshTokensByUserId` | `// ROPC: the user is on the token itself and there is no code at all.` | the two-linkage-shape precedent |
 | `data/promote-generations` | `src/core/data/commondb/refresh_token.go` | `PromoteRefreshTokenGenerations` | `// An empty id list is a no-op. That is not a formality: an empty IN () is a syntax` | narrow writer of `auth_state_generation` |
-| `data/delete-expired-or-revoked` | `src/core/data/commondb/refresh_token.go` | `DeleteExpiredOrRevokedRefreshTokens` | `unable to delete expired/revoked refresh tokens` | deletes every revoked row with no grace |
+| `data/delete-expired` | `src/core/data/commondb/refresh_token.go` | `DeleteExpiredRefreshTokens` | `unable to delete expired refresh tokens` | deleted every revoked row with no grace before stage 5 |
 | `data/iface-mark-code-as-used` | `src/core/data/database.go` | `n/a` | `MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error)` | interface declaration to mirror |
 | `data/iface-refresh-by-code` | `src/core/data/database.go` | `n/a` | `GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)` | where a family query would be declared |
 | `data/mark-refresh-token-revoked` | `src/core/data/commondb/refresh_token.go` | `MarkRefreshTokenAsRevoked` | `// MarkRefreshTokenAsRevoked atomically transitions a refresh token from live to` | added by stage 2; the defect 1 compare-and-set |
@@ -38,7 +38,7 @@
 | `issuer/refresh-insert` | `src/core/oauth/token_issuer.go` | `generateRefreshToken` | `err := t.database.CreateRefreshToken(nil, refreshTokenEntity)` | child inserted outside any transaction |
 | `issuer/ropc-family-carry` | `src/core/oauth/token_issuer.go` | `generateRefreshTokenForROPC` | `refreshTokenEntity.FirstRefreshTokenJti = previousRefreshToken.FirstRefreshTokenJti` | family carried forward on ROPC rotation |
 | `validator/refresh-lookup` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `refreshToken, err := val.database.GetRefreshTokenByJti(nil, jti)` | the read whose `revoked` value the handler later trusts |
-| `validator/refresh-missing-row` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `the refresh token is invalid because it does not exist in the database` | what a swept-away row produces |
+| `validator/refresh-missing-row` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `// A validly signed, unexpired refresh token with no row. RFC 6749 Section 5.2` | what a swept-away row produces; a plain 500 before stage 5 |
 | `validator/refresh-generation-authcode` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `if refreshToken.AuthStateGeneration != refreshToken.Code.User.AuthStateGeneration {` | fires before the handler's revoked check |
 | `validator/refresh-generation-ropc` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `if refreshToken.AuthStateGeneration != refreshToken.User.AuthStateGeneration {` | same, ROPC branch |
 | `validator/refresh-session-check` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `userSession, err := val.database.GetUserSessionBySessionIdentifier(nil, refreshToken.SessionIdentifier)` | session-bound tokens only, not offline |
@@ -46,7 +46,7 @@
 | `handlers/revoke-user-auth-state` | `src/authserver/internal/handlers/revocation.go` | `RevokeUserAuthState` | `newGeneration, err := db.IncrementUserAuthStateGeneration(tx, userId)` | the #106 user-scoped sweep |
 | `worker/cleanup-interval` | `src/authserver/internal/workers/background_worker.go` | `n/a` | `cleanupInterval = 12 * time.Hour` | how often revoked rows are reaped |
 | `worker/used-code-grace` | `src/authserver/internal/workers/background_worker.go` | `n/a` | `usedCodeCleanupGrace = 5 * time.Minute` | the only cleanup grace that exists today |
-| `worker/refresh-token-sweep` | `src/authserver/internal/workers/background_worker.go` | `performTask` | `err := w.database.DeleteExpiredOrRevokedRefreshTokens(nil)` | the call that erases the replay signal |
+| `worker/refresh-token-sweep` | `src/authserver/internal/workers/background_worker.go` | `performTask` | `err := w.database.DeleteExpiredRefreshTokens(nil)` | erased the replay signal before stage 5 |
 | `constants/authcode-reuse-event` | `src/core/constants/constants.go` | `n/a` | `// AuditAuthCodeReuseDetected is logged when an authorization code is replayed` | naming and doc-comment precedent |
 | `constants/event-type-list` | `src/core/constants/constants.go` | `n/a` | `var AuditEventTypes = []string{` | a new event must be appended here too |
 | `constants/replay-event` | `src/core/constants/constants.go` | `n/a` | `AuditRefreshTokenReplayDetected = "refresh_token_replay_detected"` | added by stage 4 |
@@ -55,6 +55,9 @@
 | `test/handler-replay-payload` | `src/authserver/internal/handlers/handler_token_test.go` | `TestHandleTokenPost_Refresh_Replay_AuditsContainment` | `the replay payload must carry exactly these six fields` | added by stage 4; the only tier that can see the payload |
 | `test/replay-family-scope` | `src/authserver/tests/integration/token_refresh_replay_test.go` | `TestToken_Refresh_Replay_DoesNotContainOtherFamilies` | `family B shares the browser session but not the family: it must stay live` | added by stage 4; the assertion that pins decision 3 |
 | `test/replay-ropc` | `src/authserver/tests/integration/token_refresh_replay_test.go` | `TestToken_Refresh_Replay_ContainsROPCFamily` | `a ROPC refresh token must have no code_id` | added by stage 4 |
+| `test/data-retention-table` | `src/authserver/tests/data/refresh_token_test.go` | `TestDeleteExpiredRefreshTokens` | `TWO ROWS DELIBERATELY REVERSE THE BEHAVIOUR THIS TEST ASSERTED BEFORE` | added by stage 5; the eight-row predicate table |
+| `test/validator-expiry-order` | `src/core/validators/token_validator_test.go` | `TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup` | `The LOAD-BEARING assertion is the literal` | added by stage 5 |
+| `test/missing-row-invalid-grant` | `src/authserver/tests/integration/token_refresh_test.go` | `TestToken_Refresh_MissingRowIsInvalidGrant` | `the fixture must actually remove the row` | added by stage 5 |
 | `test/authcode-concurrent` | `src/authserver/tests/integration/token_authcode_concurrent_test.go` | `TestToken_AuthCode_ConcurrentDoubleSpend_IssuesOnlyOnce` | `const concurrency = 8` | the integration shape to mirror |
 | `test/concurrent-post-helper` | `src/authserver/tests/integration/token_authcode_concurrent_test.go` | `concurrentTokenPost` | `// multiple goroutines. Unlike postToTokenEndpoint it never touches *testing.T` | reusable, already goroutine-safe |
 | `test/refresh-marked-used` | `src/authserver/tests/integration/token_refresh_test.go` | `TestToken_Refresh_TokenMarkedAsUsed` | `The original refresh token should be marked as revoked after use` | the regression that must keep passing |
@@ -170,7 +173,7 @@ already exists on the refresh path at `token/refresh-revoked-check`. This is ope
 
 ### The detection signal is deleted on a schedule nobody chose
 
-`DeleteExpiredOrRevokedRefreshTokens` (`data/delete-expired-or-revoked`) deletes every row
+`DeleteExpiredOrRevokedRefreshTokens` (`data/delete-expired`, renamed by stage 5) deleted every row
 with `revoked = true`, with no grace period and no age predicate. The background worker calls
 it (`worker/refresh-token-sweep`) on a 12-hour cadence (`worker/cleanup-interval`). Once the
 parent row is gone, `GetRefreshTokenByJti` returns nil and the validator fails with a plain
@@ -423,7 +426,7 @@ from it.
 4. **Revoked refresh-token rows are retained until their natural token expiry, and the
    missing-row error is corrected to `invalid_grant`.** Status: **Decided**
 
-   The sweep at `data/delete-expired-or-revoked` stops deleting a row merely because
+   The sweep at `data/delete-expired` stops deleting a row merely because
    `revoked = true`. Its predicate becomes `expires_at < now OR max_lifetime < now`, and the
    method is renamed to `DeleteExpiredRefreshTokens` so its contract stays truthful.
 
@@ -887,7 +890,7 @@ from `src/core/.mockery.yaml`, or every package constructing the mock fails to c
 
 ### Retention and error mapping
 
-`data/delete-expired-or-revoked` drops its `revoked = true` disjunct and is renamed
+`data/delete-expired` drops its `revoked = true` disjunct and is renamed
 `DeleteExpiredRefreshTokens`, per decision 4. The rename reaches the interface, `commondb`,
 four engine wrappers, the generated mock and `worker/refresh-token-sweep`.
 
@@ -1344,18 +1347,19 @@ Five things worth knowing, all contained inside these steps:
    carried the same error about the compare-and-set loser and is corrected the same way.
 
 ### Stage 5: retention and error mapping
-Status: **Not started**
+Status: **Done**
 
 Tests: data tier in the container, validator unit tests on the host, one integration test.
 
 1. Change the sweep predicate and rename the method to `DeleteExpiredRefreshTokens`.
-   Status: **Not started**
+   Status: **Done** (`data/delete-expired`, `worker/refresh-token-sweep`)
    The predicate becomes exactly `expires_at < now OR max_lifetime < now`, per decisions 4
    and 10. No third disjunct.
    The rename reaches the `Database` interface, `commondb`, the four engine wrappers and
    `worker/refresh-token-sweep`, and also these test files, which do not compile until they
    are updated:
-   - `src/authserver/internal/workers/background_worker_test.go`, **15 sites** including
+   - `src/authserver/internal/workers/background_worker_test.go`, **14 sites** (this step
+     first said 15; the correct count is 14) including
      `AssertNumberOfCalls` expectations that name the method as a string, so they fail at
      runtime rather than at compile time if missed;
    - `src/authserver/tests/data/code_test.go`, 1 site;
@@ -1364,12 +1368,12 @@ Tests: data tier in the container, validator unit tests on the host, one integra
    Counts reproduce with
    `grep -rn DeleteExpiredOrRevokedRefreshTokens --include=*.go src/`.
 2. Regenerate `src/core/data/mocks/database_mock.go` a second time.
-   Status: **Not started**
+   Status: **Done**
    Stage 2's regeneration predates this rename, so the mock still carries the old method name.
    Skipping this leaves `background_worker_test.go`'s string-named expectations matching a
    method the interface no longer has.
 3. Rewrite `TestDeleteExpiredOrRevokedRefreshTokens` as `TestDeleteExpiredRefreshTokens`.
-   Status: **Not started**
+   Status: **Done** (`test/data-retention-table`)
 
    | Row | Today | After | Note |
    |---|---|---|---|
@@ -1387,23 +1391,72 @@ Tests: data tier in the container, validator unit tests on the host, one integra
    a defect. It reverses today's behaviour in the same way the first row does, so neither
    should be "corrected" back.
 4. Map `validator/refresh-missing-row` to an `ErrorDetail` with `invalid_grant` and a 400.
-   Status: **Not started**
+   Status: **Done** (`validator/refresh-missing-row`)
    Generic message, not revealing whether a row existed.
-5. Update the validator unit test asserting the old error string. Status: **Not started**
+5. Update the validator unit test asserting the old error string. Status: **Done**
    `token_validator_test.go` asserts the old text through `err.Error()`. It pins behaviour
    this change reverses, so it is updated deliberately, not deleted as noise.
-6. Add an integration case for a signed, unexpired token with no row. Status: **Not started**
+6. Add an integration case for a signed, unexpired token with no row.
+   Status: **Done** (`test/missing-row-invalid-grant`)
    Delete the row directly, then present the token. Assert **400 `invalid_grant`**, not 500.
    Deleting the row rather than waiting for a sweep is deliberate: after step 1 no sweep would
    remove an unexpired row, so the only way to reach this state in a test is to construct it.
 7. Add a **validator unit test** proving the expiry check precedes the lookup.
-   Status: **Not started**
+   Status: **Done** (`test/validator-expiry-order`)
    Present an expired refresh token and assert the request is refused **and** that
    `GetRefreshTokenByJti` was never called, using the mocked database. This is the case that
    bounds containment's horizon, per section 4.
    It lives at the unit tier deliberately: an integration test can observe only the HTTP
    response, which is identical whether or not the lookup ran, so it could never prove the
    ordering. An integration case would pass with the ordering reversed.
+
+**As built.** The predicate and rename at `data/delete-expired` and
+`worker/refresh-token-sweep`, the mock regenerated a second time, the eight-row table at
+`test/data-retention-table`, the error mapping at
+`validator/refresh-missing-row`, and two tests for it
+(`test/validator-expiry-order`, `test/missing-row-invalid-grant`).
+
+Six things worth knowing, all contained inside these steps:
+
+1. **Three mutations, three different lessons.** Restoring the `revoked = true` disjunct
+   fails exactly the two rows marked "keep this" in the eight-row table, and nothing else in
+   it, which is what those two rows exist for. Reverting the missing-row mapping to a plain
+   error fails
+   `test/missing-row-invalid-grant` on both the status and the code, so the 500 really was
+   observable end to end. And passing `withExpirationCheck = false` fails
+   `test/validator-expiry-order` on the unmatched stub argument.
+2. **Step 7's own claim needed correcting, and the test now says so.** The ordering it
+   asserts is already forced structurally: the lookup key is the jti claim read out of the
+   parsed token, so the lookup cannot precede the parse. The `AssertNotCalled` is therefore
+   a guard against a future rewrite, not proof of the current ordering. What actually
+   carries the test is the literal `true` in the parser stub, which is the expiration check
+   itself, and that is what the mutation confirmed. The doc comment says which is which
+   rather than overstating the weaker one.
+3. **A second data test was written and then removed, and the reasoning for it was
+   wrong.** It swept five times and asserted the decision 10 row survived each time,
+   justified as distinguishing "the predicate never matches it" from "this sweep happened
+   not to". Review pointed out that it does no such thing: the statement is deterministic
+   and the row's NULL values do not change between calls, so five calls prove exactly what
+   one proves. The eight-row table already pins decision 10. Removed rather than kept as a
+   redundant regression, since its only justification was a claim that does not hold. The
+   same overstatement is in decision 10's note that the row was "confirmed still present
+   after five consecutive sweeps": the observation is real, the extra evidence it implies
+   is not.
+4. **The rename touched 27 identifier sites plus the generated mock**, one fewer in
+   `background_worker_test.go` than the plan's count (14, not 15). The worker's two log
+   strings also said "expired or revoked" and were corrected, which the plan did not
+   mention: a log line asserting the old behaviour is the same class of error as the
+   documentation sentences stage 6 fixes.
+5. **`code_test.go`'s comments and failure message still described the old contract**,
+   saying the sweep deletes "expired/revoked refresh tokens". Its fixture token is both
+   expired and revoked, so the test passed either way, but the strings preserved a contract
+   this stage removed: the row is now deleted solely because it is past both timestamps.
+   Corrected, with a note that the revoked flag there is incidental. Found in review.
+6. **The missing-row message is deliberately generic.** "The refresh token is invalid."
+   with no mention of the row, and the tests assert the absence of the word "database".
+   Saying the row was missing would distinguish a never-issued JTI from a revoked one,
+   which is a disclosure the old plain error happened to avoid only because it produced a
+   500 page.
 
 ### Stage 6: documentation
 Status: **Not started**
@@ -1462,7 +1515,9 @@ Tests: none. No tier covers prose. Verify with `npm run build` in `site/`.
    Status: **Resolved**
 
    Verified with `grep -rn DeleteExpiredOrRevokedRefreshTokens --include=*.go src/`: 15 sites in
-   `background_worker_test.go`, 1 in `code_test.go`, 2 in `refresh_token_test.go`. Stage 5 step
+   `background_worker_test.go`, 1 in `code_test.go`, 2 in `refresh_token_test.go`.
+   **Superseded during stage 5: the correct count is 14, not 15. The other two are right.**
+   Stage 5 step
    1 now lists all three files with counts, and flags that
    `background_worker_test.go`'s `AssertNumberOfCalls` expectations name the method as a
    **string**, so those fail at runtime rather than at compile time if missed.
