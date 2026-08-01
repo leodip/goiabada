@@ -67,6 +67,105 @@ func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 	return nil
 }
 
+// MarkRefreshTokenAsRevoked atomically transitions a refresh token from live to
+// revoked via a conditional UPDATE (`WHERE id = ? AND revoked = false`). It returns
+// true only if this call is the one that flipped the flag; a false return means the
+// row was no longer live, which a concurrent rotation, a concurrent security
+// revocation or a deleted row all produce.
+//
+// Compare-and-set for the same reason MarkCodeAsUsed is: rotation read `revoked` back
+// in request validation and then wrote unconditionally, leaving a double-spend window
+// spanning the whole of validation, so two presentations of one refresh token could
+// each mint a token set (#77, #128).
+//
+// Narrow on purpose. It writes only revoked and updated_at, so it cannot touch
+// auth_state_generation at all. That is an independent guarantee, not a repair of
+// UpdateRefreshToken: the full-row writer already excludes the column through its
+// dont-update struct tag (#106). Stating it in the statement itself means the boundary
+// does not rest on a tag a future writer might not honour.
+func (d *CommonDatabase) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int64) (bool, error) {
+
+	if refreshTokenId == 0 {
+		return false, errors.WithStack(errors.New("can't mark refresh token with id 0 as revoked"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("refresh_tokens")
+	ub.Set(
+		ub.Assign("revoked", true),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", refreshTokenId),
+		ub.Equal("revoked", false),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to mark refresh token as revoked")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "unable to get rows affected when marking refresh token as revoked")
+	}
+
+	return rowsAffected == 1, nil
+}
+
+// RevokeRefreshTokenFamily revokes every currently live member of one rotation family
+// in a single statement, and returns how many rows it moved from live to revoked.
+//
+// A family is the rows sharing a first_refresh_token_jti: the identifier is stamped at
+// first issuance and carried forward on every rotation, for both linkage shapes, so it
+// covers ROPC chains (which have no code) without a fallback branch. Containment
+// touches nothing else, in particular not the originating code and not the browser
+// session, because refresh token replay implicates one grant's client-side storage
+// rather than the authorization ceremony (#128).
+//
+// The count is exact on every supported engine: the predicate selects only rows whose
+// revoked is false and sets it true, so no matched row is left unchanged and the
+// matched-versus-changed distinction cannot affect it. Callers use it to tell a real
+// containment from an idempotent no-op.
+//
+// An empty family identifier is an ERROR, not an empty result. That is deliberately a
+// stronger contract than GetRefreshTokensBySessionIdentifier's, which returns nothing
+// for an empty key. On a revocation path an empty identifier can only be a caller bug,
+// and absorbing it goes wrong in two different directions depending on the data: with
+// no matching rows it hides the bug as a zero-count no-op, and with malformed
+// empty-family rows present it mutates them.
+func (d *CommonDatabase) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
+
+	if firstRefreshTokenJti == "" {
+		return 0, errors.WithStack(errors.New("can't revoke a refresh token family with an empty first refresh token jti"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("refresh_tokens")
+	ub.Set(
+		ub.Assign("revoked", true),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("first_refresh_token_jti", firstRefreshTokenJti),
+		ub.Equal("revoked", false),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to revoke refresh token family")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to get rows affected when revoking refresh token family")
+	}
+
+	return rowsAffected, nil
+}
+
 func (d *CommonDatabase) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
 

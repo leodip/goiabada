@@ -58,6 +58,14 @@ func (d *PostgresDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.R
 	return d.CommonDB.UpdateRefreshToken(tx, refreshToken)
 }
 
+func (d *PostgresDatabase) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int64) (bool, error) {
+	return d.CommonDB.MarkRefreshTokenAsRevoked(tx, refreshTokenId)
+}
+
+func (d *PostgresDatabase) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
+	return d.CommonDB.RevokeRefreshTokenFamily(tx, firstRefreshTokenJti)
+}
+
 func (d *PostgresDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
 	return d.CommonDB.GetRefreshTokenById(tx, refreshTokenId)
 }

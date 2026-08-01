@@ -144,7 +144,7 @@ func describeIndex(t *testing.T, h *isolatedDB, table, index string) indexShape 
 	case "postgres":
 		// indkey is an int2vector of column numbers; unnesting it WITH ORDINALITY is
 		// what preserves the index's own column order. indkey holds INCLUDE columns
-		// after the key ones, so the ordinal is bounded by indnkeyatts to keep this
+		// after the key ones, so the position is bounded by indnkeyatts to keep this
 		// branch reporting key columns only, which is what the mssql branch's
 		// is_included_column filter does and what Columns is documented to hold.
 		q = fmt.Sprintf(`SELECT a.attname, CASE WHEN ix.indisunique THEN '1' ELSE '0' END

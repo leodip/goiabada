@@ -14,6 +14,14 @@ func (d *MySQLDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.Refr
 	return d.CommonDB.UpdateRefreshToken(tx, refreshToken)
 }
 
+func (d *MySQLDatabase) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int64) (bool, error) {
+	return d.CommonDB.MarkRefreshTokenAsRevoked(tx, refreshTokenId)
+}
+
+func (d *MySQLDatabase) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
+	return d.CommonDB.RevokeRefreshTokenFamily(tx, firstRefreshTokenJti)
+}
+
 func (d *MySQLDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
 	return d.CommonDB.GetRefreshTokenById(tx, refreshTokenId)
 }

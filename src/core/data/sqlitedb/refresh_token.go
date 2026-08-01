@@ -14,6 +14,14 @@ func (d *SQLiteDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 	return d.CommonDB.UpdateRefreshToken(tx, refreshToken)
 }
 
+func (d *SQLiteDatabase) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int64) (bool, error) {
+	return d.CommonDB.MarkRefreshTokenAsRevoked(tx, refreshTokenId)
+}
+
+func (d *SQLiteDatabase) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
+	return d.CommonDB.RevokeRefreshTokenFamily(tx, firstRefreshTokenJti)
+}
+
 func (d *SQLiteDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
 	return d.CommonDB.GetRefreshTokenById(tx, refreshTokenId)
 }

@@ -9199,6 +9199,72 @@ func (_c *Database_MarkCodeAsUsed_Call) RunAndReturn(run func(tx *sql.Tx, codeId
 	return _c
 }
 
+// MarkRefreshTokenAsRevoked provides a mock function for the type Database
+func (_mock *Database) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int64) (bool, error) {
+	ret := _mock.Called(tx, refreshTokenId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkRefreshTokenAsRevoked")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (bool, error)); ok {
+		return returnFunc(tx, refreshTokenId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) bool); ok {
+		r0 = returnFunc(tx, refreshTokenId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, refreshTokenId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_MarkRefreshTokenAsRevoked_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkRefreshTokenAsRevoked'
+type Database_MarkRefreshTokenAsRevoked_Call struct {
+	*mock.Call
+}
+
+// MarkRefreshTokenAsRevoked is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - refreshTokenId int64
+func (_e *Database_Expecter) MarkRefreshTokenAsRevoked(tx any, refreshTokenId any) *Database_MarkRefreshTokenAsRevoked_Call {
+	return &Database_MarkRefreshTokenAsRevoked_Call{Call: _e.mock.On("MarkRefreshTokenAsRevoked", tx, refreshTokenId)}
+}
+
+func (_c *Database_MarkRefreshTokenAsRevoked_Call) Run(run func(tx *sql.Tx, refreshTokenId int64)) *Database_MarkRefreshTokenAsRevoked_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_MarkRefreshTokenAsRevoked_Call) Return(b bool, err error) *Database_MarkRefreshTokenAsRevoked_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_MarkRefreshTokenAsRevoked_Call) RunAndReturn(run func(tx *sql.Tx, refreshTokenId int64) (bool, error)) *Database_MarkRefreshTokenAsRevoked_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Migrate provides a mock function for the type Database
 func (_mock *Database) Migrate() error {
 	ret := _mock.Called()
@@ -9650,6 +9716,72 @@ func (_c *Database_RefreshTokenLoadUser_Call) Return(err error) *Database_Refres
 }
 
 func (_c *Database_RefreshTokenLoadUser_Call) RunAndReturn(run func(tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_RefreshTokenLoadUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RevokeRefreshTokenFamily provides a mock function for the type Database
+func (_mock *Database) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
+	ret := _mock.Called(tx, firstRefreshTokenJti)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RevokeRefreshTokenFamily")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (int64, error)); ok {
+		return returnFunc(tx, firstRefreshTokenJti)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) int64); ok {
+		r0 = returnFunc(tx, firstRefreshTokenJti)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
+		r1 = returnFunc(tx, firstRefreshTokenJti)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RevokeRefreshTokenFamily_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeRefreshTokenFamily'
+type Database_RevokeRefreshTokenFamily_Call struct {
+	*mock.Call
+}
+
+// RevokeRefreshTokenFamily is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - firstRefreshTokenJti string
+func (_e *Database_Expecter) RevokeRefreshTokenFamily(tx any, firstRefreshTokenJti any) *Database_RevokeRefreshTokenFamily_Call {
+	return &Database_RevokeRefreshTokenFamily_Call{Call: _e.mock.On("RevokeRefreshTokenFamily", tx, firstRefreshTokenJti)}
+}
+
+func (_c *Database_RevokeRefreshTokenFamily_Call) Run(run func(tx *sql.Tx, firstRefreshTokenJti string)) *Database_RevokeRefreshTokenFamily_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RevokeRefreshTokenFamily_Call) Return(n int64, err error) *Database_RevokeRefreshTokenFamily_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_RevokeRefreshTokenFamily_Call) RunAndReturn(run func(tx *sql.Tx, firstRefreshTokenJti string) (int64, error)) *Database_RevokeRefreshTokenFamily_Call {
 	_c.Call.Return(run)
 	return _c
 }

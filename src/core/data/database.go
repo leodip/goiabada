@@ -247,6 +247,17 @@ type Database interface {
 
 	CreateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error
 	UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error
+	// MarkRefreshTokenAsRevoked atomically flips a refresh token from live to revoked
+	// and reports whether this call is the one that made the transition. It is the
+	// guard against double-spending a single refresh token, for the same reason
+	// MarkCodeAsUsed guards an authorization code (#128).
+	MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int64) (bool, error)
+	// RevokeRefreshTokenFamily revokes every currently live member of one rotation
+	// family, identified by the first_refresh_token_jti its members share, and returns
+	// the exact number of rows it moved from live to revoked. An empty identifier is an
+	// error rather than a no-op, since on a revocation path it can only be a caller
+	// bug (#128).
+	RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
 	GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error)
 	GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error)
 	GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)

@@ -876,3 +876,384 @@ func TestPromoteRefreshTokenGenerations(t *testing.T) {
 		t.Errorf("after an empty promotion, unnamed generation = %d, want 0", got)
 	}
 }
+
+// TestMarkRefreshTokenAsRevoked pins the compare-and-set that makes refresh token
+// single use atomic (#128). Modelled on TestMarkCodeAsUsed, which guards the same
+// shape of race on authorization codes (#77).
+func TestMarkRefreshTokenAsRevoked(t *testing.T) {
+	rt := createTestRefreshToken(t)
+
+	// Sanity: a freshly created refresh token is live.
+	if rt.Revoked {
+		t.Fatalf("expected a freshly created refresh token to be live")
+	}
+
+	// First claim wins: the compare-and-set flips revoked=false -> true.
+	claimed, err := database.MarkRefreshTokenAsRevoked(nil, rt.Id)
+	if err != nil {
+		t.Fatalf("first MarkRefreshTokenAsRevoked returned error: %v", err)
+	}
+	if !claimed {
+		t.Fatalf("first MarkRefreshTokenAsRevoked should claim the token, got claimed=false")
+	}
+
+	reloaded, err := database.GetRefreshTokenById(nil, rt.Id)
+	if err != nil {
+		t.Fatalf("failed to reload refresh token: %v", err)
+	}
+	if !reloaded.Revoked {
+		t.Errorf("expected the refresh token to be revoked after a successful claim")
+	}
+
+	// Second claim loses: the WHERE revoked=false predicate no longer matches. This
+	// is what stops two concurrent presentations of one refresh token from each
+	// minting a token set.
+	claimed, err = database.MarkRefreshTokenAsRevoked(nil, rt.Id)
+	if err != nil {
+		t.Fatalf("second MarkRefreshTokenAsRevoked returned error: %v", err)
+	}
+	if claimed {
+		t.Errorf("second MarkRefreshTokenAsRevoked must not claim an already-revoked token, got claimed=true")
+	}
+
+	// A token revoked by some OTHER path also loses. Same predicate miss, but
+	// reached without this method having run at all, which is the case a security
+	// revocation or a family cascade produces.
+	other := createTestRefreshToken(t)
+	other.Revoked = true
+	if err := database.UpdateRefreshToken(nil, other); err != nil {
+		t.Fatalf("failed to revoke a token by another path: %v", err)
+	}
+	claimed, err = database.MarkRefreshTokenAsRevoked(nil, other.Id)
+	if err != nil {
+		t.Fatalf("MarkRefreshTokenAsRevoked on an externally revoked token returned error: %v", err)
+	}
+	if claimed {
+		t.Errorf("MarkRefreshTokenAsRevoked must not claim a token revoked elsewhere, got claimed=true")
+	}
+
+	// A non-existent id affects zero rows: claimed=false, and no error. Reporting it
+	// as an error would make a deleted row indistinguishable from a broken query.
+	claimed, err = database.MarkRefreshTokenAsRevoked(nil, 999999999)
+	if err != nil {
+		t.Fatalf("MarkRefreshTokenAsRevoked for a missing token returned error: %v", err)
+	}
+	if claimed {
+		t.Errorf("MarkRefreshTokenAsRevoked for a non-existent id must return claimed=false")
+	}
+
+	// Guard: id 0 is rejected outright, and must be an ERROR rather than
+	// claimed=false. The bare SQL affects zero rows for id 0, so asserting false here
+	// would pass with the guard deleted and would be indistinguishable from the
+	// missing-id case above. The guard is the only thing under test.
+	_, err = database.MarkRefreshTokenAsRevoked(nil, 0)
+	if err == nil {
+		t.Errorf("MarkRefreshTokenAsRevoked(0) must return an error")
+	}
+}
+
+// TestMarkRefreshTokenAsRevoked_DoesNotClobberAuthStateGeneration pins that the
+// compare-and-set writes only revoked and updated_at.
+//
+// It does NOT show that rewriting this as UpdateRefreshToken would regress the column:
+// that path already excludes auth_state_generation through the field's dont-update tag,
+// and TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration covers it. This is an
+// independent contract for the narrow writer, so the boundary holds without depending
+// on struct tags a future full-row writer might not honour (#106).
+func TestMarkRefreshTokenAsRevoked_DoesNotClobberAuthStateGeneration(t *testing.T) {
+	rt := createTestRefreshToken(t)
+
+	if err := database.PromoteRefreshTokenGenerations(nil, []int64{rt.Id}, 5); err != nil {
+		t.Fatalf("failed to set the token's generation: %v", err)
+	}
+
+	claimed, err := database.MarkRefreshTokenAsRevoked(nil, rt.Id)
+	if err != nil {
+		t.Fatalf("MarkRefreshTokenAsRevoked returned error: %v", err)
+	}
+	if !claimed {
+		t.Fatalf("expected to claim a live token")
+	}
+
+	reloaded, err := database.GetRefreshTokenById(nil, rt.Id)
+	if err != nil {
+		t.Fatalf("failed to reload refresh token: %v", err)
+	}
+	if reloaded.AuthStateGeneration != 5 {
+		t.Errorf("auth_state_generation = %d after the claim, want 5 (the claim must not touch it)",
+			reloaded.AuthStateGeneration)
+	}
+	if !reloaded.Revoked {
+		t.Errorf("expected the token to be revoked")
+	}
+}
+
+// familyTokenSpec describes one seeded member of a rotation family. A zero CodeId is
+// the ROPC shape: no code at all, with the user and client on the refresh token row
+// itself. That is the shape a code-scoped query would miss entirely.
+type familyTokenSpec struct {
+	FamilyJti         string
+	CodeId            int64
+	UserId            int64
+	ClientId          int64
+	SessionIdentifier string
+	Revoked           bool
+}
+
+func seedFamilyToken(t *testing.T, spec familyTokenSpec) *models.RefreshToken {
+	t.Helper()
+
+	rt := &models.RefreshToken{
+		RefreshTokenJti:      gofakeit.UUID(),
+		FirstRefreshTokenJti: spec.FamilyJti,
+		SessionIdentifier:    spec.SessionIdentifier,
+		RefreshTokenType:     "Refresh",
+		Scope:                "openid",
+		IssuedAt:             sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ExpiresAt:            sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
+		Revoked:              spec.Revoked,
+	}
+	if spec.CodeId != 0 {
+		rt.CodeId = sql.NullInt64{Int64: spec.CodeId, Valid: true}
+	}
+	if spec.UserId != 0 {
+		rt.UserId = sql.NullInt64{Int64: spec.UserId, Valid: true}
+	}
+	if spec.ClientId != 0 {
+		rt.ClientId = sql.NullInt64{Int64: spec.ClientId, Valid: true}
+	}
+
+	if err := database.CreateRefreshToken(nil, rt); err != nil {
+		t.Fatalf("failed to seed family token: %v", err)
+	}
+	return rt
+}
+
+// seedCodeOnSession creates a used authorization code bound to a chosen session
+// identifier, so a test can put two independent families on one browser session.
+// createTestCode generates its own session identifier and cannot express that.
+func seedCodeOnSession(t *testing.T, clientId, userId int64, sessionIdentifier string) *models.Code {
+	t.Helper()
+
+	random := gofakeit.LetterN(6)
+	code := &models.Code{
+		ClientId:            clientId,
+		UserId:              userId,
+		Code:                "famcode_" + random,
+		CodeHash:            "famhash_" + random,
+		CodeChallenge:       sql.NullString{String: "famchallenge_" + random, Valid: true},
+		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+		RedirectURI:         "https://example.com/callback",
+		Scope:               "openid",
+		IpAddress:           "127.0.0.1",
+		UserAgent:           "test",
+		ResponseMode:        "query",
+		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+		SessionIdentifier:   sessionIdentifier,
+		AcrLevel:            "1",
+		AuthMethods:         "pwd",
+		Used:                true,
+	}
+	if err := database.CreateCode(nil, code); err != nil {
+		t.Fatalf("failed to create code on session %s: %v", sessionIdentifier, err)
+	}
+	return code
+}
+
+// refreshTokenIsRevoked reloads a row and reports its revoked flag.
+func refreshTokenIsRevoked(t *testing.T, id int64) bool {
+	t.Helper()
+	rt, err := database.GetRefreshTokenById(nil, id)
+	if err != nil {
+		t.Fatalf("failed to reload refresh token %d: %v", id, err)
+	}
+	if rt == nil {
+		t.Fatalf("refresh token %d disappeared", id)
+	}
+	return rt.Revoked
+}
+
+// TestRevokeRefreshTokenFamily is the exhaustive owner of the family predicate's
+// semantics (#128). The handler tests in later stages are deliberately thin on it and
+// assert only that the handler calls it and branches on the returned count.
+func TestRevokeRefreshTokenFamily(t *testing.T) {
+
+	t.Run("retired parent and live child", func(t *testing.T) {
+		client := createTestClient(t)
+		user := createTestUser(t)
+		code := createTestCode(t, client.Id, user.Id)
+		family := gofakeit.UUID()
+
+		parent := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
+		child := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
+
+		count, err := database.RevokeRefreshTokenFamily(nil, family)
+		if err != nil {
+			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
+		}
+		if count != 1 {
+			t.Errorf("count = %d, want 1 (only the live child transitions)", count)
+		}
+		if !refreshTokenIsRevoked(t, child.Id) {
+			t.Errorf("the live child must be revoked")
+		}
+		if !refreshTokenIsRevoked(t, parent.Id) {
+			t.Errorf("the already-revoked parent must stay revoked")
+		}
+	})
+
+	t.Run("forked family with two live children", func(t *testing.T) {
+		// The fork defect 1 can currently produce: one parent, two children minted
+		// from it. Containment has to cover every branch, not just the newest.
+		client := createTestClient(t)
+		user := createTestUser(t)
+		code := createTestCode(t, client.Id, user.Id)
+		family := gofakeit.UUID()
+
+		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
+		childA := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
+		childB := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
+
+		count, err := database.RevokeRefreshTokenFamily(nil, family)
+		if err != nil {
+			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
+		}
+		if count != 2 {
+			t.Errorf("count = %d, want 2 (both forked children transition)", count)
+		}
+		if !refreshTokenIsRevoked(t, childA.Id) || !refreshTokenIsRevoked(t, childB.Id) {
+			t.Errorf("both forked children must be revoked")
+		}
+	})
+
+	t.Run("family already fully revoked", func(t *testing.T) {
+		// The zero-count case the audit gate reads as "nothing to contain": an
+		// idempotent no-op, not an incident.
+		client := createTestClient(t)
+		user := createTestUser(t)
+		code := createTestCode(t, client.Id, user.Id)
+		family := gofakeit.UUID()
+
+		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
+		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
+
+		count, err := database.RevokeRefreshTokenFamily(nil, family)
+		if err != nil {
+			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
+		}
+		if count != 0 {
+			t.Errorf("count = %d, want 0 (nothing left to transition)", count)
+		}
+	})
+
+	t.Run("unknown family identifier", func(t *testing.T) {
+		client := createTestClient(t)
+		user := createTestUser(t)
+		code := createTestCode(t, client.Id, user.Id)
+
+		bystander := seedFamilyToken(t, familyTokenSpec{FamilyJti: gofakeit.UUID(), CodeId: code.Id})
+
+		count, err := database.RevokeRefreshTokenFamily(nil, "no-such-family-"+gofakeit.UUID())
+		if err != nil {
+			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
+		}
+		if count != 0 {
+			t.Errorf("count = %d, want 0 for an unknown family", count)
+		}
+		if refreshTokenIsRevoked(t, bystander.Id) {
+			t.Errorf("an unrelated live token must not be revoked: the predicate is not a match-all")
+		}
+	})
+
+	t.Run("two families on one browser session", func(t *testing.T) {
+		// Decision 3: containment is family-scoped, not session-scoped. Revoking
+		// family A must leave family B untouched even though both descend from codes
+		// carrying the same session identifier, which is what a user federated to two
+		// clients in one SSO session looks like.
+		client := createTestClient(t)
+		user := createTestUser(t)
+		sessionId := "sess_" + gofakeit.LetterN(12)
+		codeA := seedCodeOnSession(t, client.Id, user.Id, sessionId)
+		codeB := seedCodeOnSession(t, client.Id, user.Id, sessionId)
+
+		familyA := gofakeit.UUID()
+		familyB := gofakeit.UUID()
+
+		seedFamilyToken(t, familyTokenSpec{
+			FamilyJti: familyA, CodeId: codeA.Id, SessionIdentifier: sessionId, Revoked: true})
+		childA := seedFamilyToken(t, familyTokenSpec{
+			FamilyJti: familyA, CodeId: codeA.Id, SessionIdentifier: sessionId})
+
+		parentB := seedFamilyToken(t, familyTokenSpec{
+			FamilyJti: familyB, CodeId: codeB.Id, SessionIdentifier: sessionId})
+		childB := seedFamilyToken(t, familyTokenSpec{
+			FamilyJti: familyB, CodeId: codeB.Id, SessionIdentifier: sessionId})
+
+		count, err := database.RevokeRefreshTokenFamily(nil, familyA)
+		if err != nil {
+			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
+		}
+		if count != 1 {
+			t.Errorf("count = %d, want 1 (only family A's live member)", count)
+		}
+		if !refreshTokenIsRevoked(t, childA.Id) {
+			t.Errorf("family A's live member must be revoked")
+		}
+		if refreshTokenIsRevoked(t, parentB.Id) || refreshTokenIsRevoked(t, childB.Id) {
+			t.Errorf("family B shares the browser session but not the family: it must stay live")
+		}
+	})
+
+	t.Run("ROPC family with no code at all", func(t *testing.T) {
+		// Decision 3 again, from the other side: this is where
+		// first_refresh_token_jti materially differs from code_id. A code-scoped
+		// containment query would find nothing here, and the predicate must involve
+		// no join for it to work.
+		client := createTestClient(t)
+		user := createTestUser(t)
+		family := gofakeit.UUID()
+
+		parent := seedFamilyToken(t, familyTokenSpec{
+			FamilyJti: family, UserId: user.Id, ClientId: client.Id, Revoked: true})
+		child := seedFamilyToken(t, familyTokenSpec{
+			FamilyJti: family, UserId: user.Id, ClientId: client.Id})
+
+		if parent.CodeId.Valid || child.CodeId.Valid {
+			t.Fatalf("the ROPC fixture must leave code_id NULL")
+		}
+
+		count, err := database.RevokeRefreshTokenFamily(nil, family)
+		if err != nil {
+			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
+		}
+		if count != 1 {
+			t.Errorf("count = %d, want 1 (the live ROPC child)", count)
+		}
+		if !refreshTokenIsRevoked(t, child.Id) {
+			t.Errorf("the live ROPC child must be revoked")
+		}
+	})
+
+	t.Run("empty family identifier is an error", func(t *testing.T) {
+		// The trap this row exists for: no production row carries an empty
+		// first_refresh_token_jti, so asserting "revokes nothing" would be the benign
+		// instance of the class and would pass with the guard deleted. Confirmed by
+		// deleting the guard and re-running: the statement revoked the seeded row and
+		// returned a nonzero count. So the assertion has to be the ERROR, and the
+		// fixture has to seed a LIVE row carrying an empty identifier for the
+		// assertion to have anything to protect.
+		client := createTestClient(t)
+		user := createTestUser(t)
+		code := createTestCode(t, client.Id, user.Id)
+
+		emptyFamily := seedFamilyToken(t, familyTokenSpec{FamilyJti: "", CodeId: code.Id})
+
+		count, err := database.RevokeRefreshTokenFamily(nil, "")
+		if err == nil {
+			t.Errorf("RevokeRefreshTokenFamily(\"\") must return an error, got count=%d", count)
+		}
+		if refreshTokenIsRevoked(t, emptyFamily.Id) {
+			t.Errorf("a live row with an empty family identifier must not be revoked")
+		}
+	})
+}
