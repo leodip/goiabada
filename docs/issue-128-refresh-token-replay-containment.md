@@ -53,7 +53,10 @@
 | `test/handler-refresh-subtests` | `src/authserver/internal/handlers/handler_token_test.go` | `TestHandleTokenPost` | `Refresh_token and token is revoked` | the subtests whose mocks change |
 | `docs/security-single-use` | `site/src/content/docs/reference/security.mdx` | `n/a` | `**Refresh token rotation** - Each refresh token can only be used once` | overstated today |
 | `docs/tokens-chain-claim` | `site/src/content/docs/concepts/tokens.mdx` | `n/a` | `Attempting to reuse an old refresh token will fail and may invalidate the entire token chain for security reasons.` | asserts behaviour that does not exist |
-| `schema/refresh-tokens-sqlite` | `src/core/data/sqlitedb/schema.sql` | `n/a` | `first_refresh_token_jti TEXT NOT NULL,` | the column, with no index on it |
+| `schema/refresh-tokens-sqlite` | `src/core/data/sqlitedb/schema.sql` | `n/a` | `first_refresh_token_jti TEXT NOT NULL,` | the column, no index on it before stage 1 |
+| `migration/family-index` | `src/core/data/sqlitedb/migrations/000025_add_refresh_token_family_index.up.sql` | `n/a` | `CREATE INDEX idx_refresh_tokens_first_refresh_token_jti` | added by stage 1; three siblings under the other engines |
+| `test/migration-000025` | `src/authserver/tests/data/migration_000025_family_index_test.go` | `TestMigration000025_RefreshTokenFamilyIndex` | `control index idx_refresh_token_jti is UNIQUE on every engine` | added by stage 1 |
+| `test/describe-index` | `src/authserver/tests/data/migration_testdb_helper.go` | `describeIndex` | `// describeIndex reads an index's uniqueness and key columns from the configured` | the generalized helper stage 1 replaced the name-only check with |
 
 ## 1. Context
 
@@ -931,20 +934,21 @@ before the run. The harness models the statements and the column nullability, no
 guards or the other three engines, and each table says which rows it therefore cannot prove.
 
 ### Stage 1: migration 000025, the family index
-Status: **Not started**
+Status: **Done**
 
 Tests: data tier only, dev container, all four engines.
 
 1. Add `000025_add_refresh_token_family_index.{up,down}.sql` for sqlite, mysql, postgres and
-   mssql. Status: **Not started**
+   mssql. Status: **Done** (`migration/family-index`)
    Up creates `idx_refresh_tokens_first_refresh_token_jti` on
    `refresh_tokens(first_refresh_token_jti)`, non-unique. Down drops it. Per decision 5.
    Each engine's file is written rather than copied: MySQL serves `code_id` through the
    inline `fk_refresh_tokens_code` key while the others use `idx_refresh_tokens_code_id`, and
    SQLite has no `client_id` index, so the surrounding index sets already differ.
-2. Add the same index line to all four `schema.sql` snapshots. Status: **Not started**
+2. Add the same index line to all four `schema.sql` snapshots. Status: **Done**
    Documentation-only files, never loaded by Go, but they are the reference readers use.
-3. Add `migration_000025_family_index_test.go`. Status: **Not started**
+3. Add `migration_000025_family_index_test.go`. Status: **Done** (`test/migration-000025`,
+   `test/describe-index`)
    Modelled on `migration_000024_auth_state_generation_test.go` and using `newIsolatedDB`.
    Asserts: the index is absent at 000024; applying 000025 creates it; **it is non-unique and
    its column list is exactly `first_refresh_token_jti`**; rolling back to 000024 removes it;
@@ -957,6 +961,48 @@ Tests: data tier only, dev container, all four engines.
    the name-only version.
    Running this per engine in a loop exhausts the mssql container's 4GiB pool; if an
    unrelated test appears to hang afterwards, `docker restart` the mssql container.
+
+   **As built.** Eight migration files under the four `migrations/` directories, the index line
+   in all four `schema.sql` snapshots, and `migration_000025_family_index_test.go`. The
+   name-only `index000024Exists` helper now delegates to a new `describeIndex`
+   (`test/describe-index`) in `migration_testdb_helper.go`, which reports existence,
+   uniqueness and the ordered key-column list from each engine's catalog. The 000024 test
+   keeps its existence-only assertion and its own comments; only its per-dialect query block
+   was removed, so there is one implementation of the introspection rather than two.
+
+   Five things worth knowing, all contained inside these steps:
+
+   1. **A control assertion was added that the plan did not list**, and it is the reason the
+      "not unique" assertion means anything. Each catalog reports uniqueness differently and
+      MySQL reports it *inverted* (`NON_UNIQUE` is 0 for a unique index), so a flag read
+      backwards would make a wrongly-UNIQUE index pass as non-unique. The test therefore
+      asserts first that `idx_refresh_token_jti`, which is UNIQUE on all four engines and
+      present at 000024, reads as unique on the engine under test. Verified in the migrations,
+      not only the snapshots: mssql/mysql/postgres declare it in `000001_initial_create`, and
+      sqlite's `000011_ropc_refresh_token` recreates it during its table rebuild.
+   2. **Uniqueness is normalized in SQL, not in Go.** The four catalogs disagree on polarity
+      *and* on type (a PostgreSQL boolean, a SQL Server bit, a SQLite integer, a MySQL inverted
+      integer), so every branch of `describeIndex` emits `'1'` or `'0'` and the Go side holds
+      one meaning. This mirrors how `generationColumnShape000024` resolves the same problem
+      for NOT NULL, which inverts between SQLite and SQL Server.
+   3. **Both failure modes were executed, not assumed.** With the sqlite migration temporarily
+      changed to `CREATE UNIQUE INDEX`, the test fails on the uniqueness assertion; with it
+      pointed at `previous_refresh_token_jti`, it fails on the column-list assertion. The
+      migration was restored afterwards. Without this, the two assertions the step exists for
+      would have been unexecuted paths.
+   4. **The MySQL snapshot takes an inline `KEY`, not a trailing `CREATE INDEX`.** Its
+      `refresh_tokens` block already declares `idx_refresh_token_jti`,
+      `fk_refresh_tokens_code`, `idx_refresh_tokens_user_id` and `idx_refresh_tokens_client_id`
+      inline, so the new index is declared the same way. The other three snapshots append a
+      `CREATE INDEX` to their trailing index block, and sqlite's block is backtick-quoted while
+      postgres's is not. This is the divergence the step anticipated, landing in the snapshots
+      rather than in the migrations.
+   5. **The PostgreSQL branch bounds its ordinal by `indnkeyatts`**, added during review of this
+      stage. `pg_index.indkey` holds INCLUDE columns after the key ones, so without the bound
+      that branch would have reported payload columns as key columns, contradicting both
+      `indexShape.Columns`'s stated contract and the mssql branch's `is_included_column` filter.
+      It does not affect this stage's index, which has no INCLUDE columns, so it is hardening
+      for later callers rather than a fix to a wrong result here.
 
 ### Stage 2: the two new data-layer methods
 Status: **Not started**
