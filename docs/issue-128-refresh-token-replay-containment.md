@@ -49,6 +49,12 @@
 | `worker/refresh-token-sweep` | `src/authserver/internal/workers/background_worker.go` | `performTask` | `err := w.database.DeleteExpiredOrRevokedRefreshTokens(nil)` | the call that erases the replay signal |
 | `constants/authcode-reuse-event` | `src/core/constants/constants.go` | `n/a` | `// AuditAuthCodeReuseDetected is logged when an authorization code is replayed` | naming and doc-comment precedent |
 | `constants/event-type-list` | `src/core/constants/constants.go` | `n/a` | `var AuditEventTypes = []string{` | a new event must be appended here too |
+| `constants/replay-event` | `src/core/constants/constants.go` | `n/a` | `AuditRefreshTokenReplayDetected = "refresh_token_replay_detected"` | added by stage 4 |
+| `token/replay-containment` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `revokedCount, err := database.RevokeRefreshTokenFamily(nil, refreshToken.FirstRefreshTokenJti)` | added by stage 4; the cascade behind the revoked read |
+| `token/replay-audit` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `auditLogger.Log(constants.AuditRefreshTokenReplayDetected, map[string]interface{}{` | added by stage 4; gated on a positive count |
+| `test/handler-replay-payload` | `src/authserver/internal/handlers/handler_token_test.go` | `TestHandleTokenPost_Refresh_Replay_AuditsContainment` | `the replay payload must carry exactly these six fields` | added by stage 4; the only tier that can see the payload |
+| `test/replay-family-scope` | `src/authserver/tests/integration/token_refresh_replay_test.go` | `TestToken_Refresh_Replay_DoesNotContainOtherFamilies` | `family B shares the browser session but not the family: it must stay live` | added by stage 4; the assertion that pins decision 3 |
+| `test/replay-ropc` | `src/authserver/tests/integration/token_refresh_replay_test.go` | `TestToken_Refresh_Replay_ContainsROPCFamily` | `a ROPC refresh token must have no code_id` | added by stage 4 |
 | `test/authcode-concurrent` | `src/authserver/tests/integration/token_authcode_concurrent_test.go` | `TestToken_AuthCode_ConcurrentDoubleSpend_IssuesOnlyOnce` | `const concurrency = 8` | the integration shape to mirror |
 | `test/concurrent-post-helper` | `src/authserver/tests/integration/token_authcode_concurrent_test.go` | `concurrentTokenPost` | `// multiple goroutines. Unlike postToTokenEndpoint it never touches *testing.T` | reusable, already goroutine-safe |
 | `test/refresh-marked-used` | `src/authserver/tests/integration/token_refresh_test.go` | `TestToken_Refresh_TokenMarkedAsUsed` | `The original refresh token should be marked as revoked after use` | the regression that must keep passing |
@@ -215,6 +221,11 @@ not on token replay.
 - **No exact-length assertions** were found that a new audit event would break. Adding an
   event does require appending to `constants/event-type-list`; `constants_test.go` asserts
   uniqueness and non-emptiness of that slice, not its length.
+  **[Wrong, found in stage 4. `constants_test.go` has two more assertions that a new event
+  breaks: `TestAuditEventTypes_Count` pins an exact length as a drift guard, and
+  `TestAuditEventTypes_MatchesConstants` carries a hand-maintained list of every audit
+  constant and cross-checks it against the slice in both directions. Both had to be updated.
+  They are drift guards working as intended, not obstacles.]**
 
 ### Documentation already claims the behaviour this issue is adding
 
@@ -650,10 +661,16 @@ from it.
    instead: retained rows keep carrying `first_refresh_token_jti` even after the root row is
    gone, so the family stays queryable while its members are retained (decision 4).
 
-   **The name** distinguishes the audited condition from a benign concurrent reuse attempt
-   that loses the compare-and-set, matching RFC 9700 section 4.14.2's vocabulary and decision
-   1's split. It does **not** assert malicious intent: under decision 9 the event can
-   legitimately describe a concurrent duplicate, and its doc comment must say so. **Rejected:** `refresh_token_reuse_detected`, more parallel with
+   **The name** distinguishes the audited condition, an already-revoked token presentation
+   that caused containment, from a reuse attempt that loses the compare-and-set and therefore
+   causes neither cascade nor event, whatever the presenter's intent. It matches RFC 9700
+   section 4.14.2's vocabulary and decision 1's split. It does **not** assert malicious
+   intent: under decision 9 the event can legitimately describe a concurrent duplicate, and
+   its doc comment must say so. (An earlier draft called the compare-and-set loser "benign",
+   which is the same error: decision 1's first residual records that a genuine replay whose
+   lookup preceded the winning claim is classified as a loser. The distinction is observable
+   behaviour, not intent. Corrected during stage 4 review; the decision itself is unchanged.)
+   **Rejected:** `refresh_token_reuse_detected`, more parallel with
    `auth_code_reuse_detected` but blurring exactly that distinction.
 
    When `revokedCount == 0`, respond `invalid_grant` and emit no event. A structured debug
@@ -1248,40 +1265,83 @@ Four things worth knowing, all contained inside these steps:
    corrected only in stage 3's step text, now reads four there too.
 
 ### Stage 4: replay containment and the audit event (defect 2)
-Status: **Not started**
+Status: **Done**
 
 Tests: handler unit tests on the host, integration tests in the container.
 
 1. Add `AuditRefreshTokenReplayDetected` to `constants/authcode-reuse-event`'s block and to
-   `constants/event-type-list`. Status: **Not started**
+   `constants/event-type-list`. Status: **Done** (`constants/replay-event`)
    Doc comment per decision 8, including that the event does not assert malicious intent.
-2. Add the replay branch to the handler ahead of the claim. Status: **Not started**
+2. Add the replay branch to the handler ahead of the claim.
+   Status: **Done** (`token/replay-containment`, `token/replay-audit`)
    Calls `RevokeRefreshTokenFamily`, audits when the count is positive, debug-logs when it is
    zero with the neutral wording, and always responds `invalid_grant`. No explicit
    transaction: one statement, so its return is its commit.
-3. Handler unit tests for the branch. Status: **Not started**
+3. Handler unit tests for the branch. Status: **Done** (`test/handler-replay-payload`)
    This is where the audit payload is asserted exactly, because the mock logger makes it
    exact and the integration tier cannot. Cases: positive count emits exactly one event with
    all six fields of decision 8 and a `revokedCount` equal to the stubbed return; zero count
    emits **no** event; a containment error emits no event and returns a 500; the payload
    carries neither the refresh token itself nor any JTI list; the auth-code and ROPC shapes
    produce the same field set.
-4. Add `TestToken_Refresh_Replay_ContainsFamily` (integration). Status: **Not started**
+4. Add `TestToken_Refresh_Replay_ContainsFamily` (integration). Status: **Done**
    Rotate RT1 to RT2 legitimately, then present RT1. Assert RT1 is refused with
    `invalid_grant`, and that RT2 is now revoked in the database. Pins the core of decision 1.
-5. Add the family-scope boundary test (integration). Status: **Not started**
+5. Add the family-scope boundary test (integration). Status: **Done** (`test/replay-family-scope`)
    Two clients on one browser session, each with its own family. Rotate and replay family A,
    then assert family B still rotates successfully **and** the browser session still works.
    This is the assertion that pins **decision 3**, and it is the only test that would fail if
    containment were widened to session scope.
    Ordering is load-bearing: family B must be exercised **after** the replay, not before, or
    it proves nothing about what containment did.
-6. Add the ROPC containment test (integration). Status: **Not started**
+6. Add the ROPC containment test (integration). Status: **Done** (`test/replay-ropc`)
    The same replay shape on a ROPC family. This is where `first_refresh_token_jti` materially
    differs from `code_id`, per decision 3, so the auth-code test cannot stand in for it.
-7. Add the repeat-replay test (integration). Status: **Not started**
+7. Add the repeat-replay test (integration). Status: **Done**
    Present RT1 a third time after containment. Assert `invalid_grant` and that no further row
    changes state. The absence of a second audit event is asserted in step 3, not here.
+
+**As built.** The constant at `constants/replay-event`, the replay branch at
+`token/replay-containment` and `token/replay-audit`, three unit tests
+(`test/handler-replay-payload` plus a containment-error case and the restubbed
+already-revoked subtest), and four integration tests in a new
+`token_refresh_replay_test.go`.
+
+Five things worth knowing, all contained inside these steps:
+
+1. **Every integration case was mutation-tested, and the results were not all the same.**
+   With containment removed entirely, all four fail, each on the assertion it exists for.
+   Then, with containment widened to SESSION scope (the shape `revokeOnAuthCodeReuse` uses),
+   `TestToken_Refresh_Replay_ContainsFamily` still **passes** and only
+   `test/replay-family-scope` fails, on "family B shares the browser session but not the
+   family" and then on family B failing to rotate. That confirms the plan's claim that the
+   boundary test is the only one with discriminating power over decision 3, and it means the
+   other three could not have caught a session-scoped implementation.
+2. **The already-revoked subtest became the zero-count case.** It now stubs
+   `RevokeRefreshTokenFamily` returning 0 and asserts no audit event, which gives decision
+   2's gate a home in the existing suite. Its fixture also gained a non-empty family
+   identifier, since an empty one is a data-layer error rather than a realistic row.
+3. **A malformed row with an empty family identifier yields a 500, not `invalid_grant`.**
+   `RevokeRefreshTokenFamily` errors on an empty identifier (decision 7) and the handler maps
+   that to `InternalServerError`, which is what section 4's sketch specifies. No issuer path
+   creates such a row: `issuer/refresh-family-carry` stamps either the parent's identifier or
+   the new JTI on every insert, so this needs legacy or imported data, the same population
+   decision 10 covers. Recorded rather than special-cased: failing loudly on corrupt data on
+   a security path is preferable to silently treating it as a family of one.
+4. **The audit event's flow discriminator reuses `validateResult.CodeEntity == nil`**, which
+   is the same test the issuance path below it already uses to pick the ROPC branch. The
+   principal fields then come from the loaded code on one shape and the refresh-token row on
+   the other, so the payload's field set is identical either way. The unit test runs both
+   shapes against one expected map, which is what pins that.
+5. **The repeat-replay test asserts `updated_at`, not just `revoked`.** Both rows are already
+   revoked, so a second containment matches nothing; had it matched, it would have bumped the
+   timestamp. Asserting only `revoked` would pass even if the statement rewrote every row.
+6. **Two wording corrections from review, no behaviour change.** The handler said a
+   zero-count containment means "none of those is an incident", which does not follow: a
+   repeated replay may well be malicious, it simply caused no new containment. It now says
+   the gate exists to avoid duplicate and misattributed rows and log amplification, and
+   explicitly does not classify the presentation as benign. Decision 8's naming rationale
+   carried the same error about the compare-and-set loser and is corrected the same way.
 
 ### Stage 5: retention and error mapping
 Status: **Not started**
