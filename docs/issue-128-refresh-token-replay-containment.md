@@ -11,8 +11,9 @@
 
 | Label | File | Function | Locate by | Note |
 |---|---|---|---|---|
-| `token/refresh-revoked-check` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `This refresh token has been revoked.` | the read half of defect 1 |
-| `token/refresh-unconditional-write` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `refreshToken.Revoked = true` | the write half of defect 1 |
+| `token/refresh-revoked-check` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `if refreshToken.Revoked {` | the validation-time read; the replay branch hangs off it |
+| `token/refresh-claim` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `claimed, err := database.MarkRefreshTokenAsRevoked(nil, refreshToken.Id)` | stage 3 replaced the unconditional write here |
+| `token/refresh-loser-no-cascade` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `// It does not protect EVERY concurrent duplicate. One whose lookup lands` | the recorded rationale for refusing a lost claim without cascading |
 | `token/authcode-claim` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `claimed, err := database.MarkCodeAsUsed(nil, validateResult.CodeEntity.Id)` | the #77 compare-and-set call site |
 | `token/authcode-loser-no-cascade` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `// Lost the race: another request concurrently redeemed this same code` | the loser branch that deliberately skips the cascade |
 | `token/authcode-reuse-dispatch` | `src/authserver/internal/handlers/handler_token.go` | `HandleTokenPost` | `if reused, ok := err.(*customerrors.AuthCodeReusedError); ok {` | the sequential-reuse branch that does cascade |
@@ -56,8 +57,10 @@
 | `test/data-promote-generations` | `src/authserver/tests/data/refresh_token_test.go` | `TestPromoteRefreshTokenGenerations` | `revoked := createTestRefreshToken(t)` | fixture helper for refresh token rows |
 | `test/handler-concurrent-loser` | `src/authserver/internal/handlers/handler_token_test.go` | `TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses` | `racedCode.Id).Return(false, nil)` | the unit-test shape for a lost claim |
 | `test/handler-refresh-subtests` | `src/authserver/internal/handlers/handler_token_test.go` | `TestHandleTokenPost` | `Refresh_token and token is revoked` | the subtests whose mocks change |
-| `docs/security-single-use` | `site/src/content/docs/reference/security.mdx` | `n/a` | `**Refresh token rotation** - Each refresh token can only be used once` | overstated today |
-| `docs/tokens-chain-claim` | `site/src/content/docs/concepts/tokens.mdx` | `n/a` | `Attempting to reuse an old refresh token will fail and may invalidate the entire token chain for security reasons.` | asserts behaviour that does not exist |
+| `test/handler-refresh-loser` | `src/authserver/internal/handlers/handler_token_test.go` | `TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses` | `database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), racedToken.Id).Return(false, nil)` | added by stage 3 |
+| `test/refresh-concurrent` | `src/authserver/tests/integration/token_refresh_concurrent_test.go` | `TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce` | `at most one family member may be left live after the race` | added by stage 3; the weaker assertion is deliberate |
+| `docs/security-single-use` | `site/src/content/docs/reference/security.mdx` | `n/a` | `**Refresh token rotation** - Each refresh token can only be used once` | overstated before stage 3; rewritten by stage 6 |
+| `docs/tokens-chain-claim` | `site/src/content/docs/concepts/tokens.mdx` | `n/a` | `Attempting to reuse an old refresh token will fail and may invalidate the entire token chain for security reasons.` | asserts containment that arrives in stage 4; rewritten by stage 6 |
 | `schema/refresh-tokens-sqlite` | `src/core/data/sqlitedb/schema.sql` | `n/a` | `first_refresh_token_jti TEXT NOT NULL,` | the column, no index on it before stage 1 |
 | `migration/family-index` | `src/core/data/sqlitedb/migrations/000025_add_refresh_token_family_index.up.sql` | `n/a` | `CREATE INDEX idx_refresh_tokens_first_refresh_token_jti` | added by stage 1; three siblings under the other engines |
 | `test/migration-000025` | `src/authserver/tests/data/migration_000025_family_index_test.go` | `TestMigration000025_RefreshTokenFamilyIndex` | `control index idx_refresh_token_jti is UNIQUE on every engine` | added by stage 1 |
@@ -65,20 +68,30 @@
 
 ## 1. Context
 
+**This section records the code as it stood at verification time, 2026-07-31, before any
+stage landed.** It is deliberately not updated as stages land, because it is the evidence
+the decisions in section 3 were taken on, and rewriting it would erase the reasoning's
+basis. Where a claim has since been changed by implementation, a bracketed note says which
+stage changed it. Section 5's step statuses and as-built notes are the record of the
+current state.
+
 ### Defect 1 is real, exactly as described
 
-The `refresh_token` case of `HandleTokenPost` reads `refreshToken.Revoked`
-(`token/refresh-revoked-check`), rejects if set, then unconditionally assigns and writes
-(`token/refresh-unconditional-write`). The write goes through `UpdateRefreshToken`
+The `refresh_token` case of `HandleTokenPost` read `refreshToken.Revoked`
+(`token/refresh-revoked-check`), rejected if set, then unconditionally assigned and wrote.
+That write went through `UpdateRefreshToken`
 (`data/update-refresh-token`), a full-row `UPDATE ... WHERE id = ?` with no predicate on
-`revoked`. The `revoked` value the handler tests came from the validator's read
-(`validator/refresh-lookup`), so read and write are separated by the entire validation
-pass. Two concurrent presentations of one refresh token both observe `revoked = false`,
-both write, and both mint a child. Confirmed by reading all three sites.
+`revoked`. The `revoked` value the handler tested came from the validator's read
+(`validator/refresh-lookup`), so read and write were separated by the entire validation
+pass. Two concurrent presentations of one refresh token both observed `revoked = false`,
+both wrote, and both minted a child. Confirmed by reading all three sites, and reproduced
+end to end during stage 3: against the pre-fix handler the concurrent integration test
+records 2 successes, 2 children from one parent and 2 live family members.
 
 The authorization-code path solved this shape in #77 with a compare-and-set
 (`data/mark-code-as-used`), called before any token is minted (`token/authcode-claim`).
-There is no equivalent for refresh tokens.
+There was no equivalent for refresh tokens. **[Stage 3 added one:
+`token/refresh-claim`.]**
 
 ### Defect 2 is real, and the family identity is present and unread
 
@@ -93,13 +106,15 @@ grep -rn "FirstRefreshTokenJti\|PreviousRefreshTokenJti" --include=*.go src/ \
 ```
 
 returns 8 lines: two model field declarations and six write sites in the issuer. So the
-family grouping exists on every row and has never been queried.
+family grouping exists on every row and has never been queried. **[Stage 2 added the
+first reader, `data/revoke-refresh-token-family`; stage 4 wires it to the handler.]**
 
-There is also no index on `first_refresh_token_jti` on any engine. Verified in the
+There was also no index on `first_refresh_token_jti` on any engine. Verified in the
 migrations, which are the source of truth, not only in the schema snapshots: `grep -rn
-first_refresh_token_jti src/core/data/*/migrations/` returns only column definitions in the
+first_refresh_token_jti src/core/data/*/migrations/` returned only column definitions in the
 initial-create migrations and in sqlite's 000011 table rebuild, never a `CREATE INDEX`. The
-snapshots agree (`schema/refresh-tokens-sqlite`).
+snapshots agreed (`schema/refresh-tokens-sqlite`). **[Stage 1 added one on all four engines:
+`migration/family-index`.]**
 
 ### The issue's grep claim about `revoked` is now stale
 
@@ -181,10 +196,12 @@ not on token replay.
   tier that does.
 - **Handler unit tests** (`src/authserver/internal/handlers/handler_token_test.go`): the
   refresh subtests live inside the single large `TestHandleTokenPost`
-  (`test/handler-refresh-subtests`). Five of them stub `UpdateRefreshToken` and would need
-  their mocks changed by a compare-and-set: the revoked-token case, the update-error case,
-  the issuer-error case, the session-bump case and the no-session case.
-  `test/handler-concurrent-loser` is the shape a new lost-race unit test should copy.
+  (`test/handler-refresh-subtests`). **Four** of them stub `UpdateRefreshToken` and would
+  need their mocks changed by a compare-and-set: the update-error case, the issuer-error
+  case, the session-bump case and the no-session case. This paragraph first said five and
+  counted the revoked-token case, which returns before the write and stubs nothing; finding
+  3 caught it. `test/handler-concurrent-loser` is the shape a new lost-race unit test should
+  copy. **[Stage 3 restubbed all four.]**
 - **Integration** (`src/authserver/tests/integration/`): `test/authcode-concurrent` is the
   concurrency template and `test/concurrent-post-helper` is already reusable as-is.
   `test/refresh-marked-used` is the regression that pins today's rotation behaviour, and
@@ -201,11 +218,13 @@ not on token replay.
 
 ### Documentation already claims the behaviour this issue is adding
 
-Two user-facing sentences are false today and would become true if both defects are fixed:
-`docs/security-single-use` ("Each refresh token can only be used once", untrue under
-concurrency) and `docs/tokens-chain-claim` ("may invalidate the entire token chain for
-security reasons", which describes family containment that does not exist). Correcting or
-earning these belongs in this change rather than in a follow-up.
+Two user-facing sentences were false at verification time and become true once both defects
+are fixed: `docs/security-single-use` ("Each refresh token can only be used once", untrue
+under concurrency) and `docs/tokens-chain-claim` ("may invalidate the entire token chain for
+security reasons", which describes family containment that did not exist). Correcting or
+earning these belongs in this change rather than in a follow-up. **[Stage 3 earned the
+first; the second waits on stage 4. Stage 6 rewrites both, so until it lands they are
+accidentally-true rather than accurate.]**
 
 ## 2. Goal
 
@@ -750,7 +769,7 @@ fix in the validator, and one index migration.
 ### The handler's `refresh_token` case
 
 The case splits into a replay branch and a claim, replacing the read-then-unconditional-write
-at `token/refresh-revoked-check` and `token/refresh-unconditional-write`:
+at `token/refresh-revoked-check` and the unconditional write that used to follow it:
 
 ```go
 case "refresh_token":
@@ -915,10 +934,27 @@ auditing are unchanged.
 
 A `!claimed` return does **not** mean specifically "another rotation claimed this row". It
 means the row is no longer live: a concurrent rotation, a concurrent security revocation such
-as `handlers/revoke-user-auth-state`, or the row having been deleted all produce it. Refusing
-without a cascade is correct in every one of those cases, since a credential-change
-revocation has already advanced the generation and a deleted row has no family left to
-contain.
+as `handlers/revoke-user-auth-state`, or the row having been deleted all produce it.
+
+**Refusing without a cascade follows from that ambiguity, not from the cases being
+individually harmless.** The handler cannot tell which of the three produced the false
+return, and one of them is a concurrent rotation whose freshly minted child a cascade would
+destroy. So containment cannot fire here at all, and each case is left as it is:
+
+- **Concurrent rotation.** Cascading would be actively wrong. This is the case the branch
+  exists for.
+- **Credential-change revocation.** Genuinely benign: `handlers/revoke-user-auth-state`
+  advanced the user's generation, so every family member is already rejected by
+  `validator/refresh-generation-authcode` or `validator/refresh-generation-ropc` before
+  reaching this handler.
+- **Deleted row.** An **accepted residual**. Deletion is row-scoped and proves nothing about
+  descendants, so live family members can survive a deletion of their ancestor and this
+  branch will not contain them. An earlier draft claimed "a deleted row has no family left to
+  contain", which is false. What bounds it: after decision 4 no sweep deletes an unexpired
+  row, so reaching this state needs user deletion, a referential cascade or a restore, all of
+  which remove or invalidate the wider grant anyway; and containment still fires on the next
+  replay presented against any surviving family member, since that presentation reads its own
+  row revoked and takes the branch above.
 
 **Not promised:** family containment is best-effort against a child whose insert commits after
 the containment statement (decision 7, residual owned here). Detection remains reactive: a
@@ -1123,17 +1159,17 @@ mock regeneration.
       identifier, and the decision 3 case needs two codes deliberately sharing one.
 
 ### Stage 3: atomic single use (defect 1)
-Status: **Not started**
+Status: **Done**
 
 Tests: handler unit tests on the host, one integration test in the container.
 
-1. Replace the read-then-write at `token/refresh-unconditional-write` with a call to
+1. Replace the read-then-write that followed `token/refresh-revoked-check` with a call to
    `MarkRefreshTokenAsRevoked`, rejecting on `!claimed` without any cascade.
-   Status: **Not started**
+   Status: **Done** (`token/refresh-claim`, `token/refresh-loser-no-cascade`)
    The in-memory `refreshToken.Revoked = true` assignment is dropped, not moved. Verified
    nothing downstream reads it. Comment per decision 9's wording.
 2. Update the four refresh subtests inside `test/handler-refresh-subtests` that stub
-   `UpdateRefreshToken`. Status: **Not started**
+   `UpdateRefreshToken`. Status: **Done**
    The update-error case, the issuer-error case, the session-bump case and the no-session case
    stub it and must stub `MarkRefreshTokenAsRevoked` instead. Verified:
    `grep -c 'database.On("UpdateRefreshToken"' src/authserver/internal/handlers/handler_token_test.go`
@@ -1141,13 +1177,13 @@ Tests: handler unit tests on the host, one integration test in the container.
    write; it changes in stage 4 instead, when the replay branch gains a containment call it
    must stub. Mechanical, but a missed site fails as an unexpected-call panic rather than a
    clear assertion.
-3. Add a handler unit test for the lost claim. Status: **Not started**
+3. Add a handler unit test for the lost claim. Status: **Done** (`test/handler-refresh-loser`)
    Modelled on `test/handler-concurrent-loser`: stub the CAS to return `(false, nil)` and
    assert `invalid_grant`, **no** call to `RevokeRefreshTokenFamily`, and **no** audit event.
    The two negative assertions are the test: without them it passes under a design that
    cascades on the lost claim, which is exactly the design decision 1 rejected.
 4. Add `TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce` to a new
-   `token_refresh_concurrent_test.go`. Status: **Not started**
+   `token_refresh_concurrent_test.go`. Status: **Done** (`test/refresh-concurrent`)
    Mirrors `test/authcode-concurrent` and reuses `test/concurrent-post-helper` unchanged.
    Asserts, across 8 racing presentations:
    - exactly **one** successful response;
@@ -1169,9 +1205,47 @@ Tests: handler unit tests on the host, one integration test in the container.
    step 3 covers a validation read of already revoked. They do not prove or force the
    inter-request ordering that produced either state.
 5. Confirm `test/refresh-marked-used` and `ropc_flow_test.go` still pass unchanged.
-   Status: **Not started**
+   Status: **Done**
    Rotation behaviour is not meant to change. Note this proves nothing about the new
    concurrent behaviour, which did not exist before.
+
+**As built.** The claim replaces the read-then-write in the handler's `refresh_token` case
+(`token/refresh-claim`), with the loser branch and its recorded rationale at
+`token/refresh-loser-no-cascade`. Four subtests restubbed, one new handler unit test
+(`test/handler-refresh-loser`), one new integration file (`test/refresh-concurrent`).
+
+Four things worth knowing, all contained inside these steps:
+
+1. **The defect was reproduced before the fix was trusted.** With the handler temporarily
+   reverted to the pre-fix read-then-write, the new integration test fails on three
+   assertions at once against sqlite: **2** successful concurrent presentations, **2**
+   children persisted from one parent, and **2** live family members. That is defect 1
+   exactly as #128 describes it. The handler was restored and the tier re-run. Without this
+   the test would only have been known to pass, not to bite.
+2. **The lost-claim unit test's negative assertions were verified the same way.** With a
+   `RevokeRefreshTokenFamily` call inserted into the `!claimed` branch, the test fails on an
+   unexpected mock call. That is the design decision 1 rejected, so the assertion that would
+   have to catch it does.
+3. **The error-case subtest was renamed and its message changed.** "Refresh_token
+   UpdateRefreshToken gives error" is now "Refresh_token MarkRefreshTokenAsRevoked gives
+   error", and its fixture message went from "Failed to update refresh token" to "Failed to
+   claim refresh token", since the `httpHelper` matcher asserts on that string and a stale
+   one would describe a call the handler no longer makes.
+4. **The stubs pin the id, not the type.** The four restubbed sites match
+   `int64(1)` rather than `mock.AnythingOfType`, which the old full-row stub needed because
+   it took a `*models.RefreshToken`. Matching the id means a claim on the wrong row fails
+   as an unexpected call rather than passing.
+5. **Two wording corrections from review, no behaviour change.** The `!claimed` rationale
+   said refusing without a cascade is "correct in every one of those cases" because "a
+   deleted row has no family left to contain". That is false: deletion is row-scoped and
+   proves nothing about descendants. The real reason is ambiguity, since a false return
+   cannot be told apart from the concurrent-rotation case whose child a cascade would
+   destroy, and deletion-with-surviving-family is an accepted residual rather than an
+   impossibility. Corrected in the handler comment (`token/refresh-loser-no-cascade`) and in
+   section 4. Section 1 also gained a scoping note: it records the code at verification time
+   and is not rewritten as stages land, with bracketed markers where implementation has since
+   changed a claim. Its "five subtests stub UpdateRefreshToken" count, which finding 3 had
+   corrected only in stage 3's step text, now reads four there too.
 
 ### Stage 4: replay containment and the audit event (defect 2)
 Status: **Not started**
