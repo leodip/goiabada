@@ -5,7 +5,7 @@
 **Spec written:** 2026-07-31
 **Last synced:** 2026-07-31 (no comments on the issue)
 **Plan approved:** 2026-07-31 (through finding 8)
-**Related:** #77 (closed) is the pattern for defect 1 and the cautionary precedent for defect 2. #106 (closed 2026-07-31, after this issue was filed) landed the authentication-generation machinery this spec must not fight. #131 (open) is a sibling concurrency defect that explicitly states #128 does not subsume it. #127 (closed, not planned) surfaced the unused family columns. #129 (open) covers session termination and is untouched here.
+**Related:** #132 (open) tracks the containment residual decision 7 accepts. #77 (closed) is the pattern for defect 1 and the cautionary precedent for defect 2. #106 (closed 2026-07-31, after this issue was filed) landed the authentication-generation machinery this spec must not fight. #131 (open) is a sibling concurrency defect that explicitly states #128 does not subsume it. #127 (closed, not planned) surfaced the unused family columns. #129 (open) covers session termination and is untouched here.
 
 ## 0. Code anchors
 
@@ -215,8 +215,8 @@ rotation behaviour, for both authorization-code and ROPC grants, is unchanged.
 **Family containment is best-effort, deliberately.** A child whose insert commits after the
 containment statement survives it, because rotation commits its parent claim separately from
 its child insert. Decision 7 records why closing that needs a per-family serialization
-boundary this change does not introduce, and why the residual stays owned here rather than
-by #131.
+boundary this change does not introduce, and why it is not #131's to own. It is tracked by
+**#132**.
 
 **Strict containment is chosen over retry tolerance.** A legitimate parallel refresh whose
 lookup lands after the winner's claim can revoke the winner's child and force fresh
@@ -227,6 +227,8 @@ from it.
 
 ### Out of scope
 
+- **#132, making family containment atomic with rotation.** The residual decision 7 accepts,
+  filed as its own issue so it stays tracked after this one closes. Does not block this change.
 - **#131, coordinating rotation with the user-scoped generation sweep.** #131 states in its
   own text that #128 is not a superset of it and that a compare-and-set on the refresh-token
   row does not order rotation against a sweep touching different rows. Verified: the two
@@ -554,7 +556,7 @@ from it.
    `issuer/refresh-insert` would need an issuer signature change to reach a handler-level
    transaction anyway.
 
-   **Accepted residual, owned by #128.** A rotation can claim a live descendant, the replay
+   **Accepted residual, tracked by #132.** A rotation can claim a live descendant, the replay
    cascade can then update every currently committed family member, and the rotation can
    afterwards insert its new child. That child is invisible to the containment statement and
    survives. Closing it requires rotation and containment to share a durable per-family
@@ -563,9 +565,16 @@ from it.
    This residual is **not** automatically resolved by #131, and an earlier draft of this
    decision that assigned it there was wrong. #131 coordinates rotation with a *user-scoped*
    generation change; its boundary might later supply usable machinery, but satisfying #131
-   does not by itself serialize rotation against a family-replay cascade. The residual stays
-   tracked under #128 or a dedicated follow-up unless #131's scope and acceptance tests are
-   deliberately widened.
+   does not by itself serialize rotation against a family-replay cascade. It is therefore
+   tracked by its own issue, #132, filed after plan approval so the gap keeps an open item once
+   #128 closes rather than surviving only as prose here.
+
+   **One interleaving is also silent.** If the attacker's claim commits, containment then finds
+   zero live members, and the attacker's child commits afterwards, decision 2's zero-count gate
+   suppresses the audit event. So the interleaving in which containment fails is the one in
+   which it records nothing. A later replay would contain the child and emit the event, but the
+   legitimate client has already had `invalid_grant` and typically stops. Recorded in #132's
+   acceptance criteria rather than fixed here, since fixing it needs the same boundary.
 
    **Consequence for section 2:** family containment is best-effort against a child committed
    after the containment statement. Atomic single use carries no such qualification.
