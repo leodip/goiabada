@@ -87,7 +87,22 @@ const (
 	// redirect_uri, client_secret/PKCE). Per RFC 6749 Section 4.1.2 the server
 	// then revokes refresh tokens issued from that code and terminates the
 	// associated user session.
-	AuditAuthCodeReuseDetected    = "auth_code_reuse_detected"
+	AuditAuthCodeReuseDetected = "auth_code_reuse_detected"
+	// AuditRefreshTokenReplayDetected records an authenticated presentation of an
+	// already-revoked refresh token that caused at least one live member of the
+	// same rotation family to be revoked. Per RFC 9700 Section 4.14.2, rotation
+	// responds to an invalidated refresh token by revoking the active one, since
+	// the server cannot tell which presenter is legitimate.
+	//
+	// It does NOT assert malicious intent. Under the strict rotation policy this
+	// event can legitimately describe a concurrent duplicate whose lookup landed
+	// after the winner's claim (#128).
+	//
+	// A presentation that revokes nothing emits no event, so an idempotent no-op
+	// (a family already fully revoked, or a repeated replay) cannot amplify the
+	// audit log.
+	AuditRefreshTokenReplayDetected = "refresh_token_replay_detected"
+
 	AuditCreatedUser              = "created_user"
 	AuditActivatedAccount         = "activated_account"
 	AuditCreatedPreRegistration   = "created_pre_registration"
@@ -221,6 +236,7 @@ var AuditEventTypes = []string{
 	AuditFailedResetPasswordCode,
 	AuditGeneratedEmailVerificationCode,
 	AuditLogout,
+	AuditRefreshTokenReplayDetected,
 	AuditRevokedKey,
 	AuditRevokedUserAuthState,
 	AuditROPCAuthFailed,

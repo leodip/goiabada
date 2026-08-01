@@ -235,6 +235,63 @@ func HandleTokenPost(
 		case "refresh_token":
 			refreshToken := validateResult.RefreshToken
 			if refreshToken.Revoked {
+				// The validation-time read observed this token already revoked, so it is
+				// a replay CANDIDATE: rotation retired it and it came back. Contain the
+				// whole rotation family, since a thief holding one member can otherwise
+				// keep rotating while the victim is locked out (#128).
+				//
+				// Attempt containment even though the server cannot distinguish a
+				// malicious replay from a legitimate concurrent duplicate whose lookup
+				// landed after the winner's claim. That is RFC 9700 Section 4.14.2's
+				// strict model, and it is deliberate: no overlap window, because any
+				// window leaves the defining theft scenario uncontained.
+				revokedCount, err := database.RevokeRefreshTokenFamily(nil, refreshToken.FirstRefreshTokenJti)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+
+				// Audited only when containment actually moved a member from live to
+				// revoked. A zero count means containment changed no state, which an
+				// already-swept family, an earlier auth-code-reuse cascade and a repeated
+				// replay all produce. Suppressing the event there avoids duplicate and
+				// misattributed audit rows and stops a client amplifying the log by
+				// replaying the same token repeatedly.
+				//
+				// It does NOT classify the presentation as benign. A repeated replay may
+				// well be malicious; it simply caused no new containment, and the
+				// presentation that DID contain the family is the one that recorded it.
+				//
+				// No explicit transaction: containment is one statement, so its
+				// successful return IS its commit, and the event is emitted after it.
+				if revokedCount > 0 {
+					// The principal fields are populated uniformly for both linkage
+					// shapes, so a security-event consumer does not need flow-specific
+					// logic just to identify the client and user. This deliberately
+					// departs from AuditTokenIssuedRefreshTokenResponse below, which
+					// logs codeId on one shape and userId/clientId on the other.
+					replayClientId := refreshToken.ClientId.Int64
+					replayUserId := refreshToken.UserId.Int64
+					replayFlow := "ropc"
+					if validateResult.CodeEntity != nil {
+						replayClientId = validateResult.CodeEntity.ClientId
+						replayUserId = validateResult.CodeEntity.UserId
+						replayFlow = "auth_code"
+					}
+
+					auditLogger.Log(constants.AuditRefreshTokenReplayDetected, map[string]interface{}{
+						"presentedRefreshTokenJti": refreshToken.RefreshTokenJti,
+						"firstRefreshTokenJti":     refreshToken.FirstRefreshTokenJti,
+						"revokedCount":             revokedCount,
+						"clientId":                 replayClientId,
+						"userId":                   replayUserId,
+						"flow":                     replayFlow,
+					})
+				} else {
+					slog.Debug("refresh_token: revoked token presented, no live family members to revoke",
+						"refreshTokenId", refreshToken.Id)
+				}
+
 				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"This refresh token has been revoked.", http.StatusBadRequest))
 				return

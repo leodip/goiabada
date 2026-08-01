@@ -279,11 +279,15 @@ func TestHandleTokenPost(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		mockRefreshToken := &models.RefreshToken{Id: 1, Revoked: true}
+		mockRefreshToken := &models.RefreshToken{Id: 1, Revoked: true, FirstRefreshTokenJti: "family-1"}
 		validationResult := &validators.ValidateTokenRequestResult{RefreshToken: mockRefreshToken}
 
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
+
+		// Containment runs but finds nothing live, which is the idempotent no-op an
+		// already-swept family produces. Zero count means no audit event (#128).
+		database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), "family-1").Return(int64(0), nil)
 
 		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.(*customerrors.ErrorDetail).GetCode() == "invalid_grant" &&
@@ -294,6 +298,8 @@ func TestHandleTokenPost(t *testing.T) {
 
 		httpHelper.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 	})
 
 	t.Run("Refresh_token MarkRefreshTokenAsRevoked gives error", func(t *testing.T) {
@@ -1061,6 +1067,175 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything)
 	userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+}
+
+// TestHandleTokenPost_Refresh_Replay_AuditsContainment asserts the replay-containment
+// audit payload EXACTLY. It lives at the unit tier deliberately: the mock logger makes
+// the payload observable, and the integration tier cannot see it at all (#128).
+//
+// Both linkage shapes are run against the same expectations on purpose. A security-event
+// consumer must not need flow-specific logic to identify the client and user, which is
+// where this departs from AuditTokenIssuedRefreshTokenResponse (codeId on one shape,
+// userId/clientId on the other).
+//
+// The exact-key assertion is what pins the two negative requirements from decision 8: the
+// payload carries neither the presented refresh token itself nor a list of revoked JTIs.
+// A set-based update yields an exact COUNT but not an exact cross-engine row set, and an
+// inaccurate security field is worse than an omitted one.
+func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
+	const (
+		presentedJti = "jti-presented"
+		familyJti    = "jti-family"
+		clientId     = int64(111)
+		userId       = int64(222)
+	)
+
+	testCases := []struct {
+		name     string
+		result   *validators.ValidateTokenRequestResult
+		wantFlow string
+	}{
+		{
+			name: "authorization code family",
+			result: &validators.ValidateTokenRequestResult{
+				RefreshToken: &models.RefreshToken{
+					Id:                   1,
+					Revoked:              true,
+					RefreshTokenJti:      presentedJti,
+					FirstRefreshTokenJti: familyJti,
+					CodeId:               sql.NullInt64{Int64: 9, Valid: true},
+				},
+				// The principal fields come from the loaded code on this shape.
+				CodeEntity: &models.Code{Id: 9, ClientId: clientId, UserId: userId},
+			},
+			wantFlow: "auth_code",
+		},
+		{
+			name: "ROPC family",
+			result: &validators.ValidateTokenRequestResult{
+				// No code at all: the client and user are on the refresh token row.
+				RefreshToken: &models.RefreshToken{
+					Id:                   1,
+					Revoked:              true,
+					RefreshTokenJti:      presentedJti,
+					FirstRefreshTokenJti: familyJti,
+					UserId:               sql.NullInt64{Int64: userId, Valid: true},
+					ClientId:             sql.NullInt64{Int64: clientId, Valid: true},
+				},
+			},
+			wantFlow: "ropc",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			userSessionManager := mocks_users.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			tokenValidator := mocks_validators.NewTokenValidator(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+
+			formData := "grant_type=refresh_token&refresh_token=replayed"
+			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rr := httptest.NewRecorder()
+
+			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+				Return(tc.result, nil)
+
+			// Two live members transitioned, so this is a real containment.
+			database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), familyJti).Return(int64(2), nil)
+
+			var logged []map[string]interface{}
+			auditLogger.On("Log", constants.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
+				Run(func(args mock.Arguments) {
+					logged = append(logged, args.Get(1).(map[string]interface{}))
+				}).Return()
+
+			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+				detail, ok := err.(*customerrors.ErrorDetail)
+				return ok && detail.GetCode() == "invalid_grant"
+			})).Return().Once()
+
+			handler.ServeHTTP(rr, req)
+
+			httpHelper.AssertExpectations(t)
+			tokenValidator.AssertExpectations(t)
+			database.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+
+			require.Len(t, logged, 1, "exactly one replay event must be emitted")
+			assert.Equal(t, map[string]interface{}{
+				"presentedRefreshTokenJti": presentedJti,
+				"firstRefreshTokenJti":     familyJti,
+				"revokedCount":             int64(2),
+				"clientId":                 clientId,
+				"userId":                   userId,
+				"flow":                     tc.wantFlow,
+			}, logged[0], "the replay payload must carry exactly these six fields")
+
+			// A replay mints nothing and bumps nothing.
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything)
+			userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500 pins that a failed
+// containment is surfaced rather than swallowed, and that no event is emitted for it.
+//
+// Emitting on a failed containment would be worse than emitting nothing: the event's
+// contract is that it records members actually revoked, and a failure revoked none.
+func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	userSessionManager := mocks_users.NewUserSessionManager(t)
+	database := mocks_data.NewDatabase(t)
+	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+	tokenValidator := mocks_validators.NewTokenValidator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+
+	formData := "grant_type=refresh_token&refresh_token=replayed"
+	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	replayed := &models.RefreshToken{
+		Id:                   1,
+		Revoked:              true,
+		RefreshTokenJti:      "jti-presented",
+		FirstRefreshTokenJti: "jti-family",
+	}
+	validationResult := &validators.ValidateTokenRequestResult{
+		RefreshToken: replayed,
+		CodeEntity:   &models.Code{Id: 9},
+	}
+
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+		Return(validationResult, nil)
+
+	database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), "jti-family").
+		Return(int64(0), customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to contain family", http.StatusInternalServerError))
+
+	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		return strings.Contains(err.Error(), "Failed to contain family")
+	})).Return().Once()
+
+	handler.ServeHTTP(rr, req)
+
+	httpHelper.AssertExpectations(t)
+	tokenValidator.AssertExpectations(t)
+	database.AssertExpectations(t)
+
+	// No event, and no invalid_grant either: the request did not get a clean refusal,
+	// it got a server error.
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestNormalizeScope is the exhaustive table for the helper, which is a pure string function, so
