@@ -19,6 +19,9 @@
 tmp/
 .devdata/
 
+# Agent review mailbox (throwaway ping-pong between Claude Code and Codex)
+.review/
+
 # Go workspace file
 go.work
 
