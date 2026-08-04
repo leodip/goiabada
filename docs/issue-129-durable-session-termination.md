@@ -1334,29 +1334,34 @@ Tiers: unit (three modules), data (four engines). Integration not applicable, no
 Docs: none, internals only. Verified in section 2 that `CLAUDE.md` and `AGENTS.md` enumerate neither
 migrations nor the `codes` table, and no page on the docs site describes either.
 
-1. Migration `000026_add_code_revoked`, up and down, for all four engines. Types follow
-   `refresh_tokens.revoked` on each: sqlite `numeric`, mysql `tinyint(1)`, postgres `boolean`, mssql
-   `BIT`. Each declares `NOT NULL DEFAULT` false, and mssql names its default constraint
-   `df_codes_revoked` so the down migration can drop the constraint before the column, which is the
-   hazard 000024 documents. **No index**: the sweep is keyed on `session_identifier`, which
-   `idx_codes_session_identifier` from 000024 already covers, and stage 6's reaper scans by
-   `created_at`. Status: **Done**
-2. The four `schema.sql` snapshots gain the column, in the position the migration puts it (after
-   `used`). Documentation only, never loaded by Go. Status: **Done**
-3. `models.Code.Revoked` with `db:"revoked"` and `fieldtag:"dont-update"`, carrying the comment
-   decision 4 requires: an ordinary full-row `UpdateCode` must not be able to write the marker back
-   to false. Mirrors `Code.AuthStateGeneration`. Status: **Done**
-4. `RevokeCodesBySessionIdentifier(tx, sid) (int64, error)` in `commondb/code.go`, its declaration in
-   the `Code` block of `data/database.go`, the one-line wrapper in each of the four engine packages,
-   and regenerated mocks (`authserver/generate-mocks.sh`, run in the dev container). The predicate is
+Each step carries its status on its own numbered line, because that is what the guard parses. A status
+on a continuation line reads as an untraced step and refuses the gate.
+
+1. **Migration `000026_add_code_revoked`, up and down, on four engines.** Status: **Done**
+   Types follow `refresh_tokens.revoked` on each: sqlite `numeric`, mysql `tinyint(1)`, postgres
+   `boolean`, mssql `BIT`. Each declares `NOT NULL DEFAULT` false, and mssql names its default
+   constraint `df_codes_revoked` so the down migration can drop the constraint before the column,
+   which is the hazard 000024 documents. **No index**: the sweep is keyed on `session_identifier`,
+   which `idx_codes_session_identifier` from 000024 already covers, and stage 7's reaper scans by
+   `created_at`.
+2. **The four `schema.sql` snapshots gain the column.** Status: **Done**
+   In the position the migration puts it, after `used`. Documentation only, never loaded by Go.
+3. **`models.Code.Revoked`, tagged `dont-update`.** Status: **Done**
+   With the comment decision 4 requires: an ordinary full-row `UpdateCode` must not be able to write
+   the marker back to false. Mirrors `Code.AuthStateGeneration`.
+4. **`RevokeCodesBySessionIdentifier(tx, sid) (int64, error)`.** Status: **Done**
+   In `commondb/code.go`, declared in the `Code` block of `data/database.go`, with the one-line
+   wrapper in each of the four engine packages and regenerated mocks
+   (`authserver/generate-mocks.sh`, run in the dev container). The predicate is
    `session_identifier = ? AND revoked = false`, the assignment sets `revoked` and `updated_at`, and
    the return is `RowsAffected`. An empty identifier returns an error rather than being used as a
-   filter. Status: **Done**
-5. `db/mark-code-used` gains `AND revoked = false`, with the comment section 4.3 requires: validation
-   and claiming are separate steps, so without this term a code revoked in between is still claimed.
-   The interface doc comment gains the same note. Status: **Done**
-6. Data cases at **seam 1**, in `code_test.go`, all four engines. Two tests: the sweep's table, and
-   the transaction and failure path a mock cannot answer for. The rows, all executed:
+   filter.
+5. **`db/mark-code-used` gains `AND revoked = false`.** Status: **Done**
+   With the comment section 4.3 requires: validation and claiming are separate steps, so without this
+   term a code revoked in between is still claimed. The interface doc comment gains the same note.
+6. **Data cases at seam 1, in `code_test.go`, all four engines.** Status: **Done**
+   Two tests: the sweep's table, and the transaction and failure path a mock cannot answer for. The
+   rows, all executed before being written here:
 
    | Case | Expected | Which gate rejects it, or what it proves |
    |---|---|---|
@@ -1371,21 +1376,35 @@ migrations nor the `codes` table, and no page on the docs site describes either.
    **Keep the unrelated-session row and the rolled-back row.** The first is the only case that fails
    if the sweep is written session-wide by mistake, which would sign out every device of every user.
    The second is the only case exercising the real implementation's transaction handling; every
-   mock-based test above it passes with the parameter ignored. Status: **Done**
-7. Data cases at **seam 2**, extending `TestMarkCodeAsUsed` rather than adding a sibling: a revoked
-   but unused code is **not** claimable, and stays unused afterwards. **Keep the existing
+   mock-based test above it passes with the parameter ignored.
+7. **Data cases at seam 2, extending `TestMarkCodeAsUsed`.** Status: **Done**
+   A revoked but unused code is **not** claimable, and stays unused afterwards. **Keep the existing
    already-used row beside it**, since either row alone still passes with the other term deleted from
    the predicate. Plus `TestUpdateCode_DoesNotClobberRevoked`, mirroring the four existing
    `DoesNotClobber` tests, which is the only case that fails if the `dont-update` tag on the model
-   field is dropped. Status: **Done**
-8. `migration_000026_code_revoked_test.go`, following 000024 and 000025: the column is absent at
-   000025, is `NOT NULL` defaulting to false afterwards, a `codes` row that predates it lands
-   `revoked = false`, and the down migration then the re-apply are clean. The pre-existing row is
-   seeded through the ORM at 000026 and carried down to 000025 and back, rather than hand-written at
-   000025, which is what makes the case affordable: `codes` has twenty NOT NULL columns and foreign
-   keys into `clients` and `users`. Status: **Done**
-9. Verify: `check-anchors.sh`, then `where.sh test --type modules` and
-   `where.sh test --type data --db <each of the four>`. Status: **Done**
+   field is dropped.
+8. **`migration_000026_code_revoked_test.go`.** Status: **Done**
+   Following 000024 and 000025: the column is absent at 000025, is `NOT NULL` defaulting to false
+   afterwards, a `codes` row that predates it lands `revoked = false`, and the down migration then
+   the re-apply are clean. The pre-existing row is seeded through the ORM at 000026 and carried down
+   to 000025 and back, rather than hand-written at 000025, which is what makes the case affordable:
+   `codes` has twenty NOT NULL columns and foreign keys into `clients` and `users`.
+9. **Verify.** Status: **Done**
+   `check-anchors.sh`, then `where.sh test --type modules` and
+   `where.sh test --type data --db <each of the four>`.
+
+**As built.** Every step landed as written, with two departures worth naming.
+
+`handler_token.go` was edited, which no step listed: a comment rewrite and one changed `slog.Debug`
+message, no behaviour. Step 5 made the old text false, because a false return from
+`db/mark-code-used` now means "no row transitioned" rather than "already used", and the comment there
+told the reader it meant authorization-code reuse. The reviewer found it, and the fix belongs to this
+stage rather than a later one because this stage is what falsified it.
+
+The order was inverted against the skill: the code existed before section 6 did. Section 5's closing
+obligation requires the case tables to be executed before they are written down, and a data-tier table
+cannot run without the migration and the method. Section 7's plan entry records what executing them
+changed, which is the return on doing it in that order.
 
 ### Stage 2: rejection at redemption and at refresh
 Status: **Not started**
