@@ -5,7 +5,7 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** in progress, started 2026-08-04. Stages 1 and 2 done, stage 3 next.
+**Run state:** in progress, started 2026-08-04. Stages 1, 2 and 3 done, stage 4 next.
 **PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
@@ -92,6 +92,10 @@ log can cite it the same way. Nothing above the line changed.
 | `validator/code-revoked` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `if codeEntity.Revoked {` | stage 2, the redemption rejection, behind client auth, PKCE and the reuse return |
 | `validator/refresh-code-revoked` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `if !isROPCToken && refreshToken.Code.Revoked {` | stage 2, the refresh rejection, behind ownership and ahead of the `typ` switch, so it reaches Offline |
 | `test/revoked-code-ordering` | `src/core/validators/token_validator_test.go` | `TestValidateTokenRequest_RevokedCode` | `ordering: a wrong client secret answers before the revoked check` | stage 2, the row the review's round 1 finding added |
+| `audit/terminated-session` | `src/core/constants/constants.go` | `n/a` | `AuditTerminatedUserSession = "terminated_user_session"` | stage 3, decision 9's second event, emitted by stage 4 |
+| `revoke/terminate-session` | `src/authserver/internal/handlers/revocation.go` | `TerminateUserSessionTx` | `revokedCodeCount, err := db.RevokeCodesBySessionIdentifier(tx, userSession.SessionIdentifier)` | stage 3, the first of decision 5's three writes and the only one that survives |
+| `test/terminate-offline-token` | `src/authserver/internal/handlers/revocation_test.go` | `TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession` | `the offline token of the terminated session must be revoked` | stage 3, decision 2's guard at this seam |
+| `test/terminate-zero-result` | `src/authserver/internal/handlers/revocation_test.go` | `TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult` | `the count must not survive a rolled-back transaction` | stage 3, the keep-this row of the failure table |
 
 Counts in this document carry their command:
 
@@ -1467,19 +1471,112 @@ revoked check into the confidential branch just ahead of `subtle.ConstantTimeCom
 exactly the oracle decision 7 exists to prevent.
 
 ### Stage 3: the termination helper, uncalled
-Status: **Not started**
-Detail: **sketch**
+Status: **Done**
+Seams: `revocation_test.go`, which section 5 names as the helper's home and which owns the
+transaction threading, the zero result on the error path, and decision 5's write order. Section 5's
+rejected-seams list is what keeps that scope honest: this file is mock based, so seam 1's
+rolled-back-transaction case and seam 9 own the atomicity, and this seam owns only what a mock can
+answer for.
+Tiers: unit (three modules). Integration and data not applicable: no endpoint changes, no query added,
+and every data method called here was covered on four engines in stage 1 or already existed.
+Docs: none, internals only. Nothing calls the helper, so nothing observable changes until stage 4.
 
-Deliberately inert: the helper exists and nothing calls it, so this commit changes no behaviour and
-owes no user-facing text. A helper in `revocation.go` modelled on `RevokeUserAuthStateTx`, performing
-decision 5's three writes in one transaction (`RevokeCodesBySessionIdentifier`, the sid-scoped refresh
-sweep through `db/refresh-by-sid` and `revoke/refresh-tokens`, then `DeleteUserSession`), returning
-the zero result on any error so a caller cannot audit a half-truth, and reporting the revoked code
-count and the transitioned JTIs decision 9's payload needs. Plus the new `terminated_user_session`
-constant and its entry in the audit event list in `constants.go`. Seam: `revocation_test.go`, which
-owns the transaction threading, the zero result on the error path, and that the three writes are
-issued in decision 5's order. Tier: unit. Docs: none, internals only, because nothing observable
-changes until stage 4 calls it.
+Deliberately inert, which is the plan review's second finding: stage 4 carries the endpoint calls and
+every piece of user-facing material about them in one commit, so this stage cannot deploy the broader
+security action ahead of the copy describing it.
+
+**The docs line is verified rather than assumed, because the new audit event does reach a UI
+surface.** `AuditEventTypes` feeds the audit log viewer's event filter, and
+`admin_settings_audit_log_viewer.html` renders `{{range .auditEventTypes}}` into
+`<option value="{{.}}">{{.}}</option>` with no `T` call, so the new event appears there as the raw
+identifier exactly as the other 94 do. No catalog key, and per section 2 `concepts/audit-log.mdx`
+points at `constants.go` rather than enumerating events.
+
+1. **`AuditTerminatedUserSession`, and its three registrations.** Status: **Done**
+   Landed at `audit/terminated-session`, with `constants_test.go` at `expectedCount` 95.
+   In `constants.go`, the constant `terminated_user_session` placed after `AuditRevokedUserAuthState`,
+   whose doc comment is the convention for a security event of this shape: why it exists beside
+   `AuditDeletedUserSession` rather than replacing it, that it fires only after the termination
+   transaction commits, and that it is the event to count for terminations, which is decision 9's own
+   stated downside. Plus its entry in `AuditEventTypes`, which `TestAuditEventTypes_Alphabetical`
+   sorts by **value**, so it belongs between `AuditStartedNewUserSesson` and
+   `AuditTokenIssuedAuthorizationCodeResponse`. Plus `constants_test.go`: `expectedCount` 94 to 95 and
+   the entry in `allAuditConstants`, which `TestAuditEventTypes_MatchesConstants` compares in both
+   directions and by count. Three registrations rather than one, and those two tests are why
+   forgetting any of them fails loudly instead of quietly.
+2. **`TerminationResult`.** Status: **Done**
+   Landed in `revocation.go` beside `RevocationResult`, two fields, as written.
+   In `revocation.go` beside `RevocationResult`, carrying exactly what decision 9's payload needs
+   beyond the caller's own inputs: `RevokedCodeCount int64` and `RevokedRefreshTokenJtis []string`.
+   The count is what this call **transitioned**, not what the session has, so a second termination of
+   the same session reports 0, which is the only question the audit event has to answer. `userId`,
+   `userSessionId` and `sessionIdentifier` stay out: the caller already holds the session row, and
+   restating them here would let a result and its payload disagree.
+3. **`TerminateUserSessionTx(db, userSession) (TerminationResult, error)`.** Status: **Done**
+   Landed at `revoke/terminate-session`, no inner variant, both entry guards ahead of the
+   transaction.
+   In `revocation.go`, owning its own transaction and committing it, with decision 5's three writes in
+   decision 5's order: `RevokeCodesBySessionIdentifier`, then the sid-scoped sweep through
+   `db/refresh-by-sid` fed into `revoke/refresh-tokens`, then `DeleteUserSession`. The zero result on
+   every error path, since the code sweep can succeed and the transaction still roll back, and a
+   caller that audits a count from a rolled-back transaction records a revocation that never happened.
+   The comment carries three things a later reader needs: that step 1 is the write which survives and
+   steps 2 and 3 are cleanup, that the sid-scoped **query** is the only thing reaching an offline
+   grant's tokens because their own `session_identifier` is empty (decision 2), and that this
+   deliberately does not advance the user's generation, because that would sign out every other device
+   the user has (section 4.6).
+
+   Takes the loaded `*models.UserSession` rather than an id plus a sid, because two of the writes key
+   on the identifier and the third on the id: from one row they cannot disagree, and both call sites in
+   stage 4 already load it for their 404 and their ownership check. Nil and an empty identifier are
+   refused at entry, before the transaction opens, which is where `RevokeUserAuthState` puts its own
+   precondition for the same reason.
+
+   **No inner `TerminateUserSession(db, tx, ...)` variant**, which is the one place this departs from
+   the shape of `RevokeUserAuthStateTx`. #106 needed the split because a credential write had to join
+   the same transaction through a callback; nothing composes with this one, so a second entry point
+   would be surface with no caller and a second contract to keep straight.
+4. **Unit cases at the seam.** Status: **Done**
+   Landed as four test functions over 10 leaf cases, including `test/terminate-offline-token` and
+   `test/terminate-zero-result`. Every row below shipped.
+   In `revocation_test.go`, on the strict `mocks_data.Database` the file already uses, so an
+   unexpected or missing call fails a case on its own. Fixture: three refresh tokens on the terminated
+   session, `rt-session-bound` (own sid set), `rt-offline` (own sid **empty**, code id set) and
+   `rt-already-gone` (already revoked). Expectations written before running them:
+
+   | Case | Expected | Which mechanism rejects it, or what it proves |
+   |---|---|---|
+   | a session with two live grants and one already-revoked token | the sweep's count reported as-is, JTIs `[rt-session-bound, rt-offline]`, session deleted, committed | the happy path and decision 9's payload |
+   | the offline token, whose own `session_identifier` is empty | revoked | decision 2: the sid-scoped query is the only thing that reaches it, and this row fails against an implementation that filters the returned rows by `rt.SessionIdentifier` |
+   | the already-revoked token | absent from the JTIs, and not written again | #77's invariant, inherited from `revoke/refresh-tokens` |
+   | the user's generation, and the user-scoped token query | never called | section 4.6 and decision 5's table: a user-scoped sweep signs out every other device |
+   | write order | codes, then tokens, then the delete | decision 5 states it. Within one transaction it is **not** a safety boundary, and neither sweep reads `user_sessions`, so this pins the design's order rather than a correctness property |
+   | nothing to revoke: no codes, no tokens | count 0, JTIs empty and non-nil, session still deleted and committed | ending a session with no grants is not an error, and the payload carries `[]` rather than null |
+   | nil session | error, `BeginTransaction` never called | the entry guard |
+   | empty session identifier | error, `BeginTransaction` never called | the entry guard. Without it the sweep refuses it three statements later, inside an open transaction, and it reads as a database fault |
+   | `BeginTransaction` fails | zero result, error | |
+   | the code sweep fails | zero result, and no token query, no delete, no commit | |
+   | the token query fails **after the code sweep returned 2** | zero result, `RevokedCodeCount` **0** | **keep this row.** It is the only one that fails against a partially populated result, which is exactly what would let a caller audit a revocation that rolled back |
+   | a token write fails | zero result, and no delete, no commit | |
+   | the delete fails | zero result, and no commit | |
+   | the commit fails | zero result | the caller must not audit, and the durable outcome is indeterminate per the helper's comment |
+5. **Verify.** Status: **Done**
+   `check-anchors.sh`, then `where.sh test --type modules`. Four anchor rows added for the new code,
+   not three: the plan undercounted, because `TerminationResult`'s two fields need no anchor of their
+   own but both new test functions do.
+
+**As built.** All five steps landed as written. Four anchor rows in section 0 rather than the three
+step 5 predicted, and 10 leaf cases rather than the "13" an earlier draft of this note claimed, which
+is what re-running the suite at the gate rather than quoting it is for: 2 standalone tests plus 2 and 6
+subtests, over `TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession`, `_NothingToRevoke`,
+`_RejectsAnUnusableSession` and `_AnyFailureYieldsTheZeroResult`.
+
+Two deviations, both in `constants_test.go` and both small. The event was also added to
+`criticalEvents` in `TestAuditEventTypes_ContainsCriticalEvents`, which step 1 named only
+`expectedCount` and `allAuditConstants`; the argument is #106's own, one entry above it in the same
+list, that `deleted_user_session` survives either way, so an event that stopped being emitted would
+leave the security action with only a lifecycle record and nothing attesting what it revoked. And the
+review moved one displaced comment in `revocation_test.go`, recorded in section 7.
 
 ### Stage 4: both endpoints terminate, and everything that says so
 Status: **Not started**
@@ -1802,6 +1899,123 @@ coverage rather than a failure the reviewer needed to run anything to see.
 
 **Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its fourteen items, all
 `Decided`.
+
+### Stage 3, 2026-08-04
+
+**Landed.** `revoke/terminate-session`, that is `TerminateUserSessionTx` in `revocation.go`, with
+`TerminationResult` beside `RevocationResult`; `audit/terminated-session`, the
+`AuditTerminatedUserSession` constant and its three registrations; and four new test functions in
+`revocation_test.go` over 10 leaf cases, covering the happy path, the empty case, both entry guards
+and every one of the six failure points. Four anchor rows added to section 0. Commit `d19d8b5`.
+
+Nothing calls the helper and nothing emits the event, which is the stage's defining property: this
+commit changes no observable behaviour. Stage 4 wires both endpoints and carries every piece of
+user-facing material about them in the same commit, per the plan review's finding 2.
+
+**Tiers.** Unit green, all three modules (`where.sh test --type modules`, exit 0, no `FAIL` lines,
+"All tests completed successfully"), run at the gate rather than carried forward from the
+implementation session. The stage's 10 leaf cases pass, and so do all six `TestAuditEventTypes_*`
+guards with the new event, the count guard now at 95 and `_Alphabetical` accepting
+`terminated_user_session` between `started_new_user_session` and
+`token_issued_authorization_code_response`. No data tier and no integration tier, correctly: this
+stage adds no query, changes no endpoint, and every data method it calls was covered on four engines
+in stage 1 or already existed. `check-anchors.sh` passes all 49 rows, `gofmt -l` is silent on all four
+changed files, `git diff --check` is clean.
+
+**Mutation evidence, because a green mock-based suite is worth what its rows would catch.** Two
+mutations applied to the real helper, run, and reverted, in this session rather than quoted from the
+implementation session's notes.
+
+1. Re-filtering the swept rows by `rt.SessionIdentifier == userSession.SessionIdentifier`, the
+   plausible tidy-up that silently drops offline tokens. Exactly one test failed,
+   `test/terminate-offline-token`'s parent, on three independent assertions: the JTI list came back
+   `[rt-session-bound]`, the offline assertion reported "the offline token of the terminated session
+   must be revoked", and the strict mock reported "7 out of 8 expectation(s) were met" for the
+   unreached `UpdateRefreshToken`. That is gap 1 reintroduced, caught three ways.
+2. Populating the result as the helper goes and returning it on the error path. **This refutes what
+   the implementation session wrote in the mailbox**, and the correction is the useful part. That note
+   claimed exactly one row failed, `test/terminate-zero-result`, and concluded it was therefore the
+   only row with teeth against a partially populated result. Measured here, **four** of the six failure
+   rows fail: the keep-this row plus `a token write fails`, `the deletion fails` and `the commit
+   fails`, because the shared `assert.Equal(t, TerminationResult{}, result)` in the table's loop
+   catches every path where a write had already succeeded. The row is still worth keeping, for the
+   narrower reason that it names the property and is the only one asserting the count itself, so its
+   failure reads as a contract violation rather than a struct mismatch. Step 4's table keeps its
+   original wording, because it is the prediction and editing it would erase the evidence that the
+   prediction was wrong; the comment in the test file was corrected, since a comment stating a
+   measured falsehood is the same defect class as stage 1's finding 1.
+
+**Deviations from the plan as written.** Three, all small.
+
+1. Step 1 named `expectedCount` and `allAuditConstants`; the event was also added to `criticalEvents`
+   in `TestAuditEventTypes_ContainsCriticalEvents`, with a comment in the shape of the
+   `AuditRevokedUserAuthState` entry immediately above it. The argument is #106's own, one issue over:
+   `deleted_user_session` survives either way, so if this event stopped being emitted the security
+   action would leave only a lifecycle record and nothing attesting what it revoked.
+2. Four anchor rows, not the three step 5 predicted. `TerminationResult`'s fields need no anchor of
+   their own, but both new test functions do.
+3. 10 leaf cases, not the 13 the mailbox note claimed. Counted from the suite's own output at the
+   gate: 2 standalone tests, 2 subtests under `_RejectsAnUnusableSession`, 6 under
+   `_AnyFailureYieldsTheZeroResult`.
+
+**Design choice worth recording, since it departs from #106's shape.** There is no inner
+`TerminateUserSession(db, tx, ...)` beside the `Tx` variant. #106 needed that split because a
+credential write had to join the same transaction through a callback; nothing composes with this one,
+so a second entry point would be surface with no caller and a second contract to keep straight. If a
+later stage does need to compose a write into the termination transaction, splitting it is mechanical.
+
+**Review, round 1.** `gpt-5.6-sol`, effort high, `type: code-review`, request
+`129-20260804T225911Z`. Conformance, quality and security all `reviewed`, verdict `findings`.
+
+**The reviewer reached a test tier for the first time in this run**, which matters because the stage 1
+and stage 2 entries above both record that it could not. Its `ran` list: `leo-review/SKILL.md` and the
+full agreement, the complete uncommitted diff and the neighbouring code, `git diff --check`, `gofmt -d`
+on all four changed Go files, `check-anchors.sh` with 49 anchors passing, and `where.sh test --type
+modules` reported as all three modules passing. Recorded as the reviewer's claim rather than as
+independent confirmation, since the run cannot see into its sandbox; the run executed the tier itself
+either way. Its `unchecked` list holds nothing the gate depended on: the data and integration tiers,
+correctly not applicable to an uncalled helper, the unchanged PKCE, redirect, token-validation,
+rate-limiting and secret-comparison internals, and the run's own source mutations, which it assessed
+statically because a reviewer may not edit source.
+
+**Hash check clean.** `git diff | sha256sum` was still `1ca531ab…`, matching `.review/before.sha`, when
+this session started, so the reviewer changed no tracked file and reviewed exactly the code committed
+here apart from this session's two comment edits.
+
+1. **A stage 3 fixture was inserted between `stubRevocationSweepTx`'s doc comment and the function.**
+   `Raised by: reviewer`, quality, minor, confidence high. Status: **Resolved**
+   Verified against the file and correct. The comment sat at the end of the #106 material and the new
+   termination fixtures went in directly beneath it, so it attached to the `terminateSessionId` and
+   `terminateSid` constants, describing a mock-stubbing helper that was by then 300 lines further down
+   and undocumented. Resolved by the reviewer's own forced answer, moving the eleven-line comment back
+   above `stubRevocationSweepTx`, which is the smaller of the two fixes and keeps that cross-file
+   helper last in the file where it already was; the alternative, moving the whole stage 3 block below
+   it, would have put a helper shared with `handler_reset_password_test.go` in the middle. Unit tier
+   re-run green afterwards.
+   Bookkeeping class under the reviewer reference's table, prose disagreeing with what it sits above,
+   so it does not justify a second round. Same class and same disposition as stage 1's finding 1.
+
+**No round 2, and the gate passes on one round.** Zero conformance findings and zero security
+findings, all three axes reviewed, and the only finding was a comment position. What this session
+changed since the reviewed hash is two comments in one test file, no behaviour, suite green, so a
+second round would be reviewing comment placement.
+
+**The stage stalled between sessions, and the reason belongs here because nothing else records it.**
+The implementation session wrote its trace to `.review/stage3-log.md` instead of this section, and the
+mailbox does not survive the next gate, so on the skill's own terms the stage had recorded nothing. No
+session then ran to ingest round 1, and the driver re-invoked the reviewer three further times against
+a byte-identical request. Each re-invocation correctly refused to treat it as a new round, verified the
+request hash `719cb6cb…` and the diff hash unchanged, re-raised the same finding and marked it
+`needs_human: true`, that flag meaning "somebody has to notice the request was never rewritten" rather
+than a question for the user, since the same finding carried a mechanical `forced_answer` on its first
+emission. No new findings came from any of them. Because the driver clears `verdict.json` and
+`response.md` before each reviewer run, round 1's own verdict was recovered from `.review/drive.log`,
+and its content was verified against the code before being written up here. Two lessons, both
+procedural: the trace goes in the agreement at the moment it is known, and a round-2 request that is
+never written stalls the loop silently rather than loudly.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its fourteen items, all
+`Decided`. No follow-up found: the only defect this stage surfaced was in its own comments.
 
 ---
 
