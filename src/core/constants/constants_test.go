@@ -62,7 +62,7 @@ func TestAuditEventTypes_NonEmpty(t *testing.T) {
 
 // TestAuditEventTypes_Count acts as a drift guard - update expected count when adding/removing audit events
 func TestAuditEventTypes_Count(t *testing.T) {
-	expectedCount := 94
+	expectedCount := 95
 	actualCount := len(AuditEventTypes)
 
 	require.Equal(t, expectedCount, actualCount,
@@ -98,6 +98,11 @@ func TestAuditEventTypes_ContainsCriticalEvents(t *testing.T) {
 		// (#106). Security-relevant in the same class as key revocation: if this event ever
 		// stopped being emitted, a forced logout would leave no trace.
 		AuditRevokedUserAuthState,
+		// Records that ending one session durably cut off the grants it authorized (#129). Same
+		// class as the event above, and for the same reason: deleted_user_session survives
+		// either way, so if this one stopped being emitted the security action would leave only
+		// a lifecycle record behind and nothing attesting what it revoked.
+		AuditTerminatedUserSession,
 	}
 
 	for _, critical := range criticalEvents {
@@ -173,6 +178,7 @@ func TestAuditEventTypes_MatchesConstants(t *testing.T) {
 		AuditSentPhoneVerificationMessage,
 		AuditSentTestEmail,
 		AuditStartedNewUserSesson,
+		AuditTerminatedUserSession,
 		AuditTokenIssuedAuthorizationCodeResponse,
 		AuditTokenIssuedClientCredentialsResponse,
 		AuditTokenIssuedImplicitResponse,
