@@ -5,7 +5,7 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** in progress, started 2026-08-04. Stage 1 done, stage 2 next.
+**Run state:** in progress, started 2026-08-04. Stages 1 and 2 done, stage 3 next.
 **PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
@@ -89,6 +89,9 @@ log can cite it the same way. Nothing above the line changed.
 | `migration/000026` | `src/core/data/sqlitedb/migrations/000026_add_code_revoked.up.sql` | `n/a` | `ALTER TABLE codes ADD COLUMN revoked numeric NOT NULL DEFAULT 0;` | stage 1, one of four engines |
 | `test/revoke-codes-data` | `src/authserver/tests/data/code_test.go` | `TestRevokeCodesBySessionIdentifier` | `assertCodeRevoked(t, unrelated.Id, false, "a code of an unrelated session")` | stage 1, seam 1's negative control |
 | `test/migration-000026` | `src/authserver/tests/data/migration_000026_code_revoked_test.go` | `TestMigration000026_CodeRevoked` | `require.NoError(t, h.Migrator.Migrate(25), "roll back 000026")` | stage 1, the down migration case |
+| `validator/code-revoked` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `if codeEntity.Revoked {` | stage 2, the redemption rejection, behind client auth, PKCE and the reuse return |
+| `validator/refresh-code-revoked` | `src/core/validators/token_validator.go` | `ValidateTokenRequest` | `if !isROPCToken && refreshToken.Code.Revoked {` | stage 2, the refresh rejection, behind ownership and ahead of the `typ` switch, so it reaches Offline |
+| `test/revoked-code-ordering` | `src/core/validators/token_validator_test.go` | `TestValidateTokenRequest_RevokedCode` | `ordering: a wrong client secret answers before the revoked check` | stage 2, the row the review's round 1 finding added |
 
 Counts in this document carry their command:
 
@@ -1407,19 +1410,61 @@ cannot run without the migration and the method. Section 7's plan entry records 
 changed, which is the return on doing it in that order.
 
 ### Stage 2: rejection at redemption and at refresh
-Status: **Not started**
-Detail: **sketch**
+Status: **Done**
+Seams: 5. Tiers: unit. Docs: none, internals only. Nothing a user can observe changes until stage 4
+writes a marker, and no page states today's behaviour on either path.
 
-Read the marker at the two sites decision 7 fixes, both from data already loaded, so neither adds a
-query: `codeEntity.Revoked` on the `authorization_code` path, placed after client-secret validation,
-after PKCE and after the `if wasReused` return, and `refreshToken.Code.Revoked` on the
-`refresh_token` path, placed after `validator/client-ownership`. Both carry the comment decision 7
-requires, explaining why the check sits apart from the checks in `validator/authcode-preauth` rather
-than joining them, or a reviewer tidies it back into the block that #137 exists to fix. Seam 5, whose
-four ordering rows are the only testable content of decision 7 and are what stop the drift: a wrong
-verifier, a wrong secret, a reused code and a wrong client each return their own error rather than
-the revoked-code error. Tier: unit. Docs: none, internals only, since nothing is user-visible until
-stage 3 writes a marker. Expand against stage 1's code.
+1. **The `authorization_code` rejection.** Status: **Done**
+   In `ValidateTokenRequest`, read `codeEntity.Revoked` after client-secret validation, after PKCE and
+   after the `if wasReused` return, immediately before the success return. Generic `invalid_grant`,
+   "Code is invalid.", matching its neighbours. Carries the comment decision 7 requires: it sits apart
+   from `validator/authcode-preauth` because that block runs before client authentication, so a check
+   placed there tells a presenter of a stolen code whether the session was terminated, which is the
+   class #137 exists to close; and it sits after the reuse return so #77's cascade is not pre-empted,
+   reuse being the stronger signal that already revokes everything this check would refuse.
+2. **The `refresh_token` rejection.** Status: **Done**
+   Read `refreshToken.Code.Revoked` immediately after `validator/client-ownership`, before the `typ`
+   switch. Guarded by `!isROPCToken`: a ROPC token has `code_id = NULL` and no session, so it has no
+   grant origin to terminate, and reading the zero-valued `Code` on that path would be meaningless
+   rather than merely harmless. Reuses the Refresh branch's existing message by lifting its `const`
+   to the case scope, so the two paths cannot drift into two spellings of one fact.
+3. **Unit cases at seam 5.** Status: **Done**
+   New `TestValidateTokenRequest_RevokedCode`, mirroring `TestValidateTokenRequest_AuthStateGeneration`
+   in shape: table-driven subtests over both grant types plus ROPC, on the same mock trio. The rows,
+   expectations written before running them:
+
+   | Case | Expected | Which gate rejects it |
+   |---|---|---|
+   | auth code, revoked, everything else correct | `invalid_grant` | the new revoked check |
+   | auth code, not revoked | accepted | none, the positive control |
+   | auth code, revoked, wrong PKCE verifier | `invalid_grant`, "Invalid code_verifier (PKCE)." | PKCE, which is ahead of it |
+   | auth code, revoked, confidential client with no secret | `invalid_client` | client authentication, ahead of it |
+   | auth code, revoked, already used so reuse is detected | `AuthCodeReusedError` | the `wasReused` return, ahead of it |
+   | refresh, revoked code, correct client | `invalid_grant` | the new refresh check |
+   | refresh, revoked code, wrong client | `invalid_request`, "does not belong to the client" | ownership, ahead of it |
+   | refresh, ROPC token with no code | accepted | not applicable, no grant origin to terminate |
+   | refresh, code not revoked | accepted | none, the positive control |
+
+   **The three ordering rows are decision 7's only testable content.** Each varies exactly one thing
+   from the first row and names the gate that must answer instead, so none of them can pass if the
+   revoked check drifts up into `validator/authcode-preauth`. Two positive controls, one per grant
+   type, because a check that rejected everything would pass every negative row.
+4. **Verify.** Status: **Done**
+   `check-anchors.sh`, then `where.sh test --type modules`. No data or integration tier: this stage
+   adds no query and changes no endpoint.
+
+**As built.** Both checks landed exactly where step 1 and step 2 put them, and the `const
+invalidTokenMessage` was lifted to the case scope as planned, so the two ways a grant's session can
+stop backing it share one spelling. Three anchor rows were added to section 0 for the new code:
+`validator/code-revoked`, `validator/refresh-code-revoked` and `test/revoked-code-ordering`.
+
+**One departure, and it is the review's.** Step 3's table listed nine rows; ten shipped. The extra one
+is `test/revoked-code-ordering`, a **present but wrong** client secret, added because the review's
+round 1 finding showed the planned missing-secret row was the benign member of its class. Recorded in
+full in section 7, because the reasoning is the useful part: a missing secret is refused by a length
+check that runs before decryption, so that row alone would have stayed green under a relocation of the
+revoked check into the confidential branch just ahead of `subtle.ConstantTimeCompare`, which is
+exactly the oracle decision 7 exists to prevent.
 
 ### Stage 3: the termination helper, uncalled
 Status: **Not started**
@@ -1687,6 +1732,76 @@ partial review. Everything static was reviewed, including a search for any other
 confirmed, against the diff rather than from the request, that the stage touches no index, no endpoint,
 `token_validator.go` not at all, and `DeleteUsedCodesWithoutRefreshTokens` not at all, which are the
 four out-of-scope boundaries this stage could plausibly have crossed.
+
+### Stage 2, 2026-08-04
+
+**Landed.** `validator/code-revoked` and `validator/refresh-code-revoked` in `ValidateTokenRequest`,
+the `invalidTokenMessage` const lifted to the `refresh_token` case scope so both rejections spell one
+fact one way, and `test/revoked-code-ordering`'s parent test `TestValidateTokenRequest_RevokedCode`
+with ten subtests. Three anchor rows added to section 0. Commit `266615b`.
+
+The marker now means something. Stage 1 wrote the column and its sweep with nothing reading it; after
+this commit a revoked code cannot be redeemed and no refresh token descended from one can be
+exchanged. Still nothing **writes** a marker in production, because that is stage 4, so no observable
+behaviour changes yet.
+
+**Tiers.** Unit green, all three modules (`where.sh test --type modules`), re-run from scratch at the
+gate rather than carried forward from the implementation session. `TestValidateTokenRequest_RevokedCode`
+verified individually: 10 leaf subtests, all pass. No data or integration tier, correctly: this stage
+adds no query and changes no endpoint. `check-anchors.sh` passes all 45 rows, the 42 sealed ones plus
+the three this stage added.
+
+**The stage spanned two driver sessions**, which is worth recording because the run log is the only
+place it shows. The first implemented all three steps and ran both review rounds; it ended before
+writing any of this down. The second re-verified from disk rather than trusting the document: the
+`git diff | sha256sum` hash still matched `.review/before.sha` exactly, so the reviewer had changed no
+tracked file, the round 2 verdict's `request_id` still matched the live request, and the tiers were
+re-run rather than quoted. Nothing was rebuilt, because the code on disk matched the plan's steps.
+
+**Deviation, and it is the review's.** Step 3's table specified nine rows and ten shipped. The added
+row is a **present but wrong** client secret, and it exists because round 1 showed the planned
+missing-secret row could not do the job alone. Nothing else departs from the plan.
+
+**Review, round 1.** `gpt-5.6-sol`, effort high, `type: code-review`. Conformance, quality and security
+all reviewed.
+
+1. **The client-secret ordering row did not cover a present but incorrect secret.** `Raised by:
+   reviewer`, security, blocking, confidence high. Status: **Resolved**
+   Verified and correct, for a subtler reason than "a case was missing". The planned row supplied
+   **no** secret, which `ValidateTokenRequest` refuses at a `len(input.ClientSecret) == 0` guard that
+   runs before decryption, so it pinned only that the revoked check sits after the missing-credential
+   return. It did not pin that the check sits after authentication *completes*. Relocating the revoked
+   check into the confidential branch, after that guard and before `subtle.ConstantTimeCompare`, would
+   have handed a termination-state oracle to anyone holding a stolen code and any nonempty string,
+   which is precisely what decision 7 exists to prevent.
+   **Demonstrated rather than argued.** The relocation was applied to the real code and the suite
+   re-run. Under it the missing-secret row **passed**, confirming it as the benign member of its class;
+   the new wrong-secret row **failed**, which is its whole purpose; `a revoked code is refused` also
+   failed, incidentally, because its fixture uses a public client so the relocated check never runs;
+   and every other row passed, which is what they are for, each being refused by a different gate. The
+   mutation was reverted and the suite is green. The round 1 no-op mutation also holds: with both
+   checks deleted, exactly the two direct rejection rows fail and nothing else.
+
+**Review, round 2, clean.** Same model and effort, resumed in the same Codex thread, scoped to two
+narrow questions rather than a re-review: does the added row close the gap, and is any other row the
+benign member of its class in the same way. Zero findings, verdict `static-review-exhausted`, all
+three axes `reviewed`. The reviewer answered the second question against the code rather than in
+general terms, and its answer is the part worth keeping: the wrong-PKCE row is present and nonempty so
+it reaches the challenge comparison; the wrong-client refresh row authenticates the presenter and
+loads a revoked code owned by another client; and the reuse row is found only by the used-code lookup
+and asserts both the error type and its carried `Code`. It also noted the one relocation the reuse row
+alone would survive, moving the check inside `if !wasReused`, and that the wrong-secret and wrong-PKCE
+rows reject that placement. Hash check clean, identical before and after.
+
+**Not reached, both rounds.** No test tier. `where.sh test` exits 3 in the reviewer's sandbox because
+it cannot reach docker, the standing limitation recorded in the plan entry. The reviewer read the
+run's recorded results and said so plainly rather than implying it had reproduced them, which is the
+honest form of a partial review. The gate is not weakened by it here: the tier in question is unit,
+the run executed it at the gate, and every finding this stage produced was a static reading of test
+coverage rather than a failure the reviewer needed to run anything to see.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its fourteen items, all
+`Decided`.
 
 ---
 
