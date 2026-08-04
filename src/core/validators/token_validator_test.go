@@ -5166,3 +5166,449 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	mockDB.AssertExpectations(t)
 	mockTokenParser.AssertExpectations(t)
 }
+
+// TestValidateTokenRequest_RevokedCode covers the termination boundary at both redemption
+// sites (#129 decisions 4 and 7): a code marked revoked cannot be redeemed, and neither can
+// a refresh token descended from one.
+//
+// Half of these subtests are about ORDERING rather than rejection, and they are the only
+// testable content of decision 7. The revoked check deliberately sits apart from the
+// user-enabled, generation and expiry checks in the same function, behind client
+// authentication and PKCE, because that earlier block discloses account state to an
+// unauthenticated presenter of a stolen code and #137 exists to close it. Nothing else would
+// notice the check drifting up into that block: every rejection row would still pass, since
+// the request is still refused, just earlier and to a caller who has proved nothing. Each
+// ordering row therefore varies exactly ONE thing from an otherwise-valid revoked request and
+// names the gate that must answer instead.
+//
+// Two positive controls, one per grant type, because a check that rejected everything would
+// satisfy every negative row here.
+func TestValidateTokenRequest_RevokedCode(t *testing.T) {
+	newValidator := func(t *testing.T) (*TokenValidator, *mocks_data.Database, *mocks_oauth.TokenParser) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		return NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker), mockDB, mockTokenParser
+	}
+
+	t.Run("authorization code redemption", func(t *testing.T) {
+		t.Run("a revoked code is refused", func(t *testing.T) {
+			validator, mockDB, _ := newValidator(t)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+			client := &models.Client{
+				Id: 1, ClientIdentifier: "test_client", Enabled: true,
+				AuthorizationCodeEnabled: true, IsPublic: true,
+			}
+			code := &models.Code{
+				Id: 5, ClientId: 1, UserId: 7,
+				RedirectURI: "https://example.com/cb",
+				Scope:       "openid",
+				CreatedAt:   sql.NullTime{Time: time.Now().UTC(), Valid: true},
+				Revoked:     true,
+				Client:      *client,
+				User:        models.User{Id: 7, Enabled: true},
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:   "authorization_code",
+				ClientId:    "test_client",
+				Code:        "the-code",
+				RedirectURI: "https://example.com/cb",
+			})
+
+			assert.Nil(t, result)
+			customErr, ok := err.(*customerrors.ErrorDetail)
+			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+				assert.Equal(t, "invalid_grant", customErr.GetCode())
+				// Generic on purpose: the message must not tell a caller that the session was
+				// terminated, which is the disclosure position the neighbouring checks take.
+				assert.Equal(t, "Code is invalid.", customErr.GetDescription())
+			}
+		})
+
+		t.Run("the same code unrevoked is redeemable", func(t *testing.T) {
+			// The positive control. Varies exactly one field from the row above.
+			validator, mockDB, _ := newValidator(t)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+			client := &models.Client{
+				Id: 1, ClientIdentifier: "test_client", Enabled: true,
+				AuthorizationCodeEnabled: true, IsPublic: true,
+			}
+			code := &models.Code{
+				Id: 5, ClientId: 1, UserId: 7,
+				RedirectURI: "https://example.com/cb",
+				Scope:       "openid",
+				CreatedAt:   sql.NullTime{Time: time.Now().UTC(), Valid: true},
+				Revoked:     false,
+				Client:      *client,
+				User:        models.User{Id: 7, Enabled: true},
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:   "authorization_code",
+				ClientId:    "test_client",
+				Code:        "the-code",
+				RedirectURI: "https://example.com/cb",
+			})
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+		})
+
+		t.Run("ordering: a wrong PKCE verifier answers before the revoked check", func(t *testing.T) {
+			validator, mockDB, _ := newValidator(t)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+			client := &models.Client{
+				Id: 1, ClientIdentifier: "test_client", Enabled: true,
+				AuthorizationCodeEnabled: true, IsPublic: true,
+			}
+			code := &models.Code{
+				Id: 5, ClientId: 1, UserId: 7,
+				RedirectURI:   "https://example.com/cb",
+				Scope:         "openid",
+				CreatedAt:     sql.NullTime{Time: time.Now().UTC(), Valid: true},
+				Revoked:       true,
+				CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge("the_correct_verifier_long_enough_x"), Valid: true},
+				Client:        *client,
+				User:          models.User{Id: 7, Enabled: true},
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:    "authorization_code",
+				ClientId:     "test_client",
+				Code:         "the-code",
+				RedirectURI:  "https://example.com/cb",
+				CodeVerifier: "the_wrong_verifier_long_enough_yyy",
+			})
+
+			assert.Nil(t, result)
+			customErr, ok := err.(*customerrors.ErrorDetail)
+			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+				// PKCE, not the revoked check. If this reads "Code is invalid." the revoked
+				// check has moved ahead of PKCE, which is what decision 7 forbids.
+				assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.GetDescription())
+			}
+		})
+
+		t.Run("ordering: a missing client secret answers before the revoked check", func(t *testing.T) {
+			validator, mockDB, _ := newValidator(t)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+			clientSecretEncrypted, err := encryption.EncryptData("the_client_secret")
+			require.NoError(t, err)
+
+			client := &models.Client{
+				Id: 1, ClientIdentifier: "test_client", Enabled: true,
+				AuthorizationCodeEnabled: true, IsPublic: false,
+				ClientSecretEncrypted: []byte(clientSecretEncrypted),
+			}
+			code := &models.Code{
+				Id: 5, ClientId: 1, UserId: 7,
+				RedirectURI: "https://example.com/cb",
+				Scope:       "openid",
+				CreatedAt:   sql.NullTime{Time: time.Now().UTC(), Valid: true},
+				Revoked:     true,
+				Client:      *client,
+				User:        models.User{Id: 7, Enabled: true},
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:   "authorization_code",
+				ClientId:    "test_client",
+				Code:        "the-code",
+				RedirectURI: "https://example.com/cb",
+				// No ClientSecret, on a confidential client.
+			})
+
+			assert.Nil(t, result)
+			customErr, ok := err.(*customerrors.ErrorDetail)
+			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+				// Client authentication, not the revoked check. An unauthenticated presenter
+				// of a stolen code must not learn that its session was terminated.
+				assert.Equal(t, "invalid_client", customErr.GetCode())
+			}
+		})
+
+		t.Run("ordering: a wrong client secret answers before the revoked check", func(t *testing.T) {
+			// KEEP THIS ROW. It is the one that actually pins decision 7 on the confidential
+			// path, and the row above is the benign member of its class: a MISSING secret is
+			// refused by a length check that runs before decryption, so that row stays green
+			// if the revoked check is moved to just after it and before the constant-time
+			// comparison. That placement would hand a termination-state oracle to anyone
+			// holding a stolen code and any nonempty string, which is exactly what decision 7
+			// exists to prevent. A PRESENT but wrong secret is the only input that fails if
+			// the check moves anywhere ahead of authentication completing.
+			validator, mockDB, _ := newValidator(t)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+			clientSecretEncrypted, err := encryption.EncryptData("the_real_client_secret")
+			require.NoError(t, err)
+
+			client := &models.Client{
+				Id: 1, ClientIdentifier: "test_client", Enabled: true,
+				AuthorizationCodeEnabled: true, IsPublic: false,
+				ClientSecretEncrypted: []byte(clientSecretEncrypted),
+			}
+			code := &models.Code{
+				Id: 5, ClientId: 1, UserId: 7,
+				RedirectURI: "https://example.com/cb",
+				Scope:       "openid",
+				CreatedAt:   sql.NullTime{Time: time.Now().UTC(), Valid: true},
+				Revoked:     true,
+				Client:      *client,
+				User:        models.User{Id: 7, Enabled: true},
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:    "authorization_code",
+				ClientId:     "test_client",
+				Code:         "the-code",
+				RedirectURI:  "https://example.com/cb",
+				ClientSecret: "not_the_real_client_secret",
+			})
+
+			assert.Nil(t, result)
+			customErr, ok := err.(*customerrors.ErrorDetail)
+			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+				assert.Equal(t, "invalid_client", customErr.GetCode())
+				assert.Equal(t, "Client authentication failed. Please review your client_secret.",
+					customErr.GetDescription())
+			}
+		})
+
+		t.Run("ordering: reuse answers before the revoked check", func(t *testing.T) {
+			// A revoked code that was ALSO already used. Reuse must win, because its error
+			// carries the code entity that drives #77's containment cascade, and a
+			// revoked-code rejection landing first would suppress it.
+			validator, mockDB, _ := newValidator(t)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+			client := &models.Client{
+				Id: 1, ClientIdentifier: "test_client", Enabled: true,
+				AuthorizationCodeEnabled: true, IsPublic: true,
+			}
+			code := &models.Code{
+				Id: 5, ClientId: 1, UserId: 7,
+				RedirectURI: "https://example.com/cb",
+				Scope:       "openid",
+				CreatedAt:   sql.NullTime{Time: time.Now().UTC(), Valid: true},
+				Used:        true,
+				Revoked:     true,
+				Client:      *client,
+				User:        models.User{Id: 7, Enabled: true},
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+			// Not among unused codes, then found among used ones: that is the reuse path.
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(nil, nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, true).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:   "authorization_code",
+				ClientId:    "test_client",
+				Code:        "the-code",
+				RedirectURI: "https://example.com/cb",
+			})
+
+			assert.Nil(t, result)
+			reuseErr, ok := err.(*customerrors.AuthCodeReusedError)
+			if assert.True(t, ok, "expected *customerrors.AuthCodeReusedError, got %T: %v", err, err) {
+				assert.Equal(t, code, reuseErr.Code,
+					"the reuse error must carry the code entity, or the containment cascade has nothing to act on")
+			}
+		})
+	})
+
+	t.Run("auth code refresh", func(t *testing.T) {
+		// Fixtures shared by the three rows below. An OFFLINE token deliberately: the typ
+		// switch's Offline branch never consults the session, so this is the case the
+		// pre-existing checks cannot reach and the marker exists for.
+		build := func(revoked bool, clientIdOnCode int64) (*models.Client, *models.RefreshToken, models.User) {
+			client := &models.Client{
+				Id: 1, ClientIdentifier: "test_client", Enabled: true,
+				AuthorizationCodeEnabled: true, IsPublic: true,
+			}
+			user := models.User{Id: 7, Enabled: true}
+			refreshToken := &models.RefreshToken{
+				RefreshTokenJti:   "the-jti",
+				CodeId:            sql.NullInt64{Int64: 5, Valid: true},
+				SessionIdentifier: "",
+				Code: models.Code{
+					Id: 5, ClientId: clientIdOnCode, UserId: 7, Scope: "openid offline_access",
+					SessionIdentifier: "sid-1",
+					Revoked:           revoked,
+					User:              user,
+				},
+			}
+			return client, refreshToken, user
+		}
+
+		offlineClaims := func() *oauth.JwtToken {
+			return &oauth.JwtToken{Claims: jwt.MapClaims{
+				"jti": "the-jti", "typ": "Offline", "sub": "user_subject",
+				"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
+			}}
+		}
+
+		t.Run("an offline token whose code was revoked is refused", func(t *testing.T) {
+			validator, mockDB, mockTokenParser := newValidator(t)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			client, refreshToken, _ := build(true, 1)
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+			mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+				Return(offlineClaims(), nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:    "refresh_token",
+				ClientId:     "test_client",
+				RefreshToken: "the-refresh-token",
+			})
+
+			assert.Nil(t, result)
+			customErr, ok := err.(*customerrors.ErrorDetail)
+			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+				assert.Equal(t, "invalid_grant", customErr.GetCode())
+			}
+		})
+
+		t.Run("the same token with an unrevoked code still refreshes", func(t *testing.T) {
+			// The positive control, and the row that proves the marker rather than the
+			// Offline branch is what refused above: an offline grant is designed to outlive
+			// its browser session, so this must keep working (decision 2).
+			validator, mockDB, mockTokenParser := newValidator(t)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			client, refreshToken, user := build(false, 1)
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+			mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+				Return(offlineClaims(), nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+			mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil)
+			// An Offline refresh always re-checks consent, whatever the client's
+			// ConsentRequired says, so the accepted path needs a live consent row covering
+			// the scopes. None of the rejection rows reach this far.
+			mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, int64(7), int64(1)).
+				Return(&models.UserConsent{UserId: 7, ClientId: 1, Scope: "openid offline_access"}, nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:    "refresh_token",
+				ClientId:     "test_client",
+				RefreshToken: "the-refresh-token",
+			})
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+		})
+
+		t.Run("ordering: the wrong client answers before the revoked check", func(t *testing.T) {
+			// The code belongs to client 2 while client 1 presents the token. Ownership must
+			// answer, so a client that does not hold the grant cannot learn from this
+			// endpoint that somebody's session was terminated.
+			validator, mockDB, mockTokenParser := newValidator(t)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			client, refreshToken, _ := build(true, 2)
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+			mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+				Return(offlineClaims(), nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType:    "refresh_token",
+				ClientId:     "test_client",
+				RefreshToken: "the-refresh-token",
+			})
+
+			assert.Nil(t, result)
+			customErr, ok := err.(*customerrors.ErrorDetail)
+			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+				assert.Equal(t, "invalid_request", customErr.GetCode())
+				assert.Equal(t, "The refresh token is invalid because it does not belong to the client.",
+					customErr.GetDescription())
+			}
+		})
+	})
+
+	t.Run("ROPC refresh is unaffected", func(t *testing.T) {
+		// A ROPC token has code_id NULL and no session, so there is no grant origin to
+		// terminate and refreshToken.Code is the zero value. Reading Revoked off it would be
+		// meaningless, and the !isROPCToken guard is what keeps this path out of the check.
+		// Its own zero value is false, so this row would pass with the guard deleted; it is
+		// here to pin the branch as deliberate and to fail if the guard is ever inverted.
+		validator, mockDB, mockTokenParser := newValidator(t)
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+		client := &models.Client{
+			Id: 1, ClientIdentifier: "ropc_client", Enabled: true,
+			AuthorizationCodeEnabled: true, IsPublic: true,
+		}
+		user := models.User{Id: 7, Enabled: true}
+		refreshToken := &models.RefreshToken{
+			RefreshTokenJti: "ropc_jti",
+			CodeId:          sql.NullInt64{Valid: false},
+			UserId:          sql.NullInt64{Int64: 7, Valid: true},
+			ClientId:        sql.NullInt64{Int64: 1, Valid: true},
+			Scope:           "openid",
+			User:            user,
+			Client:          *client,
+		}
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc_client").Return(client, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
+			Return(&oauth.JwtToken{Claims: jwt.MapClaims{
+				"jti": "ropc_jti", "typ": "Offline", "sub": "ropc_user_subject",
+				"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
+			}}, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
+		mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+		mockDB.On("GetUserBySubject", mock.Anything, "ropc_user_subject").Return(&user, nil)
+
+		result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			GrantType:    "refresh_token",
+			ClientId:     "ropc_client",
+			RefreshToken: "ropc_refresh_token",
+		})
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+}
