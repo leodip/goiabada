@@ -271,6 +271,117 @@ func RevokeUserAuthStateTx(db data.Database, userId int64, exceptSid string,
 	return result, nil
 }
 
+// TerminationResult reports what terminating one session actually did. It carries exactly what
+// the terminated_user_session audit payload needs beyond the caller's own inputs (#129
+// decision 9); the user id, the session id and the session identifier stay out because the
+// caller already holds the session row, and restating them here would let a result and its
+// payload disagree.
+type TerminationResult struct {
+	// RevokedCodeCount is how many codes this call TRANSITIONED from live to revoked, not how
+	// many the session has. A second termination of the same session reports 0, which is what
+	// makes the audit event answer the only question an auditor asks of it, whether this action
+	// revoked anything.
+	RevokedCodeCount int64
+	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
+	// revokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
+	// success path, so a JSON audit payload carries [] rather than null.
+	RevokedRefreshTokenJtis []string
+}
+
+// TerminateUserSessionTx ends one session as a security action: it writes the durable fact that
+// the grants of that session are revoked, sweeps the tokens those grants issued, and deletes the
+// session row, in ONE transaction it owns and commits (#129 decision 5).
+//
+// The three writes, in the order decision 5 states:
+//
+//  1. RevokeCodesBySessionIdentifier marks every code issued through this session revoked. This
+//     is the write that SURVIVES, and the only one that is a boundary. A refresh token can only
+//     descend from a code and a rotated child inherits its parent's code_id, so marking the code
+//     rejects every present and future descendant of the grant: a child inserted after this
+//     commit is born already rejected, because the fact predates its existence.
+//  2. The sid-scoped refresh-token sweep. GetRefreshTokensBySessionIdentifier matches
+//     codes.session_identifier through a join, and that join is the ONLY thing that reaches an
+//     offline grant's tokens, because an offline refresh token's own session_identifier is empty
+//     and the sid its grant came from lives on the codes row. Filtering these rows by
+//     rt.SessionIdentifier would therefore drop exactly the offline tokens decision 2 exists to
+//     revoke.
+//  3. DeleteUserSession, which is what makes the effect immediate for session-bound tokens: they
+//     already stop validating once the row is gone.
+//
+// Steps 2 and 3 are cleanup. Absence of a session row is never read as termination anywhere,
+// because the background worker reaps idle and expired sessions routinely while an offline grant
+// is designed to outlive that, which is why the durable fact has to be written down positively
+// (decision 4).
+//
+// It deliberately does NOT advance the user's authentication generation, and must not: that would
+// invalidate every other device the user has, which is the opposite of what ending one session
+// means and the whole reason #129 exists separately from #106.
+//
+// The three writes share one transaction so the durable fact and the deletion cannot land
+// separately. On any error the returned result is the zero value rather than a partially
+// populated one: the code sweep can succeed and the transaction still roll back, and a caller
+// auditing that count would record a revocation that never happened.
+//
+// The audit events are the CALLER's job, after this returns successfully, because AuditLogger.Log
+// takes no transaction and a logged termination that then rolled back would be a false record
+// (decision 9, following RevokeUserAuthStateTx).
+//
+// WHAT A COMMIT FAILURE DOES AND DOES NOT GUARANTEE is the contract RevokeUserAuthStateTx
+// documents at length and this shares: the deferred rollback covers failures before the commit
+// only, and `database/sql` promises nothing about a Commit that returns an error. So a 500 from a
+// caller here must not be read as "nothing happened"; the durable outcome of a reported commit
+// failure is indeterminate, and the bounded consequence is a termination with no audit record of
+// it, which is fail-closed on the security side and a gap on the forensic side.
+func TerminateUserSessionTx(db data.Database, userSession *models.UserSession) (TerminationResult, error) {
+	// Both sweeps key on the session identifier and the delete keys on the id, so this takes the
+	// loaded row rather than two loose values: from one row they cannot describe two different
+	// sessions, and both call sites already load it for their own not-found and ownership checks.
+	if userSession == nil {
+		return TerminationResult{}, errors.WithStack(errors.New("terminating a user session requires the session to terminate"))
+	}
+
+	// Refused at entry rather than three statements later. RevokeCodesBySessionIdentifier rejects
+	// an empty identifier itself, so the outcome is the same either way, but reaching it means
+	// opening a transaction first and surfacing a bad argument as a database failure.
+	if userSession.SessionIdentifier == "" {
+		return TerminationResult{}, errors.WithStack(errors.New("terminating a user session requires a session identifier"))
+	}
+
+	tx, err := db.BeginTransaction()
+	if err != nil {
+		return TerminationResult{}, err
+	}
+	defer db.RollbackTransaction(tx) //nolint:errcheck
+
+	revokedCodeCount, err := db.RevokeCodesBySessionIdentifier(tx, userSession.SessionIdentifier)
+	if err != nil {
+		return TerminationResult{}, err
+	}
+
+	tokens, err := db.GetRefreshTokensBySessionIdentifier(tx, userSession.SessionIdentifier)
+	if err != nil {
+		return TerminationResult{}, err
+	}
+
+	revokedJtis, err := revokeRefreshTokens(db, tx, tokens)
+	if err != nil {
+		return TerminationResult{}, err
+	}
+
+	if err := db.DeleteUserSession(tx, userSession.Id); err != nil {
+		return TerminationResult{}, err
+	}
+
+	if err := db.CommitTransaction(tx); err != nil {
+		return TerminationResult{}, err
+	}
+
+	return TerminationResult{
+		RevokedCodeCount:        revokedCodeCount,
+		RevokedRefreshTokenJtis: revokedJtis,
+	}, nil
+}
+
 // LogRevokedUserAuthState emits AuditRevokedUserAuthState. One function rather than four
 // literals, so the payload cannot differ between sites and there is a single place to assert
 // its shape field by field.

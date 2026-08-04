@@ -178,7 +178,26 @@ const (
 	//
 	// Deliberately NOT AuditUserDisabled, which already means "a disabled user was rejected"
 	// and is emitted from six auth paths; overloading it would make that event ambiguous.
-	AuditRevokedUserAuthState           = "revoked_user_auth_state"
+	AuditRevokedUserAuthState = "revoked_user_auth_state"
+	// AuditTerminatedUserSession records that an explicit "end this session" action durably cut
+	// off the grants that session authorized: the authorization codes issued through it are
+	// marked revoked, its refresh tokens including offline ones are revoked, and the session row
+	// is deleted. Emitted by the two session-termination endpoints AFTER their transaction
+	// commits, on success only, and emitted even when nothing was found to revoke, so the event
+	// attests that the action happened (#129 decision 9).
+	//
+	// It accompanies AuditDeletedUserSession rather than replacing it. The two carry different
+	// meanings, one a session-lifecycle fact and one a security action, and leaving the older
+	// event's payload untouched keeps any external consumer parsing it strictly working. The
+	// consequence is that both are emitted per action, so THIS is the event to count for
+	// terminations and deleted_user_session is the lifecycle record beside it.
+	//
+	// Its payload carries userId, userSessionId, sessionIdentifier, revokedRefreshTokenJtis and
+	// revokedCodeCount, plus loggedInUser. Codes get a count rather than a list of ids because no
+	// event here lists code ids, and a count answers the only question an auditor has, whether
+	// anything was revoked.
+	AuditTerminatedUserSession = "terminated_user_session"
+
 	AuditEnabledOTP                     = "enabled_otp"
 	AuditDisabledOTP                    = "disabled_otp"
 	AuditAutoRefreshedToken             = "auto_refreshed_token"
@@ -246,6 +265,7 @@ var AuditEventTypes = []string{
 	AuditSentPhoneVerificationMessage,
 	AuditSentTestEmail,
 	AuditStartedNewUserSesson,
+	AuditTerminatedUserSession,
 	AuditTokenIssuedAuthorizationCodeResponse,
 	AuditTokenIssuedClientCredentialsResponse,
 	AuditTokenIssuedImplicitResponse,
