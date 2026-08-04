@@ -9720,6 +9720,72 @@ func (_c *Database_RefreshTokenLoadUser_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// RevokeCodesBySessionIdentifier provides a mock function for the type Database
+func (_mock *Database) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error) {
+	ret := _mock.Called(tx, sessionIdentifier)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RevokeCodesBySessionIdentifier")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (int64, error)); ok {
+		return returnFunc(tx, sessionIdentifier)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) int64); ok {
+		r0 = returnFunc(tx, sessionIdentifier)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
+		r1 = returnFunc(tx, sessionIdentifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RevokeCodesBySessionIdentifier_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeCodesBySessionIdentifier'
+type Database_RevokeCodesBySessionIdentifier_Call struct {
+	*mock.Call
+}
+
+// RevokeCodesBySessionIdentifier is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - sessionIdentifier string
+func (_e *Database_Expecter) RevokeCodesBySessionIdentifier(tx any, sessionIdentifier any) *Database_RevokeCodesBySessionIdentifier_Call {
+	return &Database_RevokeCodesBySessionIdentifier_Call{Call: _e.mock.On("RevokeCodesBySessionIdentifier", tx, sessionIdentifier)}
+}
+
+func (_c *Database_RevokeCodesBySessionIdentifier_Call) Run(run func(tx *sql.Tx, sessionIdentifier string)) *Database_RevokeCodesBySessionIdentifier_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RevokeCodesBySessionIdentifier_Call) Return(n int64, err error) *Database_RevokeCodesBySessionIdentifier_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_RevokeCodesBySessionIdentifier_Call) RunAndReturn(run func(tx *sql.Tx, sessionIdentifier string) (int64, error)) *Database_RevokeCodesBySessionIdentifier_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RevokeRefreshTokenFamily provides a mock function for the type Database
 func (_mock *Database) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
 	ret := _mock.Called(tx, firstRefreshTokenJti)

@@ -29,6 +29,11 @@ type Code struct {
 	AcrLevel            string         `db:"acr_level"`
 	AuthMethods         string         `db:"auth_methods"`
 	Used                bool           `db:"used"`
+	// Revoked records that the session this code was issued through was explicitly
+	// terminated. Redemption rejects a revoked code, and so does any refresh token
+	// descended from it, since a rotated child inherits its parent's CodeId. Tagged
+	// dont-update so an ordinary full-row UpdateCode cannot regress it (#129).
+	Revoked bool `db:"revoked" fieldtag:"dont-update"`
 	// AuthStateGeneration records the user's generation when this code was issued,
 	// inherited from the AuthContext. Redemption rejects a mismatch against the
 	// user's current value. Tagged dont-update so an ordinary full-row UpdateCode

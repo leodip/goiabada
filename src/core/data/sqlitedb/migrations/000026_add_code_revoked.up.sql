@@ -1,0 +1,18 @@
+-- Durable session termination (#129).
+--
+-- codes.revoked is the termination boundary. Ending a session at either explicit
+-- "end session" endpoint marks every code of that session revoked, and redemption
+-- then rejects a revoked code as well as any refresh token descended from one.
+--
+-- The marker sits on the code rather than on the session because a rotated refresh
+-- token inherits its parent's code_id, so marking the code marks every present and
+-- future descendant of that grant, including a child inserted after the termination
+-- committed. A sweep over the rows that happen to exist cannot do that.
+--
+-- Existing rows land at false, which is what keeps authorizations already in flight
+-- working across the deployment: no code issued before this migration was terminated.
+--
+-- No index is added. The termination sweep is keyed on session_identifier, which
+-- idx_codes_session_identifier (000024) already covers, and the reaper for unused
+-- revoked codes scans by created_at.
+ALTER TABLE codes ADD COLUMN revoked numeric NOT NULL DEFAULT 0;

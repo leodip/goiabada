@@ -76,11 +76,21 @@ func (d *CommonDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
 }
 
 // MarkCodeAsUsed atomically transitions a code from unused to used via a
-// conditional UPDATE (`WHERE id = ? AND used = false`). It returns true only if
-// this call is the one that flipped the flag; a false return means the row was
-// already used, i.e. a concurrent request redeemed the same code first. Callers
-// treat that as authorization-code reuse. This compare-and-set closes the
-// double-spend race that a read-then-unconditional-update leaves open (#77).
+// conditional UPDATE (`WHERE id = ? AND used = false AND revoked = false`). It
+// returns true only if this call is the one that flipped the flag. This compare-and-set
+// closes the double-spend race that a read-then-unconditional-update leaves open (#77).
+//
+// A false return means **no row transitioned**, and the three ways that happens are not
+// distinguishable here: the row was already used, it was revoked, or it does not exist.
+// So false must not be read as authorization-code reuse. Reuse is detected in the
+// validator, which finds the already-used row and returns AuthCodeReusedError, and that
+// is what drives the containment cascade. The caller's job on false is to refuse
+// generically, which is what handler_token.go does.
+//
+// The revoked term is what makes session termination durable against a redemption
+// already in progress (#129). Validation and claiming are separate steps, so a code
+// validated a moment before its session was terminated would otherwise still be
+// claimed and its tokens issued.
 func (d *CommonDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) {
 
 	if codeId == 0 {
@@ -96,6 +106,7 @@ func (d *CommonDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) 
 	ub.Where(
 		ub.Equal("id", codeId),
 		ub.Equal("used", false),
+		ub.Equal("revoked", false),
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
@@ -110,6 +121,52 @@ func (d *CommonDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) 
 	}
 
 	return rowsAffected == 1, nil
+}
+
+// RevokeCodesBySessionIdentifier marks every not-yet-revoked code of one session
+// revoked, and reports how many rows this call transitioned. It is the durable half
+// of ending a session (#129): the code is the grant record, and a rotated refresh
+// token inherits its parent's code_id, so marking the code marks every descendant of
+// that grant, including one inserted after this statement committed.
+//
+// The `revoked = false` term is what makes the count mean "rows this call
+// transitioned" on all four engines rather than "rows matched". MySQL reports changed
+// rows rather than matched rows, and the updated_at assignment would make an
+// already-revoked row count as changed, so without the term the same call would
+// report differently per engine and the audit event would overstate what it did.
+//
+// An empty session identifier is rejected rather than treated as a filter. Every
+// user_sessions row carries a UUID, so an empty value means a caller bug, and
+// matching on it would sweep unrelated codes.
+func (d *CommonDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error) {
+
+	if sessionIdentifier == "" {
+		return 0, errors.WithStack(errors.New("can't revoke codes with an empty session identifier"))
+	}
+
+	ub := sqlbuilder.NewUpdateBuilder()
+	ub.Update("codes")
+	ub.Set(
+		ub.Assign("revoked", true),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("session_identifier", sessionIdentifier),
+		ub.Equal("revoked", false),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to revoke codes by session identifier")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to get rows affected when revoking codes by session identifier")
+	}
+
+	return rowsAffected, nil
 }
 
 func (d *CommonDatabase) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,

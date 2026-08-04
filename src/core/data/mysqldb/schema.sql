@@ -348,6 +348,7 @@ CREATE TABLE `codes` (
   `acr_level` varchar(128) NOT NULL,
   `auth_methods` varchar(64) NOT NULL,
   `used` tinyint(1) NOT NULL,
+  `revoked` tinyint(1) NOT NULL DEFAULT 0,
   `auth_state_generation` bigint NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_code_hash` (`code_hash`),

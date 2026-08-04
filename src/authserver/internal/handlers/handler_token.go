@@ -180,17 +180,23 @@ func HandleTokenPost(
 				return
 			}
 			if !claimed {
-				// Lost the race: another request concurrently redeemed this same code
-				// and won the atomic claim above. Reject this duplicate WITHOUT running
-				// the session-wide reuse cascade. The winner is a legitimate in-flight
-				// redemption (a concurrent duplicate still had to carry the correct
-				// PKCE verifier), and tearing the session down here would fight the
-				// winner's in-progress token minting on the same rows.
+				// No row transitioned. Usually that means another request concurrently
+				// redeemed this same code and won the atomic claim above, and since #129
+				// it can also mean the code was revoked between validation and this claim
+				// because its session was terminated. The two are not distinguishable from
+				// here and do not need to be: both refuse generically.
+				//
+				// Reject WITHOUT running the session-wide reuse cascade. In the race case
+				// the winner is a legitimate in-flight redemption (a concurrent duplicate
+				// still had to carry the correct PKCE verifier), and tearing the session
+				// down here would fight the winner's in-progress token minting on the same
+				// rows. In the revoked case the session is already gone and its grants are
+				// already swept, so there is nothing left to cascade over.
 				//
 				// This does not weaken reuse protection: a genuine *later* replay of an
 				// already-used code is still detected and fully revoked by the
 				// sequential-reuse path in the validator above (#77).
-				slog.Debug("authorization_code: lost the concurrent claim race, rejecting duplicate redemption",
+				slog.Debug("authorization_code: code could not be claimed, rejecting redemption",
 					"codeId", validateResult.CodeEntity.Id)
 				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"Code is invalid.", http.StatusBadRequest))

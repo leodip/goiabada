@@ -124,6 +124,7 @@ CREATE TABLE codes (
   acr_level TEXT NOT NULL,
   auth_methods TEXT NOT NULL,
   used numeric NOT NULL,  
+  revoked numeric NOT NULL DEFAULT 0,
   auth_state_generation INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT fk_codes_client FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
   CONSTRAINT fk_codes_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE

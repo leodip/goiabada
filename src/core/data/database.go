@@ -76,8 +76,18 @@ type Database interface {
 	UpdateCode(tx *sql.Tx, code *models.Code) error
 	// MarkCodeAsUsed atomically flips a code from unused to used and reports
 	// whether this call is the one that made the transition. It is the guard
-	// against double-spending a single authorization code (see #77).
+	// against double-spending a single authorization code (see #77). A revoked
+	// code is never claimable, which is what stops a redemption that validated
+	// just before its session was terminated (see #129). False means no row
+	// transitioned, whether used, revoked or missing, and never specifically
+	// reuse: that is the validator's finding, not this one's.
 	MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error)
+	// RevokeCodesBySessionIdentifier marks every not-yet-revoked code of one session
+	// revoked and reports how many rows it transitioned. Ending a session durably
+	// cuts off the grants that session authorized, and marking the code reaches
+	// every refresh token descended from it, present and future, because a rotated
+	// child inherits its parent's code_id (see #129).
+	RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error)
 	GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error)
 	GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error)
 	DeleteCode(tx *sql.Tx, codeId int64) error
