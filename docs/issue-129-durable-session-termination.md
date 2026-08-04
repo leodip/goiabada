@@ -5,8 +5,8 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** not started
-**PR:** none
+**Run state:** in progress, started 2026-08-04. Stage 1 done, stage 2 next.
+**PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
 work sits next to. #128 (closed) built the atomic refresh claim and family containment. #77
@@ -78,6 +78,17 @@ exists and will need reconciling against this document's section 3.
 | `schema/user-sessions` | `src/core/data/sqlitedb/schema.sql` | `n/a` | `CREATE TABLE user_sessions (` | documentation snapshot, not loaded by Go |
 | `test/fresh-ceremony-after-delete` | `src/authserver/tests/integration/session_deletion_test.go` | `TestSessionDeletedDuringAuthFlow_LoginSucceeds` | `assert.Equal(t, 1, len(userSessions2), "Should have a new session after second login")` | #46's regression guard; the case gap 3's fix must NOT break |
 | `test/completed-new-session` | `src/authserver/internal/handlers/handler_auth_completed_test.go` | `TestHandleAuthCompletedGet` | `t.Run("Successful flow, new session, consent not required", func(t *testing.T) {` | one of three subtests reaching `StartNewUserSession` with a nil `AuthenticatedAt` |
+
+Rows below this line were added **by the run**, for code the run created, so later stages and the run
+log can cite it the same way. Nothing above the line changed.
+
+| Label | File | Function | Locate by | Note |
+|---|---|---|---|---|
+| `model/code-revoked` | `src/core/models/code.go` | `n/a` | `// Revoked records that the session this code was issued through was explicitly` | stage 1, the marker field and its `dont-update` tag |
+| `db/revoke-codes-by-sid` | `src/core/data/commondb/code.go` | `RevokeCodesBySessionIdentifier` | `ub.Equal("session_identifier", sessionIdentifier),` | stage 1, the termination sweep |
+| `migration/000026` | `src/core/data/sqlitedb/migrations/000026_add_code_revoked.up.sql` | `n/a` | `ALTER TABLE codes ADD COLUMN revoked numeric NOT NULL DEFAULT 0;` | stage 1, one of four engines |
+| `test/revoke-codes-data` | `src/authserver/tests/data/code_test.go` | `TestRevokeCodesBySessionIdentifier` | `assertCodeRevoked(t, unrelated.Id, false, "a code of an unrelated session")` | stage 1, seam 1's negative control |
+| `test/migration-000026` | `src/authserver/tests/data/migration_000026_code_revoked_test.go` | `TestMigration000026_CodeRevoked` | `require.NoError(t, h.Migrator.Migrate(25), "roll back 000026")` | stage 1, the down migration case |
 
 Counts in this document carry their command:
 
@@ -1281,6 +1292,382 @@ an existing test file**, and the only new artefacts are two data methods.
 > **Obligation for the run.** Per section 5 of the testing reference, every table above is executed in
 > the scratchpad before it is written into section 6, and re-run after any revision. Counts are never
 > carried forward across a change.
+
+---
+
+## 6. Plan
+
+Eight stages, written by the run on 2026-08-04. The order is chosen so that no intermediate commit
+leaves the tree half live: the column and its sweep exist before anything rejects on them, rejection
+exists before anything writes the marker, and gap 2 lands last per decision 1 while still blocking
+the issue.
+
+**On the two unit test files section 1 says do not exist.** Neither
+`handler_api_users_sessions_test.go` nor `handler_api_account_sessions_test.go` exists, and section 1
+says "whichever stage touches those handlers creates the file". **Stage 4 creates both**, per section
+1, and the history is recorded because the first draft of this plan declined to.
+
+The first draft read section 5's "every seam here is an existing test file" as overriding section 1,
+and cited `testing.md`'s rule against testing at an unconfirmed seam. The plan review refuted that,
+and the refutation is right. Section 5 rejects **mock expectations as the only evidence for the new
+data methods** and rejects **a unit seam as the primary home for the helper's atomicity**. It rejects
+neither a handler test for handler-owned behaviour, and an HTTP handler is a public boundary that
+section 1 named explicitly, so the seam is confirmed rather than invented.
+
+What decided it is that decision 9's contract has no other home. Each handler must emit **both** audit
+events after the termination commits, and **neither** when it fails. The integration tier can observe
+the success half, since `api_settings_audit_logs_test.go` reads `GetAuditLogsPaginated` directly, but
+it cannot force the termination transaction to fail, so nothing there can prove the events are
+suppressed on failure. A mock-based handler test is the only seam that can. `revocation_test.go` still
+owns the transaction threading and seams 8 and 9 still own the observable token rejection, because the
+handler tests do not replace either. Precedent for the harness: `handler_api_account_password_test.go`
+and five siblings, over `test_main_test.go`.
+
+**The obligation above was met before this section was written.** Stage 1's tables were executed
+against all four engines first, and three of its rows changed as a result. What changed is recorded in
+the stage 1 entry of section 7.
+
+### Stage 1: the marker column and its sweep
+Status: **Done**
+Seams: 1 and 2, plus a migration test following the 000024 and 000025 precedent.
+Tiers: unit (three modules), data (four engines). Integration not applicable, no endpoint changes.
+Docs: none, internals only. Verified in section 2 that `CLAUDE.md` and `AGENTS.md` enumerate neither
+migrations nor the `codes` table, and no page on the docs site describes either.
+
+1. Migration `000026_add_code_revoked`, up and down, for all four engines. Types follow
+   `refresh_tokens.revoked` on each: sqlite `numeric`, mysql `tinyint(1)`, postgres `boolean`, mssql
+   `BIT`. Each declares `NOT NULL DEFAULT` false, and mssql names its default constraint
+   `df_codes_revoked` so the down migration can drop the constraint before the column, which is the
+   hazard 000024 documents. **No index**: the sweep is keyed on `session_identifier`, which
+   `idx_codes_session_identifier` from 000024 already covers, and stage 6's reaper scans by
+   `created_at`. Status: **Done**
+2. The four `schema.sql` snapshots gain the column, in the position the migration puts it (after
+   `used`). Documentation only, never loaded by Go. Status: **Done**
+3. `models.Code.Revoked` with `db:"revoked"` and `fieldtag:"dont-update"`, carrying the comment
+   decision 4 requires: an ordinary full-row `UpdateCode` must not be able to write the marker back
+   to false. Mirrors `Code.AuthStateGeneration`. Status: **Done**
+4. `RevokeCodesBySessionIdentifier(tx, sid) (int64, error)` in `commondb/code.go`, its declaration in
+   the `Code` block of `data/database.go`, the one-line wrapper in each of the four engine packages,
+   and regenerated mocks (`authserver/generate-mocks.sh`, run in the dev container). The predicate is
+   `session_identifier = ? AND revoked = false`, the assignment sets `revoked` and `updated_at`, and
+   the return is `RowsAffected`. An empty identifier returns an error rather than being used as a
+   filter. Status: **Done**
+5. `db/mark-code-used` gains `AND revoked = false`, with the comment section 4.3 requires: validation
+   and claiming are separate steps, so without this term a code revoked in between is still claimed.
+   The interface doc comment gains the same note. Status: **Done**
+6. Data cases at **seam 1**, in `code_test.go`, all four engines. Two tests: the sweep's table, and
+   the transaction and failure path a mock cannot answer for. The rows, all executed:
+
+   | Case | Expected | Which gate rejects it, or what it proves |
+   |---|---|---|
+   | two codes on session A, sweep A | count 2, both `Revoked` | the sweep reaches every code of the session |
+   | a code on unrelated session B | stays `Revoked = false` | the negative control; without it a method revoking the whole table passes |
+   | sweep A again | count 0, rows stay revoked | idempotent, and the count means rows transitioned |
+   | unknown identifier | count 0, no error | absence is not an error |
+   | empty identifier | error, nothing swept | the explicit guard, not the `=` predicate |
+   | sweep inside a transaction, then roll back | `Revoked = false` afterwards | it enlisted in the caller's transaction rather than the pool |
+   | sweep on the finished transaction | error, count 0 | the failure path does not collapse into a benign zero |
+
+   **Keep the unrelated-session row and the rolled-back row.** The first is the only case that fails
+   if the sweep is written session-wide by mistake, which would sign out every device of every user.
+   The second is the only case exercising the real implementation's transaction handling; every
+   mock-based test above it passes with the parameter ignored. Status: **Done**
+7. Data cases at **seam 2**, extending `TestMarkCodeAsUsed` rather than adding a sibling: a revoked
+   but unused code is **not** claimable, and stays unused afterwards. **Keep the existing
+   already-used row beside it**, since either row alone still passes with the other term deleted from
+   the predicate. Plus `TestUpdateCode_DoesNotClobberRevoked`, mirroring the four existing
+   `DoesNotClobber` tests, which is the only case that fails if the `dont-update` tag on the model
+   field is dropped. Status: **Done**
+8. `migration_000026_code_revoked_test.go`, following 000024 and 000025: the column is absent at
+   000025, is `NOT NULL` defaulting to false afterwards, a `codes` row that predates it lands
+   `revoked = false`, and the down migration then the re-apply are clean. The pre-existing row is
+   seeded through the ORM at 000026 and carried down to 000025 and back, rather than hand-written at
+   000025, which is what makes the case affordable: `codes` has twenty NOT NULL columns and foreign
+   keys into `clients` and `users`. Status: **Done**
+9. Verify: `check-anchors.sh`, then `where.sh test --type modules` and
+   `where.sh test --type data --db <each of the four>`. Status: **Done**
+
+### Stage 2: rejection at redemption and at refresh
+Status: **Not started**
+Detail: **sketch**
+
+Read the marker at the two sites decision 7 fixes, both from data already loaded, so neither adds a
+query: `codeEntity.Revoked` on the `authorization_code` path, placed after client-secret validation,
+after PKCE and after the `if wasReused` return, and `refreshToken.Code.Revoked` on the
+`refresh_token` path, placed after `validator/client-ownership`. Both carry the comment decision 7
+requires, explaining why the check sits apart from the checks in `validator/authcode-preauth` rather
+than joining them, or a reviewer tidies it back into the block that #137 exists to fix. Seam 5, whose
+four ordering rows are the only testable content of decision 7 and are what stop the drift: a wrong
+verifier, a wrong secret, a reused code and a wrong client each return their own error rather than
+the revoked-code error. Tier: unit. Docs: none, internals only, since nothing is user-visible until
+stage 3 writes a marker. Expand against stage 1's code.
+
+### Stage 3: the termination helper, uncalled
+Status: **Not started**
+Detail: **sketch**
+
+Deliberately inert: the helper exists and nothing calls it, so this commit changes no behaviour and
+owes no user-facing text. A helper in `revocation.go` modelled on `RevokeUserAuthStateTx`, performing
+decision 5's three writes in one transaction (`RevokeCodesBySessionIdentifier`, the sid-scoped refresh
+sweep through `db/refresh-by-sid` and `revoke/refresh-tokens`, then `DeleteUserSession`), returning
+the zero result on any error so a caller cannot audit a half-truth, and reporting the revoked code
+count and the transitioned JTIs decision 9's payload needs. Plus the new `terminated_user_session`
+constant and its entry in the audit event list in `constants.go`. Seam: `revocation_test.go`, which
+owns the transaction threading, the zero result on the error path, and that the three writes are
+issued in decision 5's order. Tier: unit. Docs: none, internals only, because nothing observable
+changes until stage 4 calls it.
+
+### Stage 4: both endpoints terminate, and everything that says so
+Status: **Not started**
+Detail: **sketch**
+
+The activation stage. It carries the endpoint calls **and** every piece of user-facing material about
+them, in one commit, so no deploy can perform the broader security action while a page or a modal
+still describes the narrower one. That pairing is the plan review's second finding and the reason
+stage 3 above is inert.
+
+`admin/session-delete` and `account/session-delete` call the helper, ownership still enforced on the
+account one, and each emits `AuditDeletedUserSession` unchanged plus `terminated_user_session` with
+decision 9's payload, both **after** the commit. Seams: the two new handler test files section 1 asked
+for, covering both events with their payload on success and **neither** event with a 500 on helper
+failure, which is the contract no other tier can reach; seam 8 for the headline claim (authorize with
+`offline_access`, terminate, refresh refused, paired with the assertion that an unrelated session
+still refreshes, without which the test passes against a change that revokes everything); seam 9 for
+both endpoints, the account one's 403, and pinning logout unchanged through request shapes #109 is not
+rewriting. Seam 10 for the catalog keys, which needs no new test code because
+`TestCatalog_ParityEnPtBR` and `TestCatalog_NoEmptyValues` already fail on a key in one catalog only
+or present and empty, and the step says so explicitly so the absence of new cases does not read as
+untested copy. Tiers: unit, integration.
+
+Docs, all of it here: the falsified sentences in `concepts/tokens.mdx`, a new ending-a-session section
+in `concepts/user-sessions.mdx`, both endpoints in `integration/rest-api.mdx`, a durable-termination
+bullet in `reference/security.mdx`, and decision 14's three keys in each catalog plus one `msg +=`
+line in each of `account_user_sessions.html`, `admin_users_sessions.html` and
+`admin_clients_usersessions.html`, placed before the `if (isCurrent)` append so the immediate-logout
+warning stays last and containing no double quote, since the string is interpolated into a JavaScript
+double-quoted literal. Two wordings, second person on the account page and third person on the two
+admin pages.
+
+**The new concepts section is limited to what is true when this lands**: what the two endpoints revoke
+(decision 2) and decision 11's limit, that an offline grant's access token keeps working until it
+expires. It must **not** yet claim that an in-flight ceremony cannot recreate the session, because
+that is stages 5 and 6, and documenting a fail-open path as closed is worse than documenting nothing.
+Those two sentences land with the stages that make them true.
+
+### Stage 5: the `/auth/completed` gate
+Status: **Not started**
+Detail: **sketch**
+
+Decision 6's first half: in `HandleAuthCompletedGet`, reach `completed/start-new-session` only when
+`!hasValidUserSession && !userReallyAuthenticated` is false, otherwise set `AuthStateRequiresLevel1`,
+save, and redirect to `/auth/level1`. The discriminator is already computed at
+`completed/really-authenticated` and today is consulted only in the branch where it does not matter.
+Carries the comment decision 6 asks for about `handlePromptNone` being the fragile neighbour. Seam 6,
+whose new row asserts the redirect and that `StartNewUserSession` is not called, and whose three
+existing subtests gain a non-nil `AuthenticatedAt`, which is the non-additive cost section 1 recorded.
+Tier: unit. Docs: the first of the two sentences held back from stage 4's concepts section, that a
+ceremony in flight cannot complete into a recreated session. Expand against stage 4's code.
+
+### Stage 6: the `/auth/issue` liveness check and the compensating revoke
+Status: **Not started**
+Detail: **sketch**
+
+Decision 6's second half plus decision 12. A liveness read at `/auth/issue`, placed **after** the
+implicit-flow branch so `handleImplicitFlow` is untouched and only `issue/create-code` is guarded:
+when the bound session identifier resolves to no session row, restart level 1 as in stage 5.
+Immediately after the insert, one compensating statement as a new data method on four engines,
+`UPDATE codes SET revoked = true, updated_at = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM
+user_sessions WHERE session_identifier = ?)`, so a code that committed after the termination's sweep
+read `codes` is marked by the second sweeper. Seams 4 (the data method, whose "does nothing when a
+session exists" row is the one that matters, since a method that always revoked would pass every
+other assertion) and 7 (the liveness branch, extending `TestHandleIssueGet`). Tiers: unit, data,
+integration for the mid-flight ceremony on one HTTP client, plus the #46 guard still green, which is
+the pair proving decision 6 chose the right predicate rather than merely a strict one. Docs: the
+second sentence held back from stage 4's concepts section, the consent-screen window.
+
+### Stage 7: reaping unused revoked codes
+Status: **Not started**
+Detail: **sketch**
+
+Decision 8's one predicate extension, so a code revoked while still unredeemed does not accumulate
+forever: `revoked = true AND used = false AND created_at < cutoff`, which is safe with a short cutoff
+because an unused code has no refresh tokens by definition and is unredeemable after 60 seconds
+anyway. Seam 3, whose load-bearing row is the **retention** one: a revoked code with a live refresh
+token must survive, because decision 8's whole safety argument is that the marker outlives its
+descendants, and that row's value is invisible once the design is right. Tier: data, four engines.
+Docs: to confirm at expansion; the sweep of section 2 found no page describing the reapers, and
+`concepts/audit-log.mdx` points at `constants.go` rather than enumerating events.
+
+**Extend `DeleteUsedCodesWithoutRefreshTokens` itself. No second method and no second worker call.**
+The first draft of this sketch offered the choice, which reopened something the seal had settled:
+section 4.5 says one predicate is added, and seam 3 names the existing method extended. A new method
+would add an unconfirmed data seam plus an interface method, four wrappers, regenerated mocks and its
+own wiring in `worker/perform-task`. The method keeps its name, and its doc comment states the widened
+contract, since renaming it would touch the interface, four wrappers, the mocks and the call site for
+no behavioural gain.
+
+### Stage 8: gap 2's evidence
+Status: **Not started**
+Detail: **sketch**
+
+Gap 2 closes structurally in stages 1 and 2, since a rotated child inherits its parent's `code_id`
+and so is born already rejected. What is missing is the proof, and decision 1 requires it before the
+issue closes. An integration test mirroring `token_refresh_concurrent_test.go`'s harness: a grant
+whose refresh races a termination leaves no usable descendant, checked both ways round, the child
+issued before termination and the child issued after it, on an `offline_access` grant since a
+session-bound one already dies at `validator/session-branch`. Seam 8. Tier: integration. Docs: none
+unless the evidence contradicts what stage 3 documented, which would be a blocking decision rather
+than a docs edit. Staged last per decision 1.
+
+---
+
+## 7. Run log
+
+Append-only. The run started 2026-08-04T21:34:38Z, after an earlier start the same evening was
+aborted before any stage began.
+
+### Plan, 2026-08-04
+
+**Landed.** Section 6, eight stages, stage 1 in full and the rest as sketches. Five rows added to
+section 0 for the code stage 1 creates, below a line marking them as the run's rather than the seal's.
+Draft PR [#138](https://github.com/leodip/goiabada/pull/138) opened and recorded in the header.
+
+**Sequencing deviation, deliberate.** Stage 1's implementation was written **before** section 6 was.
+Section 5's closing obligation, from `testing.md` section 5, is that every case table is executed
+before it is written into the plan, and a data-tier table cannot be executed without the migration and
+the method existing. So stage 1 was built, its tables were run on all four engines, and only then was
+stage 1 written down. The code sat uncommitted through the plan review, which was told so and used it
+as evidence.
+
+**What executing the tables changed**, which is the return on doing it in that order:
+
+1. The `revoked = false` term in the sweep predicate is load bearing for the **count**, not only for
+   idempotence. MySQL reports changed rows rather than matched rows, and the `updated_at` assignment
+   alone makes an already-revoked row count as changed, so without the term the same call reports 2 on
+   MySQL and 0 on the other three. Decision 9's audit event carries that count.
+2. SQLite declares `codes.code_challenge` and `code_challenge_method` NOT NULL where the other three
+   engines allow NULL, so the migration test's seed passes on three engines and fails on one.
+3. A zero `time.Time` for `authenticated_at` reaches MySQL as `'0000-00-00'`, rejected outright.
+
+**Environment finding, not a code defect, and it cost half an hour.** The shared server test databases
+`goiabada_data` and `goiabada_integration` on mysql, postgres and mssql were left at
+`schema_migrations.version = 26` by the **discarded** earlier attempt at this issue, whose 000026 built
+the `terminated_sessions` registry that decision 4 rejected. golang-migrate therefore reported "no need
+to migrate" and every `codes` test failed with `Unknown column 'revoked'` on those three engines, while
+sqlite was fine because its test database is a fresh file per run. Fixed by rewinding the recorded
+version to 25 in those six databases. The orphaned `terminated_sessions` tables are still present and
+inert; dropping tables was not something to do unattended. `goiabada` on mssql, a dev database rather
+than a test one, is at 23 and clean.
+
+**Review, round 1.** `gpt-5.6-sol`, effort high, `type: plan-review`. Conformance, quality and security
+all reviewed. Ran: the request and the whole agreement, the complete stage 1 diff and its neighbours,
+`check-anchors.sh` (42 anchors pass), `git diff --check`, and an attempt at `where.sh test --type
+modules`.
+
+**Not reached.** The reviewer could not run any test tier: `where.sh test` exited 3 for it, reporting
+the dev container down, although the container is up and the run's own tiers were green from it. The
+reviewer's sandbox cannot reach docker. So the tier results in this document are the run's, verified
+from its own logs, and no review of this work will independently reproduce them. Later code-review
+requests carry the test output in the request rather than expecting the reviewer to re-run it.
+
+**Hash check.** `git diff | sha256sum` mismatched afterwards, which reviewer.md treats as a stop.
+Investigated rather than accepted: every changed file's mtime predates the review except the
+agreement, which the run itself edited at 18:54:30 local to record the PR. Reverting only that header
+edit reproduced the `BEFORE` hash exactly, so the reviewer changed no tracked file. The real lesson is
+procedural: do not edit tracked files while a review is running, or compute `BEFORE` immediately before
+the call.
+
+1. **The plan wrongly declined the two handler test files.** `Raised by: reviewer`, blocking,
+   confidence high. Status: **Resolved**
+   Verified and accepted. Section 5 rejects mock expectations as the only evidence for the **new data
+   methods** and rejects a unit seam as the primary home for the **helper's atomicity**; it rejects
+   neither a handler test for handler-owned behaviour, and section 1 named those two files explicitly,
+   so the seam was confirmed rather than invented. What settles it is that decision 9's contract has no
+   other home: the integration tier can read audit rows (`api_settings_audit_logs_test.go` calls
+   `GetAuditLogsPaginated`) but cannot force the termination transaction to fail, so nothing there can
+   prove both events are suppressed on failure. Stage 4 now creates both files, and the preamble to
+   section 6 records the reversal instead of hiding it. Harness precedent confirmed:
+   `handler_api_account_password_test.go` and five siblings over `test_main_test.go`.
+2. **User-facing material was staged apart from the behaviour it describes.** `Raised by: reviewer`,
+   significant, confidence high. Status: **Resolved**
+   Verified in both directions. Forwards: the original stage 3 called both endpoints while decision
+   14's modal copy waited until stage 4, so one deploy could perform the broader revocation without
+   telling the person clicking, which contradicts goal 6. Backwards: the original stage 3 claimed all
+   of section 2's docs, and section 2's new concepts section includes the in-flight ceremony guarantee,
+   which does not exist until stages 5 and 6, so it would have documented a fail-open path as closed.
+   Fixed by splitting: stage 3 is now an inert helper nobody calls, stage 4 is the activation stage
+   carrying the endpoints, both handler suites, the integration cases, every docs page and all three
+   modals in one commit, and the two ceremony sentences are explicitly held back for stages 5 and 6.
+3. **Stage 7 reopened a seam the seal had settled.** `Raised by: reviewer`, significant, confidence
+   high. Status: **Resolved**
+   Verified: section 4.5 says one predicate is added and seam 3 names
+   `DeleteUsedCodesWithoutRefreshTokens` extended, while the sketch offered "wire a second call or
+   extend the method, whichever is cleaner". That is a design choice the seal removed, and the second
+   option would add an unconfirmed data seam plus an interface method, four wrappers, regenerated mocks
+   and its own worker wiring. Stage 7 now forces extending the existing method, keeping its name and
+   widening its doc comment.
+
+No finding needed the user. All three are conformance findings whose answer the sealed agreement
+already fixes, so escalating them would have asked the user to re-decide what sections 1, 4.5 and 5
+decide. Nothing was deferred and nothing is contested.
+
+### Stage 1, 2026-08-04
+
+**Landed.** Migration 000026 on four engines, the four `schema.sql` snapshots, `model/code-revoked`,
+`db/revoke-codes-by-sid` with its interface declaration and four wrappers, the regenerated `Database`
+mock, and `AND revoked = false` added to `db/mark-code-used`. Tests: `test/revoke-codes-data` and its
+transaction-and-failure sibling, the revoked-but-unused row inside `TestMarkCodeAsUsed`,
+`TestUpdateCode_DoesNotClobberRevoked`, and `test/migration-000026`. Commit `066d289`.
+
+Nothing reads the marker yet, so this commit changes no observable behaviour. Stage 2 adds the
+rejections and stage 4 wires the endpoints that write it.
+
+**Tiers.** Unit green, all three modules. Data green on sqlite, mysql, postgres and mssql, each run
+separately (`where.sh test --type data --db <engine>`), including the stage's five new or extended
+tests on every engine. Integration not applicable: no endpoint, handler or observable flow changes
+here, which the reviewer confirmed independently.
+
+**Deviation 1, the sequencing.** Recorded in the plan entry above: the code preceded section 6 because
+the tables had to be executed before they were written. Nothing else about the stage departs from the
+plan as written.
+
+**Deviation 2, one file the plan did not list.** `handler_token.go` gained a comment rewrite and one
+changed `slog.Debug` message, no behaviour. It is the fix for finding 1 below, and it belongs to this
+stage because this stage is what made the old comment false. The alternative, leaving a comment that
+says every failed claim is reuse, would have handed the next reader a wrong contract.
+
+**Review, round 1.** `gpt-5.6-sol`, effort high, `type: code-review`. Conformance, quality and security
+all reviewed. Ran: the request and the full agreement, the complete stage 1 diff and the neighbouring
+redemption paths, `git diff --check`, `gofmt -d` on the changed Go files, `check-anchors.sh`, and an
+attempt at `where.sh test --type modules`. Hash check clean: `git diff | sha256sum` identical before
+and after, so the reviewer changed no tracked file.
+
+**Not reached.** No test tier, for the container reason in the plan entry. The reviewer read the
+recorded results rather than reproducing them and said so plainly, which is the honest form of a
+partial review. Everything static was reviewed, including a search for any other writer of
+`codes.revoked`, which found none.
+
+1. **The failed-claim contract still said every miss was authorization-code reuse.** `Raised by:
+   reviewer`, minor, confidence high. Status: **Resolved**
+   Correct, and it also refuted a premise in the run's own request. Adding `revoked = false` makes a
+   false return from `db/mark-code-used` mean "no row transitioned", which is now three states rather
+   than one: used, revoked, or missing. The doc comment still said "already used, i.e. a concurrent
+   request redeemed the same code first. Callers treat that as authorization-code reuse", and
+   `handler_token.go`'s branch comment and debug message still said the race had been lost.
+   The runtime was already safe, and the run had verified this before the review returned: the
+   `!claimed` branch answers a generic `invalid_grant` and deliberately does **not** call
+   `revokeAndAuditAuthCodeReuse`, which only the validator's `AuthCodeReusedError` path does, pinned by
+   `TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses`. So the defect was the written contract,
+   which would have invited a later caller to treat a termination race as reuse.
+   Fixed in three places: the `db/mark-code-used` doc comment, its interface declaration, and the
+   handler's branch comment plus its debug message, now "code could not be claimed" rather than "lost
+   the concurrent claim race". Unit tier re-run green afterwards. Bookkeeping class under the
+   reviewer reference's table, prose disagreeing with behaviour, so it does not justify a second round.
+
+**Gate passed on one round.** Zero conformance findings and zero security findings. The reviewer
+confirmed, against the diff rather than from the request, that the stage touches no index, no endpoint,
+`token_validator.go` not at all, and `DeleteUsedCodesWithoutRefreshTokens` not at all, which are the
+four out-of-scope boundaries this stage could plausibly have crossed.
 
 ---
 
