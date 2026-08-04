@@ -4,7 +4,7 @@
 **Issue state:** open (labels: bug, security)
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
-**Agreement sealed:** 2026-08-04
+**Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
 **Run state:** not started
 **PR:** none
 
@@ -12,9 +12,21 @@
 work sits next to. #128 (closed) built the atomic refresh claim and family containment. #77
 (closed) built the atomic code claim. #127 (closed, not planned) proposed a grant entity. #130
 (open) owns the used-code cleanup NULL bug this issue's body flagged. #131 and #132 (open) are
-residuals of #106 and #128 in the same code. #133, #134, #135 and #137 (open) were filed out of an
+residuals of #106 and #128 in the same code. #109 (open) owns the RP-initiated logout surface this
+work deliberately does not touch, per decision 13. #133, #135 and #137 (open) were filed out of an
 earlier, discarded attempt at this issue and cite decision numbers from a document that no longer
-exists; see "Prior attempt" below. None of them blocks this work.
+exists; see "Prior attempt" below. #134 came from that attempt too and was **closed as not planned**
+on 2026-08-04, because it tracked the retention of a terminated-session registry and decision 4
+builds none. None of them blocks this work.
+
+**Amended after sealing.** Sections 1 to 5 are meant to be frozen at the seal, so the edits of
+2026-08-04 are recorded rather than absorbed. The skill's references gained a four-surface
+documentation sweep and a follow-ups section after this document was written, and running both found
+work the first pass missed: a falsified sentence in `concepts/tokens.mdx`, three confirmation modals
+whose copy is now incomplete (decision 14), and the fact that interactive logout writes nothing to
+the database (decision 13). Section 2 gained `Documentation owed` and a sixth goal, section 9 is new,
+sections 0, 1, 3 and 5 carry marked corrections, and no sealed decision was reversed. The seal holds
+because section 3 still has zero `Open` items.
 
 **Prior attempt.** An earlier `/leo-spec` plus `/leo-run` cycle for #129 reached stage 4 and was
 discarded by `git reset --hard origin/main` on 2026-08-04. The user chose to start over from zero.
@@ -32,6 +44,8 @@ exists and will need reconciling against this document's section 3.
 | `admin/session-delete` | `src/authserver/internal/handlers/apihandlers/handler_api_users_sessions.go` | `HandleAPIUserSessionDelete` | `err = database.DeleteUserSession(nil, sessionId)` | termination site 1, bare delete, no revocation |
 | `account/session-delete` | `src/authserver/internal/handlers/apihandlers/handler_api_account_sessions.go` | `HandleAPIAccountSessionDelete` | `if err := database.DeleteUserSession(nil, sessionId); err != nil {` | termination site 2, ownership checked, bare delete |
 | `logout/last-client-delete` | `src/authserver/internal/handlers/handler_account_logout.go` | `handleExistingSessionOnLogout` | `if len(userSession.Clients) == 1 {` | termination site 3, deletes the session only when the last client logs out |
+| `logout/basic-post-fork` | `src/authserver/internal/handlers/handler_account_logout.go` | `HandleAccountLogoutPost` | `if hint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint"); len(hint) > 0 {` | without a hint the handler clears the cookie and writes nothing to the database |
+| `catalog/end-session-modal` | `src/core/i18n/catalogs/active.en.toml` | `n/a` | `adminconsole.account.sessions.modal_confirm_body_prefix` | one of three end-session modals; decision 14 adds a key beside each |
 | `completed/start-new-session` | `src/authserver/internal/handlers/handler_auth_completed.go` | `HandleAuthCompletedGet` | `newSession, err := userSessionManager.StartNewUserSession(` | gap 3: reached unconditionally, no proof anyone authenticated |
 | `completed/really-authenticated` | `src/authserver/internal/handlers/handler_auth_completed.go` | `HandleAuthCompletedGet` | `userReallyAuthenticated := authContext.AuthenticatedAt != nil` | computed, then read only inside the valid-session branch |
 | `completed/set-acr-level` | `src/authserver/internal/handlers/handler_auth_completed.go` | `HandleAuthCompletedGet` | `err = authContext.SetAcrLevel(targetAcrLevel, userSession)` | runs after the branch, on the ambient session, whoever it belongs to |
@@ -67,7 +81,14 @@ exists and will need reconciling against this document's section 3.
 
 Counts in this document carry their command:
 
-- 3 termination sites (`admin/session-delete`, `account/session-delete`, `logout/last-client-delete`).
+- 3 termination sites (`admin/session-delete`, `account/session-delete`, `logout/last-client-delete`),
+  the third reachable only with an `id_token_hint`, per the correction in section 1.
+- 3 admin console pages end sessions, through 2 API endpoints
+  (`grep -c 'http.NewRequest("DELETE"' src/adminconsole/internal/apiclient/user_session_client.go`
+  returns 3, of which `DeleteUserSessionById` and `DeleteAccountSession` are the session ones and
+  `DeleteUserConsent` is not).
+- 1263 keys in each catalog, at parity
+  (`grep -c '^"' src/core/i18n/catalogs/active.en.toml src/core/i18n/catalogs/active.pt-BR.toml`).
 - 3 subtests reach `StartNewUserSession`
   (`grep -c 'StartNewUserSession", rr, req' src/authserver/internal/handlers/handler_auth_completed_test.go`).
 - Next free migration number is **000026** on all four engines
@@ -79,18 +100,46 @@ Counts in this document carry their command:
 
 ### The three termination sites
 
-All three delete the `user_sessions` row and revoke nothing. Each passes `nil` for the
-transaction, so none of them is a boundary against anything running concurrently.
+All three reach `DeleteUserSession` and revoke nothing. Each passes `nil` for the transaction, so
+none of them is a boundary against anything running concurrently.
 
 | Site | What it does | Revokes tokens? |
 |---|---|---|
 | `DELETE /api/v1/admin/user-sessions/{id}` (`admin/session-delete`) | deletes the `UserSession` | no |
 | `DELETE /api/v1/account/sessions/{id}` (`account/session-delete`) | deletes the `UserSession`, ownership checked | no |
-| `GET/POST /auth/logout` (`logout/last-client-delete`) | deletes one `UserSessionClient`, and the `UserSession` when it was the only one | no |
+| `/auth/logout` **with an `id_token_hint`** (`logout/last-client-delete`) | deletes one `UserSessionClient`, and the `UserSession` when it was the only one | no |
 
 The logout case is per-client and only incidentally ends a session. The predicate is
 `len(userSession.Clients) == 1`, evaluated after the client row is deleted, so the session dies
 exactly when the departing client was the sole one on it.
+
+Above them sit three admin console pages, all funnelling into the two API endpoints rather than
+adding a fourth site: the account sessions page through `DeleteAccountSession`, and both the admin
+users and admin clients session pages through `DeleteUserSessionById`. Those are the only two
+`DELETE` methods in `apiclient/user_session_client.go`
+(`grep -c 'http.NewRequest("DELETE"' src/adminconsole/internal/apiclient/user_session_client.go`
+returns 3, the third being `DeleteUserConsent`). Decision 14 owns their copy.
+
+> **Correction, made on the reconciliation pass of 2026-08-04.** The table above originally listed
+> the logout site as `GET/POST /auth/logout` without qualification. That overstates it, and the real
+> behaviour matters because decision 3 pins it with tests.
+>
+> `handleExistingSessionOnLogout` is reachable **only** through `doLogoutWithIdToken`, so only when
+> an `id_token_hint` is supplied, and per #109 item 1 only when `post_logout_redirect_uri` is
+> supplied too, since that parameter is wrongly treated as required and its check returns before the
+> teardown. The ordinary interactive path does not reach it at all: `logout_consent.html` posts back
+> with only a csrf field, so `HandleAccountLogoutPost` takes the no-hint branch at
+> `logout/basic-post-fork`, clears the cookie, audits `AuditLogout`, redirects, and **writes nothing
+> to the database**.
+>
+> So after an ordinary logout the `user_sessions` row survives with every client still attached.
+> Session-bound refresh tokens keep working at `validator/session-branch`, access tokens keep passing
+> `middleware/session-check`, and the row is orphaned from the browser, since the cookie no longer
+> carries the sid. It still appears as an active session on the user's own sessions page, endable
+> only by clicking "End session".
+>
+> Decision 13 records why this stays out of scope. It is drafted onto #109 in section 9, whose
+> divergence B describes the same asymmetry one path over.
 
 ### Gap 1: an offline grant outlives its session
 
@@ -238,12 +287,24 @@ On the refresh path, `validator/refresh-generation` likewise sits ahead of
 
 ### Documentation
 
-`site/src/content/docs/concepts/user-sessions.mdx` documents credential changes and live sessions
-for #106 and says nothing about explicit termination. `site/src/content/docs/integration/rest-api.mdx`
-describes the admin endpoint as "Terminates a user session by ID" and the account one as "Terminate
-session", with no claim about tokens. Nothing in the docs is falsified by this change, but the word
-"terminates" currently overpromises, and the gap that makes it overpromise is what this issue
-closes.
+`concepts/user-sessions.mdx` documents credential changes and live sessions for #106 and says
+nothing about explicit termination. `integration/rest-api.mdx` describes the admin endpoint as
+"Terminates a user session by ID" and the account one as "Terminate session", with no claim about
+tokens. The word "terminates" currently overpromises, and the gap that makes it overpromise is what
+this issue closes.
+
+The falsified sentence is in `concepts/tokens.mdx`, under offline refresh tokens: "Offline refresh
+tokens are not linked to a user session", and further down, an offline token "keeps working after the
+browser session that created it has gone". Both stay true of a session **expiring**, which is the
+feature per decision 2, and both become false of an explicit termination. Section 2 lists what each
+page owes.
+
+> **Correction, made on the reconciliation pass of 2026-08-04.** This subsection previously concluded
+> "Nothing in the docs is falsified by this change". That was wrong on `concepts/tokens.mdx` above,
+> and it rested on a sweep of one surface. The message catalogs and the templates were never searched,
+> and they carry three "End session" confirmation modals whose copy this change makes incomplete,
+> which is now decision 14. The four-surface sweep is the one in the skill's documentation reference;
+> the earlier pass did not run it.
 
 ### Failure direction
 
@@ -265,6 +326,8 @@ termination is attempted.
 4. Whatever durable state is introduced has a stated retention position, whether that is a reaper
    or a defended decision to keep the rows.
 5. The behaviour of ordinary RP-initiated logout is a recorded decision rather than an accident.
+6. Someone about to end a session is told, at the point of clicking, that it disconnects the
+   applications that session authorized, in both locales.
 
 ### Out of scope
 
@@ -280,14 +343,64 @@ termination is attempted.
 - Third-party resource servers accepting an already-issued access token by signature alone. Inherent
   to stateless tokens and already documented.
 - Reaping anything that exists today. `user_sessions` and its two existing reapers are untouched.
+- **#109**, the RP-initiated logout surface: the wrongly required `post_logout_redirect_uri`, the
+  URL construction, the non-standard `sid`, and its divergence B on the cookie-versus-database
+  asymmetry. Also the interactive logout path that writes nothing to the database at all, per
+  decision 13, which section 9 drafts onto #109.
+
+  **Not a landing-order constraint, and this is worth stating because it looks like one.** #109 and
+  #129 touch the same file, `handler_account_logout.go`, and nothing else. #129 does not modify that
+  file: decision 3 leaves logout unchanged, and its only presence there is the pinning tests at seam
+  9. Those pin behaviour #109 will deliberately change, so they must drive logout through request
+  shapes #109 is not rewriting, which seam 9 now spells out. Either issue can land first.
+
+### Documentation owed
+
+From the four-surface sweep. Each item names the behaviour that falsifies it rather than a stage
+number, because section 6 does not exist yet; the plan attaches each to the stage that changes the
+behaviour, never to a tidy-up stage at the end.
+
+- **`concepts/tokens.mdx`, offline refresh tokens.** Says offline tokens "are not linked to a user
+  session" and that one "keeps working after the browser session that created it has gone".
+  Falsified by decision 2. The distinction to draw is the one decision 4 rests on: a session
+  **expiring** still leaves an offline grant working, a session **explicitly ended** does not.
+- **`concepts/user-sessions.mdx`.** Has no section on ending a session. Needs a new one, next to
+  "Credential changes and live sessions", covering what the two endpoints now revoke (decision 2),
+  that an in-flight ceremony cannot recreate the session (decision 6), and the limit from decision
+  11: an access token already issued for an offline grant keeps working until it expires, because it
+  carries no `sid` for `middleware/session-check` to check. Without that last sentence a reader
+  generalizes the credential-change bullet, "Goiabada's own endpoints reject a token from a
+  superseded session on the very next request", to termination, and is wrong.
+- **`integration/rest-api.mdx`, both endpoints.** "Terminates a user session by ID" and the bare
+  "Terminate session" heading. Each gains a sentence on what termination revokes, linking to the new
+  concepts section.
+- **`reference/security.mdx`, "Authentication security".** Its "Session management" bullet covers
+  only configurable timeouts. Gains a durable-termination bullet in the shape of the existing
+  "Replay containment" one, which is the precedent for how a security property gets summarized here.
+- **Message catalogs, both.** Three new keys in `active.en.toml` and three in `active.pt-BR.toml`,
+  per decision 14, plus a line in each of the three templates it names.
+
+Verified as owing nothing, stated because silence reads the same as forgetting:
+
+- **`concepts/audit-log.mdx`.** Does not enumerate event identifiers, it points at
+  `src/core/constants/constants.go`. So decision 9's second event falsifies no page.
+- **`integration/endpoints.mdx`, `/auth/logout`.** Decision 3 leaves logout unchanged, and decision
+  13 leaves the interactive path's defect to #109. The page's description stays accurate, including
+  "Immediately logs out the user", which describes the cookie effect it always described.
+- **`CLAUDE.md` and `AGENTS.md`.** Byte identical (`diff AGENTS.md CLAUDE.md`, empty). Neither
+  enumerates migrations, the `codes` table, nor the test tiers this change adds to, so migration
+  000026 and `codes.revoked` owe them nothing. Any future edit goes to both.
 
 ---
 
 ## 3. Open questions and decisions
 
-Twelve items. Opened at eleven; decision 4's reversal onto a code-level marker exposed a residual at
-`/auth/issue` that the registry design did not have, which is item 12. Numbers are never reused, and
-decision 4 records its own reversal rather than being rewritten silently.
+Fourteen items. Opened at eleven; decision 4's reversal onto a code-level marker exposed a residual
+at `/auth/issue` that the registry design did not have, which is item 12. The reconciliation pass of
+2026-08-04 added two more: tracing which endpoints the "End session" buttons reach found that
+interactive logout writes nothing to the database (item 13), and the four-surface documentation sweep
+found three confirmation modals whose copy this change makes incomplete (item 14). Numbers are never
+reused, and decision 4 records its own reversal rather than being rewritten silently.
 
 1. **All three gaps land in #129, with gap 2 staged last.** Status: **Decided** Raised by: user
 
@@ -368,6 +481,17 @@ decision 4 records its own reversal rather than being rewritten silently.
    session-bound grant belonging to the client that just logged out **keeps working** while other
    clients remain on the session, because neither `validator/session-branch` nor
    `middleware/session-check` reads `UserSessionClient` at all.
+
+   > **Amended on the reconciliation pass of 2026-08-04.** The paragraph above is true of the
+   > `id_token_hint` path and describes only that path, which flatters the current behaviour. On the
+   > ordinary interactive path (`logout_consent.html` posting back with only a csrf field, taking the
+   > no-hint branch at `logout/basic-post-fork`) the session row is not deleted at all, so a
+   > session-bound grant keeps working whether or not other clients remain. The correction sits in
+   > section 1 and decision 13 records why it stays out of scope.
+   >
+   > This does not disturb the reasoning here. The dividing line is still intent, and a path that
+   > performs no termination is not evidence about what termination should mean. It does change what
+   > seam 9 pins, which is why the amendment is recorded rather than left as a detail.
 
    **Rejected:** sweeping sid-wide on logout. `handleExistingSessionOnLogout` is per-client, so this
    revokes grants belonging to clients that never logged out.
@@ -799,8 +923,101 @@ decision 4 records its own reversal rather than being rewritten silently.
 
     > **Residual, stated rather than implied.** The interleaving above is not closed. It belongs to the
     > same class as #131 and #132: ordering a write against a sweep portably across four engines. The
-    > run should record it in section 7 and it is a candidate follow-up, but it does not block this
-    > issue.
+    > run should record it in section 7, and it is drafted as follow-up 1 in section 9, but it does not
+    > block this issue.
+
+13. **The interactive logout path stays out of scope, and #129 does not touch logout.**
+    Status: **Decided** Raised by: user
+
+    Found on the reconciliation pass, by tracing which endpoint each "End session" button reaches.
+    `logout_consent.html` posts back carrying only a csrf field, so the ordinary logout takes the
+    no-hint branch at `logout/basic-post-fork`, clears the cookie, audits, redirects, and writes
+    nothing to the database. The session row survives with every client attached. Section 1 carries
+    the full correction.
+
+    **Why this is not #129's problem, which is the whole argument.** #129 makes termination
+    **durable**. This path performs no termination at all, so there is nothing for `codes.revoked` to
+    mark and no durability to add: the marker is written by the shared helper in decision 5, which
+    this path never calls. Fixing it means first deciding what interactive logout should do, whole
+    session or per-client, and that is exactly the model question #109 divergence B raises. Answering
+    it here would settle #109's design from inside an issue about something else.
+
+    Decision 3's reasoning is untouched. The dividing line is intent, and a path that terminates
+    nothing is not evidence about what termination means.
+
+    **Rejected: a stage making the no-hint POST delete the session, still without revoking.** It
+    would make logout stop lying for one line of code, which is tempting. Rejected because it edits
+    `handler_account_logout.go`, the one file #109 rewrites, and because "delete the whole session"
+    prejudges #109-B against the per-client model already in `handleExistingSessionOnLogout`. #129
+    modifies no logout code; its only presence in that file is seam 9's pinning tests.
+
+    **Rejected: treating interactive logout as a termination.** Reverses decision 3, and contradicts
+    the OIDC Core section 11 reading that decision 3 rests on.
+
+    **Consequence for seam 9.** The pinning tests must drive logout through request shapes #109 is
+    not rewriting, and must not encode #109's defects as intended behaviour. Seam 9 spells this out.
+
+    Drafted onto #109 as follow-up 2 in section 9, rather than as a new issue, because #109 already
+    owns this surface and divergence B is the same asymmetry one path over.
+
+14. **Yes, all three confirmation modals say what ending a session disconnects, in both locales.**
+    Status: **Decided** Raised by: user
+
+    Found by the four-surface sweep, which the earlier pass never ran past the docs site. Three admin
+    console pages carry an "End session" button, and all three funnel into the two endpoints decision
+    5 names, so all three inherit the new consequence: ending a session disconnects the long-lived
+    integrations that session authorized.
+
+    Today each modal promises only that a session on a device ends, plus a conditional warning that
+    ending your own logs you out. Nobody clicking it can discover the rest, and for an administrator
+    it is the fact that decides whether ending the whole session is even the right control, given
+    that the narrower capability is #135 and does not exist yet.
+
+    **What lands.** Three new keys in `active.en.toml` and three in `active.pt-BR.toml`, following
+    the per-surface prefix convention that already gives "End session" three separate keys, plus one
+    `msg +=` line in each of the three templates:
+
+    | Surface | Template | New key |
+    |---|---|---|
+    | account | `account_user_sessions.html` | `adminconsole.account.sessions.modal_revocation_note` |
+    | admin users | `admin_users_sessions.html` | `adminconsole.admin_users.sessions.modal_revocation_note` |
+    | admin clients | `admin_clients_usersessions.html` | `adminconsole.admin_clients.usersessions.modal_revocation_note` |
+
+    Two wordings, not one, because person differs. The account page is the user acting on their own
+    session; the two admin pages act on somebody else's:
+
+    - account, second person: `" <br /><br />Applications you authorized from this session, including
+      ones that keep working in the background, will need to sign in again."`
+    - admin, third person: `" <br /><br />Applications the user authorized from this session,
+      including ones that keep working in the background, will need to sign in again."`
+
+    pt-BR drafts, in the register of the neighbouring strings, which use "aplicativos" and
+    "autentique-se novamente": `" <br /><br />Os aplicativos que você autorizou nesta sessão,
+    incluindo os que continuam funcionando em segundo plano, precisarão se autenticar novamente."` and
+    the same with "que o usuário autorizou". The run treats these as drafts to refine, not sealed
+    wording, and must not ship English in the pt-BR catalog. The English is the user's chosen wording
+    and the pt-BR follows it rather than paraphrasing.
+
+    **Two mechanical constraints, verified, because getting either wrong breaks the page silently.**
+    The string is interpolated into a JavaScript double-quoted literal inside `endSessionClick`, so it
+    may contain **no double quote**, which is why the existing modal strings use
+    `<span class='text-accent'>` with single quotes. And it is appended unconditionally, placed
+    **before** the `if (isCurrent)` append so the immediate-logout warning stays last.
+
+    **Left alone deliberately:** the pre-existing key-name inconsistency, where two surfaces use
+    `modal_current_warning` and `admin_users` uses `modal_confirm_current_warning`. Renaming is not
+    this change's job, and the new keys use one consistent suffix rather than copying the divergence.
+
+    **Rejected: only the account modal.** The admin surfaces would stay silent about a consequence
+    that changes which control an admin should reach for, and an admin ending a contractor's session
+    to cut off access needs to know it also disconnects that person's background integrations.
+
+    **Rejected: the docs site only.** `concepts/user-sessions.mdx` carries the full semantics either
+    way, per section 2, but a reader at the decision point is in a modal, not on the docs site.
+
+    **Rejected: one shared key for all three surfaces.** It would be less churn, and it is against the
+    established convention here, where identical strings like "End session" and "Are you sure?" each
+    carry three per-surface keys. Mixing a shared key into a per-surface scheme is what review flags.
 
 ---
 
@@ -1015,11 +1232,30 @@ an existing test file**, and the only new artefacts are two data methods.
    - both `DELETE` endpoints revoke, with ownership still enforced on the account one;
    - `/auth/logout` behaviour is **unchanged**, decision 3, including that a logged-out client's
      session-bound refresh token keeps working while other clients share the session. This pins
-     today's behaviour so #135 has to change it deliberately;
+     today's behaviour so #135 has to change it deliberately.
+
+     **Drive it through request shapes #109 is not rewriting**, per decision 13, or these tests
+     encode #109's defects as intended behaviour and its author has to delete them. Concretely: the
+     path that reaches `logout/last-client-delete` needs both `id_token_hint` and
+     `post_logout_redirect_uri`, because #109 item 1 is that the second is wrongly required and its
+     check returns before the teardown. Assert what #129 cares about, that no grant was revoked, and
+     assert nothing about whether the parameter was required or how the redirect was built. If a case
+     covers the no-hint POST at `logout/basic-post-fork`, it asserts only that #129 revoked nothing
+     there; the surviving session row is #109's business, not a #129 expectation to lock in;
    - the mid-flight ceremony, gap 3, driven on one HTTP client so the cookie is shared: begin an SSO
      ceremony, terminate the session before it completes, and assert no usable code is issued. Plus
      the #46 case, `test/fresh-ceremony-after-delete`, still green, which is the pair that proves
      decision 6 chose the right predicate rather than merely a strict one.
+
+### Catalog, host
+
+10. **`src/core/i18n/catalog_hygiene_test.go`** (existing suite). Decision 14's six new keys need
+    **no new test code**, and that is the finding rather than an omission: `TestCatalog_ParityEnPtBR`
+    already fails in both directions when a key exists in one catalog and not the other, and
+    `TestCatalog_NoEmptyValues` already fails on a key present with an empty value, which go-i18n
+    otherwise renders as the raw key in the UI. Adding the keys to both files is what makes the
+    existing guard cover them. The step that adds them states this explicitly, so a reviewer does not
+    read the absence of new cases as the copy being untested.
 
 **Rejected seams**
 
@@ -1036,7 +1272,78 @@ an existing test file**, and the only new artefacts are two data methods.
   seam 1's rolled-back-transaction case plus seam 9 carry the atomicity.
 - **A new test file for the termination helper.** `revocation_test.go` already exists beside it and
   owns this shape.
+- **A render test for the three session templates.** `internal/rendertest` covers account phone,
+  address and profile only, so the session pages would need new harness setup to assert that one
+  `msg +=` line reaches a JavaScript string. That proves the template compiles, which the existing
+  build already proves, and it is the padding testing.md warns about. Seam 10 covers what can
+  actually regress: a key missing from one catalog, or present and empty.
 
 > **Obligation for the run.** Per section 5 of the testing reference, every table above is executed in
 > the scratchpad before it is written into section 6, and re-run after any revision. Counts are never
 > carried forward across a change.
+
+---
+
+## 9. Follow-ups
+
+Both found while grounding, both verified against code, both outside this change under section 2, and
+neither is a way to avoid work #129 owes. The run appends here as it finds more, and never files
+anything.
+
+1. **A code insert can still land between a termination's `UPDATE` and its `COMMIT`.**
+   `bug`, `security`, `go`. Found while settling decision 12. Status: **Drafted**
+
+   Decision 12 closes gap 3's fail-open window with two sweepers that cover each other: termination
+   marks codes that already exist, and `/auth/issue` marks its own code when the session is already
+   gone. One interleaving escapes both. If the code insert commits after the termination transaction's
+   `RevokeCodesBySessionIdentifier` statement has read `codes` but before that transaction commits,
+   the compensating statement's `NOT EXISTS` still sees the session row, so neither marks it. What
+   survives is an offline refresh token, for up to `RefreshTokenOfflineMaxLifetimeInSeconds`.
+
+   Verified at `db/mark-code-used` and `issue/create-code`: nothing orders the insert against the
+   sweep, and the window is between two bounded statements rather than the unbounded handler stall the
+   read-only check leaves, which is why decision 12 accepted it.
+
+   Out of scope here because closing it needs the same primitive #131 and #132 want, a portable way to
+   order a write against a sweep across SQLite, MySQL, PostgreSQL and SQL Server, and whichever of the
+   three lands first should establish it. #134 held the previous version of this residual and was
+   closed as moot when decision 4 moved the marker off a session-keyed registry, so nothing tracks it
+   now.
+
+   Searched `gh issue list --state open --search "serialization boundary sweep"` and the full open
+   list: #131 and #132 are the rotation residuals of #106 and #128, neither covers code issuance.
+
+   **Body:** #129 marks a terminated session's authorization codes revoked, and `/auth/issue` runs a
+   compensating `UPDATE ... WHERE NOT EXISTS (SELECT 1 FROM user_sessions ...)` immediately after
+   inserting a code, so a code created after the termination is marked even when the termination could
+   not see it. The remaining window is an insert committing after the termination's `UPDATE` has read
+   `codes` and before that transaction commits: the compensating statement still observes the session
+   as present, so the code carries no marker, and redeeming it yields an offline refresh token good
+   for up to the configured offline maximum lifetime. Closing it needs issuance ordered against the
+   revocation sweep, which is the same missing primitive as #131 and #132. Scope the three together.
+
+2. **Add to #109: the interactive logout path writes nothing to the database.**
+   `bug`, `go`, `security`. Found on the reconciliation pass of 2026-08-04. Status: **Drafted**
+
+   A comment on #109 rather than a new issue, because #109 already owns the RP-initiated logout
+   surface and its divergence B is this same asymmetry on the neighbouring path. Filing separately
+   would split one design question across two issues.
+
+   Verified at `logout/basic-post-fork`: `HandleAccountLogoutPost` takes the no-hint branch, clears
+   the cookie, audits `AuditLogout`, redirects, and never calls `handleExistingSessionOnLogout`.
+   `logout_consent.html` posts back with only a csrf field, so this is the path every interactive
+   logout takes. Decision 13 records why #129 leaves it alone.
+
+   **Body:** Divergence B notes that the cookie is wiped unconditionally while the database teardown
+   is per-client. There is a path where the teardown does not happen at all. `POST /auth/logout`
+   without an `id_token_hint` clears the cookie session, writes an `AuditLogout` entry, redirects, and
+   never touches `user_sessions`. Since `logout_consent.html` posts back carrying only a csrf field,
+   that is the path taken by every logout a person performs in a browser, and by the admin console's
+   account menu.
+
+   The row therefore survives with every client still attached. Session-bound refresh tokens keep
+   working, access tokens keep passing `RequireValidSession`, and the row is orphaned from the browser
+   because the cookie no longer carries the session identifier. The user still sees it listed as an
+   active session on that device and can only end it with the "End session" button. Whatever B decides
+   about per-client versus whole-session teardown, this path should reach the same code as the
+   `id_token_hint` path rather than bypassing it.
