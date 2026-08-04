@@ -242,6 +242,32 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	if _, err := database.MarkCodeAsUsed(nil, 0); err == nil {
 		t.Errorf("MarkCodeAsUsed with id 0 must return an error")
 	}
+
+	// A revoked code is not claimable even though it was never used. That is the
+	// second term of the predicate, and it is what makes ending a session durable
+	// against a redemption that validated a moment before the termination (#129).
+	// Keep BOTH this case and the already-used one above: either alone still passes
+	// with the other term deleted from the predicate.
+	revoked := createTestCode(t, client.Id, user.Id)
+	if _, err := database.RevokeCodesBySessionIdentifier(nil, revoked.SessionIdentifier); err != nil {
+		t.Fatalf("failed to revoke the code's session: %v", err)
+	}
+	claimed, err = database.MarkCodeAsUsed(nil, revoked.Id)
+	if err != nil {
+		t.Fatalf("MarkCodeAsUsed for a revoked code returned error: %v", err)
+	}
+	if claimed {
+		t.Errorf("MarkCodeAsUsed must not claim a revoked code, got claimed=true")
+	}
+
+	// And it stays unused, so nothing downstream can read it as redeemed.
+	unclaimed, err := database.GetCodeById(nil, revoked.Id)
+	if err != nil {
+		t.Fatalf("failed to reload the revoked code: %v", err)
+	}
+	if unclaimed.Used {
+		t.Errorf("a revoked code must remain unused after a failed claim")
+	}
 }
 
 func TestGetCodeById(t *testing.T) {
@@ -727,6 +753,172 @@ func TestUpdateCode_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	if after.AuthStateGeneration != 7 {
 		t.Errorf("UpdateCode regressed auth_state_generation to %d, want 7 (is the dont-update tag missing?)",
 			after.AuthStateGeneration)
+	}
+	if !after.Used {
+		t.Error("the rest of the update must still apply, Used = false")
+	}
+}
+
+// createTestCodeInSession creates a code bound to a specific session identifier,
+// which the session-scoped revocation sweep is keyed on. createTestCode randomises
+// the identifier, so a caller needing two codes on ONE session cannot use it.
+func createTestCodeInSession(t *testing.T, clientId, userId int64, sessionIdentifier string) *models.Code {
+	t.Helper()
+	code := createTestCode(t, clientId, userId)
+	code.SessionIdentifier = sessionIdentifier
+	if err := database.UpdateCode(nil, code); err != nil {
+		t.Fatalf("Failed to bind test code to session %q: %v", sessionIdentifier, err)
+	}
+	return code
+}
+
+// assertCodeRevoked reloads a code and checks the marker, since the whole point of
+// the column is what a later read of it says.
+func assertCodeRevoked(t *testing.T, codeId int64, want bool, what string) {
+	t.Helper()
+	code, err := database.GetCodeById(nil, codeId)
+	if err != nil {
+		t.Fatalf("Failed to reload code %d: %v", codeId, err)
+	}
+	if code == nil {
+		t.Fatalf("Code %d disappeared", codeId)
+	}
+	if code.Revoked != want {
+		t.Errorf("%s: Revoked = %v, want %v", what, code.Revoked, want)
+	}
+}
+
+// TestRevokeCodesBySessionIdentifier covers the marker that makes ending a session
+// durable (#129): every code of the terminated session is marked, and nothing else is.
+func TestRevokeCodesBySessionIdentifier(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+
+	sessionA := "revoke_a_" + gofakeit.LetterN(8)
+	sessionB := "revoke_b_" + gofakeit.LetterN(8)
+
+	first := createTestCodeInSession(t, client.Id, user.Id, sessionA)
+	second := createTestCodeInSession(t, client.Id, user.Id, sessionA)
+	unrelated := createTestCodeInSession(t, client.Id, user.Id, sessionB)
+
+	// Every code of the target session transitions, and the count says how many. The
+	// count is what the audit event reports, so it is part of the contract.
+	count, err := database.RevokeCodesBySessionIdentifier(nil, sessionA)
+	if err != nil {
+		t.Fatalf("RevokeCodesBySessionIdentifier returned error: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("expected 2 codes revoked, got %d", count)
+	}
+	assertCodeRevoked(t, first.Id, true, "a code of the terminated session")
+	assertCodeRevoked(t, second.Id, true, "the second code of the terminated session")
+
+	// The negative control. Without it this test passes against a method that revokes
+	// every code in the table, which is the failure that matters most here: it would
+	// sign out every other device belonging to every user.
+	assertCodeRevoked(t, unrelated.Id, false, "a code of an unrelated session")
+
+	// Idempotent, and the count reports rows actually transitioned rather than rows
+	// matched. MySQL reports changed rows, so without `revoked = false` in the
+	// predicate the updated_at assignment alone would make this return 2 there and 0
+	// on the other three engines.
+	count, err = database.RevokeCodesBySessionIdentifier(nil, sessionA)
+	if err != nil {
+		t.Fatalf("second RevokeCodesBySessionIdentifier returned error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("re-revoking an already revoked session must report 0 rows, got %d", count)
+	}
+	assertCodeRevoked(t, first.Id, true, "a code after its session was revoked twice")
+
+	// An unknown session identifier is not an error, it simply matches nothing.
+	count, err = database.RevokeCodesBySessionIdentifier(nil, "revoke_missing_"+gofakeit.LetterN(8))
+	if err != nil {
+		t.Fatalf("RevokeCodesBySessionIdentifier for an unknown session returned error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("an unknown session identifier must report 0 rows, got %d", count)
+	}
+
+	// An empty identifier is rejected outright rather than used as a filter. Every
+	// user_sessions row carries a UUID, so an empty value means a caller bug, and
+	// matching on it would sweep codes that belong to no session under termination.
+	if _, err := database.RevokeCodesBySessionIdentifier(nil, ""); err == nil {
+		t.Error("an empty session identifier must return an error")
+	}
+	assertCodeRevoked(t, unrelated.Id, false,
+		"a code of an unrelated session after the empty-identifier call")
+}
+
+// TestRevokeCodesBySessionIdentifier_TransactionAndFailurePath answers the two
+// questions a mock can never answer about a new data method: does it enlist in the
+// caller's transaction rather than writing through the pool, and does its failure
+// path return an error rather than a benign zero. Both matter here because the
+// termination helper performs three writes in one transaction, and a method that
+// collapsed a database fault into (0, nil) would let the caller audit a revocation
+// that never happened.
+func TestRevokeCodesBySessionIdentifier_TransactionAndFailurePath(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+	session := "revoke_tx_" + gofakeit.LetterN(8)
+	code := createTestCodeInSession(t, client.Id, user.Id, session)
+
+	tx := beginTx(t)
+	count, err := database.RevokeCodesBySessionIdentifier(tx, session)
+	if err != nil {
+		t.Fatalf("RevokeCodesBySessionIdentifier in a transaction returned error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 code revoked inside the transaction, got %d", count)
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+
+	// Had the statement gone through the pool instead of the transaction it would have
+	// survived the rollback, and a termination whose later steps failed would leave the
+	// grant marked while the session stayed alive.
+	assertCodeRevoked(t, code.Id, false, "a code revoked inside a rolled-back transaction")
+
+	// The failure path, forced by the same finished transaction.
+	count, err = database.RevokeCodesBySessionIdentifier(tx, session)
+	if err == nil {
+		t.Error("a statement that cannot run must return an error, not a benign zero count")
+	}
+	if count != 0 {
+		t.Errorf("a failed call must report 0 rows, got %d", count)
+	}
+}
+
+// TestUpdateCode_DoesNotClobberRevoked pins the dont-update tag on Code.Revoked
+// (#129 decision 4). Nothing else in the suite fails if the tag is removed: the
+// termination sweep writes the column with its own statement, while UpdateCode writes
+// every untagged column from whatever the caller happens to hold, so a Code loaded
+// before the termination would write revoked = false back and hand the grant to its
+// holder again.
+func TestUpdateCode_DoesNotClobberRevoked(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+	code := createTestCode(t, client.Id, user.Id)
+
+	if _, err := database.RevokeCodesBySessionIdentifier(nil, code.SessionIdentifier); err != nil {
+		t.Fatalf("Failed to revoke the code's session: %v", err)
+	}
+
+	// The in-memory copy still reads Revoked = false, exactly as a handler that loaded
+	// the code before the termination would.
+	code.Used = true
+	if err := database.UpdateCode(nil, code); err != nil {
+		t.Fatalf("Failed to update code: %v", err)
+	}
+
+	after, err := database.GetCodeById(nil, code.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload updated code: %v", err)
+	}
+	if !after.Revoked {
+		t.Error("UpdateCode regressed revoked to false (is the dont-update tag missing?)")
 	}
 	if !after.Used {
 		t.Error("the rest of the update must still apply, Used = false")

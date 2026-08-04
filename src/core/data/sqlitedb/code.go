@@ -19,6 +19,10 @@ func (d *SQLiteDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) 
 	return d.CommonDB.MarkCodeAsUsed(tx, codeId)
 }
 
+func (d *SQLiteDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error) {
+	return d.CommonDB.RevokeCodesBySessionIdentifier(tx, sessionIdentifier)
+}
+
 func (d *SQLiteDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
 	return d.CommonDB.GetCodeById(tx, codeId)
 }

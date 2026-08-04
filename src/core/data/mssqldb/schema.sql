@@ -66,6 +66,7 @@ CREATE TABLE [codes] (
     [acr_level] NVARCHAR(128) NOT NULL,
     [auth_methods] NVARCHAR(64) NOT NULL,
     [used] BIT NOT NULL,
+    [revoked] BIT NOT NULL CONSTRAINT [df_codes_revoked] DEFAULT 0,
     [auth_state_generation] BIGINT NOT NULL CONSTRAINT [df_codes_auth_state_generation] DEFAULT 0,
     CONSTRAINT [PK_codes] PRIMARY KEY ([id])
 );

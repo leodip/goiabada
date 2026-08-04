@@ -136,6 +136,7 @@ CREATE TABLE public.codes (
     acr_level character varying(128) NOT NULL,
     auth_methods character varying(64) NOT NULL,
     used boolean NOT NULL,
+    revoked boolean DEFAULT false NOT NULL,
     auth_state_generation bigint DEFAULT 0 NOT NULL
 );
 

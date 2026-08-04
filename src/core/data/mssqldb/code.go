@@ -75,6 +75,10 @@ func (d *MsSQLDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) {
 	return d.CommonDB.MarkCodeAsUsed(tx, codeId)
 }
 
+func (d *MsSQLDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error) {
+	return d.CommonDB.RevokeCodesBySessionIdentifier(tx, sessionIdentifier)
+}
+
 func (d *MsSQLDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
 	return d.CommonDB.GetCodeById(tx, codeId)
 }
