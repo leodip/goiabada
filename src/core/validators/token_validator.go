@@ -262,6 +262,26 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			}
 		}
 
+		// The termination boundary (#129 decision 4). Ending a session marks every code
+		// that session authorized, so a code marked here belongs to a grant that was
+		// explicitly cut off.
+		//
+		// Deliberately NOT up in the !wasReused block with the user-enabled, generation
+		// and expiry checks, even though it reads like one of them. That block runs before
+		// client authentication and before PKCE, so a presenter holding a stolen code
+		// learns from it whether the account's state moved without proving anything, which
+		// is the disclosure #137 exists to close. Adding a new member to that class would
+		// be going backwards.
+		//
+		// It also sits AFTER the wasReused return above, so #77's containment cascade is
+		// not pre-empted. Reuse is the stronger signal and already revokes everything a
+		// revoked-code rejection would have refused, and the reuse error carries the code
+		// entity that drives revokeAndAuditAuthCodeReuse.
+		if codeEntity.Revoked {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				"Code is invalid.", http.StatusBadRequest)
+		}
+
 		return &ValidateTokenRequestResult{
 			CodeEntity: codeEntity,
 		}, nil
@@ -503,6 +523,31 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
 		}
 
+		// One message for both ways a grant's session can stop backing it, so the two
+		// cannot drift into two spellings of one fact. Declared here rather than inside the
+		// Refresh branch because the revoked check below needs it too.
+		const invalidTokenMessage = "The refresh token is invalid because the associated session has expired or been terminated."
+
+		// The termination boundary (#129 decision 4), the half that closes gap 2 for free.
+		// A rotated child inherits its parent's code_id, so a marked code rejects every
+		// descendant of that grant, including one inserted after the termination committed:
+		// the child is born already rejected rather than caught by a sweep.
+		//
+		// This is what reaches an OFFLINE token, which the typ switch below never can. Its
+		// Offline branch checks only the max lifetime and deliberately does not consult the
+		// session, because a session merely expiring must leave an offline grant working
+		// (decision 2). Termination has to be a positive fact for exactly that reason.
+		//
+		// ROPC is excluded because it has no grant origin to terminate: code_id is NULL,
+		// there is no session, and refreshToken.Code is the zero value on that path.
+		//
+		// Placed after the ownership check above so an unauthenticated presenter of someone
+		// else's token cannot learn from it that a session was ended (decision 7).
+		if !isROPCToken && refreshToken.Code.Revoked {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				invalidTokenMessage, http.StatusBadRequest)
+		}
+
 		refreshTokenType := refreshTokenInfo.GetStringClaim("typ")
 		switch refreshTokenType {
 		case "Refresh":
@@ -513,7 +558,6 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			if err != nil {
 				return nil, err
 			}
-			const invalidTokenMessage = "The refresh token is invalid because the associated session has expired or been terminated."
 			if userSession == nil {
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
 					http.StatusBadRequest)
