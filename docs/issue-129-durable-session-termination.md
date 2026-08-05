@@ -132,6 +132,9 @@ log can cite it the same way. Nothing above the line changed.
 | `issue/prompt-none-refusal` | `src/authserver/internal/handlers/handler_auth_issue.go` | `HandleIssueGet` | `if authContext.HasPromptValue("none") {` | stage 6, decision 16 option A's branch, inside `issue/liveness-restart` |
 | `test/prompt-none-login-required` | `src/authserver/tests/integration/session_deletion_test.go` | `TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired` | `"prompt=none must not be restarted into the interactive flow")` | stage 6, decision 16's integration case, the fourth ceremony in the file |
 | `middleware/session-identifier` | `src/authserver/internal/middleware/middleware_session_identifier.go` | `MiddlewareSessionIdentifier` | `ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)` | **pre-existing code, not written by the run.** The row exists because stage 6 and decision 16 cite this label three times each and it was declared nowhere, so the citations resolved to nothing. The locator is the only line that puts the identifier in the request context, which is the fact both cite |
+| `issue/prompt-none-clear-first` | `src/authserver/internal/handlers/handler_auth_issue.go` | `HandleIssueGet` | `err := authHelper.ClearAuthContext(w, r)` | stage 6 round 2, the clear ahead of the client response. The `:=` is what makes this line unique in the function; the other two clears assign to an existing `err` |
+| `test/prompt-none-clear-committed` | `src/authserver/internal/handlers/handler_auth_issue_test.go` | `TestHandleIssueGet` | `assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),` | stage 6 round 2, the unit row that reads the committed response rather than the live header map |
+| `test/prompt-none-context-cleared` | `src/authserver/tests/integration/session_deletion_test.go` | `TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired` | `"the refusal must clear the auth context in the browser, so a replayed /auth/issue has no ceremony left")` | stage 6 round 2, the replayed `/auth/issue` that observes the clear through a real cookie jar |
 
 Counts in this document carry their command:
 
@@ -2230,11 +2233,21 @@ what proves it: every existing ceremony in the suite goes through this handler.
    missing). A ceremony carrying `prompt=none` cannot be restarted, because `/auth/level1` leads to
    `/auth/pwd` and that request forbids UI; nothing between the two reads the prompt, so it would be
    handed a login page and no error at all. `issue/prompt-none-refusal` sits first inside the refusal
-   and returns `login_required` through `redirToClientWithError`, then `ClearAuthContext`, copying the
-   `id_token_hint` branch above it. The description is `handlePromptNone`'s own wording for this
+   and clears the auth context at `issue/prompt-none-clear-first`, then returns `login_required`
+   through `redirToClientWithError`. The description is `handlePromptNone`'s own wording for this
    condition, "User authentication is required", so the client cannot tell this from the ordinary
    no-session refusal one hop earlier. Every other ceremony still restarts level 1, which is decision
    6 unchanged.
+
+   **The order of those two calls is the fix round 2 found**, and it is not cosmetic.
+   `ClearAuthContext` persists the deletion only through a `Set-Cookie` on `w`, and
+   `redirToClientWithError` commits the response in every response mode, so clearing afterwards leaves
+   the header on a response already written and the browser keeps a context reading
+   `ready_to_issue_code`. The clear therefore goes first, which is also the order the success path at
+   the foot of the same function already used. Failing the clear is a 500 rather than a refusal the
+   browser cannot record. The `id_token_hint` branch a few lines above still has the two calls the
+   other way round; that is pre-existing, is a different condition, and is drafted as follow-up 4
+   rather than fixed here.
 3. **The compensating revoke, immediately after the insert.** Status: **Done**
    Decision 12. `RevokeCodeIfSessionGone(nil, code.Id, sessionIdentifier)` directly after
    `issue/create-code`'s error check, ahead of the `AuditCreatedAuthCode` entry. On a database error,
@@ -2272,6 +2285,7 @@ what proves it: every existing ceremony in the suite goes through this handler.
    | no session identifier in the request context | 302 to `/auth/level1`, saved context reading `requires_level_1`, and no code created | the liveness check on the shape the middleware actually produces. "No code created" is enforced rather than asserted: the strict `mocks_oauth.CodeIssuer` carries no `CreateAuthCode` expectation |
    | a sid resolving to no session row | the same | the other half of the same predicate, for the narrow race where the middleware saw the session live |
    | the same empty identifier, with `prompt=none` on the context | 302 to the client's redirect URI carrying `error=login_required` and the request's `state`, no `code`, no `/auth/level1`, and `SaveAuthContext` never called | decision 16 option A. The two rows above are its negative control, since they carry no prompt and must still restart; a branch applied unconditionally reddens both, which is mutation 8 |
+   | the same row, reading the **committed** response's `Set-Cookie` | the sentinel the `ClearAuthContext` stub writes is present | added in round 2 at `test/prompt-none-clear-committed`. That the mock was called says nothing about whether the clear reaches the browser, because a header set after the redirect writes the status line is dropped; `rr.Result()` is the only view that can tell the two orderings apart, since `rr.Header()` shows the sentinel either way. Mutation 9 |
    | the session lookup fails | 500, no code created | a database fault must not read as a terminated session, and must not read as a live one either |
    | a live session | code issued as before, and `RevokeCodeIfSessionGone` called with that code's id and that sid | decision 12's statement is issued. Whether it **works** is seam 4's, per section 5 |
    | the compensating revoke fails | 500, and the client is not redirected with a code | the fail-closed direction of step 3 |
@@ -2310,6 +2324,7 @@ what proves it: every existing ceremony in the suite goes through this handler.
    |---|---|---|
    | session ended on the consent screen, then consent submitted | `/auth/consent` posts to `/auth/issue` as always, and `/auth/issue` redirects to `/auth/level1` and then `/auth/pwd`, with no code reaching the client and no session recreated | gap 3's second half at the highest seam that can see it. The consent POST succeeding first is deliberate: it is what makes `/auth/issue` the load-bearing hop rather than an incidental one |
    | session ended between `handlePromptNone`'s 302 and the browser following it | back to the client's redirect URI with `error=login_required` and the request's `state`, no `code`, nothing on `/auth/level1`, and no session recreated | decision 16, added after round 1. Same window through the other door, and the outcome is the one thing that differs, so it sits beside the consent-screen case rather than replacing it. `createSessionWithAcrLevel1` supplies the live session, and the termination goes between `assertRedirect` and `loadPage`, which is the whole window a silent ceremony has |
+   | the same `/auth/issue` requested a second time on the same jar | 302 to the account profile, and not to the client again | added in round 2 at `test/prompt-none-context-cleared`. The clear reaches this jar only if it ran before the redirect was committed, so the wrong order answers `login_required` twice from a context still reading `ready_to_issue_code`. Measured under mutation 9, which is exactly what it printed |
    | `test/fresh-ceremony-after-delete` and `test/otp-alone-no-recreate` | unchanged and green | the pair decision 6 rests on. This stage's check is the one that could redden the first: a code flow whose session vanished is exactly #46's shape one hop later |
 
    The ordinary ceremony is the control, and it is named rather than duplicated: `createOfflineGrant`
@@ -2323,11 +2338,13 @@ what proves it: every existing ceremony in the suite goes through this handler.
    load bearing at this gate rather than routine: this stage puts a new refusal in front of every
    authorization code the suite issues.
 
-**As built.** All eight steps landed. Ten anchor rows added to section 0, and no sealed row moved.
-Eight of the ten landed with the first pass; `issue/prompt-none-refusal` and
+**As built.** All eight steps landed. Thirteen anchor rows added to section 0, and no sealed row
+moved. Eight landed with the first pass; `issue/prompt-none-refusal` and
 `test/prompt-none-login-required` landed with decision 16's answer, which is also what put a second
-outcome in step 2 and a row in each of step 5's and step 7's tables. Five things worth naming beyond
-the steps.
+outcome in step 2 and a row in each of step 5's and step 7's tables; and
+`issue/prompt-none-clear-first`, `test/prompt-none-clear-committed` and
+`test/prompt-none-context-cleared` landed with round 2's fix, which put a second row in each of those
+same two tables. Six things worth naming beyond the steps.
 
 1. **The empty-sid finding is the stage, not a detail of it.** The sketch's predicate, "resolves to no
    session row", never fires on the path gap 3's second half actually takes, because
@@ -2356,6 +2373,14 @@ the steps.
    that, and the shape of the fix is worth keeping: the branch is keyed on the prompt rather than
    replacing the restart, so the interactive outcome decision 6 chose is untouched. Mutations 7 and 8
    in the run log are the two ways to get that wrong, and their failure sets are disjoint.
+6. **The refusal's two calls had to be in the other order, and no tier could see it until round 2
+   said so.** `ClearAuthContext` persists through a `Set-Cookie`, and every response mode of
+   `redirToClientWithError` commits the response, so the clear the branch promised never reached the
+   browser. The unit row asserted that the mock was called, which the wrong order satisfies, and the
+   integration ceremony stopped at the first error response, which the wrong order also satisfies.
+   Both were extended to observe the committed response rather than the call: `rr.Result()` at the
+   unit tier, and a replayed `/auth/issue` on the same cookie jar at the integration tier. Mutation 9
+   is the old order, and it fails exactly those two assertions and nothing else.
 
 ### Stage 7: reaping unused revoked codes
 Status: **Not started**
@@ -3347,6 +3372,98 @@ verdict no longer describes this tree. Stage 6 goes back through review for roun
 diff, as decision 15's answer did at stage 5, and the code commit follows that. This agreement is
 committed now, carrying decision 16 `Decided` and this entry.
 
+### Stage 6 round 2, 2026-08-05: the clear that reached nothing
+
+**The review.** `codex`, request `129-20260805T172848Z`, all three axes `reviewed`. It re-ran
+`TestHandleIssueGet` at the unit tier and `TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired` at
+the integration tier on all four engines, built `site` at 42 pages, ran `check-anchors.sh` at 74 rows,
+`git diff --check` and `gofmt -l`, and verified the diff hash afterwards. It also wrote a scratch
+reproduction against the real `CookieStore` and `AuthHelper`, which is what produced its finding.
+Not re-run, and stated by it: the untouched data method and the broad integration suite, which round
+1 had verified on the same code across all four engines.
+
+**Found sound, so a later round does not re-derive it.** Decision 16 option A's outcome selection:
+the branch is keyed on `authContext.HasPromptValue("none")` and the two interactive rows still restart
+level 1; the error code, description, redirect URI and state match `handlePromptNone`'s own no-session
+response; no code is minted on either outcome; a lookup error is still a 500 rather than a refusal;
+the shared description creates no new termination oracle; nothing new is logged or returned; mutations
+7 and 8 have complementary failure sets; and the documentation is accurate.
+
+**One finding, conformance, `significant`, `needs_human`. Confirmed against the code and fixed inside
+the stage.**
+
+> The branch writes the client response before `ClearAuthContext` saves the clearing cookie, so the
+> `Set-Cookie` never reaches the browser and it retains an auth context in `ready_to_issue_code`,
+> although decision 16 requires the cleanup.
+
+Verified rather than accepted, on three facts read from the source. `AuthHelper.ClearAuthContext`
+persists the deletion only through `sessionStore.Save(r, w, sess)`, which writes a header.
+`redirToClientWithError` commits the response in all three response modes, `http.Redirect` for query
+and fragment and `t.Execute(w, m)` for `form_post`. And Go snapshots the header map at the status
+line, in `net/http` and identically in `httptest.ResponseRecorder`, so a header set afterwards is
+dropped. The two tests could not see it: the unit row asserted that the mock was called, which the
+wrong order satisfies, and the integration ceremony stopped at the first error response, which the
+wrong order also satisfies.
+
+**Fixed rather than escalated, and the distinction from decision 16 is the point.** Decision 16 was a
+question decision 6 had already answered the other way, so overriding it was the user's call. This is
+not a question at all: it is decision 16's own answer failing to take effect, and the ordering is
+forced by the same function's success path, which has cleared before `issueAuthCode` since long
+before #129. `issue/prompt-none-clear-first` is the clear moved ahead of the response, with the 500
+on a failed clear now preceding any client response rather than following one.
+
+**Both tests were extended to observe the committed response rather than the call**, which is the
+seam the finding actually exposed. `test/prompt-none-clear-committed` gives the `ClearAuthContext`
+stub a `Run` that writes a sentinel `Set-Cookie` and asserts it survives into `rr.Result()`, the only
+view that distinguishes the orderings since `rr.Header()` shows it either way.
+`test/prompt-none-context-cleared` requests the same `/auth/issue` a second time on the same cookie
+jar and asserts the account profile rather than a second answer to the client.
+
+**Tiers, re-run in full on the fixed tree rather than narrowed to the change.** Modules green on all
+three modules. Data green on all four engines run separately, `TestRevokeCodeIfSessionGone` and its
+transaction sibling passing on each. Integration green on **all four engines**, 889 passing test lines
+per engine and zero `FAIL`, with all four `session_deletion_test.go` ceremonies passing once per
+engine. `check-anchors.sh` passes all **77** rows, three added for this fix. `gofmt -l` silent,
+`git diff --check` clean.
+
+**Mutation evidence, one more mutation, applied to the real code, run at two tiers, and reverted.**
+
+9. **The two calls swapped back**, which is the tree round 2 reviewed. At the unit tier exactly the
+   `prompt=none` row failed, on the committed `Set-Cookie` being empty, and no other row moved. At the
+   integration tier on sqlite exactly `TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired`
+   failed, and it failed by printing the finding: the replayed `/auth/issue` answered
+   `...?error=login_required&error_description=User+authentication+is+required&state=...` a second
+   time instead of the account profile. `TestSessionEndedOnConsentScreen_NoCodeIsIssued` and
+   `TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession` stayed green.
+
+**One follow-up, and it is the finding's real extent.** Chasing the ordering across the repository
+found the same inversion at **seven** pre-existing call sites, in `handler_authorize.go` twice
+(including `handlePromptNone`'s own `redirectWithError`, so every silent refusal), in
+`handler_auth_completed.go` twice, in `handler_consent.go` twice, and at `HandleIssueGet`'s
+`id_token_hint` mismatch. The success paths in the same files have it right, which is what makes it a
+copied idiom: #129's branch was written the wrong way round precisely by copying the `id_token_hint`
+one beside it. Drafted as follow-up 4 with all seven sites and the labels, and deliberately not fixed
+here: each site needs its own reachability analysis, and #129 is session termination rather than
+response-ordering hygiene. Stage 6's step 2 no longer claims to copy that branch.
+
+**Worth stating so a later round does not read it as an inconsistency.** After this fix, `/auth/issue`
+clears the context on its silent refusal and `handlePromptNone` does not clear it on the byte-identical
+refusal one hop earlier. Decision 16's indistinguishability claim is about what the **client** receives,
+which is unchanged; the difference is in the browser's cookie, and `/auth/issue` is the side that is
+correct. `handlePromptNone` is site 2 of follow-up 4.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its sixteen items, all
+`Decided`. Section 9 now has four follow-ups.
+
+**A third round, deliberately, and the reasoning is recorded because reviewer.md caps a gate at two.**
+That cap is on rounds of *disagreement*, and no finding at this gate has been contested: round 1's was
+accepted and became decision 16, round 2's was accepted and is fixed above. What the two rounds
+actually show is that this gate keeps finding real defects, both of them in the same branch and
+neither visible to the tiers as they stood. Committing on "the fix is obvious" after that, with no
+reviewer having seen the fix, is the failure mode an unattended run is most likely to reach. The wall
+clock is 24 of 240 minutes, so the round is affordable. If round 3 is clean the stage commits; if it
+finds something, that is the answer to whether the cap should have applied.
+
 ---
 
 ## 8. Deferred decisions
@@ -3364,9 +3481,10 @@ absent section reads the same as a forgotten one.
 
 ## 9. Follow-ups
 
-The first two were found while grounding, the third while building stage 5. All three are verified
-against code, all three are outside this change under section 2, and none is a way to avoid work #129
-owes. The run appends here as it finds more, and never files anything.
+The first two were found while grounding, the third while building stage 5, and the fourth at stage
+6's second review round. All four are verified against code, all four are outside this change under
+section 2, and none is a way to avoid work #129 owes. The run appends here as it finds more, and
+never files anything.
 
 1. **A code insert can still land between a termination's `UPDATE` and its `COMMIT`.**
    `bug`, `security`, `go`. Found while settling decision 12. Status: **Drafted**
@@ -3481,3 +3599,66 @@ owes. The run appends here as it finds more, and never files anything.
    and the new session records `pwd otp`. Clearing the inherited methods when the ceremony no longer
    has the session it inherited them from looks like the fix, but it is a claim-semantics change and
    wants its own decision.
+
+4. **Every error response to a client clears the auth context after the response is already
+   committed, so the clear reaches nothing.**
+   `bug`, `security`, `go`. Found at stage 6 round 2. Status: **Drafted**
+
+   `ClearAuthContext` persists the deletion only by writing a `Set-Cookie` through
+   `sessionStore.Save(r, w, sess)`. `redirToClientWithError` commits the response in all three
+   response modes, `http.Redirect` for query and fragment and `t.Execute(w, m)` for `form_post`, and
+   Go snapshots the header map when the status line is written. Every call site orders the two the
+   wrong way round, so the browser keeps the auth context the code believes it deleted.
+
+   **Seven sites, each read rather than inferred**, all of the shape `redirToClientWithError(...)`
+   then `authHelper.ClearAuthContext(w, r)`:
+
+   - `handler_authorize.go`, `HandleAuthorizeGet`'s local `redirToClientWithError` closure, which
+     every request-validation failure goes through.
+   - `handler_authorize.go`, `handlePromptNone`'s `redirectWithError` closure, which every silent
+     refusal goes through, `login_required` included.
+   - `handler_auth_completed.go`, the disabled-user refusal, and the no-authorized-scopes refusal.
+   - `handler_consent.go`, both consent-denied refusals.
+   - `handler_auth_issue.go`, the `id_token_hint` subject mismatch.
+
+   The success paths have it right, which is what makes this look like an idiom rather than a
+   decision: `HandleIssueGet` clears before `issueAuthCode`, and `handleImplicitFlow` clears before
+   `issueImplicitTokens`. #129's own `issue/prompt-none-clear-first` was written the wrong way round
+   for exactly that reason, by copying the `id_token_hint` branch beside it, and its fix is the
+   evidence this behaves as described: with the calls reversed, a replayed `/auth/issue` on the same
+   cookie jar answered the client `login_required` a second time from a context still reading
+   `ready_to_issue_code`, and reversing them back sent it to the account profile instead. That is
+   `test/prompt-none-context-cleared` under mutation 9 in section 7.
+
+   **No bypass is claimed, and each site needs its own analysis**, which is the reason this is one
+   issue rather than seven and is out of scope here under section 2. What is demonstrable is that a
+   defensive cleanup silently does nothing everywhere it is written, and that one of the seven leaves
+   a context in `ready_to_issue_code`, the state that mints codes, with nothing but the re-run of the
+   same checks between it and a replay.
+
+   Searched `gh issue list --state open --search "id_token_hint"`,
+   `--search "ClearAuthContext cookie"` and the full open list of 33: nothing covers it. #109 and
+   #133 are the nearest neighbours and are both about session binding rather than response ordering.
+
+   **Body:** `AuthHelper.ClearAuthContext` deletes the auth context from the cookie session and
+   persists that deletion through `sessionStore.Save(r, w, sess)`, which writes a `Set-Cookie`
+   header. Seven handlers call it immediately *after* `redirToClientWithError`, which has already
+   committed the response: `http.Redirect` for the query and fragment response modes, and
+   `t.Execute(w, m)` for `form_post`. Go snapshots the header map when the status line is written, so
+   the `Set-Cookie` is dropped and the browser keeps the auth context.
+
+   The sites are `HandleAuthorizeGet`'s validation-error closure and `handlePromptNone`'s
+   `redirectWithError` closure in `handler_authorize.go`; the disabled-user and no-authorized-scopes
+   refusals in `handler_auth_completed.go`; both consent-denied refusals in `handler_consent.go`; and
+   the `id_token_hint` subject mismatch in `HandleIssueGet`. The success paths in the same files do it
+   in the right order, clearing before writing the response, so this reads as a copied idiom rather
+   than an intended difference.
+
+   No bypass is claimed for any single site: replaying a retained ceremony re-runs the same checks.
+   The defect is that a cleanup written seven times never happens, and that the `id_token_hint` site
+   leaves the browser holding a context in `ready_to_issue_code`. The fix is to clear before writing
+   the response at each site, returning a 500 if the clear fails rather than committing a client
+   response that cannot be recorded. A mock expectation cannot catch a regression here, since it
+   proves only that the method was called; the assertion has to read the committed response, either
+   `httptest.ResponseRecorder.Result()` at the unit tier or a second request on the same cookie jar at
+   the integration tier.
