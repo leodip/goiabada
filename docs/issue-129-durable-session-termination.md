@@ -3197,8 +3197,15 @@ within decisions.md's "one or two on a hard change is normal" and is worth the n
 decision 6 carried two questions its own text could not answer, and both were found by a reviewer
 reading the built code rather than by the interview.
 
-**State at the halt.** Stage 6's thirteen-file diff is complete, green on every tier it claims, and
-**uncommitted**, exactly as stage 5 waited on decision 15. Nothing that rests on decision 16 is
+**State at the halt.** Stage 6's **twelve**-file diff is complete, green on every tier it claims, and
+**uncommitted**, exactly as stage 5 waited on decision 15. Twelve rather than the thirteen this
+paragraph first claimed, which counted this document alongside the stage tree; `git status` is
+`code.go` on the four engines plus `commondb/code.go`, `database.go` and `mocks/database_mock.go`,
+then `handler_auth_issue.go`, `handler_auth_issue_test.go`, `code_test.go`,
+`session_deletion_test.go` and `concepts/user-sessions.mdx`. Corrected rather than absorbed because a
+count that disagrees with the tree reads as a lost file to whoever resumes, and it cost one
+verification detour before it was. Same class as the request miscount recorded at stage 5 round 2.
+Nothing that rests on decision 16 is
 committed. This agreement is committed, carrying decision 16 `Open` and this entry, because the next
 session reads the agreement rather than the transcript. One bookkeeping fix rode along: the
 `middleware/session-identifier` label was cited three times by the stage 6 text and declared in no
