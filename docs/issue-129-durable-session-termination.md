@@ -5,7 +5,14 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** stages 1 to 6 committed, 2026-08-05. Section 3 has zero `Open` items. Stage 6 cost two
+**Run state:** stages 1 to 7 committed, 2026-08-05. **Stage 7 closed on a clean round 1**: one predicate
+extension so codes revoked while still unredeemed do not accumulate (decision 8), green on the modules
+tier and on the data tier across all four engines, with five mutations measured. Its expansion found
+that where the `NOT IN` subquery sits decides whether the whole extension works at all under #130, and
+that `fk_refresh_tokens_code` is `ON DELETE CASCADE`, which is what the keep-this retention row really
+guards. The review re-derived the built SQL on all four flavors and traced every production writer of
+`used` and of `code_id` to show the new branch cannot reach a code with a live descendant, and this
+session re-derived the SQL again before committing. Section 3 has zero `Open` items. Stage 6 cost two
 escalations and three review rounds, and all three are recorded in section 7. Its round 1 raised
 decision 16, answered by the user on PR #138 with option A: a `prompt=none` ceremony whose session ends
 in the redirect hop is returned `login_required` rather than being restarted into a password form it is
@@ -15,7 +22,7 @@ the fix plus two assertions that can observe a committed response landed inside 
 clean. Expanding the stage also found that the terminated ceremony reaches `/auth/issue` with an
 **empty** session identifier rather than a dead one, because the session middleware clears it first,
 and that an empty identifier alone makes the resulting grant offline; the stage entry in section 6
-carries the reasoning. Next: stages 7 and 8, both still sketches.
+carries the reasoning. Next: stage 8, gap 2's evidence, still a sketch and the last stage.
 **PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
@@ -134,6 +141,9 @@ log can cite it the same way. Nothing above the line changed.
 | `issue/prompt-none-clear-first` | `src/authserver/internal/handlers/handler_auth_issue.go` | `HandleIssueGet` | `err := authHelper.ClearAuthContext(w, r)` | stage 6 round 2, the clear ahead of the client response. The `:=` is what makes this line unique in the function; the other two clears assign to an existing `err` |
 | `test/prompt-none-clear-committed` | `src/authserver/internal/handlers/handler_auth_issue_test.go` | `TestHandleIssueGet` | `assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),` | stage 6 round 2, the unit row that reads the committed response rather than the live header map |
 | `test/prompt-none-context-cleared` | `src/authserver/tests/integration/session_deletion_test.go` | `TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired` | `"the refusal must clear the auth context in the browser, so a replayed /auth/issue has no ceremony left")` | stage 6 round 2, the replayed `/auth/issue` that observes the clear through a real cookie jar |
+| `db/reap-revoked-unused` | `src/core/data/commondb/code.go` | `DeleteUsedCodesWithoutRefreshTokens` | `deleteBuilder.Equal("revoked", true),` | stage 7, decision 8's second branch. `db/delete-used-codes` above still resolves, to the first branch's `used = true` term, which the extension leaves in place |
+| `test/reap-revoked-unused` | `src/authserver/tests/data/code_test.go` | `TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnused` | `must outlive it, and deleting the code would cascade the descendant away` | stage 7, seam 3's keep-this row, the only case in the suite that fails when the `used = false` term is dropped |
+| `test/reap-ropc-null-code-id` | `src/authserver/tests/data/code_test.go` | `TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnusedWithRopcTokenPresent` | `a refresh token with a NULL code_id exists` | stage 7, the row that fails if the `NOT IN` subquery is hoisted out of the used branch, which is the mutation that ships the whole extension inert |
 
 Counts in this document carry their command:
 
@@ -2382,17 +2392,23 @@ same two tables. Six things worth naming beyond the steps.
    is the old order, and it fails exactly those two assertions and nothing else.
 
 ### Stage 7: reaping unused revoked codes
-Status: **Not started**
-Detail: **sketch**
-
-Decision 8's one predicate extension, so a code revoked while still unredeemed does not accumulate
-forever: `revoked = true AND used = false AND created_at < cutoff`, which is safe with a short cutoff
-because an unused code has no refresh tokens by definition and is unredeemable after 60 seconds
-anyway. Seam 3, whose load-bearing row is the **retention** one: a revoked code with a live refresh
-token must survive, because decision 8's whole safety argument is that the marker outlives its
-descendants, and that row's value is invisible once the design is right. Tier: data, four engines.
-Docs: to confirm at expansion; the sweep of section 2 found no page describing the reapers, and
-`concepts/audit-log.mdx` points at `constants.go` rather than enumerating events.
+Status: **Done**
+Seams: 3, extending `TestDeleteUsedCodesWithoutRefreshTokens`'s neighbourhood in `code_test.go` rather
+than adding a sibling file, which is where seam 3's method already has two tests.
+Tiers: data (four engines) and unit (three modules). Data is the tier that owns this stage: the change
+is one SQL predicate and nothing above the data layer moves. The unit run is a regression run rather
+than new coverage, and step 5 says why nothing new belongs there. Integration not applicable: no
+endpoint changes, and the rows this reaps are invisible from any endpoint by the time it reaps them.
+Docs: **none, and this is verified rather than assumed.** Two searches. `grep -rin
+'cleanup\|reap\|housekeep\|background worker\|purge' site/src/content/docs/` finds four pages that
+describe background cleanup, and all four are about something else: `concepts/tokens.mdx` on refresh
+token growth, `concepts/audit-log.mdx` and `integration/rest-api.mdx` on audit retention, and
+`oauth2-flows/client-credentials.mdx` on daemons. No page describes the `codes` table, its growth or
+its reaper, so none is falsified. And nothing a client can observe changes: a code this branch reaps
+is already unredeemable, both because `db/mark-code-used` refuses a revoked row and because the code
+expired 60 seconds after it was issued, and `ValidateTokenRequest` answers a code it cannot find with
+the same `invalid_grant`, "Code is invalid." that it answers a revoked one with. The row's absence is
+therefore indistinguishable from its presence at every seam a user reaches.
 
 **Extend `DeleteUsedCodesWithoutRefreshTokens` itself. No second method and no second worker call.**
 The first draft of this sketch offered the choice, which reopened something the seal had settled:
@@ -2401,6 +2417,123 @@ would add an unconfirmed data seam plus an interface method, four wrappers, rege
 own wiring in `worker/perform-task`. The method keeps its name, and its doc comment states the widened
 contract, since renaming it would touch the interface, four wrappers, the mocks and the call site for
 no behavioural gain.
+
+**One statement, not two, and the `created_at` term is what decides it.** Both branches are bounded by
+the same cutoff, so one statement states the cutoff once and two statements state it twice, which is
+where the two drift apart when somebody later changes what the cutoff means. It also keeps the method's
+single error path single, which is the path seam 3 does not re-cover because this is not a new method.
+The shape, verified as building correctly on all four flavors before being written here:
+
+```sql
+DELETE FROM codes WHERE created_at < ?
+  AND ((used = true AND id NOT IN (SELECT code_id FROM refresh_tokens))
+       OR (revoked = true AND used = false))
+```
+
+**Where the `NOT IN` sits is load bearing, and it is the one thing in this stage that can ship inert.**
+`x NOT IN (…, NULL)` is UNKNOWN rather than TRUE, and ROPC refresh tokens carry `code_id = NULL`, which
+is #130. So the existing branch already matches nothing once any ROPC token exists, which decision 8's
+note records and section 2 leaves to #130. Keeping the subquery **inside** the used branch is what stops
+that spreading: `UNKNOWN OR TRUE` is TRUE, so the new branch reaps regardless. Hoisting the `NOT IN`
+beside the cutoff, which reads as the tidier factoring, would make the whole predicate UNKNOWN and the
+extension would do nothing at all on any deployment that has ever issued a ROPC token, silently. Step
+4's ROPC row is what fails if that happens.
+
+**The new branch carries no refresh-token term, and `used = false` is what stands in for one.** An
+unused code has no refresh tokens by definition, because `db/mark-code-used` is the gate every
+redemption passes before a token is inserted, and after stage 1 it refuses a revoked row outright. So
+the term decision 8 words is sufficient. It is also the term the retention argument rests on, and its
+consequence is sharper than it looks: `fk_refresh_tokens_code` is `ON DELETE CASCADE`, so a branch that
+reached a used code with a live refresh token would not merely delete the marker, it would delete the
+descendant the marker exists to reject. That is why step 4's keep-this row asserts the survival of the
+code **and** names the cascade.
+
+1. **The predicate extension, at `db/delete-used-codes` and `db/reap-revoked-unused`.**
+   Status: **Done**
+   One statement in the shape above, built with `Or` over two `And` groups so the subquery stays inside
+   the used branch. The doc comment gains three things a later reader needs: that the method now reaps
+   two disjoint classes and why they share one cutoff, that the subquery's position is what keeps the
+   new branch alive under #130 rather than a formatting choice, and that `used = false` is what keeps
+   the sweep away from a live descendant through the cascade.
+2. **The interface doc comment, in `data/database.go`.** Status: **Done**
+   The widened contract, in the same voice as the existing paragraph: both classes named, the cutoff's
+   role for each stated separately, since for the used branch it is the foreign-key race and for the
+   revoked branch it is the 60 second code lifetime. Plus one sentence the first draft did not have,
+   that a revoked code which **was** redeemed is deliberately out of reach while any refresh token still
+   references it, because that is the contract a caller could otherwise assume away.
+3. **The worker's cutoff comment, at `worker/perform-task`'s `usedCodeCleanupGrace`.**
+   Status: **Done**
+   One sentence, because that constant's comment currently explains the cutoff entirely in terms of the
+   used-code race and now bounds a second class as well. The value does not change: five minutes is
+   already comfortably past the 60 second code lifetime, which is the bound the revoked branch needs.
+4. **Data cases at seam 3, in `code_test.go`, all four engines.** Status: **Done**
+   **Two** new tests beside the method's two existing ones, not one: `test/reap-revoked-unused` carries
+   the table and `test/reap-ropc-null-code-id` carries the last row alone, for the reason under the
+   table. Both follow the shape of `TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff`: vary the cutoff
+   rather than the row, since `Code.CreatedAt` is tagged `dont-update` and cannot be aged through the
+   ORM. Expectations written before running them, and every row measured on all four engines:
+
+   | Case | Expected | Which term answers it, or what it proves |
+   |---|---|---|
+   | a revoked, unused code, future cutoff | deleted | decision 8's job, the whole point of the extension. Mutation 13 |
+   | a revoked, **used** code with an unrevoked refresh token descended from it, future cutoff | survives | **keep this row.** It is the regression guard for decision 4's retention argument, whose value is invisible once the design is right: the marker must outlive every descendant that could present it. The descendant is deliberately unrevoked, which makes it gap 2's racing child, the one the termination's own token sweep never saw and that the code's marker is the only thing rejecting. The `used = false` term is what answers it, and the stake is higher than retention alone, since `fk_refresh_tokens_code` is `ON DELETE CASCADE` and deleting the code would delete the very descendant the marker exists to reject. Mutation 11, which nothing else in the suite catches |
+   | an **unrevoked**, unused code, future cutoff | survives | the `revoked = true` term. The negative control: without it the sweep reaps every abandoned code. Mutation 10 |
+   | a revoked, unused code, the cutoff the **worker** passes | survives | the shared `created_at` term. Every other row uses a future cutoff, so this is the only one that fails if the extension states the cutoff per branch and forgets the new branch's copy. Mutation 14 |
+   | a revoked, **used** code with no refresh token, future cutoff | deleted | the pre-existing branch, unchanged, and the proof that adding `used = false` to the new branch did not narrow the old one |
+   | a revoked, unused code with a ROPC refresh token (`code_id = NULL`) in the table, future cutoff | deleted | the subquery's **position**, and it lives in its own test. `x NOT IN (…, NULL)` is UNKNOWN, so hoisting the `NOT IN` beside the cutoff makes the whole predicate UNKNOWN and the extension inert on any deployment that has ever issued a ROPC token. Mutation 12, which nothing else in the suite catches |
+   | `TestDeleteUsedCodesWithoutRefreshTokens` and `_AgeCutoff`, untouched | unchanged | the old branch is untouched. Both drive unrevoked codes, so the new branch cannot reach their rows, which is what makes this stage additive at the data tier |
+
+   **Why the ROPC row could not sit in the same test, which the first draft of this step had it doing.**
+   The NULL row changes what the *other* rows can prove while it is present: with the used branch
+   evaluating to UNKNOWN, a revoked and redeemed code with no refresh token is no longer reaped either,
+   so the fifth row above would have to expect the opposite of what it expects. That is #130 behaving as
+   its own issue describes rather than a defect here, and the honest way to write it is two tests, one
+   with the NULL row absent and one with it present. The second registers a `t.Cleanup` that deletes the
+   ROPC token, so it cannot change what a later test in the package proves about this sweep.
+
+   **No transaction or failure-path case, deliberately.** Testing reference section 4 asks those two
+   questions of every **new** method, and seams 1 and 4 answer them for stage 1's and stage 6's. This is
+   an existing method whose predicate widens: it gains no new error path, no new `RowsAffected` read and
+   no new return value, which is also the second reason the extension is one statement rather than two.
+   `transaction_test.go` already owns the pool-versus-transaction question for the shape. Stated because
+   the absence would otherwise read as an oversight.
+5. **Verify.** Status: **Done**
+   `check-anchors.sh` PASS on 80 rows, then `where.sh test --type modules` and `where.sh test --type
+   data` across all four engines, all in the foreground. The modules run is the regression check: the
+   mocks are unchanged because the signature is unchanged, so `background_worker_test.go`'s expectations
+   still stand, and the run is what proves it rather than the reasoning.
+
+**As built.** All five steps landed. Three anchor rows added to section 0, none moved. Four things worth
+naming beyond the steps.
+
+1. **The step 4 table shipped as two tests rather than one, and the reason is #130 rather than tidiness.**
+   The ROPC row and the fifth row want opposite expectations from the same database state, because a
+   single `code_id = NULL` row anywhere in `refresh_tokens` makes the used branch UNKNOWN for every row.
+   Splitting is what lets both be asserted. The step now says so, and the correction is here rather than
+   absorbed because the first draft's single test would have had to drop one of the two properties.
+2. **The keep-this row's descendant is unrevoked, which is stronger than the sketch's wording.** The
+   sketch says "a revoked code with a live refresh token must survive". Built with a **revoked**
+   descendant the row would be nearly vacuous, since a revoked token is already rejected on its own
+   terms and the marker adds nothing to it. Built with an unrevoked one it is gap 2's racing child, the
+   token that exists precisely because the termination's sweep could not see it, and the code's marker is
+   the only thing standing between it and a working grant. That is the row decision 4's property (a) is
+   about, so it is the row that was written.
+3. **The `ON DELETE CASCADE` on `fk_refresh_tokens_code` raises the stake on this stage and was not in
+   the sketch.** A reaper that reached a used code with a live descendant would not merely lose the
+   marker, it would delete the descendant, and the grant would stop being rejected because it stopped
+   existing. That does not change the predicate decision 8 words, since `used = false` already excludes
+   the case, but it changes what the keep-this row is guarding and it is now stated in the comment, the
+   table and the assertion message.
+4. **Five mutations, each failing exactly one row and nothing else.** Run on sqlite, since the predicate
+   is one statement and the four engines had already agreed on it:
+
+   | Mutation | What fails | Reading |
+   |---|---|---|
+   | 10, drop `revoked = true` from the new branch | the unrevoked-unused control, plus the pre-existing `TestDeleteUsedCodesWithoutRefreshTokens`, whose own unused row is reaped | the term is guarded twice, once deliberately and once by inheritance |
+   | 11, drop `used = false` from the new branch | the keep-this row, alone | the retention guard is the only thing holding the design, which is what a keep-this note means |
+   | 12, hoist the `NOT IN` beside the cutoff | the ROPC test, alone | the mutation that ships the extension inert on any real deployment while every other test stays green. The single most valuable row here |
+   | 13, the whole new branch removed, back to the pre-stage-7 predicate | both deletion rows | the stage does what it claims |
+   | 14, the cutoff moved inside the used branch, so the new branch has none | the worker-cutoff survival row, alone | the shared `created_at` term is load bearing, and the row that proves it is the one that uses the worker's own cutoff |
 
 ### Stage 8: gap 2's evidence
 Status: **Not started**
@@ -3533,6 +3666,149 @@ four engines, with all four of `session_deletion_test.go`'s ceremonies, includin
 `Decided`, and section 9 its four follow-ups. Stage 6 is committed as
 `feat(sessions): refuse to mint a code for a session that is gone`, with this document following it.
 Next: stage 7, reaping unused revoked codes, still a sketch.
+
+### Stage 7, 2026-08-05
+
+Written before the review, because this session may be the last one that knows what happened.
+
+**Expansion.** The sketch already settled the shape, so expanding it added detail rather than reversing
+anything: extend `DeleteUsedCodesWithoutRefreshTokens`, one predicate, no second method and no second
+worker call. Three things the expansion learned from the code that the sketch could not have.
+
+1. **The `NOT IN` subquery's position is the whole risk in this stage.** ROPC refresh tokens carry
+   `code_id = NULL`, so `x NOT IN (…, NULL)` is UNKNOWN, and the existing branch already matches nothing
+   on any deployment that has issued one. That is #130, out of scope per section 2, and decision 8's own
+   note records that the disk saving is latent until it lands. What the expansion adds is that the
+   *correctness* of the new branch depends on where the subquery sits: inside the used branch, `UNKNOWN
+   OR TRUE` is TRUE and the revoked branch reaps regardless; hoisted beside the cutoff, which is the
+   tidier-looking factoring, the whole predicate goes UNKNOWN and the extension does nothing at all,
+   silently, on every real deployment. Mutation 12 is that, and one test row is the only thing between it
+   and a green suite.
+2. **`fk_refresh_tokens_code` is `ON DELETE CASCADE`.** So the failure mode of a predicate that reached a
+   used code with a live descendant is not "the marker is lost", it is "the descendant is deleted", and
+   the grant stops being rejected because it stopped existing. Decision 8's `used = false` term already
+   excludes the case, so the predicate is unchanged by this, but it is what the keep-this row is actually
+   guarding and it is now said in the comment, the table and the assertion message.
+3. **The stage is one statement rather than two, and the shared cutoff is what decides it.** Both classes
+   are bounded by the same `created_at`, so one statement states it once. Two statements would state it
+   twice and give the two copies somewhere to drift, and would split the method's single error path,
+   which is the path seam 3 does not re-cover because this is not a new method.
+
+**What landed.** Five steps, all `Done`. The predicate at `db/delete-used-codes` and
+`db/reap-revoked-unused`, the interface doc comment, one sentence in the worker's `usedCodeCleanupGrace`
+comment, and two data tests at `test/reap-revoked-unused` and `test/reap-ropc-null-code-id`. No
+migration, no interface signature change, no new method, so no regenerated mocks and no engine wrappers.
+Three anchor rows added to section 0, none moved.
+
+**Two deviations from the steps as expanded, both recorded in the as-built note.** The step 4 table
+shipped as two test functions rather than one, because the ROPC row and the revoked-and-redeemed row
+want opposite expectations from the same database state. And the keep-this row's descendant is
+**unrevoked** rather than the sketch's "live", because a revoked descendant makes the row nearly vacuous
+while an unrevoked one is gap 2's racing child, which is the token decision 4's property (a) exists for.
+
+**Docs: nothing owed, verified rather than assumed.** Two searches, both recorded in the stage entry.
+`grep -rin 'cleanup\|reap\|housekeep\|background worker\|purge' site/src/content/docs/` finds four pages
+describing background cleanup and all four are about something else, and no page describes the `codes`
+table or its reaper. And nothing observable changes: a code this branch reaps was already unredeemable,
+both because `db/mark-code-used` refuses a revoked row and because it expired 60 seconds after issuance,
+and `ValidateTokenRequest` answers a code it cannot find with the same `invalid_grant`, "Code is
+invalid." it answers a revoked one with, so the row's absence is indistinguishable from its presence at
+every seam a user reaches.
+
+**Tiers.** `check-anchors.sh` PASS on all **80** rows. Modules green on all three modules. Data green on
+**all four engines** run in one pass, with `TestDeleteUsedCodesWithoutRefreshTokens`, `_AgeCutoff`,
+`_RevokedUnused` and `_RevokedUnusedWithRopcTokenPresent` each passing once per engine, confirmed from
+the per-engine logs rather than from the summary line. Integration not run and not claimed: this stage
+changes one background sweep and no endpoint, and the rows it reaps are unreachable from any endpoint by
+the time it reaps them.
+
+**Mutation evidence, five mutations applied to the real predicate, run on sqlite, each reverted.** The
+table is in the stage's as-built note. Each failed exactly the row the table names and nothing else,
+with two worth restating: mutation 11, dropping `used = false`, is caught by the keep-this row **alone**,
+and mutation 12, hoisting the subquery, is caught by the ROPC test **alone**. Both are the mutations
+whose whole danger is that they leave a plausible-looking green suite.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its sixteen items, all
+`Decided`, and section 9 its four follow-ups: nothing new was found that belongs to another change.
+
+### Stage 7 round 1, 2026-08-05: clean, and the stage closes
+
+**Review, round 1, clean.** `gpt-5.6-sol`, effort high, `type: code-review`, request
+`129-20260805T182359Z`. All three axes read `reviewed`, verdict `clean`, **zero findings and zero
+follow-ups**. The scope is recorded rather than summarised, because zero findings in a narrow scope
+reads exactly like zero findings in a thorough one, and because this gate passed on one round.
+
+**What it ran**, its own list: `where.sh test --type modules` passing all three modules,
+`where.sh test --type data` passing on mysql, postgres, mssql and sqlite, generated-SQL inspection for
+all four flavors through its own scratch program against the repository's `sqlbuilder` version,
+`check-anchors.sh` at all 80 rows, `git diff --check`, `gofmt` on the four changed Go files, and a
+documentation sweep with `rg` under `site/src/content/docs`.
+
+**What it answered, question by question**, since the request asked four and a clean verdict is worth
+only what it covered.
+
+1. **The grouping is what the code intends, on all four flavors.** It built the statement
+   independently rather than reading the Go, and got
+   `created_at < ? AND ((used = ? AND id NOT IN (SELECT code_id FROM refresh_tokens)) OR (revoked = ?
+   AND used = ?))` on SQLite, MySQL, PostgreSQL and SQL Server. The subquery is confined to the used
+   branch, so a ROPC row's NULL `code_id` cannot make the new branch UNKNOWN. **Re-derived by this
+   session at the gate** rather than taken on the reviewer's word, running the same scratch program
+   from `src/core`: identical output on all four, differing only in placeholder syntax. That is the one
+   claim in this stage whose failure ships the extension inert, so it is the one worth reproducing.
+2. **The sweep cannot reach a code it must not.** It traced every production `CreateRefreshToken` call
+   and the only production `MarkCodeAsUsed` call: authorization-code issuance claims the code before
+   inserting its first refresh token, rotation copies the already-used originating code id, ROPC
+   creates no code reference, and no production `UpdateCode` caller can reset `used`. So
+   `revoked = true AND used = false` is unreachable for a code with a descendant, which is what keeps
+   the `ON DELETE CASCADE` on `fk_refresh_tokens_code` away from a live one.
+3. **The shared cutoff is safe for the new class.** Five minutes is beyond the 60 second redemption
+   lifetime, so a revoked unused code past it can no longer become used or gain a descendant, and no
+   path needs it for rejection, auditing or the reuse cascade's evidence: redemption answers a code it
+   cannot find with the same generic `invalid_grant`, `Code is invalid.` it answers a revoked one with.
+4. **The coverage claims hold, including the two load-bearing rows.** The keep-this retention row fails
+   only when `used = false` is dropped, and the ROPC row fails only when the subquery is hoisted. It
+   confirmed no transaction or failure-path case is owed, on the stated grounds: one parameterised
+   DELETE through the existing `ExecSql(tx, ...)` path, one error return, no new `RowsAffected`
+   contract. It found no sixth mutation, which the request had named as a finding if one existed.
+
+It also took the sceptical pass the request asked for on the long comments, and confirmed their three
+substantive claims against the production paths: the subquery's position contains #130, the new class
+is bounded by the 60 second lifetime, and `used = false` excludes every auth-code-derived descendant
+because `MarkCodeAsUsed` is the only production claim path and now refuses revoked rows. It declined to
+reopen #130 or decision 8, which the request had marked settled.
+
+**Its `unchecked` list holds nothing the gate depended on.** The integration tier, correctly not
+applicable to a stage that changes one background sweep and no endpoint, with the stage entry's own
+reasoning independently confirmed: a reaped row is indistinguishable from a present one at every seam a
+user reaches. Unchanged cryptography, signature validation, PKCE, redirect matching, endpoint
+authorization and rate limiting, none of which this diff reaches. And the run's five source mutations,
+assessed statically because a reviewer may not edit source under review, which is the same limitation
+recorded at every earlier gate.
+
+**The reviewer changed no tracked file.** `.review/before.sha` still held stage 5's `40b6dacd…`, so the
+usual hash comparison was unavailable and mtimes were used instead: every file in the diff was last
+written between 18:15 and 18:23:54Z and the request was created at 18:23:59Z, so nothing was touched
+during the review. Its only artefact is the untracked scratch program above. Recorded because a stale
+`before.sha` is exactly the kind of thing that reads as a passed check when it is an absent one.
+
+**Tiers, re-run in full by this session on the tree being committed rather than carried forward from
+the implementation session, both in the foreground.** Modules green on all three modules, 2721 passing
+test lines, zero `FAIL`, exit 0. Data green on **all four engines** in one pass, exit 0, with
+`TestDeleteUsedCodesWithoutRefreshTokens`, `_AgeCutoff`, `_RevokedUnused` and
+`_RevokedUnusedWithRopcTokenPresent` each passing once per engine, read from the per-engine sections of
+the log rather than from the summary line. `check-anchors.sh` passes all 80 rows, `gofmt -l` is silent
+on all four changed files, `git diff --check` is clean. Integration not run and not claimed, for the
+reason above. No `site` build: this stage touches no page, which the docs searches in the stage entry
+establish.
+
+**No round 2, and the gate passes on one round.** All three axes reviewed with the two tiers the stage
+claims actually executed by the reviewer as well as by the run, zero findings, and nothing changed
+after the reviewed tree. That is the clean case the reviewer reference describes, and unlike stage 6
+there is no finding whose fix a later round would need to see.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its sixteen items, all
+`Decided`, and section 9 its four follow-ups. Stage 7 is committed with this document following it.
+Next: stage 8, gap 2's evidence, still a sketch and the last stage.
 
 ---
 
