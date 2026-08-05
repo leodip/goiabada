@@ -1,7 +1,9 @@
 package integrationtests
 
 import (
+	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -191,6 +193,163 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	assert.Equal(t, 1, len(userSessions2), "Should have a new session after second login")
 }
 
+// TestSessionEndedOnConsentScreen_NoCodeIsIssued is the third of this file's paired
+// ceremonies, and it covers the half of #129 gap 3 that the gate at /auth/completed cannot
+// reach (decision 6's second half, plus decision 12).
+//
+// Here the session is alive all the way through /auth/completed, which bumps or creates it,
+// so that gate passes legitimately. The user is then parked on the consent screen, which is
+// where the window widens from milliseconds to however long a person takes to click, and the
+// session is ended while they sit there. HandleConsentPost reads no session row, so the
+// submission proceeds exactly as always and hands off to /auth/issue.
+//
+// Nothing written at termination can reach the code /auth/issue would mint, because that row
+// does not exist yet when RevokeCodesBySessionIdentifier runs. Only the liveness check at
+// /auth/issue stops it, and the code is worth stopping: an empty session identifier alone
+// makes grantIsOffline true, so the refresh token that code yields would be stored as an
+// Offline one, with a max lifetime and no session for the validator to consult, whether or
+// not offline_access was ever requested.
+//
+// The pairing with the two tests around it is the point. This one varies the window rather
+// than the credential: a password really was entered in this ceremony, so a predicate keyed
+// on authentication passes and only one keyed on the session refuses.
+func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		// The consent screen is what holds the ceremony still between /auth/completed and
+		// /auth/issue, which is the whole window this case is about.
+		ConsentRequired: true,
+		DefaultAcrLevel: enums.AcrLevel1,
+	}
+	err := database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	redirectUri := &models.RedirectURI{
+		ClientId: client.Id,
+		URI:      gofakeit.URL(),
+	}
+	err = database.CreateRedirectURI(nil, redirectUri)
+	assert.NoError(t, err)
+
+	password := gofakeit.Password(true, true, true, true, false, 8)
+	passwordHashed, err := hashutil.HashPassword(password)
+	assert.NoError(t, err)
+
+	user := &models.User{
+		Subject:      uuid.New(),
+		Enabled:      true,
+		Email:        gofakeit.Email(),
+		PasswordHash: passwordHashed,
+	}
+	err = database.CreateUser(nil, user)
+	assert.NoError(t, err)
+
+	// One HTTP client throughout, so the cookie is shared and this is one browser's ceremony
+	// rather than two.
+	httpClient := createHttpClient(t)
+
+	requestState := gofakeit.LetterN(8)
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&scope=" + url.QueryEscape("openid profile email") +
+		"&state=" + requestState +
+		"&nonce=" + gofakeit.LetterN(8)
+
+	resp, err := httpClient.Get(destUrl)
+	assert.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	csrf := getCsrfValue(t, resp)
+
+	// A password IS entered here, unlike the OTP case below. That is what makes this ceremony
+	// legitimate up to the consent screen and what makes /auth/issue the only hop that can
+	// refuse it.
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// Consent, not /auth/issue: the ceremony now waits for a person.
+	redirectLocation = assertRedirect(t, resp, "/auth/consent")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	consentCsrf := getCsrfValue(t, resp)
+
+	// The session exists at this point, created by /auth/completed while it was legitimately
+	// reached. Ending it is what the rest of the case turns on.
+	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(userSessions), "the ceremony should have created one session before consent")
+
+	// Deleting the row directly, as this file's other tests do: that the two DELETE endpoints
+	// also revoke the session's grants is covered by api_users_sessions_test.go and
+	// api_account_sessions_test.go, and what this case needs is the session gone.
+	err = database.DeleteUserSession(nil, userSessions[0].Id)
+	assert.NoError(t, err)
+
+	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
+	consentForm := url.Values{
+		"gorilla.csrf.Token": {consentCsrf},
+		"btnSubmit":          {"submit"},
+		"consent0":           {"on"},
+		"consent1":           {"on"},
+		"consent2":           {"on"},
+	}
+	consentReq, err := http.NewRequest("POST", consentEndpoint, strings.NewReader(consentForm.Encode()))
+	assert.NoError(t, err)
+	consentReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	consentReq.Header.Set("Referer", consentEndpoint)
+	consentReq.Header.Set("Origin", config.GetAuthServer().BaseURL)
+
+	resp, err = httpClient.Do(consentReq)
+	assert.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	// The consent submission itself succeeds, and asserting that is deliberate: it reads no
+	// session row, so the termination is invisible to it. This is what makes the next hop the
+	// load-bearing one rather than an incidental one.
+	redirectLocation = assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// The liveness check. Before #129 stage 6 this redirected to the client with a usable code
+	// bound to a session that no longer existed.
+	redirectLocation = assertRedirect(t, resp, "/auth/level1")
+	assert.NotContains(t, redirectLocation, "code=",
+		"no authorization code may reach the client once the session backing the ceremony is gone")
+
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// And the restart is a real one: the user is asked for a password again.
+	assertRedirect(t, resp, "/auth/pwd")
+
+	userSessionsAfter, err := database.GetUserSessionsByUserId(nil, user.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(userSessionsAfter),
+		"the ended session must not be recreated by a ceremony waiting on the consent screen")
+}
+
 // TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession is the pair of the test
 // above, and the case that decided #129 decision 15.
 //
@@ -303,4 +462,95 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(userSessionsAfter),
 		"the ended session must not be recreated by a ceremony that only verified OTP")
+}
+
+// TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired is the fourth of this file's
+// ceremonies, and the case that decided #129 decision 16.
+//
+// It is the same window as TestSessionEndedOnConsentScreen_NoCodeIsIssued, entered by the
+// other door. handlePromptNone runs its silent checks, bumps the session and redirects to
+// /auth/issue; the session is ended in that one hop; and the liveness check at /auth/issue
+// finds the identifier gone exactly as it does for the consent-screen ceremony.
+//
+// What differs is the outcome, and that is the point of the pairing. The consent-screen
+// ceremony is restarted at level 1 and arrives at a password form. This one must never see a
+// page at all: prompt=none forbids UI, and nothing between /auth/issue and /auth/pwd reads
+// the prompt, so a restart would hand a silent-renewal iframe a login screen and no error,
+// which it cannot tell from a hang. It gets login_required instead, which is what
+// handlePromptNone itself returns when its own session lookup finds no row.
+func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
+	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+
+	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(userSessions), "the level 1 login should have left one session")
+	userSession := userSessions[0]
+
+	// A second authorization on the same browser, silent this time. The client does not
+	// require consent, so with a live session behind it this goes straight to /auth/issue.
+	requestState := gofakeit.LetterN(8)
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&scope=" + url.QueryEscape("openid profile email") +
+		"&state=" + requestState +
+		"&nonce=" + gofakeit.LetterN(8) +
+		"&prompt=none"
+
+	resp, err := httpClient.Get(destUrl)
+	assert.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	// handlePromptNone accepted the session and handed off. Asserting that rather than an
+	// error here is deliberate: it is what puts the whole window in the next hop.
+	redirectLocation := assertRedirect(t, resp, "/auth/issue")
+
+	// The session is ended between the 302 and the browser following it. This is the narrowest
+	// window in gap 3 and the only one prompt=none can sit in, since it never waits for a
+	// person.
+	err = database.DeleteUserSession(nil, userSession.Id)
+	assert.NoError(t, err)
+
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// Back to the client with an error, rather than on to a password form.
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	location := resp.Header.Get("Location")
+	assert.Contains(t, location, redirectUri.URI,
+		"a silent ceremony must be answered at the client's redirect URI, not with a page")
+	assert.NotContains(t, location, "/auth/level1",
+		"prompt=none must not be restarted into the interactive flow")
+
+	errorCode, _, state := getErrorFromUrl(t, resp)
+	assert.Equal(t, "login_required", errorCode)
+	assert.Equal(t, requestState, state, "the client's state must survive the error response")
+
+	parsedLocation, err := url.Parse(location)
+	assert.NoError(t, err)
+	assert.Empty(t, parsedLocation.Query().Get("code"),
+		"no authorization code may reach the client once the session backing the ceremony is gone")
+
+	userSessionsAfter, err := database.GetUserSessionsByUserId(nil, user.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(userSessionsAfter),
+		"a refused silent ceremony must not recreate the ended session")
+
+	// The refusal also has to leave the browser with no ceremony to replay, and only a
+	// second request can see that. Clearing the auth context persists through a Set-Cookie,
+	// so it reaches this jar only if the handler cleared before committing the redirect;
+	// clearing afterwards would answer login_required again here, from a context still
+	// reading ready_to_issue_code. With the context gone the handler has nothing to resume
+	// and sends the browser to the account profile instead.
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	replayLocation := resp.Header.Get("Location")
+	assert.Contains(t, replayLocation, "/account/profile",
+		"the refusal must clear the auth context in the browser, so a replayed /auth/issue has no ceremony left")
+	assert.NotContains(t, replayLocation, redirectUri.URI,
+		"a cleared ceremony must not answer the client a second time")
 }

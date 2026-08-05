@@ -9720,6 +9720,78 @@ func (_c *Database_RefreshTokenLoadUser_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// RevokeCodeIfSessionGone provides a mock function for the type Database
+func (_mock *Database) RevokeCodeIfSessionGone(tx *sql.Tx, codeId int64, sessionIdentifier string) (bool, error) {
+	ret := _mock.Called(tx, codeId, sessionIdentifier)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RevokeCodeIfSessionGone")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, string) (bool, error)); ok {
+		return returnFunc(tx, codeId, sessionIdentifier)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, string) bool); ok {
+		r0 = returnFunc(tx, codeId, sessionIdentifier)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64, string) error); ok {
+		r1 = returnFunc(tx, codeId, sessionIdentifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RevokeCodeIfSessionGone_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeCodeIfSessionGone'
+type Database_RevokeCodeIfSessionGone_Call struct {
+	*mock.Call
+}
+
+// RevokeCodeIfSessionGone is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - codeId int64
+//   - sessionIdentifier string
+func (_e *Database_Expecter) RevokeCodeIfSessionGone(tx any, codeId any, sessionIdentifier any) *Database_RevokeCodeIfSessionGone_Call {
+	return &Database_RevokeCodeIfSessionGone_Call{Call: _e.mock.On("RevokeCodeIfSessionGone", tx, codeId, sessionIdentifier)}
+}
+
+func (_c *Database_RevokeCodeIfSessionGone_Call) Run(run func(tx *sql.Tx, codeId int64, sessionIdentifier string)) *Database_RevokeCodeIfSessionGone_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RevokeCodeIfSessionGone_Call) Return(b bool, err error) *Database_RevokeCodeIfSessionGone_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_RevokeCodeIfSessionGone_Call) RunAndReturn(run func(tx *sql.Tx, codeId int64, sessionIdentifier string) (bool, error)) *Database_RevokeCodeIfSessionGone_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RevokeCodesBySessionIdentifier provides a mock function for the type Database
 func (_mock *Database) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error) {
 	ret := _mock.Called(tx, sessionIdentifier)

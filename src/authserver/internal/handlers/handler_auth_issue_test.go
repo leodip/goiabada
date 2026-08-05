@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -95,8 +97,11 @@ func TestHandleIssueGet(t *testing.T) {
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
-		assert.NoError(t, err)
+		// The positive control for the liveness check (#129 stage 6): the ordinary ceremony,
+		// with a session identifier in the context and a session row behind it. It fails
+		// against a check that refuses a live session, and the compensating call it now
+		// expects is what pins that the statement is issued at all.
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
 		rr := httptest.NewRecorder()
 
@@ -111,6 +116,8 @@ func TestHandleIssueGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
+		stubLiveSession(database)
+
 		// Mock code creation
 		mockCode := &models.Code{
 			Id:          1,
@@ -120,8 +127,13 @@ func TestHandleIssueGet(t *testing.T) {
 			State:       "test-state",
 		}
 		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
-			return reflect.DeepEqual(input.AuthContext, *authContext)
+			return reflect.DeepEqual(input.AuthContext, *authContext) &&
+				input.SessionIdentifier == liveSessionIdentifier
 		})).Return(mockCode, nil)
+
+		// The compensating revoke, keyed on the code just inserted and the session it was
+		// bound to. It matches nothing here, since the session is live.
+		database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
 
 		// Mock audit logging
 		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -142,8 +154,308 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
+		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
+
+	// The liveness check from #129 decision 6's second half. The window it closes opens
+	// after /auth/completed: the session was alive and was bumped there, the user then sits
+	// on the consent screen, and the session is ended before the code is minted. Stage 1's
+	// marker cannot reach that code, because the row does not exist when the termination
+	// sweeps.
+	//
+	// "No code created" is enforced rather than asserted in the refusal rows below: the strict
+	// mocks_oauth.CodeIssuer carries no CreateAuthCode expectation, so reaching it fails the
+	// case on its own, and the audit logger is not stubbed either.
+	//
+	// Two outcomes, one predicate. An interactive ceremony restarts level 1 (decision 6), and
+	// a prompt=none one is returned login_required (decision 16), because a request that
+	// forbids UI cannot be sent to a password form.
+	t.Run("No session identifier in the context, restarts level 1", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		// An empty identifier is the shape the terminated ceremony actually arrives in:
+		// MiddlewareSessionIdentifier finds the row gone, deletes the identifier from the
+		// cookie session, and leaves it out of the request context. It is also the shape
+		// grantIsOffline reads as an offline grant, so a code issued here would produce a
+		// refresh token with a max lifetime and no session to check.
+		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "query",
+			ResponseType: "code",
+			RedirectURI:  "https://example.com/callback",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		var savedAuthContext *oauth.AuthContext
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			savedAuthContext = ac
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
+		assert.NotNil(t, savedAuthContext)
+		assert.Equal(t, oauth.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+
+		// No lookup either: with nothing to resolve there is no question to ask the database.
+		database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+	})
+
+	t.Run("Session identifier resolves to no session, restarts level 1", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		// The narrower half of the same predicate: the middleware saw the session alive on
+		// this very request and the termination committed immediately afterwards, so the
+		// identifier is still in the context but the row is gone.
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "query",
+			ResponseType: "code",
+			RedirectURI:  "https://example.com/callback",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+	})
+
+	t.Run("No session and prompt=none, returns login_required to the client", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		// The same empty identifier as the row above, arriving from handlePromptNone rather
+		// than from the consent screen: it validated and bumped the session, redirected here,
+		// and the session was ended in that hop. Restarting level 1 would render a password
+		// form, which this request forbids (#129 decision 16).
+		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "query",
+			ResponseType: "code",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+			Prompt:       "none",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		// Asserting that ClearAuthContext was called says nothing about whether the clear
+		// reaches the browser, because the real helper persists the deletion through a
+		// Set-Cookie on w and a header set after the redirect has written the status line
+		// is dropped. The stub writes a sentinel where the CookieStore would write that
+		// cookie, so the committed response is what carries the assertion below.
+		const clearedContextCookie = "cleared-auth-context"
+		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
+		}).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com/callback")
+		assert.Contains(t, location, "error=login_required")
+		assert.Contains(t, location, "state=test-state")
+		assert.NotContains(t, location, "code=")
+		assert.NotContains(t, location, "/auth/level1")
+
+		// Result() reads the header as it was when the response was committed, which is the
+		// only view that can tell the two orderings apart: rr.Header() shows the sentinel
+		// either way, since the handler and the stub share one live map.
+		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
+			"the auth context must be cleared before the client response is committed, or the browser keeps a ready_to_issue_code context to replay")
+
+		// The ceremony ends here rather than being restarted, so the state the interactive
+		// rows assert is never saved.
+		authHelper.AssertNotCalled(t, "SaveAuthContext")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+	})
+
+	t.Run("Session lookup fails", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "query",
+			ResponseType: "code",
+			RedirectURI:  "https://example.com/callback",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		// A database fault must not read as a terminated session, and must not read as a
+		// live one either: no code is minted and no restart is offered.
+		dbError := errors.New("session lookup failed")
+		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, dbError)
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err == dbError
+		})).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+		authHelper.AssertNotCalled(t, "SaveAuthContext")
+	})
+
+	t.Run("The compensating revoke fails, so no code reaches the client", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "query",
+			ResponseType: "code",
+			RedirectURI:  "https://example.com/callback",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		stubLiveSession(database)
+
+		mockCode := &models.Code{
+			Id:          1,
+			Code:        "test-code",
+			ClientId:    1,
+			RedirectURI: "https://example.com/callback",
+			State:       "test-state",
+		}
+		codeIssuer.On("CreateAuthCode", mock.Anything).Return(mockCode, nil)
+
+		// The code row exists and carries no marker at this point, so handing it over is
+		// exactly the fail-open decision 12 closes. Unredeemed it expires in 60 seconds.
+		revokeError := errors.New("compensating revoke failed")
+		database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, revokeError)
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err == revokeError
+		})).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		// Not a redirect to the client: the code was created but never delivered.
+		assert.NotContains(t, rr.Header().Get("Location"), "code=test-code")
+
+		httpHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertNotCalled(t, "Log")
+		authHelper.AssertNotCalled(t, "ClearAuthContext")
+	})
+}
+
+// liveSessionIdentifier is the session identifier the code-flow subtests put in the request
+// context. Any non-empty value does, since the liveness check asks the database rather than
+// parsing it.
+const liveSessionIdentifier = "session-identifier-abc"
+
+// requestWithSessionIdentifier builds the /auth/issue request the way
+// MiddlewareSessionIdentifier leaves it when the session row exists: the identifier is in the
+// request context. Its absence is the terminated case, which is why the subtests that expect
+// a code have to opt in (#129 stage 6).
+func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.Request {
+	t.Helper()
+	req, err := http.NewRequest("GET", "/auth/issue", nil)
+	assert.NoError(t, err)
+	return req.WithContext(context.WithValue(req.Context(),
+		constants.ContextKeySessionIdentifier, sessionIdentifier))
+}
+
+// stubLiveSession makes the liveness check pass, which is the precondition for reaching
+// CreateAuthCode at all after #129 stage 6.
+func stubLiveSession(database *mocks_data.Database) {
+	database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
+		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier}, nil)
 }
 
 func TestIsImplicitFlow(t *testing.T) {
@@ -1091,8 +1403,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
-		assert.NoError(t, err)
+		// A live session, since this subtest reaches code creation (#129 stage 6).
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
 		rr := httptest.NewRecorder()
 
@@ -1119,6 +1431,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(mockUser, nil)
 
+		stubLiveSession(database)
+
 		// Mock code creation
 		mockCode := &models.Code{
 			Id:          1,
@@ -1130,6 +1444,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
+
+		database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
 
 		// Mock audit logging
 		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -1229,8 +1545,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
-		assert.NoError(t, err)
+		// A live session, since this subtest reaches code creation (#129 stage 6).
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
 		rr := httptest.NewRecorder()
 
@@ -1249,6 +1565,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Do NOT mock database.GetUserById - it should not be called when IdTokenHintSub is empty
 
+		stubLiveSession(database)
+
 		// Mock code creation
 		mockCode := &models.Code{
 			Id:          1,
@@ -1260,6 +1578,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
+
+		database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
 
 		// Mock audit logging
 		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
