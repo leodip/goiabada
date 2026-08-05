@@ -5,7 +5,19 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** stages 1 to 7 committed, 2026-08-05. **Stage 7 closed on a clean round 1**: one predicate
+**Run state:** **all eight stages committed, 2026-08-05.** Stage 8, the last, closed on a clean review
+round 1 whose diff hash matched the committed tree exactly: two integration tests carrying gap 2's
+evidence and no production line, since gap 2 closed structurally in stages 1 and 2. Its expansion found
+that the marker's refusal and the sweep's are different gates with different messages, the marker's
+answering first, which is what makes the sequential case discriminating; and the race it drives reaches
+gap 2's own interleaving on mssql and sqlite, where the replacement it hands out is still live in
+storage and the marker is the only thing refusing it. Two mutations measured, and what stayed green
+under them is the argument for the stage: stage 4's headline case and stage 6's consent ceremony both
+pass with the marker's read or its write removed, and only these two tests fail. Section 3 has zero
+`Open` items, section 8 nothing deferred, section 9 four drafted follow-ups the run never files.
+Remaining: the closing pass, which is the full suite across every tier, sections 8 and 9 posted to the
+pull request, and `gh pr ready`. Below, the earlier state, kept because the run log reads against it.
+**Stage 7 closed on a clean round 1**: one predicate
 extension so codes revoked while still unredeemed do not accumulate (decision 8), green on the modules
 tier and on the data tier across all four engines, with five mutations measured. Its expansion found
 that where the `NOT IN` subquery sits decides whether the whole extension works at all under #130, and
@@ -22,7 +34,7 @@ the fix plus two assertions that can observe a committed response landed inside 
 clean. Expanding the stage also found that the terminated ceremony reaches `/auth/issue` with an
 **empty** session identifier rather than a dead one, because the session middleware clears it first,
 and that an empty identifier alone makes the resulting grant offline; the stage entry in section 6
-carries the reasoning. Next: stage 8, gap 2's evidence, still a sketch and the last stage.
+carries the reasoning. Next: stage 8's gate, and then the run's closing pass on the pull request.
 **PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
@@ -144,6 +156,8 @@ log can cite it the same way. Nothing above the line changed.
 | `db/reap-revoked-unused` | `src/core/data/commondb/code.go` | `DeleteUsedCodesWithoutRefreshTokens` | `deleteBuilder.Equal("revoked", true),` | stage 7, decision 8's second branch. `db/delete-used-codes` above still resolves, to the first branch's `used = true` term, which the extension leaves in place |
 | `test/reap-revoked-unused` | `src/authserver/tests/data/code_test.go` | `TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnused` | `must outlive it, and deleting the code would cascade the descendant away` | stage 7, seam 3's keep-this row, the only case in the suite that fails when the `used = false` term is dropped |
 | `test/reap-ropc-null-code-id` | `src/authserver/tests/data/code_test.go` | `TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnusedWithRopcTokenPresent` | `a refresh token with a NULL code_id exists` | stage 7, the row that fails if the `NOT IN` subquery is hoisted out of the used branch, which is the mutation that ships the whole extension inert |
+| `test/child-born-rejected` | `src/authserver/tests/integration/token_refresh_concurrent_test.go` | `TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected` | `THE ONE COLUMN CLEARED BELOW IS THE ONLY THING THE INTERLEAVING DECIDES` | stage 8, gap 2's deterministic evidence. The locator is the paragraph defending the reconstruction, which is the part of this test a reader has to be able to find |
+| `test/refresh-races-termination` | `src/authserver/tests/integration/token_refresh_concurrent_test.go` | `TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant` | `replacement %d is still live in storage` | stage 8, the same window driven for real. The locator is the log line that says the run reached gap 2's own interleaving, which is what mssql and sqlite print |
 
 Counts in this document carry their command:
 
@@ -2536,17 +2550,152 @@ naming beyond the steps.
    | 14, the cutoff moved inside the used branch, so the new branch has none | the worker-cutoff survival row, alone | the shared `created_at` term is load bearing, and the row that proves it is the one that uses the worker's own cutoff |
 
 ### Stage 8: gap 2's evidence
-Status: **Not started**
-Detail: **sketch**
+Status: **Done**
+Seams: 8 (`POST /auth/token`), in the existing `token_refresh_concurrent_test.go`, which the sketch
+names and which is right for a second reason it does not give: that file already owns a rotation race
+at this seam, it carries `refreshTokenJti` and the release-together harness, and #128's double-spend
+case is the shape both new cases vary. The offline-grant fixtures come from
+`credential_change_revocation_test.go`, cross-file in the same package, exactly as stage 4's endpoint
+cases use them.
+Tiers: integration (dev container) only, and the other two are **not applicable rather than skipped**:
+this stage adds no production code, so nothing outside `tests/integration` changes, and `modules`
+(internal, core, adminconsole) does not compile that package, so a run there would exercise nothing
+this stage wrote. Data likewise: no query, no interface method, no migration, no model change.
+Docs: **none, and verified rather than assumed.** Two searches over `site/src/content/docs/`.
+`concurrent|race|in flight|at the same time|simultaneous` finds three pages and none is about
+termination: `concepts/tokens.mdx` and `reference/security.mdx` state the rotation invariant this
+stage does not touch, and `reference/environment-variables.mdx` is unrelated. `rotat|replacement
+token|replaced` finds the same rotation material plus `integration/rest-api.mdx` on audit retention.
+The `## Ending a session` section stages 4 to 6 wrote already says the refresh tokens of that session
+are revoked, which this stage proves rather than extends, and nothing observable changes here at all:
+the stage adds two test functions and no production line. A sentence promising race safety was
+considered and deliberately not written, for the reason stage 6 gave about follow-up 1's residual: it
+would read to a user as doubt about the feature, and it would over-claim while the neighbouring
+window in follow-up 1 is still open.
 
-Gap 2 closes structurally in stages 1 and 2, since a rotated child inherits its parent's `code_id`
-and so is born already rejected. What is missing is the proof, and decision 1 requires it before the
-issue closes. An integration test mirroring `token_refresh_concurrent_test.go`'s harness: a grant
-whose refresh races a termination leaves no usable descendant, checked both ways round, the child
-issued before termination and the child issued after it, on an `offline_access` grant since a
-session-bound one already dies at `validator/session-branch`. Seam 8. Tier: integration. Docs: none
-unless the evidence contradicts what stage 3 documented, which would be a blocking decision rather
-than a docs edit. Staged last per decision 1.
+Gap 2 is the one gap that was never implemented, because decision 4 chose the carrier that closes it
+structurally: a rotated child inherits its parent's `code_id`, so marking the code marks every
+descendant, including one inserted after the termination committed. Decision 1 requires the proof
+before the issue closes, and this stage is that proof and nothing else. If the evidence had
+contradicted what stages 4 to 6 documented, that would have been a blocking decision rather than a
+docs edit; it does not.
+
+**Three things the expansion learned from the code, none of which the sketch could have.**
+
+- **The two refusals are different gates with different messages, and the marker's answers first.**
+  `validator/refresh-code-revoked` sits in `ValidateTokenRequest`, which runs before the handler, and
+  it answers `invalid_grant` with "The refresh token is invalid because the associated session has
+  expired or been terminated." The handler's own revoked-row branch answers the same error code with
+  "This refresh token has been revoked." and additionally runs #128's family containment. So a child
+  that the termination sweep revoked **and** whose code is marked is refused by the marker, and the
+  `error_description` is what names which gate did it. That is what makes the sequential case
+  discriminating rather than decorative: on the error code alone the two gates are indistinguishable
+  from outside.
+- **No interleaving lets a racing child escape rejection**, which is why the race case asserts an
+  unconditional invariant rather than a probability. The sweep marks the code, every descendant
+  carries that `code_id`, and the marker is read from the row's joined code on every presentation.
+  What the interleaving decides is only **which** gate refuses the child: the handler's branch when
+  the sweep saw it, the validator's marker when it did not. Follow-up 1's escaping window is a
+  **code** insert at `/auth/issue`, not a refresh-token insert, and nothing in it reaches this path.
+- **The window cannot be forced over HTTP, so the case that matters is reconstructed rather than
+  raced.** A child issued after the termination is a child whose own `revoked` column is false while
+  its code is marked. Every part of that state is produced by the real server except the one bit the
+  interleaving decides, so step 1 creates it by clearing that one column on a server-minted,
+  rotation-written row after the real endpoint terminated the session. It is the only case in this
+  run where deleting `validator/refresh-code-revoked` returns a **working token** rather than a
+  differently worded refusal, which is precisely what gap 2 is.
+
+1. **`TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected`, both ways round.**
+   Status: **Done**
+   Landed at `test/child-born-rejected`, three cases in one ceremony as written.
+   In `token_refresh_concurrent_test.go`, on one offline grant from `createOfflineGrant`, terminated
+   through the real admin `DELETE` with `createAdminClientWithToken` and `makeAPIRequest`, so the
+   termination is the shipped action rather than a helper call. Expectations written before running
+   them:
+
+   | Case | Expected | Which gate answers it, or what it proves |
+   |---|---|---|
+   | the grant rotates once before the termination | 200 with a replacement refresh token, whose row carries `refresh_token_type` `Offline`, an **empty** `session_identifier` of its own, and the **parent's** `code_id` | the attribution control, plus decision 4's load-bearing property that a descendant inherits `code_id`. The Offline and empty-sid assertions are what stop this case being the benign member of its class: a session-bound child would be refused below by `validator/session-branch` whatever the marker did, and the case would prove nothing |
+   | that child presented after the session is ended, its own row revoked by the termination sweep | 400 `invalid_grant`, `error_description` "The refresh token is invalid because the associated session has expired or been terminated." | the child issued **before** the termination. The description names the gate: the marker is read in the validator, ahead of the handler's revoked-row branch, so it answers even for a child the sweep also revoked. A refusal by the row alone would read "This refresh token has been revoked." Incidentally also evidence that termination did not advance the user's generation, which would answer with `invalidGenerationMessage` instead (section 4.6) |
+   | the same child with its own `revoked` column cleared, which is the row state a child inserted after the sweep has | 400 `invalid_grant`, the same description, no `access_token`, no `refresh_token`, and the code's family gains no row | **keep this row.** It is gap 2's actual evidence: the row is live, so removing the marker lets the handler's compare-and-set claim succeed and rotation mint a working replacement. Every other case in the run merely changes which refusal you get. Mutation 15 |
+
+   The reconstruction is named in the test's own comment rather than left to be noticed, with what is
+   real about it: the JWT is server-minted, the row was written by rotation, the code was marked by
+   the real endpoint, and the single cleared column is the one bit the interleaving decides. The
+   alternative, hand-building a signed refresh token and its row, would prove less, because the shape
+   would then be the test's invention rather than rotation's.
+2. **`TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant`, the genuine race.**
+   Status: **Done**
+   Landed at `test/refresh-races-termination`, and it reaches the window rather than merely
+   approaching it: see the as-built note and the measurement in the run log.
+   The same file, mirroring `TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce`: eight
+   presentations of one offline refresh token and the admin `DELETE`, all released together off one
+   channel. The `DELETE` runs in its own goroutine through a non-asserting `concurrentDelete` beside
+   `concurrentTokenPost`, for the reason that helper exists: `require` from a goroutine is not safe.
+   Expectations written before running them:
+
+   | Case | Expected | What it proves |
+   |---|---|---|
+   | eight refresh presentations released together with the termination | at most one carries a replacement token, and every request that did not is not a 200 and carries no `access_token` | rotation's own invariant survives a termination racing it, on four engines under real contention |
+   | every replacement token the race handed out, presented afterwards | `invalid_grant`, no `access_token` | goal 3 at the highest seam that can observe it. Whichever gate answers, no descendant of a terminated grant is usable |
+   | the pre-race parent, presented afterwards | `invalid_grant`, no `access_token` | the presented token is consumed either way, so this cannot be the case that passes by accident |
+   | the termination itself | 200, and the session row gone before the invariant above is asserted | without it the case could pass because nothing was terminated |
+
+   **What it cannot force, stated in the test as `token_refresh_concurrent_test.go` already does for
+   its own case:** which interleaving occurred. A race whose `DELETE` commits first refuses all eight
+   at the marker and proves only that nothing was minted; the interesting interleaving, a validation
+   that read the code live and an insert that landed after the sweep, cannot be *guaranteed* from
+   outside and is what step 1 reconstructs. So the count of replacements is logged rather than
+   asserted, and so is whether the sweep saw each one, which makes a vacuous run visible in the log
+   rather than silently green. **Measured, it is not vacuous:** every engine produced a replacement,
+   and on mssql and sqlite that replacement was still live in storage, which is gap 2's own
+   interleaving reached end to end. The run log carries the per-engine reading.
+
+   **The termination goroutine sleeps 5 milliseconds after the release, which is a probability knob
+   and not a synchronization point.** Added after measuring that a simultaneous release consistently
+   produced no replacement at all on sqlite: the termination commits before any presentation has
+   finished verifying an RSA signature, so the race had nothing to hand out and the assertions had
+   nothing to chew on. Every assertion holds at any value including zero, which is what keeps it a
+   knob, and the log line says what the chosen value produced.
+
+   **Contention with rotation can legitimately fail the termination transaction** on the server
+   engines, as a lock timeout or a deadlock. That is not what this case is about, so a non-200 is
+   logged and the `DELETE` retried once sequentially, and the invariant is asserted only against a
+   session verified gone. Tolerating it is not weakening the case: every refusal path leaves no usable
+   descendant, and a 500 mints nothing.
+3. **Verify.** Status: **Done**
+   `check-anchors.sh` PASS on 82 rows, then `where.sh test --type integration` across all four
+   engines, in the foreground, exit 0 with 4768 passing test lines and zero `FAIL`. That tier is the
+   whole stage. No modules run and no data run, for the reason in the header: no file outside
+   `tests/integration` changes, and neither tier compiles that package. `gofmt -l` silent and
+   `go vet ./tests/integration/` clean on the one changed file.
+
+**As built.** All three steps landed. Two anchor rows added to section 0, none moved. The predicted
+case tables shipped unchanged, which is worth saying plainly because the last four stages each
+changed a row at expansion: here the expectations written first were the ones measured, on all four
+engines. Four things worth naming beyond the steps.
+
+1. **The stagger in step 2 is a deviation from the step as first written**, and it is recorded rather
+   than absorbed because the reason is a measurement. Released at the same instant, the race
+   consistently produced zero replacements on sqlite, so the case asserted only that nothing was
+   minted and its interesting loop never ran. Five milliseconds makes a replacement appear on every
+   engine. The step now says so, including that no assertion depends on the value.
+2. **The race reaches gap 2's own interleaving, which the sketch did not expect and the step only
+   hoped for.** On mssql and sqlite the replacement the race handed out was **still live** in storage,
+   so the sweep never saw it and the marker was the only thing refusing it, which is exactly the state
+   step 1 reconstructs. On mysql and postgres it landed before the sweep and was revoked. Both are
+   legitimate and neither is asserted; the log says which happened. Mutation 15 makes the difference
+   consequential rather than cosmetic: without the marker read, that live replacement is a **working
+   grant**.
+3. **The two refusals are engine-independent in the one way that matters.** All four engines answered
+   the terminated grant with the marker's description, including the two where the row was also
+   revoked, which is the ordering claim in the preamble measured rather than reasoned. Across the
+   racers, 25 of 28 refusals read "This refresh token has been revoked." and 3 read the marker's
+   message, so both gates fire in one run and the spread is the interleaving made visible.
+4. **The termination never needed its retry.** No engine logged the sequential retry path, so the
+   contention tolerance in step 2 is unexercised on this hardware. It stays, because a lock timeout
+   under contention is a property of the engine and the load rather than of this test, and the
+   alternative is a red run that says nothing about #129.
 
 ---
 
@@ -3809,6 +3958,168 @@ there is no finding whose fix a later round would need to see.
 **Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its sixteen items, all
 `Decided`, and section 9 its four follow-ups. Stage 7 is committed with this document following it.
 Next: stage 8, gap 2's evidence, still a sketch and the last stage.
+
+### Stage 8, 2026-08-05
+
+Written before the review, because this session may be the last one that knows what happened.
+
+**Expansion.** The sketch had the shape and the seam right, and expanding against the code changed
+what the stage is *worth* rather than what it does. Three findings, all written into the stage header:
+the two refusals are different gates with different messages and the marker's answers first, which is
+what makes the sequential case discriminating; no interleaving lets a racing child escape, so the race
+case can assert an unconditional invariant rather than a probability; and the window cannot be forced
+from outside the server, so the case that matters is reconstructed rather than raced.
+
+**What landed.** Two integration tests in `token_refresh_concurrent_test.go`, `test/child-born-rejected`
+and `test/refresh-races-termination`, plus a `concurrentDelete` helper beside `concurrentTokenPost` and
+one `terminatedGrantMessage` const. **No production line changed**, which is the whole stage: gap 2 was
+closed structurally by stages 1 and 2, because a rotated child inherits its parent's `code_id`, and
+decision 1 asked for the proof before the issue closes. Two anchor rows added to section 0, none moved.
+
+**Tiers.** Integration green on **all four engines** in one pass, `where.sh test --type integration`
+exit 0, 4768 passing test lines, zero `FAIL` (62.9s mysql, 67.7s postgres, 89.0s mssql, 45.6s sqlite),
+with both new tests passing once per engine. `check-anchors.sh` passes all **82** rows. `gofmt -l`
+silent and `go vet ./tests/integration/` clean on the one changed file. **Modules and data not run and
+not claimed**, and the reason is stronger than "not applicable": this stage changes one file under
+`tests/integration`, and neither tier compiles that package, so a run there would exercise nothing
+this stage wrote.
+
+**What the race measured, per engine, which is the part the sketch could not predict.** Every engine
+produced exactly one replacement token, and every replacement was refused. On **mssql and sqlite** the
+replacement was still **live** in storage when it was presented, so the termination's sweep never saw
+it and the marker was the only thing standing between it and a working grant: that is gap 2's own
+interleaving reached end to end through HTTP, not merely approached. On **mysql and postgres** the
+replacement landed before the sweep and was revoked by it, and the marker still answered first. Across
+the seven refused racers per engine, 25 of 28 read "This refresh token has been revoked." and 3 read
+the marker's message, so both gates fire inside one run. No engine needed the sequential retry the case
+tolerates.
+
+**Mutation evidence, two mutations, each applied to the real code, run on sqlite, and reverted in this
+session. What stayed green under them is the point.**
+
+15. **The marker read dropped**, `validator/refresh-code-revoked` disabled. Stage 4's headline case
+    `test/terminate-offline-endpoint` **passed**, so nothing already in the suite can see this. Both
+    stage 8 tests failed, and they failed by printing gap 2: the swept child's description flipped to
+    "This refresh token has been revoked."; the live child was answered **200 with an access token, an
+    id token and a fresh refresh token**, and the code's family grew from 2 rows to 3; and the race's
+    live replacement was likewise answered 200, immediately after the log line saying the sweep never
+    saw it. That is a working grant on a terminated session, which is the defect this stage exists to
+    disprove.
+16. **The marker write dropped**, `RevokeCodesBySessionIdentifier` removed from
+    `revoke/terminate-session` with the token sweep left in place. Stage 4's headline case **passed**
+    and so did stage 6's `test/consent-window-no-code`, because both are satisfied by the sweep alone.
+    Both stage 8 tests failed the same way as under mutation 15. So the marker's *write* is load
+    bearing at the integration tier and only this stage's cases observe it, which is the mirror of 15
+    and the reason both were run rather than one.
+
+**A third mutation was considered and deliberately not run:** moving the marker read inside the
+`Refresh` branch of the `typ` switch, which is the plausible tidy-up that would file it beside the
+other session check and make it unreachable for an offline grant. Stage 2's unit table already refuses
+it, because its refresh fixtures carry `typ: Offline` deliberately, so running it here would measure
+stage 2's coverage rather than stage 8's.
+
+**One thing checked rather than assumed, because a test writes through a production path.** Step 1's
+reconstruction clears the child's `revoked` column with `UpdateRefreshToken`, which works only because
+that column is not tagged `dont-update` the way `Code.Revoked` and `RefreshToken.AuthStateGeneration`
+are. That looked like it might be a defect of the same class, a stale full-row write regressing a
+revocation, so it was traced: `UpdateRefreshToken` has exactly one production caller,
+`revoke/refresh-tokens`, and it is the sweep that sets the flag true. Nothing in production writes a
+whole refresh token row for any other purpose, so there is no clobber to find and no follow-up to
+draft.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its sixteen items, all
+`Decided`, and section 9 its four follow-ups. The evidence agrees with what stages 4 to 6 documented,
+which is the one outcome that would have made this a blocking decision rather than a stage.
+
+**Where the stage is.** Both tests implemented, green on all four engines, and **uncommitted** at the
+point this was written, with `.review/request.md` carrying round 1. The trace is here rather than in
+the mailbox because the mailbox does not survive the next gate, which is stage 3's lesson.
+
+### Stage 8 round 1, 2026-08-05: clean, and the last stage closes
+
+**Review, round 1, clean.** `gpt-5.6-sol`, effort high, `type: code-review`, request
+`129-20260805T190122Z`. All three axes read `reviewed`, verdict `clean`, **zero findings, zero
+follow-ups and zero bookkeeping**. The scope is recorded rather than summarised, for the reason stage
+7's entry gives: zero findings in a narrow scope reads exactly like zero findings in a thorough one.
+
+**The reviewed tree is the committed tree, and this one is provable rather than argued.**
+`.review/before.sha` held `f51d8c916c26…`, `git diff | sha256sum` at this gate returns the same value,
+and the request named that hash as the ask. So the reviewer touched no tracked file and nothing moved
+after it looked, which stage 7 could only establish from mtimes because its `before.sha` was stale.
+
+**What it ran**, its own list: the full diff and the surrounding refresh, validation, termination,
+persistence and harness code; `where.sh test --type integration`, passing on mysql, postgres, mssql and
+sqlite; `check-anchors.sh` at all 82 rows; `go vet ./tests/integration/` in the dev container;
+`gofmt -l` on the changed file; `git diff --check`; and `git diff | sha256sum` compared against the
+requested hash. Its 35 shell commands are in `.review/events-codex.jsonl`, and they are reading and
+running rather than agreeing: it read the agreement in 17 slices, then the validator's `refresh_token`
+case, `handler_token.go`, `commondb/code.go`, `token_issuer.go`, `models/refresh_token.go`, the
+offline-grant harness in `credential_change_revocation_test.go` and the helpers in `utils_test.go`.
+
+**What it answered, question by question**, since the request asked five and a clean verdict is worth
+only what it covered.
+
+1. **The reconstruction is faithful, and it checked the fields the request named.** `UpdateRefreshToken`
+   excludes `CreatedAt` and `AuthStateGeneration` through `dont-update`, so clearing `Revoked` leaves a
+   row whose `UpdatedAt` is later and whose `CreatedAt` is earlier than a genuine late insert's, and it
+   traced that **neither validation nor rotation reads either field**, so the divergence is invisible to
+   the path under test. The parent state and the family columns match the real interleaving.
+2. **The description assertion identifies the gate, on the code.** The marker is read after client
+   ownership and before the `typ` switch; the asserted row is `Offline` with an empty session
+   identifier, so it cannot reach the `Refresh` branch's session lookup that shares the message; the
+   handler's revoked-row gate runs later and uses the distinct text. It found **no third reachable gate**
+   on this fixture that produces the asserted description, which is what the request asked it to look
+   for.
+3. **The racing case is a real test.** It confirmed the invariant is unconditional under the design and
+   that the case claims nothing about which interleaving occurred.
+4. **Neither the 5 millisecond delay nor the retry can mask a failure.** The delay changes only the
+   likelihood of a replacement, and every assertion holds when there is none. The retry still requires a
+   200 **and** independently requires the session row to be gone, so it cannot turn a failed termination
+   into a passing assertion; it can only make a run less concurrent, which the test says. And it cannot
+   paper over a missing marker read or write, because the deterministic case fails under either.
+5. **No third mutation is owed.** A lost `code_id` inheritance is caught by the parent-child equality
+   assertion; moving the marker read into the `Refresh` branch is already caught by stage 2's `Offline`
+   fixtures, which is the reason the run gave for not running it.
+
+It also took the sceptical pass the request asked for on the long comments, since the diff is mostly
+prose, and confirmed their substantive claims: which gate answers first, why `offline_access` is
+required rather than incidental, what the reconstruction is faithful to, and what the race cannot force.
+Three earlier gates in this run found a comment or a claim that was false, so this was asked for
+explicitly.
+
+**Its own run reached the same measurement**, independently: one replacement per engine, still live
+after the sweep on mssql and sqlite and refused by the marker anyway, the before-sweep ordering on mysql
+and postgres, and no sequential termination retry. **One honesty note about verifying that.** Codex's
+captured output for the run truncates the middle, `... 3548864 bytes omitted ...`, so what the capture
+itself proves is the run spanning mysql through sqlite, zero `FAIL`, one
+`ok github.com/leodip/goiabada/authserver/tests/integration 44.139s` for the last engine and
+`All tests completed successfully.`, which `run-tests.sh` prints only when every engine passed. The
+per-engine race reading for postgres and mssql could not be re-read from the capture, so the per-engine
+table in the stage entry stands on **this run's own** measurement rather than on the reviewer's
+agreement with it. The two agree; the point is which one carries the claim.
+
+**Its `unchecked` list holds nothing the gate depended on.** The modules and data tiers, correctly not
+applicable to a stage whose one changed file is in a package neither tier compiles, with the stage
+entry's reasoning independently restated: no production method, query, migration, schema or model
+change. Unchanged PKCE, redirect matching, signature and audience validation, session lifecycle, rate
+limiting, template escaping and secret comparison, none of which this diff reaches. And the run's two
+source mutations, assessed statically because a reviewer may not edit source under review, which is the
+same limitation recorded at every earlier gate.
+
+**Tiers at the gate.** No re-run, and the reason is the hash rather than convenience: the tree being
+committed is byte-identical to the tree that went green twice, once in the implementation session
+(exit 0, 4768 passing test lines, zero `FAIL`, both new tests passing once per engine) and once in the
+reviewer's independent run above. `check-anchors.sh` re-run here, PASS on all **82** rows.
+`git diff --stat` is two files, 538 insertions, 13 deletions.
+
+**No round 2, and the gate passes on one round.** All three axes reviewed, zero findings, the one tier
+the stage claims executed by the reviewer as well as by the run, and nothing changed after the reviewed
+tree. That is the clean case the reviewer reference describes.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its sixteen items, all
+`Decided`, and section 9 its four follow-ups. Stage 8 is committed with this document following it, and
+it is the last: next is the run's closing pass, the full suite across every tier, sections 8 and 9 onto
+the pull request, and the PR marked ready for review.
 
 ---
 
