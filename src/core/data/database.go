@@ -99,12 +99,22 @@ type Database interface {
 	DeleteCode(tx *sql.Tx, codeId int64) error
 	CodeLoadClient(tx *sql.Tx, code *models.Code) error
 	CodeLoadUser(tx *sql.Tx, code *models.Code) error
-	// DeleteUsedCodesWithoutRefreshTokens reaps codes that were redeemed but never
-	// produced a refresh token. createdBefore is a required grace cutoff: only codes
-	// created before it are deleted. Without it the sweep races the token endpoint,
-	// which marks a code used and only then inserts the refresh token that references
-	// it, so a code mid-redemption matches the predicate and its deletion fails the
-	// insert with a foreign key violation.
+	// DeleteUsedCodesWithoutRefreshTokens reaps codes that can no longer produce
+	// anything: those redeemed but never followed by a refresh token, and those
+	// revoked while still unredeemed, which is what ending a session leaves behind
+	// when the grant it marked had not been exchanged yet (#129).
+	//
+	// createdBefore is a required grace cutoff shared by both, and only codes created
+	// before it are deleted. For the redeemed ones it is required for correctness:
+	// without it the sweep races the token endpoint, which marks a code used and only
+	// then inserts the refresh token that references it, so a code mid-redemption
+	// matches and its deletion fails the insert with a foreign key violation. For the
+	// revoked ones it is the 60 second code lifetime, past which the code can no
+	// longer be exchanged at all. A cutoff comfortably beyond 60 seconds serves both.
+	//
+	// A revoked code that WAS redeemed is deliberately out of reach here while any
+	// refresh token still references it, because that marker is what rejects the
+	// token.
 	DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error
 
 	CreateResource(tx *sql.Tx, resource *models.Resource) error

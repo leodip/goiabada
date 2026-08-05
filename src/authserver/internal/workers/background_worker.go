@@ -32,6 +32,11 @@ const (
 	// Codes expire after 60 seconds (token_validator.go), so anything older than that
 	// can never be redeemed and can never gain a refresh token. Five minutes is that
 	// bound with generous room for clock skew and slow signing.
+	//
+	// The same cutoff also bounds the second class that sweep reaps, codes revoked
+	// while still unredeemed when a session was ended (#129). There the reason is only
+	// the 60 second lifetime rather than the foreign key race, so this value is already
+	// past what that class needs.
 	usedCodeCleanupGrace = 5 * time.Minute
 
 	// startupDelay holds the first poll back so the server can finish coming up
