@@ -5,7 +5,8 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** in progress, started 2026-08-04. Stages 1, 2 and 3 done, stage 4 next.
+**Run state:** in progress, started 2026-08-04. Stages 1 to 4 done, so the behaviour change has landed.
+Stage 5, the `/auth/completed` gate, is next and is still a sketch.
 **PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
@@ -41,8 +42,8 @@ exists and will need reconciling against this document's section 3.
 
 | Label | File | Function | Locate by | Note |
 |---|---|---|---|---|
-| `admin/session-delete` | `src/authserver/internal/handlers/apihandlers/handler_api_users_sessions.go` | `HandleAPIUserSessionDelete` | `err = database.DeleteUserSession(nil, sessionId)` | termination site 1, bare delete, no revocation |
-| `account/session-delete` | `src/authserver/internal/handlers/apihandlers/handler_api_account_sessions.go` | `HandleAPIAccountSessionDelete` | `if err := database.DeleteUserSession(nil, sessionId); err != nil {` | termination site 2, ownership checked, bare delete |
+| `admin/session-delete` | `src/authserver/internal/handlers/apihandlers/handler_api_users_sessions.go` | `HandleAPIUserSessionDelete` | `result, err := handlers.TerminateUserSessionTx(database, userSession)` | termination site 1. **Locator re-swept by stage 4**, which is what replaced the bare delete this row used to cite |
+| `account/session-delete` | `src/authserver/internal/handlers/apihandlers/handler_api_account_sessions.go` | `HandleAPIAccountSessionDelete` | `result, err := handlers.TerminateUserSessionTx(database, us)` | termination site 2, ownership checked. **Locator re-swept by stage 4**, same reason |
 | `logout/last-client-delete` | `src/authserver/internal/handlers/handler_account_logout.go` | `handleExistingSessionOnLogout` | `if len(userSession.Clients) == 1 {` | termination site 3, deletes the session only when the last client logs out |
 | `logout/basic-post-fork` | `src/authserver/internal/handlers/handler_account_logout.go` | `HandleAccountLogoutPost` | `if hint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint"); len(hint) > 0 {` | without a hint the handler clears the cookie and writes nothing to the database |
 | `catalog/end-session-modal` | `src/core/i18n/catalogs/active.en.toml` | `n/a` | `adminconsole.account.sessions.modal_confirm_body_prefix` | one of three end-session modals; decision 14 adds a key beside each |
@@ -96,6 +97,14 @@ log can cite it the same way. Nothing above the line changed.
 | `revoke/terminate-session` | `src/authserver/internal/handlers/revocation.go` | `TerminateUserSessionTx` | `revokedCodeCount, err := db.RevokeCodesBySessionIdentifier(tx, userSession.SessionIdentifier)` | stage 3, the first of decision 5's three writes and the only one that survives |
 | `test/terminate-offline-token` | `src/authserver/internal/handlers/revocation_test.go` | `TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession` | `the offline token of the terminated session must be revoked` | stage 3, decision 2's guard at this seam |
 | `test/terminate-zero-result` | `src/authserver/internal/handlers/revocation_test.go` | `TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult` | `the count must not survive a rolled-back transaction` | stage 3, the keep-this row of the failure table |
+| `revoke/log-terminated` | `src/authserver/internal/handlers/revocation.go` | `LogTerminatedUserSession` | `func LogTerminatedUserSession(auditLogger AuditLogger, userSession *models.UserSession,` | stage 4, decision 9's payload, one emitter for both endpoints |
+| `catalog/modal-revocation-note` | `src/core/i18n/catalogs/active.en.toml` | `n/a` | `adminconsole.account.sessions.modal_revocation_note` | stage 4, one of decision 14's six keys |
+| `test/terminate-endpoint-audit` | `src/authserver/internal/handlers/apihandlers/handler_api_users_sessions_test.go` | `TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents` | `assert.Len(t, terminatedPayload, 6)` | stage 4, decision 9's payload asserted field by field |
+| `test/failure-suppresses-events` | `src/authserver/internal/handlers/apihandlers/handler_api_users_sessions_test.go` | `TestHandleAPIUserSessionDelete_TerminationFailureIsA500` | `is the case that decided this file had to` | stage 4, the contract no other tier can reach |
+| `test/forbidden-does-not-terminate` | `src/authserver/internal/handlers/apihandlers/handler_api_account_sessions_test.go` | `TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate` | `func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {` | stage 4, ownership ahead of termination |
+| `test/terminate-offline-endpoint` | `src/authserver/tests/integration/api_users_sessions_test.go` | `TestAPIUserSessionDelete_TerminatesTheOfflineGrantsOfThatSession` | `THE SURVIVOR IS THE HALF THAT CARRIES THIS TEST` | stage 4, seam 8's headline claim and its same-user control |
+| `test/second-offline-grant` | `src/authserver/tests/integration/credential_change_revocation_test.go` | `secondOfflineGrantForSameUser` | `func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password string) *offlineGrant {` | stage 4, the one new harness helper |
+| `test/logout-revokes-nothing` | `src/authserver/tests/integration/api_account_logout_request_test.go` | `TestLogout_WithIdTokenHint_RevokesNoGrants` | `logout must revoke nothing, decision 3` | stage 4, decision 3 pinned |
 
 Counts in this document carry their command:
 
@@ -1579,41 +1588,161 @@ leave the security action with only a lifecycle record and nothing attesting wha
 review moved one displaced comment in `revocation_test.go`, recorded in section 7.
 
 ### Stage 4: both endpoints terminate, and everything that says so
-Status: **Not started**
-Detail: **sketch**
+Status: **Done**
+Seams: the two new handler test files section 1 asked for, 8 (`POST /auth/token`), 9 (the
+session-management endpoints) and 10 (the catalogs, which need no new test code).
+Tiers: unit (three modules), integration (dev container). Data not applicable, and deliberately so:
+this stage adds no query and no migration, and every data method it reaches was covered on four
+engines in stage 1 or already existed.
+Docs: all of section 2's "Documentation owed", minus the two ceremony sentences held back for stages
+5 and 6.
 
 The activation stage. It carries the endpoint calls **and** every piece of user-facing material about
 them, in one commit, so no deploy can perform the broader security action while a page or a modal
 still describes the narrower one. That pairing is the plan review's second finding and the reason
 stage 3 above is inert.
 
-`admin/session-delete` and `account/session-delete` call the helper, ownership still enforced on the
-account one, and each emits `AuditDeletedUserSession` unchanged plus `terminated_user_session` with
-decision 9's payload, both **after** the commit. Seams: the two new handler test files section 1 asked
-for, covering both events with their payload on success and **neither** event with a 500 on helper
-failure, which is the contract no other tier can reach; seam 8 for the headline claim (authorize with
-`offline_access`, terminate, refresh refused, paired with the assertion that an unrelated session
-still refreshes, without which the test passes against a change that revokes everything); seam 9 for
-both endpoints, the account one's 403, and pinning logout unchanged through request shapes #109 is not
-rewriting. Seam 10 for the catalog keys, which needs no new test code because
-`TestCatalog_ParityEnPtBR` and `TestCatalog_NoEmptyValues` already fail on a key in one catalog only
-or present and empty, and the step says so explicitly so the absence of new cases does not read as
-untested copy. Tiers: unit, integration.
-
-Docs, all of it here: the falsified sentences in `concepts/tokens.mdx`, a new ending-a-session section
-in `concepts/user-sessions.mdx`, both endpoints in `integration/rest-api.mdx`, a durable-termination
-bullet in `reference/security.mdx`, and decision 14's three keys in each catalog plus one `msg +=`
-line in each of `account_user_sessions.html`, `admin_users_sessions.html` and
-`admin_clients_usersessions.html`, placed before the `if (isCurrent)` append so the immediate-logout
-warning stays last and containing no double quote, since the string is interpolated into a JavaScript
-double-quoted literal. Two wordings, second person on the account page and third person on the two
-admin pages.
-
 **The new concepts section is limited to what is true when this lands**: what the two endpoints revoke
 (decision 2) and decision 11's limit, that an offline grant's access token keeps working until it
 expires. It must **not** yet claim that an in-flight ceremony cannot recreate the session, because
 that is stages 5 and 6, and documenting a fail-open path as closed is worse than documenting nothing.
 Those two sentences land with the stages that make them true.
+
+1. **`LogTerminatedUserSession`, one emitter for decision 9's payload.** Status: **Done**
+   In `revocation.go` beside `LogRevokedUserAuthState`, which is the precedent and states the reason:
+   one function rather than two literals, so the payload cannot differ between the two sites and there
+   is a single place to assert its shape field by field. Takes the loaded `*models.UserSession` for the
+   same reason `TerminateUserSessionTx` does, since `userId`, `userSessionId` and `sessionIdentifier`
+   all come off that one row and so cannot describe two different sessions. Six keys, exactly decision
+   9's: `userId`, `userSessionId`, `sessionIdentifier`, `revokedRefreshTokenJtis`, `revokedCodeCount`,
+   `loggedInUser`.
+2. **`admin/session-delete` terminates.** Status: **Done**
+   Replace `database.DeleteUserSession(nil, sessionId)` with `handlers.TerminateUserSessionTx(database,
+   userSession)`, the session row being already loaded for the pre-existing 404. On error, the existing
+   500 and **no** audit event of either kind. On success, `AuditDeletedUserSession` first with its
+   payload untouched, then `LogTerminatedUserSession`. The 404 and the two 400s answer before the
+   helper, unchanged, so a missing session never opens a transaction.
+3. **`account/session-delete` terminates.** Status: **Done**
+   The same replacement, with the ownership check still ahead of it: `us.UserId != user.Id` answers 403
+   before the helper is entered. Same event pair, same order, same failure contract.
+4. **Unit cases at the admin handler, in a new `handler_api_users_sessions_test.go`.**
+   Status: **Done**
+   Section 1 recorded that neither handler test file exists, and the preamble to this section records
+   why the first draft of the plan wrongly declined to create them. On the strict `mocks_data.Database`
+   and `mocks_audit.AuditLogger` the sibling files already use, with a thin `stubTermination` helper
+   following `stubSweep`'s precedent in `handler_api_account_password_test.go`: thin because
+   `revocation_test.go` owns the termination table exhaustively and restating it here would mean two
+   places to update. Expectations written before running them:
+
+   | Case | Expected | Which mechanism answers, or what it proves |
+   |---|---|---|
+   | a live session, helper succeeds | 200, both events, and `terminated_user_session` carrying exactly decision 9's six keys | decision 9's payload, field by field, asserted with a length check so a dropped key cannot pass |
+   | the same case, the older event's payload | exactly `userSessionId` and `loggedInUser` | decision 9 promises it is untouched, so an external consumer parsing it strictly keeps working |
+   | the helper fails, the code sweep erroring | 500, **neither** event, no commit | **keep this row.** It is the contract that decided the file's existence: the integration tier can read audit rows but cannot force the termination transaction to fail, so nothing above the unit tier can prove the events are suppressed |
+   | the session id is not found | 404, and `BeginTransaction` never called | the pre-existing 404 still answers first. Without this row a handler that terminated before checking would pass every other row |
+
+5. **Unit cases at the account handler, in a new `handler_api_account_sessions_test.go`.**
+   Status: **Done**
+   Same harness, and the token context through `setTokenContextWithClaims`, which the profile-picture
+   test file already provides:
+
+   | Case | Expected | Which mechanism answers, or what it proves |
+   |---|---|---|
+   | the caller's own session, helper succeeds | 200, both events, decision 9's six keys | the self-service half of decision 5 |
+   | another user's session | 403, and `BeginTransaction` never called | ownership answers before termination. **Keep this row:** a handler that terminated first and then returned 403 satisfies every existing test in the suite, because the pre-existing integration case asserts only the status code |
+   | the helper fails | 500, neither event | the same suppression contract, at the second site, because the two emitters are adjacent in the code and it is easy to leave one outside the error check |
+
+6. **Decision 14's three keys in each catalog, and one line in each of three templates.**
+   Status: **Done**
+   `modal_revocation_note` under the three prefixes decision 14's table names, placed between
+   `modal_confirm_body_suffix` and the current-session warning in each catalog, which is the order the
+   template appends them in. Two wordings, second person on the account page and third person on the
+   two admin pages, exactly as decision 14 sealed them, plus the pt-BR drafts refined against the
+   register of the neighbouring strings. **No double quote in any of the six values**, since each is
+   interpolated into a JavaScript double-quoted literal inside `endSessionClick`, and the `msg +=` line
+   goes **before** the `if (isCurrent)` append so the immediate-logout warning stays last.
+   **Seam 10 needs no new test code, and that is the finding rather than an omission.**
+   `TestCatalog_ParityEnPtBR` already fails in both directions when a key exists in one catalog and not
+   the other, and `TestCatalog_NoEmptyValues` already fails on a key present with an empty value, which
+   go-i18n otherwise renders as the raw key in the UI. Adding the keys to both files is what puts them
+   under the existing guard. Stated explicitly so the absence of new cases does not read as untested
+   copy.
+7. **The docs site, four pages.** Status: **Done**
+   Per section 2's "Documentation owed", and per section 2's verified list of what owes nothing:
+   `concepts/audit-log.mdx` points at `constants.go` rather than enumerating events,
+   `integration/endpoints.mdx`'s `/auth/logout` description stays accurate because decision 3 leaves
+   logout unchanged, and `CLAUDE.md` and `AGENTS.md` enumerate neither migrations nor the `codes` table.
+   - `concepts/tokens.mdx`, offline refresh tokens: the two falsified sentences. The distinction
+     decision 4 rests on is the one to draw, a session **expiring** still leaves an offline grant
+     working and a session **explicitly ended** does not.
+   - `concepts/user-sessions.mdx`: a new `## Ending a session` section after "Credential changes and
+     live sessions" and before "Forcing re-authentication", covering what the two endpoints revoke
+     (decision 2), decision 11's limit that an offline grant's access token keeps working until it
+     expires because it carries no session identifier to check, and decision 9's counting note. Without
+     that limit a reader generalizes the credential-change bullet, "reject a token from a superseded
+     session on the very next request", to termination and is wrong.
+   - `integration/rest-api.mdx`: one sentence on each of the two endpoints, linking to the new section.
+   - `reference/security.mdx`, "Authentication security": a durable-termination bullet in the shape of
+     the "Replay containment" one, which is the established shape for a security property here.
+8. **Integration cases at seams 8 and 9.** Status: **Done**
+   All in existing suites, per section 5. The harness is #106's: `createOfflineGrant` runs a full
+   `offline_access` ceremony through the real login and consent screens and returns the grant plus the
+   session identifier read off the `codes` row, and `offlineGrant.refresh` presents its refresh token.
+   One new helper, `secondOfflineGrantForSameUser`, which is `secondSessionFor` with the offline scope:
+   a fresh cookie jar and a distinct `User-Agent`, the latter load bearing rather than cosmetic because
+   `StartNewUserSession` deletes other sessions of the same user sharing device name, type, OS and IP.
+
+   | Case | File | Expected | What it proves |
+   |---|---|---|---|
+   | two offline grants of the **same user** on sessions A and B, admin `DELETE` on A | `api_users_sessions_test.go` | both refresh before, then A's refresh `invalid_grant` and B's still works | the headline claim at the highest seam that can observe it, plus the control seam 8 requires. **The control belongs to the same user deliberately:** it varies only the session, so it rejects a table-wide sweep and a user-scoped one at once, where an unrelated user's grant would leave the second untested |
+   | one offline grant, account `DELETE` on the caller's own session | `api_account_sessions_test.go` | refresh refused | the self-service half, end to end |
+   | another user's session holding an offline grant, account `DELETE` | `api_account_sessions_test.go` | 403 **and** that grant still refreshes | ownership answers before termination, observed rather than mocked. The pre-existing 403 case asserts only the status, which a handler terminating first would still satisfy |
+   | `/auth/logout` with `id_token_hint` and `post_logout_redirect_uri`, the session's only client | `api_account_logout_request_test.go` | 302 to the post-logout redirect, and the offline refresh token still works | decision 3: logout revokes nothing, in every case. The 302 assertion is what stops the case passing because logout did nothing at all |
+   | the same, with a second client on the session | `api_account_logout_request_test.go` | the logged-out client's **session-bound** refresh token still works | decision 3's second contract, pinned so #135 has to change it deliberately. The second client is created directly with `CreateUserSessionClient`, which this suite already does, because what matters is the count `handleExistingSessionOnLogout` reads |
+   | `test/fresh-ceremony-after-delete` | `session_deletion_test.go` | unchanged and green | #46's guard. No new code, named because it is the case decision 6 must not break and stage 5 depends on it |
+
+   **Driven through request shapes #109 is not rewriting**, per decision 13. Both logout cases supply
+   `id_token_hint` **and** `post_logout_redirect_uri`, because #109 item 1 is that the second is wrongly
+   required and its check returns before the teardown. They assert only what #129 cares about, that no
+   grant was revoked, and nothing about whether the parameter was required, how the redirect was built,
+   or whether the session row survived, which is #109 divergence B's business. The hint is taken from
+   the token exchange's own `id_token` rather than from the logout-request API, so the case does not
+   depend on that API's client resolution, which is also #109's surface.
+
+   **What this tier deliberately does not prove.** The marker's distinctive property, that a child
+   inserted after termination is born already rejected, is invisible here: the sweep revokes every
+   token that exists at termination, so these cases would pass against a sweep with no marker at all.
+   That is correct division of labour, seams 1 to 4 own the column and section 5 rejects asserting
+   `codes.revoked` from an integration test, and stage 8 owns the racing-child evidence.
+9. **Verify.** Status: **Done**
+   `check-anchors.sh`, then `where.sh test --type modules` and `where.sh test --type integration`. The
+   integration tier runs for the first time this run, so a failure there is as likely to be harness as
+   regression and gets diagnosed rather than worked around.
+
+**As built.** All nine steps landed as written. Five deviations, all small, plus one omission with a
+stated reason.
+
+1. **Two sealed anchor rows were re-swept**, which no earlier stage had to do: `admin/session-delete`
+   and `account/session-delete` cited the bare `DeleteUserSession` calls this stage replaced, so their
+   locators resolved to nothing. Both now cite the helper call and say in their note that stage 4
+   re-swept them. Stage 1's line "Nothing above the line changed" no longer holds, and saying so here
+   is cheaper than leaving a reader to notice.
+2. **Nine anchor rows added**, more than any earlier stage, because the stage created two test files,
+   an emitter, a catalog key and four integration cases.
+3. Both handlers hoist `authHelper.GetLoggedInSubject(r)` into a local rather than calling it twice,
+   one call per event. No behaviour change; it just stops the two payloads reading as though they
+   could disagree.
+4. `secondOfflineGrantForSameUser` landed in `credential_change_revocation_test.go`, which is #106's
+   file, rather than in the suite that uses it. That is where `offlineGrant`, `createOfflineGrant` and
+   `secondSessionFor` already live, and it sits directly beneath the helper it mirrors.
+5. The consent branch the helper was going to need turned out to be unnecessary: both
+   `HandleAuthCompletedGet` and `HandleConsentGet` route an `offline_access` request to consent
+   unconditionally, to re-confirm the refresh token grant, so the second ceremony is deterministic and
+   the helper asserts the consent screen rather than branching on it. Verified in both handlers.
+6. **Omitted deliberately: a case for the no-hint POST at `logout/basic-post-fork`.** Seam 9 made it
+   conditional, "if a case covers the no-hint POST", and it was not written. That path calls no
+   revocation code at all, so a case there would pin nothing the `id_token_hint` cases do not already
+   pin, and decision 13 leaves the path itself to #109, where it is drafted as follow-up 2.
 
 ### Stage 5: the `/auth/completed` gate
 Status: **Not started**
@@ -2016,6 +2145,122 @@ never written stalls the loop silently rather than loudly.
 
 **Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its fourteen items, all
 `Decided`. No follow-up found: the only defect this stage surfaced was in its own comments.
+
+### Stage 4, 2026-08-04
+
+**Landed.** The activation stage, in one commit as the plan review's finding 2 requires.
+`revoke/log-terminated`, that is `LogTerminatedUserSession`; both endpoints calling
+`TerminateUserSessionTx` at `admin/session-delete` and `account/session-delete`, each emitting
+`AuditDeletedUserSession` with its payload untouched plus `terminated_user_session` with decision 9's
+six keys, both after the commit and neither on the error path; the two handler test files section 1
+asked for, six cases over `test/terminate-endpoint-audit`, `test/failure-suppresses-events` and
+`test/forbidden-does-not-terminate` among them; five integration cases, `test/terminate-offline-endpoint`,
+its account sibling, the account 403 pairing, and the two logout pinnings starting at
+`test/logout-revokes-nothing`; one new harness helper at `test/second-offline-grant`; decision 14's
+`catalog/modal-revocation-note` and its five siblings plus one line in each of the three templates; and
+the four documentation pages. Nine anchor rows added and two sealed ones re-swept.
+
+**This is the commit where the behaviour changes.** Stages 1 to 3 were inert by construction: the
+column existed with nothing writing it, the rejections existed with nothing marked, and the helper
+existed with no caller. After this commit ending a session at either endpoint revokes the codes of that
+session and the refresh tokens those grants issued, offline ones included, and every page and modal
+that describes the action says so in the same commit.
+
+**Tiers.** Unit green, all three modules, run at the gate after the mutations below were reverted
+("All tests completed successfully", no `FAIL` lines). The stage's six new unit cases pass.
+Integration green on **all four engines**, `where.sh test --type integration` exit 0, 3544 passing
+tests, zero `FAIL` lines; each of the five new cases passes four times, once per engine. No data tier,
+correctly: this stage adds no query and no migration, and every data method it reaches was covered on
+four engines in stage 1 or already existed. `check-anchors.sh` passes all 57 rows, `gofmt -l` is silent,
+`git diff --check` is clean, and `cd site && npm run build` completes with 42 pages and no link errors.
+
+**The integration tier ran for the first time in this run**, and it needed no repair: the two earlier
+stages recorded it as not applicable rather than untried.
+
+**Mutation evidence, because three of this stage's rows exist to catch specific mistakes.** Each
+mutation was applied to the real code, run, and reverted, in this session.
+
+1. **The sid-scoped sweep replaced by the user-scoped one**, `GetRefreshTokensByUserId`, which is the
+   plausible tidy-up that reuses #106's query. At the integration tier exactly one assertion failed,
+   the survivor half of `test/terminate-offline-endpoint`: "the same user's OTHER session must be
+   untouched: map[error:invalid_grant error_description:This refresh token has been revoked.]". The
+   terminated half still passed, which is the point: without the survivor row this mutation ships. At
+   the unit tier it also failed four `TestTerminateUserSessionTx_*` cases on the strict mock, so both
+   tiers catch it, and the integration one catches it as the observable outcome rather than as an
+   unexpected call.
+2. **Termination moved ahead of the account handler's ownership check.** Exactly
+   `test/forbidden-does-not-terminate` and `TestHandleAPIAccountSessionDelete_TerminationFailureIsA500`
+   failed. The happy-path case still passed, and so, by reading, would the pre-existing integration
+   case `TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession`, which asserts only the status code
+   and the error description. That is the whole argument for adding both the unit row and its
+   integration pairing: before #129 the mistake leaked nothing, and after it revokes a stranger's
+   grants.
+3. **`AuditDeletedUserSession` moved above the error check**, in both handlers, which is the one-line
+   mistake the two adjacent emitters invite. Exactly the two `_TerminationFailureIsA500` cases failed,
+   one per handler, and nothing else. That is the contract the plan review said had no other home, and
+   it now has a measurement rather than an argument.
+
+**Deviations from the plan as written.** Six, recorded in full in the stage's as-built note above: two
+sealed anchor rows re-swept, nine anchor rows rather than an unstated number, `GetLoggedInSubject`
+hoisted to one call per handler, the new harness helper placed in #106's test file beside the helper it
+mirrors, the helper's consent branch dropped once both handlers were verified to route
+`offline_access` to consent unconditionally, and the no-hint POST logout case deliberately not written.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its fourteen items, all
+`Decided`. No follow-up found: the only surprise this stage produced was that the consent path is
+unconditional, which is existing behaviour working as its comments describe.
+
+**Review request.** `129-20260805T000627Z`. The two new test files were marked intent-to-add so
+`git diff` covers them, which no earlier stage needed; the request carries the resulting hash and this
+entry deliberately does not, since recording it here changes it. Everything above this line was written
+before the review ran, which is stage 3's lesson: the trace goes into the agreement at the moment it is
+known, because the mailbox does not survive the next gate.
+
+**Review, round 1, clean.** `gpt-5.6-sol`, effort high, `type: code-review`. Conformance, quality and
+security all `reviewed`, verdict `clean`, zero findings and zero follow-ups. The scope is recorded
+below rather than summarised, because zero findings in a narrow scope reads exactly like zero findings
+in a thorough one.
+
+**What it ran**, its own list: `where.sh test --type modules` passing all three modules,
+`where.sh test --type integration` passing on mysql, postgres, mssql and sqlite, `npm run build`
+completing with 42 pages, `check-anchors.sh` passing all 57 rows, `git diff --check HEAD` clean, and
+`gofmt -l` silent on every changed Go file. This is the second gate at which the reviewer reached a
+test tier and the first at which it reached the integration one, which the stage 1 and 2 entries above
+record it could not.
+
+**What it checked by reading**, named because these are the stage's contracts rather than general
+approval: that `admin/session-delete` and `account/session-delete` are the only production callers this
+stage adds for `TerminateUserSessionTx`, with decision 5's four excluded `DeleteUserSession` callers
+untouched; that the account handler resolves the token subject and compares `us.UserId` to it before
+opening the transaction, and the admin handler's 404 and two 400s still answer first; that both
+handlers emit `deleted_user_session` with exactly its two prior keys and then `terminated_user_session`
+with exactly decision 9's six, both after a successful helper return and so after the commit, and
+neither reachable from an error path; that the six catalog values contain no double quote that would
+break their JavaScript literal and each template appends before its current-session warning; that the
+four pages describe what stage 4 actually provides and do **not** claim the stage 5 and 6 ceremony gap
+is closed; and that the logout production path is unchanged, with both new cases supplying
+`id_token_hint` and `post_logout_redirect_uri` and asserting only what decision 3 owns. On security it
+recorded that storage failures fail closed through both handlers and the helper, that the marker
+update, the sid-scoped sweep and the session delete share one transaction with parameterised
+predicates, that the join reaches offline tokens through their code without widening to another session
+or user, and that no raw code, refresh token, client secret or OTP reaches a log, response, template or
+URL.
+
+**Its `unchecked` list holds nothing the gate depended on.** The data tier, correctly not applicable to
+a stage adding no query, interface method, migration or schema change, with stage 1's four-engine
+evidence standing behind every data method it reaches; the run's own three source mutations, which it
+assessed statically by inspecting each target branch and the tests claimed to catch it, because a
+reviewer may not modify source under review; and unchanged cryptography, token signature internals,
+global PKCE policy, redirect matching and unrelated rate limiting, none of which the diff reaches.
+
+**Hash check clean.** `git diff HEAD | sha256sum` was still `570a8395…` when this session started,
+matching both `.review/before.sha` and the hash the reviewer reported after its run, so it changed no
+tracked file and reviewed exactly the code committed here. `check-anchors.sh` re-run at ingestion, 57
+rows passing, and the two handler diffs re-read against the reviewer's conformance claims before this
+was written.
+
+**No round 2.** All three axes reviewed with the tiers actually executed and zero findings is the clean
+case the reviewer reference describes, and nothing changed after the reviewed hash.
 
 ---
 
