@@ -5,11 +5,11 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** stage 5 awaiting review round 2, 2026-08-05. Stages 1 to 4 are committed. Decision 15
-was answered on PR #138 ("Let's go with option A"), and stage 5 now carries that answer: the gate reads
-a dedicated level 1 proof on the `AuthContext` rather than `AuthenticatedAt`. Still **uncommitted**,
-because the gate has not passed a review round since it changed. Modules and integration are green on
-the amended tree.
+**Run state:** stages 1 to 5 committed, 2026-08-05. Stage 5 passed its gate at review round 2, whose
+one quality finding (a lost negative case for `userReallyAuthenticated`'s pre-existing `!IsZero()`
+term) was resolved inside the stage. Decision 15 was answered on PR #138 ("Let's go with option A"), so
+the gate reads a dedicated level 1 proof on the `AuthContext` rather than `AuthenticatedAt`. Next:
+stage 6, the `/auth/issue` liveness check and the compensating revoke, still a sketch.
 **PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
@@ -114,6 +114,7 @@ log can cite it the same way. Nothing above the line changed.
 | `pwd/level1-proof` | `src/authserver/internal/handlers/handler_auth_pwd.go` | `HandleAuthPwdPost` | `authContext.Level1AuthCompleted = true` | stage 5, the only writer of that field |
 | `test/completed-gate-otp` | `src/authserver/internal/handlers/handler_auth_completed_test.go` | `TestHandleAuthCompletedGet` | `t.Run("No valid session and only OTP authenticated this ceremony, restarts level 1"` | stage 5, decision 15's unit row, the one that fails against the round 1 gate |
 | `test/otp-alone-no-recreate` | `src/authserver/tests/integration/session_deletion_test.go` | `TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession` | `"the ended session must not be recreated by a ceremony that only verified OTP")` | stage 5, decision 15's integration case, paired with `test/fresh-ceremony-after-delete` in the same file |
+| `test/completed-authtime-zero` | `src/authserver/internal/handlers/handler_auth_completed_test.go` | `TestHandleAuthCompletedGet` | `t.Run("Successful flow, existing session, zero AuthenticatedAt does not refresh AuthTime"` | stage 5 round 2, the valid-session row covering `userReallyAuthenticated`'s pre-existing `!IsZero()` term, which the gate does not read |
 
 Counts in this document carry their command:
 
@@ -1848,7 +1849,7 @@ stated reason.
    pin, and decision 13 leaves the path itself to #109, where it is drafted as follow-up 2.
 
 ### Stage 5: the `/auth/completed` gate
-Status: **In progress**
+Status: **Done**
 Seams: 6 (`HandleAuthCompletedGet`, in the existing `handler_auth_completed_test.go`), plus, per
 decision 15's answer, one assertion each in the existing `handler_auth_pwd_test.go` and
 `handler_auth_otp_test.go` subtests, which are the only seams that can see who writes the new field.
@@ -1926,12 +1927,15 @@ into `StartNewUserSession`; it is verified and drafted as follow-up 3 in section
    | the three existing subtests reaching `StartNewUserSession` gain `Level1AuthCompleted` and a non-nil `AuthenticatedAt` | outcomes unchanged: 302 to `/auth/issue` or `/auth/consent`, `StartNewUserSession` called with the same arguments | **keep these as the positive control.** They are `test/fresh-ceremony-after-delete`'s shape at the unit tier, session gone and the user really did level 1, and they fail against a gate keyed on the session alone. Both fields are set because `pwd/level1-proof` sets both, so the row stays a shape the code can actually produce. This is the non-additive cost section 1 recorded |
    | the three existing subtests with a valid session and nothing authenticated, untouched | unchanged: SSO reuse still bumps and proceeds | the gate is confined to the else branch. These fail if it is hoisted above `if hasValidUserSession`, which is the natural-looking tidy-up |
    | the existing re-auth subtest: valid session, `AuthenticatedAt` set, `Level1AuthCompleted` false, untouched | unchanged: bumps, refreshes `AuthTime`, proceeds | the legitimate step-up by OTP on a live session, which option A must not disturb. It was already in the file and needed no amendment, and it is the fourth row that fails if the gate is hoisted |
+   | valid session, `AuthenticatedAt` non-nil but **zero** | bumps, does **not** call `UpdateUserSession`, and the session's own `AuthTime` reaches the saved context unchanged | `userReallyAuthenticated`'s `!IsZero()` term, which this gate does not read but the valid-session branch still does. Added in round 2, see below |
 
-   **Amended per decision 15.** The zero-time `AuthenticatedAt` row was replaced by the OTP row rather
-   than kept beside it. It existed to pin the `!IsZero()` spelling of a discriminator this gate no
-   longer reads, and the OTP row catches the same mistake, a gate falling back to `AuthenticatedAt`,
-   through a shape the code can actually reach. `userReallyAuthenticated`'s own `!IsZero()` term is
-   pre-existing and still covered by the re-auth subtest, which is where it belongs.
+   **Amended per decision 15, then corrected in round 2.** The zero-time `AuthenticatedAt` row was
+   first replaced by the OTP row rather than kept beside it, on the reasoning that it pinned the
+   `!IsZero()` spelling of a discriminator this gate no longer reads and that the re-auth subtest still
+   covered that term. The second half of that was **wrong**, and round 2 of the review caught it: the
+   re-auth subtest supplies a *nonzero* timestamp, which satisfies both spellings, so deleting
+   `!IsZero()` left the whole file green. The row is back, in the shape the finding asked for, and both
+   rows now stand: the OTP row for the gate, this one for the discriminator the branch above it reads.
 
    No new audit event, no new mock method and no new fixture: the gate reads one bool off the auth
    context and writes a state the router already knows.
@@ -1967,17 +1971,19 @@ into `StartNewUserSession`; it is verified and drafted as follow-up 3 in section
    are existing `SaveAuthContext` matchers in existing subtests, one line each, at handler seams
    section 1 already named.
 
-**As built.** All six steps landed, the first five as written once decision 15's amendments are read
-into them. Six anchor rows added in total: `completed/level1-restart` and `test/completed-gate` when the
-stage was first built, then `authcontext/level1-proof`, `pwd/level1-proof`, `test/completed-gate-otp`
-and `test/otp-alone-no-recreate` when option A landed. One row needed re-sweeping,
+**As built.** All six steps landed, the first five as written once decision 15's amendments and round
+2's correction are read into them. Seven anchor rows added in total: `completed/level1-restart` and
+`test/completed-gate` when the stage was first built, then `authcontext/level1-proof`,
+`pwd/level1-proof`, `test/completed-gate-otp` and `test/otp-alone-no-recreate` when option A landed,
+then `test/completed-authtime-zero` at round 2. One row needed re-sweeping,
 `completed/level1-restart`, because option A replaced the predicate it cites; no sealed row moved.
 
 Three things worth naming beyond the steps.
 
 1. **The predicted case table shipped unchanged when first built**, and decision 15's answer then
-   replaced one of its rows rather than adding one, so the file stays at twelve subtests where `main`
-   has ten (`grep -c 't.Run(' handler_auth_completed_test.go`). The three amended
+   replaced one of its rows rather than adding one; round 2 put that row back beside the replacement,
+   so the file ends at thirteen subtests where `main` has ten
+   (`grep -c 't.Run(' handler_auth_completed_test.go`). The three amended
    positive controls still pass with their original assertions, including the `StartNewUserSession`
    argument expectations, because the handler overwrites `AuthenticatedAt` from the new session before
    saving and the amendment therefore cannot be observed downstream of the gate.
@@ -2693,6 +2699,86 @@ section 9 and in the stage's as-built note.
 after round 1 read it and no review round has seen the current tree. `.review/request.md` carries round
 2, whose ask is the whole stage 5 diff with the decision 15 answer applied. The tiers above were green
 on exactly that tree.
+
+### Stage 5 round 2, 2026-08-05: the gate closes
+
+**Review, round 2.** `gpt-5.6-sol`, effort high, request `129-20260805T152741Z`. All three axes read
+`reviewed`. It ran the modules tier (green, three modules), the integration tier (green on mysql,
+postgres, mssql and sqlite), `check-anchors.sh` (63 rows), `npm run build` in `site` (42 pages),
+`gofmt -l` on the changed Go files, `git diff --check`, and `git diff | sha256sum` before and after its
+own verification, both `32a49f32`, so it reviewed the diff the request named and touched nothing.
+
+**What it found sound**, recorded because a clean axis needs a stated scope. Conformance: option A is
+implemented as chosen, `Level1AuthCompleted` is on the `AuthContext`, `pwd/level1-proof` is the only
+source writer, the OTP handler does not set it, the gate reads it, and an older cookie decodes the
+absent bool as false. Security: it searched for every path that sets
+`AuthStateAuthenticationCompleted` and redirects to `/auth/completed`, found three (level 1 completion,
+optional level 2 completion, OTP completion), and confirmed none of them provides a second writer;
+`prompt=none` goes straight to `/auth/issue`; and the auth context is JSON inside the encrypted,
+HMAC-authenticated Gorilla cookie, so a request parameter cannot inject the bool. Quality: the paired
+integration cases prove both directions, and the two writer assertions pin the asymmetry.
+
+Not reached: the data tier, correctly, this stage adds no data-layer behaviour; the five mutations,
+assessed statically because a reviewer may not modify source under review; and unchanged
+authentication, token-validation, endpoint-authorization and rate-limiter internals outside the stage.
+
+One finding, on the quality axis.
+
+1. **Replacing the zero-time row removed the only negative coverage of a separate guard.**
+   `Raised by: reviewer`, minor, confidence high, `needs_human: true`. Status: **Resolved**
+
+   **Confirmed against the code, and the run's own round 1 evidence already said so.**
+   `completed/really-authenticated` reads
+   `AuthenticatedAt != nil && !AuthenticatedAt.IsZero()`, and `git diff` shows that line unchanged, so
+   the `!IsZero()` term is pre-existing. After the decision 15 amendment every non-nil
+   `AuthenticatedAt` fixture in the file carried `time.Now().UTC()`: the SSO rows cover nil, which
+   short-circuits before `!IsZero()` is evaluated, and the re-auth row covers nonzero, which satisfies
+   both spellings. So step 3's amendment note claiming the term was "still covered by the re-auth
+   subtest" was **false**, and the first stage 5 entry's mutation 2 had already demonstrated exactly
+   that: dropping the term failed only the zero-time row, "without that row this mutation ships". The
+   amendment then deleted the row and carried the claim forward without re-running the mutation.
+
+   **Resolved rather than escalated, and the reasoning matters because the verdict asked for a human.**
+   The finding is on the **quality** axis, so reviewer.md's rule that a security finding is never
+   settled by the run alone does not reach it. What it asks for is a test row: no production code
+   changes, no interface, no schema, no wire format, no persisted shape and no security property, which
+   is decisions.md's "local and reversible" exactly. And there is no question left to put to anyone,
+   which is what an escalation would be for: the reviewer's recommendation, the code, and the run's own
+   mutation 2 agree on which term is uncovered and what covers it. leo-run is explicit that coverage
+   the plan missed is added and named rather than escalated, and spending an escalation on "may we add a
+   test row" would burn the budget decisions.md section 5 treats as a signal.
+
+   **What landed.** `test/completed-authtime-zero`, a valid-session subtest carrying a non-nil zero
+   `AuthenticatedAt`, asserting the ordinary bump, **no** `UpdateUserSession`, and the session's own
+   `AuthTime` reaching the saved context unchanged. Two independent things fail if the term is dropped:
+   the strict `mocks_data.Database` carries no `UpdateUserSession` expectation, and the
+   `SaveAuthContext` matcher pins the carried-forward timestamp. The comment says why nothing else in
+   the file can cover it. Step 3's table gained the row, its amendment note now records the false claim
+   rather than absorbing it, and the block comment above the two gate subtests no longer says the
+   zero-time row was replaced.
+
+   **Mutation, applied to the real handler, run and reverted in this session.**
+   `userReallyAuthenticated := authContext.AuthenticatedAt != nil`, the term dropped, which is round
+   1's mutation 2 re-run against the amended file. Exactly one subtest failed,
+   `test/completed-authtime-zero`, and nothing else moved. Before this row the same mutation shipped
+   green, which is the whole finding.
+
+**Tiers, re-run in full on the tree that is being committed, both in the foreground.** Modules green,
+all three modules, 2760 passing test lines, zero `FAIL`, `TestHandleAuthCompletedGet` at **13**
+subtests where `main` has 10. Integration green on **all four engines**, 4756 passing test lines, zero
+`FAIL`, with `test/otp-alone-no-recreate` and `test/fresh-ceremony-after-delete` each passing once per
+engine. `check-anchors.sh` passes all 64 rows, `gofmt -l` is silent, `git diff --check` is clean. Still
+no data tier, and still correctly: a bool on a struct persisted as JSON in a cookie is not a schema.
+
+**Bookkeeping, from the reviewer's own section.** Round 2's request described the diff as nine Go files
+and one mdx file. `git diff ee400e1` is eight Go files, one mdx file and this document; the
+uncommitted stage tree alone is eight Go files and one mdx file. The count in the request was wrong,
+the 582-insertion total was right once the committed agreement amendment is included, and the request
+is throwaway so the correction lives here.
+
+**Nothing deferred, nothing contested, nothing new raised.** Section 3 keeps its fifteen items, all
+`Decided`. Round 2 was the second and last round at this gate, its one finding is resolved rather than
+carried, so the gate is passed and the stage is committed.
 
 ---
 
