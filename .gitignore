@@ -426,3 +426,11 @@ src/todo.txt
 
 # Playwright MCP session output
 .playwright-mcp/
+
+# Agreement run logs. docs/issue-<n>-<slug>/log/ holds the per-stage trace of a run and
+# is the durable record of why the code looks the way it does, so it has to be tracked.
+# The Visual Studio boilerplate above excludes any directory named log/, which caught
+# these silently: the first agreement directory landed with its log entry invisible to
+# git status. Negate the directory before the files, or git never descends into it.
+!docs/**/log/
+!docs/**/log/**
