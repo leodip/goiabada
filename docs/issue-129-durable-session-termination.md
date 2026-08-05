@@ -6,17 +6,17 @@
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
 **Run state:** stages 1 to 5 committed, 2026-08-05. Stage 6, the `/auth/issue` liveness check and the
-compensating revoke, is expanded, implemented and green on all three tiers, but **halted and
-uncommitted** on decision 16, raised by its round 1 code review on 2026-08-05 and awaiting the user on
-PR #138. The finding: the new refusal restarts level 1 unconditionally, so a `prompt=none` ceremony
-whose session ends in the redirect hop is shown a password form instead of being returned
-`login_required`, which contradicts the no-UI contract this repository documents and implements
-everywhere else. Decision 6 says restart level 1 for this case and explicitly rejected
-`login_required`, so reconciling the two is the user's call. Expanding the stage also found that the
-terminated ceremony reaches `/auth/issue` with an **empty** session identifier rather than a dead one,
-because the session middleware clears it first, and that an empty identifier alone makes the resulting
-grant offline; the stage entry in section 6 carries the reasoning. Next after stage 6: stages 7 and 8,
-both still sketches.
+compensating revoke, is expanded, implemented and green on all three tiers, and **uncommitted pending
+review round 2**. Its round 1 review raised decision 16, which the user answered on PR #138 on
+2026-08-05 with option A: a `prompt=none` ceremony whose session ends in the redirect hop is returned
+`login_required` rather than being restarted into a password form it is forbidden to display, and
+every other ceremony still restarts level 1. That branch, its unit row, its integration ceremony and a
+docs sentence are now in the tree, so the diff round 1 read no longer exists and the stage goes back
+for round 2 rather than to its gate. Section 3 has zero `Open` items. Expanding the stage also found
+that the terminated ceremony reaches `/auth/issue` with an **empty** session identifier rather than a
+dead one, because the session middleware clears it first, and that an empty identifier alone makes the
+resulting grant offline; the stage entry in section 6 carries the reasoning. Next after stage 6:
+stages 7 and 8, both still sketches.
 **PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
@@ -129,6 +129,8 @@ log can cite it the same way. Nothing above the line changed.
 | `test/revoke-code-gone-tx` | `src/authserver/tests/data/code_test.go` | `TestRevokeCodeIfSessionGone_TransactionAndFailurePath` | `a code revoked inside a rolled-back transaction` | stage 6, the two questions a mock cannot answer |
 | `test/issue-liveness` | `src/authserver/internal/handlers/handler_auth_issue_test.go` | `TestHandleIssueGet` | `t.Run("No session identifier in the context, restarts level 1"` | stage 6, seam 7's gate row; the three other new rows sit below it |
 | `test/consent-window-no-code` | `src/authserver/tests/integration/session_deletion_test.go` | `TestSessionEndedOnConsentScreen_NoCodeIsIssued` | `the ended session must not be recreated by a ceremony waiting on the consent screen` | stage 6, the third of the file's paired ceremonies |
+| `issue/prompt-none-refusal` | `src/authserver/internal/handlers/handler_auth_issue.go` | `HandleIssueGet` | `if authContext.HasPromptValue("none") {` | stage 6, decision 16 option A's branch, inside `issue/liveness-restart` |
+| `test/prompt-none-login-required` | `src/authserver/tests/integration/session_deletion_test.go` | `TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired` | `"prompt=none must not be restarted into the interactive flow")` | stage 6, decision 16's integration case, the fourth ceremony in the file |
 | `middleware/session-identifier` | `src/authserver/internal/middleware/middleware_session_identifier.go` | `MiddlewareSessionIdentifier` | `ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)` | **pre-existing code, not written by the run.** The row exists because stage 6 and decision 16 cite this label three times each and it was declared nowhere, so the citations resolved to nothing. The locator is the only line that puts the identifier in the request context, which is the fact both cite |
 
 Counts in this document carry their command:
@@ -447,7 +449,7 @@ Verified as owing nothing, stated because silence reads the same as forgetting:
 
 ## 3. Open questions and decisions
 
-Sixteen items, fifteen `Decided` and **one `Open`**, which is item 16 and is what halts the run.
+Sixteen items, **all `Decided`**. Nothing is open, so nothing here halts the run.
 Opened at eleven; decision 4's reversal onto a code-level marker exposed a residual at `/auth/issue`
 that the registry design did not have, which is item 12. The
 reconciliation pass of 2026-08-04 added two more: tracing which endpoints the "End session" buttons
@@ -456,7 +458,8 @@ documentation sweep found three confirmation modals whose copy this change makes
 Item 15 was raised by the run during stage 5, when the code review found that decision 6's gate is
 satisfied by OTP alone; it halted the run until the user answered it on PR #138 on 2026-08-05, and it
 keeps the question it was escalated with rather than being trimmed to its answer. Item 16 was raised
-the same way at stage 6's gate, and is the second and last of the two decision 6 has now cost.
+the same way at stage 6's gate, halted the run until the user answered it on 2026-08-05, and is the
+second and last of the two decision 6 has now cost.
 Numbers are never reused, and decision 4 records its own reversal rather than being rewritten silently.
 
 1. **All three gaps land in #129, with gap 2 staged last.** Status: **Decided** Raised by: user
@@ -1167,10 +1170,46 @@ Numbers are never reused, and decision 4 records its own reversal rather than be
     Answering C when A was right leaves explicit termination defeatable by an in-flight ceremony, which
     is the defect #129 exists to close, on a path a stolen cookie reaches.
 
-16. **What does `/auth/issue` do when the liveness check fails and the ceremony carries
-    `prompt=none`?** Status: **Open** Raised by: reviewer, raised during stage 6
+16. **`prompt=none` is returned `login_required`. Every other ceremony still restarts level 1.**
+    Status: **Decided** Raised by: reviewer, raised during stage 6
 
-    **The question.** Stage 6 built `issue/liveness-restart` exactly as decision 6 words it: when the
+    Answered by the user on PR #138, 2026-08-05, in full: "Let's go with option A again." That is
+    option A below, the recommended one, taken over B, C and D with no amendment, so the run applied
+    it as written: one branch at `issue/prompt-none-refusal` reading `authContext.HasPromptValue("none")`
+    inside the existing refusal, calling `redirToClientWithError` with `constants.ErrorLoginRequired`
+    and then `ClearAuthContext`, copying the `id_token_hint` branch a few lines above it in the same
+    function.
+
+    What the answer settles, beyond the branch: decision 6's rejection of `login_required` is
+    **scoped to interactive ceremonies** rather than reversed. Its stated reason, that failing to the
+    client "costs the user a round trip through the client to arrive at the same password form",
+    describes a ceremony that has a password form to arrive at. A `prompt=none` client does not and is
+    forbidden from rendering one, so the reason does not reach it. The rejection stands everywhere it
+    applies, which is what `test/consent-window-no-code` still asserts and what option D would have
+    reversed.
+
+    The error description is `handlePromptNone`'s own wording for this condition, "User
+    authentication is required", chosen rather than invented: the condition really is the same one
+    arriving a redirect hop later, so the client sees a response it cannot distinguish from the
+    ordinary no-session case and does not need to. That also leaves
+    `concepts/prompt-parameter.mdx`'s `login_required` row ("No valid session, session expired ...")
+    accurate without an edit, which is the docs cost option B would have carried.
+
+    **What lost.** B, keeping stage 6 as built and documenting a carve-out in
+    `concepts/prompt-parameter.mdx`, which would have shipped an authorization server rendering a
+    login form in response to a request that forbids one. C, minting the code and letting the
+    compensating statement handle it, ruled out rather than weighed because the identifier is empty on
+    this path and `db/revoke-code-if-session-gone` refuses an empty identifier, so it answers 500. D,
+    returning `login_required` for every ceremony, which discards a ceremony that could have completed
+    correctly and reddens `test/consent-window-no-code`; mutation 8 in the run log is exactly that
+    option applied, and it is what fails.
+
+    The question as it was escalated is kept below, because the reasoning is what makes the answer
+    reviewable.
+
+    ---
+
+    **The original question.** Stage 6 built `issue/liveness-restart` exactly as decision 6 words it: when the
     ceremony's bound session identifier no longer resolves to a session row, refuse to mint a code, set
     `AuthStateRequiresLevel1` and redirect to `/auth/level1`. Decision 6 names `prompt=none` as reaching
     this same place. But `/auth/level1` sends the browser on to `/auth/pwd`, which renders a password
@@ -2108,7 +2147,8 @@ Tiers: unit (three modules), data (four engines), integration (dev container). D
 where stage 5 said it did not: this stage adds an interface method and a statement no other tier
 runs against mysql, postgres, mssql and sqlite.
 Docs: the second sentence held back from stage 4's concepts section, the consent-screen window, in
-`concepts/user-sessions.mdx`.
+`concepts/user-sessions.mdx`, plus a third on the silent-renewal outcome once decision 16 was
+answered.
 
 Decision 6's second half plus decision 12. Gap 3's remaining exposure is a ceremony that passed
 `/auth/completed` while its session was alive, sat on the consent screen, and reaches `/auth/issue`
@@ -2185,6 +2225,16 @@ what proves it: every existing ceremony in the suite goes through this handler.
    `issuer/grant-is-offline`, so refusing it is not belt-and-braces; and that this is deliberately a
    **liveness** check rather than a validity one, so it asks whether the row resolves and leaves
    idle timeout and max age to `/auth/completed`, which has already applied them.
+
+   **One predicate, two outcomes** (decision 16, answered after round 1 found the second one
+   missing). A ceremony carrying `prompt=none` cannot be restarted, because `/auth/level1` leads to
+   `/auth/pwd` and that request forbids UI; nothing between the two reads the prompt, so it would be
+   handed a login page and no error at all. `issue/prompt-none-refusal` sits first inside the refusal
+   and returns `login_required` through `redirToClientWithError`, then `ClearAuthContext`, copying the
+   `id_token_hint` branch above it. The description is `handlePromptNone`'s own wording for this
+   condition, "User authentication is required", so the client cannot tell this from the ordinary
+   no-session refusal one hop earlier. Every other ceremony still restarts level 1, which is decision
+   6 unchanged.
 3. **The compensating revoke, immediately after the insert.** Status: **Done**
    Decision 12. `RevokeCodeIfSessionGone(nil, code.Id, sessionIdentifier)` directly after
    `issue/create-code`'s error check, ahead of the `AuditCreatedAuthCode` entry. On a database error,
@@ -2221,6 +2271,7 @@ what proves it: every existing ceremony in the suite goes through this handler.
    |---|---|---|
    | no session identifier in the request context | 302 to `/auth/level1`, saved context reading `requires_level_1`, and no code created | the liveness check on the shape the middleware actually produces. "No code created" is enforced rather than asserted: the strict `mocks_oauth.CodeIssuer` carries no `CreateAuthCode` expectation |
    | a sid resolving to no session row | the same | the other half of the same predicate, for the narrow race where the middleware saw the session live |
+   | the same empty identifier, with `prompt=none` on the context | 302 to the client's redirect URI carrying `error=login_required` and the request's `state`, no `code`, no `/auth/level1`, and `SaveAuthContext` never called | decision 16 option A. The two rows above are its negative control, since they carry no prompt and must still restart; a branch applied unconditionally reddens both, which is mutation 8 |
    | the session lookup fails | 500, no code created | a database fault must not read as a terminated session, and must not read as a live one either |
    | a live session | code issued as before, and `RevokeCodeIfSessionGone` called with that code's id and that sid | decision 12's statement is issued. Whether it **works** is seam 4's, per section 5 |
    | the compensating revoke fails | 500, and the client is not redirected with a code | the fail-closed direction of step 3 |
@@ -2234,6 +2285,19 @@ what proves it: every existing ceremony in the suite goes through this handler.
    for someone deciding whether ending a session is enough, so it says the outcome rather than the
    mechanism, and it does not describe the residual interleaving, which is follow-up 1's and reads
    to a user as doubt about the feature.
+
+   **A third sentence landed with decision 16's answer**, in the same section: an application renewing
+   quietly with `prompt=none` meets the same check and is told rather than shown, getting
+   `login_required` back and never a login page. The two sentences beside it both say "sent back to
+   the login page", which is the outcome a reader would otherwise generalize to a background renewal,
+   and it is the outcome decision 16 rejected for that shape. It links to
+   `concepts/prompt-parameter.mdx` rather than restating it.
+
+   **Verified as owing nothing, stated because silence reads the same as forgetting.**
+   `concepts/prompt-parameter.mdx` keeps its `login_required` row, "No valid session, session expired
+   (idle or max lifetime), or `max_age` exceeded", because option A's response is byte-identical to
+   the no-session case that row already describes, down to the `error_description` the page prints in
+   its own example. That page needing an edit was option B's cost, not A's.
 7. **The mid-flight integration case, in `session_deletion_test.go`.** Status: **Done**
    `TestSessionEndedOnConsentScreen_NoCodeIsIssued`, the third of the file's paired ceremonies and
    the one that varies the window rather than the credential: the session is alive through
@@ -2245,6 +2309,7 @@ what proves it: every existing ceremony in the suite goes through this handler.
    | Case | Expected | What it proves |
    |---|---|---|
    | session ended on the consent screen, then consent submitted | `/auth/consent` posts to `/auth/issue` as always, and `/auth/issue` redirects to `/auth/level1` and then `/auth/pwd`, with no code reaching the client and no session recreated | gap 3's second half at the highest seam that can see it. The consent POST succeeding first is deliberate: it is what makes `/auth/issue` the load-bearing hop rather than an incidental one |
+   | session ended between `handlePromptNone`'s 302 and the browser following it | back to the client's redirect URI with `error=login_required` and the request's `state`, no `code`, nothing on `/auth/level1`, and no session recreated | decision 16, added after round 1. Same window through the other door, and the outcome is the one thing that differs, so it sits beside the consent-screen case rather than replacing it. `createSessionWithAcrLevel1` supplies the live session, and the termination goes between `assertRedirect` and `loadPage`, which is the whole window a silent ceremony has |
    | `test/fresh-ceremony-after-delete` and `test/otp-alone-no-recreate` | unchanged and green | the pair decision 6 rests on. This stage's check is the one that could redden the first: a code flow whose session vanished is exactly #46's shape one hop later |
 
    The ordinary ceremony is the control, and it is named rather than duplicated: `createOfflineGrant`
@@ -2258,8 +2323,11 @@ what proves it: every existing ceremony in the suite goes through this handler.
    load bearing at this gate rather than routine: this stage puts a new refusal in front of every
    authorization code the suite issues.
 
-**As built.** All eight steps landed. Eight anchor rows added to section 0, and no sealed row moved.
-Four things worth naming beyond the steps.
+**As built.** All eight steps landed. Ten anchor rows added to section 0, and no sealed row moved.
+Eight of the ten landed with the first pass; `issue/prompt-none-refusal` and
+`test/prompt-none-login-required` landed with decision 16's answer, which is also what put a second
+outcome in step 2 and a row in each of step 5's and step 7's tables. Five things worth naming beyond
+the steps.
 
 1. **The empty-sid finding is the stage, not a detail of it.** The sketch's predicate, "resolves to no
    session row", never fires on the path gap 3's second half actually takes, because
@@ -2282,6 +2350,12 @@ Four things worth naming beyond the steps.
    target session gone while an unrelated session row exists" are one call, because the fixture's live
    session is still in the table while it runs and a shared test database always holds other sessions
    anyway. The property both rows were for is intact and is what mutation 6 kills.
+5. **The refusal has two outcomes, not one, and the second was missing until the review.** Decision 6
+   fixes the predicate and the run applied it as written; what its text does not settle is what a
+   ceremony forbidden from seeing UI should be handed once the predicate fires. Decision 16 settles
+   that, and the shape of the fix is worth keeping: the branch is keyed on the prompt rather than
+   replacing the restart, so the interactive outcome decision 6 chose is untouched. Mutations 7 and 8
+   in the run log are the two ways to get that wrong, and their failure sets are disjoint.
 
 ### Stage 7: reaping unused revoked codes
 Status: **Not started**
@@ -3219,6 +3293,60 @@ built inside stage 6 rather than a later one: under option A that is one branch 
 its `loadPage`. Step 2 of the stage and both of its case tables gain the row, and the stage then needs a
 round 2 on the new branch rather than a fresh gate.
 
+### Stage 6 continued, 2026-08-05: decision 16 answered
+
+**The answer.** "Let's go with option A again," on PR #138 at 17:09Z. Recorded in decision 16 with the
+user's words, and what lost is recorded beside it: B, C and D, with D's cost measurable rather than
+argued, since mutation 8 below is exactly option D applied to the code.
+
+**Landed, inside stage 6 as the escalation said it would.** `issue/prompt-none-refusal`, one branch at
+the head of the existing refusal: when the ceremony carries `prompt=none`, `redirToClientWithError`
+with `constants.ErrorLoginRequired` and then `ClearAuthContext`, copying the `id_token_hint` branch a
+few lines above it in the same function. Every other ceremony still restarts level 1, untouched. Plus
+an eighth row at `test/issue-liveness`, `test/prompt-none-login-required` at the integration tier, and
+a third docs sentence in `concepts/user-sessions.mdx`. Two anchor rows added, and the stage's step 2,
+step 5 table, step 6 and step 7 table all carry the new outcome.
+
+**One judgement inside the answer, and it is recorded rather than silent.** The error description is
+`handlePromptNone`'s own wording for this condition, "User authentication is required", rather than
+something naming the mid-flight termination. Local and reversible under decisions.md section 1: it is
+one string in one branch, changes no interface and no persisted shape, and a test pins it. It is also
+the better answer on its own terms, since the client genuinely cannot act differently on the two cases
+and a distinct description would only tell a caller which internal hop refused it. The side effect is
+that `concepts/prompt-parameter.mdx` stays accurate unedited, down to the `error_description` in its
+own worked example, which is checked rather than assumed.
+
+**Tiers, all re-run in full on the amended tree rather than narrowed to the change.** Modules green on
+all three modules. Data green on all four engines run separately, with `TestRevokeCodeIfSessionGone`
+and its transaction sibling passing on each; the data layer is untouched by this amendment, and
+re-running it is what makes "the stage is green" a statement about the tree rather than about the
+diff. Integration green on **all four engines**, 889 passing test lines per engine and zero `FAIL`,
+with all four of `session_deletion_test.go`'s ceremonies passing once per engine. `check-anchors.sh`
+passes all **74** rows. `gofmt -l` silent, `npm run build` in `site` at 42 pages.
+
+**Mutation evidence, two more mutations, applied to the real code, run, and reverted in this session.
+Their failure sets are disjoint, and between them they pin that the branch is keyed on the prompt
+rather than replacing the refusal.**
+
+7. **The `prompt=none` branch removed**, which is stage 6 exactly as round 1 reviewed it and is option
+   B. At the unit tier exactly one row failed, the new one. At the integration tier on sqlite exactly
+   `test/prompt-none-login-required` failed, while `test/consent-window-no-code`,
+   `test/fresh-ceremony-after-delete` and `test/otp-alone-no-recreate` stayed green. So the finding
+   reproduces against the code the review read, and the new case is what closes it.
+8. **The branch made unconditional**, which is option D: `login_required` for every ceremony. At the
+   unit tier the two interactive rows failed and the `prompt=none` row passed. At the integration tier
+   `test/consent-window-no-code` failed and the new case passed. That is the cost decision 16 priced
+   for D, measured rather than predicted, and it is why the branch reads the prompt.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 now has sixteen items, all
+`Decided`, and section 9 keeps its three follow-ups: the amendment surfaced no new one, and the
+question it answers was already tracked as a decision rather than as a defect.
+
+**Still uncommitted, deliberately.** The branch the review found missing is now present, so round 1's
+verdict no longer describes this tree. Stage 6 goes back through review for round 2 on the amended
+diff, as decision 15's answer did at stage 5, and the code commit follows that. This agreement is
+committed now, carrying decision 16 `Decided` and this entry.
+
 ---
 
 ## 8. Deferred decisions
@@ -3227,8 +3355,7 @@ Nothing deferred. Stages 1 to 6 met no question that was safe to postpone on a s
 judgement calls stages 5 and 6 made each resolved under section 3 (recorded in their run log entries),
 and the two questions the run could not answer were both in authentication territory, which
 decisions.md forbids deferring. Those are decisions 15 and 16, which halted the run rather than sitting
-here. Decision 15 was answered by the user on 2026-08-05; decision 16 is `Open` and is what the run is
-currently waiting on.
+here. Both were answered by the user on 2026-08-05, and both answers are built.
 
 This section stays in the document even while empty, because the closing PR comment reports it and an
 absent section reads the same as a forgotten one.
