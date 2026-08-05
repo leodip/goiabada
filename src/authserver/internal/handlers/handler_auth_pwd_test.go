@@ -439,6 +439,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				ac.AuthState == oauth.AuthStateLevel1PasswordCompleted &&
 				ac.AuthMethods == enums.AuthMethodPassword.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
+				// This handler is the only writer of Level1AuthCompleted, so this is the
+				// only unit case that fails if the write is dropped. Without it the gate in
+				// handler_auth_completed sends every fresh login back to /auth/pwd and only
+				// the integration tier notices (#129 decision 15).
+				ac.Level1AuthCompleted &&
 				// Captured from the user whose credentials were just verified. Thin on
 				// purpose: token_issuer_auth_state_generation_test.go owns the tables.
 				ac.AuthStateGeneration == 7

@@ -603,7 +603,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateAuthenticationCompleted &&
 				ac.AuthMethods == enums.AuthMethodOTP.String() &&
-				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero()
+				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
+				// OTP is level 2 and must not claim level 1: a ceremony can reach here by
+				// reusing a session rather than by entering a password, so setting this
+				// would let it recreate a session that was just ended (#129 decision 15).
+				!ac.Level1AuthCompleted
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -680,7 +684,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateAuthenticationCompleted &&
 				ac.AuthMethods == enums.AuthMethodOTP.String() &&
-				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero()
+				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
+				// OTP is level 2 and must not claim level 1: a ceremony can reach here by
+				// reusing a session rather than by entering a password, so setting this
+				// would let it recreate a session that was just ended (#129 decision 15).
+				!ac.Level1AuthCompleted
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

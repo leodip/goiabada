@@ -47,6 +47,19 @@ type AuthContext struct {
 	Prompt                        string     // Normalized prompt values (space-delimited, deduplicated)
 	AuthenticatedAt               *time.Time // Optional: override for auth_time in code issuance (used by prompt=none)
 	IdTokenHintSub                string     // sub claim from id_token_hint (empty if no hint provided)
+	// Level1AuthCompleted records that level 1 authentication happened in THIS ceremony,
+	// as opposed to being inherited from a session the ceremony reused. It is written only
+	// where level 1 is performed, today only handler_auth_pwd, and read by
+	// handler_auth_completed to decide whether a ceremony with no valid session may create
+	// one (#129 decision 15).
+	//
+	// AuthenticatedAt cannot answer that question, which is why this field exists: the OTP
+	// handler sets it too, so a ceremony that stepped up to level 2 by reusing a session
+	// and never saw the password form satisfies it on OTP alone. Any future level 1 method
+	// must set this, or a ceremony using it is sent back to /auth/level1 when its session
+	// is gone. Absent from an older cookie it unmarshals as false, which is the safe
+	// direction.
+	Level1AuthCompleted bool
 	// AuthStateGeneration is the user's authentication generation as it stood when this
 	// ceremony authenticated. Captured from the user at password verification, or
 	// inherited from the reused session on the SSO path, and NEVER read from the current

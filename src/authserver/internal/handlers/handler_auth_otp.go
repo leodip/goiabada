@@ -306,6 +306,11 @@ func HandleAuthOtpPost(
 		authContext.AddAuthMethod(enums.AuthMethodOTP.String())
 		// Mark that real authentication occurred — used by handler_auth_completed
 		// to decide whether to refresh the session's AuthTime.
+		//
+		// Deliberately does NOT set authContext.Level1AuthCompleted. OTP is level 2, and a
+		// ceremony can arrive here having reused a session rather than entered a password,
+		// so verifying OTP is no proof of level 1 and must not let a ceremony recreate a
+		// session that was ended mid-flight (#129 decision 15).
 		utcNow := time.Now().UTC()
 		authContext.AuthenticatedAt = &utcNow
 		authContext.AuthState = oauth.AuthStateAuthenticationCompleted
