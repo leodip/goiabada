@@ -150,8 +150,8 @@ Checkable:
 - **Narrowing the skew window** (issue recommendation 3). Independent of replay, changes behaviour for
   users with fast clocks, and the issue itself calls it optional and separate. Decision 6; drafted as a
   follow-up in `closing.md` so it is not lost when #111 closes.
-- **The empty-secret enrolment defect** found while grounding (see `closing.md`). Real and verified,
-  but a different bug.
+- **Any empty-secret or malformed-secret hardening beyond `otp/verify-enrolling`.** Decision 9 guards
+  the one site this change rewrites and nothing else.
 - **Rate limiting `PUT /api/v1/account/otp`**, already tracked as #113.
 - **`LimitOtp` returning a blank 200 on an unreadable auth context**, already tracked as #114.
 - **Dropping the plaintext `users.otp_secret` column**, already tracked as #98.
@@ -162,66 +162,163 @@ Checkable:
 
 - `docs/security-2fa`: the "Authentication security" list says two-factor auth exists but nothing about
   one-time use. One bullet, in the stage that lands enforcement, in the shape of the neighbouring
-  "Refresh token rotation" and "Replay containment" bullets.
-- `site/src/content/docs/concepts/acr-amr.mdx` describes the OTP prompt but makes no claim about code
-  reuse, so it is not falsified. No change unless decision 5 adds an audit event, which would also
-  touch `site/src/content/docs/concepts/audit-log.mdx`.
+  "Refresh token rotation" and "Replay containment" bullets, naming `otp_code_replay_detected` and
+  linking to `/concepts/audit-log/` exactly as those two do.
+- **`concepts/audit-log.mdx` is not touched.** Verified: it does not enumerate events, it states that
+  the full set is defined in `src/core/constants/constants.go`. New events are documented where the
+  behaviour is, which for both #128 and #129 was `security.mdx` plus the concepts page owning that
+  behaviour.
+- **No new concepts page or section.** `concepts/acr-amr.mdx` owns ACR and AMR levels, not TOTP
+  mechanics, and makes no claim about code reuse, so nothing there is falsified. No page owns TOTP
+  mechanics today, and one-time use is a single sentence, so the `security.mdx` bullet carries it
+  rather than inventing a section structure for it.
 - **No new user-facing string.** `catalog/incorrect-otp` already carries the generic message a replay
-  must reuse, so neither `active.en.toml` nor `active.pt-BR.toml` changes. If decision 5 adds an audit
-  event that is a server-side event name, not a catalog entry.
+  must reuse, so neither `active.en.toml` nor `active.pt-BR.toml` changes. The audit event is a
+  server-side identifier, not a catalog entry.
 - `CLAUDE.md` gains nothing: no new directory, tier or flow. The migration number is not recorded there.
 
 ## 3. Decisions
 
-Eight, provisionally. Answering one routinely exposes another.
+Nine. Announced as eight; sweeping the design for what the run would otherwise have to escalate added
+decision 9.
 
 1. **Where does the consumed-code state live?**
-   Status: **Open** · Raised by: user
+   Status: **Decided** · Raised by: user
 
-   A column on `users`, a separate consumed-codes table, or an in-process cache. What hangs on it:
-   everything downstream, including whether this needs a migration at all.
+   **A single last-consumed time-step counter per user, as a column on `users`.** One row per user,
+   nothing to grow, nothing to sweep, and the shared database is the arbiter so it holds across
+   multiple server instances. Matches the issue's proposal.
+
+   **Rejected:** a consumed-codes table, one row per burned (user, step) pair. More precise, since a
+   high-water mark also refuses codes below it that were never actually used, but that over-rejection
+   only spans the 90-second acceptance window and it costs a table, an index and a cleanup sweep.
+   **Rejected:** an in-process cache, which forgets on restart and does not hold across instances, so
+   a replay right after a deploy succeeds.
 
 2. **What shape is the column and how is it written?**
-   Status: **Open** · Raised by: user
+   Status: **Decided** · Raised by: user
 
-   Nullable `BIGINT` with `sql.NullInt64` as the issue proposes, or `NOT NULL DEFAULT 0` with a plain
-   `int64` as `model/generation-field` does. And whether it rides in `UpdateUser` or is tagged
-   `dont-update` with a narrow compare-and-set method. Depends on 1.
+   **`users.last_otp_step`, `NOT NULL DEFAULT 0`, a plain `int64` on the model tagged
+   `dont-update`, written only by a narrow compare-and-set.** 0 means never used, unambiguously: any
+   real step is around 1.8e9. The same shape as `model/generation-field`, for the same reason spelled
+   out there. The only write is
+
+   ```sql
+   UPDATE users SET last_otp_step = ?, updated_at = ? WHERE id = ? AND last_otp_step < ?
+   ```
+
+   which is both the claim and the replay check, so a second submission of one code matches no row.
+   `data/insert-user-tags` shows `dont-update` columns are still in the insert, so a new user lands at
+   the Go zero value 0, which is the correct starting state.
+
+   **Rejected:** nullable with `sql.NullInt64`, as the issue proposes. It distinguishes never-used
+   from used, nothing needs that distinction, and it puts `.Valid` handling at every read site.
+   **Rejected:** an ordinary field carried by `UpdateUser`. `otp/enroll-write` is a whole-user write
+   on the very path that claims a counter, so a model loaded before a concurrent verification would
+   write the old counter back and reopen the replay window.
 
 3. **Do all three call sites claim the counter, or only verification?**
-   Status: **Open** · Raised by: user
+   Status: **Decided** · Raised by: user
 
-   Context item 4 shows enrolment leaves a code usable twice if it does not claim. Claiming everywhere
-   costs the friction in context, plus the test repair in decision 8.
+   **All three.** `otp/verify-enabled`, `otp/verify-enrolling` and `api-otp/verify`. Enrolment claims
+   because it is not merely lower risk: it sets `OTPEnabled = true`, so the same code resubmitted takes
+   the verification branch against the now-stored secret and is accepted a second time. Claiming makes
+   one-time use hold across that boundary.
+
+   Accepted costs: the repair in decision 8, and a user who enrols and immediately meets a level2
+   prompt (via `Level2AuthConfigHasChanged`) waits for the next code.
+
+   **Rejected:** verification only. Cheaper, and it leaves an enrolment code usable exactly twice,
+   which is the property this change exists to remove.
 
 4. **Does disabling OTP reset the counter?**
-   Status: **Open** · Raised by: user
+   Status: **Decided** · Raised by: user
 
-   Resets at `api-otp/disable` and `admin-otp/disable` are the only operator remedy for the clock-jump
-   lockout in context. Costs a second narrow data method and touches the admin path. Depends on 2.
+   **Yes, at `api-otp/disable` and `admin-otp/disable`, via a second narrow method.** The counter
+   belongs to the enrolled authenticator; removing the authenticator clears it. It is also the only
+   in-product remedy for the clock-jump lockout in section 1: with no reset, admin-disabling and
+   re-enrolling claims against the same poisoned counter and fails too.
+
+   Not a bypass. Self-service disable requires the password (`api-otp/disable` verifies it before
+   branching), admin disable requires `authserver:manage`, and re-enrolling requires possession of a
+   fresh secret. Nothing here lets a replayed code buy anything.
+
+   **Rejected:** strictly monotonic with no reset. One method instead of two and a simpler invariant,
+   at the price of a permanent per-user OTP lockout that no operator can clear from the product.
 
 5. **Does a detected replay get its own audit event?**
-   Status: **Open** · Raised by: user
+   Status: **Decided** · Raised by: user
 
-   The issue says reuse `AuditAuthFailedOtp`. #128 set the opposite precedent with
-   `refresh_token_replay_detected`. The audit log is server side, so a distinct event leaks nothing to
-   the caller. Adds a constant and a line to `concepts/audit-log.mdx`.
+   **Yes, `otp_code_replay_detected`, emitted alongside the existing `AuditAuthFailedOtp`.** A
+   replayed code is a far stronger signal than a mistyped one, usually a real-time phishing proxy, and
+   it deserves to be alertable on its own. Follows #128's `refresh_token_replay_detected` rather than
+   the issue's suggestion. The audit log is server side, so the caller still sees only
+   `catalog/incorrect-otp` and learns nothing.
+
+   Payload follows the neighbours: `userId`, and the matched step so an operator can see which code
+   was replayed. Never the code itself.
+
+   **Rejected:** reusing `AuditAuthFailedOtp` alone, as the issue asks. Nothing new to add, and it
+   makes the one failure mode that indicates an active attack indistinguishable from a typo.
 
 6. **Is narrowing the skew window part of this change?**
-   Status: **Open** · Raised by: user
+   Status: **Decided** · Raised by: user
 
-   Provisionally out of scope per section 2. Confirm, and confirm the follow-up draft.
+   **No. Skew stays at 1, and the question is drafted as a follow-up in `closing.md`.** It is
+   independent: the counter guard behaves identically at any skew. Narrowing it starts refusing users
+   whose device clock runs fast, which is a user-visible change that should not ride along inside a
+   security fix nobody is reading for UX.
+
+   **Rejected:** narrowing here, which is cheap once the matcher iterates the window explicitly and
+   is exactly why it would go unnoticed. **Rejected:** dropping it, since the issue raised it and
+   closing #111 would lose it.
 
 7. **Where does the step matcher live, and do the three sites share a helper?**
-   Status: **Open** · Raised by: user
+   Status: **Decided** · Raised by: user
 
-   A pure function in `src/core/otp/` iterating the skew window over `hotp.ValidateCustom`, versus the
-   issue's hand-rolled compare. And whether the match-then-claim pair is inlined at each site or
-   extracted. Determines the seams in section 5.
+   **`otp.MatchStep(passcode, secret string, now time.Time) (int64, bool)` in `src/core/otp/`, pure,
+   with match-then-claim inlined at each of the three sites.** It iterates the skew window over
+   `hotp.ValidateCustom`, so the constant-time comparison stays the library's. No database dependency
+   in `core/otp`, and the six inlined lines respect that the three sites' failure handling genuinely
+   differs: two rerender a template, one writes JSON.
+
+   `now` is a parameter rather than read inside, which is what makes the exhaustive table testable at
+   a pinned instant instead of racing period boundaries.
+
+   **Rejected:** a shared verify-and-consume helper. It removes little, since it must return a
+   three-way result each site translates back into its own branches, and it pulls `data.Database` into
+   whichever package holds it. **Rejected:** the issue's hand-rolled `GenerateCode` plus
+   `subtle.ConstantTimeCompare`, which writes cryptographic comparison code that
+   `hotp.ValidateCustom` already provides.
 
 8. **How is `test/reenroll-same-window` repaired?**
-   Status: **Open** · Raised by: user
+   Status: **Decided** · Raised by: user
 
-   It already reaches into the database to disable OTP, so clearing the counter there is consistent,
-   but only if decision 4 makes that production behaviour. The alternative is waiting out a period,
-   which adds up to 30 seconds to the suite. Depends on 3 and 4.
+   **The test resets the step alongside the direct disable it already performs.** It bypasses the
+   handlers to disable OTP (`user.OTPEnabled = false` then `UpdateUser`), and `last_otp_step` is
+   `dont-update` so that write cannot reach it. Adding the reset call there reproduces exactly what
+   `api-otp/disable` and `admin-otp/disable` do under decision 4. One line, no wall clock.
+
+   **Requires a comment** saying the test is standing in for the disable handler, or it reads as a
+   test helping itself past the guard under review.
+
+   **Rejected:** disabling through the admin API, which is more faithful but rewrites setup in a test
+   about ACR step-up and needs an admin token it does not have. **Rejected:** sleeping past the period
+   boundary, which adds up to 30 seconds of wall clock to the integration suite for one test.
+
+9. **Is the empty-secret enrolment gap fixed here?**
+   Status: **Decided** · Raised by: user
+
+   **Yes, a guard at `otp/verify-enrolling` refusing an empty candidate secret before matching.**
+   Confirmed by execution: `totp` computes a real six-digit code for the empty secret and accepts it,
+   so an enrolment reached with an empty session secret enrols a secret anyone can derive. That line
+   is being rewritten by this change, so leaving the path in it is a review objection waiting to
+   happen, and the guard is two lines. The follow-up is still drafted in `closing.md`, recorded as
+   fixed here.
+
+   Scope stays honest: the guard is at the one site being rewritten, not a general hardening pass.
+
+   **Rejected:** follow-up only, which is the tidier scope boundary but knowingly ships the gap on a
+   line we touched. **Rejected:** guarding all three sites; `api-otp/verify` already rejects a secret
+   outside 16 to 64 base32 characters, and `otp/verify-enabled` reads its secret from the database, so
+   the extra checks would be redundant.
