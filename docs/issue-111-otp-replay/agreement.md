@@ -4,7 +4,7 @@
 **Issue state:** open (labels: bug, security)
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
-**Agreement sealed:** not yet
+**Agreement sealed:** 2026-08-05
 **Run state:** not started
 **PR:** none
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
@@ -70,7 +70,8 @@ boundary, checked a candidate matcher against the library's own accept/reject se
   step in all three accepted cases.
 - All nine degenerate inputs agree with today's behaviour: empty passcode, 5-digit, 7-digit,
   non-numeric, whitespace-padded (accepted, the library trims), lowercase secret (accepted, the
-  library upper-cases), space-padded secret (rejected), invalid base32 secret, empty secret.
+  library upper-cases), space-padded secret (rejected), invalid base32 secret, empty secret. The
+  shipped matcher then diverges on exactly one of these, the empty secret, by decision 9.
 - Claiming the matched step and refusing anything at or below it gives: first submit accepted, second
   and third refused, previous-step code refused, next-step code accepted then refused on resubmit.
 
@@ -150,8 +151,9 @@ Checkable:
 - **Narrowing the skew window** (issue recommendation 3). Independent of replay, changes behaviour for
   users with fast clocks, and the issue itself calls it optional and separate. Decision 6; drafted as a
   follow-up in `closing.md` so it is not lost when #111 closes.
-- **Any empty-secret or malformed-secret hardening beyond `otp/verify-enrolling`.** Decision 9 guards
-  the one site this change rewrites and nothing else.
+- **Malformed-secret hardening beyond the empty case, and repairing rows the empty-secret bug already
+  created.** Decision 9 refuses an empty secret in `MatchStep`, which makes such a row inert; it does
+  not detect or repair one, and it does not touch the other secret-format checks.
 - **Rate limiting `PUT /api/v1/account/otp`**, already tracked as #113.
 - **`LimitOtp` returning a blank 200 on an unreadable auth context**, already tracked as #114.
 - **Dropping the plaintext `users.otp_secret` column**, already tracked as #98.
@@ -306,22 +308,29 @@ decision 9.
    about ACR step-up and needs an admin token it does not have. **Rejected:** sleeping past the period
    boundary, which adds up to 30 seconds of wall clock to the integration suite for one test.
 
-9. **Is the empty-secret enrolment gap fixed here?**
+9. **Is the empty-secret gap fixed here, and where does the guard go?**
    Status: **Decided** · Raised by: user
 
-   **Yes, a guard at `otp/verify-enrolling` refusing an empty candidate secret before matching.**
-   Confirmed by execution: `totp` computes a real six-digit code for the empty secret and accepts it,
-   so an enrolment reached with an empty session secret enrols a secret anyone can derive. That line
-   is being rewritten by this change, so leaving the path in it is a review objection waiting to
-   happen, and the guard is two lines. The follow-up is still drafted in `closing.md`, recorded as
-   fixed here.
+   **Yes. `MatchStep` returns `(0, false)` for an empty secret**, which covers all three call sites
+   from one place. Confirmed by execution: `totp` computes a real six-digit code for the empty secret
+   and accepts it, and the code depends only on the time step, so it is the same for every deployment.
 
-   Scope stays honest: the guard is at the one site being rewritten, not a general hardening pass.
+   **First answered as a guard at `otp/verify-enrolling` alone, then revised.** That reading rested on
+   the claim that `otp/verify-enabled` is safe because its secret comes from the database. It is not.
+   `SetOTPSecret("")` stores the ciphertext of an empty string, so `model/get-otp-secret` returns `""`
+   for such a row, and a user enrolled through this very bug ends up with `OTPEnabled = true` and an
+   empty secret. For that user `otp/verify-enabled` accepts the computable empty-secret code, so an
+   enrolment-site-only guard would stop new poisoned rows and leave existing ones exploitable by
+   anyone holding the password. The guard belongs where every site passes through.
 
-   **Rejected:** follow-up only, which is the tidier scope boundary but knowingly ships the gap on a
-   line we touched. **Rejected:** guarding all three sites; `api-otp/verify` already rejects a secret
-   outside 16 to 64 base32 characters, and `otp/verify-enabled` reads its secret from the database, so
-   the extra checks would be redundant.
+   **Consequence, accepted:** an existing poisoned row becomes inert rather than exploitable. That user
+   cannot pass level2 until an admin disables OTP and they re-enrol, which is the same operator remedy
+   decision 4 provides for a stranded counter.
+
+   **Rejected:** follow-up only, which knowingly ships the gap on a line this change rewrites.
+   **Rejected:** the enrolment-site guard, for the reason above. **Rejected:** adding a startup sweep
+   that disables OTP on rows with an unusable secret, which is correct but introduces a data-repair
+   path to a change that otherwise has none, for a population that may well be empty.
 
 ## 4. Design
 
@@ -338,7 +347,15 @@ const StepSeconds = 30
 // MatchStep reports which time step produced passcode, within the accepted skew
 // window, so the caller can record that step as consumed. now is a parameter rather
 // than read here so the window can be tested at a pinned instant.
+//
+// An empty secret matches nothing (#111 decision 9). The library happily derives a
+// code from the empty key, and that code depends only on the time step, so it is the
+// same everywhere and anyone can compute it. Refusing here covers every call site at
+// once, including a stored secret that decrypts to empty.
 func MatchStep(passcode string, secret string, now time.Time) (int64, bool) {
+	if secret == "" {
+		return 0, false
+	}
 	current := now.Unix() / StepSeconds
 	for _, delta := range []int64{0, -1, 1} {
 		step := current + delta
@@ -358,8 +375,8 @@ func MatchStep(passcode string, secret string, now time.Time) (int64, bool) {
 ```
 
 Digits, algorithm and the 30 second step are the library defaults `otp/secret-generator` relies on, so
-this accepts exactly what `totp.Validate` accepts today. Verified by execution against
-`pquerna/otp v1.5.0`, per section 1.
+this accepts exactly what `totp.Validate` accepts today, with the single deliberate exception of the
+empty secret. Verified by execution against `pquerna/otp v1.5.0`, per section 1.
 
 Errors collapse to "no match" rather than propagating, which preserves today's behaviour: `totp.Validate`
 discards the same errors (`rv, _ := ValidateCustom(...)`). A wrong-length passcode and an unparseable
@@ -445,8 +462,8 @@ the caller, and both emit `AuditAuthFailedOtp`; the new event is additional, not
 fails, a code is burned and the user retries with the next one. The reverse order would leave OTP
 enabled on a request that was refused.
 
-**At `otp/verify-enrolling`, an empty `secretKey` is refused before matching** (decision 9), with the
-generic incorrect-OTP error.
+**No per-site empty-secret check.** `MatchStep` refuses an empty secret (decision 9), so all three
+sites get the generic incorrect-OTP response without repeating the guard.
 
 ### Disable resets
 
@@ -466,3 +483,78 @@ Confirm migration version 000027 is not already recorded in `schema_migrations` 
 `goiabada_data` and `goiabada_integration` databases before writing it, per the assumption in section 1.
 A version recorded by a discarded attempt is skipped silently and the suite then runs against the wrong
 schema. The `migration_000024_*` and `migration_000026_*` data tests are the pattern for reading it.
+
+## 5. Seams
+
+1. **`otp.MatchStep`** (`src/core/otp/verifier.go`), new unit file `src/core/otp/verifier_test.go`
+   beside the existing `generator_test.go`. **Owns the exhaustive matcher table**, at a pinned instant
+   so nothing races a period boundary: window positions -2, -1, 0, +1, +2 with the accepted ones
+   asserting the returned step; passcodes empty, 5-digit, 7-digit, non-numeric, whitespace-padded;
+   secrets lowercase, space-padded, invalid base32, empty. Every row was executed against
+   `pquerna/otp v1.5.0` before being written down (section 1).
+
+   **Two rows deserve a "keep this" note.** The empty-secret row asserts a refusal where today's
+   library accepts, so it is the one row that deliberately diverges from `totp.Validate` and pins
+   decision 9; it must use the code actually derived from the empty secret at the pinned instant, not
+   an arbitrary six digits, or it passes with the guard deleted. The lowercase-secret row asserts
+   acceptance, which reads like a laxity to be tightened; it is there because the library upper-cases
+   and dropping it would be a silent behaviour change.
+
+2. **`TryConsumeUserOTPStep` and `ResetUserOTPStep`** at the data tier, appended as new functions to
+   `src/authserver/tests/data/user_test.go`, where #106's narrow user methods are already tested.
+   **Owns the claim table**, on all four engines: first claim from 0 succeeds; the same step again is
+   refused; a lower step is refused; a higher step is accepted; an unknown user id returns false with
+   no error; reset returns the marker to 0 and a previously consumed step is then accepted again.
+   Plus the two questions testing against a mock cannot answer: the **failure path** returns
+   `(false, err)` rather than a benign false, and the methods **enlist in the caller's transaction**.
+   A rolled-back transaction forces both.
+
+3. **`POST /auth/otp`** (browser flow), new integration file
+   `src/authserver/tests/integration/auth_otp_replay_test.go`, named after the existing
+   `token_refresh_replay_test.go`. **Owns the end-to-end proof** that a code accepted once is refused
+   afterwards, without reaching into storage.
+
+   **The second submission must happen in a fresh ceremony**, driven by a new authorize with
+   `prompt=login`. Resubmitting inside the same ceremony proves nothing: the first success moves the
+   auth context to `AuthStateAuthenticationCompleted`, so the handler's `requiredState` check rejects
+   the second POST with a 500 before the replay guard is ever consulted. That is a negative case
+   failing for the wrong reason, and the ordering here is load-bearing rather than incidental.
+
+   Two cases:
+   - **Replay refused.** Enrolled user, submit code C, complete. New ceremony with `prompt=login`,
+     submit C again: the same rendered incorrect-OTP error as a wrong code.
+   - **Enrolment code refused at verification** (pins decision 3). Enrol at step N in the browser flow,
+     then in a fresh ceremony submit the same code, now against the stored secret. Fails if enrolment
+     does not claim, which is the hole decision 3 exists to close.
+
+   Each needs a control in the same test: a code from a later step is accepted in that fresh ceremony,
+   so the refusal is attributable to the replay guard and not to the ceremony being broken.
+
+4. **`PUT /api/v1/account/otp`**, extending `src/authserver/tests/integration/api_account_otp_test.go`
+   at `test/api-otp-enable`. **Owns the pin for decision 4**: enable with code C, disable, enable again
+   with the same C, which succeeds. It fails if reset-on-disable is removed.
+
+   **Keep this case.** It asserts a success where a replay-guard reading expects a refusal, so it looks
+   like a mistake. It is the only test that breaks if the reset is dropped.
+
+5. **`HandleAuthOtpPost` with a mocked `data.Database`**, extending the existing
+   `handler_auth_otp_test.go`. **Deliberately thin**, because seams 1 and 2 own the tables: one subtest
+   where the claim is refused, asserting the generic error plus both `AuditAuthFailedOtp` and
+   `AuditOTPCodeReplayDetected`, and one where the claim errors, asserting 500. Plus the new stub on
+   the three existing subtests that reach a successful validation (`test/unit-otp-success`,
+   "Successful OTP validation for disabled OTP (enrollment)", "Error updating user during OTP
+   enrollment"). The empty-secret guard is seam 1's, not this one's: it lives in `MatchStep` now, so a
+   handler-level case would only re-test seam 1 through a mock.
+
+**Rejected seams**
+
+- **Asserting `users.last_otp_step` from handler or integration tests.** A side channel into storage
+  that passes with the endpoint broken. Seam 2 owns the column; everything above it observes refusals.
+- **A unit test file for `handler_api_account_otp.go`.** None exists today (the package has only
+  `handler_api_account_password_test.go`), the claim logic there is identical to seam 5's, and seam 4
+  observes it end to end. Recorded as absent infrastructure rather than built, so the gap is a stated
+  choice rather than an oversight.
+- **Testing `hotp.ValidateCustom` itself.** Library behaviour. Seam 1 tests our window and our step
+  arithmetic, not the HMAC.
+- **Reading the real clock in seam 1.** A table built on `time.Now()` straddles a period boundary a few
+  times a day and fails for a reason unrelated to the change.
