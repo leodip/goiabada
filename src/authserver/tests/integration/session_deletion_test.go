@@ -3,6 +3,7 @@ package integrationtests
 import (
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -187,4 +189,118 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	userSessions2, err := database.GetUserSessionsByUserId(nil, user.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(userSessions2), "Should have a new session after second login")
+}
+
+// TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession is the pair of the test
+// above, and the case that decided #129 decision 15.
+//
+// The ceremony here never enters a password. It reuses an existing level 1 session, is sent
+// to /auth/otp because the client asks for level2_mandatory, and the session is ended while
+// it sits on the OTP form. HandleAuthOtpPost reads no session row, so the termination is
+// invisible to it: it verifies the code and hands off to /auth/completed with
+// AuthenticatedAt set. Only the gate there stops the ceremony, and only because it reads
+// Level1AuthCompleted rather than AuthenticatedAt.
+//
+// Without that distinction the ended session is silently recreated, which is the defect
+// #129 exists to close. The sub-case that makes it serious is a user without OTP on a
+// level2_mandatory client: the enrollment page hands the browser the secret it will be
+// tested on, so a stolen session cookie alone is enough to reach here.
+//
+// This is the same shape as TestSessionDeletedDuringAuthFlow_LoginSucceeds above, varying
+// exactly one thing: whether a password was entered in this ceremony. That pairing is what
+// pins the predicate as "this ceremony did level 1" rather than "no valid session".
+func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T) {
+	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+
+	// Give the user OTP, so /auth/level2 sends the step-up to the OTP form rather than
+	// to enrollment. Either arrives at the same gate; this is the shorter route.
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "Goiabada",
+		AccountName: user.Email,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	user.OTPEnabled = true
+	user.OTPSecret = key.Secret()
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
+	err = database.UpdateUser(nil, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(userSessions), "the level 1 login should have left one session")
+	userSession := userSessions[0]
+
+	// A second authorization request on the same browser, asking for level 2. The session
+	// is reused, so this ceremony never reaches the password handler.
+	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := gofakeit.LetterN(8)
+	requestNonce := gofakeit.LetterN(8)
+	requestScope := "openid profile email"
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + requestCodeChallenge +
+		"&scope=" + url.QueryEscape(requestScope) +
+		"&state=" + requestState +
+		"&nonce=" + requestNonce +
+		"&acr_values=" + enums.AcrLevel2Mandatory.String()
+
+	resp, err := httpClient.Get(destUrl)
+	assert.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	// Straight to level1completed: the session covers level 1, no password is asked for.
+	redirectLocation := assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level2")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/otp")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	csrf := getCsrfValue(t, resp)
+
+	// The session is ended while the ceremony waits on the OTP form. Deleting the row is
+	// what the gate keys on, and it is how this file's other test ends a session too; that
+	// the two DELETE endpoints revoke the session's grants as well is covered by
+	// api_users_sessions_test.go and api_account_sessions_test.go.
+	err = database.DeleteUserSession(nil, userSession.Id)
+	assert.NoError(t, err)
+
+	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	defer func() { _ = resp.Body.Close() }()
+
+	// The OTP itself is accepted: the handler reads no session row, so it cannot see the
+	// termination. Asserting this rather than a failure here is deliberate, because it is
+	// what makes the next hop the load-bearing one.
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// The gate. Before #129 this went to /auth/issue with a recreated session behind it.
+	redirectLocation = assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// And the restart is a real one: the user is asked for a password.
+	assertRedirect(t, resp, "/auth/pwd")
+
+	userSessionsAfter, err := database.GetUserSessionsByUserId(nil, user.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(userSessionsAfter),
+		"the ended session must not be recreated by a ceremony that only verified OTP")
 }

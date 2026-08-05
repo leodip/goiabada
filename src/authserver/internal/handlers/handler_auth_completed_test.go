@@ -197,6 +197,101 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.AssertExpectations(t)
 	})
 
+	// The only row that distinguishes the two spellings of userReallyAuthenticated. The SSO
+	// subtest above carries nil, which short-circuits before !IsZero() is reached, and the
+	// re-auth subtest carries a nonzero timestamp, which passes either way; so with the
+	// !IsZero() term deleted a zero AuthenticatedAt would count as authentication and the
+	// session's AuthTime would be overwritten with now. That term is pre-existing and the
+	// #129 gate does not read it, but nothing else in the file covers it (found by round 2
+	// of the stage 5 review).
+	t.Run("Successful flow, existing session, zero AuthenticatedAt does not refresh AuthTime", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		// Non-nil but zero, which is what an AuthContext round-tripped through the cookie
+		// yields for an absent RFC 3339 timestamp.
+		var zeroAuthenticatedAt time.Time
+		authContext := &oauth.AuthContext{
+			AuthState:       oauth.AuthStateAuthenticationCompleted,
+			ClientId:        "test-client",
+			UserId:          1,
+			Scope:           "openid profile",
+			AuthenticatedAt: &zeroAuthenticatedAt,
+		}
+
+		sessionIdentifier := "test-session"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
+		userSession := &models.UserSession{
+			Id:       1,
+			UserId:   1,
+			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: sessionAuthTime,
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
+			"", enums.AcrLevel1.String()).Return(userSession, nil)
+
+		// No UpdateUserSession expectation: a zero timestamp is not authentication, so
+		// AuthTime must not be refreshed. Reaching it fails the case on the strict mock.
+
+		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+
+		user := &models.User{
+			Id:      1,
+			Enabled: true,
+		}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+
+		// The session's existing AuthTime is carried forward rather than replaced.
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode &&
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
 	t.Run("Successful flow, new session, consent not required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -211,6 +306,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
+		// This ceremony did level 1: handler_auth_pwd sets both of these. Without
+		// Level1AuthCompleted the #129 gate restarts level 1 rather than starting a
+		// session, so this subtest is also the positive control for that gate.
+		pwdAuthTime := time.Now().UTC()
 		authContext := &oauth.AuthContext{
 			AuthState:   oauth.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
@@ -221,6 +320,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			// forwards THIS value. With 0 the assertion would also pass against a
 			// hard-coded zero (#106 decision 11).
 			AuthStateGeneration: 7,
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
 		}
 
 		sessionIdentifier := "new-test-session"
@@ -578,6 +679,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
+		// Positive control for the #129 gate, as in the subtest above.
+		pwdAuthTime := time.Now().UTC()
 		authContext := &oauth.AuthContext{
 			AuthState:   oauth.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
@@ -588,6 +691,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			// forwards THIS value. With 0 the assertion would also pass against a
 			// hard-coded zero (#106 decision 11).
 			AuthStateGeneration: 7,
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
 		}
 
 		sessionIdentifier := "new-test-session"
@@ -663,6 +768,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
+		// Positive control for the #129 gate, as in the two subtests above.
+		pwdAuthTime := time.Now().UTC()
 		authContext := &oauth.AuthContext{
 			AuthState:   oauth.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
@@ -672,6 +779,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			// Nonzero for the same reason as the other cases: it pins that the handler
 			// forwards this value rather than a hard-coded zero (#106).
 			AuthStateGeneration: 7,
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
 		}
 
 		sessionIdentifier := "new-test-session"
@@ -724,6 +833,156 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/consent", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// #129 decisions 6 and 15. The two subtests below are the gate on the else branch; the
+	// three "new session" subtests above are its positive control, since they now differ
+	// from these only in carrying Level1AuthCompleted. That pairing is what pins the
+	// predicate as "this ceremony did level 1" rather than "no valid session", which is the
+	// shape TestSessionDeletedDuringAuthFlow_LoginSucceeds (#46) legitimately has.
+	//
+	// The second subtest is decision 15's: it carries a non-nil AuthenticatedAt written by
+	// the OTP handler, so it is the row that fails against a gate reading
+	// userReallyAuthenticated. That discriminator is still read on the valid-session branch,
+	// and the zero-AuthenticatedAt subtest above is what covers its !IsZero() term.
+	//
+	// StartNewUserSession is deliberately not stubbed on the strict mock, so reaching it
+	// fails the case on its own rather than through an assertion that could be deleted.
+	t.Run("No valid session and this ceremony did not authenticate, restarts level 1", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		// An SSO ceremony: handler_authorize copied the session's user, methods and
+		// generation onto the context and never reached the password handler, so both
+		// AuthenticatedAt and Level1AuthCompleted are unset. The session was then ended
+		// mid-flight.
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              1,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd",
+			AuthStateGeneration: 7,
+			Level1AuthCompleted: false,
+		}
+
+		sessionIdentifier := "terminated-session"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		// The session is gone, which is what "ended mid-flight" looks like from here.
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	t.Run("No valid session and only OTP authenticated this ceremony, restarts level 1", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		// Decision 15's ceremony. An SSO reuse stepped up to level 2, so AuthMethods came
+		// off the reused session and handler_auth_otp set AuthenticatedAt on a successful
+		// code, but no password was ever entered, so Level1AuthCompleted stays false. A gate
+		// reading userReallyAuthenticated recreates the session here; this gate must not.
+		otpAuthTime := time.Now().UTC()
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              1,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd otp",
+			AuthStateGeneration: 7,
+			AuthenticatedAt:     &otpAuthTime,
+			Level1AuthCompleted: false,
+		}
+
+		sessionIdentifier := "terminated-session"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)

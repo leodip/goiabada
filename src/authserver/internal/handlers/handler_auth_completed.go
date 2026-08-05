@@ -74,9 +74,11 @@ func HandleAuthCompletedGet(
 
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
 		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
-		// authContext.AuthenticatedAt is set by the password handler when the user
-		// actually enters credentials. It is nil for SSO session reuse (existing
-		// session flows through level1completed without hitting the password handler).
+		// authContext.AuthenticatedAt is set when the user actually enters credentials in
+		// this ceremony, by the password handler and by the OTP handler. It is nil for SSO
+		// session reuse (existing session flows through level1completed without hitting
+		// either). Used only to decide whether to refresh the session's AuthTime below:
+		// it is NOT proof of level 1, since OTP alone sets it (#129 decision 15).
 		userReallyAuthenticated := authContext.AuthenticatedAt != nil && !authContext.AuthenticatedAt.IsZero()
 
 		if hasValidUserSession {
@@ -120,6 +122,36 @@ func HandleAuthCompletedGet(
 				"clientId": client.Id,
 			})
 		} else {
+			// No valid session. Only level 1 authentication performed in THIS ceremony
+			// justifies creating one: without this gate StartNewUserSession below mints a
+			// session from authContext.UserId with no proof anyone authenticated, so a
+			// ceremony whose session was ended mid-flight silently recreates it (#129
+			// decision 6).
+			//
+			// The predicate is deliberately "this ceremony did level 1" rather than "no
+			// valid session". The second shape is legitimate: a session is deleted and the
+			// user then starts a fresh ceremony and really does enter a password, which is
+			// what TestSessionDeletedDuringAuthFlow_LoginSucceeds guards (#46). There is no
+			// loop either, because the second pass through here has Level1AuthCompleted set
+			// by handler_auth_pwd.
+			//
+			// It reads Level1AuthCompleted rather than userReallyAuthenticated above, and
+			// that is the whole point of the field (#129 decision 15): AuthenticatedAt has
+			// two writers, and a ceremony that stepped up to OTP by reusing a session
+			// satisfies it without a password. handlePromptNone sets AuthenticatedAt too,
+			// from the session it reused, and while it goes straight to /auth/issue and
+			// never arrives here, it would be stopped rather than let through if it ever did.
+			if !authContext.Level1AuthCompleted {
+				authContext.AuthState = oauth.AuthStateRequiresLevel1
+				err = authHelper.SaveAuthContext(w, r, authContext)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+				return
+			}
+
 			// start new session
 			newSession, err := userSessionManager.StartNewUserSession(
 				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String(),

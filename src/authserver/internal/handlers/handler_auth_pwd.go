@@ -244,6 +244,11 @@ func HandleAuthPwdPost(
 		// to decide whether to refresh the session's AuthTime.
 		utcNow := time.Now().UTC()
 		authContext.AuthenticatedAt = &utcNow
+		// This ceremony performed level 1, so it may create a session even when the one it
+		// started on has gone. This is the only writer of the field, deliberately: the OTP
+		// handler also sets AuthenticatedAt, and level 2 alone must not stand in for level 1
+		// at the gate in handler_auth_completed (#129 decisions 6 and 15).
+		authContext.Level1AuthCompleted = true
 		authContext.AuthState = oauth.AuthStateLevel1PasswordCompleted
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
