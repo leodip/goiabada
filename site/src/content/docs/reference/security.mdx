@@ -31,6 +31,7 @@ Goiabada includes several built-in security features:
 - **Two-factor authentication** - Optional or mandatory 2FA using TOTP
 - **Rate limiting** - Configurable rate limiting on sensitive endpoints (login, OTP verification, password reset)
 - **Session management** - Configurable session timeouts with idle and absolute expiration
+- **Durable session termination** - Ending a session revokes the refresh tokens and authorization codes that session authorized, including offline refresh tokens that outlive the browser session. A `terminated_user_session` [audit event](/concepts/audit-log/) records what each termination revoked. See [ending a session](/concepts/user-sessions/#ending-a-session)
 
 ### Token security
 

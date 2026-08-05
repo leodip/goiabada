@@ -404,3 +404,32 @@ func LogRevokedUserAuthState(auditLogger AuditLogger, userId int64, reason strin
 		"newGeneration":              result.NewGeneration,
 	})
 }
+
+// LogTerminatedUserSession emits AuditTerminatedUserSession, the security record of an explicit
+// "end this session" action (#129 decision 9). One function rather than a literal at each of the
+// two endpoints, following LogRevokedUserAuthState: the payload cannot then differ between sites,
+// and there is a single place to assert its shape field by field.
+//
+// It takes the loaded session row for the same reason TerminateUserSessionTx does. userId,
+// userSessionId and sessionIdentifier all come off that one row, so they cannot end up describing
+// two different sessions, and both call sites already hold it for their own not-found and
+// ownership checks.
+//
+// Call this only after TerminateUserSessionTx returned without error, and beside rather than
+// instead of AuditDeletedUserSession, whose payload decision 9 leaves untouched.
+func LogTerminatedUserSession(auditLogger AuditLogger, userSession *models.UserSession,
+	loggedInUser string, result TerminationResult) {
+
+	auditLogger.Log(constants.AuditTerminatedUserSession, map[string]interface{}{
+		"userId":            userSession.UserId,
+		"userSessionId":     userSession.Id,
+		"sessionIdentifier": userSession.SessionIdentifier,
+		"loggedInUser":      loggedInUser,
+		// What this call TRANSITIONED, not what the session had. A second termination of the same
+		// session reports 0 and an empty list, which is the honest answer to the only question an
+		// auditor asks of this event.
+		"revokedCodeCount": result.RevokedCodeCount,
+		// Always a list rather than null: TerminationResult initialises it on the success path.
+		"revokedRefreshTokenJtis": result.RevokedRefreshTokenJtis,
+	})
+}

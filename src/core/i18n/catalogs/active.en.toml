@@ -448,6 +448,7 @@
 "adminconsole.account.sessions.modal_confirm_title" = "Are you sure?"
 "adminconsole.account.sessions.modal_confirm_body_prefix" = "Would you like to end the session on device <span class='text-accent'>"
 "adminconsole.account.sessions.modal_confirm_body_suffix" = "</span>?"
+"adminconsole.account.sessions.modal_revocation_note" = " <br /><br />Applications you authorized from this session, including ones that keep working in the background, will need to sign in again."
 "adminconsole.account.sessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate logout."
 
 # === Adminconsole — admin clients =============================================
@@ -542,6 +543,7 @@
 "adminconsole.admin_clients.usersessions.modal_confirm_title" = "Are you sure?"
 "adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" = "Do you want to end the session for user <span class='text-accent'>"
 "adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" = "</span>?"
+"adminconsole.admin_clients.usersessions.modal_revocation_note" = " <br /><br />Applications the user authorized from this session, including ones that keep working in the background, will need to sign in again."
 "adminconsole.admin_clients.usersessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate logout."
 
 # --- Common modal strings used across client management pages --------------
@@ -878,6 +880,7 @@
 "adminconsole.admin_users.sessions.modal_confirm_title" = "Are you sure?"
 "adminconsole.admin_users.sessions.modal_confirm_body_prefix" = "Would you like to end the session on device <span class='text-accent'>"
 "adminconsole.admin_users.sessions.modal_confirm_body_suffix" = "</span>?"
+"adminconsole.admin_users.sessions.modal_revocation_note" = " <br /><br />Applications the user authorized from this session, including ones that keep working in the background, will need to sign in again."
 "adminconsole.admin_users.sessions.modal_confirm_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate logout."
 "adminconsole.admin_users.sessions.col_device" = "Device"
 "adminconsole.admin_users.sessions.col_clients" = "Clients"

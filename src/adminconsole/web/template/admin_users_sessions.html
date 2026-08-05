@@ -12,6 +12,7 @@
     function endSessionClick(elem, evt, userSessionId, device, isCurrent) {
 
         let msg = "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_body_prefix" }}" + device + "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_body_suffix" }}";
+        msg += "{{ T $.ctx "adminconsole.admin_users.sessions.modal_revocation_note" }}";
         if (isCurrent) {
             msg += "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_current_warning" }}";
         }

@@ -55,6 +55,28 @@ This is inherent to stateless tokens rather than a limitation of the revocation 
 If your resource servers must reject access immediately after a credential change, they need to verify the token against Goiabada on each request rather than relying on signature validation alone.
 </Aside>
 
+## Ending a session
+
+A session can be ended explicitly: a user ends one from their own sessions page, or an administrator ends one from the user or client pages. That is a security action rather than housekeeping, so it also cuts off what the session authorized.
+
+| What | Effect |
+| ---- | ------ |
+| The session | Deleted. That device has to sign in again |
+| Refresh tokens from that session | Revoked, including offline ones that were still working in the background |
+| Authorization codes from that session | Revoked, so a code that was issued but not yet redeemed can no longer be exchanged |
+
+This is what separates ending a session from a session merely expiring. An offline refresh token is meant to outlive the browser session it came from, so it keeps working when that session times out. Ending the session revokes it deliberately.
+
+Logging out is not the same thing. It is navigation rather than a security decision, so it leaves refresh tokens alone.
+
+Each termination writes two entries to the [audit log](/concepts/audit-log/): `terminated_user_session`, recording what was revoked, and `deleted_user_session`, the lifecycle record beside it. Count `terminated_user_session` if you want to know how many sessions were ended.
+
+### What ending a session does not cover
+
+An access token that was already issued for an offline grant keeps working until it expires, even at Goiabada's own endpoints. Offline access tokens carry no reference to a session, so there is nothing for Goiabada to match against the session you ended. This differs from a credential change, where Goiabada's own endpoints reject the old token on the very next request.
+
+The bound is the access token's own expiration, 5 minutes by default. If you have raised **Token expiration** substantially, you have widened it.
+
 ## Forcing re-authentication
 
 There are two ways to force re-authentication in an authorization request:

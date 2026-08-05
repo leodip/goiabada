@@ -185,6 +185,127 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 	return accessToken, sid
 }
 
+// secondOfflineGrantForSameUser is secondSessionFor with the offline scope: it logs the SAME user in
+// again through a fresh cookie jar and returns a second, independent offline grant on the same
+// client. Added by #129 stage 4, whose termination cases need a grant that must SURVIVE while
+// another session of the same user is ended. Varying only the session is what makes it reject a
+// table-wide sweep and a user-scoped one at once.
+//
+// A DISTINCT User-Agent is required rather than cosmetic, for the reason secondSessionFor states:
+// StartNewUserSession deletes other sessions of the same user sharing device name, type, OS and IP
+// address, so without it the second login silently deletes the first.
+//
+// The consent screen is reached unconditionally rather than conditionally, and that is a property of
+// the server rather than an assumption: both HandleAuthCompletedGet and HandleConsentGet route an
+// offline_access request to consent regardless of what the user already consented to, deliberately,
+// to re-confirm the refresh token grant every time.
+//
+// password must be the user's CURRENT password.
+func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password string) *offlineGrant {
+	t.Helper()
+
+	httpClient := createHttpClientWithUserAgent(t,
+		"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+	const codeVerifier = "code-verifier-second-offline"
+	scope := "openid offline_access " +
+		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+
+	destURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + base.client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(base.redirectURI) +
+		"&response_type=code&code_challenge_method=S256" +
+		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
+		"&scope=" + url.QueryEscape(scope) +
+		"&state=" + gofakeit.LetterN(8) + "&nonce=" + gofakeit.LetterN(8)
+
+	resp, err := httpClient.Get(destURL)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+
+	location := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, location)
+	_ = resp.Body.Close()
+
+	location = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, location)
+	csrf := getCsrfValue(t, resp)
+	_ = resp.Body.Close()
+
+	resp = authenticateWithPassword(t, httpClient, location, base.user.Email, password, csrf)
+	_ = resp.Body.Close()
+
+	location = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, location)
+	_ = resp.Body.Close()
+
+	location = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, location)
+	_ = resp.Body.Close()
+
+	location = assertRedirect(t, resp, "/auth/consent")
+	resp = loadPage(t, httpClient, location)
+	csrf = getCsrfValue(t, resp)
+	_ = resp.Body.Close()
+
+	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
+	consentForm := url.Values{
+		"gorilla.csrf.Token": {csrf},
+		"btnSubmit":          {"submit"},
+		"consent0":           {"on"},
+		"consent1":           {"on"},
+		"consent2":           {"on"},
+		"consent3":           {"on"},
+	}
+	consentReq, err := http.NewRequest("POST", consentEndpoint, strings.NewReader(consentForm.Encode()))
+	require.NoError(t, err)
+	consentReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	consentReq.Header.Set("Referer", consentEndpoint)
+	consentReq.Header.Set("Origin", config.GetAuthServer().BaseURL)
+
+	resp, err = httpClient.Do(consentReq)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+
+	location = assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, location)
+	code, _ := getCodeAndStateFromUrl(t, resp)
+	_ = resp.Body.Close()
+	require.NotEmpty(t, code)
+
+	// The sid comes off the codes row, not the token: an offline refresh token's own
+	// session_identifier column is empty.
+	codeHash, err := hashutil.HashString(code)
+	require.NoError(t, err)
+	codeEntity, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	require.NoError(t, err)
+	require.NotNil(t, codeEntity)
+	require.NotEmpty(t, codeEntity.SessionIdentifier)
+
+	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {base.client.ClientIdentifier},
+		"client_secret": {base.clientSecret},
+		"code":          {code},
+		"redirect_uri":  {base.redirectURI},
+		"code_verifier": {codeVerifier},
+	})
+	accessToken, ok := data["access_token"].(string)
+	require.True(t, ok, "expected an access token: %v", data)
+	refreshToken, ok := data["refresh_token"].(string)
+	require.True(t, ok, "offline_access must yield a refresh token: %v", data)
+
+	return &offlineGrant{
+		client:            base.client,
+		clientSecret:      base.clientSecret,
+		user:              base.user,
+		password:          password,
+		redirectURI:       base.redirectURI,
+		accessToken:       accessToken,
+		refreshToken:      refreshToken,
+		sessionIdentifier: codeEntity.SessionIdentifier,
+		httpClient:        httpClient,
+	}
+}
+
 // exchange redeems a code for tokens on this grant's client.
 func (g *offlineGrant) exchange(t *testing.T, code string, codeVerifier string) map[string]interface{} {
 	t.Helper()
