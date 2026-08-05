@@ -69,6 +69,10 @@ This is what separates ending a session from a session merely expiring. An offli
 
 A sign-in that was still in progress cannot slip past this. If someone was partway through signing in to an application and was relying on the session you ended rather than typing a password, that sign-in does not quietly become a replacement session. Goiabada sends them back to the login page instead.
 
+Nor can a sign-in that had already reached the consent screen. Goiabada checks the session once more at the very last step, just before it hands the application its authorization code, so a sign-in left waiting on that screen is sent back to the login page as well rather than collecting a code on a session that is no longer there.
+
+An application renewing quietly in the background with [`prompt=none`](/concepts/prompt-parameter/) hits the same check and is told rather than shown: it gets a `login_required` error back, never a login page, so it can decide when to ask the person to sign in again.
+
 Logging out is not the same thing. It is navigation rather than a security decision, so it leaves refresh tokens alone.
 
 Each termination writes two entries to the [audit log](/concepts/audit-log/): `terminated_user_session`, recording what was revoked, and `deleted_user_session`, the lifecycle record beside it. Count `terminated_user_session` if you want to know how many sessions were ended.

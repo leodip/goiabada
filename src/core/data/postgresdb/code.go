@@ -74,6 +74,10 @@ func (d *PostgresDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIde
 	return d.CommonDB.RevokeCodesBySessionIdentifier(tx, sessionIdentifier)
 }
 
+func (d *PostgresDatabase) RevokeCodeIfSessionGone(tx *sql.Tx, codeId int64, sessionIdentifier string) (bool, error) {
+	return d.CommonDB.RevokeCodeIfSessionGone(tx, codeId, sessionIdentifier)
+}
+
 func (d *PostgresDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
 	return d.CommonDB.GetCodeById(tx, codeId)
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
@@ -89,6 +90,89 @@ func HandleIssueGet(
 		}
 
 		// Authorization Code Flow
+
+		// A ceremony must not bind a grant to a session that no longer exists (#129
+		// decision 6, second half). The session was alive at /auth/completed, which bumped
+		// or created it, and the user may then have spent minutes on the consent screen;
+		// if it was ended in between, the code minted below is brand new and no marker
+		// written by the termination can reach it, because the row did not exist yet.
+		//
+		// An EMPTY identifier is the shape that case actually arrives in, not a stale one.
+		// MiddlewareSessionIdentifier looks the session up on every request and puts the
+		// identifier in the request context ONLY when the row exists, so the read above
+		// yields "" for a ceremony whose session was ended. The non-empty branch below
+		// covers the narrower race where the middleware saw the session alive on this very
+		// request and the termination committed afterwards.
+		//
+		// Neither case is inert. grantIsOffline treats an empty session identifier as an
+		// offline grant on its own, so a code issued here would yield an Offline refresh
+		// token: it stores a max lifetime instead of a session identifier and the validator
+		// never consults a session, which means it outlives the terminated session by up to
+		// RefreshTokenOfflineMaxLifetimeInSeconds whether or not offline_access was asked
+		// for.
+		//
+		// This is deliberately a LIVENESS check and not a validity one: it asks whether the
+		// row resolves, and leaves idle timeout and max age to /auth/completed, which has
+		// already applied them. Restarting level 1 rather than failing to the client is
+		// decision 6's answer for the same reason the gate at /auth/completed uses it, and
+		// the second pass mints a session of its own before arriving back here.
+		sessionIsLive := false
+		if sessionIdentifier != "" {
+			userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			sessionIsLive = userSession != nil
+		}
+		if !sessionIsLive {
+			// prompt=none is the one ceremony that cannot be restarted: /auth/level1 sends the
+			// browser to /auth/pwd, which renders a form, and this request forbids any UI at
+			// all (OIDC Core 3.1.2.1, and concepts/prompt-parameter.mdx says the same). Nothing
+			// between here and the form reads the prompt, so the client would be handed a login
+			// page and no error, and a silent-renewal iframe would wait for its own timeout
+			// instead. It gets login_required instead (#129 decision 16), which is what
+			// handlePromptNone itself returns when its session lookup finds no row: the
+			// condition really is the same one, arriving one redirect hop later, so the client
+			// cannot tell the two apart and does not need to. No code is minted on either
+			// branch, so the fail-open decision 6 closes stays closed.
+			if authContext.HasPromptValue("none") {
+				slog.Warn("the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
+					"sessionIdentifier", sessionIdentifier)
+				// The clear goes FIRST, which is the order the code path below uses too.
+				// ClearAuthContext persists the deletion through a Set-Cookie on w, and
+				// redirToClientWithError commits the response in every response mode, so
+				// clearing afterwards leaves the header on a response already written and
+				// the browser keeps a ready_to_issue_code context it can replay. Failing
+				// the clear is a 500 rather than a refusal the browser cannot record.
+				err := authHelper.ClearAuthContext(w, r)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+				err = redirToClientWithError(w, r, templateFS, constants.ErrorLoginRequired,
+					"User authentication is required",
+					authContext.ResponseMode, authContext.RedirectURI, authContext.State,
+					authContext.ResponseType)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+				return
+			}
+
+			slog.Warn("the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
+				"sessionIdentifier", sessionIdentifier)
+			authContext.AuthState = oauth.AuthStateRequiresLevel1
+			err = authHelper.SaveAuthContext(w, r, authContext)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+			return
+		}
+
 		createCodeInput := &oauth.CreateCodeInput{
 			AuthContext:       *authContext,
 			SessionIdentifier: sessionIdentifier,
@@ -97,6 +181,26 @@ func HandleIssueGet(
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
+		}
+
+		// The check above is a read followed by an insert, so a termination can commit
+		// between the two. This compensates for that (#129 decision 12): the two sweepers
+		// cover each other, since a code committing before the termination's UPDATE reads
+		// the codes table is marked by the termination, and a code committing after it is
+		// marked here. Only a code landing between that UPDATE and its COMMIT escapes both,
+		// which is recorded as a residual in the #129 agreement rather than closed here.
+		//
+		// A failure is a 500 rather than a code handed over: the row exists and carries no
+		// marker at this point, so returning it is exactly the fail-open this statement is
+		// for. Unredeemed it expires in 60 seconds.
+		codeRevoked, err := database.RevokeCodeIfSessionGone(nil, code.Id, sessionIdentifier)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		if codeRevoked {
+			slog.Warn("the session backing this ceremony was ended while its code was being issued, so the code was revoked",
+				"codeId", code.Id, "sessionIdentifier", sessionIdentifier)
 		}
 
 		auditLogger.Log(constants.AuditCreatedAuthCode, map[string]interface{}{

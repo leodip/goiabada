@@ -23,6 +23,10 @@ func (d *MySQLDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdenti
 	return d.CommonDB.RevokeCodesBySessionIdentifier(tx, sessionIdentifier)
 }
 
+func (d *MySQLDatabase) RevokeCodeIfSessionGone(tx *sql.Tx, codeId int64, sessionIdentifier string) (bool, error) {
+	return d.CommonDB.RevokeCodeIfSessionGone(tx, codeId, sessionIdentifier)
+}
+
 func (d *MySQLDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
 	return d.CommonDB.GetCodeById(tx, codeId)
 }

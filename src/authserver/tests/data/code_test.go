@@ -891,6 +891,122 @@ func TestRevokeCodesBySessionIdentifier_TransactionAndFailurePath(t *testing.T) 
 	}
 }
 
+// TestRevokeCodeIfSessionGone covers the compensating revoke that runs immediately after a
+// code is inserted (#129 decision 12). The liveness read at /auth/issue and that insert are
+// two statements, so a termination can commit between them and leave a code bound to a
+// session that no longer exists and that the termination's own sweep could not have marked.
+func TestRevokeCodeIfSessionGone(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+
+	// A session that really exists, plus a code bound to it. This is the ordinary case: the
+	// statement runs after every authorization code issued, and normally matches nothing.
+	liveSession := createTestUserSession(t, user.Id)
+	liveCode := createTestCodeInSession(t, client.Id, user.Id, liveSession.SessionIdentifier)
+
+	// A session identifier with no row, plus two codes bound to it.
+	goneSession := "gone_" + gofakeit.LetterN(8)
+	goneCode := createTestCodeInSession(t, client.Id, user.Id, goneSession)
+	siblingOfGoneCode := createTestCodeInSession(t, client.Id, user.Id, goneSession)
+
+	// Keep this row. It is the only case that fails against a method that always revokes,
+	// and such a method would pass every other assertion in this test while breaking every
+	// authorization code the server issues.
+	revoked, err := database.RevokeCodeIfSessionGone(nil, liveCode.Id, liveSession.SessionIdentifier)
+	if err != nil {
+		t.Fatalf("RevokeCodeIfSessionGone for a live session returned error: %v", err)
+	}
+	if revoked {
+		t.Error("a code whose session still exists must not be revoked")
+	}
+	assertCodeRevoked(t, liveCode.Id, false, "a code whose session is still alive")
+
+	// The statement's own job. liveSession above is still in the table while this runs, which
+	// is what makes this also the control for the subquery's WHERE clause: a NOT EXISTS over
+	// user_sessions with no predicate would find that row and revoke nothing, forever.
+	revoked, err = database.RevokeCodeIfSessionGone(nil, goneCode.Id, goneSession)
+	if err != nil {
+		t.Fatalf("RevokeCodeIfSessionGone for a gone session returned error: %v", err)
+	}
+	if !revoked {
+		t.Error("a code whose session is gone must be revoked")
+	}
+	assertCodeRevoked(t, goneCode.Id, true, "a code whose session is gone")
+
+	// The id term. Without it this is a session-wide sweep wearing a single-code signature,
+	// and the compensating statement would revoke codes of earlier ceremonies on the same
+	// session that were legitimately issued while it was alive.
+	assertCodeRevoked(t, siblingOfGoneCode.Id, false,
+		"another code of the same gone session, not the one named by id")
+
+	// Idempotent, and the bool means "this call transitioned it" rather than "matched a row".
+	// The revoked = false term is what makes that true, and measurement says it is needed on
+	// all four engines here rather than on MySQL alone: the updated_at assignment changes on
+	// every call, so without the term an already-revoked row reports as affected everywhere.
+	// This interleaving is reachable rather than theoretical: it is the one where the
+	// termination's sweep marked the code first and this statement then ran on the same row.
+	revoked, err = database.RevokeCodeIfSessionGone(nil, goneCode.Id, goneSession)
+	if err != nil {
+		t.Fatalf("second RevokeCodeIfSessionGone returned error: %v", err)
+	}
+	if revoked {
+		t.Error("re-revoking an already revoked code must report false")
+	}
+	assertCodeRevoked(t, goneCode.Id, true, "a code after being revoked twice")
+
+	// An empty session identifier is rejected outright, and that guard is load bearing here
+	// rather than defensive: no user_sessions row carries an empty identifier, so NOT EXISTS
+	// over one is trivially true and the statement would revoke whatever code it was handed.
+	if _, err := database.RevokeCodeIfSessionGone(nil, liveCode.Id, ""); err == nil {
+		t.Error("an empty session identifier must return an error")
+	}
+	assertCodeRevoked(t, liveCode.Id, false, "a live session's code after the empty-identifier call")
+
+	// A zero code id is a caller bug, refused the way MarkCodeAsUsed refuses it.
+	if _, err := database.RevokeCodeIfSessionGone(nil, 0, goneSession); err == nil {
+		t.Error("a zero code id must return an error")
+	}
+	assertCodeRevoked(t, siblingOfGoneCode.Id, false, "an unnamed code after the zero-id call")
+}
+
+// TestRevokeCodeIfSessionGone_TransactionAndFailurePath answers the two questions a mock
+// cannot answer about a new data method, following the sweep's sibling above. The failure
+// path matters more here than usual: this statement is the second of the two sweepers that
+// cover each other, so collapsing a database fault into a benign false would leave a code
+// bound to a terminated session unmarked with the suite green.
+func TestRevokeCodeIfSessionGone_TransactionAndFailurePath(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+	goneSession := "gone_tx_" + gofakeit.LetterN(8)
+	code := createTestCodeInSession(t, client.Id, user.Id, goneSession)
+
+	tx := beginTx(t)
+	revoked, err := database.RevokeCodeIfSessionGone(tx, code.Id, goneSession)
+	if err != nil {
+		t.Fatalf("RevokeCodeIfSessionGone in a transaction returned error: %v", err)
+	}
+	if !revoked {
+		t.Fatal("expected the code to be revoked inside the transaction")
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+
+	// Had the statement gone through the pool it would have survived the rollback. The
+	// production caller passes nil, but a method that ignores its transaction parameter is
+	// a trap for whichever caller composes it into one later.
+	assertCodeRevoked(t, code.Id, false, "a code revoked inside a rolled-back transaction")
+
+	revoked, err = database.RevokeCodeIfSessionGone(tx, code.Id, goneSession)
+	if err == nil {
+		t.Error("a statement that cannot run must return an error, not a benign false")
+	}
+	if revoked {
+		t.Error("a failed call must report false")
+	}
+}
+
 // TestUpdateCode_DoesNotClobberRevoked pins the dont-update tag on Code.Revoked
 // (#129 decision 4). Nothing else in the suite fails if the tag is removed: the
 // termination sweep writes the column with its own statement, while UpdateCode writes
