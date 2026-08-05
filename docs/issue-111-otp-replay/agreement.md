@@ -5,8 +5,8 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** not started
-**PR:** none
+**Run state:** plan written, stage 1 of 4 next
+**PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
 ---
