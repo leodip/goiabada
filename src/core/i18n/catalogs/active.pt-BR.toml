@@ -446,6 +446,7 @@
 "adminconsole.account.sessions.modal_confirm_title" = "Tem certeza?"
 "adminconsole.account.sessions.modal_confirm_body_prefix" = "Deseja encerrar a sessão no dispositivo <span class='text-accent'>"
 "adminconsole.account.sessions.modal_confirm_body_suffix" = "</span>?"
+"adminconsole.account.sessions.modal_revocation_note" = " <br /><br />Os aplicativos que você autorizou nesta sessão, incluindo os que continuam funcionando em segundo plano, precisarão se autenticar novamente."
 "adminconsole.account.sessions.modal_current_warning" = " <br /><br />Atenção: encerrar a sessão atual provocará logout imediato."
 
 # === Adminconsole — clientes admin ===========================================
@@ -529,6 +530,7 @@
 "adminconsole.admin_clients.usersessions.modal_confirm_title" = "Tem certeza?"
 "adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" = "Deseja encerrar a sessão do usuário <span class='text-accent'>"
 "adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" = "</span>?"
+"adminconsole.admin_clients.usersessions.modal_revocation_note" = " <br /><br />Os aplicativos que o usuário autorizou nesta sessão, incluindo os que continuam funcionando em segundo plano, precisarão se autenticar novamente."
 "adminconsole.admin_clients.usersessions.modal_current_warning" = " <br /><br />Atenção: encerrar a sessão atual provocará logout imediato."
 
 "adminconsole.admin_clients.modal.are_you_sure" = "Tem certeza?"
@@ -845,6 +847,7 @@
 "adminconsole.admin_users.sessions.modal_confirm_title" = "Tem certeza?"
 "adminconsole.admin_users.sessions.modal_confirm_body_prefix" = "Deseja encerrar a sessão no dispositivo <span class='text-accent'>"
 "adminconsole.admin_users.sessions.modal_confirm_body_suffix" = "</span>?"
+"adminconsole.admin_users.sessions.modal_revocation_note" = " <br /><br />Os aplicativos que o usuário autorizou nesta sessão, incluindo os que continuam funcionando em segundo plano, precisarão se autenticar novamente."
 "adminconsole.admin_users.sessions.modal_confirm_current_warning" = " <br /><br />Atenção: encerrar a sessão atual provocará logout imediato."
 "adminconsole.admin_users.sessions.col_device" = "Dispositivo"
 "adminconsole.admin_users.sessions.col_clients" = "Clientes"

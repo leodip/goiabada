@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // GET /api/v1/account/sessions — happy path, includes isCurrent
@@ -176,6 +177,63 @@ func TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession(t *testing.T) {
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "Forbidden", errResp.ErrorDescription)
+}
+
+// TestAPIAccountSessionDelete_TerminatesTheOfflineGrantsOfThatSession is the self-service half of
+// #129's headline claim, end to end. The bearer is the offline grant's own access token, which
+// carries authserver:manage-account and no `sid`: the account API accepts that, because
+// RequireValidSession only looks a session up for a token that carries one.
+func TestAPIAccountSessionDelete_TerminatesTheOfflineGrantsOfThatSession(t *testing.T) {
+	grant := createOfflineGrant(t)
+
+	// Refreshing works to begin with, so a later failure is attributable to the termination.
+	first := grant.refresh(t)
+	require.NotEmpty(t, first["access_token"], "the grant should refresh before termination: %v", first)
+	grant.refreshToken = first["refresh_token"].(string)
+
+	session, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	deleteURL := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
+	resp := makeAPIRequest(t, "DELETE", deleteURL, grant.accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	after := grant.refresh(t)
+	assert.Equal(t, "invalid_grant", after["error"],
+		"ending your own session must stop its offline refresh token working: %v", after)
+	assert.Empty(t, after["access_token"])
+}
+
+// TestAPIAccountSessionDelete_ForbiddenDoesNotTerminate pairs the ownership check with the new
+// consequence. KEEP THIS. TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession above asserts only
+// the status code, which a handler that terminated first and refused afterwards would still satisfy,
+// and after #129 that mistake revokes a stranger's grants.
+func TestAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
+	callerToken, _ := getUserAccessTokenWithAccountScope(t)
+
+	victim := createOfflineGrant(t)
+	first := victim.refresh(t)
+	require.NotEmpty(t, first["access_token"], "the victim's grant should refresh to begin with: %v", first)
+	victim.refreshToken = first["refresh_token"].(string)
+
+	session, err := database.GetUserSessionBySessionIdentifier(nil, victim.sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	deleteURL := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
+	resp := makeAPIRequest(t, "DELETE", deleteURL, callerToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+
+	stillThere, err := database.GetUserSessionById(nil, session.Id)
+	require.NoError(t, err)
+	assert.NotNil(t, stillThere, "a refused request must not delete the session")
+
+	stillWorks := victim.refresh(t)
+	assert.NotEmpty(t, stillWorks["access_token"],
+		"a refused request must not revoke anything: %v", stillWorks)
 }
 
 func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {

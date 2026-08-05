@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIUserSessionsGet tests the GET /api/v1/admin/users/{id}/sessions endpoint
@@ -303,6 +304,57 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 	deletedSession, err := database.GetUserSessionById(nil, session.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedSession)
+}
+
+// TestAPIUserSessionDelete_TerminatesTheOfflineGrantsOfThatSession is #129's headline claim,
+// observed at the highest seam that can see it: the administrator ends a session and the offline
+// refresh token authorized through it stops working, without the test reaching into storage to look
+// for a marker.
+//
+// THE SURVIVOR IS THE HALF THAT CARRIES THIS TEST. Without it the case passes against a sweep that
+// revokes everything, which is the failure mode #106 exists to keep this one away from: ending one
+// session must not sign the user out everywhere. It belongs to the SAME user deliberately, so it
+// varies only the session, and so it rejects a user-scoped sweep as well as a table-wide one.
+//
+// What this cannot prove, by design: that a refresh token created AFTER the termination is also
+// refused. The sweep revokes every token that exists at termination, so both mechanisms produce this
+// result. The revoked-code marker's distinctive property is stage 8's evidence, and the column itself
+// belongs to the data tests.
+func TestAPIUserSessionDelete_TerminatesTheOfflineGrantsOfThatSession(t *testing.T) {
+	adminToken, _ := createAdminClientWithToken(t)
+
+	terminated := createOfflineGrant(t)
+	survivor := secondOfflineGrantForSameUser(t, terminated, terminated.password)
+	require.NotEqual(t, terminated.sessionIdentifier, survivor.sessionIdentifier,
+		"the second login must create a DIFFERENT session, or this test proves nothing")
+
+	// Both refresh before the termination, so a later failure is attributable to it and not to a
+	// grant that never worked.
+	first := terminated.refresh(t)
+	require.NotEmpty(t, first["access_token"], "the grant should refresh before termination: %v", first)
+	terminated.refreshToken = first["refresh_token"].(string)
+
+	firstSurvivor := survivor.refresh(t)
+	require.NotEmpty(t, firstSurvivor["access_token"], "the survivor should refresh before termination: %v", firstSurvivor)
+	survivor.refreshToken = firstSurvivor["refresh_token"].(string)
+
+	session, err := database.GetUserSessionBySessionIdentifier(nil, terminated.sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	deleteURL := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	resp := makeAPIRequest(t, "DELETE", deleteURL, adminToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	after := terminated.refresh(t)
+	assert.Equal(t, "invalid_grant", after["error"],
+		"the offline refresh token of the terminated session must stop working: %v", after)
+	assert.Empty(t, after["access_token"])
+
+	stillWorks := survivor.refresh(t)
+	assert.NotEmpty(t, stillWorks["access_token"],
+		"the same user's OTHER session must be untouched: %v", stillWorks)
 }
 
 func TestAPIUserSessionDelete_NotFound(t *testing.T) {

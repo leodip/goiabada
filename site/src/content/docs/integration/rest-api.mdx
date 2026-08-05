@@ -542,7 +542,7 @@ Updates session metadata (implementation specific).
 DELETE /api/v1/admin/user-sessions/{id}
 ```
 
-Terminates a user session by ID.
+Terminates a user session by ID. This also revokes the refresh tokens and authorization codes that session authorized, including offline refresh tokens. See [ending a session](/concepts/user-sessions/#ending-a-session).
 
 ---
 
@@ -1542,6 +1542,8 @@ Returns all active sessions with device info and validity status. Each session i
 ```
 DELETE /api/v1/account/sessions/{id}
 ```
+
+Terminates one of the caller's own sessions, including the current one. This also revokes the refresh tokens and authorization codes that session authorized, including offline refresh tokens. See [ending a session](/concepts/user-sessions/#ending-a-session).
 
 ---
 

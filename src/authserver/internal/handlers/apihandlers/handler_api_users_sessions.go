@@ -172,18 +172,26 @@ func HandleAPIUserSessionDelete(
 			return
 		}
 
-		// Delete the user session
-		err = database.DeleteUserSession(nil, sessionId)
+		// Terminate the session rather than merely deleting it: this is the explicit
+		// administrative "end this session" action, so it also marks the codes issued through the
+		// session revoked and sweeps the refresh tokens those grants produced, all in one
+		// transaction (#129 decision 5). The 404 above answers first, so a missing session never
+		// opens one.
+		result, err := handlers.TerminateUserSessionTx(database, userSession)
 		if err != nil {
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return
 		}
 
-		// Log audit event
+		// Both events, after the commit, neither on the error path above: an audited termination
+		// that rolled back would be a false record. deleted_user_session keeps its existing
+		// payload untouched and terminated_user_session carries the security detail (decision 9).
+		loggedInUser := authHelper.GetLoggedInSubject(r)
 		auditLogger.Log(constants.AuditDeletedUserSession, map[string]interface{}{
 			"userSessionId": sessionId,
-			"loggedInUser":  authHelper.GetLoggedInSubject(r),
+			"loggedInUser":  loggedInUser,
 		})
+		handlers.LogTerminatedUserSession(auditLogger, userSession, loggedInUser, result)
 
 		// Return success response
 		response := api.SuccessResponse{

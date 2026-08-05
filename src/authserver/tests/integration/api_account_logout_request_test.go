@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
@@ -12,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper to get a user access token with account scope and also the auth code details (client, redirect, sid)
@@ -91,6 +93,130 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	assert.Equal(t, code.RedirectURI, loc2.Scheme+"://"+loc2.Host+loc2.Path)
 	assert.Equal(t, reqBody.State, loc2.Query().Get("state"))
 	assert.Equal(t, code.SessionIdentifier, loc2.Query().Get("sid"))
+}
+
+// The two cases below pin that #129 changed NOTHING about RP-initiated logout (decision 3). The
+// dividing line is intent: "end this session" is a security action aimed at a device, logout is
+// navigation, and the fact that logout happens to delete the session row when the departing client
+// was the only one on it is bookkeeping rather than a revocation decision.
+//
+// THEY ARE DRIVEN THROUGH REQUEST SHAPES #109 IS NOT REWRITING, per decision 13. Both supply
+// id_token_hint AND post_logout_redirect_uri, because #109's first item is that the second is wrongly
+// treated as required and its check returns before the teardown. They assert only what #129 cares
+// about, that no grant was revoked, and nothing about whether that parameter should be required, how
+// the redirect was built, or whether the session row survives, which is #109 divergence B's business.
+//
+// The hint comes from the token exchange's own id_token rather than from /api/v1/account/logout-request,
+// so these cases do not depend on that endpoint's client resolution, which is also #109's surface.
+
+// logoutWithHint performs the RP-initiated logout for a grant's client and returns nothing but a
+// completed teardown: it fails the test unless the server redirected to the post-logout URI, which is
+// what stops a "nothing was revoked" assertion passing because logout did nothing at all.
+func logoutWithHint(t *testing.T, grant *offlineGrant, idToken string) {
+	t.Helper()
+
+	state := gofakeit.LetterN(10)
+	logoutURL := config.GetAuthServer().BaseURL + "/auth/logout?id_token_hint=" + url.QueryEscape(idToken) +
+		"&post_logout_redirect_uri=" + url.QueryEscape(grant.redirectURI) +
+		"&state=" + state
+
+	resp, err := grant.httpClient.Get(logoutURL)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusFound, resp.StatusCode, "logout should redirect")
+
+	location, err := url.Parse(resp.Header.Get("Location"))
+	require.NoError(t, err)
+	require.Equal(t, grant.redirectURI, location.Scheme+"://"+location.Host+location.Path,
+		"the teardown must have run to completion, not stopped at an error page")
+	require.Equal(t, state, location.Query().Get("state"))
+}
+
+// sessionBoundGrantOnSameSession runs a second authorization on the grant's live session WITHOUT
+// offline_access and returns its id_token and refresh token. The id_token is what logout matches
+// against the session, and the refresh token is session bound, so it is the one whose survival
+// decision 3's second claim is about.
+func sessionBoundGrantOnSameSession(t *testing.T, grant *offlineGrant) (string, string) {
+	t.Helper()
+
+	const codeVerifier = "code-verifier-logout"
+	scope := "openid " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	exchanged := grant.exchange(t, grant.codeFromSameSession(t, scope, codeVerifier), codeVerifier)
+
+	idToken, ok := exchanged["id_token"].(string)
+	require.True(t, ok, "expected an id_token to use as the logout hint: %v", exchanged)
+	require.Equal(t, grant.sessionIdentifier, claimString(t, idToken, "sid"),
+		"the hint must name the session logout is being asked to tear down")
+
+	refreshToken, ok := exchanged["refresh_token"].(string)
+	require.True(t, ok, "a session-bound auth code grant must yield a refresh token: %v", exchanged)
+	return idToken, refreshToken
+}
+
+// TestLogout_WithIdTokenHint_RevokesNoGrants is decision 3's first claim: an offline grant survives
+// logout in every case, including the one where logout deletes the session row because the departing
+// client was the only one on it.
+func TestLogout_WithIdTokenHint_RevokesNoGrants(t *testing.T) {
+	grant := createOfflineGrant(t)
+
+	first := grant.refresh(t)
+	require.NotEmpty(t, first["access_token"], "the grant should refresh before logout: %v", first)
+	grant.refreshToken = first["refresh_token"].(string)
+
+	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
+	logoutWithHint(t, grant, idToken)
+
+	after := grant.refresh(t)
+	assert.NotEmpty(t, after["access_token"],
+		"logout must revoke nothing, decision 3: %v", after)
+}
+
+// TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWorking is decision 3's
+// second claim, which is the more surprising one and the reason it is pinned: the client that just
+// logged out keeps a working session-bound refresh token, because the session row survives while
+// another client remains on it and nothing in refresh validation reads the client-session link.
+//
+// Pinned so #135, "disconnect this application", has to change it deliberately rather than by
+// accident.
+func TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWorking(t *testing.T) {
+	grant := createOfflineGrant(t)
+	idToken, sessionBoundRefresh := sessionBoundGrantOnSameSession(t, grant)
+
+	session, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	// A second client on the same session, created directly as this suite already does for its
+	// session listings. What handleExistingSessionOnLogout reads is the NUMBER of clients on the
+	// session, not how each got there.
+	otherClient := &models.Client{
+		ClientIdentifier:         "logout-other-" + gofakeit.LetterN(8),
+		ClientSecretEncrypted:    []byte("encrypted-secret"),
+		Description:              "Second client sharing the session",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+	}
+	require.NoError(t, database.CreateClient(nil, otherClient))
+	defer func() { _ = database.DeleteClient(nil, otherClient.Id) }()
+
+	now := time.Now().UTC()
+	require.NoError(t, database.CreateUserSessionClient(nil, &models.UserSessionClient{
+		UserSessionId: session.Id,
+		ClientId:      otherClient.Id,
+		Started:       now.Add(-time.Hour),
+		LastAccessed:  now.Add(-5 * time.Minute),
+	}))
+
+	logoutWithHint(t, grant, idToken)
+
+	data := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {grant.client.ClientIdentifier},
+		"client_secret": {grant.clientSecret},
+		"refresh_token": {sessionBoundRefresh},
+	})
+	assert.NotEmpty(t, data["access_token"],
+		"the logged-out client's session-bound refresh token must keep working while another client shares the session: %v", data)
 }
 
 func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
