@@ -36,9 +36,13 @@ Seams: 1. Tiers: unit (core module). Docs: none, internals only.
 
    Codes are derived through `totp.GenerateCode(secret, time.Unix(step*StepSeconds+15, 0).UTC())`,
    the library's TOTP generator with the same defaults `otp/secret-generator` relies on. Generating
-   through TOTP and validating through HOTP is deliberate: it is the path a real authenticator takes,
-   so the table pins parity with what `totp.Validate` accepts today rather than checking `MatchStep`
-   against itself.
+   through TOTP and validating through HOTP is **not** two independent cryptographic
+   implementations, and the plan review corrected an earlier wording here that implied it was:
+   `totp.GenerateCode` delegates to `hotp.GenerateCodeCustom`, so both sides share one HMAC. What the
+   table does pin is the part that is genuinely ours and genuinely independent: TOTP maps a chosen
+   *timestamp* to a counter, while `MatchStep` must derive the correct counter and window from `now`.
+   The step arithmetic is the thing under test; the HMAC is the library's and seam 1 does not retest
+   it (§5, rejected seams).
 
    Base secret `JBSWY3DPEHPK3PXP` (16 characters, valid base32). Every case varies exactly one thing
    from the accepted case at delta 0.
@@ -108,6 +112,35 @@ Seams: 2. Tiers: unit (all three modules, since the interface and its mock chang
 engines): seam 2's claim table plus a `migration_000027_*` test in the shape of
 `migration_000026_code_revoked_test.go`. Docs: none, internals only. Expand when stage 1 lands.
 
+**Blocked on decision 10.** The plan review found that the claim predicate as designed (`id` plus
+`last_otp_step < step`, with disable and reset as separate writes) lets a reset reopen a consumed
+step to a verification request that loaded the old enabled authenticator. Answering it may change
+`TryConsumeUserOTPStep`'s signature, so the method is not written until decision 10 is `Decided`.
+Everything else in this stage, the migration, the column, the tag and `ResetUserOTPStep`, is
+unaffected by the answer.
+
+**Two coverage cases the first plan draft was missing**, both added by the plan review and both
+pinning a §2 goal that no other planned case could fail on. Neither depends on decision 10:
+
+- **Concurrent single-winner** (§2 goal 3, "two concurrent submissions of one code yield at most one
+  success"). The sequential claim table cannot tell a conditional `UPDATE` from a read-then-write,
+  because a non-atomic implementation passes first/same/lower/higher rows perfectly and still lets two
+  concurrent callers both win. Follows `cleanup_claim_test.go:TestTryClaimCleanupRun_ConcurrentCallersProduceOneWinner`
+  exactly: N callers released together on one barrier against one user and one step, assert exactly
+  one `true`, treat a lock-wait timeout or deadlock as a legitimate "did not claim", and repeat over
+  several rounds since overlap can only be made likely rather than forced. **Skips sqlite**, which is
+  held to one connection (`SetMaxOpenConns(1)`) so callers queue instead of contending and the test
+  would pass without ever creating overlap. Carries that precedent's honesty note: a green run detects
+  a broken implementation probabilistically, it does not certify atomicity.
+- **Stale whole-user write** (§2 goal 4, "the counter cannot be regressed by an ordinary whole-user
+  write"). Decision 2 assigns the `dont-update` tag, and dropping or misspelling it still compiles and
+  leaves every claim and migration case green. Follows
+  `user_test.go:TestUpdateUser_DoesNotClobberAuthStateGeneration`, which exists for this exact
+  invisible failure: claim a nonzero step, then change an unrelated field on a model loaded before the
+  claim, `UpdateUser` it, reload, and assert both that the unrelated change applied and that the
+  claimed step survived. The claimed step must be nonzero, since 0 is the column default and a case
+  written with 0 passes with the field never assigned at all.
+
 ### Stage 3: enforcement in the browser flow
 Status: **Not started**
 Detail: **sketch**
@@ -126,9 +159,15 @@ claim, one erroring claim, plus the new stub on the three existing subtests that
 validation. Seam 3 is a new `auth_otp_replay_test.go` with both cases and their controls, each second
 submission in a fresh `prompt=login` ceremony for the reason §5 gives.
 
-Docs: `docs/security-2fa` gains its bullet here rather than in stage 4. This is the stage that makes
-the claim true of authentication and that introduces the audit event the bullet names, and a docs
-line attached to the last stage is the first thing an early stop loses. Expand when stage 2 lands.
+Docs: **none. The `docs/security-2fa` bullet moved to stage 4**, reversing this plan's first draft.
+The draft put it here, arguing that stage 3 is where the claim becomes true of authentication, that
+stage 3 introduces the audit event the bullet names, and that a docs line attached to the last stage
+is the first thing an early stop loses. The plan review disproved the first of those, which was the
+one carrying the argument: after stage 3 the account API still accepts a code without claiming it, so
+a code accepted at `api-otp/verify` remains replayable at browser verification until stage 4 lands.
+§2's goal is one-time use "on any of the three call sites", and stage 3 enforces two of three, so the
+bullet would state a guarantee broader than the code gives. An early stop is a reason to lose a docs
+line, never a reason to publish an untrue security claim. Expand when stage 2 lands.
 
 ### Stage 4: the account API, and reset on disable
 Status: **Not started**
@@ -145,4 +184,34 @@ case that pins decision 4, carrying the "keep this" note §5 asks for, since it 
 a replay reading expects a refusal. No unit test file is created for `handler_api_account_otp.go`: §5
 records that absence as a stated choice.
 
-Docs: none, stage 3 carries the bullet. Expand when stage 3 lands.
+**Two more coverage cases the first plan draft was missing**, both added by the plan review. The
+enable/disable/re-enable case above is a *reset* test that silently assumes the enable path already
+claims: with the whole of stage 4's claim change reverted, today's handler accepts all three
+operations, so on its own it proves nothing about the third call site. And decision 4 names two
+disable sites while seam 4 exercised only one.
+
+- **API enrolment claims, observed at browser verification** (pins decision 3's third call site).
+  Enable OTP through `PUT /api/v1/account/otp` with code C, then start a fresh browser level 2
+  ceremony for that same user and submit C: it must draw the generic incorrect-code response. Seam 3's
+  enrolment-to-verification case enrols *in the browser flow*, so no planned case crossed the API
+  boundary, and omitting `TryConsumeUserOTPStep` from `api-otp/verify` alone left the whole suite
+  green. The attack that makes this worth a case: a user enables OTP through the API and consumes C
+  there, and anyone holding C plus the level 1 credential presents C at the browser prompt and reaches
+  level 2 because the API acceptance was never recorded. **Needs the later-step control** in the same
+  test, per §5, so the refusal is attributable to the claim and not to a broken ceremony.
+- **Admin disable resets too** (pins decision 4's second site). Consume C for a user, disable that
+  user through the admin endpoint `PUT /api/v1/admin/users/{id}/otp`, then re-enable through the
+  account API with the same secret and C, which must succeed. `api_users_auth_test.go:TestAPIUserOTPPut_DisableSuccess`
+  already owns that endpoint and is the place to extend. Endpoint-observable throughout: it never
+  asserts `users.last_otp_step`, which §5 rejects as a side channel that passes with the endpoint
+  broken. Forgetting the reset call in the admin handler previously left the complete suite green.
+
+Docs: **`docs/security-2fa` gains its bullet here**, moved from stage 3, because this is the first
+stage at which one-time use holds at all three call sites and so the first at which the bullet is
+true. Shape and content unchanged from §2's "documentation owed": one bullet in the shape of the
+neighbouring "Refresh token rotation" and "Replay containment" bullets, naming
+`otp_code_replay_detected` and linking to `/concepts/audit-log/` exactly as those two do.
+
+**Blocked on decision 10** for the disable resets specifically: the answer decides whether disable and
+reset must be one atomic transition, and whether the claim binds to enrolment state. The
+`api-otp/verify` claim and its two coverage cases above are unaffected. Expand when stage 3 lands.

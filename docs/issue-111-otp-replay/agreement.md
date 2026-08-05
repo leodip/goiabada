@@ -5,7 +5,7 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** plan written, stage 1 of 4 next
+**Run state:** plan reviewed (round 1, findings resolved), blocked on open decision 10, no code written
 **PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
@@ -181,8 +181,8 @@ Checkable:
 
 ## 3. Decisions
 
-Nine. Announced as eight; sweeping the design for what the run would otherwise have to escalate added
-decision 9.
+Ten. Announced as eight; sweeping the design for what the run would otherwise have to escalate added
+decision 9, and the plan review added decision 10, which is **open** and halts the run.
 
 1. **Where does the consumed-code state live?**
    Status: **Decided** · Raised by: user
@@ -333,6 +333,80 @@ decision 9.
    **Rejected:** the enrolment-site guard, for the reason above. **Rejected:** adding a startup sweep
    that disables OTP on rows with an unusable secret, which is correct but introduces a data-repair
    path to a change that otherwise has none, for a population that may well be empty.
+
+10. **Does a disable reset reopen a consumed step to a verification request already in flight, and if
+    so what binds the claim?**
+    Status: **Open** · Raised by: run (raised during stage 1, at the plan-review gate, before any
+    stage started)
+
+    The plan review found an interleaving that decision 4's "Not a bypass. ... Nothing here lets a
+    replayed code buy anything" does not cover. Both mechanism claims verified against the code:
+
+    1. A browser request at `otp/verify-enabled` loads the user (`GetUserById`), then decrypts the
+       stored secret and validates, holding both in memory for the rest of the request.
+    2. A disable (`api-otp/disable` or `admin-otp/disable`) commits `ClearOTPSecret` plus
+       `UpdateUser`, then `ResetUserOTPStep` sets the marker to 0, as two separate writes.
+    3. The designed claim predicate is `id` plus `last_otp_step < step` and binds nothing about
+       enrolment, so the in-flight request then claims an already-consumed step successfully.
+    4. `handler_auth_completed.go:HandleAuthCompletedGet` reloads the user but checks only
+       `user.Enabled`, never `user.OTPEnabled`, so nothing downstream catches it.
+
+    The race is required: after a disable commits, a *fresh* request takes the enrolling branch and
+    validates against the session secret, not the stored one, so only a request that loaded the old
+    enabled state can do this.
+
+    **The impact is narrower than the review states, and this is what the answer should turn on.**
+    The review concludes the attacker "obtains level 2". Verified otherwise: once OTP is disabled, a
+    holder of the level 1 credential already reaches level 2 more cheaply.
+    `handler_auth_level2.go:HandleAuthLevel2Get` sends `AcrLevel2Optional` with `!user.OTPEnabled`
+    straight to `/auth/completed`, skipping OTP entirely, and `AcrLevel2Mandatory` to the enrolment
+    form where the attacker can enrol their own secret. So the replay buys no access that the disable
+    did not already grant. What it does buy is a token asserting `amr: ["pwd","otp"]` for an
+    authenticator that has just been removed, obtained without the `AuditEnabledOTP` event and the
+    visible new authenticator that self-enrolment would leave. A false factor assertion and a stealth
+    gain, not an access gain.
+
+    **Why this is the user's call rather than the run's:** it is a security property, it touches
+    authentication, and the leading options change `TryConsumeUserOTPStep`'s signature or decision 4's
+    observable behaviour, which stage 2 fixes and stage 4 depends on. The reviewer returned it with an
+    empty `forced_answer`, so it is a choice, not a mechanical repair.
+
+    **Option A, bind the claim to enrolment state.** Add `AND otp_enabled = 1` to the claim, which
+    cannot be unconditional because the two enrolment sites claim while `otp_enabled` is still false
+    (§4 puts the claim before `otp/enroll-write` deliberately). So the method takes a flag:
+    `TryConsumeUserOTPStep(tx, userId, step, requireOTPEnabled bool)`. Closes the hole at its cause,
+    costs a signature change and one more branch at three call sites. Does not close the narrower
+    variant where a disable is immediately followed by a re-enrolment with a new secret while the
+    stale request is still in flight, since `otp_enabled` is true again by then; closing that needs an
+    enrolment generation column, which is a second column and a larger change.
+
+    **Option B, reset to the current step rather than to 0.** `last_otp_step = now/30` on disable. A
+    code consumed in the current window stays refused, and a marker stranded in the future by a clock
+    jump still comes back to now, so decision 4's operator remedy survives. No signature change, no
+    new column, one line different in `ResetUserOTPStep`. Cost: after a disable, re-enrolling with a
+    code from the current window is refused and the user waits up to 30 seconds, and seam 4's pinned
+    "enable, disable, re-enable with the same C succeeds" case has to become a later-step code, which
+    weakens what that case proves about the reset.
+
+    **Option C, accept and document it.** Given the corrected impact above, record the false AMR
+    assertion as a known narrow window and proceed with the design as sealed. Costs nothing now and
+    leaves an authentication surface where a token can name a factor that no longer exists.
+
+    **Option D, drop the reset entirely**, reversing decision 4. Removes the reopening completely and
+    reinstates the permanent clock-jump lockout with no in-product remedy, which decision 4 rejected
+    for good reason. Recorded for completeness; not recommended.
+
+    **Recommendation: A.** It is the only option that fixes the cause rather than the blast radius,
+    the signature change is cheap because it lands in stage 2 before any caller exists, and the flag
+    reads honestly at each site (verification requires enrolment, enrolment does not). B is the
+    fallback if the signature change is unwelcome, and its 30 second re-enrolment delay is the thing
+    to weigh. C is defensible only if the false AMR assertion is judged acceptable, which is a
+    judgement about what the tokens this server issues are allowed to claim, and that is not the run's
+    to make.
+
+    Getting it wrong either way: choosing C and later reversing means revisiting stage 2's interface
+    and stage 4's tests after both have landed. Choosing A when C would have done costs one boolean
+    parameter and a little noise at three call sites.
 
 ## 4. Design
 
