@@ -133,3 +133,49 @@ stage 2's method signature and stage 4's disable resets rather than the whole pl
 one, at the plan gate, which is the cheapest place in the run to spend one.
 
 Waiting on: the user's answer to decision 10 on PR #143.
+
+## Decision 10 answered, 2026-08-05
+
+The user replied on PR #143 at 23:39Z, four minutes after the escalation: "A. Bind the claim to
+enrolment state." Option A, the recommendation, with no amendment. One session applied it; no code was
+written, and stage 1 is still `Not started`.
+
+Verified before writing anything down, since option A rests on two mechanism claims the escalation had
+not checked:
+
+- **`api-otp/verify` is only ever reached with OTP off**, so `requireOTPEnabled` false is honest there
+  rather than merely convenient: the enable branch refuses with `OTP_ALREADY_ENABLED` when
+  `user.OTPEnabled`. Read in `handler_api_account_otp.go`. Same for `otp/verify-enrolling`, which is the
+  `else` of `if user.OTPEnabled` in `handler_auth_otp.go`.
+- **The bound bool predicate is portable.** `users.otp_enabled` has the same column type as
+  `users.enabled` on all four engines (`numeric`, `tinyint(1)`, `boolean`, `BIT`), and
+  `TrySetUserEnabled` already binds a Go bool against `users.enabled` in this exact position, so
+  `ub.Equal("otp_enabled", true)` needs nothing engine-specific. Checked against the four `schema.sql`
+  snapshots, not inferred from one.
+
+**Two things the answer settled that the escalation had left implicit**, both now in decision 10 and in
+the plan:
+
+1. **The disable writes need no transaction, but their order is load-bearing.** The reset must follow
+   the `otp_enabled = false` write. Reversed, there is a window where the marker reads 0 while the
+   authenticator still reads enabled, and an in-flight verification claims a consumed step through it,
+   reintroducing the hole by ordering. §4's order is already the correct one; stage 4 adds the comment.
+2. **A false at a verification site now has a second cause**, the authenticator being removed under the
+   request, so `otp_code_replay_detected` is named for the likely cause rather than the certain one.
+   `data/mark-code-used` documents the same imprecision about its own three-way false, so this follows
+   existing precedent rather than inventing a convention.
+
+Applied to: decision 10 (flipped to `Decided`, the question kept below the answer), the header's run
+state, stage 2 (signature, predicate, and two data cases at seam 2 pinning both directions of the flag),
+stage 3 (which site passes which value, and why), stage 4 (the write order, and `api-otp/verify` passing
+false). §4 and §5 are frozen at seal and were not rewritten; decision 10 names what it supersedes, which
+is how issue 129 handled the same situation with its decision 15.
+
+Not closed by option A, and drafted as follow-up 2 in `closing.md`: a re-enrolment landing while a stale
+verification request is in flight. Narrower than option A's text said, worked out while applying it, and
+the narrowing is what makes it a follow-up rather than a second escalation: the re-enrolment must claim a
+step strictly below the replayed one, so the replayed code has to come from the +1 window.
+
+Escalation budget: one, spent at the plan gate and answered in four minutes. Nothing else is open.
+
+Waiting on: nothing. Stage 1 is next.
