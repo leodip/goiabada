@@ -322,3 +322,147 @@ decision 9.
    line we touched. **Rejected:** guarding all three sites; `api-otp/verify` already rejects a secret
    outside 16 to 64 base32 characters, and `otp/verify-enabled` reads its secret from the database, so
    the extra checks would be redundant.
+
+## 4. Design
+
+**The property that makes this safe:** a code is accepted only by the statement that consumes it. The
+compare-and-set is the claim and the replay check at once, so there is no window between deciding a
+code is good and recording that it was used. Two requests presenting one code contend on a single
+`UPDATE`, and at most one row transitions.
+
+### The matcher, `src/core/otp/verifier.go`
+
+```go
+const StepSeconds = 30
+
+// MatchStep reports which time step produced passcode, within the accepted skew
+// window, so the caller can record that step as consumed. now is a parameter rather
+// than read here so the window can be tested at a pinned instant.
+func MatchStep(passcode string, secret string, now time.Time) (int64, bool) {
+	current := now.Unix() / StepSeconds
+	for _, delta := range []int64{0, -1, 1} {
+		step := current + delta
+		ok, err := hotp.ValidateCustom(passcode, uint64(step), secret, hotp.ValidateOpts{
+			Digits:    otp.DigitsSix,
+			Algorithm: otp.AlgorithmSHA1,
+		})
+		if err != nil {
+			return 0, false
+		}
+		if ok {
+			return step, true
+		}
+	}
+	return 0, false
+}
+```
+
+Digits, algorithm and the 30 second step are the library defaults `otp/secret-generator` relies on, so
+this accepts exactly what `totp.Validate` accepts today. Verified by execution against
+`pquerna/otp v1.5.0`, per section 1.
+
+Errors collapse to "no match" rather than propagating, which preserves today's behaviour: `totp.Validate`
+discards the same errors (`rv, _ := ValidateCustom(...)`). A wrong-length passcode and an unparseable
+secret both produce the generic incorrect-OTP response, not a 500. This is deliberate and not an
+oversight to be tidied later.
+
+### The column and its two writes
+
+`users.last_otp_step`, `NOT NULL DEFAULT 0`, `int64` on the model tagged `dont-update` per decision 2.
+Migration 000027 on all four engines, following `migration/generation-sqlite` for shape and
+`migration/generation-mssql` for the named default constraint the down migration needs. The four
+`schema.sql` snapshots are updated in the same stage; they are documentation, but 000024's columns are
+in all four, so leaving them out is drift.
+
+Two methods on `data.Database`, declared next to `data/interface-generation`:
+
+```go
+// TryConsumeUserOTPStep records step as the user's most recently consumed TOTP time
+// step, but only if it is strictly newer than what is stored, and reports whether
+// this call is the one that made the transition. Compare-and-set for the same reason
+// MarkCodeAsUsed is: validating a code and recording it as used must not be separable,
+// or two concurrent submissions of one code both pass.
+TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int64) (bool, error)
+
+// ResetUserOTPStep returns the user's consumed-step marker to 0, meaning no code has
+// been consumed. Called when OTP is disabled: the marker belongs to the enrolled
+// authenticator, and it is the only remedy if a clock jump strands the marker in the
+// future (#111 decision 4).
+ResetUserOTPStep(tx *sql.Tx, userId int64) error
+```
+
+`tx` is optional on both, as on `MarkCodeAsUsed`, because each is a single statement. Neither reads
+back, so the transaction requirement `data/increment-generation` documents does not apply.
+
+The claim is:
+
+```sql
+UPDATE users SET last_otp_step = ?, updated_at = ? WHERE id = ? AND last_otp_step < ?
+```
+
+with the same value bound to both `?` for the step. `rowsAffected == 1` means this call transitioned
+the row, on all four engines: matching the `WHERE` implies the assigned step is strictly greater, so
+the row genuinely changes and MySQL's changed-rows accounting agrees with matched-rows. That is the
+trap `RevokeCodesBySessionIdentifier` documents, and it does not bite here.
+
+**A `false` return is not proof of replay.** It means no row transitioned, which is either a step at or
+below the stored one, or a user row that vanished. The caller loaded the user moments earlier, so
+replay is overwhelmingly the cause, and the response is identical either way. The audit event in
+decision 5 is named for the likely cause and the doc comment records the imprecision, as
+`data/mark-code-used` does for its own.
+
+**Failure is not benign.** A query error returns `(false, err)` and the caller responds 500. Collapsing
+a database fault into "not consumed" would refuse valid codes; collapsing it into "consumed" would
+accept replays for the duration of the fault. Neither is acceptable, and the data tier proves the
+error path with a rolled-back transaction.
+
+### The three call sites
+
+Each becomes, in place of the single `totp.Validate` call:
+
+```go
+step, matched := otp.MatchStep(code, secret, time.Now().UTC())
+if !matched {
+    // existing AuditAuthFailedOtp path, unchanged
+}
+consumed, err := database.TryConsumeUserOTPStep(nil, user.Id, step)
+if err != nil {
+    // 500
+}
+if !consumed {
+    auditLogger.Log(constants.AuditOTPCodeReplayDetected, map[string]interface{}{
+        "userId": user.Id, "step": step,
+    })
+    // the same AuditAuthFailedOtp path as a wrong code
+}
+```
+
+The replay branch reuses `otp/incorrect-error` at the two browser sites and the existing
+`INVALID_OTP_CODE` JSON error at `api-otp/verify`. A replay is indistinguishable from a wrong code to
+the caller, and both emit `AuditAuthFailedOtp`; the new event is additional, not a substitute.
+
+**At `otp/verify-enrolling`, the claim comes before `otp/enroll-write`.** If the enable write then
+fails, a code is burned and the user retries with the next one. The reverse order would leave OTP
+enabled on a request that was refused.
+
+**At `otp/verify-enrolling`, an empty `secretKey` is refused before matching** (decision 9), with the
+generic incorrect-OTP error.
+
+### Disable resets
+
+`api-otp/disable` and `admin-otp/disable` call `ResetUserOTPStep` alongside their existing
+`ClearOTPSecret` and `UpdateUser`. `UpdateUser` cannot do it: the column is `dont-update`, which is the
+whole point.
+
+### Not part of this
+
+`last_otp_step` is internal state and is not added to `api.ToUserResponse`, which maps fields
+explicitly, so nothing exposes it over the API. No settings key, no per-client configuration: one-time
+use is unconditional.
+
+### Pre-flight the run owes
+
+Confirm migration version 000027 is not already recorded in `schema_migrations` in the long-lived
+`goiabada_data` and `goiabada_integration` databases before writing it, per the assumption in section 1.
+A version recorded by a discarded attempt is skipped silently and the suite then runs against the wrong
+schema. The `migration_000024_*` and `migration_000026_*` data tests are the pattern for reading it.
