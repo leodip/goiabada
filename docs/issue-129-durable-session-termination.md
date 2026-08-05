@@ -5,10 +5,11 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** blocked on decision 15, 2026-08-05. Stages 1 to 4 done, so the behaviour change has
-landed. Stage 5, the `/auth/completed` gate, is implemented and reviewed but **uncommitted**: round 1
-found a blocking security finding, the run confirmed it against the code, and the question it raises is
-decision 15, escalated on PR #138. The run resumes when that is answered.
+**Run state:** stage 5 awaiting review round 2, 2026-08-05. Stages 1 to 4 are committed. Decision 15
+was answered on PR #138 ("Let's go with option A"), and stage 5 now carries that answer: the gate reads
+a dedicated level 1 proof on the `AuthContext` rather than `AuthenticatedAt`. Still **uncommitted**,
+because the gate has not passed a review round since it changed. Modules and integration are green on
+the amended tree.
 **PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
@@ -107,8 +108,12 @@ log can cite it the same way. Nothing above the line changed.
 | `test/terminate-offline-endpoint` | `src/authserver/tests/integration/api_users_sessions_test.go` | `TestAPIUserSessionDelete_TerminatesTheOfflineGrantsOfThatSession` | `THE SURVIVOR IS THE HALF THAT CARRIES THIS TEST` | stage 4, seam 8's headline claim and its same-user control |
 | `test/second-offline-grant` | `src/authserver/tests/integration/credential_change_revocation_test.go` | `secondOfflineGrantForSameUser` | `func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password string) *offlineGrant {` | stage 4, the one new harness helper |
 | `test/logout-revokes-nothing` | `src/authserver/tests/integration/api_account_logout_request_test.go` | `TestLogout_WithIdTokenHint_RevokesNoGrants` | `logout must revoke nothing, decision 3` | stage 4, decision 3 pinned |
-| `completed/level1-restart` | `src/authserver/internal/handlers/handler_auth_completed.go` | `HandleAuthCompletedGet` | `if !userReallyAuthenticated {` | stage 5, decision 6's gate, inside the else branch and ahead of `completed/start-new-session` |
-| `test/completed-gate` | `src/authserver/internal/handlers/handler_auth_completed_test.go` | `TestHandleAuthCompletedGet` | `t.Run("No valid session and this ceremony did not authenticate, restarts level 1"` | stage 5, the gate's own row; the zero-time sibling sits directly below it |
+| `completed/level1-restart` | `src/authserver/internal/handlers/handler_auth_completed.go` | `HandleAuthCompletedGet` | `if !authContext.Level1AuthCompleted {` | stage 5, decision 6's gate, inside the else branch and ahead of `completed/start-new-session`. **Locator re-swept when decision 15 was answered**, which replaced the `userReallyAuthenticated` predicate this row used to cite |
+| `test/completed-gate` | `src/authserver/internal/handlers/handler_auth_completed_test.go` | `TestHandleAuthCompletedGet` | `t.Run("No valid session and this ceremony did not authenticate, restarts level 1"` | stage 5, the gate's own row; `test/completed-gate-otp` sits directly below it |
+| `authcontext/level1-proof` | `src/core/oauth/auth_context.go` | `n/a` | `Level1AuthCompleted bool` | stage 5, decision 15 option A's field, next to the `AuthenticatedAt` it deliberately does not reuse |
+| `pwd/level1-proof` | `src/authserver/internal/handlers/handler_auth_pwd.go` | `HandleAuthPwdPost` | `authContext.Level1AuthCompleted = true` | stage 5, the only writer of that field |
+| `test/completed-gate-otp` | `src/authserver/internal/handlers/handler_auth_completed_test.go` | `TestHandleAuthCompletedGet` | `t.Run("No valid session and only OTP authenticated this ceremony, restarts level 1"` | stage 5, decision 15's unit row, the one that fails against the round 1 gate |
+| `test/otp-alone-no-recreate` | `src/authserver/tests/integration/session_deletion_test.go` | `TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession` | `"the ended session must not be recreated by a ceremony that only verified OTP")` | stage 5, decision 15's integration case, paired with `test/fresh-ceremony-after-delete` in the same file |
 
 Counts in this document carry their command:
 
@@ -426,14 +431,15 @@ Verified as owing nothing, stated because silence reads the same as forgetting:
 
 ## 3. Open questions and decisions
 
-Fifteen items, one of them `Open`. Opened at eleven; decision 4's reversal onto a code-level marker
+Fifteen items, all `Decided`. Opened at eleven; decision 4's reversal onto a code-level marker
 exposed a residual at `/auth/issue` that the registry design did not have, which is item 12. The
 reconciliation pass of 2026-08-04 added two more: tracing which endpoints the "End session" buttons
 reach found that interactive logout writes nothing to the database (item 13), and the four-surface
 documentation sweep found three confirmation modals whose copy this change makes incomplete (item 14).
 Item 15 was raised by the run during stage 5, when the code review found that decision 6's gate is
-satisfied by OTP alone; it is the only `Open` item and it halts the run. Numbers are never reused, and
-decision 4 records its own reversal rather than being rewritten silently.
+satisfied by OTP alone; it halted the run until the user answered it on PR #138 on 2026-08-05, and it
+keeps the question it was escalated with rather than being trimmed to its answer. Numbers are never
+reused, and decision 4 records its own reversal rather than being rewritten silently.
 
 1. **All three gaps land in #129, with gap 2 staged last.** Status: **Decided** Raised by: user
 
@@ -1052,12 +1058,35 @@ decision 4 records its own reversal rather than being rewritten silently.
     established convention here, where identical strings like "End session" and "Are you sure?" each
     carry three per-surface keys. Mixing a shared key into a per-surface scheme is what review flags.
 
-15. **Does decision 6's gate require level 1 authentication in this ceremony, or is OTP enough?**
-    Status: **Open** Raised by: reviewer, raised during stage 5
+15. **Level 1 in this ceremony is required. A dedicated proof on the `AuthContext` carries it.**
+    Status: **Decided** Raised by: reviewer, raised during stage 5
 
-    Escalated on PR #138. The run cannot answer it: decisions.md never auto-resolves anything in
-    authentication or session territory, and reviewer.md never lets the run alone settle a security
-    finding.
+    Answered by the user on PR #138, 2026-08-05, in full: "Let's go with option A." That is option A
+    below, the recommended one, taken over B, C and D with no amendment, so the run applied it as
+    written: a new field on the `AuthContext` set only by `pwd/level1-proof`, read by the gate at
+    `completed/level1-restart`, with `AuthenticatedAt` keeping its existing job of deciding whether to
+    refresh the session's `AuthTime` on a step-up.
+
+    What the answer settles, beyond the gate expression: the two sealed passages that disagreed are
+    reconciled in section 1's favour, so **the discriminator is level 1 authentication in this
+    ceremony**, and decision 6's supporting note calling both `AuthenticatedAt` writers "real
+    authentication" is true of the field but not of the gate. Section 5's seam 6 table grew two rows
+    and one integration case landed in `session_deletion_test.go`, as option A's costing said it
+    would.
+
+    **What lost.** B, the liveness read in the OTP handler, on the reasoning in its bullet: it leaves
+    the gate reading a field that does not mean what it says and puts the reasoning in two handlers.
+    C, accepting the limit, which the run did not recommend because the enrollment sub-case makes it a
+    fail-open reachable with a stolen cookie alone. D, a follow-up, ruled out rather than weighed.
+
+    The question as it was escalated is kept below, because the reasoning is what makes the answer
+    reviewable.
+
+    ---
+
+    **The original question.** Escalated on PR #138. The run could not answer it: decisions.md never
+    auto-resolves anything in authentication or session territory, and reviewer.md never lets the run
+    alone settle a security finding.
 
     **The question.** Decision 6 fixes the gate as `!hasValidUserSession && !userReallyAuthenticated`,
     and stage 5 shipped exactly that, reading `completed/really-authenticated`. But
@@ -1820,7 +1849,10 @@ stated reason.
 
 ### Stage 5: the `/auth/completed` gate
 Status: **In progress**
-Seams: 6 (`HandleAuthCompletedGet`, in the existing `handler_auth_completed_test.go`).
+Seams: 6 (`HandleAuthCompletedGet`, in the existing `handler_auth_completed_test.go`), plus, per
+decision 15's answer, one assertion each in the existing `handler_auth_pwd_test.go` and
+`handler_auth_otp_test.go` subtests, which are the only seams that can see who writes the new field.
+Named in step 6 with the reasoning, since section 5 does not enumerate them.
 Tiers: unit (three modules) and integration (dev container). Data not applicable: no query, no
 migration, no interface method, no model change.
 Docs: the first of the two sentences held back from stage 4's concepts section, that a ceremony in
@@ -1828,9 +1860,15 @@ flight cannot complete into a recreated session.
 
 Decision 6's first half. The else branch of `HandleAuthCompletedGet` reaches
 `completed/start-new-session` today with no proof anyone authenticated; after this stage it reaches it
-only when this ceremony did. The discriminator is already computed at
-`completed/really-authenticated` and is consulted only inside the valid-session branch, where it
-decides whether to refresh `AuthTime`.
+only when this ceremony performed level 1.
+
+> **Amended on 2026-08-05, after decision 15 was answered.** The stage as first written read the
+> discriminator off `completed/really-authenticated`, which the handler already computes and consults
+> only inside the valid-session branch. Round 1 of the code review found that `AuthenticatedAt` has two
+> writers, so OTP alone satisfied that predicate, and the user answered decision 15 with option A: a
+> dedicated level 1 proof on the `AuthContext`. Step 6 below is that answer, steps 1 to 3 are amended
+> where it changed them, and the amendments are marked rather than absorbed because the run log's first
+> stage 5 entry describes the earlier version.
 
 **The integration tier is an addition to the sketch, and `test/fresh-ceremony-after-delete` is the
 reason.** The sketch said unit only and left the integration run to stage 6. Expanding against the
@@ -1849,39 +1887,54 @@ into `StartNewUserSession`; it is verified and drafted as follow-up 3 in section
 
 1. **The gate, at the top of the else branch in `HandleAuthCompletedGet`.** Status: **Done**
    Landed at `completed/level1-restart`, inside the else branch as written.
-   When `!userReallyAuthenticated`, set `AuthStateRequiresLevel1`, save the auth context, redirect to
-   `/auth/level1` and return, before `completed/start-new-session` is reached. Inside the else branch
-   rather than above `if hasValidUserSession`, because `hasValidUserSession` is already false there,
-   so the gate reads as the one condition it adds and the SSO branch is visibly untouched.
+   When `!authContext.Level1AuthCompleted`, set `AuthStateRequiresLevel1`, save the auth context,
+   redirect to `/auth/level1` and return, before `completed/start-new-session` is reached. Inside the
+   else branch rather than above `if hasValidUserSession`, because `hasValidUserSession` is already
+   false there, so the gate reads as the one condition it adds and the SSO branch is visibly untouched.
    Carries the comment decision 6 asks for, three things a later reader needs: that the predicate is
-   deliberately "this ceremony authenticated" rather than "no valid session", because
+   deliberately "this ceremony did level 1" rather than "no valid session", because
    `test/fresh-ceremony-after-delete` is #46's guard over a legitimate case with the second shape;
-   that there is no loop, since the second pass has `AuthenticatedAt` set by `pwd/authenticated-at`;
-   and that `handlePromptNone` is the fragile neighbour, because it *does* set `AuthenticatedAt` from
-   the session it reused and only its current call graph, straight to `/auth/issue` without passing
-   here, keeps the discriminator meaning what it says.
-2. **The two comments this stage falsifies.** Status: **Done**
-   `pwd/authenticated-at` and the OTP handler's matching write both say `AuthenticatedAt` is "used by
-   handler_auth_completed to decide whether to refresh the session's AuthTime". After this stage it
-   also decides whether a session may be created at all, which is the stronger consumer and the one a
-   later reader must not delete by accident. Same class and same reasoning as stage 1's finding 1: the
-   stage that falsifies a comment owns fixing it, because the alternative hands the next reader a
-   wrong contract.
+   that there is no loop, since the second pass has `Level1AuthCompleted` set by `pwd/level1-proof`;
+   and that `handlePromptNone` also sets `AuthenticatedAt`, from the session it reused, so a gate on
+   that field would be satisfied by a ceremony that authenticated nothing.
+   **Amended per decision 15:** the predicate was `!userReallyAuthenticated` as first shipped. The
+   comment gained the reason the field it reads is not the one the handler already computes, and the
+   `handlePromptNone` note flipped direction: under option A that neighbour would be *stopped* by this
+   gate rather than let through, so it is no longer load-bearing fragility.
+2. **The comments this stage falsifies.** Status: **Done**
+   **Amended per decision 15, and the amendment reverses this step's direction.** As first shipped it
+   widened the comments at `pwd/authenticated-at` and its OTP twin to say `AuthenticatedAt` also
+   decides whether a session may be created. Under option A that is false: the gate does not read that
+   field. Both comments are back to their original claim, which is accurate again, and each gained the
+   fact a later reader actually needs. `pwd/level1-proof` says it is the only writer of the level 1
+   proof and why; the OTP handler says it deliberately does **not** set it, because a ceremony can
+   reach OTP by reusing a session rather than by entering a password. That second comment is the one
+   that stops a future reader tidying away the asymmetry, and `handler_auth_otp_test.go` pins it.
+   The third comment, at `completed/really-authenticated`, is the one this stage really did falsify:
+   it claimed the field is "set by the password handler", which is what made this defect easy to
+   reach. It now names both writers and says the field is not proof of level 1.
 3. **Unit cases at seam 6.** Status: **Done**
-   Landed at `test/completed-gate` and its zero-time sibling, with the three positive controls
+   Landed at `test/completed-gate` and `test/completed-gate-otp`, with the three positive controls
    amended. Every row below shipped and was executed.
    In `TestHandleAuthCompletedGet`, extending it rather than adding a sibling, on the same strict mock
    quartet its ten subtests already use. Expectations written before running them:
 
    | Case | Expected | Which gate rejects it, or what it proves |
    |---|---|---|
-   | no valid session, `AuthenticatedAt` nil, which is the terminated-SSO shape | 302 to `/auth/level1`, the saved context reading `requires_level_1`, and `StartNewUserSession` never called | decision 6's gate. "Never called" is enforced rather than asserted: the strict mock carries no `StartNewUserSession` expectation, so reaching it fails the case on its own, and neither audit event is stubbed either |
-   | no valid session, `AuthenticatedAt` non-nil but the zero time | 302 to `/auth/level1` | the `!IsZero()` term of `completed/really-authenticated`. A gate written as `AuthenticatedAt == nil` passes this row, which is the only thing that catches that spelling |
-   | the three existing subtests reaching `StartNewUserSession` gain a non-nil `AuthenticatedAt` | outcomes unchanged: 302 to `/auth/issue` or `/auth/consent`, `StartNewUserSession` called with the same arguments | **keep these as the positive control.** They are `test/fresh-ceremony-after-delete`'s shape at the unit tier, session gone and the user really authenticated, and they fail against a gate keyed on the session alone. This is the non-additive cost section 1 recorded |
-   | the three existing subtests with a valid session and `AuthenticatedAt` nil, untouched | unchanged: SSO reuse still bumps and proceeds | the gate is confined to the else branch. These are the rows that fail if it is hoisted above `if hasValidUserSession`, which is the natural-looking tidy-up |
+   | no valid session, nothing authenticated this ceremony, which is the terminated-SSO shape | 302 to `/auth/level1`, the saved context reading `requires_level_1`, and `StartNewUserSession` never called | decision 6's gate. "Never called" is enforced rather than asserted: the strict mock carries no `StartNewUserSession` expectation, so reaching it fails the case on its own, and neither audit event is stubbed either |
+   | no valid session, `AuthenticatedAt` set by the OTP handler, `Level1AuthCompleted` false | 302 to `/auth/level1` | **decision 15's row, and the only one that fails against the gate as first shipped.** A gate reading `userReallyAuthenticated` recreates the session here. Its `AuthMethods` is `pwd otp`, off the reused session, because that is the shape the five hops in decision 15 produce |
+   | the three existing subtests reaching `StartNewUserSession` gain `Level1AuthCompleted` and a non-nil `AuthenticatedAt` | outcomes unchanged: 302 to `/auth/issue` or `/auth/consent`, `StartNewUserSession` called with the same arguments | **keep these as the positive control.** They are `test/fresh-ceremony-after-delete`'s shape at the unit tier, session gone and the user really did level 1, and they fail against a gate keyed on the session alone. Both fields are set because `pwd/level1-proof` sets both, so the row stays a shape the code can actually produce. This is the non-additive cost section 1 recorded |
+   | the three existing subtests with a valid session and nothing authenticated, untouched | unchanged: SSO reuse still bumps and proceeds | the gate is confined to the else branch. These fail if it is hoisted above `if hasValidUserSession`, which is the natural-looking tidy-up |
+   | the existing re-auth subtest: valid session, `AuthenticatedAt` set, `Level1AuthCompleted` false, untouched | unchanged: bumps, refreshes `AuthTime`, proceeds | the legitimate step-up by OTP on a live session, which option A must not disturb. It was already in the file and needed no amendment, and it is the fourth row that fails if the gate is hoisted |
 
-   No new audit event, no new mock method and no new fixture: the gate reads a field the handler
-   already computes and writes a state the router already knows.
+   **Amended per decision 15.** The zero-time `AuthenticatedAt` row was replaced by the OTP row rather
+   than kept beside it. It existed to pin the `!IsZero()` spelling of a discriminator this gate no
+   longer reads, and the OTP row catches the same mistake, a gate falling back to `AuthenticatedAt`,
+   through a shape the code can actually reach. `userReallyAuthenticated`'s own `!IsZero()` term is
+   pre-existing and still covered by the re-auth subtest, which is where it belongs.
+
+   No new audit event, no new mock method and no new fixture: the gate reads one bool off the auth
+   context and writes a state the router already knows.
 4. **The docs sentence, in `concepts/user-sessions.mdx`.** Status: **Done**
    Into the `## Ending a session` section stage 4 created, and limited to what is true after this
    commit: a sign-in that was riding on the ended session cannot quietly become a replacement session.
@@ -1889,26 +1942,60 @@ into `StartNewUserSession`; it is verified and drafted as follow-up 3 in section
    `/auth/issue` is stage 6 and stays open until then. `reference/security.mdx`'s durable-termination
    bullet is checked and needs no edit: it summarises what termination revokes and claims nothing
    about ceremonies.
+   **Unchanged by decision 15, and worth stating rather than passing over.** The paragraph says the
+   sign-in that cannot become a replacement session is one that was "relying on the session you ended
+   rather than typing a password". That is option A's predicate in plain words. Under the gate as first
+   shipped it was slightly generous, since a step-up that typed an OTP and no password also passed, so
+   the answer made the shipped sentence true rather than obliging an edit.
 5. **Verify.** Status: **Done**
    `check-anchors.sh`, then `where.sh test --type modules` and `where.sh test --type integration`, the
    latter for the reason stated above. Both in the foreground.
+   Re-run in full after decision 15's answer landed, plus the five mutations recorded in the run log,
+   including one at the integration tier: the gate as first shipped reddens
+   `test/otp-alone-no-recreate` and leaves `test/fresh-ceremony-after-delete` green.
+6. **Decision 15's answer: the dedicated level 1 proof.** Status: **Done**
+   Added after the user chose option A on PR #138, so this step exists where the others were amended.
+   `authcontext/level1-proof`, a bool on the `AuthContext` beside the `AuthenticatedAt` it deliberately
+   does not reuse, carrying the comment a later reader needs: why the neighbouring field cannot answer
+   the question, that it is written only where level 1 happens, and that an older cookie unmarshals it
+   as false, which is the safe direction. Written at `pwd/level1-proof` and nowhere else.
+   Two assertions pin the writers, and they are the coverage section 5 does not enumerate, named here
+   rather than left to be noticed: `handler_auth_pwd_test.go`'s successful-authentication subtest
+   requires the field on the saved context, and `handler_auth_otp_test.go`'s two success subtests
+   require its **absence**. Seam 6 cannot reach either, since it stubs the auth context rather than
+   producing it, and testing.md section 8 asks for a case that fails when a decision is reversed. Both
+   are existing `SaveAuthContext` matchers in existing subtests, one line each, at handler seams
+   section 1 already named.
 
-**As built.** All five steps landed as written. Two anchor rows added, `completed/level1-restart` and
-`test/completed-gate`, and no sealed row needed re-sweeping: unlike stage 4 this stage replaces no
-cited call, it only adds a branch above one.
+**As built.** All six steps landed, the first five as written once decision 15's amendments are read
+into them. Six anchor rows added in total: `completed/level1-restart` and `test/completed-gate` when the
+stage was first built, then `authcontext/level1-proof`, `pwd/level1-proof`, `test/completed-gate-otp`
+and `test/otp-alone-no-recreate` when option A landed. One row needed re-sweeping,
+`completed/level1-restart`, because option A replaced the predicate it cites; no sealed row moved.
 
-Two things worth naming beyond the steps.
+Three things worth naming beyond the steps.
 
-1. **The predicted case table shipped unchanged**, which is rare enough in this run to say plainly.
-   Twelve subtests where there were ten, the two new ones passing and the three amended positive
-   controls passing with their original assertions, including the `StartNewUserSession` argument
-   expectations, because the handler overwrites `AuthenticatedAt` from the new session before saving
-   and the amendment therefore cannot be observed downstream of the gate.
-2. **The follow-up this stage found is recorded in section 9 rather than fixed here.** The restart
+1. **The predicted case table shipped unchanged when first built**, and decision 15's answer then
+   replaced one of its rows rather than adding one, so the file stays at twelve subtests where `main`
+   has ten (`grep -c 't.Run(' handler_auth_completed_test.go`). The three amended
+   positive controls still pass with their original assertions, including the `StartNewUserSession`
+   argument expectations, because the handler overwrites `AuthenticatedAt` from the new session before
+   saving and the amendment therefore cannot be observed downstream of the gate.
+2. **Option A widens the gate's reach beyond the ceremony that raised it**, which is the reason it was
+   recommended over the OTP-handler liveness read. Any future route arriving at `/auth/completed`
+   without a password, not only the OTP step-up, is stopped rather than let through, including
+   `handlePromptNone` if its call graph ever changed. The cost is the one the escalation named: an
+   honest user whose session expires mid-step-up enters a password once, which is arguably the correct
+   outcome anyway, and a ceremony already past the password form when the binary is replaced is sent
+   back to login once, because the field is absent from its cookie.
+3. **The follow-up this stage found is recorded in section 9 rather than fixed here.** The restart
    reuses the ceremony's `AuthContext`, which still carries the terminated session's `AuthMethods`, so
    a user who re-authenticates with a password alone can land a new session and a token claiming
    `otp`. Verified reachable, verified pre-existing, and deliberately not this stage's work: decision 6
    fixes what the restart preserves, and `amr` accuracy is neither in a goal nor in any decision.
+   Decision 15's answer does not change it, and narrows it slightly: the OTP step-up route now
+   restarts at level 1 rather than completing, so the stale `pwd otp` reaches a new session only after
+   the user really does enter a password, which is the shape follow-up 3 already describes.
 
 ### Stage 6: the `/auth/issue` liveness check and the compensating revoke
 Status: **Not started**
@@ -2490,7 +2577,10 @@ redirect validation, token validation, unrelated endpoint authorization and rate
 One finding, and it is the security axis.
 
 1. **OTP alone satisfies a gate meant to prove level 1 authentication.** `Raised by: reviewer`,
-   blocking, confidence high, `needs_human: true`. Status: **Open**
+   blocking, confidence high, `needs_human: true`. Status: **Resolved**
+   Resolved on 2026-08-05 by decision 15's answer, option A, applied in the stage 5 continuation entry
+   below. It read `Open` for the four hours the escalation was outstanding, which is what halted the
+   run.
 
    **Confirmed against the code**, not taken on the reviewer's word. `AuthenticatedAt` has two writers
    on the path to `/auth/completed`, and `handler_auth_otp.go` is the second one. The five hops are
@@ -2519,6 +2609,7 @@ One finding, and it is the security axis.
    cookie, option B adds a query to a second handler, and both are defensible, which is a choice and
    not a collision. Decision 15 carries the question, the options and the recommendation.
 
+
 **Where the stage got to, for whoever resumes.** All five steps are implemented and their code is
 **uncommitted**, deliberately: the gate expression is the subject of decision 15 and nothing resting on
 an `Open` decision gets committed. The working tree holds
@@ -2530,14 +2621,87 @@ re-establish that. What it needs to do is read the answer to decision 15 from PR
 OTP-after-termination row, add the `session_deletion_test.go` case if the answer is A or B, re-run
 modules and integration, and open round 2 at this gate.
 
+### Stage 5 continued, 2026-08-05: decision 15 answered
+
+**The answer.** The user replied on PR #138 with "Let's go with option A", the run's recommendation,
+unamended. Decision 15 is flipped to `Decided` with those words and with what the three rejected
+options lost on. Nothing else in the escalation needed interpreting: the options were fully stated in
+the comment and in section 3, so applying it was mechanical rather than a second judgement.
+
+**What landed on top of the earlier stage 5 tree.** `authcontext/level1-proof`, a bool on the
+`AuthContext` written only at `pwd/level1-proof`, and the gate at `completed/level1-restart` now reads
+it instead of `userReallyAuthenticated`. Three comments changed rather than two, and one of those
+changes is a reversal of what the first stage 5 pass did: the widened claim it put on both
+`AuthenticatedAt` writers was false under option A and is now back to its original, accurate wording,
+with the OTP handler additionally saying it deliberately does **not** set the level 1 proof. The
+comment at `completed/really-authenticated`, which claimed the field is "set by the password handler",
+is the one that really was falsified and now names both writers. Unit rows: the zero-time sibling was
+replaced by `test/completed-gate-otp`, the three positive controls carry the new field, and one
+assertion each was added to the existing `handler_auth_pwd_test.go` and `handler_auth_otp_test.go`
+success subtests to pin who writes it and who must not. Integration: `test/otp-alone-no-recreate`, the
+five-hop ceremony from decision 15 driven on one HTTP client. Four anchor rows added, one re-swept.
+
+**What changes for a user, beyond the first stage 5 entry.** A step-up that verifies OTP without a
+password no longer recreates a session that was ended mid-flight. The honest cost, accepted in the
+escalation: a user whose session expires while they are on the OTP form enters a password once. The
+legitimate step-up on a live session is untouched, because it takes the `hasValidUserSession` branch
+and never reaches this gate, which the pre-existing re-auth subtest pins.
+
+**Tiers, re-run in full on the amended tree, both in the foreground.** Modules green, all three
+modules, 2645 passing test lines, zero `FAIL`, `TestHandleAuthCompletedGet` still at 12 subtests where
+`main` has 10, since one row was replaced rather than added
+(`grep -cE "    --- PASS: TestHandleAuthCompletedGet/"` over the run's log). Integration green on **all four engines**, 4752 passing test
+lines, zero `FAIL`, with `test/otp-alone-no-recreate` and `test/fresh-ceremony-after-delete` each
+passing once per engine. `check-anchors.sh` passes all 63 rows and `gofmt -l` is silent on every file
+this stage touches. No data tier, still correctly: no query, no migration, no interface method, no
+model change. A field on a struct persisted as JSON in a cookie is not a persisted schema.
+
+**Mutation evidence, five mutations, each applied to the real code, run, and reverted in this
+session.** The failure sets are disjoint, which is the point, and mutation 1 is the one that answers
+decision 15.
+
+1. **The gate reverted to the round 1 predicate**, `if !userReallyAuthenticated`. Exactly one unit row
+   failed, `test/completed-gate-otp`. Run again at the integration tier on sqlite:
+   `test/otp-alone-no-recreate` failed with the ceremony landing on the client's redirect URI, so a
+   code was issued, and with one session row where it asserts zero, while
+   `test/fresh-ceremony-after-delete` and the three other `TestSession*` cases stayed green. That is
+   the defect reproduced end to end and the fix shown to close it.
+2. **The gate removed**, `if false`. Both no-session rows failed, and only those.
+3. **`pwd/level1-proof` dropped**, the field left false. `TestHandleAuthPwdPost/Successful
+   authentication` failed, and nothing else. Before step 6's assertion was added this mutation shipped
+   green at the unit tier, which is why the assertion is there: without it only the integration tier
+   notices, and it notices by every login looping back to the password form.
+4. **The OTP handler setting the proof**, which is the tidy-up option A invites. Both
+   `TestHandleAuthOtpPost` success subtests failed. This is the mutation that keeps the asymmetry from
+   being "corrected" by a later reader.
+5. **The gate hoisted above `if hasValidUserSession`.** Four valid-session subtests failed, one more
+   than under the round 1 gate, the extra being the re-auth case, which carries `AuthenticatedAt` with
+   no level 1 and is exactly the legitimate step-up option A must not break.
+
+**Deviations from the plan as written.** Two new ones, both named in the stage's amended steps. The
+seam 6 table lost a row rather than only gaining one, with the reasoning in step 3. And two assertions
+landed at seams section 5 does not enumerate, `handler_auth_pwd_test.go` and
+`handler_auth_otp_test.go`, because seam 6 stubs the auth context and so cannot see who writes the
+field; step 6 carries that reasoning. Both are one-line additions to existing matchers in existing
+subtests at handler seams section 1 named, not new files or new harnesses.
+
+**Nothing deferred, nothing contested, nothing new raised.** Section 3 is back to zero `Open` items.
+Follow-up 3 was re-checked against the answer and stands, slightly narrowed, which is recorded in
+section 9 and in the stage's as-built note.
+
+**Where the stage is now.** All six steps implemented, still **uncommitted**, because the gate changed
+after round 1 read it and no review round has seen the current tree. `.review/request.md` carries round
+2, whose ask is the whole stage 5 diff with the decision 15 answer applied. The tiers above were green
+on exactly that tree.
+
 ---
 
 ## 8. Deferred decisions
 
 Nothing deferred. Stages 1 to 5 met no question that was safe to postpone on a stated assumption: the
 one judgement call stage 5 made resolved under section 3 (recorded in its run log entry), and the one
-question stage 5 could not answer was a security finding, which reviewer.md forbids deferring. It is
-decision 15 in section 3, `Open`, and it halts the run rather than sitting here.
+question stage 5 could not answer was a security finding, which reviewer.md forbids deferring. That was
+decision 15, which halted the run rather than sitting here and was answered by the user on 2026-08-05.
 
 This section stays in the document even while empty, because the closing PR comment reports it and an
 absent section reads the same as a forgotten one.
@@ -2640,6 +2804,11 @@ owes. The run appends here as it finds more, and never files anything.
    Searched `gh issue list --state open --search "amr auth methods"` and the full open list: nothing
    tracks it. #133 is the closest neighbour and is a different mechanism, a live session belonging to
    another user rather than a dead session's methods surviving on the context.
+
+   **Re-checked after decision 15's answer, and it stands.** Option A narrows the reachable set rather
+   than closing it: the OTP step-up route now restarts at level 1 instead of completing, so the stale
+   `pwd otp` reaches a new session only once the user really has entered a password. That is exactly
+   the shape described above, so neither the body nor the reproduction changes.
 
    **Body:** An authorization ceremony that reuses an existing session copies that session's
    `AuthMethods` onto its `AuthContext` in `HandleAuthorizeGet`, and nothing clears the copy if the
