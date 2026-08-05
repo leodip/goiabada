@@ -5,18 +5,17 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** stages 1 to 5 committed, 2026-08-05. Stage 6, the `/auth/issue` liveness check and the
-compensating revoke, is expanded, implemented and green on all three tiers, and **uncommitted pending
-review round 2**. Its round 1 review raised decision 16, which the user answered on PR #138 on
-2026-08-05 with option A: a `prompt=none` ceremony whose session ends in the redirect hop is returned
-`login_required` rather than being restarted into a password form it is forbidden to display, and
-every other ceremony still restarts level 1. That branch, its unit row, its integration ceremony and a
-docs sentence are now in the tree, so the diff round 1 read no longer exists and the stage goes back
-for round 2 rather than to its gate. Section 3 has zero `Open` items. Expanding the stage also found
-that the terminated ceremony reaches `/auth/issue` with an **empty** session identifier rather than a
-dead one, because the session middleware clears it first, and that an empty identifier alone makes the
-resulting grant offline; the stage entry in section 6 carries the reasoning. Next after stage 6:
-stages 7 and 8, both still sketches.
+**Run state:** stages 1 to 6 committed, 2026-08-05. Section 3 has zero `Open` items. Stage 6 cost two
+escalations and three review rounds, and all three are recorded in section 7. Its round 1 raised
+decision 16, answered by the user on PR #138 with option A: a `prompt=none` ceremony whose session ends
+in the redirect hop is returned `login_required` rather than being restarted into a password form it is
+forbidden to display, and every other ceremony still restarts level 1. Round 2 found that branch
+clearing the auth context **after** committing the client response, so the clear reached nothing, and
+the fix plus two assertions that can observe a committed response landed inside the stage. Round 3 was
+clean. Expanding the stage also found that the terminated ceremony reaches `/auth/issue` with an
+**empty** session identifier rather than a dead one, because the session middleware clears it first,
+and that an empty identifier alone makes the resulting grant offline; the stage entry in section 6
+carries the reasoning. Next: stages 7 and 8, both still sketches.
 **PR:** [#138](https://github.com/leodip/goiabada/pull/138) (draft)
 
 **Related:** #106 (closed) built the per-user generation boundary and the revocation helper this
@@ -2141,7 +2140,7 @@ Three things worth naming beyond the steps.
    the user really does enter a password, which is the shape follow-up 3 already describes.
 
 ### Stage 6: the `/auth/issue` liveness check and the compensating revoke
-Status: **In progress**
+Status: **Done**
 Seams: 4 (the compensating revoke, in `code_test.go` on four engines) and 7 (`HandleIssueGet`,
 extending `TestHandleIssueGet` in the existing `handler_auth_issue_test.go`), plus the mid-flight
 ceremony in `session_deletion_test.go`, which is where stage 5 put its pair and where #46's guard
@@ -3463,6 +3462,77 @@ neither visible to the tiers as they stood. Committing on "the fix is obvious" a
 reviewer having seen the fix, is the failure mode an unattended run is most likely to reach. The wall
 clock is 24 of 240 minutes, so the round is affordable. If round 3 is clean the stage commits; if it
 finds something, that is the answer to whether the cap should have applied.
+
+### Stage 6 round 3, 2026-08-05: clean, and the stage closes
+
+**The review.** `codex`, request `129-20260805T175118Z`, all three axes `reviewed`, **no findings**. It
+weighted the round on the fix and what the fix could have broken, which is what the request asked for.
+It re-ran the module tier, ran the `prompt=none` integration ceremony on mysql, postgres, mssql and
+sqlite, ran `check-anchors.sh` at 77 rows, `git diff --check` and `gofmt -l`, and verified the source
+diff hash afterwards at `cf47c584…`, unchanged, so it edited nothing.
+
+Deliberately not re-run, and it said so rather than leaving it implied: the untouched data tier and the
+`site` build, both green in rounds 1 and 2 on files this round did not move. That is the right call on
+an unchanged subtree and it is recorded so a later reader does not read the narrower run as a narrower
+result.
+
+**What it verified, since a clean verdict is only worth what it covered.** The four numbered questions
+of the request, each answered on evidence rather than by reading the diff:
+
+1. **The clear reaches the browser in all three response modes.** It wrote its own scratch
+   reproduction against the real `CookieStore` and `AuthHelper`: clearing first leaves one committed
+   `Set-Cookie` on a query redirect, on a fragment redirect and on a `form_post` render; clearing after
+   a query redirect leaves **zero** committed cookies while the recorder's live header map still shows
+   one, which is round 2's defect reproduced independently. That is the claim the fix rests on,
+   established by a third party against the real store rather than against a stub.
+2. **The refusal itself still behaves.** `login_required`, the original `state`, no code, no
+   interactive redirect, and a failed clear now reaching `InternalServerError` before any client
+   response is written.
+3. **Both new assertions bite for the right reason.** `rr.Result()` snapshots the header as committed,
+   so the unit row fails under the reversed order while `rr.Header()` would pass either way; the
+   integration replay can reach the account profile only when the context is actually absent from the
+   jar. It agreed the two are complementary rather than redundant, the unit row isolating the ordering
+   and the integration row exercising the real cookie store and middleware.
+4. **Follow-up 4 is correctly scoped out.** Its seven sites predate this branch, need their own
+   reachability analysis, and change none of the OAuth response parameters decision 16's
+   indistinguishability claim is about. It restated that `handlePromptNone`'s own cleanup defect is a
+   real follow-up and not a reason to widen this fix into seven handlers, which is the run's position
+   at the foot of the round 2 entry, reached independently.
+
+On security it confirmed the branch stays fail-closed at every exit, the moved call adds no lookup
+keyed by user input, no route, no scope or audience change and no token or PKCE change, and that the
+reordering pre-empts no termination audit event and lets no attacker replay a refused ceremony.
+
+**So the third round was worth taking, and the record should say which way.** The reasoning for
+exceeding reviewer.md's two-round cap was that this gate kept finding real defects in the same branch,
+not that a third round was likely to find a third. It did not, and that is the outcome that closes the
+question rather than one that argues the cap should have applied: the two rounds that found something
+each found it in code no earlier round had seen.
+
+**One bookkeeping finding, fixed here.** The reviewer noted the header still described stage 6 as
+pending round 2 while the run log and the request were both round 3. Correct, and it is the same class
+of drift as the file count corrected at round 1 and the request miscount at stage 5 round 2. The header
+now describes the committed state.
+
+**Tiers, re-run in full by this session on the tree being committed rather than carried forward from
+round 2.** Modules green on all three modules. Data green on all four engines run separately, with
+`TestRevokeCodeIfSessionGone` and its transaction sibling passing on each. Integration green on all
+four engines, with all four of `session_deletion_test.go`'s ceremonies, including
+`test/fresh-ceremony-after-delete`, passing once per engine. `check-anchors.sh` passes all 77 rows.
+`gofmt -l` silent, `git diff --check` clean, `npm run build` in `site` at 42 pages.
+
+> **One red run happened first and it was not the code.** The first invocation of the tier script in
+> this session was piped into `head`, which killed the reading end but not the script: it kept running
+> inside the dev container and held port 19090, so the next run's server contended with it and the
+> mysql integration tier failed broadly across tests this change does not touch. Killing the orphan and
+> re-running gave the green above on the identical tree. Recorded because a stray red in a gate's logs
+> is exactly what a later reader would take for a flake in this stage, and because the cause is a run
+> hygiene rule worth carrying: never pipe the tier script into a pager.
+
+**Nothing deferred, nothing contested, no decision raised.** Section 3 keeps its sixteen items, all
+`Decided`, and section 9 its four follow-ups. Stage 6 is committed as
+`feat(sessions): refuse to mint a code for a session that is gone`, with this document following it.
+Next: stage 7, reaping unused revoked codes, still a sketch.
 
 ---
 
