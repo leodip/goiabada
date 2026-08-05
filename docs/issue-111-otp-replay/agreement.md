@@ -149,8 +149,8 @@ Checkable:
 ### Out of scope
 
 - **Narrowing the skew window** (issue recommendation 3). Independent of replay, changes behaviour for
-  users with fast clocks, and the issue itself calls it optional and separate. Decision 6; drafted as a
-  follow-up in `closing.md` so it is not lost when #111 closes.
+  users with fast clocks, and the issue itself calls it optional and separate. Decision 6; filed as
+  #142 so it is not lost when #111 closes.
 - **Malformed-secret hardening beyond the empty case, and repairing rows the empty-secret bug already
   created.** Decision 9 refuses an empty secret in `MatchStep`, which makes such a row inert; it does
   not detect or repair one, and it does not touch the other secret-format checks.
@@ -274,6 +274,8 @@ decision 9.
    **Rejected:** narrowing here, which is cheap once the matcher iterates the window explicitly and
    is exactly why it would go unnoticed. **Rejected:** dropping it, since the issue raised it and
    closing #111 would lose it.
+
+   Filed as #142 on 2026-08-05.
 
 7. **Where does the step matcher live, and do the three sites share a helper?**
    Status: **Decided** · Raised by: user

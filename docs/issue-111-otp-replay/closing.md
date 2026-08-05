@@ -7,7 +7,8 @@ None yet.
 ## 9. Follow-ups
 
 1. **Narrow the TOTP skew window so future-period codes are not accepted.**
-   `enhancement`, `security`, `go`. Found during grounding. Status: **Drafted**
+   `enhancement`, `security`, `go`. Found during grounding. Status: **Filed** as
+   [#142](https://github.com/leodip/goiabada/issues/142) on 2026-08-05.
 
    Raised as recommendation 3 of #111 and deliberately left out of that change (decision 6): it is
    independent of replay, and it changes behaviour for users whose device clock runs fast, which should
