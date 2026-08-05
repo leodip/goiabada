@@ -32,3 +32,36 @@ None yet.
    Decide whether the window should shrink, and whether the skew should become configurable rather than
    fixed, before changing it. If it changes, `otp.MatchStep` in `src/core/otp/verifier.go` is the single
    place that defines the window.
+
+2. **A re-enrolment landing mid-request can still let a consumed code assert `otp`.**
+   `security`, `go`. Found while applying decision 10. Status: **Drafted**, not filed.
+
+   Decision 10 closed the disable case by binding the claim to `otp_enabled`, and its option A said
+   plainly that a disable immediately followed by a re-enrolment is not closed, because `otp_enabled` is
+   true again by the time the stale claim lands. Recorded here so the residual is not lost with #111.
+
+   Narrower than option A's text says, worked out while applying it. The re-enrolment claims a step of
+   its own, so the stale request survives only if the re-enrolment's step is strictly below the replayed
+   one: the replayed code must come from the +1 window and the re-enrolment from the current window or
+   earlier. It also needs the disable, the re-enrolment and the stale request to overlap inside one
+   30 second period, and the attacker to already hold both the level 1 credential and a code from the
+   removed authenticator.
+
+   Adjacent to #140, which is the same class of defect (a token asserting `amr: ["pwd","otp"]` for
+   authentication that no longer holds) by a different mechanism, so whoever picks one up should read
+   the other. Searched `gh issue list --state open --search "otp"`, `--search "otp enrolment
+   generation"` and `--state all --search "otp replay in-flight"` on 2026-08-05: #140 is the only
+   neighbour and it is not this.
+
+   **Body:** After #111, `TryConsumeUserOTPStep` refuses a verification claim unless `otp_enabled` is
+   still true, so removing an authenticator invalidates a claim from a request that loaded it. A
+   re-enrolment restores `otp_enabled`, so a verification request holding the *old* secret can still
+   claim a code it already spent, provided the new enrolment claimed a lower time step. The resulting
+   token asserts `otp` for an authenticator that no longer exists, without the `AuditEnabledOTP` trail
+   that enrolling would leave. No access is gained that the disable did not already grant (see #111
+   decision 10), so this is a false factor assertion rather than an authentication bypass.
+
+   Closing it properly needs the claim bound to the authenticator rather than to the enrolment flag: an
+   enrolment generation column on `users`, incremented on every enable and disable, carried on the
+   request and compared in the claim predicate. That is a migration plus a second column, which #111
+   deliberately did not take on. Decide whether the window is worth that before building it.

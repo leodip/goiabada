@@ -112,15 +112,32 @@ Seams: 2. Tiers: unit (all three modules, since the interface and its mock chang
 engines): seam 2's claim table plus a `migration_000027_*` test in the shape of
 `migration_000026_code_revoked_test.go`. Docs: none, internals only. Expand when stage 1 lands.
 
-**Blocked on decision 10.** The plan review found that the claim predicate as designed (`id` plus
-`last_otp_step < step`, with disable and reset as separate writes) lets a reset reopen a consumed
-step to a verification request that loaded the old enabled authenticator. Answering it may change
-`TryConsumeUserOTPStep`'s signature, so the method is not written until decision 10 is `Decided`.
-Everything else in this stage, the migration, the column, the tag and `ResetUserOTPStep`, is
-unaffected by the answer.
+**Amended per decision 10, answered option A on 2026-08-05.** The signature is
+`TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)`,
+which supersedes §4's three-argument declaration; the doc comment follows §4's otherwise and gains
+the flag's reasoning plus the second cause of a false at a verification site. When the flag is set the
+builder adds `ub.Equal("otp_enabled", true)` to the `WHERE`, alongside `id` and `last_otp_step < step`;
+when it is not, the predicate is §4's unchanged. `TrySetUserEnabled` is the precedent for the bound
+bool, and `users.otp_enabled` carries the same type as `users.enabled` on all four engines, so nothing
+here is engine-specific. `ResetUserOTPStep`, the migration, the column and the tag are exactly as
+sealed: the answer changed no schema.
+
+**Two more data cases, from decision 10.** Both at seam 2, which owns the column, and neither is
+observable from an endpoint, because the interleaving they pin needs a request holding state loaded
+before a disable:
+
+- **A verification claim is refused once the authenticator is gone.** Claim step S with
+  `requireOTPEnabled` true against an enrolled user, which succeeds; disable OTP; then claim S+1 with
+  the flag true, which must be refused with no error, and the same claim with the flag false, which
+  must succeed. Pins both directions of the flag, so deleting the term or hard-wiring it fails.
+- **A reset does not reopen a consumed step to a verification claim.** Consume S with the flag true,
+  disable, `ResetUserOTPStep`, then claim S again: refused with the flag true, accepted with it false.
+  This is decision 10's hole and decision 4's remedy in one case, and it fails if the flag's term is
+  dropped or if the reset is made unconditional on enrolment state.
 
 **Two coverage cases the first plan draft was missing**, both added by the plan review and both
-pinning a §2 goal that no other planned case could fail on. Neither depends on decision 10:
+pinning a §2 goal that no other planned case could fail on. Neither is affected by decision 10's
+answer, beyond passing the flag:
 
 - **Concurrent single-winner** (§2 goal 3, "two concurrent submissions of one code yield at most one
   success"). The sequential claim table cannot tell a conditional `UPDATE` from a read-then-write,
@@ -148,7 +165,10 @@ Detail: **sketch**
 `constants.AuditOTPCodeReplayDetected = "otp_code_replay_detected"`, added to the event list the way
 `AuditRefreshTokenReplayDetected` was. Both browser call sites (`otp/verify-enabled` and
 `otp/verify-enrolling`) become match-then-claim per §4, with the claim placed **before**
-`otp/enroll-write` so a failed enable cannot leave OTP on for a refused request. The replay branch
+`otp/enroll-write` so a failed enable cannot leave OTP on for a refused request. **Per decision 10**
+`otp/verify-enabled` passes `requireOTPEnabled` true and `otp/verify-enrolling` passes false, each with
+a short comment saying why: the first asserts a factor, the second is establishing one and runs while
+`otp_enabled` is still false. The replay branch
 reuses `otp/incorrect-error` and emits `AuditAuthFailedOtp` alongside the new event, so the caller
 cannot tell a replay from a typo. `test/reenroll-same-window` is repaired per decision 8 by calling
 `ResetUserOTPStep` beside the direct disable it already performs, with the comment that decision
@@ -174,9 +194,19 @@ Status: **Not started**
 Detail: **sketch**
 
 `api-otp/verify` becomes match-then-claim in the same shape, reusing the existing `INVALID_OTP_CODE`
-JSON error so the API caller learns nothing either. `api-otp/disable` and `admin-otp/disable` call
+JSON error so the API caller learns nothing either. It passes `requireOTPEnabled` **false** per
+decision 10: the handler refuses an enable with `OTP_ALREADY_ENABLED` when OTP is already on, so this
+site only ever runs with `otp_enabled` false. `api-otp/disable` and `admin-otp/disable` call
 `ResetUserOTPStep` alongside their existing `ClearOTPSecret` plus `UpdateUser`, which cannot carry the
 column because it is `dont-update`.
+
+**Amended per decision 10: the reset goes after the `UpdateUser` that clears `otp_enabled`, at both
+sites, with a comment saying why.** No transaction is needed, but the order is load-bearing: reset
+first and there is a window where the marker reads 0 while the authenticator still reads enabled, and a
+verification request that loaded the old state claims a consumed step through it, which is exactly the
+hole decision 10's flag closes. Placing it after means the flag has already refused that claim. The
+residual decision 10 leaves open, a re-enrolment landing while a stale request is in flight, is a
+drafted follow-up in `closing.md` and is not built here.
 
 Seams: 4. Tiers: unit (modules, for the build and the existing API tests), integration: extend
 `api_account_otp_test.go` at `test/api-otp-enable` with the enable, disable, re-enable-with-the-same-code
@@ -212,6 +242,4 @@ true. Shape and content unchanged from §2's "documentation owed": one bullet in
 neighbouring "Refresh token rotation" and "Replay containment" bullets, naming
 `otp_code_replay_detected` and linking to `/concepts/audit-log/` exactly as those two do.
 
-**Blocked on decision 10** for the disable resets specifically: the answer decides whether disable and
-reset must be one atomic transition, and whether the claim binds to enrolment state. The
-`api-otp/verify` claim and its two coverage cases above are unaffected. Expand when stage 3 lands.
+Expand when stage 3 lands.

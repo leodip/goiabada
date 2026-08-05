@@ -5,7 +5,7 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** plan reviewed (round 1, findings resolved), blocked on open decision 10, no code written
+**Run state:** plan reviewed (round 1, findings resolved), decision 10 answered and applied, stage 1 next, no code written
 **PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
@@ -181,8 +181,9 @@ Checkable:
 
 ## 3. Decisions
 
-Ten. Announced as eight; sweeping the design for what the run would otherwise have to escalate added
-decision 9, and the plan review added decision 10, which is **open** and halts the run.
+Ten, all decided. Announced as eight; sweeping the design for what the run would otherwise have to
+escalate added decision 9, and the plan review added decision 10, which halted the run until the user
+answered it on PR #143.
 
 1. **Where does the consumed-code state live?**
    Status: **Decided** · Raised by: user
@@ -334,13 +335,60 @@ decision 9, and the plan review added decision 10, which is **open** and halts t
    that disables OTP on rows with an unusable secret, which is correct but introduces a data-repair
    path to a change that otherwise has none, for a population that may well be empty.
 
-10. **Does a disable reset reopen a consumed step to a verification request already in flight, and if
-    so what binds the claim?**
-    Status: **Open** · Raised by: run (raised during stage 1, at the plan-review gate, before any
+10. **The claim binds to enrolment state. `TryConsumeUserOTPStep` takes a `requireOTPEnabled` flag.**
+    Status: **Decided** · Raised by: run (raised during stage 1, at the plan-review gate, before any
     stage started)
 
-    The plan review found an interleaving that decision 4's "Not a bypass. ... Nothing here lets a
-    replayed code buy anything" does not cover. Both mechanism claims verified against the code:
+    Answered by the user on PR #143, 2026-08-05, in full: "A. Bind the claim to enrolment state."
+    That is option A below, the recommended one, taken over B, C and D with no amendment.
+
+    **What the answer settles.** The method becomes
+    `TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)`,
+    superseding the three-argument declaration in §4 and its doc comment. With the flag set the
+    predicate gains `AND otp_enabled = ?` bound true; without it the predicate is §4's.
+    `otp/verify-enabled` passes true, because a verification claim asserts a factor and that assertion
+    is only true of an enrolled authenticator. `otp/verify-enrolling` and `api-otp/verify` pass false,
+    because §4 puts the claim before the enable write deliberately and `otp_enabled` is still false
+    there. Verified for the third site: `api-otp/verify` refuses an enable with `OTP_ALREADY_ENABLED`
+    when `user.OTPEnabled`, so it is only ever reached with OTP off.
+
+    **The predicate is portable, checked rather than assumed.** `users.otp_enabled` carries the same
+    type as `users.enabled` on all four engines (`numeric`, `tinyint(1)`, `boolean`, `BIT`), and
+    `TrySetUserEnabled` already binds a Go bool against `users.enabled` in exactly this position, so
+    `ub.Equal("otp_enabled", true)` needs nothing engine-specific.
+
+    **The two writes need no transaction, but their order is load-bearing**, which is the half of the
+    question the plan review left open. A disable must write `otp_enabled = false` before it resets the
+    marker, the order §4 already describes. Reversed, there is a window where the marker reads 0 while
+    the authenticator still reads enabled, and an in-flight verification claims a consumed step through
+    it, reintroducing by ordering the hole the flag closes. Both disable sites carry a comment saying
+    so; neither needs `tx`.
+
+    **Accepted cost, and it is not only the parameter.** A verification claim now returns false for a
+    second reason: the authenticator was removed under this request. So `otp_code_replay_detected`
+    fires on that rare interleaving too, naming the likely cause rather than the certain one, which is
+    what `data/mark-code-used` already documents about its own three-way false. The caller sees
+    `catalog/incorrect-otp` either way.
+
+    **Not closed, and knowingly.** A disable immediately followed by a re-enrolment, while a stale
+    verification request is still in flight, has `otp_enabled` true again by the time the claim lands.
+    Closing that needs an enrolment-generation column. Narrower than option A's text below says: the
+    re-enrolment must also claim a step strictly below the replayed one, so the replayed code has to
+    come from the +1 window and the re-enrolment from the current one or earlier. Drafted as a
+    follow-up in `closing.md`.
+
+    **What lost.** B, resetting to the current step, on its 30 second re-enrolment delay and because it
+    bounds the blast radius instead of fixing the cause, weakening seam 4's pinned case in the process.
+    C, accepting the false factor assertion, which the run declined to judge on the user's behalf. D,
+    dropping the reset, which was not recommended.
+
+    The question as escalated is kept below, because the reasoning is what makes the answer reviewable.
+
+    ---
+
+    **The original question.** The plan review found an interleaving that decision 4's "Not a bypass.
+    ... Nothing here lets a replayed code buy anything" does not cover. Both mechanism claims verified
+    against the code:
 
     1. A browser request at `otp/verify-enabled` loads the user (`GetUserById`), then decrypts the
        stored secret and validates, holding both in memory for the rest of the request.
