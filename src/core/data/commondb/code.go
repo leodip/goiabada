@@ -344,28 +344,55 @@ func (d *CommonDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
 	return nil
 }
 
-// DeleteUsedCodesWithoutRefreshTokens deletes codes that were marked used but never
-// produced a refresh token, and that are older than createdBefore.
+// DeleteUsedCodesWithoutRefreshTokens reaps codes that can no longer produce anything,
+// and that are older than createdBefore. Two disjoint classes qualify, and the name is
+// kept for the first of them because renaming it would touch the interface, four engine
+// wrappers, the generated mocks and the worker for no behavioural gain:
 //
-// The age cutoff is not an optimisation, it is required for correctness. The token
-// endpoint marks a code used (handler_token.go, MarkCodeAsUsed) and only afterwards
-// inserts the refresh token that references it, so for the duration of token generation
-// a perfectly healthy code sits in exactly the state this predicate selects. Deleting it
-// there makes the subsequent insert fail on fk_refresh_tokens_code and the client gets a
-// 500 instead of its tokens. Observed in CI on postgres.
+//   - codes that were marked used but never produced a refresh token, and
+//   - codes revoked while still unredeemed, which is what ending a session leaves behind
+//     when the grant it marked had not been exchanged yet (#129 decision 8).
 //
-// Callers should pass a cutoff comfortably beyond the 60 second code lifetime enforced in
-// token_validator.go, since a code older than that can no longer be redeemed and so can
-// never acquire a refresh token legitimately.
+// Both share one cutoff, for different reasons. For the used class the age cutoff is not
+// an optimisation, it is required for correctness: the token endpoint marks a code used
+// (handler_token.go, MarkCodeAsUsed) and only afterwards inserts the refresh token that
+// references it, so for the duration of token generation a perfectly healthy code sits in
+// exactly the state that branch selects. Deleting it there makes the subsequent insert
+// fail on fk_refresh_tokens_code and the client gets a 500 instead of its tokens. Observed
+// in CI on postgres. For the revoked class the cutoff is simply the code lifetime: a code
+// is unredeemable 60 seconds after issuance (token_validator.go), so past that it can
+// never acquire a refresh token legitimately either. Callers should pass a cutoff
+// comfortably beyond that 60 seconds, which serves both.
+//
+// The subquery stays INSIDE the used branch rather than beside the cutoff, and that is
+// load bearing rather than formatting. ROPC refresh tokens carry code_id = NULL, and
+// `x NOT IN (…, NULL)` is UNKNOWN rather than TRUE, so the used branch already matches
+// nothing on any deployment that has issued one (#130 owns that). Since UNKNOWN OR TRUE
+// is TRUE, the revoked branch still reaps; hoisting the subquery out would make the whole
+// predicate UNKNOWN and this method would silently do nothing at all.
+//
+// The revoked branch needs no refresh-token term of its own because `used = false` is
+// stronger: MarkCodeAsUsed is the gate every redemption passes before a token is inserted,
+// and since #129 it refuses a revoked row outright, so an unused code has no descendants.
+// That term is also what keeps this sweep away from a live one, and the stake is higher
+// than losing a marker: fk_refresh_tokens_code is ON DELETE CASCADE, so reaching a used
+// code with a live refresh token would delete the very descendant the marker exists to
+// reject.
 func (d *CommonDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()
 	deleteBuilder.DeleteFrom("codes")
 	deleteBuilder.Where(
-		deleteBuilder.And(
-			deleteBuilder.Equal("used", true),
-			deleteBuilder.LessThan("created_at", createdBefore),
-			deleteBuilder.NotIn("id",
-				d.Flavor.NewSelectBuilder().Select("code_id").From("refresh_tokens"),
+		deleteBuilder.LessThan("created_at", createdBefore),
+		deleteBuilder.Or(
+			deleteBuilder.And(
+				deleteBuilder.Equal("used", true),
+				deleteBuilder.NotIn("id",
+					d.Flavor.NewSelectBuilder().Select("code_id").From("refresh_tokens"),
+				),
+			),
+			deleteBuilder.And(
+				deleteBuilder.Equal("revoked", true),
+				deleteBuilder.Equal("used", false),
 			),
 		),
 	)
