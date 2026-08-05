@@ -5,7 +5,10 @@
 **Written:** 2026-08-04
 **Last synced:** 2026-08-04 (issue has zero comments; body is the whole specification)
 **Agreement sealed:** 2026-08-04, amended 2026-08-04 on a reconciliation pass, still sealed
-**Run state:** **all eight stages committed, 2026-08-05.** Stage 8, the last, closed on a clean review
+**Run state: complete, 2026-08-05.** All eight stages committed, the full suite green on every tier and
+all four engines, sections 8 and 9 posted to PR [#138](https://github.com/leodip/goiabada/pull/138) as
+two comments, and the pull request marked ready for review. The closing pass is the last entry in section
+7. The issue stays open: closing it is the user's call. Stage 8, the last, closed on a clean review
 round 1 whose diff hash matched the committed tree exactly: two integration tests carrying gap 2's
 evidence and no production line, since gap 2 closed structurally in stages 1 and 2. Its expansion found
 that the marker's refusal and the sweep's are different gates with different messages, the marker's
@@ -15,8 +18,7 @@ storage and the marker is the only thing refusing it. Two mutations measured, an
 under them is the argument for the stage: stage 4's headline case and stage 6's consent ceremony both
 pass with the marker's read or its write removed, and only these two tests fail. Section 3 has zero
 `Open` items, section 8 nothing deferred, section 9 four drafted follow-ups the run never files.
-Remaining: the closing pass, which is the full suite across every tier, sections 8 and 9 posted to the
-pull request, and `gh pr ready`. Below, the earlier state, kept because the run log reads against it.
+Below, the earlier state, kept because the run log reads against it.
 **Stage 7 closed on a clean round 1**: one predicate
 extension so codes revoked while still unredeemed do not accumulate (decision 8), green on the modules
 tier and on the data tier across all four engines, with five mutations measured. Its expansion found
@@ -4120,6 +4122,66 @@ tree. That is the clean case the reviewer reference describes.
 `Decided`, and section 9 its four follow-ups. Stage 8 is committed with this document following it, and
 it is the last: next is the run's closing pass, the full suite across every tier, sections 8 and 9 onto
 the pull request, and the PR marked ready for review.
+
+### Closing pass, 2026-08-05: the full suite, the two comments, and the PR ready
+
+The guard answered `DONE: every stage is Done` at stage 8's gate, exit 11, which is the terminal state
+rather than a refusal. What follows is the closing pass, and it is recorded here because the pull request
+summarises it and this document is the record.
+
+**The full suite, every tier, on the committed tree.** `where.sh test --type all`, foreground, exit 0,
+**zero `FAIL` and zero panics** across 46189 log lines, ending in the harness's
+`All tests completed successfully.` Per tier:
+
+- **Modules**, all three, every package `ok`. Reported `(cached)`, which is worth naming rather than
+  hiding: Go's test cache is keyed on the content of the inputs, so a cached `ok` is a genuine pass for
+  these exact bytes, and the packages this stage did not touch had already run green on identical
+  sources at stage 7's gate.
+- **Data**, run per engine: mysql 9.9s, postgres 4.1s, mssql 5.8s, sqlite 2.3s, each `ok`.
+- **Integration**, run per engine: mysql 64.8s, postgres 74.3s, mssql 99.2s, sqlite 43.2s, each `ok`.
+- 9022 `--- PASS` lines and 52 `ok` package lines in total.
+
+**The race's per-engine reading reproduced exactly, which is the third independent run to say so.**
+Every engine produced one replacement token alongside the termination. mysql and postgres logged
+`replacement 0 was revoked in storage: it landed before the termination's sweep`; mssql and sqlite logged
+`replacement 0 is still live in storage: the sweep never saw it, which is gap 2's own interleaving`. No
+engine needed the sequential termination retry. That matches the stage 8 entry's table engine for engine,
+across the implementation session, the reviewer's independent run and this one.
+
+**Section 8 posted**, as
+[a PR comment](https://github.com/leodip/goiabada/pull/138#issuecomment-5196348942). Nothing was
+deferred, so the comment says why an empty section is not a forgotten one: every question this run met
+was in authentication, token or session territory, where `decisions.md` forbids both self-resolving and
+deferring, so the two the run could not answer became decisions 15 and 16 and halted it instead. Both
+answers are quoted in section 3 and both are built.
+
+**Section 9 posted**, as
+[a second PR comment](https://github.com/leodip/goiabada/pull/138#issuecomment-5196349557), each of the
+four follow-ups with its title, labels, body and the `gh` command that files it. Follow-up 2 is a
+`gh issue comment 109` rather than a new issue, for the reason section 9 gives. **Duplicate searches
+re-run at the close**, against the 33 currently open issues rather than the list from when each was
+drafted: `serialization boundary sweep` returns #131, #132 and #129 only, so nothing new covers
+follow-up 1's window; `logout` returns #109, #135, #129 and #114, none of which covers the no-hint
+path's silence; `amr auth methods` and `ClearAuthContext` return nothing at all. All four still stand,
+and **none was filed**, which is deliberate: drafting is the run's job and filing is the user's.
+
+**The pull request body rewritten** to what actually landed: the three gaps in the terms the code closes
+them, a stage-by-stage table with each commit, the closing suite result, the deviations that were load
+bearing, the three known limits stated rather than implied, and a line pointing at each of the two
+comments above. Then `gh pr ready 138`.
+
+**What the run cost and what it met, for the next planning pass.** Eight stages over two days, 26
+commits, 60 files. **Thirteen review rounds**, counted from their own headings: one on the plan, then 1,
+2, 1, 1, 2, 3, 1 and 1 on stages 1 to 8. Three stages passed clean on a first round (4, 7 and 8), three
+needed a second (2, 5 and 6, the last needing a third), and the remainder produced a single finding each,
+resolved inside the stage. **Sixteen mutations** measured, numbered continuously across the run. **Two
+blocking escalations, both belonging to decision 6**, which is inside the normal range for a change this
+size; the observation that decision 6 was the expensive one is recorded in section 3 rather than here,
+because that judgement belongs to the next `/leo-spec` rather than to this run. Four follow-ups drafted,
+three of them defects this work sat next to rather than caused.
+
+**Where this leaves the issue.** #129 stays open. Closing it is the user's call, and the pull request is
+ready for review with everything the run knows either in this document or in the two comments.
 
 ---
 
