@@ -10,11 +10,12 @@ stage 3 against stage 2's method.
 
 ### Stage 1: the step matcher
 Status: **Done**
-Landed 2026-08-06, commit `7841920`. Account in `log/stage-1.md`.
+Landed 2026-08-06, code at `01a186c`, closed at `7841920`. Account in `log/stage-1.md`.
 
 ### Stage 2: the column and its two narrow writes
-Status: **Not started**
-Detail: **sketch**
+Status: **Done**
+Landed 2026-08-06, code at `a10c6bb`, on tree `f53d3b9a0856`. One clean review round. Account in
+`log/stage-2.md`.
 
 Pre-flight first, per §4: confirm version 000027 is not already recorded in `schema_migrations` in
 the long-lived `goiabada_data` and `goiabada_integration` databases on mysql, postgres and mssql
@@ -34,7 +35,105 @@ constraint the down migration needs; the four `schema.sql` snapshots updated in 
 
 Seams: 2. Tiers: unit (all three modules, since the interface and its mock change), data (four
 engines): seam 2's claim table plus a `migration_000027_*` test in the shape of
-`migration_000026_code_revoked_test.go`. Docs: none, internals only. Expand when stage 1 lands.
+`migration_000026_code_revoked_test.go`. Docs: none, internals only.
+
+#### Steps
+
+1. **Pre-flight the migration number.** Status: **Done**
+
+   `probe/preflight-migration-version/` reads `schema_migrations` on mysql, postgres and mssql for
+   both `goiabada_data` and `goiabada_integration`, opening each with the driver directly rather than
+   through the repo constructors, which create an absent database and would make the check
+   self-fulfilling. All six report highest 26 and no row at 27, so 000027 is free;
+   `output.txt` beside it is that run. sqlite is out of scope for the reason above.
+
+2. **The migration, all four engines.** Status: **Done**
+
+   `000027_add_last_otp_step.{up,down}.sql` in each of the four `migrations/` directories. One column,
+   `users.last_otp_step`, `NOT NULL DEFAULT 0`, typed per engine as `data/mark-code-used`'s neighbours
+   are: `INTEGER` on sqlite, `bigint` on mysql and postgres, `BIGINT` with a **named** default
+   constraint `df_users_last_otp_step` on mssql, which is what lets the down migration drop the column
+   at all (`migration/generation-mssql`). The sqlite up migration carries the reasoning; the other
+   three point at it, exactly as the 000024 set does. No index: every read and write is by `id`.
+
+   Existing rows land at 0, which is "no code consumed" per decision 2, so no user is locked out by
+   the deployment.
+
+3. **The model field.** Status: **Done**
+
+   `models.User` gains `LastOTPStep int64` with `db:"last_otp_step" fieldtag:"dont-update"`, beside
+   `AuthStateGeneration`, carrying the reasoning `model/generation-field` records in its own terms: a
+   monotonic marker in the ordinary update set is regressed by any whole-user write holding a stale
+   model, and `otp/enroll-write` is exactly such a write on the path that claims it.
+
+4. **The two interface methods.** Status: **Done**
+
+   Declared in `src/core/data/database.go` in the user block, next to
+   `data/interface-generation`, with the short summaries that file uses; the full reasoning goes on the
+   implementations. `TryConsumeUserOTPStep` carries decision 10's signature, four arguments including
+   `requireOTPEnabled`.
+
+5. **The commondb implementations.** Status: **Done**
+
+   In `src/core/data/commondb/user.go`, on the `data/mark-code-used` template: a single conditional
+   `UPDATE` built with the flavour's update builder, `rowsAffected == 1` as the return, a wrapped error
+   on failure and a rejected `userId == 0`. `TryConsumeUserOTPStep` adds `ub.Equal("otp_enabled", true)`
+   to the predicate only when the flag is set, `TrySetUserEnabled` being the precedent for the bound
+   bool. `ResetUserOTPStep` assigns 0 unconditionally and returns only an error, so a reset of an
+   already-reset user is not a failure.
+
+   The doc comments carry §4's text plus what decision 10 added: why the flag exists, why a false at a
+   verification site now has two causes, and why the reset must not be reordered before the
+   `otp_enabled` write at either disable site.
+
+6. **The four engine delegations.** Status: **Done**
+
+   Two forwarding methods in each of `sqlitedb/user.go`, `mysqldb/user.go`, `postgresdb/user.go` and
+   `mssqldb/user.go`, in the shape `IncrementUserAuthStateGeneration` uses. **As built: no comments.**
+   This step's draft said "each with the one-line comment those neighbours carry", and the neighbours
+   carry none: every delegation in those four files is a bare forward. The code won.
+
+7. **Regenerate the `data.Database` mock.** Status: **Done**
+
+   `mockery` in the container against `src/core/.mockery.yaml`. Skipping this is the classic way a
+   stage lands broken: every `mocks_data.Database` user in all three modules stops satisfying the
+   interface, so the unit tier fails to compile rather than fail a test.
+
+8. **The four `schema.sql` snapshots.** Status: **Done**
+
+   Documentation-only, but 000024's and 000026's columns are in all four, so leaving this out is drift.
+   The column is added to the `users` block of each, in the position and spelling that engine's snapshot
+   uses.
+
+9. **Seam 2's data tests.** Status: **Done**
+
+   Appended to `src/authserver/tests/data/user_test.go`, where #106's narrow user methods already live:
+   the claim table (first claim from 0, same step refused, lower refused, higher accepted, unknown user
+   id false with no error, reset returns to 0 and reopens a consumed step), the `requireOTPEnabled`
+   cases from decision 10 in both directions, the failure path returning `(false, err)` and the
+   transaction enlistment, both forced by a rolled-back transaction, the concurrent single-winner case
+   following `cleanup_claim_test.go` and skipping sqlite, and the stale whole-user write case following
+   `TestUpdateUser_DoesNotClobberAuthStateGeneration` with a nonzero step.
+
+10. **The migration test.** Status: **Done**
+
+    `migration_000027_last_otp_step_test.go`, in the shape of `migration_000026_code_revoked_test.go`:
+    absent at 000026, present and `NOT NULL DEFAULT 0` after, a row that predates the column reads 0,
+    and the down/up round trip is clean, which is what exercises mssql's named-constraint drop.
+
+11. **Repair `TestMigration000026_CodeRevoked`, which this stage breaks.** Status: **Done**
+    Not in the plan; found by running the data tier.
+
+    That test seeds a client, a user and a code **through the ORM while the schema is at 000026**, and
+    the ORM writes every column the Go models carry, so the insert began naming `last_otp_step` at a
+    version that does not have it. It failed on all four engines at `seed user`. The seed now runs at
+    the head migration (`Migrator.Up()`) before the down/up round trip that restores 000026, which is
+    the fix `migration_000021_countries_test.go` already made for the same reason, in its own words:
+    "This used to be a plain `Migrate(20)`". The comment there records why, so the next column does not
+    reopen it.
+
+    In scope rather than a follow-up: this stage broke it, and a stage that leaves the suite red has
+    not landed.
 
 **Amended per decision 10, answered option A on 2026-08-05.** The signature is
 `TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)`,
