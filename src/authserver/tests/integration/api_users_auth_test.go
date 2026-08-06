@@ -199,6 +199,58 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	assert.Empty(t, updatedUser.OTPSecret)
 }
 
+// TestAPIUserOTPPut_DisableResetsConsumedStep pins the second of the two disable sites #111
+// decision 4 names: an admin disabling a user's OTP returns their consumed-step marker to 0, just
+// as the self-service disable does. Forgetting the reset in this handler left the complete suite
+// green before this case existed, because seam 4 only ever exercised the account endpoint.
+//
+// A new function rather than an extension of TestAPIUserOTPPut_DisableSuccess above, which owns the
+// admin response shape and holds no account token: this one needs a user who can drive
+// PUT /api/v1/account/otp themselves, since enrolling is the only endpoint-observable way to
+// consume a step and the only way to see afterwards that it was released.
+//
+// **Keep this case**, for the same reason seam 4's does: it asserts one code accepted twice, which
+// reads like the replay #111 refuses. See TestAPIAccountOTPPut_Disable_ResetsConsumedStep.
+func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
+	accessToken, user := getUserAccessTokenWithAccountScope(t)
+	setUserPasswordForOTP(t, user.Id, "Correct1!")
+
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: "adminreset@otp.test"})
+	assert.NoError(t, err)
+	secret := key.Secret()
+
+	code, err := totp.GenerateCode(secret, time.Now())
+	assert.NoError(t, err)
+
+	enable := api.UpdateAccountOTPRequest{
+		Enabled:   true,
+		Password:  "Correct1!",
+		OtpCode:   code,
+		SecretKey: secret,
+	}
+
+	status, body := putAccountOTP(t, accessToken, enable)
+	if status != http.StatusOK {
+		t.Fatalf("expected the enable to succeed, got %d. body: %s", status, body)
+	}
+
+	// Disable through the admin endpoint, which is the site under test here.
+	adminToken, _ := createAdminClientWithToken(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/otp"
+	resp := makeAPIRequest(t, "PUT", url, adminToken, api.UpdateUserOTPRequest{Enabled: false})
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// The same code the enable already consumed. It is accepted only because the admin disable
+	// reset the marker.
+	skipIfOtpCodeOutsideWindow(t, secret, code)
+	status, body = putAccountOTP(t, accessToken, enable)
+	if status != http.StatusOK {
+		t.Fatalf("expected the re-enable with the same code to succeed after the admin disable reset "+
+			"the consumed-step marker, got %d. body: %s", status, body)
+	}
+}
+
 func TestAPIUserOTPPut_EnableNotSupported(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)

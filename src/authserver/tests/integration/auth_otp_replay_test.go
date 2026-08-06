@@ -11,6 +11,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -24,17 +25,10 @@ import (
 // Observed end to end: nothing here reads users.last_otp_step, because a test asserting the
 // marker directly would pass with the endpoint broken.
 
-// createLevel2MandatoryUser creates a client whose default ACR is level2_mandatory plus a
-// user for it, and returns the generated password. Unlike createSessionWithAcrLevel2Mandatory
-// it completes no ceremony, so the user's consumed-step marker is still 0 and the test owns
-// every code ever submitted for them.
-//
-// With otpEnabled the user is enrolled with a fresh secret, kept in plaintext on the model for
-// generating codes and encrypted in the column the way production stores it. Without it the
-// first ceremony enrolls, which is what the second test needs.
-func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *models.RedirectURI,
-	*models.User, string) {
-
+// createLevel2MandatoryClient creates a client whose default ACR is level2_mandatory, so any
+// authorization request against it reaches the OTP screen. Separate from the user, because a
+// user the account API created needs the same fixture to be driven through the browser flow.
+func createLevel2MandatoryClient(t *testing.T) (*models.Client, *models.RedirectURI) {
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
 		Enabled:                  true,
@@ -55,6 +49,22 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	return client, redirectUri
+}
+
+// createLevel2MandatoryUser creates a client whose default ACR is level2_mandatory plus a
+// user for it, and returns the generated password. Unlike createSessionWithAcrLevel2Mandatory
+// it completes no ceremony, so the user's consumed-step marker is still 0 and the test owns
+// every code ever submitted for them.
+//
+// With otpEnabled the user is enrolled with a fresh secret, kept in plaintext on the model for
+// generating codes and encrypted in the column the way production stores it. Without it the
+// first ceremony enrolls, which is what the second test needs.
+func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *models.RedirectURI,
+	*models.User, string) {
+
+	client, redirectUri := createLevel2MandatoryClient(t)
 
 	password := gofakeit.Password(true, true, true, true, false, 8)
 	passwordHashed, err := hashutil.HashPassword(password)
@@ -299,6 +309,70 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	// verification branch validating C against the secret it just stored.
 	httpClient, resp, otpUrl = startOtpCeremony(t, client, redirectUri, user, password)
 	csrf = getCsrfValue(t, resp)
+	_ = resp.Body.Close()
+
+	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC, csrf)
+	assertOtpRefused(t, resp)
+	csrf = getCsrfValue(t, resp)
+	_ = resp.Body.Close()
+
+	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, secret, codeC), csrf)
+	assertRedirect(t, resp, "/auth/completed")
+	_ = resp.Body.Close()
+}
+
+// TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification is the case above with the enrollment moved
+// to the third call site, PUT /api/v1/account/otp, so it pins that site's claim (#111 decision 3).
+// It lives here rather than beside the other account API cases because it is the browser sibling
+// with one step swapped, and because the ceremony helpers it needs are here.
+//
+// The attack it closes: a user enables OTP through the API, spending code C there, and anyone
+// holding C plus that user's password presents C at the browser OTP prompt and reaches level 2,
+// because the API acceptance was never recorded. Omitting TryConsumeUserOTPStep from the API
+// handler alone left the whole suite green before this case existed: every other API OTP test
+// submits one code per user, and the browser enrollment case above enrolls in the browser flow, so
+// nothing crossed the boundary.
+func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
+	accessToken, user := getUserAccessTokenWithAccountScope(t)
+	setUserPasswordForOTP(t, user.Id, "Correct1!")
+
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: user.Email})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := key.Secret()
+
+	codeC, err := totp.GenerateCode(secret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Enroll through the account API, which consumes codeC's step.
+	enableUrl := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	resp := makeAPIRequest(t, "PUT", enableUrl, accessToken, api.UpdateAccountOTPRequest{
+		Enabled:   true,
+		Password:  "Correct1!",
+		OtpCode:   codeC,
+		SecretKey: secret,
+	})
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		t.Fatalf("expected the API enrollment to succeed, got %d. body: %s", resp.StatusCode, string(body))
+	}
+	_ = resp.Body.Close()
+
+	enrolled, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.True(t, enrolled.OTPEnabled, "the API enrollment must have enrolled, or the ceremony below is not a verification")
+
+	// Now the browser prompt, where the user is enrolled and codeC is checked against the
+	// secret the API just stored.
+	client, redirectUri := createLevel2MandatoryClient(t)
+	httpClient, resp, otpUrl := startOtpCeremony(t, client, redirectUri, enrolled, "Correct1!")
+	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
 	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC, csrf)

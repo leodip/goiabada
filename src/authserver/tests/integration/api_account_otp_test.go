@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -62,6 +63,35 @@ func getAccountUserId(t *testing.T, accessToken string) int64 {
 	err := json.NewDecoder(resp.Body).Decode(&getResp)
 	assert.NoError(t, err)
 	return getResp.User.Id
+}
+
+// putAccountOTP submits one PUT /api/v1/account/otp and returns its status together with the
+// response body, so the #111 reset cases can drive several enables and disables in a row without
+// repeating the request shape or asserting an outcome the caller has not chosen.
+func putAccountOTP(t *testing.T, accessToken string, reqBody api.UpdateAccountOTPRequest) (int, string) {
+	t.Helper()
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	return resp.StatusCode, string(body)
+}
+
+// skipIfOtpCodeOutsideWindow skips when code no longer matches secret at this instant. The reset
+// cases below submit one code across several endpoint calls, and a period boundary crossed
+// mid-test takes that code out of the acceptance window: the enable then fails because the matcher
+// refused the code, not because the marker was never reset. Without this guard such a run reads as
+// a reset regression, which is a case failing for the wrong reason (#111).
+func skipIfOtpCodeOutsideWindow(t *testing.T, secret string, code string) {
+	t.Helper()
+
+	if _, matched := otp.MatchStep(code, secret, time.Now().UTC()); !matched {
+		t.Skip("the code fell outside the acceptance window before the re-enable, so the matcher " +
+			"would refuse it for a reason unrelated to the reset")
+	}
 }
 
 func TestAPIAccountOTPEnrollmentGet_Success(t *testing.T) {
@@ -266,6 +296,57 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, updated.OTPEnabled)
 	assert.Equal(t, "", updated.OTPSecret)
+}
+
+// TestAPIAccountOTPPut_Disable_ResetsConsumedStep is seam 4's pin for #111 decision 4: disabling
+// OTP returns the consumed-step marker to 0, so the same code can enroll an authenticator again.
+//
+// **Keep this case.** It asserts that one code is accepted twice, which reads like exactly the
+// replay #111 exists to refuse, and it is the only test that fails if ResetUserOTPStep is dropped
+// from the disable path. The marker belongs to the enrolled authenticator, so removing the
+// authenticator clears it, and nothing is bypassed: disabling requires the password and enrolling
+// requires possession of a secret. It is also the only in-product remedy if a clock jump strands a
+// user's marker in the future, which without the reset would lock them out of OTP permanently.
+//
+// Endpoint-observable throughout. Nothing here reads users.last_otp_step, which would pass with
+// the endpoints broken.
+func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
+	accessToken, _ := getUserAccessTokenWithAccountScope(t)
+	userId := getAccountUserId(t, accessToken)
+	setUserPasswordForOTP(t, userId, "Correct1!")
+
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: "reset@otp.test"})
+	assert.NoError(t, err)
+	secret := key.Secret()
+
+	code, err := totp.GenerateCode(secret, time.Now())
+	assert.NoError(t, err)
+
+	enable := api.UpdateAccountOTPRequest{
+		Enabled:   true,
+		Password:  "Correct1!",
+		OtpCode:   code,
+		SecretKey: secret,
+	}
+
+	status, body := putAccountOTP(t, accessToken, enable)
+	if status != http.StatusOK {
+		t.Fatalf("expected the first enable to succeed, got %d. body: %s", status, body)
+	}
+
+	status, body = putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{Password: "Correct1!"})
+	if status != http.StatusOK {
+		t.Fatalf("expected the disable to succeed, got %d. body: %s", status, body)
+	}
+
+	// The same code again. It was consumed by the first enable, so this succeeds only because the
+	// disable reset the marker.
+	skipIfOtpCodeOutsideWindow(t, secret, code)
+	status, body = putAccountOTP(t, accessToken, enable)
+	if status != http.StatusOK {
+		t.Fatalf("expected the re-enable with the same code to succeed after the disable reset the "+
+			"consumed-step marker, got %d. body: %s", status, body)
+	}
 }
 
 func TestAPIAccountOTPPut_Enable_SetsSessionFlag(t *testing.T) {
