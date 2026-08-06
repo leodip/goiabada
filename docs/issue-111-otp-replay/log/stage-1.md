@@ -379,3 +379,92 @@ entry, and the probe's cap ladder with the regenerated output.
 Round 4 is requested at this gate, scoped to the walk, the cap and the boundary the amendment opened.
 The three escalations from this stage are all settled and the judgement about the agreement having been
 sealed too early stands as recorded after round 3: it belongs to the next `/leo-spec`, not to this run.
+
+### Round 4, 2026-08-06: clean
+
+Code review, `gpt-5.6-sol` at effort `xhigh`, Codex session resumed, per `.review/reviewer.env`.
+Request `111-20260806T112000Z`. All three axes `reviewed`. **Verdict `clean`, zero findings**, so
+nothing was refuted, resolved or deferred and no code moved in response to it.
+
+It ran: `tree-hash.sh`; a reconstruction of the recorded hash against the parent agreement;
+`where.sh test --type core --run 'TestMatchStepWith(ChainsOfCollidingSteps|AChainLongerThanTheWalk|AFailingStepPredicate)$'`;
+its own exhaustive model, `.review/scratch/issue111_decision12_exhaustive.go`, in the container; and
+`gofmt -d` on both files and the model.
+
+**What the round actually contributed**, since a clean verdict is otherwise unfalsifiable. The run
+pinned 14 hand-enumerated shapes. The review pinned the class: it enumerated **every one of the 32,767
+nonempty match sets over a 15-step domain**, which includes mixed-gap chains of four and five and
+disconnected components the run never wrote down, and checked each against an independent
+connected-component oracle. The walk had **0 failures**; substituting round 3's fixed lookback produced
+**50,816**. That is a stronger statement than anything in this entry, arrived at from a different
+direction, and it is what makes decision 12's amendment 3, settling colliding steps as a class rather
+than shape by shape, hold in the code rather than only in the agreement.
+
+It also redid the cap arithmetic independently rather than reading it off the comment: five successful
+links need six local occurrences at `(3e-6)^5 = 2.4e-28`, about `7.3e-28` allowing the three skew
+positions, so `7.3e-10` expected over the deliberately extreme `1e18` presentations, under the stated
+`1e-9` criterion. It reached the same conclusion the probe's ladder prints. It further observed that
+`current` is `Unix()/30` in production, so subtracting at most 15 cannot approach `int64` underflow and
+the inclusive scan cannot wrap, and that the two library errors are counter-independent so both
+internal error positions still return no match.
+
+**Coverage, and what it declared not checked.** Conformance: signature and acceptance window unchanged,
+the walk begins only after a window match, and the only new refusal of an otherwise matching passcode
+is the cap, which is the behaviour decision 12 chose. Quality: cap accounting, termination, cost on the
+ordinary paths, and the synthetic predicate staying inside the named seam 1 amendment with the 15 rows
+and the three real HMAC pairs still reaching `MatchStep`. Security: comparison stays inside
+`hotp.ValidateCustom`, nothing logs or exposes the passcode or secret, and predicate errors and cap
+exhaustion both fail closed. Not checked: the 20,000,000-step sweep was not re-run, round 2 and round
+3's actual-source mutations were not repeated (the exhaustive scratch mutation was run instead, after
+confirming the reviewed source byte-identical to the pre-mutation backup), and the data, integration
+and cross-module tiers are not applicable because stage 1 has no interface, query, schema, caller or
+endpoint. That is the correct scope for this stage, so the review is clean rather than partial in the
+sense of `reviewer.md` §4.
+
+### The one bookkeeping item, and why it is not a follow-up here
+
+The review reported that `tree-hash.sh` prints `d60a482eeab0` and not the `ba3b1f75278d` the tier claim
+above records. Confirmed, and the cause is in the helper rather than in this tree: it excludes the
+agreement directory from `git add` but then pins it with `git reset -q HEAD -- "$SPEC"`, so the hash
+carries **HEAD's** copy of the agreement rather than a constant, and committing the agreement moves the
+hash even though the script's header says that directory is excluded.
+
+The claim it was protecting still holds, checked independently at this gate rather than taken from the
+review: `git diff --name-only HEAD~1 HEAD` returns only paths under `docs/issue-111-otp-replay/`, so
+the source the reviewer read is byte-identical to the source the recorded tier ran against. The
+reviewer's own reconstruction reached `ba3b1f75278d` exactly.
+
+**Not drafted into `closing.md`.** `tree-hash.sh` lives in `~/.claude/skills/leo-spec/scripts/`, outside
+this repository, so it is neither a goiabada defect nor something `gh issue create` could file against
+this tracker. Reported to the user in the run's account instead. `closing.md` is unchanged by this
+round: still two follow-ups, neither from stage 1.
+
+## Tiers at the gate, re-run after the review
+
+Re-run here rather than cited from the entry above, because that claim's hash no longer reproduces for
+the reason just given. Tree `d60a482eeab0` at HEAD `e6c626a`, with the two files still uncommitted at
+the time of the run.
+
+- `where.sh test --type core`, foreground, whole core module. Exit 0,
+  `All tests completed successfully`, 29 packages `ok`, no `FAIL` anywhere. 3 seconds warm; the first
+  run of this tree at 11:28 was cold and slower.
+- `go test ./otp/ -count=1 -v` in the container, cache defeated so the green is this tree's and not a
+  replay: `ok github.com/leodip/goiabada/core/otp 0.027s`, **54 `PASS` lines over 7 test functions, 0
+  `FAIL`**.
+- `check-anchors.sh`: **24 of 24** rows resolve. Stage 1 added files rather than moving cited code, so
+  section 0 needed no re-sweep.
+- Data, integration and cross-module tiers: not applicable, for the reason repeated throughout this
+  entry. Stage 2 is the first stage that has a schema to run them against.
+
+## Where this stage closed
+
+Stage 1 is **`Done`**. Both files are committed on `issue-111-otp-replay`: `src/core/otp/verifier.go`
+and `src/core/otp/verifier_test.go`, and nothing else in the tree. Nothing calls `MatchStep` yet, which
+is the plan's shape and not an omission: stage 2 owns the storage the callers claim against and stages
+3 and 4 are the callers.
+
+Four rounds at this gate, one of them the plan review, and three escalations, decisions 10, 11 and 12,
+all `Decided` and all applied. Nine mutations were run against the two files across the stage and
+reverted, and the review's exhaustive model is the tenth check of the same property from outside. The
+judgement recorded after round 3, that decisions 11 and 12 both came from one grounding question the
+interview never asked, stands as written and belongs to the next `/leo-spec` rather than to this run.

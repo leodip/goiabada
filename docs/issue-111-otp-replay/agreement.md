@@ -5,7 +5,7 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** stage 1 in progress, decision 12 answered A and applied, round 4 requested at gate `stage-1`. Account in `log/stage-1.md`
+**Run state:** stage 1 done and committed, round 4 clean, all twelve decisions decided. Stage 2 next. Account in `log/stage-1.md`
 **PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
