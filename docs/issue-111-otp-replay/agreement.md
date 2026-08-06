@@ -5,7 +5,7 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** stage 1 in progress, decision 11 answered B and applied, awaiting round 3 at gate `stage-1`. Account in `log/stage-1.md`
+**Run state:** stage 1 in progress, blocked on decision 12 from round 3 at gate `stage-1`. Account in `log/stage-1.md`
 **PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
@@ -181,9 +181,10 @@ Checkable:
 
 ## 3. Decisions
 
-Eleven, all decided. Announced as eight; sweeping the design for what the run would otherwise have to
-escalate added decision 9, and two more were raised during stage 1 and answered by the user on
-PR #143: decision 10 from the plan review, decision 11 from the code review.
+Twelve, eleven decided and decision 12 open. Announced as eight; sweeping the design for what the run
+would otherwise have to escalate added decision 9, and three more were raised during stage 1: decision
+10 from the plan review and decision 11 from the code review, both answered by the user on PR #143,
+and decision 12 from the code review's third round, awaiting an answer.
 
 1. **Where does the consumed-code state live?**
    Status: **Decided** · Raised by: user
@@ -595,6 +596,79 @@ PR #143: decision 10 from the plan review, decision 11 from the code review.
     nothing collides within eight steps of the instant they pin, for both the valid secret and the
     empty one. Whichever rule wins, the table gains collision rows pinned at their own instants, and
     the pairs above are already located for them.
+
+12. **A fixed lookback closes colliding pairs but not chains of three. Closed, or accepted?**
+    Status: **Open** · Raised by: run (raised during stage 1, at the code-review gate, round 3)
+
+    Escalated on PR #143, 2026-08-06. Nothing rests on it in the tree: stage 1's two files stay
+    uncommitted and stage 1 stays `In progress`.
+
+    **The defect, confirmed and then widened.** Decision 11's answer reports the lowest match in
+    `current-4 .. current+1`. Three steps producing one passcode chain their acceptance ranges into
+    one unbroken run when each adjacent gap is at most 3, and the lowest of them then falls out of
+    that fixed interval while the run is still live. For steps 100, 103 and 106 the passcode is
+    accepted continuously from current 99 through 107, but the reported step advances from 100 to 103
+    at current 105, so a marker holding 100 accepts 103 and the same passcode is consumed twice.
+    Executed: the reviewer's `.review/scratch/issue111_decision11_model.go`, reproduced and extended
+    in `probe/step-collisions`.
+
+    Wider than the review found. **6 of the 9 continuously live chains of three are replayable**,
+    every one whose total span exceeds the lookback of 3; `{A, A+1, A+2}`, `{A, A+1, A+3}` and
+    `{A, A+2, A+3}` are safe. The span 4 pair also leaks from 5 presentations rather than 3.
+
+    **How often, measured rather than argued.** The probe swept 20,000,000 steps over 4 secrets, 19
+    years of one authenticator: 55 colliding pairs at most 3 apart, 2.75e-06 per step against 3.0e-06
+    expected, which is what validates the 1e-06 per-pair model everything else here rests on. Chains
+    of three: **0**, against 1.8e-04 expected. A presented code sits in a chain about **2.7e-11** of
+    the time, roughly 3 in 100 billion authentications, five orders of magnitude below the 8.3e-06
+    pair rate decision 11 was answered against.
+
+    **Why this is the user's call rather than the run's.** It is a security property in
+    authentication, which `decisions.md` never auto-resolves, and the reviewer returned it
+    `needs_human: true` with an empty `forced_answer`, naming three resolutions. Decision 11 chose to
+    close a rate five orders of magnitude higher; whether that choice carries down to this one is the
+    same judgement decision 11 recorded as not the run's, about how literally RFC 6238 5.2 binds.
+
+    **Option A, walk the lookback down transitively** instead of applying it once: from the matched
+    step, look for a match in the 3 steps below it, and repeat from whatever it finds. Closes all 9
+    chain shapes and all 3 continuously live pairs, executed in the probe. Acceptance is untouched,
+    `MatchStep` keeps `(int64, bool)`, and nothing in stages 2 to 4 moves. **Costs exactly what the
+    current code costs whenever nothing collides**, one lookback scan of 3 steps, because the walk
+    stops the moment a scan finds nothing; 2 scans on a pair, 3 on a chain of three. Needs a cap to
+    stay a total function, at a chain length nothing can reach. Two real costs. On the inherent span 4
+    pair it re-accepts at `A+3` rather than `A+5`, 60 seconds sooner, though from 3 presentations
+    rather than 5, and that whole class is what decision 11 already accepted as inherent. And it
+    **cannot be tested at seam 1**: no reachable secret exhibits a chain, so the scan has to move
+    behind a step predicate and be pinned with a synthetic match set, which is a boundary below the
+    seam sealed in §5. The three located pairs report identically under both rules at every current
+    step, executed in the probe, so `TestMatchStepWithCollidingSteps` and the 15-row table are
+    unaffected either way.
+
+    **Option B, accept the residual and narrow the claim.** One sentence in `MatchStep`'s doc comment
+    and in decision 11 saying the constant answer holds for a pair and for a chain spanning at most 3,
+    and not beyond. Costs nothing and ships #111 with a 3-in-100-billion instance of the defect #111
+    exists to close.
+
+    **Option C, bind consumption to the passcode** rather than to the step, storing the consumed code
+    or its hash. Closes the chains and the inherent wide pairs with them. Reopens decision 1, which
+    rejected a consumed-codes table as too expensive for a 90-second window, and costs a second column
+    in stage 2.
+
+    **Option D, widen the lookback to a larger fixed number.** Recorded because it is the obvious first
+    thought and it does not work: any fixed `L` fails for a chain spanning more than `L`. Strictly
+    dominated by A, which is D taken to its limit at lower cost.
+
+    **Recommendation: A.** It is the only candidate that makes the invariant decision 11 chose actually
+    hold, it is free in the case every real authentication takes, and no signature or later stage
+    moves. Its honest price is the test boundary, not the code. B is defensible if 3 in 100 billion is
+    judged acceptable, which is the same question decision 11 answered at 3 in a million and is why
+    this is being asked rather than applied. C is a larger change than #111 has called for anywhere
+    else.
+
+    Getting it wrong either way: choosing B and later reversing costs the matcher and one test
+    function, both still uncommitted, so it is cheap now and less so once stages 2 to 4 have built on
+    the returned step. Choosing A when B would have done costs a loop, a cap and a test at a lower
+    boundary than §5 sealed.
 
 ## 4. Design
 
