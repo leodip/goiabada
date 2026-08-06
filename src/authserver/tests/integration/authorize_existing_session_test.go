@@ -1253,6 +1253,16 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		t.Fatal(err)
 	}
 
+	// Standing in for the disable handlers, which reset the consumed-step marker alongside
+	// clearing the secret (#111 decision 4). The direct write above cannot: last_otp_step is
+	// tagged dont-update precisely so an ordinary whole-user write can never move it. Without
+	// this the enrollment below submits a code from the same time step the session helper
+	// already consumed, and the claim refuses it (#111 decision 8).
+	err = database.ResetUserOTPStep(nil, user.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
 	if err != nil {
 		t.Fatal(err)

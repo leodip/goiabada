@@ -102,6 +102,23 @@ const (
 	// (a family already fully revoked, or a repeated replay) cannot amplify the
 	// audit log.
 	AuditRefreshTokenReplayDetected = "refresh_token_replay_detected"
+	// AuditOTPCodeReplayDetected records a TOTP code that validated against the user's
+	// secret but whose time step could not be claimed, which per RFC 6238 Section 5.2
+	// means the code had already been used. Emitted alongside AuditAuthFailedOtp rather
+	// than instead of it: a replayed code is a far stronger signal than a mistyped one,
+	// usually a real-time phishing proxy, and it deserves to be alertable on its own
+	// (#111 decision 5).
+	//
+	// It does NOT assert malicious intent, and it is not proof of replay. The claim is a
+	// compare-and-set, so a false return only says no row transitioned, which is either
+	// an already-consumed step, a user row that vanished, or an authenticator disabled
+	// under this very request. The caller loaded the user moments earlier, so replay is
+	// overwhelmingly the cause. See TryConsumeUserOTPStep for the full accounting.
+	//
+	// Payload: userId and the matched time step, so an operator can see which code was
+	// replayed. Never the code itself. The caller learns nothing either way: a replay
+	// renders the same generic incorrect-code response as a wrong code.
+	AuditOTPCodeReplayDetected = "otp_code_replay_detected"
 
 	AuditCreatedUser              = "created_user"
 	AuditActivatedAccount         = "activated_account"
@@ -255,6 +272,7 @@ var AuditEventTypes = []string{
 	AuditFailedResetPasswordCode,
 	AuditGeneratedEmailVerificationCode,
 	AuditLogout,
+	AuditOTPCodeReplayDetected,
 	AuditRefreshTokenReplayDetected,
 	AuditRevokedKey,
 	AuditRevokedUserAuthState,

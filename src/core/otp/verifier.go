@@ -72,13 +72,15 @@ type producesPasscode func(step int64) (bool, error)
 // A passcode does not name a step. Several steps can produce the same six digits, so
 // the step reported is the lowest one in the chain of such steps, found by walking
 // lookbackSteps down at a time from the match. That answer is the same at every current
-// step from which the passcode is accepted, which is what makes the first claim of it
-// refuse every later presentation. Reporting the step that matched inside the window
-// instead would let one passcode be consumed once against each colliding step as the
-// window slides (#111 decision 11), and applying the lookback once rather than walking
-// it would do the same for three or more colliding steps (#111 decision 12). What is
-// accepted does not change either way: only a match inside the window accepts, and the
-// walk moves nothing but the answer.
+// step in one unbroken run of accepting steps, which is what makes the first claim of it
+// refuse every later presentation in that run. Steps spread wider than lookbackSteps
+// apart have a refused gap between their runs and so a different answer either side,
+// which is the residual lookbackSteps records as inherent. Reporting the step that
+// matched inside the window instead would let one passcode be consumed once against each
+// colliding step as the window slides (#111 decision 11), and applying the lookback once
+// rather than walking it would do the same for three or more colliding steps (#111
+// decision 12). What is accepted does not change either way: only a match inside the
+// window accepts, and the walk moves nothing but the answer.
 //
 // An empty secret matches nothing (#111 decision 9). The library happily derives a
 // code from the empty key, and that code depends only on the time step, so it is the

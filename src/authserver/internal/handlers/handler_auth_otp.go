@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pquerna/otp/totp"
+	"github.com/leodip/goiabada/core/otp"
 )
 
 func HandleAuthOtpGet(
@@ -261,8 +261,30 @@ func HandleAuthOtpPost(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			otpValid := totp.Validate(otpCode, otpSecret)
-			if !otpValid {
+			step, matched := otp.MatchStep(otpCode, otpSecret, time.Now().UTC())
+			if !matched {
+				auditLogger.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
+					"userId": user.Id,
+				})
+				renderError(incorrectOtpError)
+				return
+			}
+
+			// requireOTPEnabled is true here: this claim asserts a factor, and that
+			// assertion is only true of an enrolled authenticator. Without the term a
+			// request that loaded the user before a concurrent disable could still claim
+			// a step and be issued a token naming amr "otp" for an authenticator that had
+			// just been removed (#111 decision 10).
+			consumed, err := database.TryConsumeUserOTPStep(nil, user.Id, step, true)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			if !consumed {
+				auditLogger.Log(constants.AuditOTPCodeReplayDetected, map[string]interface{}{
+					"userId": user.Id,
+					"step":   step,
+				})
 				auditLogger.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
@@ -271,8 +293,31 @@ func HandleAuthOtpPost(
 			}
 		} else {
 			// is enrolling to TOTP now
-			otpValid := totp.Validate(otpCode, secretKey)
-			if !otpValid {
+			step, matched := otp.MatchStep(otpCode, secretKey, time.Now().UTC())
+			if !matched {
+				auditLogger.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
+					"userId": user.Id,
+				})
+				renderError(incorrectOtpError)
+				return
+			}
+
+			// requireOTPEnabled is false here: enrollment is establishing the
+			// authenticator rather than asserting it, and otp_enabled is still off until
+			// the write below (#111 decision 10). The claim comes first deliberately: if
+			// the enable write then fails, a code is burned and the user retries with the
+			// next one, whereas the reverse order would leave OTP enabled on a request
+			// that was refused.
+			consumed, err := database.TryConsumeUserOTPStep(nil, user.Id, step, false)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			if !consumed {
+				auditLogger.Log(constants.AuditOTPCodeReplayDetected, map[string]interface{}{
+					"userId": user.Id,
+					"step":   step,
+				})
 				auditLogger.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
