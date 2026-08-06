@@ -1,0 +1,89 @@
+scanned 600000 steps, 208 days of one secret
+same-passcode pairs within span 5, by span: map[1:1 3:1 5:3], total 5
+so an authentication meets one about 8.3e-06 of the time, against 5.0e-06 expected
+
+continuously live pairs are those of span 1 to 3
+
+== can one passcode be accepted twice under a high-water claim? ==
+A is the lower colliding step; a trace reads first accepted at c1, accepted again at c2
+
+--- shipped: first match, deltas 0, -1, +1 ---
+  steps 56077475/56077478 span 3 passcode 194241: replayable from 3 presentations [A-1->A+2 A+0->A+2 A+1->A+2]
+  steps 56218367/56218372 span 5 passcode 989240: replayable from 3 presentations [A-1->A+4 A+0->A+4 A+1->A+4]
+  steps 56235133/56235138 span 5 passcode 137338: replayable from 3 presentations [A-1->A+4 A+0->A+4 A+1->A+4]
+  steps 56245959/56245960 span 1 passcode 249386: replayable from 2 presentations [A-1->A+1 A+0->A+1]
+  steps 56462031/56462036 span 5 passcode 600537: replayable from 3 presentations [A-1->A+4 A+0->A+4 A+1->A+4]
+  steps 818665/818667 span 2 passcode 475244: replayable from 3 presentations [A-1->A+2 A+0->A+2 A+1->A+2]
+
+--- A: greatest in the window ---
+  steps 56077475/56077478 span 3 passcode 194241: replayable from 3 presentations [A-1->A+2 A+0->A+2 A+1->A+2]
+  steps 56218367/56218372 span 5 passcode 989240: replayable from 3 presentations [A-1->A+4 A+0->A+4 A+1->A+4]
+  steps 56235133/56235138 span 5 passcode 137338: replayable from 3 presentations [A-1->A+4 A+0->A+4 A+1->A+4]
+  steps 56245959/56245960 span 1 passcode 249386: replayable from 1 presentations [A-1->A+0]
+  steps 56462031/56462036 span 5 passcode 600537: replayable from 3 presentations [A-1->A+4 A+0->A+4 A+1->A+4]
+  steps 818665/818667 span 2 passcode 475244: replayable from 2 presentations [A-1->A+1 A+0->A+1]
+
+--- B: greatest in the window, guard on lookback 3 ---
+  steps 56077475/56077478 span 3: safe from every presentation
+  steps 56218367/56218372 span 5 passcode 989240: replayable from 3 presentations [A-1->A+5 A+0->A+5 A+1->A+5]
+  steps 56235133/56235138 span 5 passcode 137338: replayable from 3 presentations [A-1->A+5 A+0->A+5 A+1->A+5]
+  steps 56245959/56245960 span 1: safe from every presentation
+  steps 56462031/56462036 span 5 passcode 600537: replayable from 3 presentations [A-1->A+5 A+0->A+5 A+1->A+5]
+  steps 818665/818667 span 2: safe from every presentation
+
+--- B': lowest within lookback 3, claimed ---
+  steps 56077475/56077478 span 3: safe from every presentation
+  steps 56218367/56218372 span 5 passcode 989240: replayable from 4 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+4->A+5]
+  steps 56235133/56235138 span 5 passcode 137338: replayable from 4 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+4->A+5]
+  steps 56245959/56245960 span 1: safe from every presentation
+  steps 56462031/56462036 span 5 passcode 600537: replayable from 4 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+4->A+5]
+  steps 818665/818667 span 2: safe from every presentation
+
+--- D: greatest with lookahead 3 ---
+  steps 56077475/56077478 span 3: safe from every presentation
+  steps 56218367/56218372 span 5 passcode 989240: replayable from 2 presentations [A-1->A+1 A+0->A+1]
+  steps 56235133/56235138 span 5 passcode 137338: replayable from 2 presentations [A-1->A+1 A+0->A+1]
+  steps 56245959/56245960 span 1: safe from every presentation
+  steps 56462031/56462036 span 5 passcode 600537: replayable from 2 presentations [A-1->A+1 A+0->A+1]
+  steps 818665/818667 span 2: safe from every presentation
+
+secret "JBSWY3DPEHPK3PXP": 0 duplicate codes in steps [56666658, 56666674], the pinned table's neighbourhood
+
+secret "": 0 duplicate codes in steps [56666658, 56666674], the pinned table's neighbourhood
+
+instants that would pin a collision row:
+  steps 56245959/56245960 span 1 code 249386: the lower step starts at Unix 1687378770
+  steps 818665/818667 span 2 code 475244: the lower step starts at Unix 24559950
+  steps 56077475/56077478 span 3 code 194241: the lower step starts at Unix 1682324250
+
+== decision 11 answer B: the sweep the test table is transcribed from ==
+
+  pair 56245959/56245960 span 1, passcode 249386, lower step starts at Unix 1687378770
+    other steps producing it within 8 either side: []
+    current 56245957 (A-2): refused
+    current 56245958 (A-1): accepted, reports step 56245959 (A+0), guard 56245959
+    current 56245959 (A+0): accepted, reports step 56245959 (A+0), guard 56245959
+    current 56245960 (A+1): accepted, reports step 56245959 (A+0), guard 56245959
+    current 56245961 (A+2): accepted, reports step 56245959 (A+0), guard 56245959
+    current 56245962 (A+3): refused
+
+  pair 818665/818667 span 2, passcode 475244, lower step starts at Unix 24559950
+    other steps producing it within 8 either side: []
+    current 818663 (A-2): refused
+    current 818664 (A-1): accepted, reports step 818665 (A+0), guard 818665
+    current 818665 (A+0): accepted, reports step 818665 (A+0), guard 818665
+    current 818666 (A+1): accepted, reports step 818665 (A+0), guard 818665
+    current 818667 (A+2): accepted, reports step 818665 (A+0), guard 818665
+    current 818668 (A+3): accepted, reports step 818665 (A+0), guard 818665
+    current 818669 (A+4): refused
+
+  pair 56077475/56077478 span 3, passcode 194241, lower step starts at Unix 1682324250
+    other steps producing it within 8 either side: []
+    current 56077473 (A-2): refused
+    current 56077474 (A-1): accepted, reports step 56077475 (A+0), guard 56077475
+    current 56077475 (A+0): accepted, reports step 56077475 (A+0), guard 56077475
+    current 56077476 (A+1): accepted, reports step 56077475 (A+0), guard 56077475
+    current 56077477 (A+2): accepted, reports step 56077475 (A+0), guard 56077475
+    current 56077478 (A+3): accepted, reports step 56077475 (A+0), guard 56077475
+    current 56077479 (A+4): accepted, reports step 56077475 (A+0), guard 56077475
+    current 56077480 (A+5): refused

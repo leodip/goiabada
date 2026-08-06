@@ -14,6 +14,8 @@
 //	go run ./probe-tmp && rm -rf ./probe-tmp
 //
 // It has no dependency on goiabada code, so it stays valid as the tree moves.
+// output.txt beside this file is what it printed on 2026-08-06, and the last
+// section of that output is what TestMatchStepWithCollidingSteps asserts.
 package main
 
 import (
@@ -232,5 +234,37 @@ func main() {
 	for _, p := range []pair{{56245959, 56245960}, {818665, 818667}, {56077475, 56077478}} {
 		fmt.Printf("  steps %d/%d span %d code %s: the lower step starts at Unix %d\n",
 			p.a, p.b, p.b-p.a, codeAt(p.a), p.a*30)
+	}
+
+	// Decision 11 answered B, the rule ruleBprime models. The rows verifier_test.go
+	// asserts are transcribed from the sweep below rather than reasoned out: for each
+	// located pair, every current step from which the passcode is accepted must report
+	// the *same* step, and the two steps either side of that range must refuse.
+	fmt.Println("\n== decision 11 answer B: the sweep the test table is transcribed from ==")
+	const L = int64(3)
+	for _, p := range []pair{{56245959, 56245960}, {818665, 818667}, {56077475, 56077478}} {
+		code := codeAt(p.a)
+		fmt.Printf("\n  pair %d/%d span %d, passcode %s, lower step starts at Unix %d\n",
+			p.a, p.b, p.b-p.a, code, p.a*30)
+
+		// A third colliding step near the pair would make the lowest match move as the
+		// window slides, so the sweep is only transcribable if there is not one.
+		var others []int64
+		for s := p.a - 8; s <= p.b+8; s++ {
+			if codeAt(s) == code && s != p.a && s != p.b {
+				others = append(others, s)
+			}
+		}
+		fmt.Printf("    other steps producing it within 8 either side: %v\n", others)
+
+		for c := p.a - 2; c <= p.b+2; c++ {
+			claim, guard, ok := ruleBprime(L)(code, c)
+			if !ok {
+				fmt.Printf("    current %d (A%+d): refused\n", c, c-p.a)
+				continue
+			}
+			fmt.Printf("    current %d (A%+d): accepted, reports step %d (A%+d), guard %d\n",
+				c, c-p.a, claim, claim-p.a, guard)
+		}
 	}
 }
