@@ -646,3 +646,122 @@ func (d *CommonDatabase) TrySetUserEnabled(tx *sql.Tx, userId int64, expected bo
 
 	return rowsAffected == 1, nil
 }
+
+// TryConsumeUserOTPStep records step as the user's most recently consumed TOTP time
+// step, but only if it is strictly newer than what is stored, and reports whether
+// this call is the one that made the transition. Compare-and-set for the same reason
+// MarkCodeAsUsed is: accepting a code and recording it as used must not be separable,
+// or two concurrent submissions of one code both pass. The single conditional UPDATE
+// is the claim and the replay check at once (#111).
+//
+// requireOTPEnabled adds `otp_enabled = true` to the predicate. Verification sites
+// pass true, because a verification claim asserts a factor and that assertion is only
+// true of an enrolled authenticator: without the term, a request that loaded the user
+// before a concurrent disable could still claim a step and be issued a token naming
+// amr "otp" for an authenticator that had just been removed. Enrollment sites pass
+// false, because they claim before the enable write and otp_enabled is still off
+// there (#111 decision 10).
+//
+// **A false return is not proof of replay.** It means no row transitioned, and the
+// causes are not distinguishable here: the step is at or below the stored one, the
+// user row is gone, or, at a verification site, the authenticator was removed under
+// this request. The caller loaded the user moments earlier, so replay is
+// overwhelmingly the cause, and the response is identical either way. This is the
+// same imprecision MarkCodeAsUsed documents about its own three-way false.
+//
+// **A query error is not benign.** It returns (false, err) and the caller responds
+// 500. Collapsing a database fault into "not consumed" would refuse valid codes;
+// collapsing it into "consumed" would accept replays for the duration of the fault.
+//
+// tx is optional, as on MarkCodeAsUsed: this is one statement and nothing is read
+// back, so the transaction requirement IncrementUserAuthStateGeneration documents
+// does not apply.
+//
+// Deliberately not part of UpdateUser. last_otp_step is tagged dont-update because
+// the OTP enrollment handler claims a step and then writes the whole user back, so an
+// ordinary update would write the pre-claim value over the claim.
+func (d *CommonDatabase) TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int64,
+	requireOTPEnabled bool) (bool, error) {
+
+	if userId == 0 {
+		return false, errors.WithStack(errors.New("can't consume an OTP step for user with id 0"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("last_otp_step", step),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	// The strict inequality is what refuses a replay: the second submission of one code
+	// carries the step already stored, so it matches no row. rowsAffected == 1 means
+	// this call transitioned the row on all four engines, because matching the WHERE
+	// implies the assigned step differs from the stored one, so MySQL's changed-rows
+	// accounting agrees with matched rows. That is the trap
+	// RevokeCodesBySessionIdentifier documents, and it does not bite here.
+	predicates := []string{
+		ub.Equal("id", userId),
+		ub.LessThan("last_otp_step", step),
+	}
+	if requireOTPEnabled {
+		// A bound Go bool, as TrySetUserEnabled does against users.enabled. The two
+		// columns carry the same type on every engine, so nothing here is dialect
+		// specific.
+		predicates = append(predicates, ub.Equal("otp_enabled", true))
+	}
+	ub.Where(predicates...)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to consume user OTP step")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "unable to get rows affected when consuming user OTP step")
+	}
+
+	return rowsAffected == 1, nil
+}
+
+// ResetUserOTPStep returns the user's consumed-step marker to 0, meaning no code has
+// been consumed. Called when OTP is disabled: the marker belongs to the enrolled
+// authenticator, and it is the only remedy if a clock jump strands the marker in the
+// future, where every code would be refused until wall time caught up (#111
+// decision 4).
+//
+// **Callers must reset AFTER the write that clears otp_enabled, not before.** Neither
+// order needs a transaction, but reversed there is a window in which the marker reads
+// 0 while the authenticator still reads enabled, and a verification request that
+// loaded the old state claims an already-consumed step through it, which is precisely
+// the hole TryConsumeUserOTPStep's requireOTPEnabled term closes.
+//
+// Not a bypass: self-service disable verifies the password first, admin disable
+// requires authserver:manage, and re-enrolling requires possession of a fresh secret.
+//
+// Resetting an already-reset user is not a failure, so this reports only an error
+// rather than whether anything changed. Nothing gates on the transition, unlike
+// TrySetUserEnabled's disable direction.
+func (d *CommonDatabase) ResetUserOTPStep(tx *sql.Tx, userId int64) error {
+
+	if userId == 0 {
+		return errors.WithStack(errors.New("can't reset the OTP step of user with id 0"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("last_otp_step", 0),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(ub.Equal("id", userId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	_, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to reset user OTP step")
+	}
+
+	return nil
+}

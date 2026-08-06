@@ -363,6 +363,7 @@ CREATE TABLE [users] (
     [forgot_password_code_encrypted] VARBINARY(MAX) NULL,
     [forgot_password_code_issued_at] DATETIME2(6) NULL,
     [auth_state_generation] BIGINT NOT NULL CONSTRAINT [df_users_auth_state_generation] DEFAULT 0,
+    [last_otp_step] BIGINT NOT NULL CONSTRAINT [df_users_last_otp_step] DEFAULT 0,
     CONSTRAINT [PK_users] PRIMARY KEY ([id])
 );
 

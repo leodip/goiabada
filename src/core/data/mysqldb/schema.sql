@@ -170,6 +170,7 @@ CREATE TABLE `users` (
   `forgot_password_code_encrypted` longblob,
   `forgot_password_code_issued_at` datetime(6) DEFAULT NULL,
   `auth_state_generation` bigint NOT NULL DEFAULT 0,
+  `last_otp_step` bigint NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_subject` (`subject`),
   UNIQUE KEY `idx_email` (`email`),

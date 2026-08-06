@@ -1,0 +1,15 @@
+-- Per-user one-time-use marker for TOTP codes (#111).
+--
+-- RFC 6238 5.2 requires that a code accepted once is never accepted again. The
+-- column records the most recently consumed time step, and every acceptance claims
+-- it with a conditional UPDATE (last_otp_step < step), so the claim and the replay
+-- check are one statement and two concurrent submissions of one code cannot both
+-- pass.
+--
+-- NOT NULL DEFAULT 0 rather than nullable: any real time step is around 1.8e9, so 0
+-- is unambiguously "no code consumed yet" and no read site needs NULL handling.
+-- Existing rows land at 0, which is exactly that state, so nobody is refused a code
+-- by the deployment.
+--
+-- No index. Every read and write is by users.id, which is the primary key.
+ALTER TABLE users ADD COLUMN last_otp_step INTEGER NOT NULL DEFAULT 0;

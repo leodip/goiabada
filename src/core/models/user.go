@@ -54,10 +54,20 @@ type User struct {
 	// every credential handler loads the whole user and writes it back, so leaving it
 	// in the ordinary update set would let a stale model regress it. It advances only
 	// through IncrementUserAuthStateGeneration (#106).
-	AuthStateGeneration int64           `db:"auth_state_generation" fieldtag:"dont-update"`
-	Groups              []Group         `db:"-"`
-	Permissions         []Permission    `db:"-"`
-	Attributes          []UserAttribute `db:"-"`
+	AuthStateGeneration int64 `db:"auth_state_generation" fieldtag:"dont-update"`
+	// LastOTPStep is the most recently consumed TOTP time step, 0 meaning none has
+	// been consumed: a step is Unix seconds divided by 30, so any real one is around
+	// 6e7, and the column default is unambiguous. It is what makes a code one-time-use
+	// (#111, RFC 6238 5.2). Tagged
+	// dont-update for the same reason AuthStateGeneration is, and the hazard is even
+	// more direct here: the OTP enrollment handler loads the whole user, claims a step
+	// and then writes the user back, so leaving the column in the ordinary update set
+	// would let it write the pre-claim value over its own claim. It moves only through
+	// TryConsumeUserOTPStep and ResetUserOTPStep.
+	LastOTPStep int64           `db:"last_otp_step" fieldtag:"dont-update"`
+	Groups      []Group         `db:"-"`
+	Permissions []Permission    `db:"-"`
+	Attributes  []UserAttribute `db:"-"`
 }
 
 // SetOTPSecret encrypts the TOTP seed at rest (AES-256-GCM, via the process

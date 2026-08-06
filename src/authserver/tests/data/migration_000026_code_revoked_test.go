@@ -53,14 +53,22 @@ func TestMigration000026_CodeRevoked(t *testing.T) {
 
 	// 3. A row that predates the column lands at false.
 	//
-	// Seeded through the ORM at 000026 and then carried DOWN to 000025 and back up,
-	// rather than seeded with raw SQL at 000025. Both prove the same thing, and the
-	// round trip costs a dozen lines instead of a hand-written insert covering the
-	// twenty NOT NULL columns of codes plus the clients and users rows its foreign
-	// keys require, with per-dialect datetime and boolean literals for each.
+	// Seeded through the ORM and then carried DOWN to 000025 and back up, rather than
+	// seeded with raw SQL at 000025. Both prove the same thing, and the round trip
+	// costs a dozen lines instead of a hand-written insert covering the twenty NOT
+	// NULL columns of codes plus the clients and users rows its foreign keys require,
+	// with per-dialect datetime and boolean literals for each.
+	//
+	// The seed happens at the HEAD migration rather than at 000026, because the ORM
+	// writes every column the Go models carry: seeding at 000026 broke the moment
+	// #111's users.last_otp_step landed at 000027, since the insert then named a
+	// column that version of the schema does not have. Up() keeps this test working as
+	// later migrations arrive; the assertions still run at 000026, which is what the
+	// round trip below restores.
+	require.NoError(t, h.Migrator.Up(), "migrate to head before seeding through the ORM")
 	codeId := seedCode000026(t, h)
 
-	require.NoError(t, h.Migrator.Migrate(25), "roll back 000026")
+	require.NoError(t, h.Migrator.Migrate(25), "roll back to 000025")
 	require.NoError(t, h.Migrator.Migrate(26), "re-apply 000026")
 
 	assert.False(t, readCodeRevoked000026(t, h, codeId),

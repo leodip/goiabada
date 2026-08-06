@@ -89,3 +89,11 @@ func (d *SQLiteDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordH
 func (d *SQLiteDatabase) TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {
 	return d.CommonDB.TrySetUserEnabled(tx, userId, expected, desired)
 }
+
+func (d *SQLiteDatabase) TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error) {
+	return d.CommonDB.TryConsumeUserOTPStep(tx, userId, step, requireOTPEnabled)
+}
+
+func (d *SQLiteDatabase) ResetUserOTPStep(tx *sql.Tx, userId int64) error {
+	return d.CommonDB.ResetUserOTPStep(tx, userId)
+}
