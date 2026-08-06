@@ -9,7 +9,7 @@ the repair of `test/reenroll-same-window` (decision 8) needs `ResetUserOTPStep`,
 stage 3 against stage 2's method.
 
 ### Stage 1: the step matcher
-Status: **In progress**
+Status: **Done**
 Seams: 1. Tiers: unit (core module). Docs: none, internals only.
 
 1. **`src/core/otp/verifier.go`**, new file in the existing `package otp` beside `generator.go`.
