@@ -18,73 +18,7 @@ Landed 2026-08-06, commit `21cdef8`. Account in `log/stage-2.md`.
 
 ### Stage 3: enforcement in the browser flow
 Status: **Done**
-Seams: 3, 5. Tiers: unit (modules), integration.
-
-Docs: **none. The `docs/security-2fa` bullet moved to stage 4**, reversing this plan's first draft.
-The draft put it here, arguing that stage 3 is where the claim becomes true of authentication, that
-stage 3 introduces the audit event the bullet names, and that a docs line attached to the last stage
-is the first thing an early stop loses. The plan review disproved the first of those, which was the
-one carrying the argument: after stage 3 the account API still accepts a code without claiming it, so
-a code accepted at `api-otp/verify` remains replayable at browser verification until stage 4 lands.
-§2's goal is one-time use "on any of the three call sites", and stage 3 enforces two of three, so the
-bullet would state a guarantee broader than the code gives. An early stop is a reason to lose a docs
-line, never a reason to publish an untrue security claim.
-
-1. `constants.AuditOTPCodeReplayDetected = "otp_code_replay_detected"` in
-   `src/core/constants/constants.go`, declared beside `AuditRefreshTokenReplayDetected` with a doc
-   comment in its shape, saying what a `false` claim does and does not prove (decision 5, and the
-   three-way false `TryConsumeUserOTPStep` documents). Added to `AuditEventTypes`, which
-   `TestAuditEventTypes_Alphabetical` sorts by **value**, so it lands between `AuditLogout` and
-   `AuditRefreshTokenReplayDetected`. Two drift guards in `constants_test.go` move with it:
-   `allAuditConstants` in `TestAuditEventTypes_MatchesConstants`, and `expectedCount` in
-   `TestAuditEventTypes_Count`, 95 to 96 (`grep -c "^	Audit" src/core/constants/constants.go` over
-   the slice). Not added to `criticalEvents`: #128 did not add its own replay event there and the
-   sketch says to follow it. Status: **Done**
-
-2. `otp/verify-enabled` becomes match-then-claim per §4: `otp.MatchStep(otpCode, otpSecret,
-   time.Now().UTC())` in place of `totp.Validate`, then `TryConsumeUserOTPStep(nil, user.Id, step,
-   true)`. `requireOTPEnabled` is **true** here with a comment saying why (a verification claim
-   asserts a factor, decision 10). A claim error is a 500; a refused claim emits
-   `AuditOTPCodeReplayDetected` with `userId` and `step`, then takes the existing
-   `AuditAuthFailedOtp` plus `otp/incorrect-error` path unchanged. The `totp` import goes, since
-   neither branch validates directly any more. Status: **Done**
-
-3. `otp/verify-enrolling` the same, against `secretKey` and with `requireOTPEnabled` **false**
-   (enrolment establishes the authenticator and runs while `otp_enabled` is still off), the claim
-   placed **before** `otp/enroll-write` so a failed enable cannot leave OTP on for a refused request.
-   Status: **Done**
-
-4. Seam 5, `handler_auth_otp_test.go`, deliberately thin. The new stub on the three subtests that
-   reach a successful validation, each pinning its flag by matching the argument exactly:
-   `test/unit-otp-success` with `true`, "Successful OTP validation for disabled OTP (enrollment)" and
-   "Error updating user during OTP enrollment" with `false`. Two new subtests on the verification
-   branch: a refused claim asserting both audit events and that the rendered error is the **same
-   value** the wrong-code path renders, and an erroring claim asserting `InternalServerError`.
-   Status: **Done**
-
-5. Seam 3, new `src/authserver/tests/integration/auth_otp_replay_test.go`, named after
-   `token_refresh_replay_test.go`. Two cases, each with the later-step control §5 requires, and each
-   second submission in a genuinely fresh ceremony: **replay refused** (enrolled user, submit C,
-   complete, then submit C again) and **enrolment code refused at verification** (enrol at step N in
-   the browser flow, then submit the same C against the now-stored secret, pinning decision 3).
-   Local setup helpers create a `level2_mandatory` client and user without completing a ceremony, so
-   the marker is 0 and the test owns every code submitted.
-
-   **Deviation from §5, verified: the fresh ceremony is a fresh cookie jar, not `prompt=login`.**
-   `prompt=login` re-runs level 1 only. `HandleAuthLevel1CompletedGet` then loads the session the
-   cookie still names and steps up only when `targetAcrLevel.IsHigherThan(session ACR)`, which is
-   false for a `level2_mandatory` session meeting a `level2_mandatory` request, so the ceremony
-   redirects straight to `/auth/completed` and never reaches `/auth/otp`. A new `createHttpClient`
-   has no session cookie, so the target beats level 1 and the OTP form is shown. §5's actual reason
-   for demanding a fresh ceremony is untouched and still honoured: resubmitting inside the first one
-   500s at the `requiredState` check before the guard is consulted. Status: **Done**
-
-6. `test/reenroll-same-window` repaired per decision 8: `ResetUserOTPStep` beside the direct disable
-   it already performs, with the comment that decision requires. Recounted, and the count holds: it
-   is still the only test submitting two codes for one user
-   (`awk` over `authenticateWithOtp`, `createSessionWithAcrLevel2Mandatory` and `navigateToOtpScreen`
-   across `src/authserver/tests/integration/*.go`, mapping each call to its enclosing function).
-   Status: **Done**
+Landed 2026-08-06, commit `a856e4b`. Account in `log/stage-3.md`.
 
 ### Stage 4: the account API, and reset on disable
 Status: **Not started**
