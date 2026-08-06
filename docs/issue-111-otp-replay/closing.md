@@ -33,8 +33,10 @@ None yet.
    fixed, before changing it. If it changes, `otp.MatchStep` in `src/core/otp/verifier.go` is the single
    place that defines the window.
 
-2. **A re-enrolment landing mid-request can still let a consumed code assert `otp`.**
-   `security`, `go`. Found while applying decision 10. Status: **Drafted**, not filed.
+2. **A re-enrolment landing mid-request can still let a consumed code assert `otp`, and a stale
+   enrolment can replace a fresh authenticator.**
+   `security`, `go`. Found while applying decision 10, widened at stage 3's review.
+   Status: **Drafted**, not filed.
 
    Decision 10 closed the disable case by binding the claim to `otp_enabled`, and its option A said
    plainly that a disable immediately followed by a re-enrolment is not closed, because `otp_enabled` is
@@ -47,11 +49,22 @@ None yet.
    30 second period, and the attacker to already hold both the level 1 credential and a code from the
    removed authenticator.
 
+   **The second shape, raised by stage 3's review and verified against the code.** It needs no disable
+   at all. At `otp/verify-enrolling` the claim passes `requireOTPEnabled` false, so it binds nothing
+   about *which* authenticator is being established, and the enable is a whole-user `UpdateUser` writing
+   the secret this request holds in its own session. Two password-authenticated enrolment ceremonies
+   that both loaded `otp_enabled` false therefore both succeed: the first claims step N and stores
+   secret A, the second claims N+1 and replaces A with secret B. One-time use of a code is not violated,
+   since each ceremony spends a different code, which is why this was not a stage 3 finding; it is the
+   same unbound-authenticator class, and the enrolment generation below closes both shapes.
+
    Adjacent to #140, which is the same class of defect (a token asserting `amr: ["pwd","otp"]` for
    authentication that no longer holds) by a different mechanism, so whoever picks one up should read
    the other. Searched `gh issue list --state open --search "otp"`, `--search "otp enrolment
    generation"` and `--state all --search "otp replay in-flight"` on 2026-08-05: #140 is the only
-   neighbour and it is not this.
+   neighbour and it is not this. Re-searched for the second shape on 2026-08-06,
+   `--state open --search "concurrent enrollment otp secret"` and
+   `--state all --search "otp enrolment race"`: nothing.
 
    **Body:** After #111, `TryConsumeUserOTPStep` refuses a verification claim unless `otp_enabled` is
    still true, so removing an authenticator invalidates a claim from a request that loaded it. A
@@ -61,7 +74,12 @@ None yet.
    that enrolling would leave. No access is gained that the disable did not already grant (see #111
    decision 10), so this is a false factor assertion rather than an authentication bypass.
 
-   Closing it properly needs the claim bound to the authenticator rather than to the enrolment flag: an
-   enrolment generation column on `users`, incremented on every enable and disable, carried on the
+   The enrolment claim has the mirror image of the same gap, which predates #111: it passes
+   `requireOTPEnabled` false and so binds nothing about which authenticator it establishes, while the
+   enable is a whole-user write. Two overlapping enrolment ceremonies both succeed and the later one's
+   write replaces the earlier one's secret.
+
+   Closing both properly needs the claim bound to the authenticator rather than to the enrolment flag:
+   an enrolment generation column on `users`, incremented on every enable and disable, carried on the
    request and compared in the claim predicate. That is a migration plus a second column, which #111
    deliberately did not take on. Decide whether the window is worth that before building it.
