@@ -5,7 +5,7 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** stage 1 in progress, blocked on decision 12 from round 3 at gate `stage-1`. Account in `log/stage-1.md`
+**Run state:** stage 1 in progress, decision 12 answered A and applied, round 4 requested at gate `stage-1`. Account in `log/stage-1.md`
 **PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
@@ -181,10 +181,10 @@ Checkable:
 
 ## 3. Decisions
 
-Twelve, eleven decided and decision 12 open. Announced as eight; sweeping the design for what the run
-would otherwise have to escalate added decision 9, and three more were raised during stage 1: decision
-10 from the plan review and decision 11 from the code review, both answered by the user on PR #143,
-and decision 12 from the code review's third round, awaiting an answer.
+Twelve, all decided. Announced as eight; sweeping the design for what the run would otherwise have to
+escalate added decision 9, and three more were raised during stage 1: decision 10 from the plan review,
+decision 11 from the code review and decision 12 from its third round, all three answered by the user
+on PR #143.
 
 1. **Where does the consumed-code state live?**
    Status: **Decided** · Raised by: user
@@ -598,10 +598,72 @@ and decision 12 from the code review's third round, awaiting an answer.
     the pairs above are already located for them.
 
 12. **A fixed lookback closes colliding pairs but not chains of three. Closed, or accepted?**
-    Status: **Open** · Raised by: run (raised during stage 1, at the code-review gate, round 3)
+    Status: **Decided** · Raised by: run (raised during stage 1, at the code-review gate, round 3)
 
-    Escalated on PR #143, 2026-08-06. Nothing rests on it in the tree: stage 1's two files stay
-    uncommitted and stage 1 stays `In progress`.
+    Answered by the user on PR #143, 2026-08-06, in full: "A. Walk the lookback down transitively."
+    That is option A below, the recommended one, taken over B, C and D, with three amendments the
+    answer attaches and one instruction about what it settles.
+
+    **What the answer settles**, superseding decision 11's single lookback interval and §4's
+    `MatchStep` sketch with it. `MatchStep` still accepts exactly a match at
+    `current-skew .. current+skew` and still returns `(int64, bool)`, so nothing in stages 2 to 4
+    moves. What changes is how the reported step is found: from the matched step, scan the
+    `lookbackSteps` below it, and repeat from whatever that finds, until a scan finds nothing. The
+    answer is then the bottom of the whole backward-connected chain rather than the bottom of one
+    fixed interval, which is what makes it constant across every current step from which the passcode
+    is accepted. Each scan takes the lowest step it finds, which reaches at least as far down as any
+    higher step in the same scan could, so one pass down is enough.
+
+    Executed rather than argued: `probe/step-collisions` replays both rules against every
+    continuously live shape, and the walk is safe from every presentation for all 9 chains of three
+    and all 3 continuously live pairs, where the fixed interval leaves 6 of the 9 chains replayable.
+
+    **Amendment 1, the seam, recorded in §5 rather than inside a step.** The walk cannot be exercised
+    at seam 1: no secret anyone can enrol exhibits a chain, so the scan moves behind a step predicate
+    and is pinned with a synthetic match set, one boundary below the seam the interview sealed. §5
+    carries that as a named amendment with its reason, per the answer.
+
+    **Amendment 2, the cap, with its reasoning where the cap is written.** `maxLookbackScans = 5`,
+    read off the sweep rather than rounded to a comfortable number. Every further scan that finds
+    something needs one more step producing the same six digits within `lookbackSteps` below the last,
+    and the sweep measured that link rate instead of assuming it: 55 links in 20,000,000 steps over 4
+    secrets, 2.75e-06 per step against the 3.0e-06 an independent-uniform model predicts. Links are
+    independent, so a chain of n steps is `(3e-06)^(n-1)` per presentation. The stated criterion is
+    that the cap must first refuse at a chain whose expected count stays under one in a billion across
+    1e18 presentations, an absurdly generous bound on every authentication every deployment of this
+    server will ever perform; 5 scans is the first value that clears it, refusing at a chain of 6 at
+    2.4e-28 per presentation. The probe prints that ladder, so the number is checkable rather than
+    asserted. Hitting the cap refuses the passcode, which fails in the same direction as the error
+    branches: a refusal costs one code and the next one works, while claiming a step above the bottom
+    of a chain is a replay.
+
+    The cap is not what makes the walk terminate. Each scan searches strictly below the step it last
+    found, so the loop is already a total function; what the cap bounds is work per request, turning
+    a bound of the whole step axis into `maxLookbackScans * lookbackSteps` HMAC computations.
+
+    **Amendment 3, this settles the class and not just this shape.** The walk canonicalises a chain of
+    any length within the cap, so no further escalation about colliding steps is wanted. A fourth shape,
+    if one turns up, gets the same rule applied and a line in the log entry.
+
+    **Accepted costs, as the answer states them.** On the inherent span 4 pair the walk re-accepts at
+    `A+3` rather than `A+5`, 60 seconds sooner, from 3 presentations rather than 5. That whole class,
+    pairs spread 4 or more apart, stays replayable at roughly a millionth per presentation and decision
+    11 accepted it knowingly; the answer restates that it is about a hundred thousand times more likely
+    than the chain case closed here, that option A is worth taking because it is nearly free rather
+    than because chains are a threat, and that no further rounds should be spent narrowing this class,
+    since closing the residual that dominates needs the consumed-codes table decision 1 rejected.
+
+    **What lost.** B, accepting the residual and narrowing the claim, because it ships #111 with an
+    instance of exactly the defect #111 exists to close. C, binding consumption to the passcode,
+    because it reopens decision 1 for a rate five orders of magnitude below what decision 11 already
+    accepted as inherent. D, a wider fixed lookback, which does not work at any fixed value.
+
+    The question as escalated is kept below, because the reasoning is what makes the answer reviewable.
+
+    ---
+
+    **The original question.** Escalated on PR #143, 2026-08-06. Nothing rested on it in the tree:
+    stage 1's two files stayed uncommitted and stage 1 stayed `In progress`.
 
     **The defect, confirmed and then widened.** Decision 11's answer reports the lowest match in
     `current-4 .. current+1`. Three steps producing one passcode chain their acceptance ranges into
@@ -837,6 +899,39 @@ schema. The `migration_000024_*` and `migration_000026_*` data tests are the pat
    an arbitrary six digits, or it passes with the guard deleted. The lowercase-secret row asserts
    acceptance, which reads like a laxity to be tightened; it is there because the library upper-cases
    and dropping it would be a silent behaviour change.
+
+   **Amendment, decision 12: seam 1 also owns one boundary below itself, the walk over a step
+   predicate.** The interview sealed this seam at `otp.MatchStep`, which takes a passcode and a secret,
+   and every case above reaches the step arithmetic through real HMAC output. Decision 12's answer
+   cannot be tested that way. It makes the reported step the bottom of a chain of colliding steps, and
+   **no secret anyone can enrol exhibits a chain**: the sweep in `probe/step-collisions` found 0 chains
+   of three in 20,000,000 steps over 4 secrets, against 1.8e-04 expected, because each further link is
+   another factor of about 3e-06. A test that only drives `MatchStep` therefore passes with the walk
+   deleted, which is the one thing this seam must not allow.
+
+   So the walk moves behind an unexported step predicate, `matchStepWith(produces, current)`, and is
+   pinned with a **synthetic match set**: an explicit set of steps standing in for the HMAC, over which
+   the chain shapes are reachable. That is a boundary below the sealed seam, named here rather than
+   left as an implementation detail inside a plan step, because it is a change to what this seam covers
+   and not a choice about how a step is written.
+
+   **What it owns**, all three over the predicate, all three transcribed from or replaying the probe:
+   every continuously live shape (pairs spread 1 to 5, and all 9 chains of three whose adjacent gaps
+   are at most 3), asserted by replaying decision 2's high-water claim over every presentation rather
+   than by transcribing constants; the cap, where a chain of `maxLookbackScans` steps resolves to its
+   bottom and one step further is refused; and the walk's **error branch**, which is unreachable
+   through `MatchStep` and must refuse rather than answer with a step whose chain was not fully walked.
+
+   **What it does not move.** Acceptance, the 15 rows above and `TestMatchStepWithCollidingSteps` all
+   still run through `MatchStep` against real HMAC output. The probe confirms the three located pairs
+   report identically under both rules at every current step, so the transcribed rows are unaffected by
+   the amendment.
+
+   **The inherent pairs are pinned as replayable, deliberately.** Two of the shapes above, spreads 4
+   and 5, assert that a second acceptance is still possible, which reads like a test of a bug. It is
+   the residual decisions 11 and 12 both accepted knowingly: a pair spread wider than `2*skew+1` has a
+   refused gap, so the authenticator is legitimately redisplaying those digits, and refusing it needs
+   the consumed-codes table decision 1 rejected. Pinning it is what makes the safe rows mean something.
 
 2. **`TryConsumeUserOTPStep` and `ResetUserOTPStep`** at the data tier, appended as new functions to
    `src/authserver/tests/data/user_test.go`, where #106's narrow user methods are already tested.

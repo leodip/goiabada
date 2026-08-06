@@ -25,6 +25,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 
 	pquernaotp "github.com/pquerna/otp"
 	"github.com/pquerna/otp/hotp"
@@ -286,7 +287,7 @@ func main() {
 		}
 	}
 
-	chainFrequency()
+	measuredLinkRate, longestRun := chainFrequency()
 	chainShapes()
 
 	// Does the closure rule change any row TestMatchStepWithCollidingSteps already
@@ -310,6 +311,8 @@ func main() {
 				"    transcribed rows are unaffected\n", p.a, p.b, p.b-p.a, p.a-2, p.b+2)
 		}
 	}
+
+	capLadder(measuredLinkRate, longestRun)
 }
 
 // closureCode is the closure rule over real HMAC output rather than a match set,
@@ -344,7 +347,7 @@ func closureCode(L int64) rule {
 // steps than the pair sweep above, because that number is what decision 12 turns
 // on. It counts an "edge" wherever two steps at most 3 apart produce one passcode,
 // and a "chain" wherever a step closes a run of three such steps.
-func chainFrequency() {
+func chainFrequency() (measuredLinkRate float64, longestRun int) {
 	secrets := []string{
 		"JBSWY3DPEHPK3PXP",
 		"KRSXG5CTMVRXEZLU",
@@ -373,6 +376,9 @@ func chainFrequency() {
 					}
 				}
 			}
+			if chainLen[step] > longestRun {
+				longestRun = chainLen[step]
+			}
 			if chainLen[step] >= 3 {
 				chains++
 				fmt.Printf("  CHAIN found: secret %q ending at step %d, code %s\n", s, step, c)
@@ -394,6 +400,49 @@ func chainFrequency() {
 	fmt.Printf("  so a presented code sits in a chain about 2.7e-11 of the time, roughly\n")
 	fmt.Printf("  3 in 100 billion authentications, five orders of magnitude below the\n")
 	fmt.Printf("  8.3e-06 pair rate decision 11 was answered against\n")
+
+	return float64(edges) / float64(steps), longestRun
+}
+
+// capLadder prints where maxLookbackScans in verifier.go comes from, so the number is
+// read off measured output rather than rounded to something comfortable.
+//
+// The walk terminates without a cap, since each scan searches strictly below the step it
+// last found, but that bound is the whole step axis rather than a small constant, so the
+// cap bounds work per request instead. Refusing at the cap is only safe if nothing can
+// reach it, and that is what the ladder below is for: every scan that finds something
+// needs one more step producing the same six digits within the lookback of the last, and
+// the sweep above measured that link rate rather than assuming it. Links are independent,
+// so a chain of n steps is linkRate^(n-1) per presentation.
+//
+// The criterion is stated rather than eyeballed: the cap must first refuse at a chain
+// whose expected count stays under one in a billion across a deliberately absurd bound on
+// every authentication every deployment of this server will ever perform.
+func capLadder(measuredLinkRate float64, longestRun int) {
+	const (
+		modelLinkRate = 3.0e-06 // 3 spans at 1e-06 each, above the measured rate
+		presentations = 1e18
+		tolerance     = 1e-9
+	)
+
+	fmt.Printf("\n== the ladder the walk's cap is read off ==\n")
+	fmt.Printf("  link rate: %.2e per step measured, %.1e modelled; longest run the sweep\n",
+		measuredLinkRate, modelLinkRate)
+	fmt.Printf("  reached: %d steps, so a chain of three was never observed at all\n", longestRun)
+	fmt.Printf("  a cap of s scans first refuses at a chain of s+1 steps\n")
+
+	chosen := 0
+	for n := 2; n <= 10; n++ {
+		rate := math.Pow(modelLinkRate, float64(n-1))
+		expected := rate * presentations
+		note := ""
+		if chosen == 0 && expected < tolerance {
+			chosen = n - 1
+			note = fmt.Sprintf("  <- maxLookbackScans = %d, the first that clears %.0e", chosen, tolerance)
+		}
+		fmt.Printf("    chain of %2d steps: %.1e per presentation, %.1e expected over %.0e presentations%s\n",
+			n, rate, expected, presentations, note)
+	}
 }
 
 // setRule is a rule over an explicit set of matching steps rather than over HMAC
