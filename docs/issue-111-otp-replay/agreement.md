@@ -5,7 +5,7 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** plan reviewed (round 1, findings resolved), decision 10 answered and applied, stage 1 next, no code written
+**Run state:** stage 1 implemented and reviewed, round 2 at gate `stage-1` ingested and traced in `log/stage-1.md`; halted on decision 11, posted to PR #143 on 2026-08-05, waiting on the user. The two new files stay uncommitted because the step the matcher returns is the question
 **PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
@@ -181,9 +181,10 @@ Checkable:
 
 ## 3. Decisions
 
-Ten, all decided. Announced as eight; sweeping the design for what the run would otherwise have to
-escalate added decision 9, and the plan review added decision 10, which halted the run until the user
-answered it on PR #143.
+Eleven, ten decided and one open. Announced as eight; sweeping the design for what the run would
+otherwise have to escalate added decision 9, the plan review added decision 10, which halted the run
+until the user answered it on PR #143, and stage 1's code review added decision 11, which halts it
+again.
 
 1. **Where does the consumed-code state live?**
    Status: **Decided** · Raised by: user
@@ -455,6 +456,103 @@ answered it on PR #143.
     Getting it wrong either way: choosing C and later reversing means revisiting stage 2's interface
     and stage 4's tests after both have landed. Choosing A when C would have done costs one boolean
     parameter and a little noise at three call sites.
+
+11. **One passcode can be produced by two steps in the window. Which step does `MatchStep` return?**
+    Status: **Open** · Raised by: run (raised during stage 1, at the code-review gate, after the
+    matcher landed)
+
+    Stage 1's code review found the shipped matcher replayable and returned a populated
+    `forced_answer`, which is normally a repair the run applies rather than a question it escalates.
+    This one is escalated because the answer is **demonstrably insufficient**: applying it verbatim
+    leaves the invariant broken in cases the probe pins. What to do instead is a choice, and it is a
+    choice about the matcher's contract, so it belongs here.
+
+    **The mechanism, reproduced.** A six-digit passcode does not name a time step. `MatchStep` returns
+    the first step in delta order `0, -1, 1` that produces the passcode, and decision 2's marker
+    records exactly that step. When two steps that are both live for one passcode produce the same six
+    digits, the lower is claimed first and the higher is still claimable once the window slides, so the
+    same passcode is accepted twice. Verified: steps 3710568 and 3710569 both yield `874294`, and steps
+    818665 and 818667 both yield `475244`, for the secret seam 1 pins its table on.
+
+    **How often.** `probe/step-collisions` swept 600,000 consecutive steps, 208 days of one secret, and
+    found 5 same-passcode pairs within a spread of 5 steps, against 5 expected: one pair spread 1
+    apart, one spread 3, three spread 5. So roughly 8 authentications in a million meet one at all, and
+    roughly 3 in a million meet one that matters, for the reason in the next paragraph. Meeting one is
+    not yet an exploit: an attacker still needs the code, which is the same precondition #111 already
+    assumes.
+
+    **The boundary this should be decided against.** Step A is acceptable while the current step is
+    `A-1`, `A` or `A+1`, so two matching steps are *continuously* acceptable only when they are at most
+    3 apart, which is `2 * skew + 1` at today's skew of 1. A wider pair has a gap in which the passcode
+    is refused, and by the time it is accepted again the authenticator is legitimately displaying those
+    same six digits for a new step. No marker that records a *step* can refuse that; refusing it means
+    storing the code itself, a stronger thing than the consumed-codes table decision 1 already rejected.
+    **Continuously live pairs, spread 1 to 3, are the target. Wider ones are inherent.**
+
+    **What each candidate does**, from the probe. A trace reads "first accepted at current `c1`,
+    accepted again at `c2`", and a rule is safe for a pair when no presentation leaves a later one
+    acceptable. Every rule below accepts exactly the codes `totp.Validate` accepts today, the empty
+    secret aside; they differ only in what they record as consumed.
+
+    | Rule | spread 1 | spread 2 | spread 3 | spread 5 (inherent) |
+    |---|---|---|---|---|
+    | shipped, first match | replayable from 2 presentations | 3 | 3 | 3, again at `A+4` |
+    | A, greatest inside the window | 1, only from `A-1` | 2 | 3 | 3, again at `A+4` |
+    | B, lowest within 3 below the window | safe | safe | safe | 4, again at `A+5` |
+    | B2, as B but claiming the greatest inside the window | safe | safe | safe | 3, again at `A+5` |
+    | C, greatest within 3 above the window | safe | safe | safe | 2, again at `A+1` |
+
+    **Option A, the reviewer's answer as given.** Return the greatest match inside the window, one line,
+    reverse the delta order. It closes the trace the reviewer demonstrated and nothing else: the spread
+    1 pair survives when the code is presented a step early, which is what the `+1` window exists to
+    allow, and spreads 2 and 3 survive from an ordinary presentation because the colliding step is not
+    in the window yet when the claim is made.
+
+    **Option B, return the lowest step within three below the window that produces the passcode.**
+    Acceptance still requires a match in `c-1 .. c+1`; on a match, walk down to `c-4` and return the
+    lowest step there that produces the same code. That value is constant across every presentation of
+    a continuously live passcode, which is what makes the first claim block the rest. **No signature
+    moves:** `MatchStep` keeps `(int64, bool)` and `TryConsumeUserOTPStep` keeps decision 10's shape,
+    so stages 2 to 4 are untouched. Costs: up to four extra HMAC computations on a successful match,
+    microseconds; and in the same 3-in-a-million case the marker sits up to three steps below the
+    code's own step, which shrinks the incidental refusal of lower unused codes that decision 1
+    describes as the counter's imprecision, and which nothing depends on. It can refuse one legitimate
+    code, when a collision coincides with a consumption in the previous four steps: the user's next
+    code works, so it fails toward a retry rather than a lockout. The `3` should be derived from the
+    window rather than written as a literal, so #142 narrowing the skew narrows it too.
+
+    **Option B2, as B but returning two values**, the lowest for the guard and the greatest inside the
+    window for the claim, so the marker keeps sitting at the top of the window. The claim stays a single
+    statement, `SET last_otp_step = <claim> WHERE id = ? AND last_otp_step < <guard>`. Marginally
+    stronger on the inherent wide pairs. Costs a wider `MatchStep` return and a wider
+    `TryConsumeUserOTPStep`, both in stage 2, which has no callers yet.
+
+    **Option C, claim upward instead**, the greatest match within three steps above the window. Equal
+    on the continuously live cases and no signature change, but the guard rises with the claim, so on a
+    wide pair it accepts the second presentation 30 seconds later rather than after a refused gap, the
+    worst second-acceptance timing of any candidate. When it fires it also burns up to three of the
+    user's upcoming codes, up to 90 seconds of refusals, so it fails toward a lockout.
+
+    **Option D, take A and record the remainder as a known limitation** with a drafted follow-up. It is
+    the cheapest, and it ships #111 with a reachable instance of the exact defect #111 exists to close.
+
+    **Recommendation: B.** It is the only candidate that closes every continuously live case, changes
+    no signature and no later stage, and fails toward a retry. B2 is the answer if the marker sitting
+    below the current step is judged to matter, and the two extra signatures are the price. C is
+    strictly worse than B on both failure modes. D is defensible only if 3 in a million is judged
+    acceptable for this property, which is a judgement about how literally RFC 6238 5.2 binds here, and
+    that is not the run's to make.
+
+    Getting it wrong either way: choosing A or D and later reversing means revisiting the matcher and
+    its table after stages 2 to 4 have built on the returned step, and it means the release notes for
+    this fix are wrong. Choosing B when A would have done costs four HMAC computations, one test row
+    and a longer doc comment.
+
+    **State.** Stage 1's two files are written and its tiers are green, but the returned step is what
+    this question is about, so nothing is committed and stage 1 stays `In progress`. Seam 1's existing
+    15 rows survive every option unchanged: the probe confirms nothing collides within eight steps of
+    the instant they pin, for both the valid secret and the empty one. Whichever rule wins, the table
+    gains a collision row pinned at its own instant, and the pairs above are already located for it.
 
 ## 4. Design
 

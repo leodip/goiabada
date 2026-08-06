@@ -9,7 +9,7 @@ the repair of `test/reenroll-same-window` (decision 8) needs `ResetUserOTPStep`,
 stage 3 against stage 2's method.
 
 ### Stage 1: the step matcher
-Status: **Not started**
+Status: **In progress**
 Seams: 1. Tiers: unit (core module). Docs: none, internals only.
 
 1. **`src/core/otp/verifier.go`**, new file in the existing `package otp` beside `generator.go`.
@@ -27,7 +27,7 @@ Seams: 1. Tiers: unit (core module). Docs: none, internals only.
    inside `package otp` reads as a self-reference and is worth avoiding.
 
    Carry §4's doc comment verbatim: why `now` is a parameter, and why an empty secret matches nothing.
-   Status: **Not started**
+   Status: **Done** (`src/core/otp/verifier.go`, `StepSeconds` and `MatchStep`)
 
 2. **`src/core/otp/verifier_test.go`**, new file, testify `assert`/`require` with `t.Run` subtests to
    match `generator_test.go`. **Seam 1's exhaustive table**, at the pinned instant
@@ -82,11 +82,12 @@ Seams: 1. Tiers: unit (core module). Docs: none, internals only.
    Each negative row names the mechanism that rejects it in a comment: outside the window, wrong
    passcode length (`ErrValidateInputInvalidLength` on the first iteration), unparseable base32
    secret, or the decision 9 guard.
-   Status: **Not started**
+   Status: **Done** (`src/core/otp/verifier_test.go`, `TestMatchStep`, 15 rows, plus the `codeAtStep`
+   helper and the pinned constants)
 
 3. Run the unit tier: `where.sh test --type core`. Nothing outside `src/core/otp/` is touched, so no
    other module can be affected, and nothing calls `MatchStep` yet.
-   Status: **Not started**
+   Status: **Done** (core tier green, `ok github.com/leodip/goiabada/core/otp 0.023s`, no FAIL anywhere)
 
 ### Stage 2: the column and its two narrow writes
 Status: **Not started**
