@@ -5,7 +5,7 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** stage 3 of 4 done, commit `cc208c5`, closed on a clean round 2. All twelve decisions decided, none raised this stage. Next: stage 4, the account API and the reset on disable. Account in `log/stage-3.md`
+**Run state:** all 4 stages `Done`, stage 4 gated 2026-08-06 after two review rounds. All thirteen decisions are `Decided`. Closing pass owed: full suite, the two PR comments, PR ready. Account in `log/stage-4.md`
 **PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
@@ -19,9 +19,10 @@
 | `otp/verify-enrolling` | `src/authserver/internal/handlers/handler_auth_otp.go` | `HandleAuthOtpPost` | `step, matched := otp.MatchStep(otpCode, secretKey, time.Now().UTC())` | call site 2: browser login, enrolling now. Match-then-claim since stage 3; was `totp.Validate` |
 | `otp/enroll-write` | `src/authserver/internal/handlers/handler_auth_otp.go` | `HandleAuthOtpPost` | `if err := user.SetOTPSecret(secretKey); err != nil {` | the enable write that follows call site 2 |
 | `otp/incorrect-error` | `src/authserver/internal/handlers/handler_auth_otp.go` | `HandleAuthOtpPost` | `incorrectOtpError := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil).Localize(r.Context())` | the generic error a replay must reuse |
-| `api-otp/verify` | `src/authserver/internal/handlers/apihandlers/handler_api_account_otp.go` | `HandleAPIAccountOTPPut` | `if !totp.Validate(req.OtpCode, normalizedSecret) {` | call site 3: self-service enable |
-| `api-otp/disable` | `src/authserver/internal/handlers/apihandlers/handler_api_account_otp.go` | `HandleAPIAccountOTPPut` | `user.ClearOTPSecret()` | self-service disable |
-| `admin-otp/disable` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserOTPPut` | `user.ClearOTPSecret()` | admin disable, the only other place OTP is turned off |
+| `api-otp/verify` | `src/authserver/internal/handlers/apihandlers/handler_api_account_otp.go` | `HandleAPIAccountOTPPut` | `step, matched := otp.MatchStep(req.OtpCode, normalizedSecret, time.Now().UTC())` | call site 3: self-service enable. Match-then-claim since stage 4; was `totp.Validate` |
+| `api-otp/disable` | `src/authserver/internal/handlers/apihandlers/handler_api_account_otp.go` | `HandleAPIAccountOTPPut` | `if err := disableUserOTP(database, user); err != nil {` | self-service disable. Delegates to `otp/disable-writes` since stage 4; was two unbound writes here |
+| `admin-otp/disable` | `src/authserver/internal/handlers/apihandlers/handler_api_users_crud.go` | `HandleAPIUserOTPPut` | `err = disableUserOTP(database, user)` | admin disable, the only other place OTP is turned off. Same delegation since stage 4 |
+| `otp/disable-writes` | `src/authserver/internal/handlers/apihandlers/handler_api_account_otp.go` | `disableUserOTP` | `func disableUserOTP(database data.Database, user *models.User) error {` | the one transaction both disable sites commit (#111 decision 13) |
 | `model/generation-field` | `src/core/models/user.go` | `n/a` | `// AuthStateGeneration is the authoritative per-user authentication generation:` | the `dont-update` precedent, verbatim reasoning |
 | `model/get-otp-secret` | `src/core/models/user.go` | `GetOTPSecret` | `if len(u.OTPSecretEncrypted) == 0 {` | how a stored secret is read |
 | `data/mark-code-used` | `src/core/data/commondb/code.go` | `MarkCodeAsUsed` | `ub.Equal("used", false),` | the compare-and-set template |
@@ -181,10 +182,12 @@ Checkable:
 
 ## 3. Decisions
 
-Twelve, all decided. Announced as eight; sweeping the design for what the run would otherwise have to
+Thirteen, all decided. Announced as eight; sweeping the design for what the run would otherwise have to
 escalate added decision 9, and three more were raised during stage 1: decision 10 from the plan review,
-decision 11 from the code review and decision 12 from its third round, all three answered by the user
-on PR #143.
+decision 11 from the code review and decision 12 from its third round. Decision 13 was raised during
+stage 4, at its code-review gate: it is the second escalation in decision 10's family, and it asks that
+family's general question rather than only the shape the review brought. All four run-raised decisions
+were answered by the user on PR #143.
 
 1. **Where does the consumed-code state live?**
    Status: **Decided** · Raised by: user
@@ -731,6 +734,133 @@ on PR #143.
     function, both still uncommitted, so it is cheap now and less so once stages 2 to 4 have built on
     the returned step. Choosing A when B would have done costs a loop, a cap and a test at a lower
     boundary than §5 sealed.
+
+13. **The marker and the enrolment flag are written unbound, so an operation that loaded one
+    authenticator generation can act on a later one. Bind the disable, or accept it?**
+    Status: **Decided** · Raised by: run (raised during stage 4, at the code-review gate, round 1)
+
+    Answered by the user on PR #143, 2026-08-06, in full: "A". That is option A below, the recommended
+    one, taken over B, C and D with no amendment.
+
+    **What the answer settles**, superseding §4's "Disable resets" paragraph, which describes the two
+    writes as separate calls, and completing the half of decision 10 that said "the two writes need no
+    transaction, but their order is load-bearing". They now commit together. A concurrent enrolment
+    therefore sees either the pre-disable state, where `OTP_ALREADY_ENABLED` refuses it at the account
+    API and decision 10's `requireOTPEnabled` refuses it at the browser verification branch, or the
+    fully committed post-disable state including the reset, where its claim stands. Member (c) is
+    closed at its cause.
+
+    The order inside the transaction stays decision 10's, `otp_enabled` cleared before the marker.
+    What closes the window is now the commit boundary rather than the ordering, since no reader outside
+    the transaction observes either write until both have landed, but the order is kept: it costs
+    nothing and it is the order both sites have always written in.
+
+    **No interface, column, migration or user-visible behaviour moves**, exactly as the option
+    promised. `UpdateUser` and `ResetUserOTPStep` both already take `tx`, and
+    `TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed` already proves enlistment for
+    `ResetUserOTPStep` on all four engines, so nothing new is owed at the data tier.
+
+    **As built, one thing the option did not prescribe.** The five statements are one shared unexported
+    function, `otp/disable-writes`, rather than written out at each site. Both sites run the identical
+    sequence, the reasoning is a paragraph that would otherwise be duplicated, and a `defer`-scoped
+    rollback needs a function of its own rather than the enclosing handler's scope. The two sites keep
+    their own 500 responses.
+
+    **Accepted, and unchanged by this answer.** Members (a) and (b) stay exactly where decision 10
+    knowingly left them, drafted as follow-up 2 in `closing.md`. Closing those needs the
+    enrolment-generation column, which is option D and is that follow-up's job.
+
+    **What lost.** B, the compare-and-set reset, on the `data.Database` signature change in the last
+    stage and because a silently no-op reset weakens decision 4's clock-jump remedy. C, accepting it,
+    which ships #111 with a reachable state in which a consumed code is accepted again. D, the
+    generation column, which is larger than anything else in #111 and is follow-up 2's.
+
+    The question as escalated is kept below, because the reasoning is what makes the answer reviewable.
+
+    ---
+
+    **The original question.** Escalated on PR #143, 2026-08-06, as
+    [comment 5205689887](https://github.com/leodip/goiabada/pull/143#issuecomment-5205689887). Nothing
+    in the tree rested on it: stage 4's diff was uncommitted and stage 4 stayed `In progress`, the same
+    state stage 1 held while decisions 11 and 12 were open.
+
+    **The class, which is why this is asked once rather than per shape.** `otp_enabled` and
+    `last_otp_step` are written by separate statements, and neither the claim nor the reset carries any
+    identity of the authenticator generation the request loaded. Three members: **(a)** decision 10's
+    recorded residual, a stale verification claim landing after a disable plus a re-enrolment, drafted
+    as follow-up 2; **(b)** the mirror-image unbound enrolment shape stage 3's review found, also
+    follow-up 2; and **(c)**, new at this gate, a stale disable *reset* erasing a newer enrolment's
+    already-successful claim.
+
+    **(c), verified in the code.** Both disable sites run `UpdateUser` then `ResetUserOTPStep`
+    unconditionally, in the order decision 10 requires, with no transaction. `ResetUserOTPStep`'s
+    predicate is `id` alone, so it is bound to nothing the disable observed. Schedule: D commits
+    `otp_enabled = false`; enrolment E loads the user, sees OTP off, matches code C at step N and
+    claims N; D resets the marker to 0; E's enable write lands. End state `otp_enabled = 1`,
+    `last_otp_step = 0`, C consumed, so C is claimable again at the browser prompt for the rest of its
+    acceptance window. The reviewer's `.review/scratch/issue111_stage4_disable_race.sql` executes those
+    transitions on SQLite and reports `enrollment claim rows|1`, `state after stale reset|1|0`,
+    `replay claim rows|1`; the database permitting the state was demonstrated, the code permitting the
+    schedule was read.
+
+    **Wider than the review found.** The review reasoned about the account API as the racing enrolment,
+    which verifies the password between loading the user and claiming, so the disable would have to
+    stall for a whole bcrypt to lose the race. The **browser** enrolment site is also an enrolment
+    claim with `requireOTPEnabled` false and has no password verify in that gap: `handler_auth_otp.go`
+    loads the user at the top of `HandleAuthOtpPost` and claims a few lines later, with a client fetch
+    and a few HMAC computations between. E therefore needs microseconds inside D's inter-statement gap,
+    not tens of milliseconds.
+
+    **Impact, not overstated.** Both operations need the account password, and decision 10 established
+    that anyone holding it already reaches level 2 by disabling OTP or self-enrolling. So this grants no
+    access the disable did not already grant; it grants one further acceptance of an already-consumed
+    code and a token asserting `amr: ["pwd","otp"]` for it. That is the same false-factor-assertion harm
+    decision 10 was asked about and chose to close at its cause.
+
+    **Why §1b's proportion test does not apply.** The attacker chooses the timing, supplies both
+    requests, and can repeat without limit because rate limiting this endpoint is out of scope (#113).
+    There is no plain statement of why an attacker cannot steer it, so it blocks. No meaningful rate can
+    be measured either: it depends on deployment load and connection-pool behaviour, not on anything a
+    probe can pin.
+
+    **Option A, wrap each disable's two writes in one transaction.** A concurrent enrolment then either
+    sees `otp_enabled` still true, and is refused by `OTP_ALREADY_ENABLED` at the account API or by
+    decision 10's flag in the browser verification branch, or sees the fully committed post-disable
+    state including the reset. Closes (c). No interface change, no column, no migration, no user-visible
+    behaviour change: both methods already take `tx`,
+    `TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed` already proves enlistment on all four
+    engines, and `BeginTransaction` is already the idiom in `handler_api_users_crud.go`, one of the two
+    files this touches. Price: rollback handling on two paths and one case proving atomicity. Leaves (a)
+    and (b) where decision 10 knowingly left them.
+
+    **Option B, compare-and-set the reset against the marker the disable loaded.**
+    `ResetUserOTPStep(tx, userId, expectedStep)` with `AND last_otp_step = ?`. Also closes (c). Costs a
+    `data.Database` signature change in the last stage, regenerated mocks, and changes to stage 2's
+    four-engine table. It also weakens decision 4: a reset can now silently no-op, so a disable holding
+    a stale marker loses the clock-jump remedy. An `otp_enabled = false` predicate alone is **not**
+    sufficient, because enrolment claims while that flag is false.
+
+    **Option C, accept it and fold it into follow-up 2.** Costs nothing now, and ships #111 with a
+    reachable state in which a consumed code is accepted again.
+
+    **Option D, add the enrolment-generation column now.** Closes (a), (b) and (c) together, which is
+    what follow-up 2 drafts. A column, a four-engine migration and a fifth stage.
+
+    **Recommendation: A.** The only option that closes the new shape at its cause without an interface
+    or schema change, resting on enlistment already proven on four engines, and leaving the two
+    knowingly-accepted residuals alone. B pays an interface change and weakens decision 4. C ships a
+    reachable instance of the defect #111 exists to close. D is follow-up 2's job.
+
+    Getting it wrong either way: choosing C and later reversing means reopening both disable sites and
+    their tests after stage 4 has merged. Choosing A when C would have done costs a transaction on two
+    disable paths and one test.
+
+    **Note for the next `/leo-spec`, per `decisions.md` §5.** This is the fifth escalation on #111 and
+    the second in decision 10's family, which §3 of that reference calls evidence the first was scoped
+    too narrowly. Decision 10 asked "should the claim bind to enrolment state" when the general question
+    was "the marker and the flag are not bound to an authenticator generation, how completely do you
+    want that closed" — the same widening decisions 11 and 12 went through on colliding steps. Both
+    families were answerable once.
 
 ## 4. Design
 
