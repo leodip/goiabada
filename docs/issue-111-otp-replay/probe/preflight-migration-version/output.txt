@@ -1,0 +1,8 @@
+mysql     goiabada_data          highest recorded: 26       clean
+mysql     goiabada_integration   highest recorded: 26       clean
+postgres  goiabada_data          highest recorded: 26       clean
+postgres  goiabada_integration   highest recorded: 26       clean
+mssql     goiabada_data          highest recorded: 26       clean
+mssql     goiabada_integration   highest recorded: 26       clean
+
+version 27 is free in every long-lived database checked
