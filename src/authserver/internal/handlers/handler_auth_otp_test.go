@@ -16,8 +16,10 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/otp"
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -598,6 +600,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
+		// requireOTPEnabled is matched exactly rather than with mock.Anything: true is what
+		// makes a verification claim assert an enrolled authenticator (#111 decision 10),
+		// and passing false here would go unnoticed otherwise.
+		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, true).
+			Return(true, nil)
+
 		auditLogger.On("Log", constants.AuditAuthSuccessOtp, mock.Anything).Return()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
@@ -668,6 +676,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		// false, because enrollment claims before the enable write and otp_enabled is
+		// still off at that point (#111 decision 10). Matched exactly for the reason the
+		// verification subtest above matches true.
+		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, false).
+			Return(true, nil)
 
 		database.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
 			// The secret must be stored encrypted, with the plaintext column cleared.
@@ -750,6 +764,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
+		// The claim succeeds and the enable write then fails, which is the ordering §4
+		// asks for: a burned code and a retry beats OTP left enabled on a refused request.
+		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, false).
+			Return(true, nil)
+
 		updateError := errors.New("failed to update user")
 		database.On("UpdateUser", mock.Anything, mock.Anything).Return(updateError)
 
@@ -760,6 +779,162 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
+	})
+
+	// The two subtests below are deliberately thin: seam 1 owns the matcher table and seam 2
+	// owns the claim table, so all this layer has to show is that the handler consults the
+	// claim and translates its two answers correctly (#111 seam 5).
+	t.Run("Replayed OTP code is refused for enabled OTP", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
+
+		key, err := totp.Generate(totp.GenerateOpts{
+			Issuer:      "TestApp",
+			AccountName: "test@test.com",
+		})
+		assert.Nil(t, err)
+
+		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
+		assert.Nil(t, err)
+
+		form := url.Values{}
+		form.Add("otp", otpCode)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState: oauth.AuthStateLevel2OTP,
+			UserId:    1,
+			ClientId:  "test-client",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
+
+		user := &models.User{
+			Id:                 1,
+			Enabled:            true,
+			OTPEnabled:         true,
+			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
+		}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		// The code validates against the secret, so the matcher accepts it; the claim is
+		// what refuses it. That is the whole point of the case: without the claim this is
+		// an ordinary successful authentication.
+		expectedStep := time.Now().UTC().Unix() / otp.StepSeconds
+		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, true).
+			Return(false, nil)
+
+		auditLogger.On("Log", constants.AuditOTPCodeReplayDetected,
+			mock.MatchedBy(func(payload map[string]interface{}) bool {
+				step, ok := payload["step"].(int64)
+				if !ok {
+					return false
+				}
+				// The submitted code is generated at the same instant, so its step is the
+				// current one; allow the neighbours in case the clock crosses a period
+				// boundary mid-test. Never the code itself.
+				if step < expectedStep-1 || step > expectedStep+1 {
+					return false
+				}
+				_, hasCode := payload["otp"]
+				return payload["userId"] == int64(1) && !hasCode
+			})).Return()
+		// Emitted alongside, not instead: the replay is additional signal on top of the
+		// ordinary failure the caller sees (#111 decision 5).
+		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
+
+		// A replay must be indistinguishable from a wrong code, so it renders the same
+		// message the wrong-code branch renders, computed here the way the handler does.
+		expectedError := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil).Localize(req.Context())
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
+			mock.MatchedBy(func(bind map[string]interface{}) bool {
+				return bind["error"] == expectedError
+			})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("Error consuming the OTP step", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
+
+		key, err := totp.Generate(totp.GenerateOpts{
+			Issuer:      "TestApp",
+			AccountName: "test@test.com",
+		})
+		assert.Nil(t, err)
+
+		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
+		assert.Nil(t, err)
+
+		form := url.Values{}
+		form.Add("otp", otpCode)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState: oauth.AuthStateLevel2OTP,
+			UserId:    1,
+			ClientId:  "test-client",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
+
+		user := &models.User{
+			Id:                 1,
+			Enabled:            true,
+			OTPEnabled:         true,
+			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
+		}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		// A database fault must surface as a 500 rather than being collapsed into either
+		// answer: "not consumed" would refuse valid codes for the duration of the fault,
+		// and "consumed" would accept replays through it.
+		consumeError := errors.New("failed to consume the OTP step")
+		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, true).
+			Return(false, consumeError)
+
+		httpHelper.On("InternalServerError", rr, req, consumeError).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("User account is disabled", func(t *testing.T) {
