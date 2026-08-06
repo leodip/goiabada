@@ -87,3 +87,64 @@ instants that would pin a collision row:
     current 56077478 (A+3): accepted, reports step 56077475 (A+0), guard 56077475
     current 56077479 (A+4): accepted, reports step 56077475 (A+0), guard 56077475
     current 56077480 (A+5): refused
+
+== how often do steps collide, and how often do three of them chain? ==
+  swept 20000000 steps over 4 secrets, 19 years of one authenticator
+  colliding pairs at most 3 apart, by span: map[1:15 2:17 3:23], total 55
+  measured 2.75e-06 per step, against 3.0e-06 expected (3 spans, 1e-6 each)
+  chains of three: 0, against 1.8e-04 expected (9 shapes, 1e-12 each)
+  so a presented code sits in a chain about 2.7e-11 of the time, roughly
+  3 in 100 billion authentications, five orders of magnitude below the
+  8.3e-06 pair rate decision 11 was answered against
+
+== every continuously live shape, both rules ==
+A is the lowest step; a trace reads first accepted at c1, accepted again at c2
+pairs at span 4 and 5 are the inherent case decision 11 accepted: they have a
+refused gap, so the authenticator is legitimately redisplaying those digits
+
+--- as built: lowest within lookback 3 below the window ---
+  pair  {A, A+1}: safe from every presentation
+  pair  {A, A+2}: safe from every presentation
+  pair  {A, A+3}: safe from every presentation
+  pair  {A, A+4}: replayable from 5 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+3->A+5 A+4->A+5]
+  pair  {A, A+5}: replayable from 4 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+4->A+5]
+  chain {A, A+1, A+2}: safe from every presentation
+  chain {A, A+1, A+3}: safe from every presentation
+  chain {A, A+1, A+4}: replayable from 6 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+2->A+5 A+3->A+5 A+4->A+5]
+  chain {A, A+2, A+3}: safe from every presentation
+  chain {A, A+2, A+4}: replayable from 6 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+2->A+5 A+3->A+5 A+4->A+5]
+  chain {A, A+2, A+5}: replayable from 6 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+2->A+5 A+3->A+5 A+4->A+5]
+  chain {A, A+3, A+4}: replayable from 6 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+2->A+5 A+3->A+5 A+4->A+5]
+  chain {A, A+3, A+5}: replayable from 6 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+2->A+5 A+3->A+5 A+4->A+5]
+  chain {A, A+3, A+6}: replayable from 6 presentations [A-1->A+5 A+0->A+5 A+1->A+5 A+2->A+5 A+3->A+5 A+4->A+5]
+
+--- closure: lookback 3 walked down from the matched step ---
+  pair  {A, A+1}: safe from every presentation
+  pair  {A, A+2}: safe from every presentation
+  pair  {A, A+3}: safe from every presentation
+  pair  {A, A+4}: replayable from 3 presentations [A-1->A+3 A+0->A+3 A+1->A+3]
+  pair  {A, A+5}: replayable from 3 presentations [A-1->A+4 A+0->A+4 A+1->A+4]
+  chain {A, A+1, A+2}: safe from every presentation
+  chain {A, A+1, A+3}: safe from every presentation
+  chain {A, A+1, A+4}: safe from every presentation
+  chain {A, A+2, A+3}: safe from every presentation
+  chain {A, A+2, A+4}: safe from every presentation
+  chain {A, A+2, A+5}: safe from every presentation
+  chain {A, A+3, A+4}: safe from every presentation
+  chain {A, A+3, A+5}: safe from every presentation
+  chain {A, A+3, A+6}: safe from every presentation
+
+  cost of the closure walk, worst accepting current step per shape,
+  in lookback scans of 3 steps each (as built always takes exactly 1):
+    no collision, what every real authentication takes   1 scan(s)
+    a colliding pair {A, A+3}                            2 scan(s)
+    a chain of three {A, A+3, A+6}                       3 scan(s)
+    a chain of ten, three apart, unreachable             10 scan(s)
+
+== the three located pairs under the closure rule, for comparison ==
+  pair 56245959/56245960 span 1: identical at every current step 56245957 to 56245962, so the
+    transcribed rows are unaffected
+  pair 818665/818667 span 2: identical at every current step 818663 to 818669, so the
+    transcribed rows are unaffected
+  pair 56077475/56077478 span 3: identical at every current step 56077473 to 56077480, so the
+    transcribed rows are unaffected

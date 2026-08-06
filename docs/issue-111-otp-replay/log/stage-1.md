@@ -211,3 +211,78 @@ Stage 1 is `In progress`. Both files are written and green and stay **uncommitte
 closes, per §4.5. Committed on this branch: the agreement carrying decision 11 as `Decided`, the
 amended plan steps, this entry, and the probe with its output. Round 3 is requested at this gate,
 scoped to the matcher's new rule and the cases that pin it.
+
+### Round 3, 2026-08-06
+
+Code review, `gpt-5.6-sol` at effort `xhigh`, Codex session resumed, per `.review/reviewer.env`.
+Request `111-20260806T004343Z`. All three axes `reviewed`. One finding, `security`, `blocking`,
+confidence medium, `needs_human: true` with an **empty** `forced_answer`. It ran the core tier, its
+own control-flow model, `go vet ./otp/...` and `gofmt -d` on both files and the model. It declared
+data, integration and cross-module tiers not run because stage 1 has no interface, query, schema,
+caller or endpoint, and it did not re-run round 2's three mutations. That is the correct scope for
+this stage, so the review is clean rather than partial in the sense of `reviewer.md` §4.
+
+Everything it found sound is in its response and is not repeated here.
+
+### Finding 1, a third colliding step advances the reported step with no refusal gap
+
+**Disposition: confirmed, widened by execution, and escalated as decision 12. Status: **Open**.**
+
+Decision 11's answer reports the lowest match in `current-4 .. current+1`. The review's claim is that
+this is constant only for an isolated pair, not for a chain. Verified by running its model
+(`.review/scratch/issue111_decision11_model.go`, an exact copy of `MatchStep`'s two scans with the
+HMAC predicate replaced by the set `{100, 103, 106}`): accepted continuously from current 99 through
+107, reporting 100 through current 104 and **103 from current 105**. A marker holding 100 admits 103,
+so the passcode is consumed twice with no refused step between the two presentations. The production
+code forces that result: at current 105 its whole search interval is 101 through 106, and 100 has
+fallen out of it.
+
+**Not refuted, and it is worse than reported.** `probe/step-collisions` gained two sections for this
+and its output is committed. Replaying both rules against every continuously live shape:
+
+- **6 of the 9 chains of three are replayable as built**, every one whose total span exceeds the
+  lookback of 3. `{A, A+1, A+2}`, `{A, A+1, A+3}` and `{A, A+2, A+3}` are safe.
+- The span 4 pair leaks from 5 presentations rather than 3, which the earlier single-rule sweep did
+  not surface.
+- The transitive walk closes all 9 chain shapes and all 3 continuously live pairs.
+
+**How often, since that is what the decision turns on.** 20,000,000 steps over 4 secrets, 19 years of
+one authenticator: 55 colliding pairs at most 3 apart, 2.75e-06 per step against 3.0e-06 expected,
+which is what validates the 1e-06 per-pair model the rest of this rests on. Chains of three: 0,
+against 1.8e-04 expected. A presented code sits in a chain about 2.7e-11 of the time, roughly 3 in
+100 billion authentications, five orders of magnitude below the 8.3e-06 pair rate decision 11 was
+answered against.
+
+**Two costs of the walk, both executed rather than estimated.** It costs exactly what the current code
+costs whenever nothing collides, one lookback scan of 3 steps, because the walk stops the moment a
+scan finds nothing; 2 scans on a pair, 3 on a chain of three, 10 on an unreachable chain of ten. And
+the three located pairs report identically under both rules at every current step, so
+`TestMatchStepWithCollidingSteps` and the 15-row table are unaffected whichever way this goes.
+
+**Why this blocked rather than resolving in-stage.** `decisions.md` §1 never auto-resolves
+authentication, and its one exception requires a populated `forced_answer`; this one is empty and the
+reviewer named three resolutions, one of which is accepting the residual. `reviewer.md` §5 puts a
+security finding in the same place. The run declining to judge 3 in 100 billion on the user's behalf
+is the same call decision 11 recorded at 3 in a million.
+
+**The escalation budget is now 4**, which `decisions.md` §5 says is evidence the agreement was sealed
+too early. Recording the judgement, since it belongs to the next `/leo-spec` rather than to this run:
+decisions 10, 11 and 12 all came out of stage 1 and all three are about the same thing, the exact
+contract of a step-based replay marker. §4 sketched `MatchStep` as an eight-line function and §5 sealed
+one seam over it, and neither asked what a step means when a passcode does not name one. One grounding
+question, whether a passcode identifies a step, would have caught 11 and 12 together at interview time.
+Decision 10 is unrelated and was a genuine plan-review find.
+
+**No follow-up discovered**, so `closing.md` is unchanged.
+
+### Where this stops, after round 3
+
+Stage 1 is `In progress` and **blocked on decision 12**. Stage 1's two files are unchanged since round
+2's fix and stay **uncommitted**, since committing them would be committing work that rests on an open
+decision. Committed on this branch by this session: decision 12 in the agreement, the header, this
+entry, and the probe's two new sections with the regenerated output. The pre-existing sections of
+`probe/step-collisions/output.txt` are byte-identical, checked with `diff`, so the rows
+`TestMatchStepWithCollidingSteps` transcribes still have their source.
+
+`.review/request.md` set to `status: ingested`. No further review request is written at this gate
+until the answer arrives.
