@@ -32,10 +32,29 @@ Seams: 1. Tiers: unit (core module). Docs: none, internals only.
    compiler, since a package's own name is not an identifier in its own file scope, but `otp.DigitsSix`
    inside `package otp` reads as a self-reference and is worth avoiding.
 
-   Carry §4's doc comment, extended with decision 11's reasoning: why `now` is a parameter, why an
-   empty secret matches nothing, and why the reported step is not always the matched one.
+   **Per decision 12, answered A**, that lookback is walked down transitively rather than applied
+   once: from the matched step, scan the `lookbackSteps` below it, and repeat from whatever that
+   finds. Applied once it reports the bottom of one fixed interval, which is the bottom of an
+   isolated pair but not of a chain of three, whose lowest step falls out of the interval while the
+   passcode is still continuously acceptable. Each scan takes the lowest step it finds, which is
+   enough to reach the bottom in one pass down, and the walk costs exactly what the single interval
+   cost whenever nothing collides, since it stops the moment a scan finds nothing.
+
+   A third unexported constant, `maxLookbackScans = 5`, bounds the walk, **with its derivation
+   stated where it is written** as the answer asks: read off the sweep's measured link rate against
+   a stated criterion, not rounded to a comfortable number, and refusing rather than answering when
+   it fires. The probe prints the ladder it comes off.
+
+   The walk moves behind an unexported step predicate, `producesPasscode`, called through
+   `matchStepWith(produces, current)`, because a chain cannot be exhibited with any real secret.
+   That is a boundary below the seam the interview sealed and it is recorded as a **named amendment
+   to §5**, per the answer, rather than as a detail of this step.
+
+   Carry §4's doc comment, extended with decisions 11 and 12: why `now` is a parameter, why an empty
+   secret matches nothing, and why the reported step is the bottom of a chain rather than the step
+   that matched.
    Status: **Done** (`src/core/otp/verifier.go`, `StepSeconds`, `skewSteps`, `lookbackSteps`,
-   `MatchStep` and the `lowestMatch` helper)
+   `maxLookbackScans`, `producesPasscode`, `MatchStep`, `matchStepWith` and the `lowestMatch` helper)
 
 2. **`src/core/otp/verifier_test.go`**, new file, testify `assert`/`require` with `t.Run` subtests to
    match `generator_test.go`. **Seam 1's exhaustive table**, at the pinned instant
@@ -98,13 +117,25 @@ Seams: 1. Tiers: unit (core module). Docs: none, internals only.
    passcode is accepted and a refusal either side. Steps and expectations are transcribed from
    `probe/step-collisions`, whose output is committed beside it, not reasoned out here. The spreads
    are written as literals because they are claims about a skew of 1, so #142 has to revisit them.
-   Status: **Done** (`src/core/otp/verifier_test.go`, `TestMatchStep`, 15 rows, and
-   `TestMatchStepWithCollidingSteps`, 3 pairs sweeping 21 current steps, plus the `codeAtStep` and
-   `stepMidpoint` helpers and the pinned constants)
+
+   **Plus decision 12's cases, which no real secret can reach**, at the boundary §5's amendment names:
+   three functions over `matchStepWith` and a synthetic match set. One replays decision 2's high-water
+   claim across **every continuously live shape**, the 5 pairs and all 9 chains of three, asserting
+   that no presentation leaves a later one acceptable, with the two inherent spreads asserting the
+   opposite and carrying the "keep this" note saying why. One pins the cap, where a chain of
+   `maxLookbackScans` steps resolves to its bottom and one step further is refused, both written in
+   terms of the constants. One pins the two error branches, including the walk's, which is unreachable
+   through `MatchStep` and must refuse rather than answer with the match.
+   Status: **Done** (`src/core/otp/verifier_test.go`, `TestMatchStep`, 15 rows,
+   `TestMatchStepWithCollidingSteps`, 3 pairs sweeping 21 current steps,
+   `TestMatchStepWithChainsOfCollidingSteps`, 14 shapes, `TestMatchStepWithAChainLongerThanTheWalk`
+   and `TestMatchStepWithAFailingStepPredicate`, plus the `codeAtStep` and `stepMidpoint` helpers and
+   the pinned constants)
 
 3. Run the unit tier: `where.sh test --type core`. Nothing outside `src/core/otp/` is touched, so no
    other module can be affected, and nothing calls `MatchStep` yet.
-   Status: **Done** (core tier green, `ok github.com/leodip/goiabada/core/otp 0.023s`, no FAIL anywhere)
+   Status: **Done** (core tier green, `ok github.com/leodip/goiabada/core/otp`, no FAIL anywhere,
+   re-run after decision 12)
 
 ### Stage 2: the column and its two narrow writes
 Status: **Not started**

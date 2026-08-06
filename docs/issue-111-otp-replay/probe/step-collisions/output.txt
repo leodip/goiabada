@@ -148,3 +148,17 @@ refused gap, so the authenticator is legitimately redisplaying those digits
     transcribed rows are unaffected
   pair 56077475/56077478 span 3: identical at every current step 56077473 to 56077480, so the
     transcribed rows are unaffected
+
+== the ladder the walk's cap is read off ==
+  link rate: 2.75e-06 per step measured, 3.0e-06 modelled; longest run the sweep
+  reached: 2 steps, so a chain of three was never observed at all
+  a cap of s scans first refuses at a chain of s+1 steps
+    chain of  2 steps: 3.0e-06 per presentation, 3.0e+12 expected over 1e+18 presentations
+    chain of  3 steps: 9.0e-12 per presentation, 9.0e+06 expected over 1e+18 presentations
+    chain of  4 steps: 2.7e-17 per presentation, 2.7e+01 expected over 1e+18 presentations
+    chain of  5 steps: 8.1e-23 per presentation, 8.1e-05 expected over 1e+18 presentations
+    chain of  6 steps: 2.4e-28 per presentation, 2.4e-10 expected over 1e+18 presentations  <- maxLookbackScans = 5, the first that clears 1e-09
+    chain of  7 steps: 7.3e-34 per presentation, 7.3e-16 expected over 1e+18 presentations
+    chain of  8 steps: 2.2e-39 per presentation, 2.2e-21 expected over 1e+18 presentations
+    chain of  9 steps: 6.6e-45 per presentation, 6.6e-27 expected over 1e+18 presentations
+    chain of 10 steps: 2.0e-50 per presentation, 2.0e-32 expected over 1e+18 presentations

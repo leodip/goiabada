@@ -286,3 +286,96 @@ entry, and the probe's two new sections with the regenerated output. The pre-exi
 
 `.review/request.md` set to `status: ingested`. No further review request is written at this gate
 until the answer arrives.
+
+## Decision 12 answered: A, applied 2026-08-06
+
+The user answered on PR #143: "A. Walk the lookback down transitively." Recorded in the agreement as
+`Decided`, with the three amendments the answer attached folded in. Stage 1's two files are rewritten
+and green, still uncommitted until the gate closes.
+
+**What moved.** `MatchStep` keeps `(int64, bool)` and accepts exactly what it accepted before, so
+stages 2 to 4 are untouched again. The reported step is now the bottom of the whole backward-connected
+chain rather than the bottom of one fixed interval: from the matched step, scan the `lookbackSteps`
+below it, and repeat from whatever that finds until a scan finds nothing. Each scan takes the lowest
+step it finds, which is enough to reach the bottom in one pass down, and the doc comment says why: a
+higher step in the same scan is within `lookbackSteps` of the step being searched below, so anything
+that step could reach is itself within `lookbackSteps` of the lowest one and the next scan sees it.
+
+Cost, counted rather than estimated: unchanged in the case every real authentication takes, one scan
+of 3 steps, because the walk stops the moment a scan finds nothing. The probe's cost table puts it at
+2 scans on a pair and 3 on a chain of three.
+
+**Amendment 1, the seam, recorded in §5 and not inside a plan step.** The walk cannot be exercised
+through `MatchStep`: no secret anyone can enrol exhibits a chain, so a test driving real HMAC output
+passes with the walk deleted. The walk therefore sits behind an unexported step predicate,
+`producesPasscode`, reached through `matchStepWith(produces, current)`, and is pinned with a synthetic
+match set. §5's seam 1 now carries that as a named amendment: what the boundary is, why it exists, the
+three things it owns, what it does not move, and why two of its rows assert a replay rather than
+safety.
+
+**Amendment 2, the cap, with its derivation where it is written.** `maxLookbackScans = 5`, and the
+constant's comment carries four things: what it bounds (`maxLookbackScans * lookbackSteps` HMAC
+computations), that reaching it refuses rather than answers and why that is the safe direction, that
+the walk terminates without it so the cap bounds work rather than correctness, and where 5 comes from.
+
+That last part is read off measured output rather than rounded. Every scan that finds something needs
+one more step producing the same six digits within `lookbackSteps` below the last, and the sweep
+measured that link rate instead of assuming it: 2.75e-06 per step against 3.0e-06 modelled. Links are
+independent, so a chain of n steps is `(3e-06)^(n-1)` per presentation. The criterion is stated: the
+cap must first refuse at a chain whose expected count stays under one in a billion across 1e18
+presentations, a deliberately absurd bound on every authentication every deployment will ever perform.
+`capLadder` in the probe prints the ladder and names the first value that clears it, independently of
+the constant in the code, and it prints 5. The sweep's own longest run was 2 steps, which the probe
+now reports rather than leaving implicit.
+
+**Amendment 3, the class.** The answer settles colliding steps as a class, so a fourth shape gets the
+same rule and a line here rather than a fifth escalation. Nothing in this application needed that.
+
+**The accepted residual, restated because the answer restates it.** Pairs spread 4 or more apart stay
+replayable at roughly a millionth per presentation, about a hundred thousand times more likely than
+the chain case closed here, and closing them needs the consumed-codes table decision 1 rejected. The
+walk re-accepts the span 4 pair at `A+3` rather than `A+5`, 60 seconds sooner, from 3 presentations
+rather than 5. Two test rows assert that this class is still replayable, with a note saying that
+asserting safety there would assert something the design does not provide.
+
+## Tiers, after decision 12
+
+`where.sh test --type core`, foreground, whole core module, tree `ba3b1f75278d`. Green:
+`All tests completed successfully`, no `FAIL` anywhere in the run. `go test ./otp/ -v`:
+`ok github.com/leodip/goiabada/core/otp 0.023s`, 54 `PASS` lines over 7 test functions, 0 `FAIL`.
+`go vet ./otp/...` clean and `gofmt -l ./otp/` empty, both in the container. `check-anchors.sh`: 24 of
+24 rows resolve. Data, integration and cross-module tiers are still not applicable: stage 1 has no
+interface, query, schema, caller or endpoint.
+
+The probe was re-run from `src/core` and `output.txt` regenerated. Its first 150 lines are
+byte-identical, checked with `diff`, so every row `TestMatchStepWithCollidingSteps` transcribes still
+has its source; the ladder is appended after them.
+
+## The new cases earn their rows: three more mutations, run and reverted
+
+Each was applied to `verifier.go`, the package run, and the file restored from a copy taken first,
+with `diff` confirming it back to its pre-mutation bytes.
+
+1. **Apply the lookback once instead of walking it**, which is decision 11's rule exactly. **6 of the
+   9 chain subtests fail** and the other 3 pass, `{A, A+1, A+2}`, `{A, A+1, A+3}` and `{A, A+2, A+3}`,
+   which is the same 6 and the same 3 the probe reported from a separate model. That agreement between
+   the production code under test and the probe's model is the strongest evidence in this round. The
+   cap's two subtests fail with them, since without the walk a chain never reaches its bottom. All 15
+   rows of the pinned table pass, and so do the three located pairs: neither can see this defect.
+2. **Reach the cap and answer with the lowest step found so far** rather than refusing. Only
+   "One step further and the passcode is refused instead" fails, which is precisely the direction that
+   subtest exists to pin.
+3. **On an error below the window, answer with the match** rather than refusing. Only "An error below
+   the window is refused, not answered with the match" fails. That branch is unreachable through
+   `MatchStep`, so before this round nothing could have caught it.
+
+## Where this stops, after decision 12
+
+Stage 1 is `In progress` and no longer blocked: all twelve decisions are `Decided`. Both files are
+written and green and stay **uncommitted** until the gate closes, per §4.5. Committed on this branch by
+this session: decision 12 as `Decided`, §5's named amendment, the header, the amended plan steps, this
+entry, and the probe's cap ladder with the regenerated output.
+
+Round 4 is requested at this gate, scoped to the walk, the cap and the boundary the amendment opened.
+The three escalations from this stage are all settled and the judgement about the agreement having been
+sealed too early stands as recorded after round 3: it belongs to the next `/leo-spec`, not to this run.
