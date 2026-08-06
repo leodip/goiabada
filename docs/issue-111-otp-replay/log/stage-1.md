@@ -154,11 +154,60 @@ rather than in the files, since the files are the subject of an open decision:
    fixture actually needs is being a multiple of 8, so it needs no padding, and that is what the
    comment should say when the file is next touched.
 
+## Decision 11 answered: B, applied 2026-08-06
+
+The user replied "B" on PR #143. Decision 11 is `Decided` and carries the reasoning; what follows is
+what the answer did to the code.
+
+**`MatchStep`.** Acceptance is untouched and still decided by the window alone. The reported step is
+now the lowest within `lookbackSteps` below the window that produces the same passcode, which is one
+constant answer at every current step from which a continuously acceptable passcode is accepted, and
+that constancy is what makes the first claim of it refuse the rest. Two unexported constants,
+`skewSteps = 1` and `lookbackSteps = 2*skewSteps + 1`, the second derived from the first per the
+answer, so #142 narrowing the window narrows the lookback with it. A `lowestMatch` helper carries
+both scans, which is what keeps the window scan reading as exactly the acceptance rule it was before.
+
+Cost, counted rather than estimated: the failure path computes the window and stops, 3 HMACs as
+before. A successful match adds at most 3 more, the steps `current-4` through `current-2`. The
+escalation's "up to four" was a bound, not a count.
+
+**The lookback cannot error once the window has matched**, since the library's two errors are an
+unparseable secret and a wrong-length passcode and neither depends on the step. Collapsed to
+`(0, false)` anyway, so the file has one error rule and the unreachable branch fails closed.
+
+**`TestMatchStepWithCollidingSteps`**, three pairs at spreads 1, 2 and 3, sweeping 21 current steps in
+total, each asserting the reported step where the passcode is accepted and `(0, false)` either side.
+The pairs and every expectation are transcribed from `probe/step-collisions`, extended for this with a
+sweep section and its output committed as `probe/step-collisions/output.txt`. The probe also reports
+no third step within eight either side producing those passcodes, which is what makes the answer
+constant rather than merely lower. Spreads are written as literals, not as `2*skewSteps + 1`, because
+they are claims about a skew of 1: #142 should fail here rather than quietly adjust.
+
+**Three mutations, run in the container and reverted**, since a new table that passes proves nothing
+about what it catches. `git diff` confirmed the file back to its pre-mutation bytes each time.
+
+1. **Drop the lookback, report the step matched inside the window.** All three collision subtests
+   fail. The 15-row table passes, which is the point: it cannot see this defect, and every rule
+   decision 11 rejected passes all 15 of its rows.
+2. **`lookbackSteps = 2*skewSteps`, one too narrow.** Only the spread 3 subtest fails, so the pair at
+   the continuous-liveness boundary is what pins the derivation rather than decoration around it.
+3. **`skewSteps = 2`, a wider acceptance window.** The two window-boundary rows fail, as they did
+   under the old shape, and all three collision subtests fail with them.
+
+**Tiers.** `where.sh test --type core`, foreground, whole core module. Green:
+`ok github.com/leodip/goiabada/core/otp`, `All tests completed successfully`, no `FAIL` in the run.
+`gofmt -l ./otp/` empty and `go vet ./otp/...` clean in the container. `check-anchors.sh`: 24 of 24
+rows resolve.
+
+**Bookkeeping item 2 above is now done.** `validSecret`'s comment no longer claims to be the shape
+`GenerateOTPSecret` produces; it says the length is a multiple of 8 and why that matters to the
+interior-space row. Item 1 stands as corrected in this entry. `stepMidpoint` was extracted while
+touching the file, so the mid-step instant has one definition shared by the code generator and the
+collision sweep.
+
 ## Where this stops
 
-Stage 1 is `In progress` and stays there. `verifier.go` and `verifier_test.go` are written, their
-tiers are green, and they are **not committed**, because the step `MatchStep` returns is precisely
-what decision 11 asks about and `decisions.md` forbids committing work resting on an open decision.
-Committed on this branch: the agreement carrying decision 11, this entry, and the probe. Decision 11
-is posted on PR #143. The next session applies the answer, amends plan steps 1 and 2 and seam 1's
-table to match, re-runs the core tier, and opens round 3 at this gate.
+Stage 1 is `In progress`. Both files are written and green and stay **uncommitted** until the gate
+closes, per §4.5. Committed on this branch: the agreement carrying decision 11 as `Decided`, the
+amended plan steps, this entry, and the probe with its output. Round 3 is requested at this gate,
+scoped to the matcher's new rule and the cases that pin it.

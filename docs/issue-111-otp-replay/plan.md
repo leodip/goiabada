@@ -14,20 +14,28 @@ Seams: 1. Tiers: unit (core module). Docs: none, internals only.
 
 1. **`src/core/otp/verifier.go`**, new file in the existing `package otp` beside `generator.go`.
    Holds `const StepSeconds = 30` and
-   `MatchStep(passcode string, secret string, now time.Time) (int64, bool)`, exactly as §4 sketches
-   it: empty secret returns `(0, false)` per decision 9, then the deltas `0, -1, 1` over
-   `hotp.ValidateCustom` with `Digits: DigitsSix` and `Algorithm: AlgorithmSHA1`, returning the
-   matched step. An error from the library collapses to `(0, false)`, which is what `totp.Validate`
-   does today (`rv, _ := ValidateCustom(...)`), so a 5-digit passcode stays a generic incorrect-OTP
-   response rather than becoming a 500.
+   `MatchStep(passcode string, secret string, now time.Time) (int64, bool)`: empty secret returns
+   `(0, false)` per decision 9, then the window over `hotp.ValidateCustom` with `Digits: DigitsSix`
+   and `Algorithm: AlgorithmSHA1`. An error from the library collapses to `(0, false)`, which is what
+   `totp.Validate` does today (`rv, _ := ValidateCustom(...)`), so a 5-digit passcode stays a generic
+   incorrect-OTP response rather than becoming a 500.
+
+   **Per decision 11, answered B**, the step reported is not the one that matched inside the window
+   but the lowest within `lookbackSteps` below it that produces the same passcode, so that a passcode
+   two steps can produce reports one answer at every current step that accepts it. Two unexported
+   constants, `skewSteps = 1` and `lookbackSteps = 2*skewSteps + 1`, the second derived from the first
+   so #142 narrowing the window narrows the lookback with it. Acceptance is unchanged and is still
+   decided by the window alone; the search below it moves the answer only.
 
    Import `github.com/pquerna/otp/hotp` plus the root package aliased,
    `pquernaotp "github.com/pquerna/otp"`, for the two enum values. The alias is not required by the
    compiler, since a package's own name is not an identifier in its own file scope, but `otp.DigitsSix`
    inside `package otp` reads as a self-reference and is worth avoiding.
 
-   Carry §4's doc comment verbatim: why `now` is a parameter, and why an empty secret matches nothing.
-   Status: **Done** (`src/core/otp/verifier.go`, `StepSeconds` and `MatchStep`)
+   Carry §4's doc comment, extended with decision 11's reasoning: why `now` is a parameter, why an
+   empty secret matches nothing, and why the reported step is not always the matched one.
+   Status: **Done** (`src/core/otp/verifier.go`, `StepSeconds`, `skewSteps`, `lookbackSteps`,
+   `MatchStep` and the `lowestMatch` helper)
 
 2. **`src/core/otp/verifier_test.go`**, new file, testify `assert`/`require` with `t.Run` subtests to
    match `generator_test.go`. **Seam 1's exhaustive table**, at the pinned instant
@@ -82,8 +90,17 @@ Seams: 1. Tiers: unit (core module). Docs: none, internals only.
    Each negative row names the mechanism that rejects it in a comment: outside the window, wrong
    passcode length (`ErrValidateInputInvalidLength` on the first iteration), unparseable base32
    secret, or the decision 9 guard.
-   Status: **Done** (`src/core/otp/verifier_test.go`, `TestMatchStep`, 15 rows, plus the `codeAtStep`
-   helper and the pinned constants)
+
+   **Plus decision 11's cases, which the pinned table cannot reach**: nothing collides within eight
+   steps of the pinned instant, so all 15 rows above pass under every rule decision 11 rejected. A
+   second function sweeps the three located colliding pairs, spreads 1, 2 and 3, over every current
+   step from two below the lower to two above the upper, asserting the same reported step wherever the
+   passcode is accepted and a refusal either side. Steps and expectations are transcribed from
+   `probe/step-collisions`, whose output is committed beside it, not reasoned out here. The spreads
+   are written as literals because they are claims about a skew of 1, so #142 has to revisit them.
+   Status: **Done** (`src/core/otp/verifier_test.go`, `TestMatchStep`, 15 rows, and
+   `TestMatchStepWithCollidingSteps`, 3 pairs sweeping 21 current steps, plus the `codeAtStep` and
+   `stepMidpoint` helpers and the pinned constants)
 
 3. Run the unit tier: `where.sh test --type core`. Nothing outside `src/core/otp/` is touched, so no
    other module can be affected, and nothing calls `MatchStep` yet.

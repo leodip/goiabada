@@ -5,7 +5,7 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** stage 1 implemented and reviewed, round 2 at gate `stage-1` ingested and traced in `log/stage-1.md`; halted on decision 11, posted to PR #143 on 2026-08-05, waiting on the user. The two new files stay uncommitted because the step the matcher returns is the question
+**Run state:** stage 1 in progress, decision 11 answered B and applied, awaiting round 3 at gate `stage-1`. Account in `log/stage-1.md`
 **PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
@@ -181,10 +181,9 @@ Checkable:
 
 ## 3. Decisions
 
-Eleven, ten decided and one open. Announced as eight; sweeping the design for what the run would
-otherwise have to escalate added decision 9, the plan review added decision 10, which halted the run
-until the user answered it on PR #143, and stage 1's code review added decision 11, which halts it
-again.
+Eleven, all decided. Announced as eight; sweeping the design for what the run would otherwise have to
+escalate added decision 9, and two more were raised during stage 1 and answered by the user on
+PR #143: decision 10 from the plan review, decision 11 from the code review.
 
 1. **Where does the consumed-code state live?**
    Status: **Decided** · Raised by: user
@@ -458,10 +457,52 @@ again.
     parameter and a little noise at three call sites.
 
 11. **One passcode can be produced by two steps in the window. Which step does `MatchStep` return?**
-    Status: **Open** · Raised by: run (raised during stage 1, at the code-review gate, after the
+    Status: **Decided** · Raised by: run (raised during stage 1, at the code-review gate, after the
     matcher landed)
 
-    Stage 1's code review found the shipped matcher replayable and returned a populated
+    Answered by the user on PR #143, 2026-08-06, in full: "B". That is option B below, the
+    recommended one, taken over A, B2, C and D with no amendment.
+
+    **What the answer settles**, superseding §4's `MatchStep` sketch and its doc comment. `MatchStep`
+    keeps `(int64, bool)` and accepts exactly what §4 accepted, a match at
+    `current-skew .. current+skew`, so nothing in stages 2 to 4 moves. What changes is the step it
+    reports:
+    the lowest one within `lookbackSteps` below the window that produces the same passcode, where
+    `lookbackSteps = 2*skewSteps + 1`, derived from the window rather than written as a literal so
+    that #142 narrowing the skew narrows this with it. Costs at most three further HMAC computations,
+    and only on a successful match: the failure path still computes the window and stops.
+
+    That value is the same at every current step from which a continuously acceptable passcode is
+    accepted, which is what makes the first claim of it refuse all the rest. Verified by executing the
+    sweep rather than by argument: `probe/step-collisions` reports, for each of the three located
+    pairs, the same step at every accepting current step and a refusal either side, and confirms no
+    third step within eight either side produces those passcodes. `probe/step-collisions/output.txt`
+    is that run. `TestMatchStepWithCollidingSteps` asserts exactly the sweep's last section.
+
+    **What lost, and why the reviewer's own answer was not taken.** A, the greatest match inside the
+    window, is the `forced_answer`, and the probe shows it leaves the spread 1 pair replayable from a
+    step-early presentation and does not touch spreads 2 and 3 at all. B2 buys only the inherent
+    spread 5 case and costs two signature changes in stage 2. C is strictly worse than B on both
+    failure modes, accepting a second presentation 30 seconds later and burning up to three of the
+    user's upcoming codes. D ships #111 with a reachable instance of the defect #111 exists to close.
+
+    **Accepted cost, unchanged from the escalation.** In the same 3-in-a-million case the marker sits
+    up to three steps below the code's own step, which shrinks the incidental refusal of lower unused
+    codes that decision 1 calls the counter's imprecision, and which nothing depends on. It can refuse
+    one legitimate code, when a collision coincides with a consumption in the previous four steps: the
+    user's next code works, so it fails toward a retry rather than a lockout.
+
+    **Still inherent, and knowingly.** Pairs spread 4 or more apart have a gap in which the passcode is
+    refused, so by the time it is accepted again the authenticator is legitimately displaying those
+    digits for a new step. No marker recording a step can refuse that, and refusing it means storing
+    the code itself, which is stronger than the consumed-codes table decision 1 already rejected. The
+    probe shows B accepting such a pair a second time at `A+5`, from three presentations.
+
+    The question as escalated is kept below, because the reasoning is what makes the answer reviewable.
+
+    ---
+
+    **The original question.** Stage 1's code review found the shipped matcher replayable and returned a populated
     `forced_answer`, which is normally a repair the run applies rather than a question it escalates.
     This one is escalated because the answer is **demonstrably insufficient**: applying it verbatim
     leaves the invariant broken in cases the probe pins. What to do instead is a choice, and it is a
@@ -548,11 +589,12 @@ again.
     this fix are wrong. Choosing B when A would have done costs four HMAC computations, one test row
     and a longer doc comment.
 
-    **State.** Stage 1's two files are written and its tiers are green, but the returned step is what
-    this question is about, so nothing is committed and stage 1 stays `In progress`. Seam 1's existing
-    15 rows survive every option unchanged: the probe confirms nothing collides within eight steps of
-    the instant they pin, for both the valid secret and the empty one. Whichever rule wins, the table
-    gains a collision row pinned at its own instant, and the pairs above are already located for it.
+    **State at the time of asking.** Stage 1's two files were written and its tiers green, but the
+    returned step is what this question is about, so nothing was committed and stage 1 stayed
+    `In progress`. Seam 1's existing 15 rows survive every option unchanged: the probe confirms
+    nothing collides within eight steps of the instant they pin, for both the valid secret and the
+    empty one. Whichever rule wins, the table gains collision rows pinned at their own instants, and
+    the pairs above are already located for them.
 
 ## 4. Design
 
