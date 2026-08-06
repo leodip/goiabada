@@ -812,7 +812,8 @@ CREATE TABLE public.users (
     otp_enabled boolean NOT NULL,
     forgot_password_code_encrypted bytea,
     forgot_password_code_issued_at timestamp(6) without time zone,
-    auth_state_generation bigint DEFAULT 0 NOT NULL
+    auth_state_generation bigint DEFAULT 0 NOT NULL,
+    last_otp_step bigint DEFAULT 0 NOT NULL
 );
 
 

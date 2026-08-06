@@ -101,7 +101,7 @@ CREATE TABLE users (
   forgot_password_code_encrypted BLOB,
   forgot_password_code_issued_at DATETIME
 , phone_number_country_uniqueid TEXT, phone_number_country_callingcode TEXT
-, auth_state_generation INTEGER NOT NULL DEFAULT 0);
+, auth_state_generation INTEGER NOT NULL DEFAULT 0, last_otp_step INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE codes (
   `id` integer PRIMARY KEY AUTOINCREMENT,

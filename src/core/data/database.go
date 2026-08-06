@@ -66,6 +66,19 @@ type Database interface {
 	// call made the transition. Compare-and-set for the same reason MarkCodeAsUsed is.
 	// The disable direction's return gates the revocation sweep (#106).
 	TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
+	// TryConsumeUserOTPStep records step as the user's most recently consumed TOTP
+	// time step, only if it is strictly newer than what is stored, and reports whether
+	// this call made the transition. Compare-and-set for the same reason MarkCodeAsUsed
+	// is: accepting a code and recording it as used must not be separable, or two
+	// concurrent submissions of one code both pass (#111). requireOTPEnabled adds
+	// otp_enabled to the predicate, which verification sites set and enrollment sites
+	// do not. False means no row transitioned, which is a replay in all but a rare
+	// interleaving, never specifically proof of one.
+	TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
+	// ResetUserOTPStep returns the consumed-step marker to 0. Called when OTP is
+	// disabled: the marker belongs to the enrolled authenticator, and it is the only
+	// remedy if a clock jump strands the marker in the future (#111).
+	ResetUserOTPStep(tx *sql.Tx, userId int64) error
 	UserLoadGroups(tx *sql.Tx, user *models.User) error
 	UsersLoadGroups(tx *sql.Tx, users []models.User) error
 	UserLoadPermissions(tx *sql.Tx, user *models.User) error

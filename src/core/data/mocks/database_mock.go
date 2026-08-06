@@ -9720,6 +9720,63 @@ func (_c *Database_RefreshTokenLoadUser_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// ResetUserOTPStep provides a mock function for the type Database
+func (_mock *Database) ResetUserOTPStep(tx *sql.Tx, userId int64) error {
+	ret := _mock.Called(tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResetUserOTPStep")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
+		r0 = returnFunc(tx, userId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_ResetUserOTPStep_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResetUserOTPStep'
+type Database_ResetUserOTPStep_Call struct {
+	*mock.Call
+}
+
+// ResetUserOTPStep is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) ResetUserOTPStep(tx any, userId any) *Database_ResetUserOTPStep_Call {
+	return &Database_ResetUserOTPStep_Call{Call: _e.mock.On("ResetUserOTPStep", tx, userId)}
+}
+
+func (_c *Database_ResetUserOTPStep_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_ResetUserOTPStep_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_ResetUserOTPStep_Call) Return(err error) *Database_ResetUserOTPStep_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_ResetUserOTPStep_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) error) *Database_ResetUserOTPStep_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RevokeCodeIfSessionGone provides a mock function for the type Database
 func (_mock *Database) RevokeCodeIfSessionGone(tx *sql.Tx, codeId int64, sessionIdentifier string) (bool, error) {
 	ret := _mock.Called(tx, codeId, sessionIdentifier)
@@ -10258,6 +10315,84 @@ func (_c *Database_TryClaimCleanupRun_Call) Return(b bool, err error) *Database_
 }
 
 func (_c *Database_TryClaimCleanupRun_Call) RunAndReturn(run func(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)) *Database_TryClaimCleanupRun_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TryConsumeUserOTPStep provides a mock function for the type Database
+func (_mock *Database) TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error) {
+	ret := _mock.Called(tx, userId, step, requireOTPEnabled)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryConsumeUserOTPStep")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, int64, bool) (bool, error)); ok {
+		return returnFunc(tx, userId, step, requireOTPEnabled)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, int64, bool) bool); ok {
+		r0 = returnFunc(tx, userId, step, requireOTPEnabled)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64, int64, bool) error); ok {
+		r1 = returnFunc(tx, userId, step, requireOTPEnabled)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryConsumeUserOTPStep_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryConsumeUserOTPStep'
+type Database_TryConsumeUserOTPStep_Call struct {
+	*mock.Call
+}
+
+// TryConsumeUserOTPStep is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+//   - step int64
+//   - requireOTPEnabled bool
+func (_e *Database_Expecter) TryConsumeUserOTPStep(tx any, userId any, step any, requireOTPEnabled any) *Database_TryConsumeUserOTPStep_Call {
+	return &Database_TryConsumeUserOTPStep_Call{Call: _e.mock.On("TryConsumeUserOTPStep", tx, userId, step, requireOTPEnabled)}
+}
+
+func (_c *Database_TryConsumeUserOTPStep_Call) Run(run func(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool)) *Database_TryConsumeUserOTPStep_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryConsumeUserOTPStep_Call) Return(b bool, err error) *Database_TryConsumeUserOTPStep_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryConsumeUserOTPStep_Call) RunAndReturn(run func(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)) *Database_TryConsumeUserOTPStep_Call {
 	_c.Call.Return(run)
 	return _c
 }
