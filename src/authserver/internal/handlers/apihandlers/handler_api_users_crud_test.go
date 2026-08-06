@@ -246,3 +246,50 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 	assert.True(t, present)
 	assert.Equal(t, "", value)
 }
+
+// TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically is the admin half of #111 decision 13.
+// Decision 4 names two disable sites and this is the second: they share disableUserOTP, and this case
+// is what pins that this handler goes through it rather than keeping two unbound writes of its own.
+// Its account sibling, TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically, carries the
+// reasoning about why the two writes have to commit together.
+func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
+	const userId = int64(42)
+
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	user := &models.User{Id: userId, Enabled: true, OTPEnabled: true}
+	database.On("GetUserById", (*sql.Tx)(nil), userId).Return(user, nil).Once()
+
+	var calls []string
+	database.On("BeginTransaction").Return(otpDisableTx, nil).
+		Run(func(mock.Arguments) { calls = append(calls, "begin") }).Once()
+	database.On("UpdateUser", otpDisableTx, user).Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
+	database.On("ResetUserOTPStep", otpDisableTx, userId).Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "reset") }).Once()
+	database.On("CommitTransaction", otpDisableTx).Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
+	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
+
+	auditLogger.On("Log", constants.AuditDisabledOTP, mock.Anything).Return().Once()
+	database.On("GetUserById", (*sql.Tx)(nil), userId).
+		Return(&models.User{Id: userId, Enabled: true}, nil).Once()
+
+	body, err := json.Marshal(map[string]bool{"enabled": false})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/otp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = setChiURLParam(req, "id", "42")
+	req = setTokenContextWithClaims(req, map[string]interface{}{
+		"sub": adminSubject, "auth_time": float64(1),
+	})
+
+	rr := httptest.NewRecorder()
+	HandleAPIUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, []string{"begin", "update", "reset", "commit"}, calls,
+		"both writes belong inside one transaction, otp_enabled first per decision 10, commit last")
+	assert.False(t, user.OTPEnabled)
+}

@@ -233,11 +233,10 @@ func HandleAPIUserOTPPut(
 			return
 		}
 
-		// Disable OTP
-		user.OTPEnabled = false
-		user.ClearOTPSecret()
-
-		err = database.UpdateUser(nil, user)
+		// Disable OTP. Clearing the secret, turning otp_enabled off and resetting the
+		// consumed-step marker are one atomic operation, shared with the account API's disable
+		// branch (#111 decisions 4 and 13); disableUserOTP carries the reasoning.
+		err = disableUserOTP(database, user)
 		if err != nil {
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return
