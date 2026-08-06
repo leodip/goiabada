@@ -83,3 +83,35 @@ None yet.
    an enrolment generation column on `users`, incremented on every enable and disable, carried on the
    request and compared in the claim predicate. That is a migration plus a second column, which #111
    deliberately did not take on. Decide whether the window is worth that before building it.
+
+3. **Redact credentials and OTP material from API debug request logging.**
+
+   Raised by stage 4's code review as a follow-up, not a finding, and verified against the code before
+   drafting. Belongs to a logging-hardening change rather than to #111: §2 asks for nothing about debug
+   logging, so this is genuinely out of scope rather than a missing requirement wearing that label.
+
+   **Title:** Redact passwords, client secrets and OTP material from API debug logging
+
+   **Labels:** security, enhancement
+
+   **Anchor:** `src/authserver/internal/middleware/api_debug_middleware.go`, `debugLog`, locate by
+   `slog.Info(fmt.Sprintf("[DEBUG API]   Request Body:\n%s", prettyReq.String()))`
+
+   **Duplicate search**, 2026-08-06: `gh issue list --state open --search "debug request logging redact
+   password"` and `--search "DEBUG_API_REQUESTS"` both return nothing.
+
+   **Body:** When `GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS` is enabled, `debugLog` pretty-prints the
+   entire JSON request and response body to the log. The function already redacts the `Authorization`
+   header to `Bearer ***`, so the intent to keep credentials out of logs is there, but the bodies are
+   written verbatim. `PUT /api/v1/account/otp` alone carries `password`, `otpCode` and `secretKey`,
+   which is the account password, a live TOTP code and the authenticator seed; other account and admin
+   endpoints carry passwords and client secrets on the same path.
+
+   Redact by key before formatting, so the shape of the body is still readable for debugging while the
+   values are not. Worth covering with tests over at least `password`, `currentPassword`,
+   `newPassword`, `clientSecret`, `otpCode` and `secretKey`, and worth applying to the response body
+   too, since enrollment responses return `secretKey`.
+
+   This is a debug-only path and off by default, which is why it is a follow-up rather than a blocker.
+   The cost of leaving it is that anyone who turns the flag on to diagnose an unrelated problem writes
+   reusable credentials and authenticator seeds into their console and log aggregator.
