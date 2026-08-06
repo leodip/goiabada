@@ -5,7 +5,7 @@
 **Written:** 2026-08-05
 **Last synced:** 2026-08-05 (no comments on the issue)
 **Agreement sealed:** 2026-08-05
-**Run state:** stage 2 done at `a10c6bb`, unit/data/integration green on tree `f53d3b9a0856`, review clean in one round. Stage 3 next, enforcement in the browser flow. All twelve decisions decided, none raised this stage. Account in `log/stage-2.md`
+**Run state:** stage 3 of 4 done, commit `cc208c5`, closed on a clean round 2. All twelve decisions decided, none raised this stage. Next: stage 4, the account API and the reset on disable. Account in `log/stage-3.md`
 **PR:** [#143](https://github.com/leodip/goiabada/pull/143) (draft)
 **Related:** #106 (closed) established the `dont-update` + narrow-write pattern this reuses. #128 (closed) established the replay audit event this may follow. Neither blocks; no shared call sites.
 
@@ -15,8 +15,8 @@
 
 | Label | File | Function | Locate by | Note |
 |---|---|---|---|---|
-| `otp/verify-enabled` | `src/authserver/internal/handlers/handler_auth_otp.go` | `HandleAuthOtpPost` | `otpValid := totp.Validate(otpCode, otpSecret)` | call site 1: browser login, user already enrolled |
-| `otp/verify-enrolling` | `src/authserver/internal/handlers/handler_auth_otp.go` | `HandleAuthOtpPost` | `otpValid := totp.Validate(otpCode, secretKey)` | call site 2: browser login, enrolling now |
+| `otp/verify-enabled` | `src/authserver/internal/handlers/handler_auth_otp.go` | `HandleAuthOtpPost` | `step, matched := otp.MatchStep(otpCode, otpSecret, time.Now().UTC())` | call site 1: browser login, user already enrolled. Match-then-claim since stage 3; was `totp.Validate` |
+| `otp/verify-enrolling` | `src/authserver/internal/handlers/handler_auth_otp.go` | `HandleAuthOtpPost` | `step, matched := otp.MatchStep(otpCode, secretKey, time.Now().UTC())` | call site 2: browser login, enrolling now. Match-then-claim since stage 3; was `totp.Validate` |
 | `otp/enroll-write` | `src/authserver/internal/handlers/handler_auth_otp.go` | `HandleAuthOtpPost` | `if err := user.SetOTPSecret(secretKey); err != nil {` | the enable write that follows call site 2 |
 | `otp/incorrect-error` | `src/authserver/internal/handlers/handler_auth_otp.go` | `HandleAuthOtpPost` | `incorrectOtpError := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil).Localize(r.Context())` | the generic error a replay must reuse |
 | `api-otp/verify` | `src/authserver/internal/handlers/apihandlers/handler_api_account_otp.go` | `HandleAPIAccountOTPPut` | `if !totp.Validate(req.OtpCode, normalizedSecret) {` | call site 3: self-service enable |
