@@ -14,7 +14,24 @@
 {{define "body"}}
 
     <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "logout_consent.title" }}</h2>
-    <form action="" method="post">
+    <!-- An explicit action, not action="", because action="" resolves to the current URL
+         INCLUDING its query string, which on this page carries the id_token_hint that could
+         not be confirmed. Confirming this page must be a hintless POST: the CSRF token below
+         is then what proves the request came from here, and a POST carrying a hint is only
+         trusted when that hint validates. Sending the hint back would let a cross-site POST
+         with a bogus hint reach a teardown, since the CSRF exemption for the POST binding can
+         only key on the hint being present and cannot judge whether it is genuine (#109).
+
+         The parameters that must survive the round trip are hidden fields instead. state is
+         emitted whenever it was present, empty value included, because an RP that sent
+         "state=" must get "state=" back and one that sent nothing must get no state at all;
+         an unconditional field would make every confirmation look like the former. -->
+    <form action="{{.formAction}}" method="post">
+
+        {{if .postLogoutRedirectUri}}<input type="hidden" name="post_logout_redirect_uri" value="{{.postLogoutRedirectUri}}" />{{end}}
+        {{if .clientId}}<input type="hidden" name="client_id" value="{{.clientId}}" />{{end}}
+        {{if .statePresent}}<input type="hidden" name="state" value="{{.state}}" />{{end}}
+        {{if .uiLocales}}<input type="hidden" name="ui_locales" value="{{.uiLocales}}" />{{end}}
 
         <div class="mt-5">
 

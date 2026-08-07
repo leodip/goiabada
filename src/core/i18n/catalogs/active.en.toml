@@ -80,6 +80,13 @@
 "logout_consent.title" = "Logout"
 "logout_consent.confirm" = "Are you sure you want to logout?"
 
+# --- Logged out (auth/logout) -----------------------------------------------
+
+"logged_out.page_title" = "Logged out"
+"logged_out.title" = "Logged out"
+"logged_out.message" = "You have been logged out."
+"logged_out.redirect_declined" = "We could not return you to the application that logged you out."
+
 # --- OAuth/internal error page (auth_error.html) ----------------------------
 
 "auth_error.page_title" = "Error"

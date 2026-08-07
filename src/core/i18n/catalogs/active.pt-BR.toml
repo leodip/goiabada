@@ -78,6 +78,13 @@
 "logout_consent.title" = "Sair"
 "logout_consent.confirm" = "Tem certeza de que deseja sair?"
 
+# --- Sessão encerrada (auth/logout) ------------------------------------------
+
+"logged_out.page_title" = "Sessão encerrada"
+"logged_out.title" = "Sessão encerrada"
+"logged_out.message" = "Você saiu da sua conta."
+"logged_out.redirect_declined" = "Não foi possível retornar você ao aplicativo que solicitou a saída."
+
 # --- Página de erro OAuth/interno (auth_error.html) --------------------------
 
 "auth_error.page_title" = "Erro"
