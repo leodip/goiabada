@@ -23,6 +23,7 @@ type HttpHelper interface {
 	JsonError(w http.ResponseWriter, r *http.Request, err error)
 	EncodeJson(w http.ResponseWriter, r *http.Request, data interface{})
 	GetFromUrlQueryOrFormPost(r *http.Request, key string) string
+	LookupFromUrlQueryOrFormPost(r *http.Request, key string) (string, bool)
 }
 
 type AuthHelper interface {

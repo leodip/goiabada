@@ -1234,3 +1234,216 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 }
+
+func TestBuildPostLogoutRedirect(t *testing.T) {
+	tests := []struct {
+		name          string
+		registeredURI string
+		state         string
+		statePresent  bool
+		expected      string
+		expectError   bool
+	}{
+		{
+			name:          "Base64 state survives byte-identical",
+			registeredURI: "https://app.example.com/out",
+			state:         "aB+cd/efgh==",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?state=aB%2Bcd%2Fefgh%3D%3D",
+		},
+		{
+			name:          "Fragment and parameter separators in state are escaped",
+			registeredURI: "https://app.example.com/out",
+			state:         "a#b&c=d",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?state=a%23b%26c%3Dd",
+		},
+		{
+			name:          "Absent state writes no query",
+			registeredURI: "https://app.example.com/out",
+			state:         "",
+			statePresent:  false,
+			expected:      "https://app.example.com/out",
+		},
+		{
+			name:          "Empty state supplied comes back empty",
+			registeredURI: "https://app.example.com/out",
+			state:         "",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?state=",
+		},
+		{
+			name:          "Whitespace-only state is not trimmed",
+			registeredURI: "https://app.example.com/out",
+			state:         "   ",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?state=+++",
+		},
+		{
+			name:          "A registered query is preserved",
+			registeredURI: "https://app.example.com/out?lang=en",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?lang=en&state=abc",
+		},
+		{
+			name:          "A registered state is replaced, not duplicated",
+			registeredURI: "https://app.example.com/out?state=fixed",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?state=abc",
+		},
+		{
+			// The counterpart to the row above, and it reads like a bug beside it: with
+			// no state supplied the builder writes nothing at all, so whatever the
+			// registered URI carried survives untouched, including its own state.
+			name:          "A registered state survives when none is supplied",
+			registeredURI: "https://app.example.com/out?state=fixed",
+			state:         "",
+			statePresent:  false,
+			expected:      "https://app.example.com/out?state=fixed",
+		},
+		{
+			// What forces url.Parse over the model's url.ParseRequestURI: the latter
+			// keeps the "#" in the path and yields ".../out%23frag?state=abc".
+			name:          "A fragment stays a fragment",
+			registeredURI: "https://app.example.com/out#frag",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?state=abc#frag",
+		},
+		{
+			// Registered parameters keep their order. Decoding the query into url.Values
+			// and re-encoding it sorts by key, which would rewrite a query an RP signs
+			// over as a raw string.
+			name:          "Registered parameter order is preserved",
+			registeredURI: "https://app.example.com/out?b=2&a=1",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?b=2&a=1&state=abc",
+		},
+		{
+			// The shape that made round-tripping through url.Values lossy: url.ParseQuery
+			// rejects a literal semicolon and url.Query throws the error away, so the whole
+			// registered query used to vanish and the RP landed on a bare path.
+			name:          "A semicolon-separated registered query survives",
+			registeredURI: "https://app.example.com/out?lang=en;mode=dark",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?lang=en;mode=dark&state=abc",
+		},
+		{
+			// The same URI with no state, which never went through url.Values at all. The
+			// pair is what stops preservation depending on whether the RP sent a state.
+			name:          "A semicolon-separated registered query survives with no state",
+			registeredURI: "https://app.example.com/out?lang=en;mode=dark",
+			state:         "",
+			statePresent:  false,
+			expected:      "https://app.example.com/out?lang=en;mode=dark",
+		},
+		{
+			name:          "A valueless registered field does not gain an equals sign",
+			registeredURI: "https://app.example.com/out?flag",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?flag&state=abc",
+		},
+		{
+			name:          "Registered percent-escapes are not normalised",
+			registeredURI: "https://app.example.com/out?p=%7Eok",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?p=%7Eok&state=abc",
+		},
+		{
+			// Field names are decoded before they are compared, so a registered state
+			// cannot survive alongside the RP's by hiding behind an escape.
+			name:          "A percent-encoded registered state key is still replaced",
+			registeredURI: "https://app.example.com/out?%73tate=fixed",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?state=abc",
+		},
+		{
+			name:          "A repeated registered parameter survives intact",
+			registeredURI: "https://app.example.com/out?a=1&a=2",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?a=1&a=2&state=abc",
+		},
+		{
+			// An empty field is data the operator registered, not noise. Skipping empty
+			// fields while copying is the tidy-looking change that quietly rewrites the
+			// target: this row came back as ".../out?a=1&b=2&state=abc" until it did not.
+			name:          "An interior empty registered field survives",
+			registeredURI: "https://app.example.com/out?a=1&&b=2",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?a=1&&b=2&state=abc",
+		},
+		{
+			// The pair for the row above, on the path that returns the parsed URI
+			// untouched. Together they stop preservation depending on whether the RP
+			// happened to send a state.
+			name:          "An interior empty registered field survives with no state",
+			registeredURI: "https://app.example.com/out?a=1&&b=2",
+			state:         "",
+			statePresent:  false,
+			expected:      "https://app.example.com/out?a=1&&b=2",
+		},
+		{
+			name:          "A leading empty registered field survives",
+			registeredURI: "https://app.example.com/out?&a=1",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?&a=1&state=abc",
+		},
+		{
+			name:          "A trailing empty registered field survives",
+			registeredURI: "https://app.example.com/out?a=1&",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?a=1&&state=abc",
+		},
+		{
+			// Dropping the registered state leaves the empty field behind, so the query
+			// opens with a separator. That is the preservation rule applied literally
+			// rather than a stray ampersand.
+			name:          "A registered state is replaced beside a trailing empty field",
+			registeredURI: "https://app.example.com/out?state=fixed&",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?&state=abc",
+		},
+		{
+			// What the RawQuery != "" guard is for. url.Parse leaves RawQuery empty here
+			// and sets ForceQuery, and strings.Split("", "&") yields one empty field, so
+			// copying unconditionally would emit ".../out?&state=abc".
+			name:          "A registered URI ending in a bare question mark gains only state",
+			registeredURI: "https://app.example.com/out?",
+			state:         "abc",
+			statePresent:  true,
+			expected:      "https://app.example.com/out?state=abc",
+		},
+		{
+			name:          "An unparseable registered URI is an error, not a panic",
+			registeredURI: "://bad",
+			state:         "abc",
+			statePresent:  true,
+			expectError:   true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := buildPostLogoutRedirect(tc.registeredURI, tc.state, tc.statePresent)
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Empty(t, result)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}

@@ -266,3 +266,32 @@ func (h *HttpHelper) GetFromUrlQueryOrFormPost(r *http.Request, key string) stri
 	}
 	return value
 }
+
+// LookupFromUrlQueryOrFormPost reports the value of key and whether the parameter was
+// supplied at all. GetFromUrlQueryOrFormPost cannot express that difference: it returns
+// "" both for a parameter that was absent and for one supplied empty.
+//
+// RP-initiated logout needs the distinction, because the OP echoes the RP's "state" back
+// on the post-logout redirect and the two cases have different answers: an RP that sent
+// "state=" must get "state=" back, and one that sent nothing must get no state parameter
+// at all. Collapsing them either invents a parameter the RP never sent or drops one it
+// did (#109).
+//
+// The value comes from GetFromUrlQueryOrFormPost rather than being re-derived, so the
+// query-beats-body precedence cannot drift between the two helpers. Presence is only
+// consulted when that value is empty, and r.PostForm is populated by then: an empty
+// query value is exactly the case where the legacy helper falls through to r.FormValue,
+// which parses the body.
+func (h *HttpHelper) LookupFromUrlQueryOrFormPost(r *http.Request, key string) (string, bool) {
+	value := h.GetFromUrlQueryOrFormPost(r, key)
+	if len(value) > 0 {
+		return value, true
+	}
+	if _, ok := r.URL.Query()[key]; ok {
+		return "", true
+	}
+	if _, ok := r.PostForm[key]; ok {
+		return "", true
+	}
+	return "", false
+}

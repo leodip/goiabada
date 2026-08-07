@@ -228,3 +228,40 @@ func TestGetFromUrlQueryOrFormPost(t *testing.T) {
 		assert.Equal(t, "value", value)
 	})
 }
+
+func TestLookupFromUrlQueryOrFormPost(t *testing.T) {
+	templateFS := &mocks.TestFS{}
+	httpHelper := NewHttpHelper(templateFS)
+
+	// postForm builds a form-encoded POST, optionally with a query string of its own.
+	postForm := func(target string, body string) *http.Request {
+		req := httptest.NewRequest("POST", target, bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		return req
+	}
+
+	tests := []struct {
+		name          string
+		request       *http.Request
+		expectValue   string
+		expectPresent bool
+	}{
+		{"Absent from the query", httptest.NewRequest("GET", "/?other=1", nil), "", false},
+		{"Empty in the query is present", httptest.NewRequest("GET", "/?state=", nil), "", true},
+		{"Present in the query", httptest.NewRequest("GET", "/?state=abc", nil), "abc", true},
+		{"Whitespace in the query is untrimmed", httptest.NewRequest("GET", "/?state=%20%20%20", nil), "   ", true},
+		{"Present in the body", postForm("/", "state=abc"), "abc", true},
+		{"Empty in the body is present", postForm("/", "state="), "", true},
+		{"A non-empty query beats the body", postForm("/?state=abc", "state=xyz"), "abc", true},
+		{"An empty query falls through to the body", postForm("/?state=", "state=xyz"), "xyz", true},
+		{"Absent from the body", postForm("/", "other=1"), "", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			value, present := httpHelper.LookupFromUrlQueryOrFormPost(tc.request, "state")
+			assert.Equal(t, tc.expectValue, value)
+			assert.Equal(t, tc.expectPresent, present)
+		})
+	}
+}
