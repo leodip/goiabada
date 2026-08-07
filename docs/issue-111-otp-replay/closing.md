@@ -36,7 +36,12 @@ None yet.
 2. **A re-enrolment landing mid-request can still let a consumed code assert `otp`, and a stale
    enrolment can replace a fresh authenticator.**
    `security`, `go`. Found while applying decision 10, widened at stage 3's review.
-   Status: **Drafted**, not filed.
+   Status: **Filed** as [#144](https://github.com/leodip/goiabada/issues/144) on 2026-08-06, titled
+   "Security: the OTP claim binds to otp_enabled, not to the authenticator". Duplicate search re-run
+   before filing: `gh issue list --state all` across otp, enrol, enroll, amr and authenticator returned
+   only #140, #111, #142, #113, #98 and #82, none of them this. Kept separate from #140 rather than
+   folded in: same class and same harm, but a different mechanism and a different fix, so one issue
+   would carry two unrelated changes. #144's body links #140 and GitHub carries the backlink.
 
    Decision 10 closed the disable case by binding the claim to `otp_enabled`, and its option A said
    plainly that a disable immediately followed by a re-enrolment is not closed, because `otp_enabled` is
@@ -85,6 +90,9 @@ None yet.
    deliberately did not take on. Decide whether the window is worth that before building it.
 
 3. **Redact credentials and OTP material from API debug request logging.**
+   Status: **Filed** as [#145](https://github.com/leodip/goiabada/issues/145) on 2026-08-06. Duplicate
+   search re-run before filing: `redact`, `debug`, `logging` and `secret` across all states returned
+   nothing on this path, and no logging-hardening issue exists to fold it into.
 
    Raised by stage 4's code review as a follow-up, not a finding, and verified against the code before
    drafting. Belongs to a logging-hardening change rather than to #111: §2 asks for nothing about debug
