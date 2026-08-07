@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
@@ -157,6 +159,270 @@ func decryptIDTokenHint(idTokenHint, clientID string, database data.Database) (s
 	}
 
 	return decryptedToken, nil
+}
+
+// hintState is what classifyIdTokenHint decided about a request's id_token_hint, and it has three
+// values rather than two on purpose. Collapsing "supplied and rejected" into "absent" is what let a
+// detected client_id/aud mismatch go on to authorize a post-logout redirect: the rejected hint
+// vanished, the unauthenticated client_id beside it survived, and client_id then chose the target.
+// OpenID Connect RP-Initiated Logout 1.0 section 4 forbids that twice over, once as "any operations
+// requiring the information that failed to correctly validate MUST be aborted and the information
+// that failed to validate MUST NOT be used", and once as "the OP MUST not perform post-logout
+// redirection to an RP" upon detecting errors (#109).
+type hintState int
+
+const (
+	// hintRejected is the zero value deliberately. A classification nobody filled in then asks the
+	// End-User and earns no redirect, which is the fail-safe direction of the three: the worst it can
+	// do is show a consent page to somebody who need not have seen one.
+	hintRejected hintState = iota
+	hintAbsent
+	hintConfirmed
+)
+
+func (h hintState) String() string {
+	switch h {
+	case hintAbsent:
+		return "absent"
+	case hintConfirmed:
+		return "confirmed"
+	default:
+		return "rejected"
+	}
+}
+
+// hintClassification is classifyIdTokenHint's answer. client and sessionIdentifier are populated for
+// hintConfirmed and left empty otherwise, so a caller that forgets to check the state still cannot
+// scope a teardown or authorize a redirect from a hint that failed to validate.
+type hintClassification struct {
+	state             hintState
+	client            *models.Client
+	sessionIdentifier string
+}
+
+// nonIdTokenTypValues are the "typ" claim values Goiabada stamps on tokens that are NOT ID Tokens:
+// enums.TokenTypeBearer on access tokens, and the two refresh-token markers "Offline" and "Refresh",
+// which are unexported constants in src/core/oauth/token_issuer.go. generateIdTokenCore emits no typ
+// at all, and neither does the short-lived hint HandleAPIAccountLogoutRequestPost mints, so this
+// rejects nothing an RP can legitimately present.
+//
+// It is a denylist rather than a requirement that typ be "ID" for exactly that reason: no ID Token
+// this server issues carries the claim, so requiring it would reject every real hint.
+var nonIdTokenTypValues = map[string]bool{
+	enums.TokenTypeBearer.String():  true, // "Bearer", access tokens
+	enums.TokenTypeRefresh.String(): true, // "Refresh", session-bound refresh tokens
+	"Offline":                       true, // offline refresh tokens; the constant is unexported
+}
+
+// classifyIdTokenHint decides whether a request's id_token_hint can be trusted, and returns which of
+// the three states it is in along with the client and session a confirmed hint names.
+//
+// The error return is reserved for one thing: a database failure while deciding whether an expired
+// hint's session is still alive. Every other failure is a rejection, because a hint the OP cannot
+// confirm is not an error to report, it is a reason to ask the End-User. RP-Initiated Logout 1.0
+// section 2: "the OP MUST ask the End-User this question if an id_token_hint was not provided or if
+// the supplied ID Token does not belong to the current OP session with the RP and/or currently
+// logged in End-User".
+//
+// Two properties are worth stating because losing either turns this into a hole rather than a bug.
+//
+// The hint is read for PRESENCE, not for a value. An id_token_hint supplied empty is Rejected rather
+// than Absent, because the CSRF middleware exempts a cross-site POST on presence and cannot judge
+// validity. If this helper read "id_token_hint=" as no hint at all, an exempted POST would take the
+// no-hint branch, which tears the whole session down without consent (#109 decision 13).
+//
+// The claims are checked BY HAND, all of them, because the parse deliberately runs with the
+// library's claims validation off. That flag is jwt.WithoutClaimsValidation() rather than an exp
+// switch, so it disables every claim check the library performs; the signature survives it, since a
+// signature is not a claim. Turning it off is what lets an expired hint reach the tolerance gate
+// below instead of being refused before the OP has looked at the session, per RP-Initiated Logout
+// 1.0 section 2: "The OP SHOULD accept ID Tokens when the RP identified by the ID Token's aud claim
+// and/or sid claim has a current session or had a recent session at the OP, even when the exp time
+// has passed."
+func classifyIdTokenHint(
+	r *http.Request,
+	httpHelper HttpHelper,
+	database data.Database,
+	tokenParser TokenParser,
+) (hintClassification, error) {
+
+	reject := func(gate string, args ...interface{}) (hintClassification, error) {
+		slog.Error("logout: id_token_hint rejected at the "+gate+" gate", args...)
+		return hintClassification{state: hintRejected}, nil
+	}
+
+	hint, present := httpHelper.LookupFromUrlQueryOrFormPost(r, "id_token_hint")
+	if !present {
+		return hintClassification{state: hintAbsent}, nil
+	}
+	if len(hint) == 0 {
+		return reject("presence", "reason", "id_token_hint was supplied with an empty value")
+	}
+
+	// Presence-aware, like the hint above and for the same reason: the client_id gate further down
+	// fires when the parameter is PRESENT, and a value-only read cannot tell "client_id=" from no
+	// client_id at all. See the comment on that gate for why the difference matters (#109).
+	clientId, clientIdPresent := httpHelper.LookupFromUrlQueryOrFormPost(r, "client_id")
+
+	// An encrypted hint is a Nested JWT (OpenID Connect Core 1.0 section 2) and must be decrypted
+	// before anything can be read from it. The key derives from a client secret, so client_id is what
+	// says whose. This one reads the value rather than the presence, correctly: an empty client_id
+	// selects no key whether it was supplied empty or left out.
+	if isEncryptedIDTokenHint(hint) {
+		if len(clientId) == 0 {
+			return reject("JWE key selection", "reason", "an encrypted id_token_hint needs client_id to select the key")
+		}
+		decrypted, locErr := decryptIDTokenHint(hint, clientId, database)
+		if locErr != nil {
+			// decryptIDTokenHint has already logged which half failed.
+			return reject("JWE decryption")
+		}
+		hint = decrypted
+	}
+
+	idToken, err := tokenParser.DecodeAndValidateTokenString(hint, nil, false)
+	if err != nil || idToken == nil {
+		return reject("parse and signature", "err", err)
+	}
+
+	// Is this an ID Token at all? Without this gate a session-bound ACCESS token satisfies every
+	// other check here whenever a resource identifier happens to equal a client identifier, which
+	// nothing in the product prevents: client identifiers are checked for uniqueness against clients
+	// and resource identifiers against resources, and no code compares the two namespaces. An access
+	// token carries iss, sub, iat, nbf, exp and a session-bound sid, and its aud is the resource
+	// identifier, so GetClientByClientIdentifier resolves it under the collision. Confirming it would
+	// skip the consent page entirely and end that client's half of the session (#109).
+	if typ := idToken.GetStringClaim("typ"); nonIdTokenTypValues[typ] {
+		return reject("ID-Token shape", "reason", "typ names a token that is not an ID Token", "typ", typ)
+	}
+
+	// sub and iat are REQUIRED on an ID Token by OpenID Connect Core 1.0 section 2, and RP-Initiated
+	// Logout 1.0 section 2 defines this parameter as an "ID Token previously issued by the OP", so
+	// establishing ID-Token shape belongs here. They do not close the access-token hole above on
+	// their own, since an access token carries both.
+	if len(idToken.GetStringClaim("sub")) == 0 {
+		return reject("ID-Token shape", "reason", "sub is missing or empty")
+	}
+	if _, ok := idToken.GetIntClaim("iat"); !ok {
+		return reject("ID-Token shape", "reason", "iat is missing or is not an integral number")
+	}
+
+	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+	issuer := idToken.GetStringClaim("iss")
+	if len(issuer) == 0 {
+		return reject("iss", "reason", "iss is missing")
+	}
+	if issuer != settings.Issuer {
+		return reject("iss", "reason", "iss is not this server", "iss", issuer)
+	}
+
+	// GetStringClaim yields "" for an aud that arrived as an array, which is right for a hint: an ID
+	// Token this server issues has exactly one audience, the client identifier.
+	clientIdentifier := idToken.GetStringClaim("aud")
+	if len(clientIdentifier) == 0 {
+		return reject("aud", "reason", "aud is missing, or is not a single string")
+	}
+
+	// RP-Initiated Logout 1.0 section 2: "When both client_id and id_token_hint are present, the OP
+	// MUST verify that the Client Identifier matches the one used when issuing the ID Token."
+	//
+	// PRESENT, not non-empty. "client_id=" is a parameter the request carried, and an empty string is
+	// not a Client Identifier valid at this server, so it fails the check and rejects the hint exactly
+	// as a wrong client_id does. Reading it as absent would skip a MUST on a parameter that arrived.
+	// RP-Initiated Logout is silent on empty-valued parameters; RFC 6749 section 3.1's "Parameters
+	// sent without a value MUST be treated as if they were omitted from the request" is stated for the
+	// OAuth authorization endpoint and is not carried into this one, which serializes per OpenID
+	// Connect Core's Query String and Form Serialization instead.
+	//
+	// What it costs a caller who sends "client_id=" beside an otherwise good hint: a consent page
+	// instead of a silent logout, a whole-session teardown instead of a per-client one, and no
+	// post-logout redirect. That is the same price any non-matching client_id already pays here, and
+	// the fail-safe direction of both (#109).
+	//
+	// Compared before the lookup so a mismatch costs no query.
+	if clientIdPresent && clientId != clientIdentifier {
+		return reject("client_id", "reason", "client_id does not match the aud the hint is signed over",
+			"clientId", clientId, "aud", clientIdentifier)
+	}
+
+	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
+	if err != nil {
+		// Rejected rather than propagated, unlike the expiry lookup below. This runs before any
+		// teardown, so a 500 here would put the End-User on a terminal page while still signed in,
+		// which is the defect #109 exists to remove. Rejecting instead widens the teardown from
+		// per-client to whole-session and forbids the redirect, which is the fail-safe direction.
+		return reject("aud", "reason", "the client lookup failed", "aud", clientIdentifier, "err", err)
+	}
+	if client == nil {
+		return reject("aud", "reason", "aud names no client", "aud", clientIdentifier)
+	}
+
+	now := time.Now().UTC()
+
+	// nbf is optional on an ID Token, but a present one still binds. Raw map presence rather than a
+	// zero-value test, so a present-but-malformed nbf is refused instead of read as absent.
+	if _, hasNbf := idToken.Claims["nbf"]; hasNbf {
+		nbf, ok := idToken.GetIntClaim("nbf")
+		if !ok {
+			return reject("nbf", "reason", "nbf is present and is not an integral number")
+		}
+		if time.Unix(nbf, 0).After(now) {
+			return reject("nbf", "reason", "nbf is in the future")
+		}
+	}
+
+	// exp must still be THERE. Decision 14 tolerates a past exp, not a missing one: a hint with no
+	// expiry at all is an indefinitely replayable forced-logout token, which is what the tolerance
+	// below is bounded to avoid becoming.
+	exp, ok := idToken.GetIntClaim("exp")
+	if !ok {
+		return reject("exp", "reason", "exp is missing or is not an integral number")
+	}
+
+	sid := idToken.GetStringClaim("sid")
+	if len(sid) == 0 {
+		return reject("sid", "reason", "sid is missing")
+	}
+
+	sessionIdentifier := ""
+	if v := r.Context().Value(constants.ContextKeySessionIdentifier); v != nil {
+		sessionIdentifier, _ = v.(string)
+	}
+	if len(sessionIdentifier) == 0 {
+		// An RP may end a session with a hint alone and no cookie in play, which is what makes
+		// RP-initiated logout work from a back-channel-less RP, so the hint's own sid names the
+		// session. MiddlewareSessionIdentifier fills the context only when the cookie resolves to a
+		// live row, so "no identifier" covers a cookie whose session has already gone too.
+		sessionIdentifier = sid
+	} else if sid != sessionIdentifier {
+		// Not an error and not a 500, which is what it used to be. The spec's answer to a hint that
+		// does not belong to the current session is to ask the End-User, and a user whose session was
+		// reaped or replaced between signing in and logging out reaches this with nobody at fault.
+		return reject("sid", "reason", "sid names a different session than the browser's")
+	}
+
+	if time.Unix(exp, 0).Before(now) {
+		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+		if err != nil {
+			// Propagated rather than read as "no such session". A database failure and a row that is
+			// not there have different answers, and conflating them would decide whether an expired
+			// hint is honoured on the database's health. The caller surfaces this as a 500, and the
+			// teardown reads the same row through the same call, so it would have failed anyway.
+			return hintClassification{}, err
+		}
+		if userSession == nil {
+			return reject("expiry tolerance", "reason", "exp has passed and sid names no live session")
+		}
+		// "Recent session" has exactly one meaning in this codebase: the row is still there.
+		slog.Info("logout: accepting an expired id_token_hint because its session is still live",
+			"aud", clientIdentifier)
+	}
+
+	return hintClassification{
+		state:             hintConfirmed,
+		client:            client,
+		sessionIdentifier: sessionIdentifier,
+	}, nil
 }
 
 func validateClientAndRedirectURI(idToken *oauth.JwtToken, postLogoutRedirectURI string, database data.Database, clientId string) (*models.Client, *i18n.LocalizedError) {

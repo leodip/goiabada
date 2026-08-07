@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
@@ -2035,6 +2036,445 @@ func TestBuildPostLogoutRedirect(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+// TestClassifyIdTokenHint is the exhaustive table for the hint classifier. Every negative row
+// differs from the confirmed row in exactly one field and names the gate that refuses it, which is
+// why the confirmed claims come from a constructor the rows mutate rather than from copy-paste: a
+// row that varied two fields could pass because of the field it was not testing.
+//
+// Nothing calls the classifier yet, so this is the only thing standing behind it until stage 4 wires
+// it into the pipeline (#109).
+func TestClassifyIdTokenHint(t *testing.T) {
+	const (
+		theIssuer    = "https://issuer.example"
+		theClientId  = "test_client"
+		theSessionId = "test-session"
+		theHint      = "a.signed.hint"
+		// The persisted row ID, distinct from the identifier, because the two are not
+		// interchangeable downstream: ClientLoadRedirectURIs queries by Client.Id, so a classifier
+		// that rebuilt the client from the identifier alone would carry Id 0 and every registered
+		// redirect URI would come back empty (#109).
+		theClientDbId int64 = 11
+	)
+
+	now := time.Now().UTC()
+
+	// Claims arrive through encoding/json inside jwt.MapClaims, so every numeric claim is a float64.
+	// Writing these as int would make GetIntClaim reject values a real token presents perfectly well,
+	// and the table would then pass for the wrong reason on every numeric gate.
+	confirmedClaims := func() map[string]interface{} {
+		return map[string]interface{}{
+			"iss": theIssuer,
+			"sub": "the-user",
+			"iat": float64(now.Add(-2 * time.Minute).Unix()),
+			"nbf": float64(now.Add(-2 * time.Minute).Unix()),
+			"exp": float64(now.Add(2 * time.Minute).Unix()),
+			"aud": theClientId,
+			"sid": theSessionId,
+		}
+	}
+
+	newClient := func() *models.Client {
+		return &models.Client{Id: theClientDbId, ClientIdentifier: theClientId}
+	}
+
+	// The confirmed row's database: the hint's aud resolves to a client and nothing else is asked.
+	// Maybe(), because the rows refused at an earlier gate never get here, and the state assertion is
+	// what catches a gate that stopped refusing.
+	resolvesClient := func(database *mocks_data.Database) {
+		database.On("GetClientByClientIdentifier", mock.Anything, theClientId).Return(newClient(), nil).Maybe()
+	}
+
+	// A live session for decision 14's tolerance lookup, which only an expired row reaches.
+	resolvesClientAndSession := func(userSession *models.UserSession, err error) func(*mocks_data.Database) {
+		return func(database *mocks_data.Database) {
+			resolvesClient(database)
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).Return(userSession, err)
+		}
+	}
+
+	strPtr := func(s string) *string { return &s }
+
+	for _, tc := range []struct {
+		name string
+		// gate names the check that is expected to refuse the row, so a failure says which one stopped
+		// working rather than only that the answer changed.
+		gate       string
+		mutate     func(claims map[string]interface{})
+		hintAbsent bool
+		hintValue  *string
+		innerToken *string
+		// clientId is the value the parameter arrived with; clientIdAbsent says it did not arrive at
+		// all. The two are separate fields because the classifier reads client_id for presence, so a
+		// row that could only say "" would be unable to tell the gate's two sides apart, which is
+		// exactly the hole this pair was added to close.
+		clientId       *string
+		clientIdAbsent bool
+		noSession      bool
+		parserErr      error
+		stubDB         func(*mocks_data.Database)
+		want           hintState
+		wantErr        bool
+		wantSid        string
+	}{
+		{
+			name: "the confirmed case",
+			want: hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			name: "no id_token_hint parameter at all", gate: "presence",
+			hintAbsent: true,
+			want:       hintAbsent,
+		},
+		{
+			// Rejected rather than absent, and the distinction is load-bearing: the CSRF middleware
+			// exempts a cross-site POST on hint PRESENCE and cannot judge validity, so reading
+			// "id_token_hint=" as no hint would send an exempted POST down the branch that tears the
+			// whole session down without consent.
+			name: "id_token_hint supplied with an empty value", gate: "presence",
+			hintValue: strPtr(""),
+			want:      hintRejected,
+		},
+		{
+			name: "an encrypted hint with no client_id", gate: "JWE key selection",
+			hintValue:      strPtr("a.b.c.d.e"),
+			clientIdAbsent: true,
+			want:           hintRejected,
+		},
+		{
+			// The other side of the key-selection gate, and the reason it reads the VALUE where the
+			// gate further down reads the presence: a client_id supplied empty names no client secret
+			// either, so it must stop here too rather than reaching the client_id gate.
+			name: "an encrypted hint with an empty client_id", gate: "JWE key selection",
+			hintValue: strPtr("a.b.c.d.e"),
+			clientId:  strPtr(""),
+			want:      hintRejected,
+		},
+		{
+			name: "an encrypted hint that will not decrypt", gate: "JWE decryption",
+			hintValue: strPtr("a.b.c.d.e"),
+			stubDB: func(database *mocks_data.Database) {
+				secret, err := encryption.EncryptData("some_client_secret")
+				assert.NoError(t, err)
+				database.On("GetClientByClientIdentifier", mock.Anything, theClientId).
+					Return(&models.Client{ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
+			},
+			want: hintRejected,
+		},
+		{
+			// The positive half of the two rows above, and the only thing that pins the decrypted
+			// inner token being what gets parsed: the parser is stubbed on the inner value, so a
+			// classifier that parsed the JWE itself would find no expectation and fail.
+			name: "an encrypted hint that decrypts", gate: "JWE decryption",
+			hintValue:  strPtr(encryptIDTokenHintForTest(t, "inner.signed.token", "some_client_secret")),
+			innerToken: strPtr("inner.signed.token"),
+			stubDB: func(database *mocks_data.Database) {
+				secret, err := encryption.EncryptData("some_client_secret")
+				assert.NoError(t, err)
+				database.On("GetClientByClientIdentifier", mock.Anything, theClientId).
+					Return(&models.Client{Id: theClientDbId, ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
+			},
+			want: hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			name: "the hint cannot be parsed", gate: "parse and signature",
+			parserErr: errors.New("token is malformed"),
+			want:      hintRejected,
+		},
+		{
+			name: "the hint is signed with the wrong key", gate: "parse and signature",
+			parserErr: errors.New("token signature is invalid"),
+			want:      hintRejected,
+		},
+		{
+			// An access token satisfies every other gate under a client/resource identifier
+			// collision, so this row is the one standing between a session-bound access token and a
+			// consent-free logout. Every other claim is identical to the confirmed row.
+			name: "typ says this is an access token", gate: "ID-Token shape",
+			mutate: func(claims map[string]interface{}) { claims["typ"] = "Bearer" },
+			want:   hintRejected,
+		},
+		{
+			name: "typ says this is an offline refresh token", gate: "ID-Token shape",
+			mutate: func(claims map[string]interface{}) { claims["typ"] = "Offline" },
+			want:   hintRejected,
+		},
+		{
+			name: "typ says this is a session refresh token", gate: "ID-Token shape",
+			mutate: func(claims map[string]interface{}) { claims["typ"] = "Refresh" },
+			want:   hintRejected,
+		},
+		{
+			// The gate is a denylist, because no ID Token this server issues carries typ at all.
+			// Turning it into a requirement that typ be "ID" would refuse every real hint, so this
+			// row fails the moment somebody inverts it.
+			name: "typ says this is an ID token", gate: "ID-Token shape",
+			mutate: func(claims map[string]interface{}) { claims["typ"] = "ID" },
+			want:   hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			name: "sub is missing", gate: "ID-Token shape",
+			mutate: func(claims map[string]interface{}) { delete(claims, "sub") },
+			want:   hintRejected,
+		},
+		{
+			name: "sub is empty", gate: "ID-Token shape",
+			mutate: func(claims map[string]interface{}) { claims["sub"] = "" },
+			want:   hintRejected,
+		},
+		{
+			name: "iat is missing", gate: "ID-Token shape",
+			mutate: func(claims map[string]interface{}) { delete(claims, "iat") },
+			want:   hintRejected,
+		},
+		{
+			name: "iat is not a number", gate: "ID-Token shape",
+			mutate: func(claims map[string]interface{}) { claims["iat"] = "yesterday" },
+			want:   hintRejected,
+		},
+		{
+			name: "iss is missing", gate: "iss",
+			mutate: func(claims map[string]interface{}) { delete(claims, "iss") },
+			want:   hintRejected,
+		},
+		{
+			name: "iss names another server", gate: "iss",
+			mutate: func(claims map[string]interface{}) { claims["iss"] = "https://elsewhere.example" },
+			want:   hintRejected,
+		},
+		{
+			name: "aud is missing", gate: "aud",
+			mutate: func(claims map[string]interface{}) { delete(claims, "aud") },
+			want:   hintRejected,
+		},
+		{
+			// An ID Token this server issues has exactly one audience, so an array is not a hint
+			// shape and GetStringClaim reads it as absent. Pinned because the array form is what a
+			// multi-audience access token carries.
+			name: "aud arrived as an array", gate: "aud",
+			mutate: func(claims map[string]interface{}) {
+				claims["aud"] = []interface{}{theClientId}
+			},
+			want: hintRejected,
+		},
+		{
+			// client_id moves with aud so that the row still reaches the gate it is about. Leaving
+			// client_id at the confirmed value would be refused one gate earlier, as a mismatch, and
+			// the row would pass without the lookup ever happening.
+			name: "aud names no client", gate: "aud",
+			mutate:   func(claims map[string]interface{}) { claims["aud"] = "ghost_client" },
+			clientId: strPtr("ghost_client"),
+			stubDB: func(database *mocks_data.Database) {
+				database.On("GetClientByClientIdentifier", mock.Anything, "ghost_client").Return(nil, nil)
+			},
+			want: hintRejected,
+		},
+		{
+			// Rejected rather than a 500, and the asymmetry with the expiry lookup below is
+			// deliberate: this one runs before any teardown, so surfacing it would put the End-User
+			// on a terminal page while still signed in.
+			name: "the client lookup fails", gate: "aud",
+			stubDB: func(database *mocks_data.Database) {
+				database.On("GetClientByClientIdentifier", mock.Anything, theClientId).
+					Return(nil, errors.New("the database is on fire"))
+			},
+			want: hintRejected,
+		},
+		{
+			name: "client_id does not match aud", gate: "client_id",
+			clientId: strPtr("another_client"),
+			want:     hintRejected,
+		},
+		{
+			// The gate only fires when both are present. RP-Initiated Logout makes client_id
+			// OPTIONAL, so its absence beside a valid hint is an ordinary conforming request. Absent
+			// here means the parameter did not arrive, which is why the row says so rather than
+			// passing an empty value: the row below is the empty one and they must not agree.
+			name: "client_id is absent beside a valid aud", gate: "client_id",
+			clientIdAbsent: true,
+			want:           hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			// Supplied empty is supplied. RP-Initiated Logout 1.0 section 2 makes the OP verify the
+			// Client Identifier "when both client_id and id_token_hint are present", and "" is not a
+			// Client Identifier valid at this server, so the hint is refused exactly as it is for a
+			// client_id naming somebody else. Reading this as absent would skip a MUST on a parameter
+			// the request carried, and it is the row that stops the two reads of client_id, this gate
+			// and the JWE key selection above, from being collapsed back into one.
+			name: "client_id supplied with an empty value", gate: "client_id",
+			clientId: strPtr(""),
+			want:     hintRejected,
+		},
+		{
+			name: "nbf is in the future", gate: "nbf",
+			mutate: func(claims map[string]interface{}) {
+				claims["nbf"] = float64(now.Add(10 * time.Minute).Unix())
+			},
+			want: hintRejected,
+		},
+		{
+			// Raw map presence rather than a zero-value test, so a present-but-malformed nbf is
+			// refused instead of read as absent and skipped.
+			name: "nbf is present and is not a number", gate: "nbf",
+			mutate: func(claims map[string]interface{}) { claims["nbf"] = "soon" },
+			want:   hintRejected,
+		},
+		{
+			name: "nbf is absent", gate: "nbf",
+			mutate: func(claims map[string]interface{}) { delete(claims, "nbf") },
+			want:   hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			// Decision 14 tolerates a past exp, never a missing one: a hint with no expiry is an
+			// indefinitely replayable forced-logout token.
+			name: "exp is missing", gate: "exp",
+			mutate: func(claims map[string]interface{}) { delete(claims, "exp") },
+			want:   hintRejected,
+		},
+		{
+			// The present-but-malformed half, which the missing row cannot reach. Claims validation is
+			// off at the parse, so this gate is the only thing standing between a garbage exp and the
+			// expiry-tolerance comparison below, and a build that read an unreadable exp as "not
+			// expired yet" would confirm a hint whose lifetime nothing had checked.
+			name: "exp is present and is not a number", gate: "exp",
+			mutate: func(claims map[string]interface{}) { claims["exp"] = "later" },
+			want:   hintRejected,
+		},
+		{
+			name: "sid is missing", gate: "sid",
+			mutate: func(claims map[string]interface{}) { delete(claims, "sid") },
+			want:   hintRejected,
+		},
+		{
+			name: "sid names a different session than the browser's", gate: "sid",
+			mutate: func(claims map[string]interface{}) { claims["sid"] = "another-session" },
+			want:   hintRejected,
+		},
+		{
+			// With no cookie the hint's own sid names the session, which is what makes RP-initiated
+			// logout work at all from an RP the browser is not currently at. The assertion that
+			// proves seeding happened is wantSid: without it the identifier would come back empty.
+			name: "no browser session, so sid seeds the identifier", gate: "sid",
+			noSession: true,
+			want:      hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			// The reachable half of decision 14: the admin console mints a 60-second hint, so a user
+			// who pauses on the way through arrives here.
+			name: "expired, and sid still names a live session", gate: "expiry tolerance",
+			mutate: func(claims map[string]interface{}) {
+				claims["exp"] = float64(now.Add(-1 * time.Minute).Unix())
+			},
+			stubDB: resolvesClientAndSession(&models.UserSession{Id: 7, UserId: 3}, nil),
+			want:   hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			name: "expired, and sid names no live session", gate: "expiry tolerance",
+			mutate: func(claims map[string]interface{}) {
+				claims["exp"] = float64(now.Add(-1 * time.Minute).Unix())
+			},
+			stubDB: resolvesClientAndSession(nil, nil),
+			want:   hintRejected,
+		},
+		{
+			// The one failure that is not a rejection. A database error and a row that is not there
+			// have different answers, so reading this as "no such session" would decide the tolerance
+			// on the database's health (decision 8's rule for this handler).
+			name: "expired, and the session lookup fails", gate: "expiry tolerance",
+			mutate: func(claims map[string]interface{}) {
+				claims["exp"] = float64(now.Add(-1 * time.Minute).Unix())
+			},
+			stubDB:  resolvesClientAndSession(nil, errors.New("the database is on fire")),
+			want:    hintRejected,
+			wantErr: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			database := mocks_data.NewDatabase(t)
+			tokenParser := mocks_oauth.NewTokenParser(t)
+
+			req, err := http.NewRequest("GET", "/auth/logout", nil)
+			assert.NoError(t, err)
+			ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{Issuer: theIssuer})
+			if !tc.noSession {
+				ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, theSessionId)
+			}
+			req = req.WithContext(ctx)
+
+			hint := theHint
+			if tc.hintValue != nil {
+				hint = *tc.hintValue
+			}
+			httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").
+				Return(hint, !tc.hintAbsent)
+
+			clientId := theClientId
+			if tc.clientId != nil {
+				clientId = *tc.clientId
+			}
+			if tc.clientIdAbsent {
+				clientId = ""
+			}
+			httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").
+				Return(clientId, !tc.clientIdAbsent).Maybe()
+
+			claims := confirmedClaims()
+			if tc.mutate != nil {
+				tc.mutate(claims)
+			}
+
+			// The literal false is decision 14's whole mechanism, so it is asserted rather than
+			// matched loosely: a classifier that passed true would find no expectation here and the
+			// row would fail outright.
+			parsed := hint
+			if tc.innerToken != nil {
+				parsed = *tc.innerToken
+			}
+			parserCall := tokenParser.On("DecodeAndValidateTokenString", parsed, (*rsa.PublicKey)(nil), false)
+			if tc.parserErr != nil {
+				parserCall.Return(nil, tc.parserErr).Maybe()
+			} else {
+				parserCall.Return(&oauth.JwtToken{TokenBase64: parsed, Claims: claims}, nil).Maybe()
+			}
+
+			stubDB := tc.stubDB
+			if stubDB == nil {
+				stubDB = resolvesClient
+			}
+			stubDB(database)
+
+			got, err := classifyIdTokenHint(req, httpHelper, database, tokenParser)
+
+			if tc.wantErr {
+				assert.Error(t, err, "a database failure in the expiry lookup must propagate")
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.want, got.state, "gate: %s", tc.gate)
+
+			if tc.want == hintConfirmed {
+				assert.NotNil(t, got.client, "a confirmed hint must yield the client its aud named")
+				assert.Equal(t, theClientId, got.client.ClientIdentifier)
+				// The persisted row, not a model rebuilt from the identifier. Asserting the identifier
+				// alone leaves Id 0 indistinguishable from the real client, and Id is what the
+				// redirect path queries by.
+				assert.Equal(t, theClientDbId, got.client.Id,
+					"a confirmed hint must yield the persisted client, since its Id is what loads the registered redirect URIs")
+				assert.Equal(t, tc.wantSid, got.sessionIdentifier)
+			} else {
+				// RP-Initiated Logout 1.0 section 4: information that failed to validate MUST NOT be
+				// used. From a caller's side that looks like having nothing to use.
+				assert.Nil(t, got.client, "a hint that was not confirmed must yield no client")
+				assert.Empty(t, got.sessionIdentifier, "a hint that was not confirmed must yield no session")
+			}
+
+			httpHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+			tokenParser.AssertExpectations(t)
 		})
 	}
 }
