@@ -86,19 +86,12 @@ const (
 	ErrCodeAdminResourcePermissionsIdentifierRequired        = "handler.admin_resource_permissions.permission_identifier_required"
 	ErrCodeAdminResourcePermissionsDescriptionTooLong        = "handler.admin_resource_permissions.description_too_long" // Args: {"max": int}
 
-	// Logout handler — RP-initiated logout via /auth/logout. Errors render
-	// the auth_error.html page; underlying diagnostic detail is logged via
-	// slog rather than concatenated into the user-visible message.
-	ErrCodeLogoutErrorTitle                  = "handler.logout.error_title"
-	ErrCodeLogoutPostLogoutRedirectRequired  = "handler.logout.post_logout_redirect_uri_required"
-	ErrCodeLogoutIdTokenHintDecryptFailed    = "handler.logout.id_token_hint_decrypt_failed"
-	ErrCodeLogoutIdTokenHintInvalid          = "handler.logout.id_token_hint_invalid"
-	ErrCodeLogoutIdTokenHintIssMissing       = "handler.logout.id_token_hint_iss_missing"
-	ErrCodeLogoutIdTokenHintIssMismatch      = "handler.logout.id_token_hint_iss_mismatch"
-	ErrCodeLogoutAudClaimMissing             = "handler.logout.aud_claim_missing"
-	ErrCodeLogoutInvalidClient               = "handler.logout.invalid_client"
-	ErrCodeLogoutClientIdMismatch            = "handler.logout.client_id_mismatch"
-	ErrCodeLogoutInvalidPostLogoutRedirect   = "handler.logout.invalid_post_logout_redirect_uri"
+	// RP-initiated logout via /auth/logout carries no error codes. It used to
+	// carry ten, all of which rendered an error page to the End-User instead of
+	// logging them out. A hint the OP cannot confirm is now answered with the
+	// consent page the spec requires, and a redirect target it may not use costs
+	// the request its redirect and nothing else, so there is no failure left on
+	// that endpoint that the End-User is the right audience for (#109).
 
 	// Profile validator — username, names, nickname, website, gender,
 	// date of birth, zone info, locale.

@@ -19,7 +19,6 @@ import (
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
@@ -73,7 +72,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
 
-		httpHelper.On("GetFromUrlQueryOrFormPost", req, "id_token_hint").Return("")
+		httpHelper.On("LookupFromUrlQueryOrFormPost", req, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", req, "post_logout_redirect_uri").Return("")
 		httpHelper.On("GetFromUrlQueryOrFormPost", req, "client_id").Return("")
 		httpHelper.On("GetFromUrlQueryOrFormPost", req, "ui_locales").Return("")
@@ -106,7 +105,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
 
-		httpHelper.On("GetFromUrlQueryOrFormPost", req, "id_token_hint").Return("")
+		httpHelper.On("LookupFromUrlQueryOrFormPost", req, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", req, "post_logout_redirect_uri").Return("https://example.com/out")
 		httpHelper.On("GetFromUrlQueryOrFormPost", req, "client_id").Return("test_client")
 		httpHelper.On("GetFromUrlQueryOrFormPost", req, "ui_locales").Return("pt-BR")
@@ -157,6 +156,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
 
 				httpHelper.On("GetFromUrlQueryOrFormPost", req, mock.Anything).Return("")
+				httpHelper.On("LookupFromUrlQueryOrFormPost", req, "id_token_hint").Return("", false)
 				httpHelper.On("LookupFromUrlQueryOrFormPost", req, "state").Return(tc.value, tc.present)
 
 				var bound map[string]interface{}
@@ -191,6 +191,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
 
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, mock.Anything).Return("")
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("", false)
 		httpHelper.On("RenderTemplate", rr, mock.MatchedBy(func(rendered *http.Request) bool {
 			return i18n.T(rendered.Context(), "logout_consent.title") == "Sair"
@@ -201,7 +202,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("No postLogoutRedirectURI given", func(t *testing.T) {
+	// Item 1, the defect this issue is named for, at the seam where it is visible.
+	// post_logout_redirect_uri is OPTIONAL, and the check that treated it as required returned before
+	// both the database teardown and the cookie wipe, so the most ordinary conforming request in the
+	// specification rendered an error page and left the End-User signed in.
+	t.Run("A confirmed hint with no post_logout_redirect_uri still logs the user out", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -211,75 +216,36 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint=sometoken", nil)
+		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
+		client := stubConfirmedHint(httpHelper, database, tokenParser, hintedClaims())
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
+		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
 
-		httpHelper.On("GetFromUrlQueryOrFormPost", req, "id_token_hint").Return("sometoken")
-		httpHelper.On("GetFromUrlQueryOrFormPost", req, "post_logout_redirect_uri").Return("")
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			title, hasTitle := data["title"].(string)
-			error, hasError := data["error"].(string)
-			return hasTitle && title == "Logout error" &&
-				hasError && error == "The post_logout_redirect_uri parameter is required. This parameter must match one of the redirect URIs that was registered for this client."
-		})).Return(nil)
+		mockSession := expectCookieWipedBeforeSave(t, httpSession)
+		httpHelper.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
+			mock.MatchedBy(func(data map[string]interface{}) bool {
+				return data["redirectDeclined"] == false
+			})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
-	})
-
-	t.Run("Fails to parse encrypted idTokenHint as JWE", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
-
-		clientSecret := "some_client_secret"
-		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
-		assert.Nil(t, err)
-
-		// A 5-segment token is detected as a JWE, but this one is malformed, so
-		// JWE parsing fails and the handler reports a decrypt failure.
-		idTokenHint := "not.a.valid.jwe.token"
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHint)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
-		rr := httptest.NewRecorder()
-
-		settings := &models.Settings{}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
-
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(idTokenHint)
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("http://example.com")
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("someclientid")
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(&models.Client{
-			ClientSecretEncrypted: clientSecretEncrypted,
-		}, nil)
-
-		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			errorMsg, ok := data["error"].(string)
-			return ok && strings.Contains(errorMsg, "Failed to decrypt the id_token_hint.")
-		})).Return(nil)
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Empty(t, rr.Header().Get("Location"))
+		assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
+		httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 		httpHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		httpSession.AssertExpectations(t)
 	})
 
-	t.Run("Fails to decrypt idTokenHint", func(t *testing.T) {
+	// The ordinary success, and the two parameters it turns on: state reaches the RP byte-identical
+	// through url.Values rather than concatenation, and sid does not reach it at all. RP-Initiated
+	// Logout 1.0 defines exactly one parameter on the way back, and sid belongs to Front-Channel
+	// Logout, a different endpoint travelling the other way (decisions 5 and 16).
+	t.Run("A confirmed hint tears down per client and redirects", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -289,510 +255,228 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		clientSecret := "some_client_secret"
-		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
-		assert.Nil(t, err)
-
-		// A structurally valid JWE, but encrypted with a different secret than the
-		// client's, so authenticated decryption fails.
-		idTokenHint := encryptIDTokenHintForTest(t, "some_id_token", "a-different-client-secret")
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHint)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
+		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
-
-		client := &models.Client{
-			ClientSecretEncrypted: clientSecretEncrypted,
-		}
-
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(idTokenHint)
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("http://example.com")
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("someclientid")
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
-
-		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
-			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				errorMsg, ok := bind["error"].(string)
-				return ok && strings.Contains(errorMsg, "Failed to decrypt the id_token_hint")
-			})).Return(nil).Once()
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
-		database.AssertExpectations(t)
-	})
-
-	t.Run("Token parser fails to validate id token", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
-
-		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
-
-		idTokenHint := "some_id_token"
-		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
-
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
-		rr := httptest.NewRecorder()
-
-		settings := &models.Settings{}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
-
-		client := &models.Client{
-			ClientSecretEncrypted: clientSecretEncrypted,
-		}
-
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(idTokenHintEncryptedBase64)
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("http://example.com")
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("someclientid")
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
-
-		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil), true).
-			Return(nil, errors.New("some error")).Once()
-
-		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
-			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				errorMsg, ok := bind["error"].(string)
-				return ok && strings.Contains(errorMsg, "The id_token_hint parameter is invalid.")
-			})).Return(nil).Once()
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
-		database.AssertExpectations(t)
-		tokenParser.AssertExpectations(t)
-	})
-
-	t.Run("Issuer does not match", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
-
-		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
-
-		idTokenHint := "some_id_token"
-		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
-
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
-		rr := httptest.NewRecorder()
-
-		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
-		settings := &models.Settings{
-			Issuer: config.GetAuthServer().BaseURL,
-		}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
-
-		client := &models.Client{
-			ClientSecretEncrypted: clientSecretEncrypted,
-			ClientIdentifier:      "someclientid",
-		}
-
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(idTokenHintEncryptedBase64)
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("http://example.com")
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("someclientid")
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
-
-		mockIdToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"iss": "http://wrong-issuer.com",
-			},
-		}
-
-		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil), true).Return(mockIdToken, nil)
-
-		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
-			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				errorMsg, ok := bind["error"].(string)
-				return ok && strings.Contains(errorMsg, "The id_token_hint parameter is invalid: the iss claim does not match the issuer of this server.")
-			})).Return(nil).Once()
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
-		tokenParser.AssertExpectations(t)
-		database.AssertExpectations(t)
-	})
-
-	t.Run("Aud claim does not match any client", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
-
-		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
-
-		idTokenHint := "some_id_token"
-		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
-
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
-		rr := httptest.NewRecorder()
-
-		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
-		settings := &models.Settings{
-			Issuer: config.GetAuthServer().BaseURL,
-		}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
-
-		client := &models.Client{
-			ClientSecretEncrypted: clientSecretEncrypted,
-			ClientIdentifier:      "someclientid",
-		}
-
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(idTokenHintEncryptedBase64)
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("http://example.com")
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("someclientid")
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
-
-		mockIdToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"iss": config.GetAuthServer().BaseURL,
-				"aud": "non_existent_client_id",
-			},
-		}
-
-		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil), true).Return(mockIdToken, nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, "non_existent_client_id").Return(nil, nil)
-
-		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
-			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				errorMsg, ok := bind["error"].(string)
-				return ok && strings.Contains(errorMsg, "Invalid client.")
-			})).Return(nil).Once()
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
-		tokenParser.AssertExpectations(t)
-		database.AssertExpectations(t)
-	})
-
-	t.Run("Post logout redirect URI not authorized", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
-
-		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
-
-		idTokenHint := "some_id_token"
-		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
-
-		unauthorizedRedirectURI := "http://unauthorized-redirect.com"
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri="+url.QueryEscape(unauthorizedRedirectURI)+"&client_id=someclientid", nil)
-		rr := httptest.NewRecorder()
-
-		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
-		settings := &models.Settings{
-			Issuer: config.GetAuthServer().BaseURL,
-		}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
-
-		client := &models.Client{
-			ClientSecretEncrypted: clientSecretEncrypted,
-			ClientIdentifier:      "someclientid",
-		}
-
-		httpHelper.On("GetFromUrlQueryOrFormPost", req, "id_token_hint").Return(idTokenHintEncryptedBase64)
-		httpHelper.On("GetFromUrlQueryOrFormPost", req, "post_logout_redirect_uri").Return(unauthorizedRedirectURI)
-		httpHelper.On("GetFromUrlQueryOrFormPost", req, "client_id").Return("someclientid")
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
-
-		mockIdToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"iss": config.GetAuthServer().BaseURL,
-				"aud": "someclientid",
-			},
-		}
-
-		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil), true).Return(mockIdToken, nil)
-
-		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
-			client := args.Get(1).(*models.Client)
-			client.RedirectURIs = []models.RedirectURI{
-				{URI: "http://authorized-redirect.com"},
-			}
-		}).Return(nil)
-
-		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
-			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				errorMsg, ok := bind["error"].(string)
-				return ok && strings.Contains(errorMsg, "Invalid post_logout_redirect_uri")
-			})).Return(nil).Once()
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
-		tokenParser.AssertExpectations(t)
-		database.AssertExpectations(t)
-	})
-
-	t.Run("SessionIdentifier exists but sid claim is missing from ID token", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
-
-		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
-
-		idTokenHint := "some_id_token"
-		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
-
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
-		rr := httptest.NewRecorder()
-
-		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
-		settings := &models.Settings{
-			Issuer: config.GetAuthServer().BaseURL,
-		}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "existing-session-id")
-		req = req.WithContext(ctx)
-
-		client := &models.Client{
-			ClientSecretEncrypted: clientSecretEncrypted,
-			ClientIdentifier:      "someclientid",
-		}
-
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(idTokenHintEncryptedBase64)
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("http://example.com")
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("someclientid")
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
-
-		mockIdToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"iss": config.GetAuthServer().BaseURL,
-				"aud": "someclientid",
-				// Note: 'sid' claim is intentionally missing
-			},
-		}
-
-		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil), true).Return(mockIdToken, nil)
-
-		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
-			client := args.Get(1).(*models.Client)
-			client.RedirectURIs = []models.RedirectURI{
-				{URI: "http://example.com"},
-			}
-		}).Return(nil)
-
-		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-			return err != nil && err.Error() == "Invalid session identifier in id_token_hint"
-		})).Return(nil).Once()
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
-		tokenParser.AssertExpectations(t)
-		database.AssertExpectations(t)
-	})
-
-	t.Run("Sid claim does not match", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
-
-		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
-
-		idTokenHint := "some_id_token"
-		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
-
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
-		rr := httptest.NewRecorder()
-
-		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
-		settings := &models.Settings{Issuer: config.GetAuthServer().BaseURL}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "existing-session-id")
-		req = req.WithContext(ctx)
-
-		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted, ClientIdentifier: "someclientid"}
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
-
-		mockIdToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"iss": config.GetAuthServer().BaseURL,
-				"aud": "someclientid",
-				"sid": "some-other-session-id",
-			},
-		}
-
-		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil), true).Return(mockIdToken, nil)
-
-		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
-			client := args.Get(1).(*models.Client)
-			client.RedirectURIs = []models.RedirectURI{{URI: "http://example.com"}}
-		}).Return(nil)
-
-		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-			return err != nil && err.Error() == "Invalid session identifier in id_token_hint"
-		})).Return(nil).Once()
-
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(idTokenHintEncryptedBase64)
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("http://example.com")
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("someclientid")
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
-		tokenParser.AssertExpectations(t)
-		database.AssertExpectations(t)
-	})
-
-	t.Run("Successful logout with DeleteUserSession call", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
-
-		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
-
-		idTokenHint := "some_id_token"
-		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
-
-		sessionIdentifier := "existing-session-id"
-		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid&state=abc123", nil)
-		rr := httptest.NewRecorder()
-
-		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
-		settings := &models.Settings{
-			Issuer: config.GetAuthServer().BaseURL,
-		}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
-		req = req.WithContext(ctx)
-
-		client := &models.Client{
-			Id:                    1,
-			ClientSecretEncrypted: clientSecretEncrypted,
-			ClientIdentifier:      "someclientid",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
-
-		mockIdToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"iss": config.GetAuthServer().BaseURL,
-				"aud": "someclientid",
-				"sid": sessionIdentifier,
-			},
-		}
-
-		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil), true).Return(mockIdToken, nil)
-
-		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
-			client := args.Get(1).(*models.Client)
-			client.RedirectURIs = []models.RedirectURI{
-				{URI: "http://example.com"},
-			}
-		}).Return(nil)
-
-		userSession := &models.UserSession{
-			Id:     1,
-			UserId: 123,
-			Clients: []models.UserSessionClient{
-				{
-					Id:       1,
-					ClientId: 1,
-					Client:   *client,
-				},
-			},
-		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
-		database.On("UserSessionClientsLoadClients", mock.Anything, userSession.Clients).Return(nil)
-		database.On("DeleteUserSessionClient", mock.Anything, int64(1)).Return(nil)
-		database.On("DeleteUserSession", mock.Anything, int64(1)).Return(nil)
-
-		auditLogger.On("Log", constants.AuditDeletedUserSessionClient, mock.Anything).Return()
-		auditLogger.On("Log", constants.AuditLogout, mock.Anything).Return()
-
-		mockSession := &sessions.Session{
-			Values: make(map[interface{}]interface{}),
-		}
-		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(mockSession, nil)
-		httpSession.On("Save", mock.Anything, mock.Anything, mockSession).Return(nil)
-
-		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
-
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(idTokenHintEncryptedBase64)
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("http://example.com")
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("someclientid")
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "state").Return("abc-123")
+		client := stubConfirmedHint(httpHelper, database, tokenParser, hintedClaims())
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(hintedRegisteredURI)
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("aB+cd/efgh==#&x=1", true)
+		stubRegisteredURI(database, client, hintedRegisteredURI)
+		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+
+		mockSession := expectCookieWipedBeforeSave(t, httpSession)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Contains(t, rr.Header().Get("Location"), "http://example.com?sid="+sessionIdentifier+"&state=abc-123")
-
+		location, err := url.Parse(rr.Header().Get("Location"))
+		assert.NoError(t, err)
+		assert.Equal(t, hintedRegisteredURI, location.Scheme+"://"+location.Host+location.Path)
+		assert.Equal(t, []string{"aB+cd/efgh==#&x=1"}, location.Query()["state"],
+			"exactly one state, byte-identical to what the RP sent")
+		assert.Empty(t, location.Query().Get("sid"),
+			"sid is not a parameter RP-initiated logout defines, decision 5")
+		assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
 		httpHelper.AssertExpectations(t)
-		tokenParser.AssertExpectations(t)
 		database.AssertExpectations(t)
-		auditLogger.AssertExpectations(t)
 		httpSession.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+	})
+
+	// The confirmed half of "whether a redirect can be honoured is a question about the response". The
+	// hintless half of this property has its own table above; this row is what says the hinted path
+	// answers it the same way rather than returning before the teardown as all seven of its error
+	// paths used to.
+	t.Run("A confirmed hint whose target is unregistered is declined, and the logout still happens", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+
+		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
+		rr := httptest.NewRecorder()
+
+		client := stubConfirmedHint(httpHelper, database, tokenParser, hintedClaims())
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").
+			Return("https://example.com/somewhere-else")
+		stubRegisteredURI(database, client, hintedRegisteredURI)
+		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+
+		mockSession := expectCookieWipedBeforeSave(t, httpSession)
+		httpHelper.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
+			mock.MatchedBy(func(data map[string]interface{}) bool {
+				return data["redirectDeclined"] == true
+			})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Empty(t, rr.Header().Get("Location"), "a declined target must never become a redirect")
+		assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
+		httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertExpectations(t)
+		httpHelper.AssertExpectations(t)
+	})
+
+	// Divergence C, which is by design rather than a defect: an RP may end a session with a hint alone
+	// and no cookie in play, which is what makes RP-initiated logout work from a relying party that
+	// cannot reach the End-User's browser session. The hint's own sid then names the session, and the
+	// teardown is still scoped to the client the hint is signed over.
+	t.Run("A confirmed hint with no browser session tears down the session its sid names", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+
+		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, "")
+		rr := httptest.NewRecorder()
+
+		client := stubConfirmedHint(httpHelper, database, tokenParser, hintedClaims())
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
+		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+
+		expectCookieWipedBeforeSave(t, httpSession)
+		httpHelper.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
+			mock.Anything).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		database.AssertExpectations(t)
+	})
+
+	// Decision 14, at the seam where the consequence is visible rather than the classification. The
+	// admin console mints a 60-second hint, so an operator who pauses on the way through arrives here
+	// with an expired one; the spec says to accept it while the session it names is still alive, and
+	// what that has to buy is the same per-client teardown and the same redirect a fresh hint gets.
+	t.Run("An expired hint whose session is still live is honoured in full", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+
+		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
+		rr := httptest.NewRecorder()
+
+		claims := hintedClaims()
+		claims["exp"] = float64(time.Now().UTC().Add(-1 * time.Minute).Unix())
+
+		client := stubConfirmedHint(httpHelper, database, tokenParser, claims)
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(hintedRegisteredURI)
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("abc", true)
+		stubRegisteredURI(database, client, hintedRegisteredURI)
+		// The tolerance lookup and the teardown read the same row through the same call, which is one
+		// of the reasons a database fault there propagates rather than being read as "no such session".
+		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+
+		expectCookieWipedBeforeSave(t, httpSession)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, "abc", mustParseURL(t, rr.Header().Get("Location")).Query().Get("state"))
+		database.AssertExpectations(t)
+	})
+
+	// The one classification failure that is not a rejection. A database fault while deciding whether
+	// an expired hint's session is still alive has a different answer from a row that is not there:
+	// reading it as "no such session" would decide whether the hint is honoured on the database's
+	// health, and silently widen the teardown at the same time.
+	t.Run("A database fault while judging an expired hint is a 500", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+
+		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
+		rr := httptest.NewRecorder()
+
+		claims := hintedClaims()
+		claims["exp"] = float64(time.Now().UTC().Add(-1 * time.Minute).Unix())
+
+		stubConfirmedHint(httpHelper, database, tokenParser, claims)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, hintedSessionId).
+			Return(nil, errors.New("the database is on fire"))
+
+		httpHelper.On("InternalServerError", mock.Anything, mock.Anything,
+			mock.MatchedBy(func(err error) bool { return err.Error() == "the database is on fire" })).
+			Run(func(args mock.Arguments) {
+				args.Get(0).(http.ResponseWriter).WriteHeader(http.StatusInternalServerError)
+			}).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+		httpHelper.AssertExpectations(t)
+	})
+
+	// Decision 15, and the case §5 warns can pass for the wrong reason. The client_id here names a
+	// DIFFERENT client from the aud the hint is signed over, which rejects the hint, and a rejected
+	// hint earns no redirect however good that client_id looks. The target supplied is one this
+	// server would accept from a hintless request, so the case fails for the reason it names rather
+	// than because the URI was unregistered.
+	//
+	// What makes the redirect impossible is that client_id does not survive the consent hop: the
+	// confirming POST is hintless by design, so a client_id carried forward would authorize the
+	// target and the detected error would become a redirect after all. The parameter is not even
+	// read, which is what the AssertNotCalled below pins.
+	t.Run("A rejected hint reaches the consent page without its client_id", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+
+		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
+		rr := httptest.NewRecorder()
+
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("another_client", true)
+		tokenParser.On("DecodeAndValidateTokenString", hintedToken, (*rsa.PublicKey)(nil), false).
+			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
+
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(hintedRegisteredURI)
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("abc", true)
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "ui_locales").Return("")
+
+		var bound map[string]interface{}
+		httpHelper.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logout_consent.html",
+			mock.MatchedBy(func(data map[string]interface{}) bool {
+				bound = data
+				return true
+			})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, "", bound["clientId"],
+			"a rejected hint's client_id must not survive the consent hop, or it authorizes the redirect decision 15 denies")
+		assert.Equal(t, hintedRegisteredURI, bound["postLogoutRedirectUri"],
+			"the target still travels, so the signed-out page can say a return was attempted and refused")
+		httpHelper.AssertNotCalled(t, "GetFromUrlQueryOrFormPost", mock.Anything, "client_id")
+		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+		httpHelper.AssertExpectations(t)
 	})
 }
 
@@ -843,8 +527,8 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		_, err := decryptIDTokenHint("a.b.c.d.e", "invalid_client", database)
 
-		assert.NotNil(t, err)
-		assert.Equal(t, i18n.ErrCodeLogoutInvalidClient, err.Code)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "client_id names no client")
 	})
 
 	t.Run("Not a valid JWE", func(t *testing.T) {
@@ -857,8 +541,8 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		_, err := decryptIDTokenHint("not.a.valid.jwe.token", "test_client", database)
 
-		assert.NotNil(t, err)
-		assert.Equal(t, i18n.ErrCodeLogoutIdTokenHintDecryptFailed, err.Code)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
 	})
 
 	t.Run("Decryption failure (wrong key)", func(t *testing.T) {
@@ -874,172 +558,61 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		_, err := decryptIDTokenHint(jwe, "test_client", database)
 
-		assert.NotNil(t, err)
-		assert.Equal(t, i18n.ErrCodeLogoutIdTokenHintDecryptFailed, err.Code)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
 	})
 }
 
-func TestValidateClientAndRedirectURI(t *testing.T) {
-	t.Run("Valid client and redirect URI", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"aud": "test_client",
-			},
-		}
-		postLogoutRedirectURI := "https://example.com/logout"
-		clientId := "test_client"
-
-		client := &models.Client{
-			ClientIdentifier: "test_client",
-			RedirectURIs: []models.RedirectURI{
-				{URI: "https://example.com/logout"},
-			},
-		}
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
-			// RedirectURIs are already set, so we don't need to do anything here
-		}).Return(nil)
-
-		result, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
-
-		assert.Nil(t, err)
-		assert.Equal(t, client, result)
-	})
-
-	t.Run("Missing aud claim", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{},
-		}
-		postLogoutRedirectURI := "https://example.com/logout"
-		clientId := "test_client"
-
-		_, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
-
-		assert.NotNil(t, err)
-		assert.Equal(t, i18n.ErrCodeLogoutAudClaimMissing, err.Code)
-	})
-
-	t.Run("Invalid client", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"aud": "invalid_client",
-			},
-		}
-		postLogoutRedirectURI := "https://example.com/logout"
-		clientId := "invalid_client"
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "invalid_client").Return(nil, nil)
-
-		_, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
-
-		assert.NotNil(t, err)
-		assert.Equal(t, i18n.ErrCodeLogoutInvalidClient, err.Code)
-	})
-
-	t.Run("Mismatched client_id", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"aud": "test_client",
-			},
-		}
-		postLogoutRedirectURI := "https://example.com/logout"
-		clientId := "different_client"
-
-		// Set up mock for GetClientByClientIdentifier
-		client := &models.Client{
-			ClientIdentifier: "test_client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-
-		_, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
-
-		assert.NotNil(t, err)
-		assert.Equal(t, i18n.ErrCodeLogoutClientIdMismatch, err.Code)
-	})
-
-	t.Run("Invalid redirect URI", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"aud": "test_client",
-			},
-		}
-		postLogoutRedirectURI := "https://example.com/invalid"
-		clientId := "test_client"
-
-		client := &models.Client{
-			ClientIdentifier: "test_client",
-			RedirectURIs: []models.RedirectURI{
-				{URI: "https://example.com/logout"},
-			},
-		}
-
-		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
-			// RedirectURIs are already set, so we don't need to do anything here
-		}).Return(nil)
-
-		_, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
-
-		assert.NotNil(t, err)
-		assert.Equal(t, i18n.ErrCodeLogoutInvalidPostLogoutRedirect, err.Code)
-	})
-}
-
+// TestHandleExistingSessionOnLogout covers the per-client teardown a confirmed id_token_hint earns.
+//
+// The sid guard this function used to open with is gone, and so is the subtest that pinned it:
+// whether the hint names the browser's session is part of whether the hint can be confirmed at all,
+// and classifyIdTokenHint owns that with an exhaustive table. Deciding it here meant returning an
+// error the caller turned into a 500, which is what a user whose session had merely been reaped or
+// replaced saw (#109 decision 11).
 func TestHandleExistingSessionOnLogout(t *testing.T) {
-	t.Run("Invalid session identifier", func(t *testing.T) {
+
+	// Item 4. A database error and a session that is simply not there used to be one branch returning
+	// a variable that was sometimes nil to mean both, so a failing lookup completed the logout as
+	// though there had been nothing to tear down. They have different answers and both are pinned.
+	t.Run("The session lookup fails", func(t *testing.T) {
 		r := &http.Request{}
-		sessionIdentifier := "test-session"
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid": "different-session",
-			},
-		}
-		client := &models.Client{}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").
+			Return(nil, errors.New("lookup exploded"))
+
+		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger, authHelper)
 
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Invalid session identifier in id_token_hint")
+		assert.Contains(t, err.Error(), "lookup exploded")
+		database.AssertExpectations(t)
+		auditLogger.AssertNotCalled(t, "Log")
 	})
 
 	t.Run("Session not found", func(t *testing.T) {
 		r := &http.Request{}
-		sessionIdentifier := "test-session"
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid": "test-session",
-			},
-		}
-		client := &models.Client{}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(nil, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(nil, nil)
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
+		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger, authHelper)
 
-		assert.NoError(t, err) // The function should not return an error if the session is not found
+		assert.NoError(t, err, "a session that is not there is nothing to tear down, not a failure")
 		database.AssertExpectations(t)
+		auditLogger.AssertNotCalled(t, "Log")
 	})
 
+	// Decision 3's first half: another client on the session means the row survives, so that client's
+	// session-bound tokens keep working. #129 wrote two integration tests so this cannot change by
+	// accident, and this is the unit-tier statement of the same rule.
 	t.Run("Delete user session client", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid": "test-session",
-			},
-		}
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
@@ -1076,7 +649,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		auditLogger.On("Log", constants.AuditDeletedUserSessionClient, mock.Anything).Return()
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
+		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger, authHelper)
 
 		assert.NoError(t, err)
 		database.AssertExpectations(t)
@@ -1087,11 +660,6 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 	t.Run("Delete entire user session", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid": "test-session",
-			},
-		}
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
@@ -1123,7 +691,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		auditLogger.On("Log", constants.AuditDeletedUserSessionClient, mock.Anything).Return()
 		auditLogger.On("Log", constants.AuditLogout, mock.Anything).Return()
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
+		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger, authHelper)
 
 		assert.NoError(t, err)
 		database.AssertExpectations(t)
@@ -1134,11 +702,6 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 	t.Run("Client not found in user session", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
-		idToken := &oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid": "test-session",
-			},
-		}
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
@@ -1163,13 +726,135 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
 		database.On("UserSessionClientsLoadClients", mock.Anything, userSession.Clients).Return(nil)
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
+		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger, authHelper)
 
 		assert.NoError(t, err) // The function should not return an error if the client is not found in the session
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log")
 		authHelper.AssertNotCalled(t, "GetLoggedInSubject")
 	})
+}
+
+// The fixtures the hinted pipeline's cases share. A confirmed hint is one classifyIdTokenHint
+// accepts, and seam 2 owns the exhaustive table of what makes it accept or refuse one, so the cases
+// here need exactly one confirmed hint and one rejected one and say which they are using.
+const (
+	hintedIssuer        = "https://hinted-issuer.example"
+	hintedClientId      = "hinted_client"
+	hintedSessionId     = "hinted-session"
+	hintedToken         = "a.signed.hint"
+	hintedRegisteredURI = "https://example.com/out"
+)
+
+// hintedClaims is the claim set of a hint that validates. Every numeric claim is a float64 because
+// claims arrive through encoding/json inside jwt.MapClaims, and GetIntClaim refuses anything else, so
+// writing them as int would make the fixture unlike any real token.
+func hintedClaims() map[string]interface{} {
+	now := time.Now().UTC()
+	return map[string]interface{}{
+		"iss": hintedIssuer,
+		"sub": "the-user",
+		"iat": float64(now.Add(-2 * time.Minute).Unix()),
+		"exp": float64(now.Add(2 * time.Minute).Unix()),
+		"aud": hintedClientId,
+		"sid": hintedSessionId,
+	}
+}
+
+// hintedRequest builds a request for the hinted pipeline. The parameters are read through the mocked
+// HttpHelper rather than off the request, so the query and body here matter for one thing only:
+// ui_locales, which refineLogoutLocale reads with r.FormValue.
+//
+// sessionIdentifier empty means the session-identifier middleware attached nothing, which it does
+// whenever the cookie names no live row.
+func hintedRequest(t *testing.T, method string, form url.Values, sessionIdentifier string) *http.Request {
+	t.Helper()
+
+	var req *http.Request
+	var err error
+	if method == http.MethodPost {
+		req, err = http.NewRequest(method, "/auth/logout", strings.NewReader(form.Encode()))
+		assert.NoError(t, err)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	} else {
+		req, err = http.NewRequest(method, "/auth/logout?"+form.Encode(), nil)
+		assert.NoError(t, err)
+	}
+
+	ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{Issuer: hintedIssuer})
+	if len(sessionIdentifier) > 0 {
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
+	}
+	return req.WithContext(ctx)
+}
+
+// stubConfirmedHint wires everything classifyIdTokenHint reads for a hint that validates, and returns
+// the client its aud names. That client pointer is the one the teardown then compares against the
+// session's clients, so the cases must not build a second one.
+//
+// The literal false on the parse is decision 14's whole mechanism: claims validation is off, and the
+// classifier checks exp by hand so it can tolerate a past one while the session lives.
+func stubConfirmedHint(
+	httpHelper *mocks_handlerhelpers.HttpHelper,
+	database *mocks_data.Database,
+	tokenParser *mocks_oauth.TokenParser,
+	claims map[string]interface{},
+) *models.Client {
+	client := &models.Client{Id: 11, ClientIdentifier: hintedClientId}
+
+	httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
+	httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("", false)
+	tokenParser.On("DecodeAndValidateTokenString", hintedToken, (*rsa.PublicKey)(nil), false).
+		Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: claims}, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, hintedClientId).Return(client, nil)
+
+	return client
+}
+
+// stubRegisteredURI gives the client one registered redirect URI, which is the set a post-logout
+// target is matched against exactly.
+func stubRegisteredURI(database *mocks_data.Database, client *models.Client, uri string) {
+	database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
+		args.Get(1).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: uri}}
+	}).Return(nil)
+}
+
+// stubPerClientTeardown wires the reads and writes the per-client teardown performs on a session whose
+// only client is the one logging out, which is the shape that also deletes the session row.
+//
+// Per-client is what the assertions in the cases are really about: the hint's SIGNED aud scopes the
+// teardown, and an unauthenticated client_id never does.
+func stubPerClientTeardown(
+	database *mocks_data.Database,
+	auditLogger *mocks_audit.AuditLogger,
+	authHelper *mocks_handlerhelpers.AuthHelper,
+	client *models.Client,
+	sessionIdentifier string,
+) {
+	userSession := &models.UserSession{
+		Id:      42,
+		UserId:  123,
+		Clients: []models.UserSessionClient{{Id: 7, ClientId: client.Id, Client: *client}},
+	}
+
+	database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
+	database.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
+	database.On("UserSessionClientsLoadClients", mock.Anything, userSession.Clients).Return(nil)
+	database.On("DeleteUserSessionClient", mock.Anything, int64(7)).Return(nil)
+	database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
+
+	authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
+	auditLogger.On("Log", constants.AuditDeletedUserSessionClient, mock.Anything).Return()
+	auditLogger.On("Log", constants.AuditLogout, mock.Anything).Return()
+}
+
+// mustParseURL fails the test rather than returning a zero URL, so an assertion on a malformed
+// Location says so instead of silently comparing empty strings.
+func mustParseURL(t *testing.T, raw string) *url.URL {
+	t.Helper()
+	parsed, err := url.Parse(raw)
+	assert.NoError(t, err)
+	return parsed
 }
 
 // logoutPostRequest builds a hintless POST the way the consent form submits one: a real
@@ -1231,14 +916,15 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 
 		userSession := &models.UserSession{Id: 42, UserId: 123}
@@ -1281,14 +967,15 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("https://example.com/out?state=registered&lang=en")
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("test_client")
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("aB+cd/efgh==#&x=1", true)
@@ -1518,9 +1205,10 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				httpSession := mocks_sessionstore.NewStore(t)
 				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
+				tokenParser := mocks_oauth.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
 				req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 				rr := httptest.NewRecorder()
@@ -1530,7 +1218,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 					redirectURI = "https://example.com/out"
 				}
 
-				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(redirectURI)
 				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return(tc.clientId)
 				tc.stubDB(database)
@@ -1601,14 +1289,15 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				httpSession := mocks_sessionstore.NewStore(t)
 				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
+				tokenParser := mocks_oauth.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
 				req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 				rr := httptest.NewRecorder()
 
-				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 				tc.stubDB(database)
 
@@ -1656,9 +1345,10 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				httpSession := mocks_sessionstore.NewStore(t)
 				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
+				tokenParser := mocks_oauth.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
 				req := logoutPostRequest(t, url.Values{})
 				if tc.sessionIdentifier != "" {
@@ -1666,7 +1356,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				}
 				rr := httptest.NewRecorder()
 
-				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 				tc.stubDB(database)
 
@@ -1699,14 +1389,15 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
 		req := logoutPostRequest(t, url.Values{"ui_locales": {"pt-BR"}})
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 
 		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
@@ -1725,40 +1416,148 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	})
 
 	// The other half of decision 17 on this method, and the half the case above cannot reach. A POST
-	// carrying a hint returns before doLogoutWithoutIdToken is ever called, so the refinement has to
-	// happen above that branch rather than inside the hintless one. Move it down and the case above
-	// still passes while every hinted POST that renders anything renders it in the fallback language,
-	// which an RP posting ui_locales in its body has no way to correct.
-	//
-	// Which page comes back is deliberately not asserted: the hinted branch is stage 4's to rewrite,
-	// and the property here is that whatever this handler renders is localized from the body. Today
-	// the shortest hinted render is the missing-target error page.
+	// carrying a hint never enters the hintless branch, so the refinement has to happen above the
+	// pipeline rather than inside it. Move it down and the case above still passes while every hinted
+	// POST that renders anything renders it in the fallback language, which an RP posting ui_locales in
+	// its body has no way to correct.
 	t.Run("ui_locales in the body only reaches a hinted POST's render", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		req := logoutPostRequest(t, url.Values{
-			"id_token_hint": {"a.b.c"},
+		req := hintedRequest(t, http.MethodPost, url.Values{
+			"id_token_hint": {hintedToken},
 			"ui_locales":    {"pt-BR"},
-		})
+		}, hintedSessionId)
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("a.b.c")
+		client := stubConfirmedHint(httpHelper, database, tokenParser, hintedClaims())
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
+		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
 
+		expectCookieWipedBeforeSave(t, httpSession)
 		httpHelper.On("RenderTemplate", rr, mock.MatchedBy(func(rendered *http.Request) bool {
-			return i18n.T(rendered.Context(), "logout_consent.title") == "Sair"
-		}), mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			return i18n.T(rendered.Context(), "logged_out.title") == "Sessão encerrada"
+		}), "/layouts/auth_layout.html", "/logged_out.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		httpHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+	})
+
+	// Decision 18. The CSRF exemption the POST binding needs keys on the hint being PRESENT, because
+	// middleware cannot judge whether one is genuine, and gorilla/csrf returns on that skip flag before
+	// it saves the cookie and attaches the token. So a consent page rendered on this request would
+	// carry no token and its own hintless confirming POST would be refused, leaving the End-User on a
+	// page they cannot submit while still signed in. The 303 sends them to the GET binding, which is
+	// never exempt and therefore renders a page that works.
+	//
+	// The two parameters dropped are the point of the case. id_token_hint, because carrying it back
+	// would land here again forever; client_id, because the follow-up GET is the hint-absent shape,
+	// where client_id authorizes the redirect a rejected hint is specifically denied (decision 15).
+	t.Run("A POST whose hint is rejected is sent to the GET binding", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+
+		req := hintedRequest(t, http.MethodPost, url.Values{
+			"id_token_hint": {hintedToken},
+			"ui_locales":    {"pt-BR"},
+		}, hintedSessionId)
+		rr := httptest.NewRecorder()
+
+		// Rejected at the client_id gate, which refuses before any lookup: the parameter names a
+		// different client from the aud the hint is signed over.
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("another_client", true)
+		tokenParser.On("DecodeAndValidateTokenString", hintedToken, (*rsa.PublicKey)(nil), false).
+			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
+
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(hintedRegisteredURI)
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("aB+cd/efgh==#&x=1", true)
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "ui_locales").Return("pt-BR")
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusSeeOther, rr.Code,
+			"303, because the browser has to re-request by GET for the consent page to carry a token")
+		location := mustParseURL(t, rr.Header().Get("Location"))
+		assert.Equal(t, "/auth/logout", location.Path)
+		assert.Equal(t, hintedRegisteredURI, location.Query().Get("post_logout_redirect_uri"))
+		assert.Equal(t, "aB+cd/efgh==#&x=1", location.Query().Get("state"),
+			"state survives the hop byte-identical, escaped rather than concatenated")
+		assert.Equal(t, "pt-BR", location.Query().Get("ui_locales"),
+			"the locale survives, or the consent page comes back in a different language from the one asked for")
+		_, hintCarried := location.Query()["id_token_hint"]
+		assert.False(t, hintCarried, "carrying the hint back would land on this branch again, forever")
+		_, clientIdCarried := location.Query()["client_id"]
+		assert.False(t, clientIdCarried,
+			"a rejected hint's client_id must not survive, or it authorizes the redirect decision 15 denies")
+
+		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+		httpSession.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+		httpHelper.AssertExpectations(t)
+	})
+
+	// The 303 keeps decision 16's contract too, which an unconditional query would quietly break: an
+	// RP that sent no state must not have one invented for it on the way to the consent page, and one
+	// that sent "state=" must still get "state=" back at the end. Neither row catches the mutation
+	// alone, since an unconditional parameter passes the empty row and no parameter at all passes the
+	// absent row.
+	t.Run("The 303 carries state only when the request did", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			value   string
+			present bool
+		}{
+			{"supplied empty", "", true},
+			{"absent", "", false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpSession := mocks_sessionstore.NewStore(t)
+				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				database := mocks_data.NewDatabase(t)
+				tokenParser := mocks_oauth.NewTokenParser(t)
+				auditLogger := mocks_audit.NewAuditLogger(t)
+
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+
+				req := hintedRequest(t, http.MethodPost, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
+				rr := httptest.NewRecorder()
+
+				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
+				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("another_client", true)
+				tokenParser.On("DecodeAndValidateTokenString", hintedToken, (*rsa.PublicKey)(nil), false).
+					Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
+
+				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
+				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return(tc.value, tc.present)
+				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "ui_locales").Return("")
+
+				handler.ServeHTTP(rr, req)
+
+				assert.Equal(t, http.StatusSeeOther, rr.Code)
+				location := mustParseURL(t, rr.Header().Get("Location"))
+				values, present := location.Query()["state"]
+				assert.Equal(t, tc.present, present, "raw query: %q", location.RawQuery)
+				if tc.present {
+					assert.Equal(t, []string{tc.value}, values)
+				}
+			})
+		}
 	})
 
 	t.Run("Session store error", func(t *testing.T) {
@@ -1766,14 +1565,15 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
 		req := logoutPostRequest(t, url.Values{})
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 
 		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
@@ -1800,14 +1600,15 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
 		req := logoutPostRequest(t, url.Values{})
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 
 		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")

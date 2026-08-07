@@ -73,7 +73,8 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	assert.Equal(t, code.RedirectURI, q.Get("post_logout_redirect_uri"))
 	assert.Equal(t, reqBody.State, q.Get("state"))
 
-	// 1) Call /auth/logout with cookies: expect 302 to post_logout_redirect with sid present
+	// 1) Call /auth/logout with cookies: expect 302 to post_logout_redirect, carrying state and
+	// nothing else this specification does not define
 	req1, _ := http.NewRequest("GET", out.LogoutUrl, nil)
 	resp1, err := httpClientWithCookies.Do(req1)
 	assert.NoError(t, err)
@@ -83,9 +84,14 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	assert.NoError(t, err)
 	assert.Equal(t, code.RedirectURI, loc1.Scheme+"://"+loc1.Host+loc1.Path)
 	assert.Equal(t, reqBody.State, loc1.Query().Get("state"))
-	assert.Equal(t, code.SessionIdentifier, loc1.Query().Get("sid"))
+	// RP-Initiated Logout 1.0 defines exactly one parameter on the way back to the RP. sid belongs to
+	// Front-Channel Logout, a different endpoint travelling the other direction, and no RP is told to
+	// read it here, so sending it only leaked the identifier into the RP's URL bar, history and access
+	// logs (#109 decision 5).
+	assert.NotContains(t, loc1.RawQuery, "sid=", "sid is not a parameter RP-initiated logout defines")
 
-	// 2) Call /auth/logout without cookies (new client): expect 302 with sid from id_token_hint (fallback)
+	// 2) Call /auth/logout without cookies (new client): the hint's own sid names the session, which
+	// is what makes RP-initiated logout work from a relying party that cannot reach the browser session
 	httpClientNoCookies := createHttpClient(t)
 	req2, _ := http.NewRequest("GET", out.LogoutUrl, nil)
 	resp2, err := httpClientNoCookies.Do(req2)
@@ -96,7 +102,75 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	assert.NoError(t, err)
 	assert.Equal(t, code.RedirectURI, loc2.Scheme+"://"+loc2.Host+loc2.Path)
 	assert.Equal(t, reqBody.State, loc2.Query().Get("state"))
-	assert.Equal(t, code.SessionIdentifier, loc2.Query().Get("sid"))
+	assert.NotContains(t, loc2.RawQuery, "sid=", "sid is not a parameter RP-initiated logout defines")
+}
+
+// TestLogout_WithIdTokenHint_NoRedirectTarget_LogsTheUserOut is #109 item 1, the defect the issue is
+// named for, at the tier where it is observable end to end.
+//
+// post_logout_redirect_uri is OPTIONAL in RP-Initiated Logout 1.0 and this endpoint treated it as
+// required. The check returned before both the database teardown and the cookie wipe, so the most
+// ordinary conforming request in the specification, a valid hint and nothing else, rendered an error
+// page and left the End-User signed in believing they had signed out.
+//
+// The session row going is the assertion that matters. The page is the visible half; the row is the
+// half a user could not have checked.
+func TestLogout_WithIdTokenHint_NoRedirectTarget_LogsTheUserOut(t *testing.T) {
+	grant := createOfflineGrant(t)
+	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
+
+	before, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, before, "the ceremony should have left a session row to tear down")
+
+	resp, err := grant.httpClient.Get(config.GetAuthServer().BaseURL +
+		"/auth/logout?id_token_hint=" + url.QueryEscape(idToken))
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Empty(t, resp.Header.Get("Location"), "no target was asked for, so there is nothing to redirect to")
+	// No note, because the RP asked for no return: being told that a return failed would be worse than
+	// saying nothing.
+	assertSignedOutPage(t, resp, signedOutEnglish, false)
+
+	after, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	assert.Nil(t, after, "a hinted logout with no redirect target must still tear the session down")
+}
+
+// TestLogout_RejectedHint_AsksTheEndUserAndRefusesTheRedirect is decision 15 driven through the real
+// stack, and it is deliberately the same request as TestLogout_Hintless_ClientIdAuthorizesTheRedirect
+// with one parameter added: an id_token_hint that cannot be confirmed.
+//
+// Without the hint those parameters redirect. With it they must not, because RP-Initiated Logout 1.0
+// section 4 forbids using information that failed to validate and forbids redirecting once an error is
+// detected. The mechanism is that the consent page a rejected hint renders drops client_id, so the
+// confirming POST has nothing left to authorize a target with, and the note appears instead.
+//
+// The teardown still happens, which is the property the whole change turns on: a hint the OP cannot
+// confirm costs the RP its redirect and costs the End-User nothing.
+func TestLogout_RejectedHint_AsksTheEndUserAndRefusesTheRedirect(t *testing.T) {
+	grant := createOfflineGrant(t)
+
+	// Rejected at the parse gate. Seam 2's unit table owns every other way a hint fails; what this tier
+	// adds is that a rejected hint reaches a consent page a browser can actually submit.
+	resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
+		"id_token_hint":            {"not.a.token"},
+		"post_logout_redirect_uri": {grant.redirectURI},
+		"client_id":                {grant.client.ClientIdentifier},
+		"state":                    {gofakeit.LetterN(8)},
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Empty(t, resp.Header.Get("Location"),
+		"a rejected hint earns no redirect, however good the client_id beside it looks")
+	assertSignedOutPage(t, resp, signedOutEnglish, true)
+
+	gone, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	assert.Nil(t, gone, "the consent page precedes the teardown, it does not replace it")
 }
 
 // The two cases below pin that #129 changed NOTHING about RP-initiated logout (decision 3). The

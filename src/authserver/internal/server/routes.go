@@ -112,7 +112,7 @@ func (s *Server) initRoutes() {
 		// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force)
 		r.With(rateLimiter.LimitROPC).Post("/token", handlers.HandleTokenPost(httpHelper, userSessionManager, s.database, tokenIssuer, tokenValidator, auditLogger))
 		r.Get("/logout", handlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, authHelper, s.database, tokenParser, auditLogger))
-		r.Post("/logout", handlers.HandleAccountLogoutPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
+		r.Post("/logout", handlers.HandleAccountLogoutPost(httpHelper, s.sessionStore, authHelper, s.database, tokenParser, auditLogger))
 	})
 
 	s.router.Route("/account", func(r chi.Router) {

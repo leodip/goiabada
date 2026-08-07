@@ -15,8 +15,6 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
-	oauthdb "github.com/leodip/goiabada/core/oauthdb"
 	"github.com/pkg/errors"
 )
 
@@ -30,20 +28,8 @@ func HandleAccountLogoutGet(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		r = refineLogoutLocale(r)
-
-		idTokenHint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint")
-
-		if len(idTokenHint) == 0 {
-			// OpenID Connect RP-Initiated Logout 1.0 section 2 makes this a MUST: "the OP MUST ask
-			// the End-User this question if an id_token_hint was not provided". So the consent page
-			// is the response, and it deliberately precedes any teardown.
-			renderLogoutConsent(w, r, httpHelper)
-			return
-		}
-
-		doLogoutWithIdToken(w, r, httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		doLogout(w, r, httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 	}
 }
 
@@ -73,14 +59,29 @@ func refineLogoutLocale(r *http.Request) *http.Request {
 // renderLogoutConsent renders the logout consent page, carrying forward the parameters the
 // confirming POST needs and NOT the id_token_hint. See logout_consent.html for why the hint is
 // dropped and why state is treated differently from the other three.
-func renderLogoutConsent(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper) {
+//
+// hint says how the request's id_token_hint was classified, and it decides one thing: whether
+// client_id survives the hop. It does when no hint was supplied, because client_id is then the only
+// thing that can authorize a post-logout redirect and doing so is its documented primary purpose. It
+// must NOT when a hint was supplied and rejected: the confirming POST is hintless by design, so a
+// surviving client_id would authorize the redirect that the rejected hint was specifically denied,
+// and the detected error would become a redirect after all. RP-Initiated Logout 1.0 section 4 forbids
+// that twice, once as "any operations requiring the information that failed to correctly validate
+// MUST be aborted", and once as "the OP MUST not perform post-logout redirection to an RP" upon
+// detecting errors (#109).
+func renderLogoutConsent(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, hint hintState) {
 	state, statePresent := httpHelper.LookupFromUrlQueryOrFormPost(r, "state")
+
+	clientId := ""
+	if hint == hintAbsent {
+		clientId = httpHelper.GetFromUrlQueryOrFormPost(r, "client_id")
+	}
 
 	bind := map[string]interface{}{
 		"csrfField":             csrf.TemplateField(r),
 		"formAction":            logoutFormPath,
 		"postLogoutRedirectUri": httpHelper.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri"),
-		"clientId":              httpHelper.GetFromUrlQueryOrFormPost(r, "client_id"),
+		"clientId":              clientId,
 		"state":                 state,
 		"statePresent":          statePresent,
 		"uiLocales":             httpHelper.GetFromUrlQueryOrFormPost(r, "ui_locales"),
@@ -111,20 +112,6 @@ func renderLoggedOut(w http.ResponseWriter, r *http.Request, httpHelper HttpHelp
 	}
 }
 
-// renderAuthError renders the auth_error.html page with a localized title
-// and message. i18n surface: A — RP-initiated logout error page.
-func renderAuthError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, locErr *i18n.LocalizedError) {
-	ctx := r.Context()
-	bind := map[string]interface{}{
-		"title": i18n.T(ctx, i18n.ErrCodeLogoutErrorTitle),
-		"error": locErr.Localize(ctx),
-	}
-	err := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
-	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
-	}
-}
-
 // isEncryptedIDTokenHint reports whether the hint is a compact JWE (5
 // dot-separated segments) rather than a compact JWS (3 segments). An encrypted
 // hint must be decrypted with the client's key before validation; a plain
@@ -139,23 +126,31 @@ func isEncryptedIDTokenHint(hint string) bool {
 // documented in integration/endpoints.mdx and implemented in
 // encryption.DecryptIDTokenHintJWE. client_id selects which client's secret to
 // use, as required by RP-Initiated Logout for symmetrically-encrypted hints.
-func decryptIDTokenHint(idTokenHint, clientID string, database data.Database) (string, *i18n.LocalizedError) {
+//
+// The returned error is for the server log and never for the End-User. Every failure here means the
+// hint cannot be confirmed, and the spec's answer to a hint the OP cannot confirm is to ask the
+// End-User rather than to show them a diagnostic about a request their relying party built (#109).
+func decryptIDTokenHint(idTokenHint, clientID string, database data.Database) (string, error) {
 	client, err := database.GetClientByClientIdentifier(nil, clientID)
-	if err != nil || client == nil {
+	if err != nil {
 		slog.Error("logout: client lookup failed", "clientId", clientID, "err", err)
-		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidClient, nil)
+		return "", errors.Wrap(err, "unable to look up the client named by client_id")
+	}
+	if client == nil {
+		slog.Error("logout: client_id names no client", "clientId", clientID)
+		return "", errors.New("client_id names no client")
 	}
 
 	clientSecret, err := encryption.DecryptData(client.ClientSecretEncrypted)
 	if err != nil {
 		slog.Error("logout: client secret decrypt failed", "err", err)
-		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil)
+		return "", errors.Wrap(err, "unable to decrypt the client secret")
 	}
 
 	decryptedToken, err := encryption.DecryptIDTokenHintJWE(idTokenHint, clientSecret)
 	if err != nil {
 		slog.Error("logout: id_token_hint decrypt failed", "err", err)
-		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil)
+		return "", errors.Wrap(err, "unable to decrypt the id_token_hint")
 	}
 
 	return decryptedToken, nil
@@ -272,8 +267,8 @@ func classifyIdTokenHint(
 		if len(clientId) == 0 {
 			return reject("JWE key selection", "reason", "an encrypted id_token_hint needs client_id to select the key")
 		}
-		decrypted, locErr := decryptIDTokenHint(hint, clientId, database)
-		if locErr != nil {
+		decrypted, err := decryptIDTokenHint(hint, clientId, database)
+		if err != nil {
 			// decryptIDTokenHint has already logged which half failed.
 			return reject("JWE decryption")
 		}
@@ -425,54 +420,36 @@ func classifyIdTokenHint(
 	}, nil
 }
 
-func validateClientAndRedirectURI(idToken *oauth.JwtToken, postLogoutRedirectURI string, database data.Database, clientId string) (*models.Client, *i18n.LocalizedError) {
-	clientIdentifier := idToken.GetStringClaim("aud")
-	if len(clientIdentifier) == 0 {
-		return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutAudClaimMissing, nil)
-	}
-
-	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
-	if err != nil || client == nil {
-		slog.Error("logout: client lookup failed", "clientIdentifier", clientIdentifier, "err", err)
-		return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidClient, nil)
-	}
-
-	if len(clientId) > 0 && clientId != clientIdentifier {
-		return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutClientIdMismatch, nil)
-	}
-
-	err = database.ClientLoadRedirectURIs(nil, client)
-	if err != nil {
-		slog.Error("logout: load redirect URIs failed", "clientIdentifier", clientIdentifier, "err", err)
-		return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidPostLogoutRedirect, nil)
-	}
-
-	for _, uri := range client.RedirectURIs {
-		if uri.URI == postLogoutRedirectURI {
-			return client, nil
-		}
-	}
-
-	return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidPostLogoutRedirect, nil)
-}
-
+// handleExistingSessionOnLogout performs the per-client teardown a CONFIRMED id_token_hint earns:
+// delete this client's row on the session, and the session row itself when that client was the last
+// one on it.
+//
+// Per-client rather than whole-session, unchanged by this rewrite, because #129 decided that logging
+// one client out must not stop the session-bound tokens of the other clients sharing that session.
+// Two of its integration tests exist so that widening this has to be deliberate (#109 decision 3).
+//
+// The sid guard this used to open with is gone. Whether the hint names the browser's session is part
+// of whether the hint can be confirmed at all, and classifyIdTokenHint decides that before anything
+// reaches here. It used to be decided here, by returning an error the caller turned into a 500, which
+// is what a user whose session had merely been reaped or replaced saw (#109 decision 11).
+//
+// A lookup or delete failure is returned so the caller can surface a 500. A session row that is not
+// there is nothing to tear down rather than a failure, and those two used to be one branch returning
+// a variable that was sometimes nil to mean both (#109 item 4).
 func handleExistingSessionOnLogout(
 	r *http.Request,
 	sessionIdentifier string,
-	idToken *oauth.JwtToken,
 	client *models.Client,
 	database data.Database,
 	auditLogger AuditLogger,
 	authHelper AuthHelper,
 ) error {
-	sid := idToken.GetStringClaim("sid")
-	if len(sid) == 0 || sid != sessionIdentifier {
-		return errors.New("Invalid session identifier in id_token_hint")
-	}
-
 	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
-	if err != nil || userSession == nil {
+	if err != nil {
 		return err
+	}
+	if userSession == nil {
+		return nil
 	}
 
 	err = database.UserSessionLoadClients(nil, userSession)
@@ -523,86 +500,181 @@ func HandleAccountLogoutPost(
 	httpSession sessions.Store,
 	authHelper AuthHelper,
 	database data.Database,
+	tokenParser TokenParser,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		r = refineLogoutLocale(r)
-
-		// If id_token_hint is present in the POST body, handle same as GET flow
-		if hint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint"); len(hint) > 0 {
-			// Use a fresh token parser based on database
-			tp := oauthdb.NewTokenParser(database)
-			doLogoutWithIdToken(w, r, httpHelper, httpSession, authHelper, database, tp, auditLogger)
-			return
-		}
-
-		doLogoutWithoutIdToken(w, r, httpHelper, httpSession, authHelper, database, auditLogger)
+		doLogout(w, r, httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 	}
 }
 
-// doLogoutWithoutIdToken logs the End-User out on a request that named no id_token_hint. Reaching
-// here on a POST means the confirming submission of the consent page, since that page is what a
-// hintless GET renders and the CSRF token it carries is what proves the request came from it.
+// doLogout is the whole endpoint, entered identically by GET and by POST. Four steps, and the design
+// is in keeping them independent:
 //
-// The three steps run in this order and, crucially, the second reads nothing the first produced.
-// That independence is the whole fix for #109's first item: every error path in this endpoint used
-// to return before both the teardown and the cookie wipe, so a request the OP considered malformed
-// rendered a page saying so and left the user signed in. Whether a redirect can be honoured is now
-// only ever a question about the response, never about whether the logout happens.
-func doLogoutWithoutIdToken(
+//  1. Classify the id_token_hint into confirmed, absent or rejected.
+//  2. Decide whether the End-User has to be asked.
+//  3. Resolve the redirect target, which is only ever a question about the RESPONSE.
+//  4. Tear down and respond, reading nothing step 3 produced.
+//
+// Step 4 not reading step 3 is the fix for #109's first item and its six siblings at once. Every
+// error path in this endpoint used to return before both the database teardown and the cookie wipe,
+// so a request the OP considered malformed rendered a page saying so and left the user signed in.
+// Hint validity now decides only whether the End-User is asked, redirect-target validity decides only
+// whether a redirect happens, and neither decides whether the logout happens.
+func doLogout(
 	w http.ResponseWriter,
 	r *http.Request,
 	httpHelper HttpHelper,
 	httpSession sessions.Store,
 	authHelper AuthHelper,
 	database data.Database,
+	tokenParser TokenParser,
 	auditLogger AuditLogger,
 ) {
-	// 1. Resolve the redirect target. With no hint to read a signed aud from, the only thing that
-	// can authorize a target is client_id, which is the parameter's documented primary purpose:
-	// RP-Initiated Logout 1.0 section 2 says "The most common use case for this parameter is to
-	// specify the Client Identifier when post_logout_redirect_uri is used but id_token_hint is not."
-	// That is the "other means of confirming the legitimacy of the post-logout redirection target"
-	// section 3 requires before an OP may redirect.
+	// 1. Classify.
+	hint, err := classifyIdTokenHint(r, httpHelper, database, tokenParser)
+	if err != nil {
+		// The single failure classification propagates instead of rejecting: a database fault while
+		// deciding whether an expired hint's session is still alive. Everything else is a rejection,
+		// because a hint the OP cannot confirm is a reason to ask rather than an error to report.
+		httpHelper.InternalServerError(w, r, err)
+		return
+	}
+
+	// 2. Decide whether to ask. RP-Initiated Logout 1.0 section 2: "the OP MUST ask the End-User this
+	// question if an id_token_hint was not provided or if the supplied ID Token does not belong to the
+	// current OP session with the RP and/or currently logged in End-User".
+	switch {
+	case hint.state == hintConfirmed:
+		// The hint names a client and a session and validates, so there is nobody to ask.
+
+	case hint.state == hintAbsent && r.Method == http.MethodPost:
+		// The confirming submission of the consent page. A hintless POST is not CSRF-exempt, so it
+		// carried a token, so it came from a page this server rendered. That is what makes it consent
+		// rather than a cross-site request, and it is why the consent form drops the hint (#109
+		// decision 13).
+
+	case hint.state == hintRejected && r.Method == http.MethodPost:
+		redirectToHintlessLogout(w, r, httpHelper)
+		return
+
+	default:
+		// Absent on GET, and rejected on either method that is not POST. Ask.
+		renderLogoutConsent(w, r, httpHelper, hint.state)
+		return
+	}
+
+	// 3. Resolve the redirect target, independently of step 2 above and of step 4 below.
 	postLogoutRedirectURI := httpHelper.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri")
 	location := ""
 	if len(postLogoutRedirectURI) > 0 {
-		clientId := httpHelper.GetFromUrlQueryOrFormPost(r, "client_id")
-		client := clientForPostLogoutRedirect(clientId, database)
+		// A confirmed hint carries its own client, resolved from the aud it is signed over. Only step
+		// 2's second row reaches here with no hint, and there the sole thing that can authorize a
+		// target is client_id, which is that parameter's documented primary purpose: RP-Initiated
+		// Logout 1.0 section 2, "The most common use case for this parameter is to specify the Client
+		// Identifier when post_logout_redirect_uri is used but id_token_hint is not". That is the
+		// "other means of confirming the legitimacy of the post-logout redirection target" section 3
+		// requires before an OP may redirect.
+		//
+		// A rejected hint never arrives here at all, because step 2 always asks first, and the consent
+		// page it renders drops client_id. That is how a detected error is kept from becoming a
+		// redirect (#109 decision 15).
+		client := hint.client
+		if hint.state == hintAbsent {
+			client = clientForPostLogoutRedirect(httpHelper.GetFromUrlQueryOrFormPost(r, "client_id"), database)
+		}
 		location = postLogoutRedirectLocation(r, httpHelper, database, client, postLogoutRedirectURI)
 	}
 
-	// 2. Tear down, which the step above cannot prevent.
-	sessionIdentifier := ""
-	if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-		sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-	}
-
-	userId := int64(0)
-	if len(sessionIdentifier) > 0 {
-		var err error
-		userId, err = deleteWholeUserSession(r, sessionIdentifier, database, auditLogger, authHelper)
-		if err != nil {
-			// A failed teardown is the one thing here that does deserve a 500: the End-User is
-			// still signed in and saying otherwise would be a lie. Contrast the redirect
-			// resolution above, whose failures deliberately degrade to "no redirect".
+	// 4. Tear down, which the step above cannot prevent.
+	if hint.state == hintConfirmed {
+		// Scoped to the client the hint's SIGNED aud names. client_id is never allowed to scope a
+		// teardown, because it is unauthenticated and a caller could name any client; it is trusted
+		// only for deciding whether a supplied URI is registered to the client it names, which is
+		// self-limiting (#109).
+		if err := handleExistingSessionOnLogout(r, hint.sessionIdentifier, hint.client, database, auditLogger, authHelper); err != nil {
+			// A failed teardown is the one thing here that does deserve a 500: the End-User is still
+			// signed in and saying otherwise would be a lie. Contrast the redirect resolution above,
+			// whose failures deliberately degrade to "no redirect".
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
+		// AuditLogout is emitted inside, and only when the session row itself goes, which is what this
+		// path did before the rewrite and what decision 3 keeps.
+	} else {
+		// No client to scope to, so the whole session goes (#109 decision 2).
+		sessionIdentifier := ""
+		if v := r.Context().Value(constants.ContextKeySessionIdentifier); v != nil {
+			sessionIdentifier, _ = v.(string)
+		}
+
+		userId := int64(0)
+		if len(sessionIdentifier) > 0 {
+			var err error
+			userId, err = deleteWholeUserSession(r, sessionIdentifier, database, auditLogger, authHelper)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+		}
+
+		// Unconditional, as before, so a logout with no usable session still records the attempt.
+		// There being no session to end is not a failure: it may have been reaped or ended from
+		// another device, and the End-User asking to leave has got what they asked for either way.
+		auditLogger.Log(constants.AuditLogout, map[string]interface{}{
+			"userId":            userId,
+			"sessionIdentifier": sessionIdentifier,
+			"loggedInUser":      authHelper.GetLoggedInSubject(r),
+		})
 	}
 
-	// Unconditional, as before, so a logout with no usable session still records the attempt. There
-	// being no session to end is not a failure: the session may have been reaped or ended from
-	// another device, and the End-User asking to leave has got what they asked for either way.
-	auditLogger.Log(constants.AuditLogout, map[string]interface{}{
-		"userId":            userId,
-		"sessionIdentifier": sessionIdentifier,
-		"loggedInUser":      authHelper.GetLoggedInSubject(r),
-	})
-
-	// 3. Respond.
+	// 5. Respond.
 	finishLogout(w, r, httpHelper, httpSession, location, len(postLogoutRedirectURI) > 0)
+}
+
+// redirectToHintlessLogout answers a POST whose id_token_hint could not be confirmed with a 303 back
+// to the GET binding, carrying what the consent page still needs and dropping the two parameters it
+// must not have.
+//
+// Why a redirect rather than simply rendering the consent page here. The CSRF exemption the POST
+// binding needs keys on the hint being PRESENT, because middleware cannot judge whether a hint is
+// genuine. gorilla/csrf returns from its handler on that skip flag before it saves the CSRF cookie
+// and before it attaches the token, so a consent page rendered on such a request carries an empty
+// csrf.TemplateField, and its own confirming POST is hintless, therefore not exempt, therefore
+// refused. That leaves the End-User on a page they cannot submit while still signed in, which is the
+// class of defect this endpoint was rewritten to remove. The GET binding is never exempt, so the page
+// it renders has a real token and a real cookie (#109).
+//
+// id_token_hint is dropped because sending it back would land on this branch again, forever.
+// client_id is dropped because the follow-up GET is then the hint-absent shape, where client_id is
+// what authorizes a post-logout redirect: keeping it would hand the request the redirect authority a
+// rejected hint is specifically denied. With no client_id nothing validates the target, so the
+// End-User is signed out and lands on the signed-out page with the "we could not return you" note,
+// which is the intended outcome for a hint that failed to validate (#109 decision 15).
+func redirectToHintlessLogout(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper) {
+	query := url.Values{}
+	if postLogoutRedirectURI := httpHelper.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri"); len(postLogoutRedirectURI) > 0 {
+		query.Set("post_logout_redirect_uri", postLogoutRedirectURI)
+	}
+	// Presence-aware, so a state supplied empty survives as "state=" and an absent one stays absent,
+	// which is the contract the consent form's hidden field keeps too (#109 decision 16).
+	if state, statePresent := httpHelper.LookupFromUrlQueryOrFormPost(r, "state"); statePresent {
+		query.Set("state", state)
+	}
+	if uiLocales := httpHelper.GetFromUrlQueryOrFormPost(r, "ui_locales"); len(uiLocales) > 0 {
+		query.Set("ui_locales", uiLocales)
+	}
+
+	location := logoutFormPath
+	if encoded := query.Encode(); len(encoded) > 0 {
+		location += "?" + encoded
+	}
+
+	// 303 rather than 302, because the browser must re-request by GET and that is what the status
+	// means: RFC 7231 section 6.4.4, "the user agent ... performing a retrieval request on the
+	// alternate URI ... using the GET method".
+	http.Redirect(w, r, location, http.StatusSeeOther)
 }
 
 // deleteWholeUserSession ends the whole OP session named by the browser's cookie and returns the
@@ -775,107 +847,6 @@ func finishLogout(
 	}
 
 	renderLoggedOut(w, r, httpHelper, targetSupplied)
-}
-
-// doLogoutWithIdToken contains the shared logic used by both GET and POST flows when an id_token_hint is provided.
-func doLogoutWithIdToken(
-	w http.ResponseWriter,
-	r *http.Request,
-	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
-	database data.Database,
-	tokenParser TokenParser,
-	auditLogger AuditLogger,
-) {
-	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-
-	idTokenHint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint")
-	postLogoutRedirectURI := httpHelper.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri")
-	if len(postLogoutRedirectURI) == 0 {
-		renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutPostLogoutRedirectRequired, nil))
-		return
-	}
-
-	clientId := httpHelper.GetFromUrlQueryOrFormPost(r, "client_id")
-	// A JWE-encrypted id_token_hint must be decrypted before validation. It is
-	// keyed off client_id (RP-Initiated Logout): without it we cannot know whose
-	// secret derives the key. A plain signed hint is validated as-is, whether or
-	// not client_id is present.
-	if isEncryptedIDTokenHint(idTokenHint) {
-		if len(clientId) == 0 {
-			slog.Error("logout: encrypted id_token_hint requires client_id")
-			renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil))
-			return
-		}
-		var locErr *i18n.LocalizedError
-		idTokenHint, locErr = decryptIDTokenHint(idTokenHint, clientId, database)
-		if locErr != nil {
-			renderAuthError(w, r, httpHelper, locErr)
-			return
-		}
-	}
-
-	idToken, err := tokenParser.DecodeAndValidateTokenString(idTokenHint, nil, true)
-	if err != nil {
-		slog.Error("logout: id_token_hint validation failed", "err", err)
-		renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintInvalid, nil))
-		return
-	}
-
-	issuer := idToken.GetStringClaim("iss")
-	if len(issuer) == 0 {
-		renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintIssMissing, nil))
-		return
-	}
-	if issuer != settings.Issuer {
-		renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintIssMismatch, nil))
-		return
-	}
-
-	client, locErr := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
-	if locErr != nil {
-		renderAuthError(w, r, httpHelper, locErr)
-		return
-	}
-
-	sessionIdentifier := ""
-	if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-		sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-	}
-	// Fallback: if no session cookie/context, use sid from id_token_hint
-	if len(sessionIdentifier) == 0 {
-		if sidClaim := idToken.GetStringClaim("sid"); len(sidClaim) > 0 {
-			sessionIdentifier = sidClaim
-		}
-	}
-
-	if len(sessionIdentifier) > 0 {
-		err = handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-	}
-
-	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
-	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
-		return
-	}
-	sess.Values = make(map[interface{}]interface{})
-	if err = httpSession.Save(r, w, sess); err != nil {
-		httpHelper.InternalServerError(w, r, err)
-		return
-	}
-
-	state := httpHelper.GetFromUrlQueryOrFormPost(r, "state")
-	sid := sessionIdentifier
-	logoutUri := postLogoutRedirectURI + "?sid=" + sid
-	if len(state) > 0 {
-		logoutUri += "&state=" + state
-	}
-	http.Redirect(w, r, logoutUri, http.StatusFound)
 }
 
 // buildPostLogoutRedirect returns the Location value for a post-logout redirect: the
