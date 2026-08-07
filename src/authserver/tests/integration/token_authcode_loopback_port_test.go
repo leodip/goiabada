@@ -24,7 +24,7 @@ import (
 //
 // The unit tests for this behaviour exercise a pure function (core/urlutil) and a mocked
 // database (core/validators), so neither shows an ephemeral-port callback actually
-// completing. This does. See docs/issue-41-loopback-redirect-uri.md, stage 2 step 4.
+// completing. This does (#41).
 func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	clientSecret := gofakeit.LetterN(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
