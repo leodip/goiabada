@@ -160,8 +160,8 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 	// !HasIdToken is also true for "code foo" and "code code". And not as
 	// !rtInfo.IsImplicitFlow(), because response_type is not validated until
 	// ValidateRequest, which runs after this check, so that negative test is true for
-	// "code token" and for garbage such as "foo". See decision 12 in
-	// docs/issue-41-loopback-redirect-uri.md.
+	// "code token" and for garbage such as "foo". This check is what scopes loopback port
+	// flexibility to the authorization code flow (#41).
 	responseTypes := strings.Fields(input.ResponseType)
 	allowLoopbackPortFlexibility := len(responseTypes) == 1 && responseTypes[0] == "code"
 

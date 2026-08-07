@@ -206,11 +206,10 @@ func TestMatchStep(t *testing.T) {
 // Colliding pairs are rare, roughly 8 authentications in a million meet one, so no
 // other test in the suite will ever reach this path by accident.
 //
-// The pairs, and the expected answer at each current step, are transcribed from the
-// executed sweep in docs/issue-111-otp-replay/probe/step-collisions, which searched
-// 600,000 consecutive steps of this secret. The probe also confirms no third step
-// within eight either side produces these passcodes, which is what makes the answer
-// constant rather than merely lower than it was.
+// The pairs, and the expected answer at each current step, are transcribed from an
+// executed sweep of 600,000 consecutive steps of this secret, which also confirmed that
+// no third step within eight either side produces these passcodes. That is what makes the
+// answer constant rather than merely lower than it was.
 func TestMatchStepWithCollidingSteps(t *testing.T) {
 	// Written for the skew of 1 the server runs at. Spreads are stated as literals
 	// rather than in terms of skewSteps so that #142, if it ever narrows the window,
@@ -261,9 +260,9 @@ func TestMatchStepWithCollidingSteps(t *testing.T) {
 // instead, and this is what pins the walk.
 //
 // It calls matchStepWith rather than MatchStep, one boundary below the seam the interview
-// sealed, because a chain cannot be exhibited with a real secret: the sweep in
-// docs/issue-111-otp-replay/probe/step-collisions found 0 chains of three in 20,000,000
-// steps over 4 secrets, against 1.8e-04 expected. Driving MatchStep with a real secret
+// sealed, because a chain cannot be exhibited with a real secret: an executed sweep found
+// 0 chains of three in 20,000,000 steps over 4 secrets, against 1.8e-04 expected.
+// Driving MatchStep with a real secret
 // therefore passes with the walk deleted. The steps below are a synthetic match set
 // standing in for the HMAC, and the shapes are every one that is acceptable over an
 // unbroken run of current steps: pairs up to spread 5, and every chain of three whose

@@ -42,8 +42,8 @@ const (
 	// bounds is work per request, turning a bound of the whole step axis into a small
 	// constant.
 	//
-	// 5 is read off the sweep in docs/issue-111-otp-replay/probe/step-collisions
-	// rather than rounded to a comfortable number. Every scan that finds something
+	// 5 is read off an executed sweep of the step axis rather than rounded to a
+	// comfortable number. Every scan that finds something
 	// needs one more step producing the same six digits within lookbackSteps below the
 	// last, and the sweep measured that link rate instead of assuming it: 55 links in
 	// 20,000,000 steps over 4 secrets, 2.75e-06 per step against the 3.0e-06 an
