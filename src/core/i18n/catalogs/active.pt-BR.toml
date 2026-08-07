@@ -1402,17 +1402,6 @@
 "handler.admin_resource_permissions.permission_identifier_required" = "O identificador da permissão é obrigatório."
 "handler.admin_resource_permissions.description_too_long" = "A descrição não pode ter mais que {{.max}} caracteres."
 
-"handler.logout.error_title" = "Erro de logout"
-"handler.logout.post_logout_redirect_uri_required" = "O parâmetro post_logout_redirect_uri é obrigatório. Este parâmetro precisa corresponder a uma das URIs de redirecionamento cadastradas para este cliente."
-"handler.logout.id_token_hint_decrypt_failed" = "Falha ao descriptografar o id_token_hint."
-"handler.logout.id_token_hint_invalid" = "O parâmetro id_token_hint é inválido."
-"handler.logout.id_token_hint_iss_missing" = "O parâmetro id_token_hint é inválido: a claim iss está ausente."
-"handler.logout.id_token_hint_iss_mismatch" = "O parâmetro id_token_hint é inválido: a claim iss não corresponde ao issuer deste servidor."
-"handler.logout.aud_claim_missing" = "A claim aud está ausente no id_token_hint."
-"handler.logout.invalid_client" = "Cliente inválido."
-"handler.logout.client_id_mismatch" = "O parâmetro client_id não corresponde à claim aud do id_token_hint."
-"handler.logout.invalid_post_logout_redirect_uri" = "post_logout_redirect_uri inválido."
-
 "validator.password.too_short" = "O comprimento mínimo para a senha é {{.min}} caracteres"
 "validator.password.too_long" = "O comprimento máximo para a senha é {{.max}} caracteres"
 "validator.password.lowercase_required" = "Conforme nossa política, é obrigatório um caractere minúsculo na senha."

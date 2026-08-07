@@ -96,25 +96,6 @@ resource-permissions page.
 | `handler.admin_resource_permissions.permission_identifier_required` | (none) | Permission identifier is required. |
 | `handler.admin_resource_permissions.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters. |
 
-## Logout handler
-
-RP-initiated logout (`/auth/logout`) error page (`auth_error.html`). Underlying
-diagnostic detail (decryption failures, JWT parse errors) is logged via slog
-rather than concatenated into the user-visible message.
-
-| Code | Args | English message |
-|---|---|---|
-| `handler.logout.error_title` | (none) | Logout error |
-| `handler.logout.post_logout_redirect_uri_required` | (none) | The post_logout_redirect_uri parameter is required. This parameter must match one of the redirect URIs that was registered for this client. |
-| `handler.logout.id_token_hint_decrypt_failed` | (none) | Failed to decrypt the id_token_hint. |
-| `handler.logout.id_token_hint_invalid` | (none) | The id_token_hint parameter is invalid. |
-| `handler.logout.id_token_hint_iss_missing` | (none) | The id_token_hint parameter is invalid: the iss claim is missing. |
-| `handler.logout.id_token_hint_iss_mismatch` | (none) | The id_token_hint parameter is invalid: the iss claim does not match the issuer of this server. |
-| `handler.logout.aud_claim_missing` | (none) | The aud claim is missing in id_token_hint. |
-| `handler.logout.invalid_client` | (none) | Invalid client. |
-| `handler.logout.client_id_mismatch` | (none) | The client_id parameter does not match the aud claim in id_token_hint. |
-| `handler.logout.invalid_post_logout_redirect_uri` | (none) | Invalid post_logout_redirect_uri. |
-
 ## Password validator
 
 | Code | Args | English message |
