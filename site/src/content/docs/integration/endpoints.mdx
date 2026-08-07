@@ -349,10 +349,22 @@ The response body contains error details:
 
 This endpoint enables the client application to initiate a logout. This implementation aligns with the [OpenID Connect RP-Initiated Logout 1.0 protocol](https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
 
-### Basic logout (no parameters)
+### Logout without an id_token_hint
 
-- **GET /auth/logout** - Displays a logout consent screen, prompting the user to confirm their intention to log out. No redirection occurs.
-- **POST /auth/logout** - Immediately logs out the user and redirects to the auth server base URL.
+`id_token_hint` is recommended but not required. Without one, Goiabada cannot tell which client is asking, so it asks the user instead:
+
+- **GET /auth/logout** - Displays a logout consent screen, prompting the user to confirm their intention to log out.
+- **POST /auth/logout** - What that screen submits. The user is logged out: the session record is deleted and the session cookie is cleared.
+
+Once the user confirms, they land on a page telling them they have been logged out.
+
+Ending the session reaches the tokens that depend on it, and no further. A normal refresh token from that session stops working, because there is no session behind it any more. Offline refresh tokens are not tied to a browser session and keep working. Access tokens that were already issued stay cryptographically valid: Goiabada's own endpoints, `/userinfo` and the account and admin APIs, reject one whose session is gone on the very next request, but a third-party resource server validating a token by signature alone cannot see that the session ended and keeps accepting it until it expires.
+
+You can still be redirected back to your application on this path, by sending `post_logout_redirect_uri` together with `client_id`. The URI must exactly match one registered for that client, and only `state` is added to it. Your `state` comes back byte for byte, including any `+`, `/`, `=`, `#` or `&`; sending it empty gives you back an empty `state`, and not sending it gives you no `state` at all. If the URI cannot be validated, because `client_id` is missing or unknown, or because the URI is not registered for that client, the user is **still logged out** and lands on the logged-out page with a short note saying we could not return them to the application.
+
+<Aside>
+Sending `post_logout_redirect_uri` with neither `id_token_hint` nor `client_id` never redirects. The spec requires the OP to confirm the legitimacy of the redirection target first, and with neither parameter there is nothing to confirm it against.
+</Aside>
 
 ### RP-initiated logout (with parameters)
 
@@ -369,28 +381,33 @@ For proper logout with redirection back to your application, use either GET or P
   <tbody>
     <tr>
       <td style="white-space: nowrap;"><code>id_token_hint</code></td>
-      <td>Yes</td>
-      <td>The previously issued ID token (can be encrypted or unencrypted).</td>
+      <td>Recommended</td>
+      <td>The previously issued ID token (can be encrypted or unencrypted). Send it when you have it: it identifies the client and session, so the user is not asked to confirm. Without it, the logout still happens, after the consent screen.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>post_logout_redirect_uri</code></td>
-      <td>Yes</td>
-      <td>A redirect URI that must be pre-registered with the client.</td>
+      <td>Conditional</td>
+      <td>A redirect URI that must be pre-registered with the client. Required when you send an <code>id_token_hint</code>. Without a hint it is optional: leave it out and the user is logged out and lands on the logged-out page.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>client_id</code></td>
       <td>Conditional</td>
-      <td>Required only if <code>id_token_hint</code> is encrypted with the client secret.</td>
+      <td>Required if <code>id_token_hint</code> is encrypted with the client secret, to select whose secret derives the key. Also required to authorize <code>post_logout_redirect_uri</code> when you send no <code>id_token_hint</code>.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>state</code></td>
       <td>No</td>
       <td>Any arbitrary string that will be echoed back in the redirect.</td>
     </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>ui_locales</code></td>
+      <td>No</td>
+      <td>Space-separated list of preferred locales for the pages this endpoint renders, such as <code>pt-BR en</code>. Read from the query string or the form body.</td>
+    </tr>
   </tbody>
 </table>
 
-### Response
+### Response (with an id_token_hint)
 
 After successful logout, the user is redirected to the `post_logout_redirect_uri` with the following query parameters:
 

@@ -1,0 +1,18 @@
+{{define "title"}}{{ .appName }} - {{ T $.ctx "logged_out.page_title" }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+
+    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "logged_out.title" }}</h2>
+
+    <div class="mt-5">
+
+        <p>{{ T $.ctx "logged_out.message" }}</p>
+
+    </div>
+
+    {{if .redirectDeclined}}
+        <p class="mt-6">{{ T $.ctx "logged_out.redirect_declined" }}</p>
+    {{end}}
+
+{{end}}
