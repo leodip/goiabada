@@ -18,6 +18,11 @@
 #                           One of: mysql | postgres | mssql | sqlite | all (default: all)
 #   -r, --run    <pattern>  go test -run regex passed to data/integration runs
 #                           (e.g. TestTemp_AccessTokenHasSidClaim or 'TestToken_.*Reuse')
+#   -n, --no-build          Skip the build step at the top of the run. Useful in
+#                           CI, where one job invokes this script several times
+#                           and only the first needs to build. Integration tests
+#                           require a prior build, and this refuses to run them
+#                           without one.
 #   -h, --help              Show this help and exit.
 #
 # Examples:
@@ -46,6 +51,11 @@
 #   * Per-phase output is also written to $LOG_DIR (printed at startup). On
 #     failure the log path plus a FAIL/panic summary is printed at the bottom
 #     so you don't have to scroll up through thousands of PASS lines.
+#   * Under GitHub Actions (detected via $GITHUB_ACTIONS) each phase is wrapped
+#     in a collapsible ::group::, failed tests are emitted as ::error::
+#     annotations so they appear at the top of the job page without opening a
+#     log, and a per-phase result table is appended to the job summary. All of
+#     that is inert outside CI: local output is unchanged.
 
 set -uo pipefail
 
@@ -53,9 +63,15 @@ set -uo pipefail
 TYPE="all"
 DB="all"
 RUN_PATTERN=""
+BUILD=true
 
+# Print the header comment block by deriving its extent, rather than with a
+# hardcoded line range. The previous '2,46p' had already gone stale: adding
+# anything to the header shifts the boundary, and the help output was silently
+# truncating the Notes section mid-sentence. This stops at the first line that
+# is not a comment, so the header can grow freely.
 print_help() {
-    sed -n '2,46p' "$0"
+    awk 'NR == 1 { next } /^#/ { print; next } { exit }' "$0"
 }
 
 while [ $# -gt 0 ]; do
@@ -66,6 +82,8 @@ while [ $# -gt 0 ]; do
             DB="${2:-}"; shift 2 ;;
         -r|--run)
             RUN_PATTERN="${2:-}"; shift 2 ;;
+        -n|--no-build)
+            BUILD=false; shift ;;
         -h|--help)
             print_help; exit 0 ;;
         *)
@@ -99,6 +117,47 @@ should_run_adminconsole() { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ 
 should_run_data()         { [ "$TYPE" = "all" ] || [ "$TYPE" = "data" ]; }
 should_run_integration()  { [ "$TYPE" = "all" ] || [ "$TYPE" = "integration" ]; }
 
+# ---- GitHub Actions output helpers ------------------------------------------
+# Everything CI-specific goes through these. $GITHUB_ACTIONS is set only by the
+# Actions runner, so on a workstation every one of them is a no-op and the
+# script's output is byte-for-byte what it was before.
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    gha_group()    { echo "::group::$1"; }
+    gha_endgroup() { echo "::endgroup::"; }
+    gha_error()    { echo "::error title=$1::$2"; }
+    # GITHUB_STEP_SUMMARY is always set by the runner, but default it anyway so
+    # that `set -u` cannot turn a missing variable into a failed test run.
+    gha_summary()  { echo "$1" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"; }
+else
+    gha_group()    { :; }
+    gha_endgroup() { :; }
+    gha_error()    { :; }
+    gha_summary()  { :; }
+fi
+
+# Render seconds as 48s / 1m52s, matching how the Actions UI shows step times.
+fmt_duration() {
+    local s=$1
+    if [ "$s" -ge 60 ]; then
+        printf '%dm%02ds' $((s / 60)) $((s % 60))
+    else
+        printf '%ds' "$s"
+    fi
+}
+
+# One row per phase in the job summary: tier, database, result, duration.
+# GitHub scopes step summaries per job, not per run, so this produces a table
+# for whichever phases this particular invocation ran.
+summary_header_written=false
+gha_summary_row() {
+    if [ "$summary_header_written" = false ]; then
+        gha_summary "| Tier | DB | Result | Duration |"
+        gha_summary "|-------------|----------|--------|----------|"
+        summary_header_written=true
+    fi
+    gha_summary "| $1 | $2 | $3 | $4 |"
+}
+
 # ---- output capture ---------------------------------------------------------
 # Every phase writes its full output here so failures are inspectable without
 # scrolling up through tens of thousands of PASS lines.
@@ -116,6 +175,18 @@ echo "==> log dir: $LOG_DIR"
 fail_with() {
     local label="$1"
     local log="$2"
+
+    # Close whatever phase group is open so the failure report below renders
+    # outside the collapsed section rather than hidden inside it.
+    gha_endgroup
+
+    # One annotation per failed test. These surface in the annotation list at
+    # the top of the job page, which is the difference between "a job went red"
+    # and "these four tests failed" without opening a log at all. Inert locally.
+    while IFS= read -r t; do
+        [ -n "$t" ] && gha_error "$t" "$label — see $log"
+    done < <(grep -oE '^(    )*--- FAIL: [^ ]+' "$log" 2>/dev/null | sed 's/.*--- FAIL: //')
+
     echo
     echo "=========================================================="
     echo "FAILED: $label"
@@ -146,10 +217,23 @@ fail_with() {
 }
 
 # ---- build ------------------------------------------------------------------
-build_log="$LOG_DIR/00-build.log"
-echo "Building the project before running tests... (log: $build_log)"
-if ! ./build.sh 2>&1 | tee "$build_log"; then
-    fail_with "Build" "$build_log"
+# start_server_and_wait execs ./tmp/goiabada-authserver, so --no-build combined
+# with integration tests fails obscurely (and late) unless there is already a
+# binary on disk. Refuse up front instead.
+if [ "$BUILD" = false ] && should_run_integration && [ ! -x ./tmp/goiabada-authserver ]; then
+    echo "--no-build requires a prior build: ./tmp/goiabada-authserver not found"
+    exit 2
+fi
+
+if [ "$BUILD" = true ]; then
+    build_log="$LOG_DIR/00-build.log"
+    echo "Building the project before running tests... (log: $build_log)"
+    build_start=$SECONDS
+    if ! ./build.sh 2>&1 | tee "$build_log"; then
+        gha_summary_row "Build" "-" "FAIL" "$(fmt_duration $((SECONDS - build_start)))"
+        fail_with "Build" "$build_log"
+    fi
+    gha_summary_row "Build" "-" "pass" "$(fmt_duration $((SECONDS - build_start)))"
 fi
 
 # Remove the temporary SQLite databases along with their sidecar files.
@@ -185,9 +269,23 @@ run_tests() {
     fi
     local log="$LOG_DIR/${test_type}-${GOIABADA_DB_TYPE:-unknown}.log"
     echo "Log: $log"
+    local db="${GOIABADA_DB_TYPE:-unknown}"
+    # Spelled out rather than using ${test_type^}, which needs bash 4+; nothing
+    # else in this script does.
+    local tier
+    case "$test_type" in
+        data)        tier="Data" ;;
+        integration) tier="Integration" ;;
+        *)           tier="$test_type" ;;
+    esac
+    local start=$SECONDS
+    gha_group "$tier tests ($db)"
     if ! go test "${args[@]}" "./tests/$test_type/..." 2>&1 | tee "$log"; then
-        fail_with "$test_type tests (${GOIABADA_DB_TYPE:-unknown})" "$log"
+        gha_summary_row "$tier" "$db" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+        fail_with "$test_type tests ($db)" "$log"
     fi
+    gha_endgroup
+    gha_summary_row "$tier" "$db" "pass" "$(fmt_duration $((SECONDS - start)))"
 }
 
 # Function to start server and wait for it to be ready
@@ -339,25 +437,40 @@ configure_database() {
 if should_run_internal; then
     log="$LOG_DIR/01-internal.log"
     echo "Running internal tests... (log: $log)"
+    start=$SECONDS
+    gha_group "Internal tests"
     if ! go test -v "./internal/..." 2>&1 | tee "$log"; then
+        gha_summary_row "Internal" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Authserver internal tests" "$log"
     fi
+    gha_endgroup
+    gha_summary_row "Internal" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 if should_run_core; then
     log="$LOG_DIR/02-core.log"
     echo "Running tests for core module... (log: $log)"
+    start=$SECONDS
+    gha_group "Core module tests"
     if ! (cd ../core && go test -v ./...) 2>&1 | tee "$log"; then
+        gha_summary_row "Core" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Core module tests" "$log"
     fi
+    gha_endgroup
+    gha_summary_row "Core" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 if should_run_adminconsole; then
     log="$LOG_DIR/03-adminconsole.log"
     echo "Running tests for admin console module... (log: $log)"
+    start=$SECONDS
+    gha_group "Admin console module tests"
     if ! (cd ../adminconsole && go test -v ./...) 2>&1 | tee "$log"; then
+        gha_summary_row "Adminconsole" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Admin console module tests" "$log"
     fi
+    gha_endgroup
+    gha_summary_row "Adminconsole" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 # ---- DB-matrix runs (data + integration) ------------------------------------
