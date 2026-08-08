@@ -316,7 +316,14 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "invalid"
 		})).Return(nil)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		// The clear has to reach the browser, so it must happen before the response is
+		// committed. rr.Header() is the live map the handler and this stub share, so it shows
+		// the sentinel under either ordering; rr.Result() reads the snapshot taken when the
+		// status line was written, which is the only unit-tier view that tells them apart.
+		const clearedContextCookie = "cleared-auth-context"
+		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
+		}).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -337,6 +344,191 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), "https://example.com?error=")
+		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
+			"the auth context must be cleared before the client response is committed")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
+	t.Run("Invalid scopes with a failing clear - server_error to the client", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+
+		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
+		// handler does next. The client is still owed its error response, and server_error is
+		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
+		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
+
+		handler.ServeHTTP(rr, req)
+
+		// httpHelper has no InternalServerError expectation, so the mock fails the test if the
+		// handler answers with a bare 500 instead of redirecting the client.
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Result().Header.Get("Location")
+		assert.Contains(t, location, "https://example.com?error=server_error")
+		assert.Contains(t, location, "error_description=Internal+server+error")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
+	t.Run("Invalid scopes with a failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
+		// redirToClientWithError returns "unable to parse template" instead of committing.
+		// form_post is the only response mode whose arm can fail after the redirect URI has
+		// been validated, so it is how this branch is reached at all.
+		templateFS := &mocks.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		// The clear failed and the server_error response the client is owed cannot be built
+		// either, so there is nowhere left to send it and the 500 is the last resort. Without
+		// this expectation the handler would answer nothing at all.
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
+
+		handler.ServeHTTP(rr, req)
+
+		// Nothing reached the client: the form_post arm fails before it writes, and the 500 is
+		// the mock's, so no redirect is committed.
+		assert.Empty(t, rr.Result().Header.Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
+	t.Run("Invalid scopes with an unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		templateFS := &mocks.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+
+		// The other half of the same family: here the clear succeeds and it is the ordinary
+		// refusal that cannot be committed. This is the closure's second and pre-existing 500,
+		// pinned separately so a future edit cannot delete either copy unnoticed.
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1923,7 +2115,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		// Same sentinel as the "Invalid scopes" case, for handlePromptNone's own refusal
+		// closure: rr.Result() reads the header snapshot taken at commit time, so the sentinel
+		// only appears there if the clear ran before the client response was committed.
+		const clearedContextCookie = "cleared-auth-context"
+		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
+		}).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -1931,6 +2129,293 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		location := rr.Header().Get("Location")
 		assert.Contains(t, location, "https://example.com?error=login_required")
 		assert.Contains(t, location, "error_description=")
+		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
+			"the auth context must be cleared before the client response is committed")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+	})
+
+	t.Run("prompt=none with a failing clear - server_error to the client", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		hintSubject := uuid.New()
+		sessionSubject := uuid.New()
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-999")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+
+		differentUserToken := &oauth.JwtToken{
+			TokenBase64: "different-user-jwt",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": hintSubject.String(),
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+
+		userSession := &models.UserSession{
+			Id:          1,
+			UserId:      999,
+			AcrLevel:    enums.AcrLevel1.String(),
+			AuthMethods: "pwd",
+			User: models.User{
+				Id:      999,
+				Enabled: true,
+				Subject: sessionSubject,
+			},
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-999").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+		// The refusal this path would otherwise send is login_required. With the clear failing,
+		// the client gets server_error instead: a silent-renewal iframe reads that as "retry
+		// later" rather than "start an interactive login", which is the accurate instruction
+		// when the server has a fault the client will never learn about.
+		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		handler.ServeHTTP(rr, req)
+
+		// httpHelper has no InternalServerError expectation, so the mock fails the test if the
+		// handler answers with a bare 500 instead of redirecting the client.
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Result().Header.Get("Location")
+		assert.Contains(t, location, "https://example.com?error=server_error")
+		assert.Contains(t, location, "error_description=Internal+server+error")
+		assert.NotContains(t, location, "login_required")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+	})
+
+	t.Run("prompt=none with a failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		// handlePromptNone's closure carries its own copy of the last-resort 500, so removing
+		// site 1's copy leaves this one and vice versa. Each is pinned at its own site.
+		templateFS := &mocks.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		hintSubject := uuid.New()
+		sessionSubject := uuid.New()
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-999")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+
+		differentUserToken := &oauth.JwtToken{
+			TokenBase64: "different-user-jwt",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": hintSubject.String(),
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+
+		userSession := &models.UserSession{
+			Id:          1,
+			UserId:      999,
+			AcrLevel:    enums.AcrLevel1.String(),
+			AuthMethods: "pwd",
+			User: models.User{
+				Id:      999,
+				Enabled: true,
+				Subject: sessionSubject,
+			},
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-999").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+	})
+
+	t.Run("prompt=none with an unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		templateFS := &mocks.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		hintSubject := uuid.New()
+		sessionSubject := uuid.New()
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-999")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+
+		differentUserToken := &oauth.JwtToken{
+			TokenBase64: "different-user-jwt",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": hintSubject.String(),
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+
+		userSession := &models.UserSession{
+			Id:          1,
+			UserId:      999,
+			AcrLevel:    enums.AcrLevel1.String(),
+			AuthMethods: "pwd",
+			User: models.User{
+				Id:      999,
+				Enabled: true,
+				Subject: sessionSubject,
+			},
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-999").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+		// The clear succeeds here, so it is the login_required refusal itself that cannot be
+		// committed. Site 2's second and pre-existing 500, pinned separately from the nested one
+		// above.
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
