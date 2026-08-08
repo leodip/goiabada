@@ -366,6 +366,24 @@ You can still be redirected back to your application on this path, by sending `p
 Sending `post_logout_redirect_uri` with neither `id_token_hint` nor `client_id` never redirects. The spec requires the OP to confirm the legitimacy of the redirection target first, and with neither parameter there is nothing to confirm it against.
 </Aside>
 
+### Choosing GET or POST
+
+Both bindings accept the same parameter names. Send them where the method puts them: in the query string on a GET, and in an `application/x-www-form-urlencoded` body on a POST. A GET's body is never read, so a parameter sent only there is ignored.
+
+A POST reads the query string as well as its body, so send each parameter once. Which copy wins when the same one arrives in both places is not worth relying on.
+
+What differs between the two methods is not the parameters but whether the request is accepted at all, which is what the rest of this section is about.
+
+POST is worth using when you have an `id_token_hint`, because it keeps the ID token out of the browser's address bar, its history and the referrer headers it sends on to other sites. A self-submitting form from your own page is the usual way to do it, and that form is a cross-site request: it comes from your origin and posts to Goiabada's.
+
+**A cross-site POST needs an `id_token_hint`.** Without one Goiabada answers `403 Forbidden`, because a POST with no hint is exactly what the logout consent screen submits, and treating an arbitrary site's request as a user's confirmation would let any page sign your users out. With a hint the request is accepted and evaluated on the hint's merits: a hint Goiabada can confirm logs the user straight out, and one it cannot is answered with a `303 See Other` back to `GET /auth/logout`, which is where the consent screen comes from. Follow the redirect and the user is asked to confirm, as they would have been on a GET.
+
+That `303` carries your `post_logout_redirect_uri`, `state` and `ui_locales` onward, and deliberately drops `id_token_hint` and `client_id`. Dropping `client_id` is why a hint that fails validation earns no redirect even when a valid `client_id` was sent beside it.
+
+<Aside>
+This is the only reason to think about the method at all. A GET is never refused, so if you are sending users to `/auth/logout` with a link or a browser redirect, nothing here applies to you.
+</Aside>
+
 ### RP-initiated logout (with parameters)
 
 For proper logout with redirection back to your application, use either GET or POST with the following parameters:
@@ -402,7 +420,7 @@ For proper logout with redirection back to your application, use either GET or P
     <tr>
       <td style="white-space: nowrap;"><code>ui_locales</code></td>
       <td>No</td>
-      <td>Space-separated list of preferred locales for the pages this endpoint renders, such as <code>pt-BR en</code>. Read from the query string or the form body.</td>
+      <td>Space-separated list of preferred locales for the pages this endpoint renders, such as <code>pt-BR en</code>. Read from the query string, and on a POST from the form body as well.</td>
     </tr>
   </tbody>
 </table>

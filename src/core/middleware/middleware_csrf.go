@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/core/handlerhelpers"
 )
 
 // csrfCookieMaxAgeSeconds keeps the CSRF cookie valid for a year so it never
@@ -56,13 +57,73 @@ var csrfExemptPrefixes = []string{
 	"/static/",
 }
 
-// shouldSkipCsrf reports whether CSRF protection should be bypassed for the
-// given request path. CSRF defends cookie-authenticated, state-changing
-// requests; the exempt paths carry no session cookie (they are bearer/client-
-// authenticated or safe-method static assets), so a CSRF token would never be
-// present and enforcing it would only break legitimate non-browser clients.
-// See csrfExemptExactPaths and csrfExemptPrefixes for the per-endpoint rationale.
-func shouldSkipCsrf(path string) bool {
+// csrfConditionalExemptions lists endpoints whose exemption depends on the request rather than only
+// on its path. Matched EXACTLY, like csrfExemptExactPaths, and the predicate decides the rest; a
+// path absent from all three tables keeps full CSRF protection.
+//
+//	/auth/logout - RP-initiated logout, exempt only for a POST carrying an id_token_hint. See
+//	               logoutIdTokenHintPresent.
+//
+// This table exists because an unconditional entry above would be a hole: any site could then POST
+// to /auth/logout with no hint and no token, and the handler treats a hintless POST as the
+// confirmation of its consent page, so the End-User would be signed out without ever being asked.
+var csrfConditionalExemptions = map[string]func(*http.Request) bool{
+	"/auth/logout": logoutIdTokenHintPresent,
+}
+
+// logoutIdTokenHintPresent reports whether this is a POST to the logout endpoint carrying an
+// id_token_hint, which is the one shape of /auth/logout that must work cross-site.
+//
+// OpenID Connect RP-Initiated Logout 1.0 section 2 is a MUST here: "OpenID Providers MUST support
+// the use of the HTTP GET and POST methods defined in RFC 7231". Without an exemption gorilla/csrf
+// rejects every cross-origin POST, so the binding exists for relying parties that cannot reach it,
+// and an RP that wants a self-submitting form to keep the ID token out of the URL has no way in.
+//
+// PRESENCE, not a value, and read through the same function the handler classifies the parameter
+// with. The two readings must agree in one direction above all: this saying "present" where the
+// handler reads "absent" would exempt a cross-site POST and then send it down the hintless branch,
+// which tears the whole session down with no consent. Sharing handlerhelpers'
+// LookupFromUrlQueryOrFormPost is what makes that agreement structural rather than a promise, and
+// it is why "id_token_hint=" is exempt here and Rejected there (#109).
+//
+// Presence alone is safe because middleware cannot judge whether a hint is genuine and the handler
+// does not trust it to: a POST whose hint fails to validate tears nothing down, it is answered with
+// a redirect to the GET binding and ends at the consent page. So the exemption buys an attacker a
+// consent page they cannot confirm, which is where a plain link to /auth/logout already lands.
+//
+// POST only. Everything gorilla/csrf checks is a POST here in practice, and confining it means the
+// form parse below happens on one path and one method rather than on requests that have no business
+// being read.
+//
+// The admin console registers this same middleware and mounts only GET /auth/logout, so a POST
+// there is answered by chi with 405 before any handler runs. Exempting a route that does not exist
+// changes nothing; noted so the shared table does not read as an oversight.
+// Reading the body here does let a foreign origin have its body parsed before it is turned away,
+// where gorilla/csrf would previously have rejected it on the Origin header alone. That is inherent
+// to decision 9 rather than introduced by reading the body: the same origin need only move the hint
+// into the query to reach the handler, which parses the body itself to honour ui_locales. Go bounds
+// the parse the same way it bounds every other form endpoint here, and middleware_ratelimiter and
+// middleware_jwt already parse forms on this side of the chain.
+func logoutIdTokenHintPresent(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	// Reads the query first and only then the body, so a hint in the query costs no parse. When it
+	// does parse, Go caches the result in r.PostForm and the handler's own r.FormValue reuses it,
+	// which is what stops this middleware consuming the body the handler is about to read.
+	_, present := handlerhelpers.LookupFromUrlQueryOrFormPost(r, "id_token_hint")
+	return present
+}
+
+// shouldSkipCsrf reports whether CSRF protection should be bypassed for this request. CSRF defends
+// cookie-authenticated, state-changing requests; the exempt paths carry no session cookie (they are
+// bearer/client-authenticated or safe-method static assets), so a CSRF token would never be present
+// and enforcing it would only break legitimate non-browser clients. See csrfExemptExactPaths,
+// csrfExemptPrefixes and csrfConditionalExemptions for the per-endpoint rationale.
+//
+// The path is passed in rather than read off the request because the caller has already resolved
+// chi's normalized RoutePath, which is what a trailing slash arrives as.
+func shouldSkipCsrf(r *http.Request, path string) bool {
 	if csrfExemptExactPaths[path] {
 		return true
 	}
@@ -70,6 +131,11 @@ func shouldSkipCsrf(path string) bool {
 		if strings.HasPrefix(path, prefix) {
 			return true
 		}
+	}
+	// Last, so an unconditional entry always wins and no predicate is consulted, and with it no
+	// request body read, for a path that was exempt anyway.
+	if exempt, ok := csrfConditionalExemptions[path]; ok {
+		return exempt(r)
 	}
 	return false
 }
@@ -86,7 +152,7 @@ func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 				path = rctx.RoutePath
 			}
 
-			if shouldSkipCsrf(path) {
+			if shouldSkipCsrf(r, path) {
 				r = csrf.UnsafeSkipCheck(r)
 			}
 			next.ServeHTTP(w, r.WithContext(r.Context()))
