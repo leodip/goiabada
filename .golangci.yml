@@ -1,0 +1,25 @@
+# golangci-lint configuration for all four Go modules.
+#
+# `default: none` is load-bearing. Without it, `enable` only ADDS to the
+# `standard` set, so the gate would silently widen whenever an upstream release
+# changes what `standard` means -- and a linter nobody chose could redden every
+# open PR. Listing the linters explicitly makes that an intentional, reviewable
+# commit instead.
+#
+# The set below is exactly golangci-lint 2.12.2's `standard` set, pinned as of
+# the CI/CD v2 stage 0 cleanup. The binary itself is pinned in
+# src/authserver/versions.yaml (tools.golangci-lint).
+#
+# Note that golangci-lint's bundled staticcheck includes the QF (quickfix)
+# family, which the standalone `staticcheck` binary does not ship at all. This
+# file is therefore the wider gate and the single definition of "lint-clean".
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused

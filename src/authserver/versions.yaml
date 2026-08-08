@@ -26,11 +26,27 @@ project:
 # tailwind:       Tailwind CSS CLI version (devcontainer, Dockerfile-test)
 # golangci-lint:  Go linter version (devcontainer)
 # mockery:        Mock generator version (devcontainer)
+# staticcheck:    Static analyzer (devcontainer, make check)
+# unparam:        Unused-parameter analyzer (devcontainer, make check)
+# govulncheck:    Vulnerability scanner (devcontainer)
+#
+# staticcheck, unparam and govulncheck are pinned because they gate CI. An
+# unpinned tool can turn every open PR red on an upstream release, with no
+# change on our side. Note that upstream version schemes differ from their
+# GitHub release tags: staticcheck's module version is 0.7.0 while its release
+# tag is 2026.1, and golang/vuln's releases page trails its module tags. The
+# Go module proxy is the source of truth for all three, which is what
+# `./version-manager.sh check` queries. unparam publishes no tags at all, so it
+# is pinned to a pseudo-version and every upstream commit will show up as an
+# available update.
 tools:
   go: "1.26.5"
   tailwind: "4.3.3"
   golangci-lint: "2.12.2"
   mockery: "3.7.2"
+  staticcheck: "0.7.0"
+  unparam: "0.0.0-20251027182757-5beb8c8f8f15"
+  govulncheck: "1.6.0"
 
 # -----------------------------------------------------------------------------
 # CDN Dependencies
