@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -159,14 +160,31 @@ func HandleAuthorizeGet(
 		}
 
 		redirToClientWithError := func(validationError *customerrors.ErrorDetail) {
-			err := redirToClientWithError(w, r, templateFS, validationError.GetCode(), validationError.GetDescription(),
-				r.FormValue("response_mode"), r.FormValue("redirect_uri"), r.FormValue("state"),
-				r.FormValue("response_type"))
+			// The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie
+			// on w, and redirToClientWithError commits the response in every response mode, so
+			// clearing afterwards leaves the header on a response already written and the
+			// browser keeps an auth context it can replay (#141).
+			err := authHelper.ClearAuthContext(w, r)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				// The clear failed, so Save wrote no cookie and the browser still holds the
+				// auth context. The client is owed an error response regardless: its redirect
+				// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
+				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
+				slog.Error("failed to clear the auth context, answering the client with server_error",
+					"error", err)
+				err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
+					r.FormValue("response_mode"), r.FormValue("redirect_uri"), r.FormValue("state"),
+					r.FormValue("response_type"))
+				if err != nil {
+					// Nowhere left to send the client, so the 500 is the last resort here.
+					httpHelper.InternalServerError(w, r, err)
+				}
+				return
 			}
 
-			err = authHelper.ClearAuthContext(w, r)
+			err = redirToClientWithError(w, r, templateFS, validationError.GetCode(), validationError.GetDescription(),
+				r.FormValue("response_mode"), r.FormValue("redirect_uri"), r.FormValue("state"),
+				r.FormValue("response_type"))
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -375,15 +393,33 @@ func HandleAuthorizeGet(
 // - Returns an error to the client if silent auth is not possible
 // - Issues a code silently if all conditions are met
 func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database data.Database, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *oauth.AuthContext, client *models.Client, sessionIdentifier string) {
-	// Helper to redirect with error and clear auth context
+	// Helper to clear the auth context and then redirect with error
 	redirectWithError := func(errorCode string, errorDescription string) {
-		err := redirToClientWithError(w, r, templateFS, errorCode, errorDescription,
-			authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+		// The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie on
+		// w, and redirToClientWithError commits the response in every response mode, so
+		// clearing afterwards leaves the header on a response already written and the browser
+		// keeps an auth context it can replay (#141).
+		err := authHelper.ClearAuthContext(w, r)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			// The clear failed, so Save wrote no cookie and the browser still holds the auth
+			// context. The client is owed an error response regardless: its redirect URI was
+			// validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749
+			// 4.1.2.1 mints server_error for exactly this condition (#141). A silent-renewal
+			// iframe reads that as "retry later" rather than "start an interactive login",
+			// which on a genuine server fault is the accurate instruction of the two.
+			slog.Error("failed to clear the auth context, answering the client with server_error",
+				"error", err)
+			err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
+				authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+			if err != nil {
+				// Nowhere left to send the client, so the 500 is the last resort here.
+				httpHelper.InternalServerError(w, r, err)
+			}
 			return
 		}
-		err = authHelper.ClearAuthContext(w, r)
+
+		err = redirToClientWithError(w, r, templateFS, errorCode, errorDescription,
+			authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

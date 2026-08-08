@@ -197,14 +197,29 @@ func HandleAuthCompletedGet(
 			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
-			err := redirToClientWithError(w, r, templateFS, "access_denied", "The user account is disabled.",
-				authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+			// The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie
+			// on w, and redirToClientWithError commits the response in every response mode, so
+			// clearing afterwards leaves the header on a response already written and the
+			// browser keeps an auth context it can replay (#141).
+			err := authHelper.ClearAuthContext(w, r)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				// The clear failed, so Save wrote no cookie and the browser still holds the
+				// auth context. The client is owed an error response regardless: its redirect
+				// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
+				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
+				slog.Error("failed to clear the auth context, answering the client with server_error",
+					"error", err)
+				err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
+					authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+				if err != nil {
+					// Nowhere left to send the client, so the 500 is the last resort here.
+					httpHelper.InternalServerError(w, r, err)
+				}
 				return
 			}
 
-			err = authHelper.ClearAuthContext(w, r)
+			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user account is disabled.",
+				authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -225,13 +240,28 @@ func HandleAuthCompletedGet(
 		// in the auth context replace the scope with the effective scope
 		authContext.SetScope(effectiveScope)
 		if len(authContext.Scope) == 0 {
-			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user is not authorized to access any of the requested scopes", authContext.ResponseMode,
-				authContext.RedirectURI, authContext.State, authContext.ResponseType)
+			// The clear goes FIRST, for the same reason as the disabled-user refusal above: a
+			// Set-Cookie written after redirToClientWithError has committed never reaches the
+			// wire, so the browser keeps a replayable auth context (#141).
+			err = authHelper.ClearAuthContext(w, r)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				// The clear failed, so Save wrote no cookie and the browser still holds the
+				// auth context. The client is owed an error response regardless: its redirect
+				// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
+				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
+				slog.Error("failed to clear the auth context, answering the client with server_error",
+					"error", err)
+				err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
+					authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+				if err != nil {
+					// Nowhere left to send the client, so the 500 is the last resort here.
+					httpHelper.InternalServerError(w, r, err)
+				}
+				return
 			}
 
-			err = authHelper.ClearAuthContext(w, r)
+			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user is not authorized to access any of the requested scopes", authContext.ResponseMode,
+				authContext.RedirectURI, authContext.State, authContext.ResponseType)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
