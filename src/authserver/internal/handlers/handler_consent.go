@@ -193,17 +193,37 @@ func HandleConsentPost(
 			consented = strings.TrimSpace(consented)
 
 			if len(consented) == 0 {
+				// The clear goes FIRST. ClearAuthContext persists the deletion through a
+				// Set-Cookie on w, and redirToClientWithError commits the response in every
+				// response mode, so clearing afterwards leaves the header on a response already
+				// written. The browser then keeps an auth context in requires_consent, which
+				// GET /auth/consent accepts: replaying it renders the consent screen again and
+				// the user may approve, so the client would receive access_denied and then a
+				// code for the same authorization request (#141).
+				err = authHelper.ClearAuthContext(w, r)
+				if err != nil {
+					// The clear failed, so Save wrote no cookie and the browser still holds the
+					// auth context. The client is owed an error response regardless: its redirect
+					// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
+					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
+					slog.Error("failed to clear the auth context, answering the client with server_error",
+						"error", err)
+					err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
+						authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+					if err != nil {
+						// Nowhere left to send the client, so the 500 is the last resort here.
+						httpHelper.InternalServerError(w, r, err)
+					}
+					return
+				}
+
 				err = redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
 					authContext.RedirectURI, authContext.State, authContext.ResponseType)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
-				}
-
-				err = authHelper.ClearAuthContext(w, r)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
 					return
 				}
+				return
 			} else {
 
 				client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
@@ -283,17 +303,34 @@ func HandleConsentPost(
 			}
 		} else {
 
+			// The clear goes FIRST, for the same reason as the no-scopes-consented refusal
+			// above: a Set-Cookie written after redirToClientWithError has committed never
+			// reaches the wire, so the browser keeps an auth context in requires_consent that
+			// a replay of GET /auth/consent can still turn into a code (#141).
+			err = authHelper.ClearAuthContext(w, r)
+			if err != nil {
+				// The clear failed, so Save wrote no cookie and the browser still holds the
+				// auth context. The client is owed an error response regardless: its redirect
+				// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
+				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
+				slog.Error("failed to clear the auth context, answering the client with server_error",
+					"error", err)
+				err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
+					authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+				if err != nil {
+					// Nowhere left to send the client, so the 500 is the last resort here.
+					httpHelper.InternalServerError(w, r, err)
+				}
+				return
+			}
+
 			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
 				authContext.RedirectURI, authContext.State, authContext.ResponseType)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
-			}
-
-			err = authHelper.ClearAuthContext(w, r)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
 				return
 			}
+			return
 		}
 	}
 }
