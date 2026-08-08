@@ -62,5 +62,9 @@ release: build-all
 	@echo "Release archives created in $(BUILD_DIR)/release/"
 	@ls -la $(BUILD_DIR)/release/
 
+check:
+	unparam -exported ./...
+	golangci-lint run ./...
+
 format:
 	gofmt -w -s .

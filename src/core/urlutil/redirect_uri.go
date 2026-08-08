@@ -153,7 +153,7 @@ func stripPortRaw(raw string) (string, bool) {
 		}
 		// Only an empty suffix or ":digits" may follow the closing bracket. Dropping
 		// whatever is there would accept [::1]:evil and [::1].attacker.
-		if suffix := host[b+1:]; suffix != "" && !(strings.HasPrefix(suffix, ":") && isDigits(suffix[1:])) {
+		if suffix := host[b+1:]; suffix != "" && (!strings.HasPrefix(suffix, ":") || !isDigits(suffix[1:])) {
 			return "", false
 		}
 		stripped = host[:b+1]

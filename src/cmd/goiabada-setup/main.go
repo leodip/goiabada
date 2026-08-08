@@ -155,7 +155,7 @@ func main() {
 		printError("Failed to initialize readline: %v", err)
 		os.Exit(1)
 	}
-	defer rl.Close()
+	defer func() { _ = rl.Close() }()
 
 	// Determine if we're in non-interactive mode
 	nonInteractive := flags.DeploymentType != ""
@@ -1177,6 +1177,16 @@ func validateURL(urlStr string) error {
 	return validateHostname(hostname)
 }
 
+// isASCIIAlphaNum reports whether c is an ASCII letter or digit.
+func isASCIIAlphaNum(c rune) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+}
+
+// isASCIILowerAlphaNum reports whether c is a lowercase ASCII letter or digit.
+func isASCIILowerAlphaNum(c rune) bool {
+	return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+}
+
 func validateHostname(hostname string) error {
 	if hostname == "" {
 		return fmt.Errorf("hostname cannot be empty")
@@ -1185,7 +1195,7 @@ func validateHostname(hostname string) error {
 		return fmt.Errorf("hostname too long (max 253 characters)")
 	}
 	for i, c := range hostname {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '.') {
+		if !isASCIIAlphaNum(c) && c != '-' && c != '.' {
 			return fmt.Errorf("invalid character '%c' at position %d (only a-z, 0-9, '-', '.' allowed)", c, i)
 		}
 	}
@@ -1247,7 +1257,7 @@ func validateNamespace(ns string) error {
 		return fmt.Errorf("namespace too long (max 63 characters)")
 	}
 	for i, c := range ns {
-		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+		if !isASCIILowerAlphaNum(c) && c != '-' {
 			return fmt.Errorf("invalid character '%c' at position %d (only lowercase a-z, 0-9, '-' allowed)", c, i)
 		}
 	}
@@ -1271,7 +1281,7 @@ func validateDatabaseName(name string) error {
 		return fmt.Errorf("database name too long (max 63 characters)")
 	}
 	for i, c := range name {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+		if !isASCIIAlphaNum(c) && c != '_' {
 			return fmt.Errorf("invalid character '%c' at position %d (only a-z, A-Z, 0-9, '_' allowed)", c, i)
 		}
 	}
@@ -1401,7 +1411,7 @@ func testDatabaseConnection(dbType, host, port, name, user, password string) boo
 		printError("Failed to open connection: %v", err)
 		return false
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	db.SetConnMaxLifetime(5 * time.Second)
 
@@ -1510,9 +1520,9 @@ func generateDBService(config *Config) string {
 		sb.WriteString("    volumes:\n")
 		sb.WriteString("      - mysql-data:/var/lib/mysql\n")
 		sb.WriteString("    environment:\n")
-		sb.WriteString(fmt.Sprintf("      MYSQL_ROOT_PASSWORD: %s\n", config.DBPassword))
+		fmt.Fprintf(&sb, "      MYSQL_ROOT_PASSWORD: %s\n", config.DBPassword)
 		sb.WriteString("    healthcheck:\n")
-		sb.WriteString(fmt.Sprintf("      test: [\"CMD\", \"mysqladmin\", \"ping\", \"-uroot\", \"-p%s\", \"--protocol\", \"tcp\"]\n", config.DBPassword))
+		fmt.Fprintf(&sb, "      test: [\"CMD\", \"mysqladmin\", \"ping\", \"-uroot\", \"-p%s\", \"--protocol\", \"tcp\"]\n", config.DBPassword)
 		sb.WriteString("      interval: 1s\n")
 		sb.WriteString("      timeout: 2s\n")
 		sb.WriteString("      retries: 20\n")
@@ -1526,7 +1536,7 @@ func generateDBService(config *Config) string {
 		sb.WriteString("    volumes:\n")
 		sb.WriteString("      - postgres-data:/var/lib/postgresql\n")
 		sb.WriteString("    environment:\n")
-		sb.WriteString(fmt.Sprintf("      POSTGRES_PASSWORD: %s\n", config.DBPassword))
+		fmt.Fprintf(&sb, "      POSTGRES_PASSWORD: %s\n", config.DBPassword)
 		sb.WriteString("      POSTGRES_DB: goiabada\n")
 		sb.WriteString("    healthcheck:\n")
 		sb.WriteString("      test: [\"CMD-SHELL\", \"pg_isready -U postgres\"]\n")
@@ -1544,9 +1554,9 @@ func generateDBService(config *Config) string {
 		sb.WriteString("      - mssql-data:/var/opt/mssql\n")
 		sb.WriteString("    environment:\n")
 		sb.WriteString("      ACCEPT_EULA: Y\n")
-		sb.WriteString(fmt.Sprintf("      MSSQL_SA_PASSWORD: %s\n", config.DBPassword))
+		fmt.Fprintf(&sb, "      MSSQL_SA_PASSWORD: %s\n", config.DBPassword)
 		sb.WriteString("    healthcheck:\n")
-		sb.WriteString(fmt.Sprintf("      test: [\"CMD-SHELL\", \"/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '%s' -C -Q 'SELECT 1' || exit 1\"]\n", config.DBPassword))
+		fmt.Fprintf(&sb, "      test: [\"CMD-SHELL\", \"/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '%s' -C -Q 'SELECT 1' || exit 1\"]\n", config.DBPassword)
 		sb.WriteString("      interval: 10s\n")
 		sb.WriteString("      timeout: 5s\n")
 		sb.WriteString("      retries: 20\n")
@@ -1583,7 +1593,7 @@ func generateAuthServerService(config *Config) string {
 			dbServiceName = "mssql-server"
 		}
 		sb.WriteString("    depends_on:\n")
-		sb.WriteString(fmt.Sprintf("      %s:\n", dbServiceName))
+		fmt.Fprintf(&sb, "      %s:\n", dbServiceName)
 		sb.WriteString("        condition: service_healthy\n")
 	}
 
@@ -1612,45 +1622,45 @@ func generateAuthServerService(config *Config) string {
 
 	sb.WriteString("    environment:\n")
 	sb.WriteString("      - TZ=UTC\n")
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMIN_EMAIL=%s\n", config.AdminEmail))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMIN_PASSWORD=%s\n", config.AdminPassword))
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMIN_EMAIL=%s\n", config.AdminEmail)
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMIN_PASSWORD=%s\n", config.AdminPassword)
 	sb.WriteString("      - GOIABADA_APPNAME=Goiabada\n")
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_BASEURL=%s\n", config.AuthServerURL))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_INTERNALBASEURL=%s\n", authInternalURL))
+	fmt.Fprintf(&sb, "      - GOIABADA_AUTHSERVER_BASEURL=%s\n", config.AuthServerURL)
+	fmt.Fprintf(&sb, "      - GOIABADA_AUTHSERVER_INTERNALBASEURL=%s\n", authInternalURL)
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_CERTFILE=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_KEYFILE=\n")
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=%s\n", trustProxyHeaders))
+	fmt.Fprintf(&sb, "      - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=%s\n", trustProxyHeaders)
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_SQL=false\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_STATICDIR=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_TEMPLATEDIR=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false\n")
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=%s\n", config.AuthSessionAuthKey))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=%s\n", config.AuthSessionEncKey))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_AES_ENCRYPTION_KEY=%s\n", config.AESEncryptionKey))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s\n", config.OAuthClientSecret))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_DB_TYPE=%s\n", config.DBType))
+	fmt.Fprintf(&sb, "      - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=%s\n", config.AuthSessionAuthKey)
+	fmt.Fprintf(&sb, "      - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=%s\n", config.AuthSessionEncKey)
+	fmt.Fprintf(&sb, "      - GOIABADA_AES_ENCRYPTION_KEY=%s\n", config.AESEncryptionKey)
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s\n", config.OAuthClientSecret)
+	fmt.Fprintf(&sb, "      - GOIABADA_DB_TYPE=%s\n", config.DBType)
 
 	switch config.DBType {
 	case "mysql":
 		sb.WriteString("      - GOIABADA_DB_USERNAME=root\n")
-		sb.WriteString(fmt.Sprintf("      - GOIABADA_DB_PASSWORD=%s\n", config.DBPassword))
+		fmt.Fprintf(&sb, "      - GOIABADA_DB_PASSWORD=%s\n", config.DBPassword)
 		sb.WriteString("      - GOIABADA_DB_HOST=mysql-server\n")
 		sb.WriteString("      - GOIABADA_DB_PORT=3306\n")
 		sb.WriteString("      - GOIABADA_DB_NAME=goiabada\n")
 	case "postgres":
 		sb.WriteString("      - GOIABADA_DB_USERNAME=postgres\n")
-		sb.WriteString(fmt.Sprintf("      - GOIABADA_DB_PASSWORD=%s\n", config.DBPassword))
+		fmt.Fprintf(&sb, "      - GOIABADA_DB_PASSWORD=%s\n", config.DBPassword)
 		sb.WriteString("      - GOIABADA_DB_HOST=postgres-server\n")
 		sb.WriteString("      - GOIABADA_DB_PORT=5432\n")
 		sb.WriteString("      - GOIABADA_DB_NAME=goiabada\n")
 	case "mssql":
 		sb.WriteString("      - GOIABADA_DB_USERNAME=sa\n")
-		sb.WriteString(fmt.Sprintf("      - GOIABADA_DB_PASSWORD=%s\n", config.DBPassword))
+		fmt.Fprintf(&sb, "      - GOIABADA_DB_PASSWORD=%s\n", config.DBPassword)
 		sb.WriteString("      - GOIABADA_DB_HOST=mssql-server\n")
 		sb.WriteString("      - GOIABADA_DB_PORT=1433\n")
 		sb.WriteString("      - GOIABADA_DB_NAME=goiabada\n")
@@ -1658,7 +1668,7 @@ func generateAuthServerService(config *Config) string {
 		sb.WriteString("      - GOIABADA_DB_DSN=/data/goiabada.db\n")
 	}
 
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_BASEURL=%s\n", config.AdminConsoleURL))
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_BASEURL=%s\n", config.AdminConsoleURL)
 	sb.WriteString("\n")
 
 	return sb.String()
@@ -1695,23 +1705,23 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString("      - goiabada-network\n")
 	sb.WriteString("    environment:\n")
 	sb.WriteString("      - TZ=UTC\n")
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=%s\n", config.OAuthClientID))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s\n", config.OAuthClientSecret))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=%s\n", config.AdminSessionAuthKey))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s\n", config.AdminSessionEncKey))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_BASEURL=%s\n", config.AdminConsoleURL))
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=%s\n", config.OAuthClientID)
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s\n", config.OAuthClientSecret)
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=%s\n", config.AdminSessionAuthKey)
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s\n", config.AdminSessionEncKey)
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_BASEURL=%s\n", config.AdminConsoleURL)
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_CERTFILE=\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_KEYFILE=\n")
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=%s\n", trustProxyHeaders))
+	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=%s\n", trustProxyHeaders)
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_STATICDIR=\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=\n")
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_BASEURL=%s\n", config.AuthServerURL))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_INTERNALBASEURL=%s\n", authInternalURL))
+	fmt.Fprintf(&sb, "      - GOIABADA_AUTHSERVER_BASEURL=%s\n", config.AuthServerURL)
+	fmt.Fprintf(&sb, "      - GOIABADA_AUTHSERVER_INTERNALBASEURL=%s\n", authInternalURL)
 	sb.WriteString("\n")
 
 	return sb.String()
@@ -1741,34 +1751,34 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("# Application settings\n")
 	sb.WriteString("# =============================================================================\n")
 	sb.WriteString("export GOIABADA_APPNAME=\"Goiabada\"\n")
-	sb.WriteString(fmt.Sprintf("export GOIABADA_ADMIN_EMAIL=\"%s\"\n", config.AdminEmail))
-	sb.WriteString(fmt.Sprintf("export GOIABADA_ADMIN_PASSWORD=\"%s\"\n", config.AdminPassword))
+	fmt.Fprintf(&sb, "export GOIABADA_ADMIN_EMAIL=\"%s\"\n", config.AdminEmail)
+	fmt.Fprintf(&sb, "export GOIABADA_ADMIN_PASSWORD=\"%s\"\n", config.AdminPassword)
 	sb.WriteString("\n")
 
 	sb.WriteString("# =============================================================================\n")
 	sb.WriteString("# Database settings\n")
 	sb.WriteString("# =============================================================================\n")
-	sb.WriteString(fmt.Sprintf("export GOIABADA_DB_TYPE=\"%s\"\n", config.DBType))
+	fmt.Fprintf(&sb, "export GOIABADA_DB_TYPE=\"%s\"\n", config.DBType)
 	if config.DBType == "sqlite" {
 		sb.WriteString("export GOIABADA_DB_DSN=\"./goiabada.db\"\n")
 	} else {
-		sb.WriteString(fmt.Sprintf("export GOIABADA_DB_HOST=\"%s\"\n", config.DBHost))
-		sb.WriteString(fmt.Sprintf("export GOIABADA_DB_PORT=\"%s\"\n", config.DBPort))
-		sb.WriteString(fmt.Sprintf("export GOIABADA_DB_NAME=\"%s\"\n", config.DBName))
-		sb.WriteString(fmt.Sprintf("export GOIABADA_DB_USERNAME=\"%s\"\n", config.DBUsername))
-		sb.WriteString(fmt.Sprintf("export GOIABADA_DB_PASSWORD=\"%s\"\n", config.DBPassword))
+		fmt.Fprintf(&sb, "export GOIABADA_DB_HOST=\"%s\"\n", config.DBHost)
+		fmt.Fprintf(&sb, "export GOIABADA_DB_PORT=\"%s\"\n", config.DBPort)
+		fmt.Fprintf(&sb, "export GOIABADA_DB_NAME=\"%s\"\n", config.DBName)
+		fmt.Fprintf(&sb, "export GOIABADA_DB_USERNAME=\"%s\"\n", config.DBUsername)
+		fmt.Fprintf(&sb, "export GOIABADA_DB_PASSWORD=\"%s\"\n", config.DBPassword)
 	}
 	sb.WriteString("\n")
 
 	sb.WriteString("# =============================================================================\n")
 	sb.WriteString("# Auth server settings\n")
 	sb.WriteString("# =============================================================================\n")
-	sb.WriteString(fmt.Sprintf("export GOIABADA_AUTHSERVER_BASEURL=\"%s\"\n", config.AuthServerURL))
+	fmt.Fprintf(&sb, "export GOIABADA_AUTHSERVER_BASEURL=\"%s\"\n", config.AuthServerURL)
 	sb.WriteString("export GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=\"0.0.0.0\"\n")
 	sb.WriteString("export GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=\"9090\"\n")
-	sb.WriteString(fmt.Sprintf("export GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=\"%s\"\n", config.AuthSessionAuthKey))
-	sb.WriteString(fmt.Sprintf("export GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=\"%s\"\n", config.AuthSessionEncKey))
-	sb.WriteString(fmt.Sprintf("export GOIABADA_AES_ENCRYPTION_KEY=\"%s\"\n", config.AESEncryptionKey))
+	fmt.Fprintf(&sb, "export GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=\"%s\"\n", config.AuthSessionAuthKey)
+	fmt.Fprintf(&sb, "export GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=\"%s\"\n", config.AuthSessionEncKey)
+	fmt.Fprintf(&sb, "export GOIABADA_AES_ENCRYPTION_KEY=\"%s\"\n", config.AESEncryptionKey)
 	sb.WriteString("export GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=\"true\"\n")
 	sb.WriteString("export GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=\"true\"\n")
 	sb.WriteString("\n")
@@ -1776,11 +1786,11 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("# =============================================================================\n")
 	sb.WriteString("# Admin console settings\n")
 	sb.WriteString("# =============================================================================\n")
-	sb.WriteString(fmt.Sprintf("export GOIABADA_ADMINCONSOLE_BASEURL=\"%s\"\n", config.AdminConsoleURL))
+	fmt.Fprintf(&sb, "export GOIABADA_ADMINCONSOLE_BASEURL=\"%s\"\n", config.AdminConsoleURL)
 	sb.WriteString("export GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=\"0.0.0.0\"\n")
 	sb.WriteString("export GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=\"9091\"\n")
-	sb.WriteString(fmt.Sprintf("export GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=\"%s\"\n", config.AdminSessionAuthKey))
-	sb.WriteString(fmt.Sprintf("export GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=\"%s\"\n", config.AdminSessionEncKey))
+	fmt.Fprintf(&sb, "export GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=\"%s\"\n", config.AdminSessionAuthKey)
+	fmt.Fprintf(&sb, "export GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=\"%s\"\n", config.AdminSessionEncKey)
 	sb.WriteString("export GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=\"true\"\n")
 	sb.WriteString("export GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=\"true\"\n")
 	sb.WriteString("\n")
@@ -1788,9 +1798,9 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("# =============================================================================\n")
 	sb.WriteString("# OAuth client for admin console\n")
 	sb.WriteString("# =============================================================================\n")
-	sb.WriteString(fmt.Sprintf("export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=\"%s\"\n", config.OAuthClientID))
-	sb.WriteString(fmt.Sprintf("export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=\"%s\"\n", config.OAuthClientSecret))
-	sb.WriteString(fmt.Sprintf("export GOIABADA_AUTHSERVER_INTERNALBASEURL=\"%s\"\n", config.AuthServerURL))
+	fmt.Fprintf(&sb, "export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=\"%s\"\n", config.OAuthClientID)
+	fmt.Fprintf(&sb, "export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=\"%s\"\n", config.OAuthClientSecret)
+	fmt.Fprintf(&sb, "export GOIABADA_AUTHSERVER_INTERNALBASEURL=\"%s\"\n", config.AuthServerURL)
 	sb.WriteString("\n")
 
 	return sb.String()
@@ -1818,7 +1828,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: Namespace\n")
 	sb.WriteString("metadata:\n")
-	sb.WriteString(fmt.Sprintf("  name: %s\n", ns))
+	fmt.Fprintf(&sb, "  name: %s\n", ns)
 	sb.WriteString("\n")
 
 	// Secret
@@ -1827,17 +1837,17 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("kind: Secret\n")
 	sb.WriteString("metadata:\n")
 	sb.WriteString("  name: goiabada-secrets\n")
-	sb.WriteString(fmt.Sprintf("  namespace: %s\n", ns))
+	fmt.Fprintf(&sb, "  namespace: %s\n", ns)
 	sb.WriteString("type: Opaque\n")
 	sb.WriteString("data:\n")
-	sb.WriteString(fmt.Sprintf("  db-password: %s\n", base64Encode(config.DBPassword)))
-	sb.WriteString(fmt.Sprintf("  admin-password: %s\n", base64Encode(config.AdminPassword)))
-	sb.WriteString(fmt.Sprintf("  auth-session-auth-key: %s\n", base64Encode(config.AuthSessionAuthKey)))
-	sb.WriteString(fmt.Sprintf("  auth-session-enc-key: %s\n", base64Encode(config.AuthSessionEncKey)))
-	sb.WriteString(fmt.Sprintf("  admin-session-auth-key: %s\n", base64Encode(config.AdminSessionAuthKey)))
-	sb.WriteString(fmt.Sprintf("  admin-session-enc-key: %s\n", base64Encode(config.AdminSessionEncKey)))
-	sb.WriteString(fmt.Sprintf("  aes-encryption-key: %s\n", base64Encode(config.AESEncryptionKey)))
-	sb.WriteString(fmt.Sprintf("  oauth-client-secret: %s\n", base64Encode(config.OAuthClientSecret)))
+	fmt.Fprintf(&sb, "  db-password: %s\n", base64Encode(config.DBPassword))
+	fmt.Fprintf(&sb, "  admin-password: %s\n", base64Encode(config.AdminPassword))
+	fmt.Fprintf(&sb, "  auth-session-auth-key: %s\n", base64Encode(config.AuthSessionAuthKey))
+	fmt.Fprintf(&sb, "  auth-session-enc-key: %s\n", base64Encode(config.AuthSessionEncKey))
+	fmt.Fprintf(&sb, "  admin-session-auth-key: %s\n", base64Encode(config.AdminSessionAuthKey))
+	fmt.Fprintf(&sb, "  admin-session-enc-key: %s\n", base64Encode(config.AdminSessionEncKey))
+	fmt.Fprintf(&sb, "  aes-encryption-key: %s\n", base64Encode(config.AESEncryptionKey))
+	fmt.Fprintf(&sb, "  oauth-client-secret: %s\n", base64Encode(config.OAuthClientSecret))
 	sb.WriteString("\n")
 
 	// ConfigMap
@@ -1846,20 +1856,20 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("kind: ConfigMap\n")
 	sb.WriteString("metadata:\n")
 	sb.WriteString("  name: goiabada-config\n")
-	sb.WriteString(fmt.Sprintf("  namespace: %s\n", ns))
+	fmt.Fprintf(&sb, "  namespace: %s\n", ns)
 	sb.WriteString("data:\n")
 	sb.WriteString("  GOIABADA_APPNAME: \"Goiabada\"\n")
-	sb.WriteString(fmt.Sprintf("  GOIABADA_ADMIN_EMAIL: \"%s\"\n", config.AdminEmail))
-	sb.WriteString(fmt.Sprintf("  GOIABADA_AUTHSERVER_BASEURL: \"%s\"\n", config.AuthServerURL))
+	fmt.Fprintf(&sb, "  GOIABADA_ADMIN_EMAIL: \"%s\"\n", config.AdminEmail)
+	fmt.Fprintf(&sb, "  GOIABADA_AUTHSERVER_BASEURL: \"%s\"\n", config.AuthServerURL)
 	sb.WriteString("  GOIABADA_AUTHSERVER_INTERNALBASEURL: \"http://goiabada-authserver:9090\"\n")
-	sb.WriteString(fmt.Sprintf("  GOIABADA_ADMINCONSOLE_BASEURL: \"%s\"\n", config.AdminConsoleURL))
+	fmt.Fprintf(&sb, "  GOIABADA_ADMINCONSOLE_BASEURL: \"%s\"\n", config.AdminConsoleURL)
 	sb.WriteString("  GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: \"true\"\n")
 	sb.WriteString("  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: \"true\"\n")
-	sb.WriteString(fmt.Sprintf("  GOIABADA_DB_TYPE: \"%s\"\n", config.DBType))
-	sb.WriteString(fmt.Sprintf("  GOIABADA_DB_HOST: \"%s\"\n", config.DBHost))
-	sb.WriteString(fmt.Sprintf("  GOIABADA_DB_PORT: \"%s\"\n", config.DBPort))
-	sb.WriteString(fmt.Sprintf("  GOIABADA_DB_NAME: \"%s\"\n", config.DBName))
-	sb.WriteString(fmt.Sprintf("  GOIABADA_DB_USERNAME: \"%s\"\n", config.DBUsername))
+	fmt.Fprintf(&sb, "  GOIABADA_DB_TYPE: \"%s\"\n", config.DBType)
+	fmt.Fprintf(&sb, "  GOIABADA_DB_HOST: \"%s\"\n", config.DBHost)
+	fmt.Fprintf(&sb, "  GOIABADA_DB_PORT: \"%s\"\n", config.DBPort)
+	fmt.Fprintf(&sb, "  GOIABADA_DB_NAME: \"%s\"\n", config.DBName)
+	fmt.Fprintf(&sb, "  GOIABADA_DB_USERNAME: \"%s\"\n", config.DBUsername)
 	sb.WriteString("  GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID: \"admin-console-client\"\n")
 	sb.WriteString("\n")
 
@@ -1869,7 +1879,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("kind: Deployment\n")
 	sb.WriteString("metadata:\n")
 	sb.WriteString("  name: goiabada-authserver\n")
-	sb.WriteString(fmt.Sprintf("  namespace: %s\n", ns))
+	fmt.Fprintf(&sb, "  namespace: %s\n", ns)
 	sb.WriteString("spec:\n")
 	sb.WriteString("  replicas: 1\n")
 	sb.WriteString("  selector:\n")
@@ -1946,7 +1956,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("kind: Deployment\n")
 	sb.WriteString("metadata:\n")
 	sb.WriteString("  name: goiabada-adminconsole\n")
-	sb.WriteString(fmt.Sprintf("  namespace: %s\n", ns))
+	fmt.Fprintf(&sb, "  namespace: %s\n", ns)
 	sb.WriteString("spec:\n")
 	sb.WriteString("  replicas: 1\n")
 	sb.WriteString("  selector:\n")
@@ -2008,7 +2018,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("kind: Service\n")
 	sb.WriteString("metadata:\n")
 	sb.WriteString("  name: goiabada-authserver\n")
-	sb.WriteString(fmt.Sprintf("  namespace: %s\n", ns))
+	fmt.Fprintf(&sb, "  namespace: %s\n", ns)
 	sb.WriteString("spec:\n")
 	sb.WriteString("  selector:\n")
 	sb.WriteString("    app: goiabada-authserver\n")
@@ -2022,7 +2032,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("kind: Service\n")
 	sb.WriteString("metadata:\n")
 	sb.WriteString("  name: goiabada-adminconsole\n")
-	sb.WriteString(fmt.Sprintf("  namespace: %s\n", ns))
+	fmt.Fprintf(&sb, "  namespace: %s\n", ns)
 	sb.WriteString("spec:\n")
 	sb.WriteString("  selector:\n")
 	sb.WriteString("    app: goiabada-adminconsole\n")
@@ -2041,7 +2051,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("kind: Ingress\n")
 	sb.WriteString("metadata:\n")
 	sb.WriteString("  name: goiabada-authserver\n")
-	sb.WriteString(fmt.Sprintf("  namespace: %s\n", ns))
+	fmt.Fprintf(&sb, "  namespace: %s\n", ns)
 	sb.WriteString("  annotations:\n")
 	sb.WriteString("    cert-manager.io/cluster-issuer: \"letsencrypt-prod\"\n")
 	sb.WriteString("    nginx.ingress.kubernetes.io/proxy-buffer-size: \"128k\"\n")
@@ -2049,10 +2059,10 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("  ingressClassName: nginx\n")
 	sb.WriteString("  tls:\n")
 	sb.WriteString("  - hosts:\n")
-	sb.WriteString(fmt.Sprintf("    - %s\n", authHost))
+	fmt.Fprintf(&sb, "    - %s\n", authHost)
 	sb.WriteString("    secretName: goiabada-tls-auth\n")
 	sb.WriteString("  rules:\n")
-	sb.WriteString(fmt.Sprintf("  - host: %s\n", authHost))
+	fmt.Fprintf(&sb, "  - host: %s\n", authHost)
 	sb.WriteString("    http:\n")
 	sb.WriteString("      paths:\n")
 	sb.WriteString("      - path: /\n")
@@ -2070,7 +2080,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("kind: Ingress\n")
 	sb.WriteString("metadata:\n")
 	sb.WriteString("  name: goiabada-adminconsole\n")
-	sb.WriteString(fmt.Sprintf("  namespace: %s\n", ns))
+	fmt.Fprintf(&sb, "  namespace: %s\n", ns)
 	sb.WriteString("  annotations:\n")
 	sb.WriteString("    cert-manager.io/cluster-issuer: \"letsencrypt-prod\"\n")
 	sb.WriteString("    nginx.ingress.kubernetes.io/proxy-buffer-size: \"128k\"\n")
@@ -2078,10 +2088,10 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("  ingressClassName: nginx\n")
 	sb.WriteString("  tls:\n")
 	sb.WriteString("  - hosts:\n")
-	sb.WriteString(fmt.Sprintf("    - %s\n", adminHost))
+	fmt.Fprintf(&sb, "    - %s\n", adminHost)
 	sb.WriteString("    secretName: goiabada-tls-admin\n")
 	sb.WriteString("  rules:\n")
-	sb.WriteString(fmt.Sprintf("  - host: %s\n", adminHost))
+	fmt.Fprintf(&sb, "  - host: %s\n", adminHost)
 	sb.WriteString("    http:\n")
 	sb.WriteString("      paths:\n")
 	sb.WriteString("      - path: /\n")

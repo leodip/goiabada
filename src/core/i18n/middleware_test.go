@@ -322,4 +322,3 @@ func TestIsMachineRequest(t *testing.T) {
 		})
 	}
 }
-

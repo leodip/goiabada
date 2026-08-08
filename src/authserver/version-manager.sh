@@ -127,6 +127,9 @@ get_all_versions() {
         echo "tools.tailwind=$(get_version 'tools.tailwind')"
         echo "tools.golangci-lint=$(get_version 'tools.golangci-lint')"
         echo "tools.mockery=$(get_version 'tools.mockery')"
+        echo "tools.staticcheck=$(get_version 'tools.staticcheck')"
+        echo "tools.unparam=$(get_version 'tools.unparam')"
+        echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
         echo "cdn.daisyui=$(get_version 'cdn.daisyui')"
         echo "cdn.humanize-duration=$(get_version 'cdn.humanize-duration')"
     }
@@ -154,6 +157,24 @@ get_github_latest() {
     response=$(curl -s --connect-timeout 10 "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$response" ]; then
         echo "$response" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 | sed 's/^v//'
+    fi
+}
+
+# Fetch latest version from the Go module proxy
+# Usage: get_goproxy_latest "honnef.co/go/tools"
+#
+# Used instead of get_github_latest for Go tools whose module version does not
+# match their GitHub release tag. dominikh/go-tools tags releases as "2026.1"
+# while the module is v0.7.0, so comparing against the release tag would report
+# an update forever; golang/vuln's releases page trails its module tags by
+# several minors, so it would never report one. The proxy is authoritative for
+# what `go install` will actually fetch, which is what we pin.
+get_goproxy_latest() {
+    local module="$1"
+    local response
+    response=$(curl -s --connect-timeout 10 "https://proxy.golang.org/${module}/@latest" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        echo "$response" | grep -o '"Version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 | sed 's/^v//'
     fi
 }
 
@@ -226,6 +247,9 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "tailwind" "$(get_version 'tools.tailwind')"
     printf "  %-23s ${GREEN}%s${NC}\n" "golangci-lint" "$(get_version 'tools.golangci-lint')"
     printf "  %-23s ${GREEN}%s${NC}\n" "mockery" "$(get_version 'tools.mockery')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "staticcheck" "$(get_version 'tools.staticcheck')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "unparam" "$(get_version 'tools.unparam')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "govulncheck" "$(get_version 'tools.govulncheck')"
 
     # CDN versions
     echo -e "\n${BOLD}CDN Dependencies:${NC}"
@@ -315,6 +339,59 @@ cmd_check() {
         print_warning "Check failed"
     fi
 
+    # --- staticcheck ---
+    # Queried via the Go module proxy, not GitHub releases: the release tag is
+    # "2026.1" while the module version is 0.7.0, and comparing those two
+    # schemes would report an update on every run.
+    echo -n "Checking staticcheck... "
+    local current_staticcheck=$(get_version 'tools.staticcheck')
+    local latest_staticcheck=$(get_goproxy_latest "honnef.co/go/tools")
+    if [ -n "$latest_staticcheck" ]; then
+        if version_lt "$current_staticcheck" "$latest_staticcheck"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("staticcheck|$current_staticcheck|$latest_staticcheck|https://github.com/dominikh/go-tools/releases")
+        else
+            print_success "Up to date ($current_staticcheck)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
+    # --- unparam ---
+    # unparam publishes no tags, so the proxy returns a pseudo-version and any
+    # upstream commit shows as an available update. That is the only signal
+    # this module offers.
+    echo -n "Checking unparam... "
+    local current_unparam=$(get_version 'tools.unparam')
+    local latest_unparam=$(get_goproxy_latest "mvdan.cc/unparam")
+    if [ -n "$latest_unparam" ]; then
+        if version_lt "$current_unparam" "$latest_unparam"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("unparam|$current_unparam|$latest_unparam|https://github.com/mvdan/unparam/commits/master")
+        else
+            print_success "Up to date ($current_unparam)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
+    # --- govulncheck ---
+    # Also proxy-queried: golang/vuln's GitHub releases page trails its module
+    # tags by several minor versions.
+    echo -n "Checking govulncheck... "
+    local current_govulncheck=$(get_version 'tools.govulncheck')
+    local latest_govulncheck=$(get_goproxy_latest "golang.org/x/vuln")
+    if [ -n "$latest_govulncheck" ]; then
+        if version_lt "$current_govulncheck" "$latest_govulncheck"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("govulncheck|$current_govulncheck|$latest_govulncheck|https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck")
+        else
+            print_success "Up to date ($current_govulncheck)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
     # --- daisyUI ---
     echo -n "Checking daisyUI... "
     local current_daisyui=$(get_version 'cdn.daisyui')
@@ -378,6 +455,9 @@ cmd_update() {
     local TAILWIND_VERSION=$(get_version 'tools.tailwind')
     local GOLANGCI_VERSION=$(get_version 'tools.golangci-lint')
     local MOCKERY_VERSION=$(get_version 'tools.mockery')
+    local STATICCHECK_VERSION=$(get_version 'tools.staticcheck')
+    local UNPARAM_VERSION=$(get_version 'tools.unparam')
+    local GOVULNCHECK_VERSION=$(get_version 'tools.govulncheck')
     local DAISYUI_VERSION=$(get_version 'cdn.daisyui')
     local HUMANIZE_VERSION=$(get_version 'cdn.humanize-duration')
 
@@ -514,6 +594,35 @@ cmd_update() {
         if update_file "$BASE_DIR/src/.devcontainer/Dockerfile" \
             "s|mockery/v3@v[0-9.]*|mockery/v3@v${MOCKERY_VERSION}|g" \
             "mockery"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+
+        # staticcheck: staticcheck@vX.Y.Z
+        if update_file "$BASE_DIR/src/.devcontainer/Dockerfile" \
+            "s|staticcheck@v[0-9.]*|staticcheck@v${STATICCHECK_VERSION}|g" \
+            "staticcheck"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+
+        # unparam: unparam@v0.0.0-TIMESTAMP-HASH. The character class has to be
+        # wider than the others because upstream publishes no tags, so this is
+        # always a pseudo-version.
+        if update_file "$BASE_DIR/src/.devcontainer/Dockerfile" \
+            "s|unparam@v[0-9A-Za-z.-]*|unparam@v${UNPARAM_VERSION}|g" \
+            "unparam"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+
+        # govulncheck: govulncheck@vX.Y.Z
+        if update_file "$BASE_DIR/src/.devcontainer/Dockerfile" \
+            "s|govulncheck@v[0-9.]*|govulncheck@v${GOVULNCHECK_VERSION}|g" \
+            "govulncheck"; then
             ((success_count++))
         else
             ((fail_count++))
