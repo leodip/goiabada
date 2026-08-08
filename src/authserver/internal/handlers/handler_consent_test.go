@@ -15,8 +15,10 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/i18n"
+	mocks_test "github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -456,12 +458,159 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		// The clear has to reach the browser, so it must happen before the response is
+		// committed. rr.Header() is the live map the handler and this stub share, so it shows
+		// the sentinel under either ordering; rr.Result() reads the snapshot taken when the
+		// status line was written, which is the only unit-tier view that tells them apart.
+		const clearedContextCookie = "cleared-auth-context"
+		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
+		}).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), "https://example.com/callback?error=access_denied")
+
+		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
+			"the auth context must be cleared before the client response is committed")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("User cancels consent, failing clear - server_error to the client", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+
+		form := url.Values{}
+		form.Add("btnCancel", "cancel")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			ResponseMode: "query",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
+		// handler does next. The client is still owed its error response, and server_error is
+		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
+		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		handler.ServeHTTP(rr, req)
+
+		// httpHelper has no InternalServerError expectation, so the mock fails the test if the
+		// handler answers with a bare 500 instead of redirecting the client.
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Result().Header.Get("Location")
+		assert.Contains(t, location, "error=server_error")
+		assert.Contains(t, location, "error_description=Internal+server+error")
+		assert.NotContains(t, location, "access_denied")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("User cancels consent, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
+		// redirToClientWithError returns "unable to parse template" instead of committing.
+		// form_post is the only response mode whose arm can fail after the redirect URI has
+		// been validated, so it is how this branch is reached at all.
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger)
+
+		form := url.Values{}
+		form.Add("btnCancel", "cancel")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			ResponseMode: "form_post",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		// The clear failed and the server_error response the client is owed cannot be built
+		// either, so there is nowhere left to send it and the 500 is the last resort. Without
+		// this expectation the handler would answer nothing at all.
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		// Nothing reached the client: the form_post arm fails before it writes, and the 500 is
+		// the mock's, so no redirect is committed.
+		assert.Empty(t, rr.Result().Header.Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("User cancels consent, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger)
+
+		form := url.Values{}
+		form.Add("btnCancel", "cancel")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			ResponseMode: "form_post",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		// The other half of the same family: here the clear succeeds and it is the ordinary
+		// refusal that cannot be committed. This is the site's second and pre-existing 500,
+		// pinned separately so a future edit cannot delete either copy unnoticed.
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -607,12 +756,145 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		// Same sentinel as the cancel case, for the second refusal in this handler. This one is
+		// reached with btnSubmit and no consent boxes ticked rather than with btnCancel.
+		const clearedContextCookie = "cleared-auth-context"
+		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
+		}).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), "https://example.com/callback?error=access_denied")
+
+		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
+			"the auth context must be cleared before the client response is committed")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("No consent given, failing clear - server_error to the client", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			ResponseMode: "query",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		handler.ServeHTTP(rr, req)
+
+		// No InternalServerError expectation, so a bare 500 fails the mock instead of passing
+		// silently the way it would if the client were simply left unanswered.
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Result().Header.Get("Location")
+		assert.Contains(t, location, "error=server_error")
+		assert.Contains(t, location, "error_description=Internal+server+error")
+		assert.NotContains(t, location, "access_denied")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("No consent given, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			ResponseMode: "form_post",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("No consent given, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			ResponseMode: "form_post",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		// The clear succeeds here and the ordinary refusal is what cannot be committed, which
+		// is this site's pre-existing 500. It is pinned separately from the last-resort one so
+		// a future edit cannot delete either copy unnoticed.
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
