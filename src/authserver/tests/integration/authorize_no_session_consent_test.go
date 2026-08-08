@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"testing"
@@ -1649,40 +1650,44 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 
 	httpClient := createHttpClient(t)
 
+	// The hops below reassign one resp, so each body is passed into its deferred close rather than
+	// read out of resp when the test returns: the bare `defer func() { _ = resp.Body.Close() }()`
+	// used elsewhere in this file captures the variable, so under reassignment every defer closes
+	// the last response and the earlier ones are never closed.
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	csrf := getCsrfValue(t, resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	redirectLocation = assertRedirect(t, resp, "/auth/consent")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	consentUrl := assertRedirect(t, resp, "/auth/consent")
+	resp = loadPage(t, httpClient, consentUrl)
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{}, csrf) // Cancel consent
-	defer func() { _ = resp.Body.Close() }()
+	resp = postConsent(t, httpClient, consentUrl, []int{}, csrf) // Cancel consent
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
@@ -1695,6 +1700,19 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 
 	assert.Equal(t, "access_denied", errorCode)
 	assert.Equal(t, "The user did not provide consent", errorDescription)
+
+	// The refusal ended the ceremony, so the auth context is gone from the browser and the replay
+	// has nothing to resume: it lands on the account profile rather than rendering the consent
+	// screen again. Without the clear reaching the browser the retained context stays in
+	// requires_consent, which this handler accepts, and the user could approve on the second
+	// screen: the client would then get access_denied and a code for the same authorization
+	// request (#141).
+	resp = loadPage(t, httpClient, consentUrl)
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
+
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/profile", resp.Header.Get("Location"),
+		"replaying the refused ceremony must not reach the auth context again")
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsCancelled(t *testing.T) {
