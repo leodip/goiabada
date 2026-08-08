@@ -646,7 +646,12 @@ func doLogout(
 // class of defect this endpoint was rewritten to remove. The GET binding is never exempt, so the page
 // it renders has a real token and a real cookie (#109).
 //
-// id_token_hint is dropped because sending it back would land on this branch again, forever.
+// id_token_hint is dropped, and not to prevent a loop: the follow-up is a GET, and the switch above
+// sends a rejected hint on any method but POST to the consent page, so sending the hint back would
+// terminate rather than return here. It is dropped because carrying it puts an ID token in the
+// address bar of a top-level navigation, its history and its referrers, which is the exposure the
+// POST binding exists to avoid, and because feeding input already judged unusable into the next
+// request gives that request nothing it can act on anyway.
 // client_id is dropped because the follow-up GET is then the hint-absent shape, where client_id is
 // what authorizes a post-logout redirect: keeping it would hand the request the redirect authority a
 // rejected hint is specifically denied. With no client_id nothing validates the target, so the

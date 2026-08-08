@@ -260,6 +260,26 @@ func (h *HttpHelper) EncodeJson(w http.ResponseWriter, r *http.Request, data int
 }
 
 func (h *HttpHelper) GetFromUrlQueryOrFormPost(r *http.Request, key string) string {
+	return GetFromUrlQueryOrFormPost(r, key)
+}
+
+func (h *HttpHelper) LookupFromUrlQueryOrFormPost(r *http.Request, key string) (string, bool) {
+	return LookupFromUrlQueryOrFormPost(r, key)
+}
+
+// The two functions below carry the behaviour and the methods above are delegates, because a
+// caller that has no HttpHelper still has to read a parameter exactly as a handler would.
+//
+// The CSRF middleware is that caller (#109). It decides whether to exempt POST /auth/logout on
+// whether an id_token_hint is PRESENT, and the logout handler then classifies the very same
+// parameter. Those two readings have to be the same reading: middleware saying "present" where the
+// handler says "absent" exempts a cross-site POST and then routes it down the hintless branch,
+// which tears the whole session down with no consent. A second implementation beside this one is
+// how that drift arrives, so there is one implementation and both halves call it.
+
+// GetFromUrlQueryOrFormPost returns the value of key from the URL query, falling back to the
+// form body. It cannot distinguish an absent parameter from one supplied empty: both are "".
+func GetFromUrlQueryOrFormPost(r *http.Request, key string) string {
 	value := r.URL.Query().Get(key)
 	if len(value) == 0 {
 		value = r.FormValue(key)
@@ -282,8 +302,8 @@ func (h *HttpHelper) GetFromUrlQueryOrFormPost(r *http.Request, key string) stri
 // consulted when that value is empty, and r.PostForm is populated by then: an empty
 // query value is exactly the case where the legacy helper falls through to r.FormValue,
 // which parses the body.
-func (h *HttpHelper) LookupFromUrlQueryOrFormPost(r *http.Request, key string) (string, bool) {
-	value := h.GetFromUrlQueryOrFormPost(r, key)
+func LookupFromUrlQueryOrFormPost(r *http.Request, key string) (string, bool) {
+	value := GetFromUrlQueryOrFormPost(r, key)
 	if len(value) > 0 {
 		return value, true
 	}
