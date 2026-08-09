@@ -100,9 +100,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -117,8 +115,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -238,9 +235,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -255,8 +250,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -380,9 +374,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -401,8 +393,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -523,9 +514,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -544,9 +533,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
 	// Partially grant consent (only for openid, email, and one resource permission)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -681,9 +669,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -698,13 +684,11 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-
 	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -715,8 +699,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -848,9 +831,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -865,13 +846,11 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-
 	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -882,9 +861,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
 	// Simulate partial consent by only consenting to some scopes
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1009,9 +987,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1026,13 +1002,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
 	otpCode, err := totp.GenerateCode(otpSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -1043,8 +1018,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1166,9 +1140,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1183,13 +1155,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
 	otpCode, err := totp.GenerateCode(otpSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -1200,10 +1171,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-
 	// Partially grant consent (only for openid, email, and the second resource/permission)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1338,9 +1307,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1355,13 +1322,11 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-
 	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -1372,8 +1337,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1505,9 +1469,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1522,13 +1484,11 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-
 	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -1539,9 +1499,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
 	// Partially grant consent (only for openid, email, and the second resource/permission)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1668,9 +1627,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1685,8 +1642,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 	resp = loadPage(t, httpClient, consentUrl)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, consentUrl, []int{}, csrf) // Cancel consent
+	resp = postConsent(t, httpClient, consentUrl, []int{}) // Cancel consent
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -1798,9 +1754,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1819,8 +1773,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{}, csrf) // Cancel consent
+	resp = postConsent(t, httpClient, redirectLocation, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -1930,9 +1883,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1947,13 +1898,11 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-
 	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -1964,8 +1913,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{}, csrf) // Cancel consent
+	resp = postConsent(t, httpClient, redirectLocation, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -2065,9 +2013,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -2082,13 +2028,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
 	otpCode, err := totp.GenerateCode(otpSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -2099,8 +2044,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{}, csrf) // Cancel consent
+	resp = postConsent(t, httpClient, redirectLocation, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -2210,9 +2154,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -2227,13 +2169,11 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-
 	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -2244,8 +2184,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{}, csrf) // Cancel consent
+	resp = postConsent(t, httpClient, redirectLocation, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)

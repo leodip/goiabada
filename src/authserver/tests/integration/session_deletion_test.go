@@ -94,9 +94,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -160,10 +158,9 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation2)
 	defer func() { _ = resp2.Body.Close() }()
 
-	// Step 6: Get CSRF token and submit credentials
-	csrf2 := getCsrfValue(t, resp2)
+	// Step 6: Submit credentials
 
-	resp2 = authenticateWithPassword(t, httpClient, redirectLocation2, user.Email, password, csrf2)
+	resp2 = authenticateWithPassword(t, httpClient, redirectLocation2, user.Email, password)
 	defer func() { _ = resp2.Body.Close() }()
 
 	// Step 7: CRITICAL TEST - After the fix, login should succeed
@@ -272,12 +269,10 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
 	// A password IS entered here, unlike the OTP case below. That is what makes this ceremony
 	// legitimate up to the consent screen and what makes /auth/issue the only hop that can
 	// refuse it.
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -293,8 +288,6 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	consentCsrf := getCsrfValue(t, resp)
-
 	// The session exists at this point, created by /auth/completed while it was legitimately
 	// reached. Ending it is what the rest of the case turns on.
 	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
@@ -309,11 +302,10 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 
 	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
 	consentForm := url.Values{
-		"gorilla.csrf.Token": {consentCsrf},
-		"btnSubmit":          {"submit"},
-		"consent0":           {"on"},
-		"consent1":           {"on"},
-		"consent2":           {"on"},
+		"btnSubmit": {"submit"},
+		"consent0":  {"on"},
+		"consent1":  {"on"},
+		"consent2":  {"on"},
 	}
 	consentReq, err := http.NewRequest("POST", consentEndpoint, strings.NewReader(consentForm.Encode()))
 	assert.NoError(t, err)
@@ -427,8 +419,6 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
 	// The session is ended while the ceremony waits on the OTP form. Deleting the row is
 	// what the gate keys on, and it is how this file's other test ends a session too; that
 	// the two DELETE endpoints revoke the session's grants as well is covered by
@@ -440,7 +430,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	// The OTP itself is accepted: the handler reads no session row, so it cannot see the

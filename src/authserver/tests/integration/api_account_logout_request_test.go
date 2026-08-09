@@ -594,8 +594,8 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 
 	// Where the form's action resolves to, which is its real destination however local the attribute
 	// reads. A <base href> moves the document's base URL, so "/auth/logout" would resolve against
-	// whatever origin that names and a browser would deliver this form's payload, CSRF token included,
-	// to that origin while the action assertion below still passed. HTML gives a document exactly one
+	// whatever origin that names and a browser would deliver this form's payload to that origin
+	// while the action assertion below still passed. HTML gives a document exactly one
 	// way to move its base URL, so refusing the element settles this rather than sampling it: with no
 	// <base>, the base URL is the response's own URL, which is what the POST below is built against
 	// (#109).
@@ -679,9 +679,10 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 
 	// A GET form would defeat this path twice over, which is why the method is asserted here and then
 	// used below rather than assumed: the GET binding renders the consent page again instead of
-	// tearing anything down, so no End-User could ever confirm a logout, and a GET carries no CSRF
-	// token, which is the only thing that makes a hintless teardown trustworthy without a confirmable
-	// hint. An absent method attribute means GET, so it fails here too (#109).
+	// tearing anything down, so no End-User could ever confirm a logout, and a GET is a safe method
+	// the origin check never applies to. Only the POST binding has its origin checked, and that is
+	// the only thing that makes a hintless teardown trustworthy without a confirmable hint. An
+	// absent method attribute means GET, so it fails here too (#109).
 	method := formSel.AttrOr("method", "")
 	require.True(t, strings.EqualFold("post", method),
 		"the confirming request must be a POST, got method=%q", method)
@@ -696,7 +697,10 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 			"two controls named %q would both reach the handler from a browser and only one from here", name)
 		form.Set(name, input.AttrOr("value", ""))
 	})
-	require.NotEmpty(t, form.Get("gorilla.csrf.Token"), "the confirming POST is CSRF protected")
+	// This used to also require a gorilla.csrf.Token control on the form. There is no token any
+	// more (#155): the confirming POST is protected because it is same-origin, which the browser
+	// reports in Sec-Fetch-Site and MiddlewareCsrf enforces, and no hidden field carries that.
+	// The loop above still pins the form's shape, which is what the rest of this helper needs.
 
 	// Which button gives which answer, read the way the End-User reads it. Identifying the affirmative
 	// control structurally is not enough on its own: swap the two translation references and the
@@ -978,16 +982,19 @@ func TestLogout_Hintless_UILocalesSurvivesTheConsentForm(t *testing.T) {
 }
 
 // The cases below drive POST /auth/logout the way a relying party's own page would: from a foreign
-// origin, with the End-User's cookies riding along and no CSRF token, because the RP has no way to
-// obtain one. That request shape is what OpenID Connect RP-Initiated Logout 1.0 section 2 makes
-// mandatory, "OpenID Providers MUST support the use of the HTTP GET and POST methods defined in RFC
-// 7231", and what gorilla/csrf refused outright until this exemption existed (#109 decision 9).
+// origin, with the End-User's cookies riding along. That request shape is what OpenID Connect
+// RP-Initiated Logout 1.0 section 2 makes mandatory, "OpenID Providers MUST support the use of the
+// HTTP GET and POST methods defined in RFC 7231", and what the CSRF middleware refused outright
+// until this exemption existed (#109 decision 9). The exemption is what still carries it: the
+// origin check refuses a cross-site POST on the browser's own Sec-Fetch-Site report (#155), so
+// without the conditional entry this binding would be as unreachable as it was before.
 //
 // It is also the classic CSRF shape, which is why the exemption is conditional and why every case
 // here asserts what was torn down and not merely which status came back.
 
 // crossOriginLogoutPost posts form to /auth/logout as another origin would: the Origin header names
-// a site this deployment does not trust, and the body carries no gorilla.csrf.Token.
+// a site whose host is not this deployment's, which is what the origin check compares against Host
+// when no Sec-Fetch-Site header is present.
 //
 // The client is the caller's, so the End-User's session cookie rides along. That is deliberate for
 // the safety cases: without a cookie they would pass for the wrong reason, having proved only that a
@@ -1011,9 +1018,6 @@ func crossOriginLogoutPost(t *testing.T, httpClient *http.Client, form url.Value
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", foreignOrigin)
 	req.Header.Set("Referer", foreignOrigin+"/signed-out")
-
-	require.False(t, form.Has("gorilla.csrf.Token"),
-		"a foreign origin cannot obtain a CSRF token, so sending one would model nothing")
 
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
@@ -1172,17 +1176,20 @@ func TestLogout_CrossOriginPost_WithoutHint_IsRefused(t *testing.T) {
 // and it is the case stage 4 could name but not run: nothing reached this branch cross-origin until
 // the exemption existed.
 //
-// The problem decision 18 answers. The exemption keys on the hint being PRESENT, because middleware
-// cannot judge whether a hint is genuine. gorilla/csrf returns on that skip flag before it saves the
-// CSRF cookie and before it attaches the token, so a consent page rendered on the skipped POST itself
-// would carry an empty token field, and its own confirming POST is hintless and therefore not exempt.
-// The End-User would be looking at a page they cannot submit while still signed in, which is the
-// class of defect this whole change exists to remove.
+// The problem decision 18 answers, and it is worth recording that the mechanism behind it has since
+// changed. The exemption keys on the hint being PRESENT, because middleware cannot judge whether a
+// hint is genuine. Under gorilla/csrf, the middleware returned on that skip flag before saving the
+// CSRF cookie and before attaching the token, so a consent page rendered on the skipped POST itself
+// carried an empty token field while its own confirming POST is hintless and therefore not exempt:
+// the End-User would be looking at a page they could not submit while still signed in.
 //
-// The answer is the 303 asserted below: the follow-up GET is never exempt, so the page it renders has
-// a real token and a real cookie. Both halves are asserted, because the redirect alone proves nothing
-// if the page at the end of it still cannot be submitted, and confirmLogoutConsentPage is what
-// refuses a page a browser could not use.
+// That specific trap is gone with the token (#155). A page rendered on the skipped POST would be a
+// document at this deployment's own origin, so its confirming POST is same-origin and the origin
+// check allows it. The 303 asserted below is still the behaviour decision 18 landed and still what
+// this test pins, because the shape a relying party observes is part of the contract; it simply no
+// longer rests on where a token gets attached. Both halves are asserted, because the redirect alone
+// proves nothing if the page at the end of it cannot be submitted, and confirmLogoutConsentPage is
+// what refuses a page a browser could not use.
 //
 // Decision 15 rides along and is the reason for the two parameter drops. client_id must not survive
 // the hop: the follow-up GET carries no hint, which is the shape where client_id authorizes a
@@ -1225,15 +1232,16 @@ func TestLogout_CrossOriginPost_RejectedHint_ReachesASubmittableConsentPage(t *t
 	require.NotNil(t, stillThere,
 		"the consent page precedes the teardown: an unconfirmable hint must not tear anything down before the End-User is asked")
 
-	// And the page at the end of the hop is one a browser can actually submit. The helper reads the
-	// token off the form, so an empty csrfField fails here rather than at the confirming POST.
+	// And the page at the end of the hop is one a browser can actually submit. The helper pins the
+	// form's shape and its Yes/No control, so a page that renders unsubmittable fails here rather
+	// than at the confirming POST.
 	consent := followSeeOther(t, grant.httpClient, resp)
 	require.Equal(t, http.StatusOK, consent.StatusCode)
 	confirmed := confirmLogoutConsentPage(t, grant.httpClient, consent, "")
 	defer func() { _ = confirmed.Body.Close() }()
 
 	require.Equal(t, http.StatusOK, confirmed.StatusCode,
-		"the confirming POST is hintless, so it carried a CSRF token and was accepted on its merits")
+		"the confirming POST is hintless, so it earns no exemption and passed the origin check on its own merits")
 	assert.Empty(t, confirmed.Header.Get("Location"),
 		"a rejected hint earns no redirect, and dropping client_id is what enforces that here")
 	assertSignedOutPage(t, confirmed, signedOutEnglish, true)

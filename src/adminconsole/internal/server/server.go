@@ -201,15 +201,16 @@ func (s *Server) initMiddleware() {
 	s.router.Use(middleware.StripSlashes)
 
 	// CSRF
-	// Note: CSRF runs before the locale middleware below, and gorilla/csrf
-	// uses its own default error handler that does not consult our localizer.
-	// CSRF rejection responses therefore render in English regardless of
-	// the user's preferred locale. This is acceptable for an infrequent,
-	// transient failure mode (typically a stale token after session expiry,
-	// fixed by a page reload). Localizing CSRF errors would require
-	// installing a custom gorilla/csrf error handler.
+	// Note: CSRF runs before the locale middleware below, so no localizer exists yet when a
+	// request is rejected. CSRF rejection responses therefore render in English regardless of
+	// the user's preferred locale. This is acceptable for an infrequent, transient failure mode
+	// (typically a form left open across a deployment change, fixed by a page reload).
+	//
+	// The pair takes no configuration: MiddlewareSkipCsrf marks the endpoints that are
+	// cross-origin by protocol, and MiddlewareCsrf refuses every other state-changing
+	// cross-origin request outright, trusting no origin but this deployment's own (#155).
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
-	s.router.Use(custom_middleware.MiddlewareCsrf(config.GetAdminConsole().SessionAuthenticationKey, config.GetAdminConsole().BaseURL, config.GetAdminConsole().BaseURL, config.GetAdminConsole().IsCookieSecure()))
+	s.router.Use(custom_middleware.MiddlewareCsrf())
 
 	// Adds settings to the request context (fetched from cache, not database)
 	s.router.Use(adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache))

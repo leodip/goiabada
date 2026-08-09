@@ -107,8 +107,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -231,8 +230,7 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -353,8 +351,7 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -397,8 +394,7 @@ func TestPromptLogin_PreservesNonce(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -493,8 +489,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -509,14 +504,10 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	// Get CSRF from consent page
-	csrf = getCsrfValue(t, resp)
-
 	// Submit consent form with decline (btn=cancel)
 	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
 	form := url.Values{
-		"gorilla.csrf.Token": {csrf},
-		"btn":                {"cancel"},
+		"btn": {"cancel"},
 	}
 
 	formDataString := form.Encode()
@@ -576,10 +567,8 @@ func TestPromptLogin_WrongPassword(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
 	// Submit wrong password
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, "wrongpassword123", csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, "wrongpassword123")
 	defer func() { _ = resp.Body.Close() }()
 
 	// Should stay on password page with error (HTTP 200, not redirect)
@@ -633,10 +622,8 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
 	// Submit correct password for disabled user
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Should stay on password page with disabled error (HTTP 200, not redirect)
@@ -726,8 +713,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -793,8 +779,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp2)
-	resp2 = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp2 = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp2.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/level1completed")

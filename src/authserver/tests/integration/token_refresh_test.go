@@ -502,8 +502,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -519,8 +518,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Provide consent
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -634,8 +632,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -650,8 +647,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2}, csrf)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")

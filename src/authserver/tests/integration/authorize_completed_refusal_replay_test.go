@@ -99,9 +99,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -218,9 +216,7 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
