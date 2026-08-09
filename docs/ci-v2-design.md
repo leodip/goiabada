@@ -5,6 +5,8 @@
 **Baseline commit:** `8b69223`
 **Repository:** `leodip/goiabada` (public, default branch `main`)
 
+> **Stages 4 to 7 implemented, 2026-08-09.** The git tag now owns the product version, and `release.yml` / `publish.yml` / `docs.yml` replace the four manual workflows, which are deleted. Verified with a `v1.5.3-rc1` dry run: **8 of 9 checks passed**, and it found a real defect in 5.2's attestation specification (see stage 5 and 5.2). Outstanding: check 9 (publish-time retag skip), branch protection, and issue #155.
+
 > **Stage 2 implemented, 2026-08-08.** `check.yml` runs alongside `run-tests.yml`, both green on the same commit: **251s against 541s**, with the wall-clock claim in 4.2 confirmed exactly. Fixed a defect in `run-tests.sh` found on the way (the module tiers could report green from Go's test cache without executing). `Vulnerabilities` is advisory-only pending #155. See stage 2 for the measurements and for four things 5.1 left unspecified.
 
 > **Stage 0 implemented, 2026-08-08.** 4.4 resolved to **option A**. Stage 0 landed on branch `ci-v2-stage-0-lint-baseline`: the lint backlog is **0** across all four modules, `.golangci.yml` is checked in, and `staticcheck`, `unparam` and `govulncheck` are pinned. Two of the plan's assumptions proved wrong while implementing it and are corrected in place — see stage 0's **Correction 1** (`--fix` did nothing) and **Correction 2** (the `QF1001` rewrite taken). 5.8's open question is resolved: `.golangci.yml` is the single definition of lint-clean. Issue #155 remains open and still gates the `Vulnerabilities` required check.
@@ -663,7 +665,17 @@ docker buildx build ... --metadata-file /tmp/authserver-meta.json --push .
 
 Without this, the attestation step has nothing to attest. Noted because it is easy to write the workflow, watch it go green, and never notice the attestation covers nothing.
 
-**Use `actions/attest`, not `actions/attest-build-provenance`.** Checked against the upstream README, which states: *"As of version 4, `actions/attest-build-provenance` is simply a wrapper on top of `actions/attest`"*, and *"Existing applications may continue to use the `attest-build-provenance` action, but new implementations should use `actions/attest` instead."* This is a new implementation.
+**~~Use `actions/attest`, not `actions/attest-build-provenance`.~~ Wrong, and it broke the first release run.** The upstream README does say *"new implementations should use `actions/attest` instead"*, and finding 22 recorded that faithfully. But that advice is about **custom** predicates. `actions/attest` is the generic action: it attests a predicate you supply, and has no provenance default. Used as specified here it fails outright with:
+
+```
+Error: predicate-type must be provided
+```
+
+Its input documentation is what makes this easy to get wrong. `predicate-type` is described as *"required when using `predicate` or `predicate-path` for custom attestations"*, which reads as though omitting all three yields provenance. It does not. Build provenance keeps a dedicated action precisely because assembling that predicate is not trivial.
+
+**Corrected: use `actions/attest-build-provenance`,** for both the binaries and the images. It takes the same `subject-path` / `subject-name` + `subject-digest` inputs, so nothing else in this section changes.
+
+Caught by the `v1.5.3-rc1` dry run, which is exactly the class of error a dry run exists to find: `actionlint` passes, the YAML is valid, the inputs are all real, and it fails only when the step actually runs — at release time.
 
 **Scope: Docker Hub only.** `subject-name` binds an attestation to a fully qualified image name, so covering GHCR too would mean four attest calls per release (two images × two registries) rather than two.
 
@@ -1628,6 +1640,30 @@ The honest reason to leave `/health` alone is separation of concerns: it is a li
 
 **Cleanup** Delete the release, delete the tag, delete the `1.5.3-rc1` image tags from both registries.
 
+> **Dry run performed. 8 of 9 checks passed; the ninth is deferred.**
+
+**It found a real defect, which is the point.** The first run failed in `Binaries` with `Error: predicate-type must be provided`: `actions/attest` does not produce provenance, contrary to what finding 22 recorded and 5.2 specified. Corrected to `actions/attest-build-provenance` (see 5.2), and the second run went green end to end. `actionlint` passed on the broken version, and every input used was real — this could only surface at release time.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Version derived, prerelease flagged | `version=1.5.3-rc1`, `prerelease=true` |
+| 2 | Full matrix re-run against the tagged commit | all 11 jobs, including `Build validation` |
+| 3 | `sha256sum -c checksums.txt` on downloaded assets | OK |
+| 4 | Images on Docker Hub **and** GHCR | both, digests identical |
+| 5 | **`authserver-latest` has not moved** | byte-identical before and after |
+| 6 | Draft, marked prerelease, 11 assets | confirmed, setup binaries unversioned |
+| 7 | Built image reports the version | `1.5.3-rc1`, commit `b896ead` |
+| 8 | **Setup binary's compose pins the version** | `authserver-1.5.3-rc1`, not `latest` |
+| 9 | Publishing skips the retag | **deferred**: publishing also fires `docs.yml`, leaving a `docs-1.5.3-rc1` tag that cannot be deleted without registry credentials |
+
+**Check 8 is the one that matters most.** A setup binary downloaded from the actual release, run non-interactively, emitted `image: leodip/goiabada:authserver-1.5.3-rc1`. Before stage 4 that same binary would have handed users manifests pinning the *previous* release. Constraint E's sharp edge, closed and demonstrated with a shipped artifact rather than a test harness.
+
+**Two claims this design declined to verify, confirmed for free.** The Docker Hub and GHCR digests came out identical (`sha256:c1b0f734…` for authserver), which is what 5.2 asserts holds by construction from one `buildx` invocation with two `-t` flags. And the digest read from `--metadata-file` matched the registry exactly, so the attestation had a real subject rather than going green while covering nothing.
+
+**The attestations are usable, not merely created.** `gh attestation verify` exits 0, and the signing certificate binds each artifact to the workflow path, the tag ref, the commit `b896ead796645dfc…`, the run ID, and `environment: prod`. The certificate is valid for ten minutes — long enough to sign, with no key to store or leak, which is what makes 4.10's "no key management" claim real. Later verification still works because Rekor records when the signature was made.
+
+**Cleanup performed:** draft release deleted, tag deleted locally and remotely. The `1.5.3-rc1` image tags in both registries need registry credentials to remove and were left for manual deletion. Attestations were left in place: they remain accurate statements about artifacts that did exist, they assert nothing about current existence, and the Sigstore transparency-log entries are append-only regardless.
+
 **Rollback** Delete the three files. Note this is **not** a complete rollback on its own: stage 4 already made the build scripts take the version as an argument, so the retained legacy workflows now produce `dev`-versioned artifacts. A real rollback from here reverts stage 4 as well. (The registry list is not a problem, since `GOIABADA_REGISTRIES` defaults to Docker Hub alone per 5.6.2.)
 
 ---
@@ -1681,6 +1717,12 @@ git commit -am "probe: bump go without running update" && git push
 
 **Rollback** Restore from git history.
 
+> **Done.** The precondition was met by the `v1.5.3-rc1` dry run recorded under stage 5, 8 of whose 9 checks passed; only the publish-time check is outstanding, and it does not bear on these four files.
+
+**Worth noting that these were no longer usable fallbacks anyway.** Stage 4 made the build scripts take the version as an argument, so a dispatched `build-binaries.yml` produced `dev`-versioned artifacts, and `build-docker-images.sh` no longer tags `latest` at all. Keeping them past this point would have preserved the *appearance* of a fallback rather than a working one — which is worse than having none, because it is the sort of thing someone reaches for in a hurry.
+
+Five workflows remain, not the four this design targets: `run-tests.yml` is still there until stage 3 retires it.
+
 ---
 
 ### Stage 8. Dependabot and remaining hardening
@@ -1718,10 +1760,10 @@ Run the same nine-point checklist from stage 5, with two differences: `publish.y
 | 1 | `run-tests.sh` | local runs | yes |
 | 2 | **Done.** add `check.yml` (11 jobs), `-count=1` fix | its own PR: 251s vs 541s, all agree | yes |
 | 3 | delete `run-tests.yml`, branch protection | 3 green PRs | yes |
-| 4 | ldflags, `versions.yaml`, `version-manager.sh` | local build checks | full revert only |
-| 5 | `release.yml`, `publish.yml`, `docs.yml`, **SHA pins + attestations on these** | `v1.5.3-rc1` dry run | yes |
-| 6 | remove `version-manager.sh` workflow writes, add the CI drift step | idempotency + probe PR | yes |
-| 7 | delete 4 old workflows | stage 5 verified | yes |
+| 4 | **Done.** ldflags, `versions.yaml`, `version-manager.sh` | local build checks + release dry run | full revert only |
+| 5 | **Done.** `release.yml`, `publish.yml`, `docs.yml`, SHA pins + attestations | `v1.5.3-rc1` dry run: 8/9 | yes |
+| 6 | **Done.** remove `version-manager.sh` workflow writes, add the CI drift step | idempotency + guard fires | yes |
+| 7 | **Done.** delete 4 old workflows | stage 5 verified | yes |
 | 8 | Dependabot, remaining SHA pins for `check.yml` | green PR | yes |
 | 9 | first real release | full checklist | n/a |
 
