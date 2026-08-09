@@ -1,4 +1,22 @@
-@import "tailwindcss";
+/* source(none) disables Tailwind v4's automatic source detection, which scans
+   the whole working directory and extracts anything that looks like a class
+   name, including ordinary English from Go comments and test files. The
+   generated file is committed and embedded into the binary, so every such word
+   produced a spurious diff on the next build. See the authserver's input.css
+   for the worked examples.
+
+   The sources below are the only two places this app writes class names. The
+   v3-era tailwind.config.js that used to scope this is gone: v4 does not
+   auto-detect a JS config, so its content globs had been dead since the
+   upgrade, which is how the scanner ended up unscoped in the first place.
+
+   Note that ../static is matched as *.js on purpose. Pointing @source at the
+   directory would scan main.css, Tailwind's own output, and re-harvest every
+   class already in it, so no junk rule could ever be removed again. */
+@import "tailwindcss" source(none);
+
+@source "../template";
+@source "../static/*.js";
 
 @layer base {
   *,

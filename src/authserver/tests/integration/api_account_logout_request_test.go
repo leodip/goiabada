@@ -433,13 +433,16 @@ var (
 	// message a run reports is reproducible.
 	consentHidingAttrs = []string{"hidden", "inert", "popover", "disabled", "style"}
 
-	// Tailwind's screen-reader-only utility is deliberately absent, for two reasons that agree. It
-	// positions a container off-screen without disabling it, so the form still submits and assistive
-	// technology still reaches it, which makes it the one candidate that does not render the page
-	// unusable. And naming it here would ship a stylesheet rule for it: the CSS build harvests
-	// class-name candidates from this whole module rather than only from web/template as
-	// tailwind.config.js says, so a token spelled out in this file, comments included, appears in the
-	// generated web/static/main.css even though no template asks for it (#109).
+	// Tailwind's screen-reader-only utility is deliberately absent: it positions a container
+	// off-screen without disabling it, so the form still submits and assistive technology still
+	// reaches it, which makes it the one candidate that does not render the page unusable.
+	//
+	// A second reason used to stand beside that one, and no longer does. Naming the token here once
+	// shipped a stylesheet rule for it, because the CSS build harvested class-name candidates from
+	// this whole module rather than only from web/template as tailwind.config.js said (#109). The
+	// config was dead: Tailwind v4 does not auto-detect a JS config, so the scanner had been running
+	// unscoped. web/tailwindcss/input.css now pins it with source(none) and explicit @source rules,
+	// and prose in this file no longer reaches the generated CSS.
 	consentHidingClasses = map[string]bool{"hidden": true, "invisible": true, "collapse": true}
 
 	// The Content-Security-Policy directives this helper has been taught, checked against both places
