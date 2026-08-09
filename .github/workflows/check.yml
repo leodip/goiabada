@@ -170,6 +170,29 @@ jobs:
           done
           exit $rc
 
+      # The remaining drift risk once the workflows read versions.yaml at run
+      # time: someone edits versions.yaml and forgets to run `update`, leaving
+      # the Dockerfiles, the four go.mod files and the template CDN pins stale
+      # while CI uses the new value.
+      #
+      # Running `update` here and requiring a clean diff catches any stale
+      # target anywhere, in any number of occurrences. That is strictly stronger
+      # than asserting each expected literal is present somewhere, which was the
+      # earlier proposal: `grep -qF` only asks whether a literal appears at all,
+      # and the devcontainer Dockerfile contains the Go archive name three
+      # times, so two stale copies and one correct one would have passed.
+      #
+      # Safe to mutate the checkout: `update` is pure sed and deterministic, and
+      # the CI working tree is disposable.
+      - name: versions.yaml is applied
+        run: |
+          set -euo pipefail
+          ( cd src/authserver && ./version-manager.sh update >/dev/null )
+          if ! git diff --exit-code; then
+            echo "::error::versions.yaml was changed without running ./version-manager.sh update — commit the regenerated files"
+            exit 1
+          fi
+
   vulnerabilities:
     name: Vulnerabilities
     needs: versions

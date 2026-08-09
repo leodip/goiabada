@@ -473,25 +473,6 @@ cmd_update() {
     local fail_count=0
 
     # -------------------------------------------------------------------------
-    # GitHub Actions Workflows
-    # -------------------------------------------------------------------------
-    echo -e "\n${BOLD}GitHub Actions Workflows${NC}"
-
-    for workflow in "$BASE_DIR/.github/workflows/build-binaries.yml" \
-                    "$BASE_DIR/.github/workflows/build-setup-binaries.yml"; do
-        if [ -f "$workflow" ]; then
-            # Pattern: go-version: 'X.Y.Z' -> go-version: 'NEW_VERSION'
-            if update_file "$workflow" \
-                "s|go-version: '[0-9.]*'|go-version: '${GO_VERSION}'|g" \
-                "Go version"; then
-                ((success_count++))
-            else
-                ((fail_count++))
-            fi
-        fi
-    done
-
-    # -------------------------------------------------------------------------
     # Product version: not handled here
     # -------------------------------------------------------------------------
     # The build scripts' VERSION= lines, the setup tool's Makefile, its
