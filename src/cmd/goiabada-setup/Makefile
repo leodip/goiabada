@@ -1,7 +1,9 @@
 # Goiabada Setup CLI - Build Makefile
 # Builds cross-platform binaries for Linux, macOS, and Windows
 
-VERSION ?= 1.0.0
+# The product version comes from the git tag at release time, not from this
+# file. A local `make` build is honestly marked "dev".
+VERSION ?= $(or $(GOIABADA_VERSION),dev)
 BUILD_DIR = ./build
 BINARY_NAME = goiabada-setup
 

@@ -2,12 +2,16 @@
 set -euo pipefail  # Exit on error, undefined variables, pipe failures
 
 # Configuration
-VERSION="1.5.2"
+#
+# The version is no longer edited into this file. It comes from the caller,
+# which in a release is the git tag (see docs/ci-v2-design.md 4.1).
+VERSION="${GOIABADA_VERSION:-dev}"
 BUILD_DATE=$(date +%Y-%m-%d)
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # Determine if this is a pre-release version (contains -alpha, -beta, -rc, etc.)
-# Pre-release versions should NOT be tagged as "latest"
+# Kept for reporting, and reinforced at the release level: `latest` is no longer
+# this script's business at all (see below).
 IS_PRERELEASE=false
 if [[ "$VERSION" == *-* ]]; then
     IS_PRERELEASE=true
@@ -21,10 +25,27 @@ PLATFORMS="linux/amd64,linux/arm64"
 # Builder name
 BUILDER_NAME="goiabada-multiarch"
 
-# Parse arguments
+# Parse arguments.
+#
+# Proper long-option parsing rather than positional $1. An earlier proposal to
+# read the version from $1 collided with the --push check that used to live
+# here: `build-docker-images.sh --push` would have set VERSION=--push and
+# published images tagged `authserver---push`, which is a legal Docker tag, so
+# it would have succeeded. The *) arm turns a future typo into a failure
+# instead of a silently ignored argument.
 PUSH=false
-if [[ "${1:-}" == "--push" ]]; then
-    PUSH=true
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --version) VERSION="${2:?--version needs a value}"; shift 2 ;;
+        --push)    PUSH=true; shift ;;
+        *) echo "unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+# Recompute after parsing, since --version may have changed it.
+IS_PRERELEASE=false
+if [[ "$VERSION" == *-* ]]; then
+    IS_PRERELEASE=true
 fi
 
 # Validate Docker is available
@@ -38,10 +59,11 @@ echo "Version: $VERSION"
 echo "Build date: $BUILD_DATE"
 echo "Git commit: $GIT_COMMIT"
 if [[ "$IS_PRERELEASE" == true ]]; then
-    echo "Pre-release: yes (will NOT tag as 'latest')"
+    echo "Pre-release: yes"
 else
-    echo "Pre-release: no (will tag as 'latest')"
+    echo "Pre-release: no"
 fi
+echo "Tags: version only ('latest' is moved by publish.yml on release)"
 if [[ "$PUSH" == true ]]; then
     echo "Mode: Multi-platform build and push"
     echo "Platforms: $PLATFORMS"
@@ -79,10 +101,11 @@ if [[ "$PUSH" == true ]]; then
 
     # Build and push authserver (multi-platform)
     echo "=== Building and pushing authserver image (multi-platform) ==="
+    # Version tag only. The `latest` tags are no longer produced here: they are
+    # moved by publish.yml when a release is deliberately published, so that the
+    # tag every unpinned deployment follows changes at that moment rather than
+    # whenever CI happens to go green (docs/ci-v2-design.md 4.6).
     AUTHSERVER_TAGS="-t leodip/goiabada:authserver-$VERSION"
-    if [[ "$IS_PRERELEASE" == false ]]; then
-        AUTHSERVER_TAGS="$AUTHSERVER_TAGS -t leodip/goiabada:authserver-latest"
-    fi
     docker buildx build --progress=plain \
       --platform "$PLATFORMS" \
       -f ./build/Dockerfile-authserver \
@@ -98,9 +121,6 @@ if [[ "$PUSH" == true ]]; then
     # Build and push adminconsole (multi-platform)
     echo "=== Building and pushing adminconsole image (multi-platform) ==="
     ADMINCONSOLE_TAGS="-t leodip/goiabada:adminconsole-$VERSION"
-    if [[ "$IS_PRERELEASE" == false ]]; then
-        ADMINCONSOLE_TAGS="$ADMINCONSOLE_TAGS -t leodip/goiabada:adminconsole-latest"
-    fi
     docker buildx build --progress=plain \
       --platform "$PLATFORMS" \
       -f ./build/Dockerfile-adminconsole \
@@ -122,10 +142,11 @@ if [[ "$PUSH" == true ]]; then
 else
     # Build authserver (local only, single platform)
     echo "=== Building authserver image (local) ==="
+    # Version tag only. The `latest` tags are no longer produced here: they are
+    # moved by publish.yml when a release is deliberately published, so that the
+    # tag every unpinned deployment follows changes at that moment rather than
+    # whenever CI happens to go green (docs/ci-v2-design.md 4.6).
     AUTHSERVER_TAGS="-t leodip/goiabada:authserver-$VERSION"
-    if [[ "$IS_PRERELEASE" == false ]]; then
-        AUTHSERVER_TAGS="$AUTHSERVER_TAGS -t leodip/goiabada:authserver-latest"
-    fi
     docker buildx build --progress=plain \
       --platform linux/amd64 \
       -f ./build/Dockerfile-authserver \
@@ -141,9 +162,6 @@ else
     # Build adminconsole (local only, single platform)
     echo "=== Building adminconsole image (local) ==="
     ADMINCONSOLE_TAGS="-t leodip/goiabada:adminconsole-$VERSION"
-    if [[ "$IS_PRERELEASE" == false ]]; then
-        ADMINCONSOLE_TAGS="$ADMINCONSOLE_TAGS -t leodip/goiabada:adminconsole-latest"
-    fi
     docker buildx build --progress=plain \
       --platform linux/amd64 \
       -f ./build/Dockerfile-adminconsole \
