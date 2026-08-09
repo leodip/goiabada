@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
@@ -70,7 +69,6 @@ func HandleAdminSettingsGeneralGet(
 		bind := map[string]interface{}{
 			"settings":          settingsInfo,
 			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)
@@ -118,9 +116,8 @@ func HandleAdminSettingsGeneralPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"settings":  settingsInfo,
-				"csrfField": csrf.TemplateField(r),
-				"error":     message,
+				"settings": settingsInfo,
+				"error":    message,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)

@@ -9,7 +9,6 @@ package rendertest
 import (
 	"context"
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -72,7 +71,6 @@ func TestRender_AccountPhone(t *testing.T) {
 			{UniqueId: "ITA_0", Alpha2: "IT", Emoji: "🇮🇹", CallingCode: "+39", Name: "🇮🇹 - Italy (+39)"},
 		},
 		"savedSuccessfully": false,
-		"csrfField":         template.HTML(""),
 	}
 	out := render(t, "/account_phone.html", bind)
 	// html/template escapes "+" to "&#43;", so assert on the emoji + localized
@@ -90,7 +88,6 @@ func TestRender_AccountAddress(t *testing.T) {
 		},
 		"countries":         countries.AllInfo(),
 		"savedSuccessfully": false,
-		"csrfField":         template.HTML(""),
 	}
 	out := render(t, "/account_address.html", bind)
 	assert.Contains(t, out, "Itália") // RefCountry: CLDR-localized name
@@ -103,7 +100,6 @@ func TestRender_AccountProfile(t *testing.T) {
 		"timezones":         timezones.Get(),
 		"locales":           locales.Get(),
 		"savedSuccessfully": false,
-		"csrfField":         template.HTML(""),
 	}
 	out := render(t, "/account_profile.html", bind)
 	assert.Contains(t, out, "português (Brasil) (Portuguese (Brazil))") // LocaleLabel
@@ -120,7 +116,6 @@ func TestRender_JSBootstrapNoKeyLeak(t *testing.T) {
 		"phoneNumber":                  "",
 		"phoneCountries":               []api.PhoneCountryResponse{},
 		"savedSuccessfully":            false,
-		"csrfField":                    template.HTML(""),
 	}
 	out := render(t, "/account_phone.html", bind)
 

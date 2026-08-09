@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -72,7 +71,6 @@ func HandleAdminResourceSettingsGet(
 			"description":           resource.Description,
 			"isSystemLevelResource": resource.IsSystemLevelResource(),
 			"savedSuccessfully":     len(savedSuccessfully) > 0,
-			"csrfField":             csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_settings.html", bind)
@@ -127,7 +125,6 @@ func HandleAdminResourceSettingsPost(
 				"description":           description,
 				"isSystemLevelResource": isSystemLevelResource,
 				"error":                 message,
-				"csrfField":             csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_settings.html", bind)

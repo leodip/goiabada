@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
@@ -38,7 +37,6 @@ func HandleAccountPictureGet(
 
 		bind := map[string]interface{}{
 			"profilePictureUrl": profilePictureUrl,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_picture.html", bind)

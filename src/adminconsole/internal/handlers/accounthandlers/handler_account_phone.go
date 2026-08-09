@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -61,7 +60,6 @@ func HandleAccountPhoneGet(
 			"phoneNumber":                  user.PhoneNumber,
 			"phoneCountries":               phoneCountries,
 			"savedSuccessfully":            len(savedSuccessfully) > 0,
-			"csrfField":                    csrf.TemplateField(r),
 		}
 
 		if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind); err != nil {
@@ -103,7 +101,6 @@ func HandleAccountPhonePost(
 				"selectedPhoneCountryUniqueId": req.PhoneCountryUniqueId,
 				"phoneNumber":                  req.PhoneNumber,
 				"phoneCountries":               phoneCountries,
-				"csrfField":                    csrf.TemplateField(r),
 				"error":                        errorMessage,
 			}
 			if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind); err != nil {

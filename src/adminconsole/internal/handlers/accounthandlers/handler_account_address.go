@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -79,7 +78,6 @@ func HandleAccountAddressGet(
 			"address":           address,
 			"countries":         countries,
 			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_address.html", bind)
@@ -148,7 +146,6 @@ func HandleAccountAddressPost(
 					"user":      user,
 					"address":   address,
 					"countries": countries,
-					"csrfField": csrf.TemplateField(r),
 					"error":     errorMessage,
 				}
 				if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_address.html", bind); err != nil {

@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
@@ -103,9 +102,8 @@ func HandleAdminClientUserSessionsGet(
 		})
 
 		bind := map[string]interface{}{
-			"client":    clientResp,
-			"sessions":  sessionInfoArr,
-			"csrfField": csrf.TemplateField(r),
+			"client":   clientResp,
+			"sessions": sessionInfoArr,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_usersessions.html", bind)

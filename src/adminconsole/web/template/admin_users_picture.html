@@ -13,8 +13,6 @@
 
 {{define "body"}}
 
-{{ .csrfField }}
-
 {{template "manage_users_tabs" (args "picture" .user.Id .page .query $.ctx) }}
 
 <div class="mt-6">

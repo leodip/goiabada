@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -63,9 +62,8 @@ func HandleAdminClientLogoGet(
 		}
 
 		bind := map[string]interface{}{
-			"client":    clientResp,
-			"logoUrl":   logoUrl,
-			"csrfField": csrf.TemplateField(r),
+			"client":  clientResp,
+			"logoUrl": logoUrl,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_logo.html", bind)

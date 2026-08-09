@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -60,7 +59,6 @@ func HandleAdminUserAttributesAddGet(
 			"includeInIdToken":     true,
 			"page":                 r.URL.Query().Get("page"),
 			"query":                r.URL.Query().Get("query"),
-			"csrfField":            csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_attributes_add.html", bind)
@@ -117,7 +115,6 @@ func HandleAdminUserAttributesAddPost(
 				"error":                message,
 				"page":                 r.URL.Query().Get("page"),
 				"query":                r.URL.Query().Get("query"),
-				"csrfField":            csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_attributes_add.html", bind)

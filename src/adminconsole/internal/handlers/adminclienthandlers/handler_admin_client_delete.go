@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/config"
@@ -79,8 +78,7 @@ func HandleAdminClientDeleteGet(
 		}
 
 		bind := map[string]interface{}{
-			"client":    view,
-			"csrfField": csrf.TemplateField(r),
+			"client": view,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
@@ -134,9 +132,8 @@ func HandleAdminClientDeletePost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"client":    client,
-				"error":     message,
-				"csrfField": csrf.TemplateField(r),
+				"client": client,
+				"error":  message,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)

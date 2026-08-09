@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
@@ -58,8 +57,7 @@ func HandleAccountSessionsGet(
 		})
 
 		bind := map[string]interface{}{
-			"sessions":  sessionInfoArr,
-			"csrfField": csrf.TemplateField(r),
+			"sessions": sessionInfoArr,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_user_sessions.html", bind)

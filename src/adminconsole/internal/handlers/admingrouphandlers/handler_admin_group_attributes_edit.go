@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -79,7 +78,6 @@ func HandleAdminGroupAttributesEditGet(
 		bind := map[string]interface{}{
 			"group":     group,
 			"attribute": attribute,
-			"csrfField": csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_edit.html", bind)
@@ -168,7 +166,6 @@ func HandleAdminGroupAttributesEditPost(
 				"group":     group,
 				"attribute": &tempAttribute,
 				"error":     message,
-				"csrfField": csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_edit.html", bind)

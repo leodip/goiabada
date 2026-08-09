@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -30,7 +29,6 @@ func HandleAdminUserNewGet(
 			"setPasswordType": "now",
 			"page":            r.URL.Query().Get("page"),
 			"query":           r.URL.Query().Get("query"),
-			"csrfField":       csrf.TemplateField(r),
 		}
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_new.html", bind)
@@ -63,7 +61,6 @@ func HandleAdminUserNewPost(
 				"givenName":       r.FormValue("givenName"),
 				"middleName":      r.FormValue("middleName"),
 				"familyName":      r.FormValue("familyName"),
-				"csrfField":       csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_new.html", bind)

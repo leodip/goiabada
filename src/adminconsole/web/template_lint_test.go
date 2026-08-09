@@ -92,6 +92,50 @@ func TestTemplates_RedirectURIAndWebOriginCellsAreText(t *testing.T) {
 	}
 }
 
+// TestTemplates_NoCsrfField guards the half of the CSRF token deletion that nothing else in any
+// tier can observe. #155 replaced the CSRF token with an origin check, so no handler binds
+// csrfField any more and no template may name it again.
+//
+// The reason this needs a lint rather than a test is that a template naming a bind no handler
+// supplies is completely silent. It does not fail to compile. It does not fail the render tests:
+// restoring {{ .csrfField }} to account_phone.html, which TestRender_AccountPhone and
+// TestRender_JSBootstrapNoKeyLeak both render from a bind map that no longer carries it, left the
+// whole adminconsole tier green. And it does not look wrong in a browser either: every csrfField
+// line deleted here was a standalone {{ .csrfField }} action sitting in HTML text, and there
+// html/template renders a missing map key as nothing at all.
+//
+// (text/template is what renders the literal "<no value>", and these pages are not text/template.
+// html/template's answer is context-dependent rather than uniform, so "it renders as nothing" is a
+// statement about the shape these lines had, not about missing binds in general: a missing key
+// becomes ZgotmplZ in an unquoted attribute and null in an unquoted JavaScript value, while HTML
+// text, quoted attributes, quoted URLs, JavaScript strings and CSS values all render empty.
+// Option("missingkey=error") would turn every one of them into a render error, and nothing in this
+// repo sets it.)
+//
+// So a stray reference is not a broken page. It is a dead one, invisible everywhere, that reads to
+// the next person as though a CSRF field were still being emitted. That is exactly what #155
+// deleted the plumbing to avoid, and a lint is the only thing that can see it.
+//
+// The claim is lexical and stops there: no template source contains the string csrfField. A
+// reference reintroduced by copy-paste or a revert carries that spelling, which is the shape a
+// regression takes. A key spelled around the scan does not, and this is demonstrable rather than
+// theoretical: {{ index . "\x63srfField" }} reads the same runtime key and this test does not see
+// it. Catching that would mean parsing each file with text/template/parse and walking the tree,
+// which needs this module's whole func map to parse at all, and a key computed at run time would
+// still be out of reach. The boundary is drawn here on purpose. See the matching note in
+// internal/handlers/csrf_lint_test.go, which draws the same one on the bind side.
+func TestTemplates_NoCsrfField(t *testing.T) {
+	walkHTMLTemplates(t, func(path, content string) {
+		if strings.Contains(content, "csrfField") {
+			// Lexical, like the scan. It does not predict what the occurrence would render
+			// as: that depends on the context the action sits in, per the note above.
+			t.Errorf(`%s: names csrfField, the spelling #155 deleted when it replaced the CSRF `+
+				`token with an origin check; no handler binds it, so remove the occurrence or `+
+				`update this guard`, path)
+		}
+	})
+}
+
 // TestTemplates_HtmlLangNotHardcoded guards the <html lang="en"> bug: page
 // layouts must render the lang attribute from the active locale so the document
 // advertises the language it renders in. Email layouts are exempt (emails are

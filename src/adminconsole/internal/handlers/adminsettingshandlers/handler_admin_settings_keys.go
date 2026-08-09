@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
@@ -74,8 +73,7 @@ func HandleAdminSettingsKeysGet(
 		}
 
 		bind := map[string]interface{}{
-			"keys":      orderedKeys,
-			"csrfField": csrf.TemplateField(r),
+			"keys": orderedKeys,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_keys.html", bind)

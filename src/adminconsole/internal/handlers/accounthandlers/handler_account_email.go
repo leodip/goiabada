@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -60,7 +59,6 @@ func HandleAccountEmailGet(
 			"emailVerified":     user.EmailVerified,
 			"emailConfirmation": "",
 			"smtpEnabled":       settings.SMTPEnabled,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind)
@@ -101,7 +99,6 @@ func HandleAccountEmailPost(
 				"email":             email,
 				"emailVerified":     user.EmailVerified,
 				"emailConfirmation": emailConfirmation,
-				"csrfField":         csrf.TemplateField(r),
 				"error":             "The email and email confirmation entries must be identical.",
 			}
 			if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); err != nil {
@@ -119,7 +116,6 @@ func HandleAccountEmailPost(
 					"email":             email,
 					"emailVerified":     user.EmailVerified,
 					"emailConfirmation": emailConfirmation,
-					"csrfField":         csrf.TemplateField(r),
 					"error":             errorMessage,
 				}
 				if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); err != nil {

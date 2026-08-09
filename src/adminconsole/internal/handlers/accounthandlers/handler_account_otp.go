@@ -3,7 +3,6 @@ package accounthandlers
 import (
 	"net/http"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -36,7 +35,6 @@ func HandleAccountOtpGet(
 
 		bind := map[string]interface{}{
 			"otpEnabled": user.OTPEnabled,
-			"csrfField":  csrf.TemplateField(r),
 		}
 
 		if !user.OTPEnabled {
@@ -85,7 +83,6 @@ func HandleAccountOtpPost(
 			bind := map[string]interface{}{
 				"error":      message,
 				"otpEnabled": user.OTPEnabled,
-				"csrfField":  csrf.TemplateField(r),
 			}
 
 			if len(base64Image) > 0 {
@@ -113,7 +110,6 @@ func HandleAccountOtpPost(
 						bind := map[string]interface{}{
 							"error":      apiErr.Message,
 							"otpEnabled": user.OTPEnabled,
-							"csrfField":  csrf.TemplateField(r),
 						}
 						if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind); err != nil {
 							httpHelper.InternalServerError(w, r, err)
@@ -150,7 +146,6 @@ func HandleAccountOtpPost(
 						bind := map[string]interface{}{
 							"error":       apiErr.Message,
 							"otpEnabled":  user.OTPEnabled,
-							"csrfField":   csrf.TemplateField(r),
 							"base64Image": base64Image,
 							"secretKey":   secretKey,
 						}

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -20,9 +19,7 @@ func HandleAdminResourceNewGet(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		bind := map[string]interface{}{
-			"csrfField": csrf.TemplateField(r),
-		}
+		bind := map[string]interface{}{}
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_new.html", bind)
 		if err != nil {
@@ -44,7 +41,6 @@ func HandleAdminResourceNewPost(
 				"error":              message,
 				"resourceIdentifier": r.FormValue("resourceIdentifier"),
 				"description":        r.FormValue("description"),
-				"csrfField":          csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_new.html", bind)
