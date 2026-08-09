@@ -437,7 +437,13 @@ src/todo.txt
 # the thing it describes, and a reader finding both has no way to tell which is
 # true. Anything already pushed stays in git history.
 #
-# To track something here later, change this to `docs/*` and add a negation:
-# git does not descend into an excluded directory, so `!docs/keep.md` has no
+# The leading slash anchors the rule to the repository root, and it has to stay.
+# A bare `docs/` has no slash of its own, so git applies it at every directory
+# level: it also excluded site/src/content/docs/, the entire content tree of the
+# documentation site, which made every new page silently unstageable (issue
+# #191).
+#
+# To track something here later, change this to `/docs/*` and add a negation:
+# git does not descend into an excluded directory, so `!/docs/keep.md` has no
 # effect while the directory itself is excluded.
-docs/
+/docs/
