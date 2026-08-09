@@ -164,11 +164,18 @@ jobs:
           [ "$count" -eq 11 ] || { echo "::error::expected 11 assets, found $count"; exit 1; }
           ls -la dist/
 
-      - uses: actions/attest@daf44fb950173508f38bd2406030372c1d1162b1 # v3
+      # attest-build-provenance, NOT the generic actions/attest.
+      #
+      # Upstream advises new implementations to use actions/attest, and its
+      # input documentation says predicate-type is "required when using
+      # predicate or predicate-path for custom attestations" -- which reads as
+      # though omitting all three yields provenance. It does not: actions/attest
+      # attests a predicate you supply and fails with "predicate-type must be
+      # provided". That advice applies to CUSTOM predicates. Build provenance
+      # has its own action precisely because constructing the predicate is not
+      # trivial. Observed failing on the v1.5.3-rc1 dry run.
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
-          # No predicate-type: supplying it selects CUSTOM mode, which then
-          # requires predicate or predicate-path. Provenance is the default
-          # precisely when those are omitted.
           subject-path: 'dist/*'
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -228,12 +235,12 @@ jobs:
       # One buildx invocation pushed the same manifest to both, so the digests
       # are identical by construction: GHCR is an unattested mirror whose
       # contents anyone can verify against the Docker Hub reference.
-      - uses: actions/attest@daf44fb950173508f38bd2406030372c1d1162b1 # v3
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-name: docker.io/leodip/goiabada
           subject-digest: ${{ steps.digests.outputs.authserver }}
           push-to-registry: false
-      - uses: actions/attest@daf44fb950173508f38bd2406030372c1d1162b1 # v3
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-name: docker.io/leodip/goiabada
           subject-digest: ${{ steps.digests.outputs.adminconsole }}
