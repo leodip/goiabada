@@ -433,13 +433,21 @@ configure_database() {
 }
 
 # ---- module test runs (no DB matrix) ----------------------------------------
+# -count=1 defeats Go's test result cache, matching what run_tests already does
+# for the data and integration tiers. It is not optional here: core's
+# TestSendEmail talks to a real SMTP server at mailpit:1025, and Go's cache
+# keys on source and flags but has no notion of whether a network service is
+# reachable. Without this, an earlier successful run makes `go test -v ./...`
+# report `ok ... (cached)` and exit 0 even when mailpit is gone -- so the tier
+# reports green having executed nothing. Verified: the same invocation exits 0
+# with 29 cached packages when isolated, and 1 once caching is defeated.
 
 if should_run_internal; then
     log="$LOG_DIR/01-internal.log"
     echo "Running internal tests... (log: $log)"
     start=$SECONDS
     gha_group "Internal tests"
-    if ! go test -v "./internal/..." 2>&1 | tee "$log"; then
+    if ! go test -v -count=1 "./internal/..." 2>&1 | tee "$log"; then
         gha_summary_row "Internal" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Authserver internal tests" "$log"
     fi
@@ -452,7 +460,7 @@ if should_run_core; then
     echo "Running tests for core module... (log: $log)"
     start=$SECONDS
     gha_group "Core module tests"
-    if ! (cd ../core && go test -v ./...) 2>&1 | tee "$log"; then
+    if ! (cd ../core && go test -v -count=1 ./...) 2>&1 | tee "$log"; then
         gha_summary_row "Core" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Core module tests" "$log"
     fi
@@ -465,7 +473,7 @@ if should_run_adminconsole; then
     echo "Running tests for admin console module... (log: $log)"
     start=$SECONDS
     gha_group "Admin console module tests"
-    if ! (cd ../adminconsole && go test -v ./...) 2>&1 | tee "$log"; then
+    if ! (cd ../adminconsole && go test -v -count=1 ./...) 2>&1 | tee "$log"; then
         gha_summary_row "Adminconsole" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Admin console module tests" "$log"
     fi
