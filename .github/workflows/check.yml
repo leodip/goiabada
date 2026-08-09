@@ -25,9 +25,17 @@ on:
         default: false
 
 concurrency:
-  # A superseded push stops burning runners instead of racing its replacement.
   group: check-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded PR runs, so pushing again to a branch stops burning
+  # runners on the previous commit. Never cancel a push to main.
+  #
+  # This was `true` unconditionally, which was wrong: `Build validation` runs
+  # ONLY on push (4.5), and it is the sole job that exercises the release path
+  # -- five cross-compiles plus both Docker images. Merging two PRs in quick
+  # succession cancelled the first one's run, so a commit landed on main having
+  # never had its build path validated, which is precisely what that job exists
+  # to prevent. Observed on 4dd17c8.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
