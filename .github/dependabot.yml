@@ -11,10 +11,24 @@
 version: 2
 
 updates:
-  # The SHA pins in the workflows. Without this they would be frozen forever,
-  # which is the failure mode pinning is accused of and this avoids.
+  # Covers the workflows in .github/workflows AND every composite action in
+  # .github/actions/*. The glob matters: `directory: /` scans .github/workflows
+  # ONLY, so an action.yml elsewhere is invisible to Dependabot and silently
+  # keeps whatever pin it was born with -- which is worse than being unpinned,
+  # because it looks maintained.
+  #
+  # That is not hypothetical. actions/cache was bumped v4 -> v6.1.0 across the
+  # workflows while the copy in .github/actions/setup-test-container stayed on
+  # v4, leaving two majors of one action in use. Naming that directory
+  # explicitly would fix today and break again the next time someone adds a
+  # composite action, so the pattern is a glob.
+  #
+  # Without this, the SHA pins would freeze forever, which is the standard
+  # objection to pinning and the reason pinning without Dependabot is a trap.
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     commit-message:
