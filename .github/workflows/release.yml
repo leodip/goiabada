@@ -174,7 +174,7 @@ jobs:
       # provided". That advice applies to CUSTOM predicates. Build provenance
       # has its own action precisely because constructing the predicate is not
       # trivial. Observed failing on the v1.5.3-rc1 dry run.
-      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: 'dist/*'
 
@@ -235,12 +235,12 @@ jobs:
       # One buildx invocation pushed the same manifest to both, so the digests
       # are identical by construction: GHCR is an unattested mirror whose
       # contents anyone can verify against the Docker Hub reference.
-      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: docker.io/leodip/goiabada
           subject-digest: ${{ steps.digests.outputs.authserver }}
           push-to-registry: false
-      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: docker.io/leodip/goiabada
           subject-digest: ${{ steps.digests.outputs.adminconsole }}
