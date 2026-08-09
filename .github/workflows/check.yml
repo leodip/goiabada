@@ -109,7 +109,7 @@ jobs:
       unparam: ${{ steps.read.outputs.unparam }}
       govulncheck: ${{ steps.read.outputs.govulncheck }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - id: read
         run: |
           set -euo pipefail
@@ -128,19 +128,43 @@ jobs:
     needs: versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ needs.versions.outputs.go }}
           cache-dependency-path: src/**/go.sum
 
+      # Both linters are compiled from source by `go install`, which dominated
+      # this job: 182s, almost none of it linting. setup-go's cache covers
+      # module downloads, not built binaries, so cache the binaries themselves.
+      #
+      # The key is the pinned versions, so a bump in versions.yaml misses the
+      # cache and rebuilds exactly once. That is also why this cannot serve a
+      # stale linter: the version is in the key, not merely in the install
+      # command.
+      - name: Cache linter binaries
+        id: linter-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/go/bin
+          key: linters-${{ runner.os }}-golangci${{ needs.versions.outputs.golangci }}-unparam${{ needs.versions.outputs.unparam }}
+
       # Pinned from versions.yaml. A blocking gate whose definition of "clean"
       # can change on an upstream release is not a gate.
       - name: Install linters
+        if: steps.linter-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${{ needs.versions.outputs.golangci }}
           go install mvdan.cc/unparam@v${{ needs.versions.outputs.unparam }}
+
+      # Fails loudly if the cache restored something unusable, rather than
+      # letting a later step fail with a confusing "command not found".
+      - name: Confirm the linters are the pinned versions
+        run: |
+          set -euo pipefail
+          golangci-lint --version
+          unparam -h 2>&1 | head -1
 
       # The standalone staticcheck binary is deliberately not run. It does not
       # ship the QF (quickfix) checks that golangci-lint's bundled copy
@@ -207,12 +231,20 @@ jobs:
     # to the required-check list (docs/ci-v2-design.md 7).
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ needs.versions.outputs.go }}
           cache-dependency-path: src/**/go.sum
+      - name: Cache govulncheck
+        id: govuln-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/go/bin
+          key: govulncheck-${{ runner.os }}-${{ needs.versions.outputs.govulncheck }}
+
       - name: Install govulncheck
+        if: steps.govuln-cache.outputs.cache-hit != 'true'
         run: go install golang.org/x/vuln/cmd/govulncheck@v${{ needs.versions.outputs.govulncheck }}
       - name: govulncheck
         run: |
@@ -235,7 +267,7 @@ jobs:
       mailpit:
         image: axllent/mailpit
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -252,7 +284,7 @@ jobs:
     runs-on: ubuntu-latest
     container: golang:${{ needs.versions.outputs.go }}-bookworm
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -267,7 +299,7 @@ jobs:
     runs-on: ubuntu-latest
     container: golang:${{ needs.versions.outputs.go }}-bookworm
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -293,7 +325,7 @@ jobs:
       mailpit:
         image: axllent/mailpit
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -328,7 +360,7 @@ jobs:
       mailpit:
         image: axllent/mailpit
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -360,7 +392,7 @@ jobs:
       mailpit:
         image: axllent/mailpit
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -395,7 +427,7 @@ jobs:
       mailpit:
         image: axllent/mailpit
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -418,13 +450,13 @@ jobs:
     if: github.event_name == 'push' || inputs.full
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ needs.versions.outputs.go }}
           cache-dependency-path: src/**/go.sum
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Install Tailwind
         run: |
           set -euo pipefail

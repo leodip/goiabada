@@ -1529,7 +1529,7 @@ The repeated container setup lives in a local composite action, `.github/actions
 
 **Deferred, with reasons.**
 
-- **`Lint` takes 182s, nearly as long as a database leg**, and almost none of it is linting: `golangci-lint` and `unparam` are compiled from source by `go install` on every run, and `actions/setup-go`'s cache covers module downloads rather than built binaries. Caching the two binaries keyed on their pinned versions should cut this to well under a minute. Left for stage 8; it is a cost, not a correctness problem.
+- **`Lint` takes 182s, nearly as long as a database leg**, and almost none of it is linting: `golangci-lint` and `unparam` are compiled from source by `go install` on every run, and `actions/setup-go`'s cache covers module downloads rather than built binaries. **Done in stage 8**: the binaries are cached under a key containing their pinned versions, so a bump in `versions.yaml` misses the cache and rebuilds exactly once, and the cache cannot serve a stale linter because the version is part of the key rather than only of the install command.
 - **`Vulnerabilities` will show red on every PR** until issue #155 is resolved, which is the failure mode 4.4 warned about under option C: a permanently red check is one nobody reads, and it also masks any *new* advisory. The alternative worth considering is `govulncheck -format json` filtered against a small allowlist naming `GO-2025-3884` with its reason, so the gate goes green now and red the moment a *different* advisory becomes reachable. Not built, because it is a judgment call about how the gate should read rather than something this document specifies.
 
 ---
@@ -1764,7 +1764,7 @@ Run the same nine-point checklist from stage 5, with two differences: `publish.y
 | 5 | **Done.** `release.yml`, `publish.yml`, `docs.yml`, SHA pins + attestations | `v1.5.3-rc1` dry run: 8/9 | yes |
 | 6 | **Done.** remove `version-manager.sh` workflow writes, add the CI drift step | idempotency + guard fires | yes |
 | 7 | **Done.** delete 4 old workflows | stage 5 verified | yes |
-| 8 | Dependabot, remaining SHA pins for `check.yml` | green PR | yes |
+| 8 | **Done.** Dependabot, SHA pins for `check.yml`, linter binary cache | green PR | yes |
 | 9 | first real release | full checklist | n/a |
 
 Stages 0 through 3 deliver the PR-visibility goal on their own and are independently valuable. Stages 4 through 7 deliver the one-command release. Stage 8 is follow-up hardening that can slip without blocking anything, now that the credential-bearing workflows are pinned at birth in stage 5.
