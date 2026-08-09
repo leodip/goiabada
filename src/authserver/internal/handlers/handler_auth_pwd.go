@@ -9,7 +9,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -83,7 +82,6 @@ func HandleAuthPwdGet(
 		bind := map[string]interface{}{
 			"error":                   nil,
 			"smtpEnabled":             settings.SMTPEnabled,
-			"csrfField":               csrf.TemplateField(r),
 			"layoutShowClientSection": displayInfo.ShowSection,
 			"layoutClientName":        displayInfo.ClientName,
 			"layoutHasClientLogo":     displayInfo.HasLogo,
@@ -155,7 +153,6 @@ func HandleAuthPwdPost(
 				"error":                   le.Localize(r.Context()),
 				"smtpEnabled":             settings.SMTPEnabled,
 				"email":                   email,
-				"csrfField":               csrf.TemplateField(r),
 				"layoutShowClientSection": displayInfo.ShowSection,
 				"layoutClientName":        displayInfo.ClientName,
 				"layoutHasClientLogo":     displayInfo.HasLogo,

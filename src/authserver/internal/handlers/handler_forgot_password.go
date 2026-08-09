@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data"
@@ -22,8 +21,7 @@ func HandleForgotPasswordGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		bind := map[string]interface{}{
-			"error":     nil,
-			"csrfField": csrf.TemplateField(r),
+			"error": nil,
 		}
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
@@ -50,8 +48,7 @@ func HandleForgotPasswordPost(
 
 			// i18n surface: A — browser-flow form rerender.
 			bind := map[string]interface{}{
-				"error":     i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()),
-				"csrfField": csrf.TemplateField(r),
+				"error": i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
@@ -109,8 +106,7 @@ func HandleForgotPasswordPost(
 		}
 
 		bind := map[string]interface{}{
-			"linkSent":  true,
-			"csrfField": csrf.TemplateField(r),
+			"linkSent": true,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)

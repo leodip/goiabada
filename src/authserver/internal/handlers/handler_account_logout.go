@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -78,7 +77,6 @@ func renderLogoutConsent(w http.ResponseWriter, r *http.Request, httpHelper Http
 	}
 
 	bind := map[string]interface{}{
-		"csrfField":             csrf.TemplateField(r),
 		"formAction":            logoutFormPath,
 		"postLogoutRedirectUri": httpHelper.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri"),
 		"clientId":              clientId,
@@ -551,9 +549,10 @@ func doLogout(
 
 	case hint.state == hintAbsent && r.Method == http.MethodPost:
 		// The confirming submission of the consent page. A hintless POST is not CSRF-exempt, so it
-		// carried a token, so it came from a page this server rendered. That is what makes it consent
-		// rather than a cross-site request, and it is why the consent form drops the hint (#109
-		// decision 13).
+		// had to pass the origin check, so it was submitted by a document served from this origin.
+		// That is what makes it consent rather than a cross-site request, and it is why the consent
+		// form drops the hint (#109 decision 13). It used to be a CSRF token that carried this
+		// argument; #155 replaced the token with the origin check, and the conclusion is unchanged.
 
 	case hint.state == hintRejected && r.Method == http.MethodPost:
 		redirectToHintlessLogout(w, r, httpHelper)
@@ -637,14 +636,20 @@ func doLogout(
 // to the GET binding, carrying what the consent page still needs and dropping the two parameters it
 // must not have.
 //
-// Why a redirect rather than simply rendering the consent page here. The CSRF exemption the POST
-// binding needs keys on the hint being PRESENT, because middleware cannot judge whether a hint is
-// genuine. gorilla/csrf returns from its handler on that skip flag before it saves the CSRF cookie
-// and before it attaches the token, so a consent page rendered on such a request carries an empty
-// csrf.TemplateField, and its own confirming POST is hintless, therefore not exempt, therefore
-// refused. That leaves the End-User on a page they cannot submit while still signed in, which is the
-// class of defect this endpoint was rewritten to remove. The GET binding is never exempt, so the page
-// it renders has a real token and a real cookie (#109).
+// Why a redirect rather than simply rendering the consent page here. The original reason has
+// expired and is worth recording, because it is the kind that looks live until someone checks it.
+// The CSRF exemption the POST binding needs keys on the hint being PRESENT, since middleware cannot
+// judge whether a hint is genuine. gorilla/csrf returned from its handler on that skip flag before
+// saving its cookie and attaching its token, so a consent page rendered on such a request carried an
+// empty token field while its own confirming POST was hintless, therefore not exempt, therefore
+// refused: an End-User stranded on a page they could not submit while still signed in. There is no
+// token now (#155). Protection is the origin check, a page served from here is a document at our own
+// origin whichever binding produced it, and its confirming POST is same-origin either way, so the
+// trap is gone.
+//
+// The redirect stays because it is the behaviour #109 landed and what the tests pin, and because it
+// keeps an independent property: the End-User ends on a GET, so a reload or a back-navigation does
+// not resubmit the failed POST. Do not read the exemption as the reason for it any more (#109, #155).
 //
 // id_token_hint is dropped, and not to prevent a loop: the follow-up is a GET, and the switch above
 // sends a rejected hint on any method but POST to the consent page, so sending the hint back would

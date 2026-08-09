@@ -901,19 +901,6 @@ func captureResetRender(t *testing.T, httpHelper *mocks_handlerhelpers.HttpHelpe
 	return captured
 }
 
-// comparableBind strips the per-request CSRF token, which necessarily differs
-// between requests and so cannot serve as an oracle.
-func comparableBind(bind map[string]interface{}) map[string]interface{} {
-	out := map[string]interface{}{}
-	for k, v := range bind {
-		if k == "csrfField" {
-			continue
-		}
-		out[k] = v
-	}
-	return out
-}
-
 func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 	const requestCode = "123456"
 
@@ -1046,7 +1033,9 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			bind, run := sc.setup(t)
 			run()
 
-			got := comparableBind(*bind)
+			// Compared whole. Nothing in this bind varies between two requests any more, so
+			// there is nothing to strip before the scenarios are held against each other.
+			got := *bind
 			assert.Equal(t, true, got["codeInvalidOrExpired"])
 			assert.Equal(t, sc.wantStatus, got["_httpStatus"])
 

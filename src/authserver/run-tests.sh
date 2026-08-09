@@ -7,7 +7,7 @@
 #
 # Options:
 #   -t, --type   <type>     Test category to run. One of:
-#                             internal      - authserver internal/* unit tests
+#                             internal      - authserver internal/* and web unit tests
 #                             core          - core module tests
 #                             adminconsole  - adminconsole module tests
 #                             data          - data-layer tests (per DB)
@@ -447,7 +447,13 @@ if should_run_internal; then
     echo "Running internal tests... (log: $log)"
     start=$SECONDS
     gha_group "Internal tests"
-    if ! go test -v -count=1 "./internal/..." 2>&1 | tee "$log"; then
+    # ./web as well as ./internal/..., because it is the only other authserver package with unit
+    # tests that need nothing running. Its four -- the OpenAPI spec pair and the two template
+    # lints -- executed nowhere at all until #155: this tier ran ./internal/... only, and the CI
+    # job runs this tier. The adminconsole never had the gap because its leg runs ./... . The two
+    # remaining packages stay out on purpose: ./tests/data and ./tests/integration have their own
+    # tiers and need a database, and ./cmd has no tests.
+    if ! go test -v -count=1 "./internal/..." "./web" 2>&1 | tee "$log"; then
         gha_summary_row "Internal" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Authserver internal tests" "$log"
     fi

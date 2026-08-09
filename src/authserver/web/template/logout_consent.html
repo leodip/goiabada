@@ -16,11 +16,14 @@
     <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "logout_consent.title" }}</h2>
     <!-- An explicit action, not action="", because action="" resolves to the current URL
          INCLUDING its query string, which on this page carries the id_token_hint that could
-         not be confirmed. Confirming this page must be a hintless POST: the CSRF token below
-         is then what proves the request came from here, and a POST carrying a hint is only
-         trusted when that hint validates. Sending the hint back would let a cross-site POST
-         with a bogus hint reach a teardown, since the CSRF exemption for the POST binding can
-         only key on the hint being present and cannot judge whether it is genuine (#109).
+         not be confirmed. Confirming this page must be a hintless POST: a hintless POST is not
+         CSRF-exempt, so it has to pass the origin check, and this action is a same-origin path
+         so the submission passes it. That is what proves the request came from here. A POST
+         carrying a hint is only trusted when that hint validates. Sending the hint back would
+         let a cross-site POST with a bogus hint reach a teardown, since the CSRF exemption for
+         the POST binding can only key on the hint being present and cannot judge whether it is
+         genuine (#109). There is no hidden CSRF token in this form: #155 replaced the token
+         with the origin check, and this argument used to be made by the token (#155).
 
          The parameters that must survive the round trip are hidden fields instead. state is
          emitted whenever it was present, empty value included, because an RP that sent
@@ -49,8 +52,6 @@
             <button class="w-full mt-2 btn btn-secondary" onclick="NoBtnClick(this, event);">{{ T $.ctx "common.button.no" }}</button>
             <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "common.button.yes" }}</button>
         </div>
-
-        {{ .csrfField }}
 
     </form>
 

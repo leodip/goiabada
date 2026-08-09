@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -91,7 +90,6 @@ func HandleAuthOtpGet(
 
 			bind := map[string]interface{}{
 				"error":                   nil,
-				"csrfField":               csrf.TemplateField(r),
 				"layoutShowClientSection": displayInfo.ShowSection,
 				"layoutClientName":        displayInfo.ClientName,
 				"layoutHasClientLogo":     displayInfo.HasLogo,
@@ -118,7 +116,6 @@ func HandleAuthOtpGet(
 
 			bind := map[string]interface{}{
 				"error":                   nil,
-				"csrfField":               csrf.TemplateField(r),
 				"base64Image":             base64Image,
 				"secretKey":               secretKey,
 				"layoutShowClientSection": displayInfo.ShowSection,
@@ -215,7 +212,6 @@ func HandleAuthOtpPost(
 		renderError := func(message string) {
 			bind := map[string]interface{}{
 				"error":                   message,
-				"csrfField":               csrf.TemplateField(r),
 				"layoutShowClientSection": displayInfo.ShowSection,
 				"layoutClientName":        displayInfo.ClientName,
 				"layoutHasClientLogo":     displayInfo.HasLogo,

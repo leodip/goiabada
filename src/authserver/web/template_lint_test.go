@@ -45,6 +45,24 @@ func TestTemplates_NoHTMLInTitle(t *testing.T) {
 	})
 }
 
+// TestTemplates_NoCsrfField guards the half of the CSRF token deletion that nothing else
+// observes. A template naming a bind no handler supplies does not fail to compile; it renders the
+// literal text "<no value>" into the page at request time. Neither the handler tests nor the
+// integration suite catches that, because both assert on the fields a page carries rather than on
+// the absence of a broken marker: restoring {{ .csrfField }} to all eight forms left every one of
+// them green.
+//
+// csrfField was the last bind in that shape. #155 replaced the CSRF token with an origin check, so
+// no handler binds it any more and no template may name it again.
+func TestTemplates_NoCsrfField(t *testing.T) {
+	walkHTMLTemplates(t, func(path, content string) {
+		if strings.Contains(content, "csrfField") {
+			t.Errorf(`%s: names csrfField, which no handler binds since #155 replaced the CSRF `+
+				`token with an origin check; this renders a literal "<no value>" into the page`, path)
+		}
+	})
+}
+
 // TestTemplates_HtmlLangNotHardcoded guards the <html lang="en"> bug: page
 // layouts must render the lang attribute from the active locale. Email layouts
 // are exempt (emails are per-locale sibling files, not context-driven).
