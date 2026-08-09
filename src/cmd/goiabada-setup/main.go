@@ -20,7 +20,18 @@ import (
 	_ "github.com/microsoft/go-mssqldb"
 )
 
-const version = "1.0.0"
+// Injected at build time via -ldflags by build-binaries.sh, which takes the
+// value from the git tag. They are vars rather than consts precisely so the
+// linker can set them.
+//
+// The defaults are what a source build gets. "dev" identifies an unreleased
+// binary, and "latest" is the right image tag for someone running the wizard
+// from a checkout: it resolves to the current release rather than to whichever
+// version happened to be hardcoded when the file was last edited.
+var (
+	version  = "dev"
+	imageTag = "latest"
+)
 
 // ANSI color codes
 var (
@@ -1579,7 +1590,7 @@ func generateAuthServerService(config *Config) string {
 	authInternalURL := "http://goiabada-authserver:9090"
 
 	sb.WriteString("  goiabada-authserver:\n")
-	sb.WriteString("    image: leodip/goiabada:authserver-1.5.2\n")
+	fmt.Fprintf(&sb, "    image: leodip/goiabada:authserver-%s\n", imageTag)
 	sb.WriteString("    restart: unless-stopped\n")
 
 	if config.DBType != "sqlite" {
@@ -1686,7 +1697,7 @@ func generateAdminConsoleService(config *Config) string {
 	authInternalURL := "http://goiabada-authserver:9090"
 
 	sb.WriteString("  goiabada-adminconsole:\n")
-	sb.WriteString("    image: leodip/goiabada:adminconsole-1.5.2\n")
+	fmt.Fprintf(&sb, "    image: leodip/goiabada:adminconsole-%s\n", imageTag)
 	sb.WriteString("    restart: unless-stopped\n")
 	sb.WriteString("    depends_on:\n")
 	sb.WriteString("      goiabada-authserver:\n")
@@ -1892,7 +1903,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("    spec:\n")
 	sb.WriteString("      containers:\n")
 	sb.WriteString("      - name: authserver\n")
-	sb.WriteString("        image: leodip/goiabada:authserver-1.5.2\n")
+	fmt.Fprintf(&sb, "        image: leodip/goiabada:authserver-%s\n", imageTag)
 	sb.WriteString("        ports:\n")
 	sb.WriteString("        - containerPort: 9090\n")
 	sb.WriteString("        envFrom:\n")
@@ -1969,7 +1980,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("    spec:\n")
 	sb.WriteString("      containers:\n")
 	sb.WriteString("      - name: adminconsole\n")
-	sb.WriteString("        image: leodip/goiabada:adminconsole-1.5.2\n")
+	fmt.Fprintf(&sb, "        image: leodip/goiabada:adminconsole-%s\n", imageTag)
 	sb.WriteString("        ports:\n")
 	sb.WriteString("        - containerPort: 9091\n")
 	sb.WriteString("        envFrom:\n")

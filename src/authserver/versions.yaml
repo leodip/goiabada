@@ -1,23 +1,18 @@
 # =============================================================================
 # Goiabada Version Definitions
 # =============================================================================
-# This file is the single source of truth for all version numbers in the project.
-# Edit this file, then run: ./version-manager.sh update
+# This file owns the TOOLCHAIN and CDN pins. Edit it, then run:
+#   ./version-manager.sh update
+#
+# It does NOT own the product version. That comes from the git tag and is
+# injected at build time via ldflags, so the tag and the version compiled into
+# the binaries cannot disagree. Releasing is:
+#   git tag vX.Y.Z && git push origin vX.Y.Z
 #
 # Structure:
-#   project:  - Goiabada application versions
 #   tools:    - Build and development tool versions
 #   cdn:      - Frontend CDN dependency versions
 # =============================================================================
-
-# -----------------------------------------------------------------------------
-# Project Versions
-# -----------------------------------------------------------------------------
-# goiabada:       Main application version (authserver + adminconsole Docker images)
-# goiabada-setup: CLI setup tool version
-project:
-  goiabada: "1.5.2"
-  goiabada-setup: "1.0.0"
 
 # -----------------------------------------------------------------------------
 # Tool Versions

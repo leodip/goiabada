@@ -16,11 +16,22 @@
 #   generate - Regenerate committed data files (timezones, countries)
 #   all     - Run all commands in sequence (check → update → deps)
 #
-# Workflow:
+# Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind,
+# golangci-lint, mockery, staticcheck, unparam, govulncheck, daisyUI,
+# humanize-duration). It does NOT manage the product version.
+#
+# Workflow, for bumping a tool or CDN pin:
 #   1. Edit versions.yaml to set desired versions
 #   2. Run: ./version-manager.sh update
 #   3. Review changes: git diff
 #   4. Run tests and build
+#
+# Releasing the product is a separate activity and needs none of this:
+#   git tag vX.Y.Z && git push origin vX.Y.Z
+#
+# The version compiled into the binaries, the Docker image tags and the image
+# tags written into the setup wizard's generated manifests all derive from that
+# one tag via ldflags, so they cannot disagree with each other.
 #
 # Requirements:
 #   - yq (YAML parser) - installed in devcontainer
@@ -107,7 +118,7 @@ check_internet() {
 # =============================================================================
 
 # Read a version from versions.yaml
-# Usage: get_version "project.goiabada" -> "1.4.4"
+# Usage: get_version "tools.go" -> "1.26.5"
 get_version() {
     local key="$1"
     yq -r ".$key" "$VERSIONS_FILE"
@@ -116,13 +127,10 @@ get_version() {
 # Get all versions as key=value pairs for display
 get_all_versions() {
     yq -r '
-        .project | to_entries | .[] | "project." + .key + "=" + .value,
         .tools | to_entries | .[] | "tools." + .key + "=" + .value,
         .cdn | to_entries | .[] | "cdn." + .key + "=" + .value
     ' "$VERSIONS_FILE" 2>/dev/null || {
         # Fallback: read each key individually
-        echo "project.goiabada=$(get_version 'project.goiabada')"
-        echo "project.goiabada-setup=$(get_version 'project.goiabada-setup')"
         echo "tools.go=$(get_version 'tools.go')"
         echo "tools.tailwind=$(get_version 'tools.tailwind')"
         echo "tools.golangci-lint=$(get_version 'tools.golangci-lint')"
@@ -236,10 +244,12 @@ cmd_show() {
     printf "%-25s %s\n" "Key" "Version"
     printf "%-25s %s\n" "---" "-------"
 
-    # Project versions
-    echo -e "\n${BOLD}Project:${NC}"
-    printf "  %-23s ${GREEN}%s${NC}\n" "goiabada" "$(get_version 'project.goiabada')"
-    printf "  %-23s ${GREEN}%s${NC}\n" "goiabada-setup" "$(get_version 'project.goiabada-setup')"
+    # Product version, which this file does not own. Reported from git so that
+    # `show` remains the one place that answers "what versions is this project
+    # on", even though the answer now comes from two different sources.
+    echo -e "\n${BOLD}Product (from git tags, not this file):${NC}"
+    printf "  %-23s ${GREEN}%s${NC}\n" "latest tag" "$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "working tree" "$(git describe --tags --dirty 2>/dev/null || echo 'unknown')"
 
     # Tool versions
     echo -e "\n${BOLD}Tools:${NC}"
@@ -449,8 +459,6 @@ cmd_update() {
     print_header "Updating Version Strings in Project Files"
 
     # Load all versions from YAML
-    local GOIABADA_VERSION=$(get_version 'project.goiabada')
-    local SETUP_VERSION=$(get_version 'project.goiabada-setup')
     local GO_VERSION=$(get_version 'tools.go')
     local TAILWIND_VERSION=$(get_version 'tools.tailwind')
     local GOLANGCI_VERSION=$(get_version 'tools.golangci-lint')
@@ -484,78 +492,15 @@ cmd_update() {
     done
 
     # -------------------------------------------------------------------------
-    # Build Scripts (Goiabada Version)
+    # Product version: not handled here
     # -------------------------------------------------------------------------
-    echo -e "\n${BOLD}Build Scripts${NC}"
-
-    for script in "$BASE_DIR/src/build/build-binaries.sh" \
-                  "$BASE_DIR/src/build/build-docker-images.sh"; do
-        if [ -f "$script" ]; then
-            # Pattern: VERSION="X.Y.Z" or VERSION="X.Y.Z-suffix"
-            if update_file "$script" \
-                "s|VERSION=\"[0-9.]*\(-[a-zA-Z0-9]*\)\?\"|VERSION=\"${GOIABADA_VERSION}\"|g" \
-                "Goiabada version"; then
-                ((success_count++))
-            else
-                ((fail_count++))
-            fi
-        fi
-    done
-
-    # -------------------------------------------------------------------------
-    # goiabada-setup Tool
-    # -------------------------------------------------------------------------
-    echo -e "\n${BOLD}Goiabada Setup Tool${NC}"
-
-    # Makefile: VERSION ?= X.Y.Z
-    if [ -f "$BASE_DIR/src/cmd/goiabada-setup/Makefile" ]; then
-        if update_file "$BASE_DIR/src/cmd/goiabada-setup/Makefile" \
-            "s|VERSION ?= [0-9.]*|VERSION ?= ${SETUP_VERSION}|g" \
-            "Makefile version"; then
-            ((success_count++))
-        else
-            ((fail_count++))
-        fi
-    fi
-
-    # main.go: const version = "X.Y.Z"
-    if [ -f "$BASE_DIR/src/cmd/goiabada-setup/main.go" ]; then
-        if update_file "$BASE_DIR/src/cmd/goiabada-setup/main.go" \
-            "s|const version = \"[0-9.]*\"|const version = \"${SETUP_VERSION}\"|g" \
-            "version constant"; then
-            ((success_count++))
-        else
-            ((fail_count++))
-        fi
-
-        # Docker image references: leodip/goiabada:authserver-X.Y.Z(-suffix)
-        if update_file "$BASE_DIR/src/cmd/goiabada-setup/main.go" \
-            "s|leodip/goiabada:authserver-[0-9.]*\(-[a-zA-Z0-9]*\)\?|leodip/goiabada:authserver-${GOIABADA_VERSION}|g" \
-            "authserver image"; then
-            ((success_count++))
-        else
-            ((fail_count++))
-        fi
-
-        if update_file "$BASE_DIR/src/cmd/goiabada-setup/main.go" \
-            "s|leodip/goiabada:adminconsole-[0-9.]*\(-[a-zA-Z0-9]*\)\?|leodip/goiabada:adminconsole-${GOIABADA_VERSION}|g" \
-            "adminconsole image"; then
-            ((success_count++))
-        else
-            ((fail_count++))
-        fi
-    fi
-
-    # build-binaries.sh: VERSION="X.Y.Z"
-    if [ -f "$BASE_DIR/src/cmd/goiabada-setup/build-binaries.sh" ]; then
-        if update_file "$BASE_DIR/src/cmd/goiabada-setup/build-binaries.sh" \
-            "s|VERSION=\"[0-9.]*\"|VERSION=\"${SETUP_VERSION}\"|g" \
-            "build script version"; then
-            ((success_count++))
-        else
-            ((fail_count++))
-        fi
-    fi
+    # The build scripts' VERSION= lines, the setup tool's Makefile, its
+    # `const version` and the four leodip/goiabada image tags in its main.go
+    # used to be generated from project.goiabada and project.goiabada-setup.
+    # All of them now come from the git tag via ldflags at build time, so there
+    # is nothing to write: the tag and the version compiled into the binaries
+    # cannot disagree, rather than agreeing only because the release procedure
+    # was followed in the right order.
 
     # -------------------------------------------------------------------------
     # DevContainer Dockerfile
@@ -915,11 +860,17 @@ show_help() {
     echo "  generate Regenerate committed data files (timezones, countries)"
     echo "  all     Run all commands in sequence"
     echo ""
-    echo "Workflow:"
+    echo "Scope: toolchain and CDN pins only. The product version comes from"
+    echo "the git tag, not from versions.yaml."
+    echo ""
+    echo "Workflow, for bumping a tool or CDN pin:"
     echo "  1. Edit versions.yaml to set desired versions"
     echo "  2. Run: $0 update"
     echo "  3. Review changes: git diff"
     echo "  4. Run tests and build"
+    echo ""
+    echo "To release:"
+    echo "  git tag vX.Y.Z && git push origin vX.Y.Z"
     echo ""
     echo "Examples:"
     echo "  $0 show          # See current versions"
