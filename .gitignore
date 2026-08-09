@@ -428,10 +428,16 @@ src/todo.txt
 .playwright-mcp/
 
 
-# Agreement documents for the two-agent workflow. /leo-spec and /leo-run write and read
-# them under docs/issue-<n>-<slug>/ and they are the run's working memory, but they are
-# deliberately not pushed: the pull request body carries the narrative, the filed issues
-# carry the follow-ups, and the code comments carry the reasoning that constrains future
-# edits. Anything already pushed stays in git history.
-docs/issue-*/
-docs/issue-*.md
+# Working documents. /leo-spec and /leo-run write agreement documents under
+# docs/issue-<n>-<slug>/, and design and planning documents live here too. All
+# of it is the working memory of a piece of work, deliberately not pushed: the
+# pull request body carries the narrative, the filed issues carry the
+# follow-ups, and the code comments carry the reasoning that constrains future
+# edits. A plan left in the repo after it has been executed invites drift from
+# the thing it describes, and a reader finding both has no way to tell which is
+# true. Anything already pushed stays in git history.
+#
+# To track something here later, change this to `docs/*` and add a negation:
+# git does not descend into an excluded directory, so `!docs/keep.md` has no
+# effect while the directory itself is excluded.
+docs/
