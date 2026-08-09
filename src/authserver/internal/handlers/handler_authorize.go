@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -637,9 +638,25 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, templateFS f
 		if err != nil {
 			return errors.Wrap(err, "unable to parse template")
 		}
-		err = t.Execute(w, m)
+
+		// Render into a buffer, not straight to w. Execute writes as it walks the template, so a
+		// template that parses and then fails part way through would leave a partial body and an
+		// implicit 200 already on the wire. Every caller answers an error from here with
+		// httpHelper.InternalServerError as its last resort, and a WriteHeader after the response
+		// is committed changes nothing, so the client would be told 200 for a page that was never
+		// finished. form_post.html is operator supplied whenever GOIABADA_AUTHSERVER_TEMPLATEDIR
+		// is set, so this is reachable in a real deployment rather than only in tests. Buffering
+		// keeps the response uncommitted until there is a whole page to send (#141).
+		var rendered bytes.Buffer
+		err = t.Execute(&rendered, m)
 		if err != nil {
 			return errors.Wrap(err, "unable to execute template")
+		}
+		_, err = w.Write(rendered.Bytes())
+		if err != nil {
+			// The connection itself failed. Nothing can be recovered from here, including the
+			// caller's 500, but the error is still worth reporting rather than swallowing.
+			return errors.Wrap(err, "unable to write the form_post response")
 		}
 		return nil
 	}

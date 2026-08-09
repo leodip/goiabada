@@ -1048,6 +1048,62 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `<input type="hidden" name="state" value="def456">`)
 }
 
+// The form_post arm is the only one that can fail after the redirect URI has been validated, and it
+// can fail in two different places. A template that will not parse fails before anything is written,
+// which the per-site last-resort cases cover. A template that parses and then fails part way through
+// execution is the other member, and it is reachable in production: server.New serves templates from
+// os.DirFS(GOIABADA_AUTHSERVER_TEMPLATEDIR) when that variable is set, so the file is operator
+// supplied. Rendering straight to the ResponseWriter would commit a partial 200 the instant the
+// template emitted its first byte, and the caller's last-resort InternalServerError could then no
+// longer change the status the client sees. The render therefore goes to a buffer and reaches w only
+// once Execute has returned successfully (#141).
+func TestRedirToClientWithError_FormPostExecutionFailureLeavesResponseUncommitted(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/authorize", nil)
+
+	// Parses cleanly. "missing" is absent from the map, so index yields an untyped nil, and
+	// indexing that fails at execution time, after the <form> prefix has been emitted.
+	templateFS := &mocks.TestFS{
+		FileContents: map[string]string{
+			"form_post.html": `<form>{{index . "missing" 0}}</form>`,
+		},
+	}
+
+	err := redirToClientWithError(w, r, templateFS, "server_error", "Internal server error", "form_post",
+		"https://example.com/callback", "def456", "code")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to execute template")
+
+	// Nothing may have reached the client yet, or the caller's last resort is not a last resort.
+	assert.Empty(t, w.Body.String(), "a failed render must not put a partial body on the wire")
+
+	w.WriteHeader(http.StatusInternalServerError)
+	assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode,
+		"the caller must still be able to answer 500 after the form_post render failed")
+}
+
+// The third and last way the form_post arm can fail: the render succeeds and the connection does
+// not. Buffering cannot help here and is not meant to, since a client that cannot receive the page
+// cannot receive a 500 either. What it must still do is report the failure rather than swallow it,
+// so the caller logs something instead of treating a dead connection as a delivered refusal (#141).
+func TestRedirToClientWithError_FormPostWriteFailureIsReported(t *testing.T) {
+	w := &failingResponseWriter{}
+	r := httptest.NewRequest("GET", "/authorize", nil)
+
+	templateFS := &mocks.TestFS{
+		FileContents: map[string]string{
+			"form_post.html": `<form method="post" action="{{.redirectURI}}"></form>`,
+		},
+	}
+
+	err := redirToClientWithError(w, r, templateFS, "server_error", "Internal server error", "form_post",
+		"https://example.com/callback", "def456", "code")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to write the form_post response")
+}
+
 func TestRedirToClientWithError_DefaultToQueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)

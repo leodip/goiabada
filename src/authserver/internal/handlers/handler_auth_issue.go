@@ -47,8 +47,9 @@ func HandleIssueGet(
 			return
 		}
 
-		// id_token_hint sub enforcement (OIDC Core 3.1.2.1):
-		// "MUST NOT reply with an ID Token or Access Token for a different user"
+		// id_token_hint sub enforcement (OIDC Core 3.1.2.2, Authentication Request Validation):
+		// "The Authorization Server MUST NOT reply with an ID Token or Access Token for a
+		// different user, even if they have an active session with the Authorization Server."
 		// This is the critical safety net that catches mismatched users even after successful authentication.
 		if authContext.IdTokenHintSub != "" {
 			user, err := database.GetUserById(nil, authContext.UserId)
@@ -57,16 +58,37 @@ func HandleIssueGet(
 				return
 			}
 			if user == nil || user.Subject.String() != authContext.IdTokenHintSub {
-				// Cannot issue tokens for a different user than the hint identifies
-				err := redirToClientWithError(w, r, templateFS, constants.ErrorLoginRequired,
+				// Cannot issue tokens for a different user than the hint identifies.
+				//
+				// The clear goes FIRST, the order the prompt=none refusal below and the success
+				// path both use. ClearAuthContext persists the deletion through a Set-Cookie on
+				// w, and redirToClientWithError commits the response in every response mode, so
+				// clearing afterwards leaves the header on a response already written. This is
+				// the one refusal that leaves the context in ready_to_issue_code, the state that
+				// mints codes, so a browser keeping it can replay this endpoint with only the
+				// comparison above standing between the replay and a code (#141).
+				err := authHelper.ClearAuthContext(w, r)
+				if err != nil {
+					// The clear failed, so Save wrote no cookie and the browser still holds the
+					// auth context. The client is owed an error response regardless: its redirect
+					// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
+					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
+					slog.Error("failed to clear the auth context, answering the client with server_error",
+						"error", err)
+					err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
+						authContext.ResponseMode, authContext.RedirectURI, authContext.State,
+						authContext.ResponseType)
+					if err != nil {
+						// Nowhere left to send the client, so the 500 is the last resort here.
+						httpHelper.InternalServerError(w, r, err)
+					}
+					return
+				}
+
+				err = redirToClientWithError(w, r, templateFS, constants.ErrorLoginRequired,
 					"The authenticated user does not match the id_token_hint",
 					authContext.ResponseMode, authContext.RedirectURI, authContext.State,
 					authContext.ResponseType)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-					return
-				}
-				err = authHelper.ClearAuthContext(w, r)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -143,11 +165,25 @@ func HandleIssueGet(
 				// ClearAuthContext persists the deletion through a Set-Cookie on w, and
 				// redirToClientWithError commits the response in every response mode, so
 				// clearing afterwards leaves the header on a response already written and
-				// the browser keeps a ready_to_issue_code context it can replay. Failing
-				// the clear is a 500 rather than a refusal the browser cannot record.
+				// the browser keeps a ready_to_issue_code context it can replay.
 				err := authHelper.ClearAuthContext(w, r)
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					// Every error return in ChunkedCookieStore.Save is above its first
+					// http.SetCookie, so a failed clear writes zero cookies and the browser keeps
+					// the auth context whether this answers 500 or redirects. Withholding the
+					// client's response therefore buys nothing, and the client is owed one: its
+					// redirect URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6
+					// applies, and RFC 6749 4.1.2.1 mints server_error for exactly this
+					// condition (#141).
+					slog.Error("failed to clear the auth context, answering the client with server_error",
+						"error", err)
+					err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
+						authContext.ResponseMode, authContext.RedirectURI, authContext.State,
+						authContext.ResponseType)
+					if err != nil {
+						// Nowhere left to send the client, so the 500 is the last resort here.
+						httpHelper.InternalServerError(w, r, err)
+					}
 					return
 				}
 				err = redirToClientWithError(w, r, templateFS, constants.ErrorLoginRequired,

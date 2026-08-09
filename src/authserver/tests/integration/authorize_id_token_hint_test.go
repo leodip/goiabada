@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"io"
 	"net/url"
 	"testing"
 
@@ -99,34 +100,40 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		"&state=" + requestStateA +
 		"&nonce=" + requestNonceA
 
-	// Start auth flow for User A
+	// Start auth flow for User A.
+	//
+	// The hops below reassign one respA, so each body is passed into its deferred close rather than
+	// read out of respA when the test returns: the bare `defer func() { _ = respA.Body.Close() }()`
+	// used elsewhere in this file captures the variable, so under reassignment every defer closes
+	// the last response and the earlier ones are never closed. The replay hop at the end of this
+	// function adds one more, which makes that worse.
 	respA, err := httpClientA.Get(destUrlA)
 	assert.NoError(t, err)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
 	redirectLocation := assertRedirect(t, respA, "/auth/level1")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/pwd")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
 	csrf := getCsrfValue(t, respA)
 	respA = authenticateWithPassword(t, httpClientA, redirectLocation, userA.Email, passwordA, csrf)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/level1completed")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/completed")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/issue")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
 	codeA, stateA := getCodeAndStateFromUrl(t, respA)
 	assert.Equal(t, requestStateA, stateA)
@@ -177,35 +184,35 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// =========================================================================
 	respB, err := httpClientB.Get(destUrlB)
 	assert.NoError(t, err)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	// Should redirect to login even with prompt=login (since no session exists)
 	redirectLocation = assertRedirect(t, respB, "/auth/level1")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/pwd")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	csrf = getCsrfValue(t, respB)
 	respB = authenticateWithPassword(t, httpClientB, redirectLocation, userB.Email, passwordB, csrf)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/level1completed")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/completed")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	// =========================================================================
 	// Step 6: At /auth/issue, expect error=login_required due to mismatch
 	// =========================================================================
-	redirectLocation = assertRedirect(t, respB, "/auth/issue")
-	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	issueUrl := assertRedirect(t, respB, "/auth/issue")
+	respB = loadPage(t, httpClientB, issueUrl)
+	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	// Should redirect back to client with error
 	assert.Equal(t, 302, respB.StatusCode, "Expected redirect to client callback")
@@ -224,6 +231,20 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	location := respB.Header.Get("Location")
 	assert.Contains(t, location, redirectUri.URI,
 		"Should redirect to client's registered redirect_uri")
+
+	// =========================================================================
+	// Step 7: The refusal ended the ceremony, so it cannot be replayed
+	// =========================================================================
+	// This is the one refusal that left the browser holding a ready_to_issue_code context, the
+	// state that mints codes, with only the id_token_hint comparison between a replay and a code.
+	// The clear now reaches the browser, so replaying /auth/issue on the same jar has no context
+	// to resume and lands on the account profile instead of refusing a second time (#141).
+	respB = loadPage(t, httpClientB, issueUrl)
+	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
+
+	assert.Equal(t, 302, respB.StatusCode)
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/profile", respB.Header.Get("Location"),
+		"replaying the refused ceremony must not reach the auth context again")
 }
 
 // TestIdTokenHint_PromptLogin_MatchingUser_Success verifies that when the
