@@ -61,3 +61,7 @@ Goiabada includes several built-in security features:
 - **CORS configuration** - Explicit web origin configuration required for JavaScript clients
 - **Proxy header trust** - Forwarded IP headers are ignored by default; enable `TRUST_PROXY_HEADERS` only behind a proxy. Behind multiple proxies or a CDN, set `TRUSTED_PROXIES` to your proxy IPs/CIDRs so the client IP is resolved from the trusted end of `X-Forwarded-For` and cannot be spoofed
 
+### Logging
+
+- **Credentials are redacted from verbose API logging** - `GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS` writes the request and response bodies of every `/api/v1/admin` and `/api/v1/account` call to the log, so credential values are replaced by `[redacted]` before anything is written: passwords, TOTP codes, TOTP secrets and their enrollment QR image, client secrets, the SMTP password, email verification codes, and the logout URL that carries a signed `id_token_hint`. Field names are kept, so the shape of the body is still readable. The `Authorization` header has always been reduced to `Bearer [redacted]`. A body that is not valid JSON, is larger than 256 KB, or nests more than 32 levels deep outside a redacted value is replaced by a one-line note giving its size and why it was not logged, rather than being written out. Depth is only counted through the parts of the body that get logged, since a redacted value is replaced whole and whatever it contains is never looked at. The flag is off by default and is meant for development
+
