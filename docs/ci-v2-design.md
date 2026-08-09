@@ -5,6 +5,8 @@
 **Baseline commit:** `8b69223`
 **Repository:** `leodip/goiabada` (public, default branch `main`)
 
+> **Stage 2 implemented, 2026-08-08.** `check.yml` runs alongside `run-tests.yml`, both green on the same commit: **251s against 541s**, with the wall-clock claim in 4.2 confirmed exactly. Fixed a defect in `run-tests.sh` found on the way (the module tiers could report green from Go's test cache without executing). `Vulnerabilities` is advisory-only pending #155. See stage 2 for the measurements and for four things 5.1 left unspecified.
+
 > **Stage 0 implemented, 2026-08-08.** 4.4 resolved to **option A**. Stage 0 landed on branch `ci-v2-stage-0-lint-baseline`: the lint backlog is **0** across all four modules, `.golangci.yml` is checked in, and `staticcheck`, `unparam` and `govulncheck` are pinned. Two of the plan's assumptions proved wrong while implementing it and are corrected in place — see stage 0's **Correction 1** (`--fix` did nothing) and **Correction 2** (the `QF1001` rewrite taken). 5.8's open question is resolved: `.golangci.yml` is the single definition of lint-clean. Issue #155 remains open and still gates the `Vulnerabilities` required check.
 
 > **Measurement correction, applied after revision 5.** The baseline was re-stamped from `ac4ffac` (the tip of an unrelated feature branch in a different working copy) to this repository's `main` HEAD, and the lint backlog in 1.4 D was re-measured with golangci-lint's issue caps disabled. **The backlog is 81 findings plus 2 unformatted files, not 11.** No design decision changed, but 4.4's "nearly free" rationale no longer follows from the numbers and now presents three options instead of asserting one. See 1.4 D, 4.4, 5.8 and stage 0.
@@ -1477,6 +1479,47 @@ Leave both workflows in place for at least two more merged PRs.
 
 **Rollback** Delete `check.yml`. `run-tests.yml` never stopped gating.
 
+> **Implemented and measured.** Every criterion above was met on the stage 2 PR. Eleven jobs rather than the nine this list anticipated, because `Versions` and `Build validation` were added by later revisions and never folded into this count.
+
+**Measured on the stage 2 PR, both workflows against the same commit:**
+
+| Job | Result | Duration |
+|---|---|---|
+| `Tests / mssql` | pass | 236s |
+| `Tests / mysql` | pass | 229s |
+| `Tests / postgres` | pass | 202s |
+| `Tests / sqlite` | pass | 199s |
+| `Lint` | pass | 182s |
+| `Unit / core` | pass | 93s |
+| `Unit / authserver` | pass | 80s |
+| `Unit / adminconsole` | pass | 79s |
+| `Vulnerabilities` | **fail, tolerated** | 68s |
+| `Versions` | pass | 8s |
+| `Build validation` | skipped, correctly | — |
+
+| Workflow | Wall clock |
+|---|---|
+| `run-tests.yml`, one opaque job | **541s** |
+| `check.yml`, eleven jobs | **251s** |
+
+541s sits inside the 8.3 to 9.2 minute band recorded in 1.3, so this is a like-for-like comparison rather than a lucky run. **4.2's claim holds exactly**: 251s is the slowest leg (`mssql`, 236s) plus about 15s of scheduling, which is what "wall clock drops to roughly the slowest single leg" predicts. Total runner time rises to roughly 23 minutes across all jobs, which is free on a public repository and is precisely the trade 1.3 identified.
+
+**Four things this stage had to resolve that 5.1 did not specify.**
+
+1. **The container jobs need about 40 `GOIABADA_*` environment variables**, copied as literals from `docker-compose-test.yml`. 5.1 mentions only "session keys, the AES key, admin credentials". Without the full set the auth server starts on its default port while `run-tests.sh` polls 19090, and `GOIABADA_AUTHSERVER_BASEURL` is unbound under `set -u`. Discovered by hitting it. They are declared once at workflow level, because GitHub does not support YAML anchors in workflow files. `GOIABADA_AUTHSERVER_INTERNALBASEURL` becomes `http://localhost:19090`, since the server and the tests share one container rather than living in separate compose services.
+2. **The database variables must stay absent** from that block, so `configure_database` remains authoritative (5.5.7).
+3. **`Dockerfile-test` fetches the musl Tailwind binary** for alpine; a bookworm container needs `tailwindcss-linux-x64`.
+4. **Services are declared only where they are needed**, established by running each tier with every service unreachable rather than by assumption: `core` needs `mailpit` (`TestSendEmail` hardcodes `SMTPHost: "mailpit"`, port 1025), while the `authserver` and `adminconsole` tiers need nothing.
+
+The repeated container setup lives in a local composite action, `.github/actions/setup-test-container`, rather than being duplicated across seven jobs.
+
+**A defect in `run-tests.sh` found while doing point 4, and fixed in the same PR.** The three module tiers ran `go test -v ./...` **without `-count=1`**, unlike the data and integration tiers, which have always had it. Go's test cache keys on source and flags but has no notion of whether a network service is reachable, so with `mailpit` gone the core tier still exits 0 reporting `ok ... (cached)` for all 29 packages: **green having executed nothing**. The container jobs cache `GOCACHE` between runs, so stale passes would have been replayed in CI as well. Verified both ways: exit 0 when cached, exit 1 once caching is defeated.
+
+**Deferred, with reasons.**
+
+- **`Lint` takes 182s, nearly as long as a database leg**, and almost none of it is linting: `golangci-lint` and `unparam` are compiled from source by `go install` on every run, and `actions/setup-go`'s cache covers module downloads rather than built binaries. Caching the two binaries keyed on their pinned versions should cut this to well under a minute. Left for stage 8; it is a cost, not a correctness problem.
+- **`Vulnerabilities` will show red on every PR** until issue #155 is resolved, which is the failure mode 4.4 warned about under option C: a permanently red check is one nobody reads, and it also masks any *new* advisory. The alternative worth considering is `govulncheck -format json` filtered against a small allowlist naming `GO-2025-3884` with its reason, so the gate goes green now and red the moment a *different* advisory becomes reachable. Not built, because it is a judgment call about how the gate should read rather than something this document specifies.
+
 ---
 
 ### Stage 3. Retire `run-tests.yml`, set branch protection
@@ -1673,7 +1716,7 @@ Run the same nine-point checklist from stage 5, with two differences: `publish.y
 |---|---|---|---|
 | 0 | **Done.** 81 lint fixes + 2 `gofmt` files (4.4 option A), `.golangci.yml`, 3 tool pins, `make check` aligned | existing CI | yes |
 | 1 | `run-tests.sh` | local runs | yes |
-| 2 | add `check.yml` | its own PR | yes |
+| 2 | **Done.** add `check.yml` (11 jobs), `-count=1` fix | its own PR: 251s vs 541s, all agree | yes |
 | 3 | delete `run-tests.yml`, branch protection | 3 green PRs | yes |
 | 4 | ldflags, `versions.yaml`, `version-manager.sh` | local build checks | full revert only |
 | 5 | `release.yml`, `publish.yml`, `docs.yml`, **SHA pins + attestations on these** | `v1.5.3-rc1` dry run | yes |
