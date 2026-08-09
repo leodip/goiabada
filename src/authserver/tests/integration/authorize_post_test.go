@@ -64,8 +64,9 @@ func TestAuthorize_PostRequest(t *testing.T) {
 				t.Fatal(err)
 			}
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			// Foreign Origin matches what the OIDC conformance suite sends; this
-			// is the trigger for the gorilla/csrf 403 we are guarding against.
+			// Foreign Origin matches what the OIDC conformance suite sends; this is
+			// the trigger for the CSRF 403 we are guarding against, which the
+			// /auth/authorize exemption is what prevents (#67).
 			req.Header.Set("Origin", "https://www.certification.openid.net")
 
 			httpClient := createHttpClient(t)

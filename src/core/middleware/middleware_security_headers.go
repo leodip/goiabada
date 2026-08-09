@@ -29,12 +29,20 @@ const strictTransportSecurityValue = "max-age=31536000; includeSubDomains"
 //
 //     It must NOT be no-referrer, even though that looks stricter. Under
 //     no-referrer a browser sends "Origin: null" on form POSTs as well as
-//     omitting Referer. gorilla/csrf then parses that opaque origin to an empty
-//     host, which no TrustedOrigins entry can match, and rejects every
-//     cookie-authenticated POST with "origin invalid": login, OTP, consent and
-//     every admin console form. Verified in a browser across four policies;
-//     same-origin, strict-origin-when-cross-origin and omitting the header all
-//     send a usable Origin, and only no-referrer does not.
+//     omitting Referer, and an opaque origin has no host for the CSRF origin
+//     check to compare against Host. It once broke every cookie-authenticated
+//     POST outright: login, OTP, consent and every admin console form.
+//
+//     The blast radius is narrower now that the check is
+//     net/http.CrossOriginProtection (#155). It consults Sec-Fetch-Site first
+//     and allows a same-origin POST whatever the Origin header says, so a
+//     browser new enough to send fetch metadata (2023 onwards) is unaffected by
+//     an opaque origin. Only a browser predating it falls through to the Origin
+//     comparison, where "null" still matches no host and is still rejected.
+//     Same conclusion, smaller set of victims, and not worth courting for a
+//     policy that buys nothing over same-origin. Verified in a browser across
+//     four policies; same-origin, strict-origin-when-cross-origin and omitting
+//     the header all send a usable Origin, and only no-referrer does not.
 //
 //   - Strict-Transport-Security is emitted only when secure is true (i.e. the
 //     deployment serves over HTTPS); it is meaningless over plain HTTP.
@@ -46,8 +54,8 @@ func MiddlewareSecurityHeaders(secure bool) func(next http.Handler) http.Handler
 			h.Set("Content-Security-Policy", "frame-ancestors 'none'")
 			h.Set("X-Content-Type-Options", "nosniff")
 			// same-origin, not no-referrer. See the note above: no-referrer makes
-			// browsers send "Origin: null" on form POSTs, which breaks CSRF
-			// validation for every cookie-authenticated POST.
+			// browsers send "Origin: null" on form POSTs, which fails the CSRF
+			// origin check on any browser that sends no Sec-Fetch-Site header.
 			h.Set("Referrer-Policy", "same-origin")
 			if secure {
 				h.Set("Strict-Transport-Security", strictTransportSecurityValue)

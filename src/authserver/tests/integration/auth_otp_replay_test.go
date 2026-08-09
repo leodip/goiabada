@@ -142,9 +142,8 @@ func startOtpCeremony(t *testing.T, client *models.Client, redirectUri *models.R
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, redirectLocation)
 
-	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	_ = resp.Body.Close()
@@ -164,12 +163,12 @@ func startOtpCeremony(t *testing.T, client *models.Client, redirectUri *models.R
 
 // assertOtpRefused asserts that an OTP submission drew the generic incorrect-code page. A
 // replay must be indistinguishable from a typo, so this is deliberately the same assertion the
-// wrong-code tests make. The body is restored, so the caller can still read the rerendered
-// form's CSRF token from it.
+// wrong-code tests make. The body is restored, so the caller can still read the rerendered form.
 //
 // The status is checked first and fatally: an accepted submission redirects with an empty
-// body, and every later read of that body reports something unrelated. With the claim
-// neutralised this said "expecting to find 'gorilla.csrf.Token'", which is true and useless.
+// body, and every later read of that body reports something unrelated. That mattered enough to
+// write down: with the claim neutralised, the failure used to surface as a complaint about a
+// missing CSRF token field, which was true and useless.
 func assertOtpRefused(t *testing.T, resp *http.Response) {
 	t.Helper()
 
@@ -245,7 +244,6 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 	client, redirectUri, user, password := createLevel2MandatoryUser(t, true)
 
 	httpClient, resp, otpUrl := startOtpCeremony(t, client, redirectUri, user, password)
-	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
 	codeC, err := totp.GenerateCode(user.OTPSecret, time.Now())
@@ -253,22 +251,20 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC, csrf)
+	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
 	// Second ceremony, fresh cookie jar, same code.
 	httpClient, resp, otpUrl = startOtpCeremony(t, client, redirectUri, user, password)
-	csrf = getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC, csrf)
+	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
 	assertOtpRefused(t, resp)
-	csrf = getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
 	// Control: the ceremony is alive and the form works, so only the replay was refused.
-	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, user.OTPSecret, codeC), csrf)
+	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, user.OTPSecret, codeC))
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 }
@@ -286,7 +282,6 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	client, redirectUri, user, password := createLevel2MandatoryUser(t, false)
 
 	httpClient, resp, otpUrl := startOtpCeremony(t, client, redirectUri, user, password)
-	csrf := getCsrfValue(t, resp)
 	secret := getOtpSecretFromEnrollmentPage(t, resp)
 	_ = resp.Body.Close()
 
@@ -295,7 +290,7 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC, csrf)
+	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
@@ -308,15 +303,13 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	// Second ceremony, fresh cookie jar. The user is enrolled now, so this is the
 	// verification branch validating C against the secret it just stored.
 	httpClient, resp, otpUrl = startOtpCeremony(t, client, redirectUri, user, password)
-	csrf = getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC, csrf)
+	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
 	assertOtpRefused(t, resp)
-	csrf = getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, secret, codeC), csrf)
+	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, secret, codeC))
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 }
@@ -372,15 +365,13 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	// secret the API just stored.
 	client, redirectUri := createLevel2MandatoryClient(t)
 	httpClient, resp, otpUrl := startOtpCeremony(t, client, redirectUri, enrolled, "Correct1!")
-	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC, csrf)
+	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
 	assertOtpRefused(t, resp)
-	csrf = getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, secret, codeC), csrf)
+	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, secret, codeC))
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 }

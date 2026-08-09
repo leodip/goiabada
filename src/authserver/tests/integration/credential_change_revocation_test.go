@@ -149,10 +149,9 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 
 	location = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, location)
-	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
-	resp = authenticateWithPassword(t, httpClient, location, grant.user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, location, grant.user.Email, password)
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/level1completed")
@@ -227,10 +226,9 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 
 	location = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, location)
-	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
-	resp = authenticateWithPassword(t, httpClient, location, base.user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, location, base.user.Email, password)
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/level1completed")
@@ -243,17 +241,15 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 
 	location = assertRedirect(t, resp, "/auth/consent")
 	resp = loadPage(t, httpClient, location)
-	csrf = getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
 	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
 	consentForm := url.Values{
-		"gorilla.csrf.Token": {csrf},
-		"btnSubmit":          {"submit"},
-		"consent0":           {"on"},
-		"consent1":           {"on"},
-		"consent2":           {"on"},
-		"consent3":           {"on"},
+		"btnSubmit": {"submit"},
+		"consent0":  {"on"},
+		"consent1":  {"on"},
+		"consent2":  {"on"},
+		"consent3":  {"on"},
 	}
 	consentReq, err := http.NewRequest("POST", consentEndpoint, strings.NewReader(consentForm.Encode()))
 	require.NoError(t, err)
@@ -405,10 +401,9 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 
 	location = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, location)
-	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
-	resp = authenticateWithPassword(t, httpClient, location, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, location, user.Email, password)
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/level1completed")
@@ -421,17 +416,15 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 
 	location = assertRedirect(t, resp, "/auth/consent")
 	resp = loadPage(t, httpClient, location)
-	csrf = getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
 	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
 	consentForm := url.Values{
-		"gorilla.csrf.Token": {csrf},
-		"btnSubmit":          {"submit"},
-		"consent0":           {"on"},
-		"consent1":           {"on"},
-		"consent2":           {"on"},
-		"consent3":           {"on"},
+		"btnSubmit": {"submit"},
+		"consent0":  {"on"},
+		"consent1":  {"on"},
+		"consent2":  {"on"},
+		"consent3":  {"on"},
 	}
 	consentReq, err := http.NewRequest("POST", consentEndpoint, strings.NewReader(consentForm.Encode()))
 	require.NoError(t, err)
@@ -516,11 +509,9 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 		url.QueryEscape(code) + "&email=" + url.QueryEscape(fresh.Email)
 
 	resp := loadPage(t, httpClient, resetURL)
-	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
 
 	form := url.Values{
-		"gorilla.csrf.Token":   {csrf},
 		"code":                 {code},
 		"email":                {fresh.Email},
 		"password":             {newPassword},

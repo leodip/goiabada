@@ -49,23 +49,25 @@ func setRegSettings(t *testing.T, selfRegEnabled, requiresVerify, smtpEnabled bo
 	assert.NoError(t, err)
 }
 
-func getRegisterPageCsrf(t *testing.T, client *http.Client) string {
+// loadRegisterPage fetches the registration form and asserts it renders, which every test below
+// did as a side effect of scraping the CSRF token out of it. The token left with gorilla/csrf
+// (#155) and the page load stayed: a POST test whose form does not render is testing nothing, and
+// this is the only assertion in this file that the GET binding works at all.
+func loadRegisterPage(t *testing.T, client *http.Client) {
 	destUrl := config.GetAuthServer().BaseURL + "/account/register"
 	resp := loadPage(t, client, destUrl)
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from /account/register, got %d", resp.StatusCode)
 	}
-	return getCsrfValue(t, resp)
 }
 
-func postRegister(t *testing.T, client *http.Client, email, password, confirm, csrf string) *http.Response {
+func postRegister(t *testing.T, client *http.Client, email, password, confirm string) *http.Response {
 	destUrl := config.GetAuthServer().BaseURL + "/account/register"
 	formData := url.Values{
 		"email":                {email},
 		"password":             {password},
 		"passwordConfirmation": {confirm},
-		"gorilla.csrf.Token":   {csrf},
 	}
 	// require, not assert: returning a nil response here would surface as a
 	// SIGSEGV in the caller instead of the real connectivity error.
@@ -98,7 +100,12 @@ func TestSelfRegister_GetPage_Disabled(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
-// 1b. With self-registration enabled the page renders with a CSRF token.
+// 1b. With self-registration enabled the page renders.
+//
+// It used to also assert the form carried a CSRF token. There is no token any more: the POST below
+// is protected by the origin check in MiddlewareCsrf, which reads the browser's own Sec-Fetch-Site
+// report and refuses anything it calls cross-site (#155). Nothing about that is visible in the
+// rendered HTML, so the assertion has no successor here rather than a weaker one.
 func TestSelfRegister_GetPage_Enabled(t *testing.T) {
 	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, false, false)
@@ -108,8 +115,6 @@ func TestSelfRegister_GetPage_Enabled(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	csrf := getCsrfValue(t, resp)
-	assert.NotEmpty(t, csrf)
 }
 
 // Scenario 2: POST /account/register with SMTP off
@@ -121,10 +126,10 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
 	httpClient := createHttpClient(t)
-	csrf := getRegisterPageCsrf(t, httpClient)
+	loadRegisterPage(t, httpClient)
 
 	email := gofakeit.Email()
-	resp := postRegister(t, httpClient, email, "Password123!", "Password123!", csrf)
+	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -155,10 +160,10 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 	setRegSettings(t, true, false, true)
 
 	httpClient := createHttpClient(t)
-	csrf := getRegisterPageCsrf(t, httpClient)
+	loadRegisterPage(t, httpClient)
 
 	email := gofakeit.Email()
-	resp := postRegister(t, httpClient, email, "Password123!", "Password123!", csrf)
+	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -185,10 +190,10 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	setRegSettings(t, true, true, true)
 
 	httpClient := createHttpClient(t)
-	csrf := getRegisterPageCsrf(t, httpClient)
+	loadRegisterPage(t, httpClient)
 
 	email := gofakeit.Email()
-	resp := postRegister(t, httpClient, email, "Password123!", "Password123!", csrf)
+	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -228,17 +233,17 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 }
 
 // Scenario 5a: POST while self-registration is disabled returns the error
-// page. We acquire a valid CSRF token while it is enabled, then disable.
+// page. We load the form while it is enabled, then disable.
 func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {
 	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, false, false)
 
 	httpClient := createHttpClient(t)
-	csrf := getRegisterPageCsrf(t, httpClient)
+	loadRegisterPage(t, httpClient)
 
 	setRegSettings(t, false, false, false)
 
-	resp := postRegister(t, httpClient, gofakeit.Email(), "Password123!", "Password123!", csrf)
+	resp := postRegister(t, httpClient, gofakeit.Email(), "Password123!", "Password123!")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
@@ -259,9 +264,9 @@ func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
-	csrf := getRegisterPageCsrf(t, httpClient)
+	loadRegisterPage(t, httpClient)
 
-	resp := postRegister(t, httpClient, existing.Email, "Password123!", "Password123!", csrf)
+	resp := postRegister(t, httpClient, existing.Email, "Password123!", "Password123!")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -275,10 +280,10 @@ func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
 	setRegSettings(t, true, true, true)
 
 	httpClient := createHttpClient(t)
-	csrf := getRegisterPageCsrf(t, httpClient)
+	loadRegisterPage(t, httpClient)
 
 	email := gofakeit.Email()
-	resp1 := postRegister(t, httpClient, email, "Password123!", "Password123!", csrf)
+	resp1 := postRegister(t, httpClient, email, "Password123!", "Password123!")
 	_ = resp1.Body.Close()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
 
@@ -286,8 +291,8 @@ func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, preReg, "pre-registration should exist after first POST")
 
-	csrf2 := getRegisterPageCsrf(t, httpClient)
-	resp2 := postRegister(t, httpClient, email, "Password123!", "Password123!", csrf2)
+	loadRegisterPage(t, httpClient)
+	resp2 := postRegister(t, httpClient, email, "Password123!", "Password123!")
 	defer func() { _ = resp2.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
@@ -302,10 +307,10 @@ func TestSelfRegister_Post_PasswordMismatch(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
 	httpClient := createHttpClient(t)
-	csrf := getRegisterPageCsrf(t, httpClient)
+	loadRegisterPage(t, httpClient)
 
 	email := gofakeit.Email()
-	resp := postRegister(t, httpClient, email, "Password123!", "Different456!", csrf)
+	resp := postRegister(t, httpClient, email, "Password123!", "Different456!")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

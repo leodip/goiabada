@@ -77,36 +77,12 @@ func loadPage(t *testing.T, client *http.Client, url string) *http.Response {
 	return resp
 }
 
-func getCsrfValue(t *testing.T, response *http.Response) string {
-	byteArr, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	response.Body = io.NopCloser(bytes.NewReader(byteArr))
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(byteArr)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	csrfNode := doc.Find("input[name='gorilla.csrf.Token']")
-	if csrfNode.Length() != 1 {
-		t.Fatal("expecting to find 'gorilla.csrf.Token' but it was not found")
-		dumpResponseBody(t, response)
-	}
-	csrf, exists := csrfNode.Attr("value")
-	if !exists {
-		t.Fatal("input 'gorilla.csrf.Token' does not have a value")
-		dumpResponseBody(t, response)
-	}
-	return csrf
-}
-
 func authenticateWithPassword(t *testing.T, client *http.Client, destUrl string,
-	email string, password string, csrf string) *http.Response {
+	email string, password string) *http.Response {
 
 	formData := url.Values{
-		"email":              {email},
-		"password":           {password},
-		"gorilla.csrf.Token": {csrf},
+		"email":    {email},
+		"password": {password},
 	}
 
 	formDataString := formData.Encode()
@@ -126,10 +102,9 @@ func authenticateWithPassword(t *testing.T, client *http.Client, destUrl string,
 	return resp
 }
 
-func authenticateWithOtp(t *testing.T, client *http.Client, destUrl string, otp string, csrf string) *http.Response {
+func authenticateWithOtp(t *testing.T, client *http.Client, destUrl string, otp string) *http.Response {
 	formData := url.Values{
-		"otp":                {otp},
-		"gorilla.csrf.Token": {csrf},
+		"otp": {otp},
 	}
 
 	formDataString := formData.Encode()
@@ -271,11 +246,9 @@ func assignPermissionToUser(t *testing.T, userId int64, permissionId int64) {
 	}
 }
 
-func postConsent(t *testing.T, client *http.Client, destUrl string, consents []int, csrf string) (resp *http.Response) {
+func postConsent(t *testing.T, client *http.Client, destUrl string, consents []int) (resp *http.Response) {
 
-	formData := url.Values{
-		"gorilla.csrf.Token": {csrf},
-	}
+	formData := url.Values{}
 	for _, consent := range consents {
 		formData.Add(fmt.Sprintf("consent%d", consent), "[on]")
 	}
@@ -374,9 +347,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -485,9 +456,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -612,9 +581,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -629,13 +596,11 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf = getCsrfValue(t, resp)
-
 	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode, csrf)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -756,9 +721,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Clie
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -898,8 +861,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	csrf := getCsrfValue(t, resp)
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1484,9 +1446,8 @@ func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *models.C
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, redirectLocation)
 
-	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	_ = resp.Body.Close()
@@ -1536,9 +1497,8 @@ func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *mode
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, redirectLocation)
 
-	csrf := getCsrfValue(t, resp)
 	_ = resp.Body.Close()
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	_ = resp.Body.Close()
