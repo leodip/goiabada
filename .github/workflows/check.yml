@@ -144,7 +144,7 @@ jobs:
       # command.
       - name: Cache linter binaries
         id: linter-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
           key: linters-${{ runner.os }}-golangci${{ needs.versions.outputs.golangci }}-unparam${{ needs.versions.outputs.unparam }}
@@ -247,7 +247,7 @@ jobs:
           cache-dependency-path: src/**/go.sum
       - name: Cache govulncheck
         id: govuln-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
           key: govulncheck-${{ runner.os }}-${{ needs.versions.outputs.govulncheck }}
