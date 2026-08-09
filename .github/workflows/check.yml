@@ -1,0 +1,415 @@
+# The PR check suite. Runs alongside the legacy run-tests.yml until stage 3 of
+# the CI/CD v2 plan retires it (docs/ci-v2-design.md).
+#
+# The point of the job split is visibility: GitHub renders two levels, jobs in
+# the sidebar and steps within a job, so the database goes on the job axis and
+# the test tier on the step axis. A red run then names the database without a
+# click and the tier with one.
+#
+# Actions are referenced by tag here, not SHA. Stage 8 pins them. That ordering
+# is deliberate: this workflow holds no credentials, while the release
+# workflows added in stage 5 do and are SHA-pinned at birth.
+
+name: Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      full:
+        description: Run the jobs that are otherwise push-only (release.yml passes true)
+        type: boolean
+        default: false
+
+concurrency:
+  # A superseded push stops burning runners instead of racing its replacement.
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Test-only values, copied as literals from src/build/docker-compose-test.yml.
+# These are fixed test credentials, not secrets: keeping them literal is what
+# lets a developer reproduce a CI failure locally. Declared once at workflow
+# level because GitHub does not support YAML anchors in workflow files, and
+# every container job needs the same block.
+#
+# The database variables are deliberately absent: run-tests.sh's
+# configure_database sets them per database, and that function is the reason CI
+# can reuse the script unchanged.
+env:
+  TZ: Europe/Lisbon
+
+  GOIABADA_ADMIN_EMAIL: admin@example.com
+  GOIABADA_ADMIN_PASSWORD: changeme
+  GOIABADA_APPNAME: Goiabada
+
+  GOIABADA_AUTHSERVER_BASEURL: http://localhost:19090
+  # The compose file points this at the goiabada-test container by name. In a
+  # container job the server and the tests share one container, so localhost is
+  # the equivalent.
+  GOIABADA_AUTHSERVER_INTERNALBASEURL: http://localhost:19090
+  GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP: 0.0.0.0
+  GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP: "19090"
+  GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS: ""
+  GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS: ""
+  GOIABADA_AUTHSERVER_CERTFILE: ""
+  GOIABADA_AUTHSERVER_KEYFILE: ""
+  GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: "false"
+  GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: "false"
+  GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS: "false"
+  GOIABADA_AUTHSERVER_LOG_SQL: "false"
+  GOIABADA_AUTHSERVER_STATICDIR: ""
+  GOIABADA_AUTHSERVER_TEMPLATEDIR: ""
+  GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  GOIABADA_AES_ENCRYPTION_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
+  GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE: /tmp/bootstrap.env
+
+  GOIABADA_ADMINCONSOLE_BASEURL: http://localhost:19091
+  GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP: 0.0.0.0
+  GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP: "19091"
+  GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS: ""
+  GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS: ""
+  GOIABADA_ADMINCONSOLE_CERTFILE: ""
+  GOIABADA_ADMINCONSOLE_KEYFILE: ""
+  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: "false"
+  GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS: "false"
+  GOIABADA_ADMINCONSOLE_STATICDIR: ""
+  GOIABADA_ADMINCONSOLE_TEMPLATEDIR: ""
+  GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+  GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+
+jobs:
+  # Every other job reads its tool versions from here, so versions.yaml stays
+  # the single source of truth and nothing is copied into this file. This job
+  # MUST be in the required-check list: GitHub counts a skipped job as
+  # successful, so if this failed and were not itself required, every dependent
+  # job would skip, count as passing, and leave the PR mergeable with nothing
+  # having run.
+  versions:
+    name: Versions
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.read.outputs.go }}
+      tailwind: ${{ steps.read.outputs.tailwind }}
+      golangci: ${{ steps.read.outputs.golangci }}
+      unparam: ${{ steps.read.outputs.unparam }}
+      govulncheck: ${{ steps.read.outputs.govulncheck }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: read
+        run: |
+          set -euo pipefail
+          f=src/authserver/versions.yaml
+          for k in go tailwind unparam govulncheck; do
+            v=$(yq -r ".tools.$k" "$f")
+            [ -n "$v" ] && [ "$v" != "null" ] || { echo "::error::tools.$k missing from $f"; exit 1; }
+            echo "$k=$v" >> "$GITHUB_OUTPUT"
+          done
+          v=$(yq -r '.tools."golangci-lint"' "$f")
+          [ -n "$v" ] && [ "$v" != "null" ] || { echo "::error::tools.golangci-lint missing from $f"; exit 1; }
+          echo "golangci=$v" >> "$GITHUB_OUTPUT"
+
+  lint:
+    name: Lint
+    needs: versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ needs.versions.outputs.go }}
+          cache-dependency-path: src/**/go.sum
+
+      # Pinned from versions.yaml. A blocking gate whose definition of "clean"
+      # can change on an upstream release is not a gate.
+      - name: Install linters
+        run: |
+          set -euo pipefail
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${{ needs.versions.outputs.golangci }}
+          go install mvdan.cc/unparam@v${{ needs.versions.outputs.unparam }}
+
+      # The standalone staticcheck binary is deliberately not run. It does not
+      # ship the QF (quickfix) checks that golangci-lint's bundled copy
+      # registers, making it a strict subset that cannot fail when golangci-lint
+      # passes. .golangci.yml is the single definition of lint-clean
+      # (docs/ci-v2-design.md 5.8).
+      - name: gofmt, vet, golangci-lint, unparam
+        run: |
+          rc=0
+          for m in core authserver adminconsole cmd/goiabada-setup; do
+            echo "::group::$m"
+            (
+              cd "src/$m"
+              # `gofmt -l` exits 0 and merely prints filenames, so the exit code
+              # cannot be relied on here.
+              unformatted=$(gofmt -l .)
+              if [ -n "$unformatted" ]; then
+                echo "::error::$m has unformatted files:"
+                echo "$unformatted"
+                exit 1
+              fi
+              go vet ./...            || exit 1
+              unparam -exported ./... || exit 1
+              golangci-lint run --max-same-issues=0 --max-issues-per-linter=0 ./... || exit 1
+            ) || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
+
+  vulnerabilities:
+    name: Vulnerabilities
+    needs: versions
+    runs-on: ubuntu-latest
+    # ADVISORY ONLY, and deliberately so. govulncheck currently reports
+    # GO-2025-3884 (github.com/gorilla/csrf) as reachable from core, authserver
+    # and adminconsole, and the advisory has no fixed version, so this job
+    # cannot pass today. Making it blocking would redden every PR on day one.
+    #
+    # Tracked in issue #155. When that is resolved, delete this line and add
+    # "Vulnerabilities" to the required checks. Until then it MUST NOT be added
+    # to the required-check list (docs/ci-v2-design.md 7).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ needs.versions.outputs.go }}
+          cache-dependency-path: src/**/go.sum
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v${{ needs.versions.outputs.govulncheck }}
+      - name: govulncheck
+        run: |
+          rc=0
+          for m in core authserver adminconsole cmd/goiabada-setup; do
+            echo "::group::$m"
+            ( cd "src/$m" && govulncheck ./... ) || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
+
+  unit-core:
+    name: Unit / core
+    needs: versions
+    runs-on: ubuntu-latest
+    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    services:
+      # core's TestSendEmail talks to a real SMTP server. Verified by running
+      # the tier without it, where that is the only test that fails.
+      mailpit:
+        image: axllent/mailpit
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+      - name: Core module tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type core --no-build
+
+  # No services: verified by running this tier with every service unreachable,
+  # where it still passes (with Go's test cache defeated, so the tests really
+  # ran).
+  unit-authserver:
+    name: Unit / authserver
+    needs: versions
+    runs-on: ubuntu-latest
+    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+      - name: Authserver internal tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type internal --no-build
+
+  # No services, verified the same way as Unit / authserver.
+  unit-adminconsole:
+    name: Unit / adminconsole
+    needs: versions
+    runs-on: ubuntu-latest
+    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+      - name: Admin console module tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type adminconsole --no-build
+
+  # The four database jobs are written out rather than expressed as a matrix.
+  # `matrix` IS available to `services`, so a matrix is possible -- this is a
+  # readability choice. Each database needs its own env block, health command
+  # and port, and expressing that through per-key conditional expressions trades
+  # obvious duplication for expressions that are harder to debug when a health
+  # check misbehaves. A naive matrix would also boot all three databases for
+  # every leg, and GitHub waits for every service health check before running
+  # any step, so the sqlite leg would block on an MSSQL container it never uses.
+
+  tests-sqlite:
+    name: Tests / sqlite
+    needs: versions
+    runs-on: ubuntu-latest
+    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    services:
+      mailpit:
+        image: axllent/mailpit
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+      - name: Build
+        working-directory: src/authserver
+        run: ./build.sh
+      - name: Data tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type data --db sqlite --no-build
+      - name: Integration tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type integration --db sqlite --no-build
+
+  tests-mysql:
+    name: Tests / mysql
+    needs: versions
+    runs-on: ubuntu-latest
+    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    services:
+      # MYSQL_TCP_PORT rather than `command: --port=13306`, because service
+      # containers cannot override a container's command. Verified against the
+      # image directly. Presenting the devcontainer's exact hostname and port is
+      # what lets run-tests.sh run here unchanged.
+      mysql-server:
+        image: mysql:latest
+        env:
+          MYSQL_ROOT_PASSWORD: mySqlPass123
+          MYSQL_TCP_PORT: 13306
+        options: >-
+          --health-cmd "mysqladmin ping -uroot -pmySqlPass123 --port=13306 --protocol=tcp"
+          --health-interval 3s --health-timeout 3s --health-retries 30
+      mailpit:
+        image: axllent/mailpit
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+      - name: Build
+        working-directory: src/authserver
+        run: ./build.sh
+      - name: Data tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type data --db mysql --no-build
+      - name: Integration tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type integration --db mysql --no-build
+
+  tests-postgres:
+    name: Tests / postgres
+    needs: versions
+    runs-on: ubuntu-latest
+    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    services:
+      postgres-server:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: myPostgresPass123
+          POSTGRES_DB: goiabada
+          PGPORT: 15432
+        options: >-
+          --health-cmd "pg_isready -U postgres -p 15432"
+          --health-interval 3s --health-timeout 3s --health-retries 30
+      mailpit:
+        image: axllent/mailpit
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+      - name: Build
+        working-directory: src/authserver
+        run: ./build.sh
+      - name: Data tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type data --db postgres --no-build
+      - name: Integration tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type integration --db postgres --no-build
+
+  tests-mssql:
+    name: Tests / mssql
+    needs: versions
+    runs-on: ubuntu-latest
+    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    services:
+      mssql-server:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: YourStr0ngPassw0rd!
+          MSSQL_PID: Express
+          MSSQL_TCP_PORT: 11433
+        # Longer retries than the others: MSSQL routinely takes 30-60s to pass
+        # a health check.
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -Q 'SELECT 1'"
+          --health-interval 5s --health-timeout 5s --health-retries 40
+      mailpit:
+        image: axllent/mailpit
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+      - name: Build
+        working-directory: src/authserver
+        run: ./build.sh
+      - name: Data tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type data --db mssql --no-build
+      - name: Integration tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type integration --db mssql --no-build
+
+  # Moves discovery of a broken Dockerfile or cross-compile from "when I tag a
+  # release" to "right after the merge", without making every PR pay for it.
+  # No registry credentials: --load, never --push.
+  build-validation:
+    name: Build validation
+    needs: versions
+    if: github.event_name == 'push' || inputs.full
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ needs.versions.outputs.go }}
+          cache-dependency-path: src/**/go.sum
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Install Tailwind
+        run: |
+          set -euo pipefail
+          curl -sfL --retry 3 --retry-delay 5 \
+            "https://github.com/tailwindlabs/tailwindcss/releases/download/v${{ needs.versions.outputs.tailwind }}/tailwindcss-linux-x64" \
+            -o /usr/local/bin/tailwindcss
+          chmod +x /usr/local/bin/tailwindcss
+      - name: Cross-compile all platforms
+        working-directory: src/build
+        run: ./build-binaries.sh
+      - name: Cross-compile the setup tool
+        working-directory: src/cmd/goiabada-setup
+        run: ./build-binaries.sh
+      - name: Build both images
+        working-directory: src/build
+        run: |
+          set -euo pipefail
+          docker buildx build --load -f Dockerfile-authserver   -t goiabada-authserver:ci   ..
+          docker buildx build --load -f Dockerfile-adminconsole -t goiabada-adminconsole:ci ..

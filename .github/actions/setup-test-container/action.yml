@@ -1,0 +1,50 @@
+# Shared setup for the container-based test jobs in check.yml.
+#
+# The golang:*-bookworm image is close to what run-tests.sh needs but not
+# identical, and seven jobs need the same three steps. Debian rather than the
+# alpine base used by Dockerfile-test, because GitHub injects a glibc-linked
+# Node.js runtime into container jobs to execute actions, which does not run on
+# musl.
+
+name: Set up test container
+description: Install the OS packages, Tailwind CLI and Go caches that run-tests.sh and build.sh need.
+
+inputs:
+  tailwind:
+    description: Tailwind CLI version, from versions.yaml
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # net-tools supplies netstat, which run-tests.sh's kill_processes_on_ports
+    # uses. Without it that function silently finds nothing rather than
+    # failing, so a stale listener would go unnoticed.
+    - name: Install OS packages
+      shell: bash
+      run: |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq --no-install-recommends net-tools curl zip ca-certificates
+
+    # The glibc build, not the -musl one Dockerfile-test fetches for alpine.
+    - name: Install Tailwind CLI
+      shell: bash
+      run: |
+        set -euo pipefail
+        curl -sfL --retry 3 --retry-delay 5 \
+          "https://github.com/tailwindlabs/tailwindcss/releases/download/v${{ inputs.tailwind }}/tailwindcss-linux-x64" \
+          -o /usr/local/bin/tailwindcss
+        chmod +x /usr/local/bin/tailwindcss
+        tailwindcss --help >/dev/null
+
+    # GOPATH and GOCACHE inside the official golang image, which runs as root.
+    - name: Cache Go modules and build output
+      uses: actions/cache@v4
+      with:
+        path: |
+          /go/pkg/mod
+          /root/.cache/go-build
+        key: ${{ runner.os }}-gomod-${{ hashFiles('src/**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-gomod-
