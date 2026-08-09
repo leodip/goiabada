@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -38,7 +37,6 @@ func HandleAccountChangePasswordGet(
 
 		bind := map[string]interface{}{
 			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind); err != nil {
@@ -67,8 +65,7 @@ func HandleAccountChangePasswordPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":     message,
-				"csrfField": csrf.TemplateField(r),
+				"error": message,
 			}
 			if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind); err != nil {
 				httpHelper.InternalServerError(w, r, err)

@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -89,7 +88,6 @@ func HandleAdminUserPhoneGet(
 			"page":                         r.URL.Query().Get("page"),
 			"query":                        r.URL.Query().Get("query"),
 			"savedSuccessfully":            len(savedSuccessfully) > 0,
-			"csrfField":                    csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_phone.html", bind)
@@ -155,7 +153,6 @@ func HandleAdminUserPhonePost(
 				"phoneCountries":               phoneCountries,
 				"page":                         r.URL.Query().Get("page"),
 				"query":                        r.URL.Query().Get("query"),
-				"csrfField":                    csrf.TemplateField(r),
 				"error":                        errorMessage,
 			}
 

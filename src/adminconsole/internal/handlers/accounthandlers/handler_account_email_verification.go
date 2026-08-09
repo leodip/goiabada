@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -62,7 +61,6 @@ func HandleAccountEmailVerificationGet(
 			"email":             user.Email,
 			"emailVerified":     user.EmailVerified,
 			"smtpEnabled":       settings.SMTPEnabled,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind)
@@ -137,7 +135,6 @@ func HandleAccountEmailVerificationPost(
 					"email":             user.Email,
 					"emailVerified":     user.EmailVerified,
 					"smtpEnabled":       settings.SMTPEnabled,
-					"csrfField":         csrf.TemplateField(r),
 					"error":             apiErr.Message,
 					"verificationCode":  verificationCode,
 				}
@@ -155,7 +152,6 @@ func HandleAccountEmailVerificationPost(
 					"email":             user.Email,
 					"emailVerified":     user.EmailVerified,
 					"smtpEnabled":       settings.SMTPEnabled,
-					"csrfField":         csrf.TemplateField(r),
 					"error":             errorMessage,
 					"verificationCode":  verificationCode,
 				}

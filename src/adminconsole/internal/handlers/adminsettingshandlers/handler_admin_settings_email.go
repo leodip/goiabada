@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
@@ -72,7 +71,6 @@ func HandleAdminSettingsEmailGet(
 		bind := map[string]interface{}{
 			"settings":          settingsInfo,
 			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email.html", bind)
@@ -111,9 +109,8 @@ func HandleAdminSettingsEmailPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"settings":  settingsInfo,
-				"csrfField": csrf.TemplateField(r),
-				"error":     message,
+				"settings": settingsInfo,
+				"error":    message,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email.html", bind)
@@ -206,7 +203,6 @@ func HandleAdminSettingsEmailSendTestGet(
 		bind := map[string]interface{}{
 			"smtpEnabled":       apiResp.SMTPEnabled,
 			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html", bind)
@@ -239,7 +235,6 @@ func HandleAdminSettingsEmailSendTestPost(
 				"smtpEnabled":      true,
 				"destinationEmail": destinationEmail,
 				"error":            message,
-				"csrfField":        csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html", bind)

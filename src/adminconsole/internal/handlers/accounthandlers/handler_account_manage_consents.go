@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
@@ -47,8 +46,7 @@ func HandleAccountManageConsentsGet(
 		}
 
 		bind := map[string]interface{}{
-			"consents":  consentInfoArr,
-			"csrfField": csrf.TemplateField(r),
+			"consents": consentInfoArr,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_manage_consents.html", bind)

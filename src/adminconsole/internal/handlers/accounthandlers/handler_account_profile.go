@@ -9,7 +9,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -66,7 +65,6 @@ func HandleAccountProfileGet(
 			"timezones":         timezones,
 			"locales":           locales,
 			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_profile.html", bind)
@@ -168,7 +166,6 @@ func HandleAccountProfilePost(
 					"user":      user,
 					"timezones": timezones,
 					"locales":   locales,
-					"csrfField": csrf.TemplateField(r),
 					"error":     errorMessage,
 				}
 

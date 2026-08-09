@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 
@@ -62,7 +61,6 @@ func HandleAdminSettingsSessionsGet(
 		bind := map[string]interface{}{
 			"settings":          settingsInfo,
 			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_sessions.html", bind)
@@ -95,9 +93,8 @@ func HandleAdminSettingsSessionsPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"settings":  settingsInfo,
-				"csrfField": csrf.TemplateField(r),
-				"error":     message,
+				"settings": settingsInfo,
+				"error":    message,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_sessions.html", bind)

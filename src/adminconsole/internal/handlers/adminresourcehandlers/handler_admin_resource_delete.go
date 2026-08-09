@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/config"
@@ -56,7 +55,6 @@ func HandleAdminResourceDeleteGet(
 			"resource":              resource,
 			"permissions":           permissions,
 			"isSystemLevelResource": resource.IsSystemLevelResource(),
-			"csrfField":             csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_delete.html", bind)
@@ -110,7 +108,6 @@ func HandleAdminResourceDeletePost(
 				"permissions":           permissions,
 				"isSystemLevelResource": resource.IsSystemLevelResource(),
 				"error":                 message,
-				"csrfField":             csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_delete.html", bind)

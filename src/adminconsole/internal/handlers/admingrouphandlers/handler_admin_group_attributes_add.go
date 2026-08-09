@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -59,7 +58,6 @@ func HandleAdminGroupAttributesAddGet(
 			"includeInAccessToken": true,
 			"includeInIdToken":     true,
 			"description":          group.Description,
-			"csrfField":            csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_add.html", bind)
@@ -116,7 +114,6 @@ func HandleAdminGroupAttributesAddPost(
 				"includeInAccessToken": r.FormValue("includeInAccessToken") == "on",
 				"includeInIdToken":     r.FormValue("includeInIdToken") == "on",
 				"error":                message,
-				"csrfField":            csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_add.html", bind)

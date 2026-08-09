@@ -122,7 +122,6 @@
                     <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
                 </a>
             </div>
-            {{ .csrfField }}
             {{if not .client.IsSystemLevelClient}}
                 <button id="btnDelete" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.delete.button" }}</button>
             {{end}}

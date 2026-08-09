@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 	"github.com/unknwon/paginater"
 )
 
@@ -89,7 +88,6 @@ func HandleAdminGroupMembersGet(
 			"pageResult":      pageResult,
 			"paginator":       p,
 			"description":     group.Description,
-			"csrfField":       csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_members.html", bind)

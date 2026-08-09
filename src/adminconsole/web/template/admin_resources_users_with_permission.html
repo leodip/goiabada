@@ -59,7 +59,6 @@
 
 {{template "manage_resources_tabs" (args "users-with-permission" .resourceId $.ctx) }}
 
-    {{ .csrfField }}
 
     {{if gt (len .permissions) 0}}
 

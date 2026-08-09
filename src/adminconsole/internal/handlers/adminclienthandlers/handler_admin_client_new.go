@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -23,7 +22,6 @@ func HandleAdminClientNewGet(
 
 		bind := map[string]interface{}{
 			"authorizationCodeEnabled": true,
-			"csrfField":                csrf.TemplateField(r),
 		}
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_new.html", bind)
@@ -48,7 +46,6 @@ func HandleAdminClientNewPost(
 				"displayName":              r.FormValue("displayName"),
 				"authorizationCodeEnabled": r.FormValue("authorizationCodeEnabled") == "on",
 				"clientCredentialsEnabled": r.FormValue("clientCredentialsEnabled") == "on",
-				"csrfField":                csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_new.html", bind)

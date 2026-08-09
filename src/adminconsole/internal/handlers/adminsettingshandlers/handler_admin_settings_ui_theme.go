@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 
@@ -63,7 +62,6 @@ func HandleAdminSettingsUIThemeGet(
 			"settings":          settingsInfo,
 			"uiThemes":          apiResp.AvailableThemes,
 			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_ui_theme.html", bind)
@@ -96,10 +94,9 @@ func HandleAdminSettingsUIThemePost(
 				}
 			}
 			bind := map[string]interface{}{
-				"settings":  settingsInfo,
-				"uiThemes":  uiThemes,
-				"csrfField": csrf.TemplateField(r),
-				"error":     message,
+				"settings": settingsInfo,
+				"uiThemes": uiThemes,
+				"error":    message,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_ui_theme.html", bind)
