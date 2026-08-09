@@ -17,6 +17,36 @@ if [[ "$VERSION" == *-* ]]; then
     IS_PRERELEASE=true
 fi
 
+# Registries to tag. Space-separated, and defaulting to Docker Hub ALONE so the
+# script stays usable by anything not authenticated to GHCR -- including the
+# legacy workflow retained until stage 7, which logs into Docker Hub only.
+# release.yml sets both. One buildx invocation pushes to every listed registry
+# in a single pass, so a second registry costs no extra build time.
+IFS=' ' read -r -a REGISTRIES <<< "${GOIABADA_REGISTRIES:-leodip/goiabada}"
+
+# Where to write buildx's metadata JSON, which is the only way to get the pushed
+# manifest digest out of the build: buildx prints it to the log but exposes it
+# nowhere consumable, and actions/attest needs it to attest anything at all.
+METADATA_DIR="${GOIABADA_METADATA_DIR:-}"
+
+# Build the -t arguments for one image across every configured registry.
+tags_for() {
+    local image="$1"
+    local reg
+    for reg in "${REGISTRIES[@]}"; do
+        printf -- '-t %s:%s-%s ' "$reg" "$image" "$VERSION"
+    done
+}
+
+# --metadata-file argument, or nothing when no directory was requested.
+metadata_for() {
+    local image="$1"
+    if [ -n "$METADATA_DIR" ]; then
+        mkdir -p "$METADATA_DIR"
+        printf -- '--metadata-file %s/%s-meta.json ' "$METADATA_DIR" "$image"
+    fi
+}
+
 # Platforms to build for:
 # - linux/amd64: Standard x86_64 servers and PCs
 # - linux/arm64: ARM servers (AWS Graviton, Raspberry Pi 4/5, Apple Silicon via Rosetta)
@@ -105,11 +135,11 @@ if [[ "$PUSH" == true ]]; then
     # moved by publish.yml when a release is deliberately published, so that the
     # tag every unpinned deployment follows changes at that moment rather than
     # whenever CI happens to go green (docs/ci-v2-design.md 4.6).
-    AUTHSERVER_TAGS="-t leodip/goiabada:authserver-$VERSION"
     docker buildx build --progress=plain \
       --platform "$PLATFORMS" \
       -f ./build/Dockerfile-authserver \
-      $AUTHSERVER_TAGS \
+      $(tags_for authserver) \
+      $(metadata_for authserver) \
       --build-arg version=$VERSION \
       --build-arg buildDate=$BUILD_DATE \
       --build-arg gitCommit=$GIT_COMMIT \
@@ -120,11 +150,11 @@ if [[ "$PUSH" == true ]]; then
 
     # Build and push adminconsole (multi-platform)
     echo "=== Building and pushing adminconsole image (multi-platform) ==="
-    ADMINCONSOLE_TAGS="-t leodip/goiabada:adminconsole-$VERSION"
     docker buildx build --progress=plain \
       --platform "$PLATFORMS" \
       -f ./build/Dockerfile-adminconsole \
-      $ADMINCONSOLE_TAGS \
+      $(tags_for adminconsole) \
+      $(metadata_for adminconsole) \
       --build-arg version=$VERSION \
       --build-arg buildDate=$BUILD_DATE \
       --build-arg gitCommit=$GIT_COMMIT \
@@ -146,11 +176,10 @@ else
     # moved by publish.yml when a release is deliberately published, so that the
     # tag every unpinned deployment follows changes at that moment rather than
     # whenever CI happens to go green (docs/ci-v2-design.md 4.6).
-    AUTHSERVER_TAGS="-t leodip/goiabada:authserver-$VERSION"
     docker buildx build --progress=plain \
       --platform linux/amd64 \
       -f ./build/Dockerfile-authserver \
-      $AUTHSERVER_TAGS \
+      $(tags_for authserver) \
       --build-arg version=$VERSION \
       --build-arg buildDate=$BUILD_DATE \
       --build-arg gitCommit=$GIT_COMMIT \
@@ -161,11 +190,10 @@ else
 
     # Build adminconsole (local only, single platform)
     echo "=== Building adminconsole image (local) ==="
-    ADMINCONSOLE_TAGS="-t leodip/goiabada:adminconsole-$VERSION"
     docker buildx build --progress=plain \
       --platform linux/amd64 \
       -f ./build/Dockerfile-adminconsole \
-      $ADMINCONSOLE_TAGS \
+      $(tags_for adminconsole) \
       --build-arg version=$VERSION \
       --build-arg buildDate=$BUILD_DATE \
       --build-arg gitCommit=$GIT_COMMIT \

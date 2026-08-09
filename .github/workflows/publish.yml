@@ -1,0 +1,65 @@
+# Phase two of the release. Publishing the draft is what moves `latest`, so the
+# tag every unpinned `docker compose` deployment follows changes at the moment
+# you consciously decide to release, not when CI happened to go green
+# (docs/ci-v2-design.md 4.6).
+#
+# Deleting the draft instead is a real abort: no user-visible tag ever moved.
+#
+# This workflow does NOT touch the docs. docs.yml owns every docs build,
+# listening for the same event; neither dispatches the other (5.4).
+
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  # REQUIRED for the GHCR push. Verified with `gh api`: this repository's
+  # default_workflow_permissions is `read`, so without this the imagetools push
+  # to ghcr.io fails.
+  packages: write
+
+jobs:
+  retag:
+    name: Retag latest
+    runs-on: ubuntu-latest
+    # An rc never moves `latest`.
+    if: ${{ !github.event.release.prerelease }}
+    # Mandatory: the Docker credentials exist only in this environment.
+    environment: prod
+    steps:
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A manifest retag: server-side, no rebuild, no layer re-upload, and
+      # byte-identical to what was tested. Takes seconds.
+      - name: Move the latest tags
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG_NAME#v}"
+          echo "Moving latest to $VERSION"
+          for img in authserver adminconsole; do
+            for reg in leodip/goiabada ghcr.io/leodip/goiabada; do
+              echo "==> $reg:$img-latest -> $reg:$img-$VERSION"
+              docker buildx imagetools create -t "$reg:$img-latest" "$reg:$img-$VERSION"
+            done
+          done
+
+      - name: Show the resulting digests
+        run: |
+          set -euo pipefail
+          for img in authserver adminconsole; do
+            docker buildx imagetools inspect "leodip/goiabada:$img-latest" | head -3
+          done

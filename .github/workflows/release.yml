@@ -1,0 +1,268 @@
+# Tag-driven release. Pushing v1.6.0 is the entire procedure; everything below
+# derives from that one tag, and it stops at a DRAFT so the notes can be written
+# before anything user-visible moves (docs/ci-v2-design.md 4.6).
+#
+# Actions are SHA-pinned here, not tag-pinned as in check.yml. This workflow
+# holds Docker Hub credentials, and a moving tag like @v3 means whoever controls
+# that tag chooses what executes next to those secrets.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write       # create the draft release
+  packages: write       # push to GHCR; the repo default is read
+  id-token: write       # attestations
+  attestations: write
+
+concurrency:
+  # Two pushes of the same tag must not race each other to the registries.
+  group: release-${{ github.ref }}
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # Required: with checkout's default depth of 1, a tag push fetches the
+          # tagged commit alone with no remote refs, so the "is it on main" check
+          # below would reject every tag, including correct ones. A guard that
+          # fails closed on all input is just an outage.
+          fetch-depth: 0
+
+      - id: v
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+
+          # Not the full SemVer grammar. It accepts leading zeros and empty
+          # prerelease identifiers, which would have to be typed deliberately.
+          # What it does enforce is the absence of '+': build metadata is legal
+          # in SemVer but INVALID in a Docker tag, so v1.6.0+build.3 would pass a
+          # naive check and then fail at push, or produce a mangled tag.
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::tag '$TAG' must be v<major>.<minor>.<patch>[-prerelease], with no build metadata"
+            exit 1
+          fi
+
+          # Reject a tag pushed from a feature branch. merge-base is used rather
+          # than parsing `git branch -r --contains`, because it states the
+          # question directly and does not depend on which remote-tracking refs
+          # happen to exist.
+          git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "::error::tag '$TAG' points at a commit that is not reachable from origin/main"
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # A prerelease must be marked as one: /releases/latest/ skips
+          # prereleases, and the docs link to that URL for the setup binaries.
+          # Publishing an rc as a normal release would silently retarget every
+          # download link in the docs at a release candidate (constraint A).
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VERSION prerelease=${VERSION#*-}"
+
+  # Duplicated from check.yml rather than shared: a reusable workflow cannot
+  # hand values to sibling jobs, and six lines of duplication is simpler than
+  # inventing a mechanism to avoid it.
+  versions:
+    name: Versions
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.read.outputs.go }}
+      tailwind: ${{ steps.read.outputs.tailwind }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - id: read
+        run: |
+          set -euo pipefail
+          f=src/authserver/versions.yaml
+          for k in go tailwind; do
+            v=$(yq -r ".tools.$k" "$f")
+            [ -n "$v" ] && [ "$v" != "null" ] || { echo "::error::tools.$k missing from $f"; exit 1; }
+            echo "$k=$v" >> "$GITHUB_OUTPUT"
+          done
+
+  # The full matrix, re-run against the tagged commit. Roughly five minutes of
+  # redundancy when the commit already passed on main, and it buys the
+  # difference between "main was green at some point" and "this exact tag is
+  # green". Tags get pushed at the wrong commit.
+  checks:
+    name: Checks
+    needs: verify
+    uses: ./.github/workflows/check.yml
+    with:
+      full: true
+
+  binaries:
+    name: Binaries
+    # Depends on both, though Checks implies Verify transitively. Naming both
+    # makes the intent explicit and survives someone editing Checks.
+    needs: [verify, checks, versions]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: ${{ needs.versions.outputs.go }}
+          cache-dependency-path: src/**/go.sum
+
+      - name: Cross-compile authserver and adminconsole
+        working-directory: src/build
+        run: ./build-binaries.sh --version "${{ needs.verify.outputs.version }}"
+
+      - name: Cross-compile the setup tool
+        working-directory: src/cmd/goiabada-setup
+        run: ./build-binaries.sh --version "${{ needs.verify.outputs.version }}"
+
+      # One staging directory feeding the checksums, the attestation and the
+      # release upload, so all three describe an identical set.
+      - name: Stage artifacts and generate checksums
+        id: stage
+        run: |
+          set -euo pipefail
+          V="${{ needs.verify.outputs.version }}"
+          mkdir -p dist
+          cp src/build/goiabada-"$V"-*.zip dist/
+          # The setup binaries keep UNVERSIONED filenames: the docs link to
+          # /releases/latest/download/goiabada-setup-linux-amd64, and adding a
+          # version would break every download link (constraint A).
+          cp src/cmd/goiabada-setup/build/goiabada-setup-* dist/
+
+          EXPECTED=(
+            "goiabada-$V-linux-amd64.zip"  "goiabada-$V-linux-arm64.zip"
+            "goiabada-$V-darwin-amd64.zip" "goiabada-$V-darwin-arm64.zip"
+            "goiabada-$V-windows-amd64.zip"
+            "goiabada-setup-linux-amd64"   "goiabada-setup-linux-arm64"
+            "goiabada-setup-darwin-amd64"  "goiabada-setup-darwin-arm64"
+            "goiabada-setup-windows-amd64.exe"
+          )
+          for f in "${EXPECTED[@]}"; do
+            [ -s "dist/$f" ] || { echo "::error::missing or empty artifact: $f"; exit 1; }
+          done
+
+          # Only after the manifest check, so checksums.txt can never describe a
+          # partial set.
+          ( cd dist && sha256sum "${EXPECTED[@]}" > checksums.txt )
+
+          count=$(find dist -type f | wc -l)
+          [ "$count" -eq 11 ] || { echo "::error::expected 11 assets, found $count"; exit 1; }
+          ls -la dist/
+
+      - uses: actions/attest@daf44fb950173508f38bd2406030372c1d1162b1 # v3
+        with:
+          # No predicate-type: supplying it selects CUSTOM mode, which then
+          # requires predicate or predicate-path. Provenance is the default
+          # precisely when those are omitted.
+          subject-path: 'dist/*'
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: dist/
+          # The default is `warn`, which is how an empty upload reaches a green
+          # job and then an empty release.
+          if-no-files-found: error
+
+  images:
+    name: Images
+    needs: [verify, checks, versions]
+    runs-on: ubuntu-latest
+    # Mandatory, not decorative. Repo-scope secrets are empty; DOCKER_USERNAME
+    # and DOCKER_PASSWORD exist only in this environment, and GitHub exposes
+    # environment secrets only to jobs that declare the environment.
+    environment: prod
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Version tags only. `latest` moves in publish.yml, when the release is
+      # deliberately published (4.6).
+      - name: Build and push multi-arch images
+        working-directory: src/build
+        env:
+          GOIABADA_REGISTRIES: leodip/goiabada ghcr.io/leodip/goiabada
+          GOIABADA_METADATA_DIR: ${{ runner.temp }}/meta
+        run: ./build-docker-images.sh --version "${{ needs.verify.outputs.version }}" --push
+
+      - name: Read pushed manifest digests
+        id: digests
+        run: |
+          set -euo pipefail
+          for img in authserver adminconsole; do
+            d=$(jq -r '."containerimage.digest"' "${{ runner.temp }}/meta/$img-meta.json")
+            [[ "$d" == sha256:* ]] || { echo "::error::no digest for $img"; exit 1; }
+            echo "$img=$d" >> "$GITHUB_OUTPUT"
+            echo "$img $d"
+          done
+
+      # Docker Hub only. subject-name binds an attestation to a fully qualified
+      # image name, so covering GHCR too would mean four calls rather than two.
+      # One buildx invocation pushed the same manifest to both, so the digests
+      # are identical by construction: GHCR is an unattested mirror whose
+      # contents anyone can verify against the Docker Hub reference.
+      - uses: actions/attest@daf44fb950173508f38bd2406030372c1d1162b1 # v3
+        with:
+          subject-name: docker.io/leodip/goiabada
+          subject-digest: ${{ steps.digests.outputs.authserver }}
+          push-to-registry: false
+      - uses: actions/attest@daf44fb950173508f38bd2406030372c1d1162b1 # v3
+        with:
+          subject-name: docker.io/leodip/goiabada
+          subject-digest: ${{ steps.digests.outputs.adminconsole }}
+          push-to-registry: false
+
+  draft:
+    name: Draft
+    # Both build jobs, so a partial release cannot produce a draft with missing
+    # assets.
+    needs: [verify, binaries, images]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: dist
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          args=(--draft --title "Release $VERSION" --generate-notes)
+          # A prerelease MUST be flagged: /releases/latest/ skips prereleases and
+          # drafts, which is what keeps the docs' download links pointing at the
+          # last stable release (constraint A).
+          [ "$PRERELEASE" = "true" ] && args+=(--prerelease)
+          gh release create "v$VERSION" "${args[@]}" dist/*
+          echo "Draft created. Write the notes, then publish to move 'latest'."
