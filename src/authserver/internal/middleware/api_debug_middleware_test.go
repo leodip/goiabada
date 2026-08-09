@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/otp"
+	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -643,4 +649,141 @@ func TestDebugLog_LogsBodiesFaithfully(t *testing.T) {
 		assert.Contains(t, output, `\n    \"inner\"`,
 			"the body is pretty printed, which is the point of logging it")
 	})
+}
+
+// -----------------------------------------------------------------------------
+// The middleware, end to end
+//
+// Everything above drives debugLog directly, which cannot show that the middleware
+// hands it the bytes it buffered and teed: the call site could pass the raw bodies
+// to anything and every case above would still pass. The two cases below run real
+// src/core/api payloads, built from a real TOTP seed, through the middleware mounted
+// the way routes.go mounts it, and assert on what an operator would find in the log.
+//
+// The handlers here are the tests' own. The production handler cannot be called from
+// this package because handlers/apihandlers imports this one, and reaching it would
+// need a mock database, a settings context value and a validated token. What is real
+// is what carries the credential: the response and request types, the seed and QR
+// from otp.OTPSecretGenerator, a live TOTP code, and the same
+// json.NewEncoder(w).Encode(resp) the endpoint writes its body with.
+// -----------------------------------------------------------------------------
+
+// debugAPIRouter mounts handler behind APIDebugMiddleware on a chi router, with the
+// middleware as the first r.Use under /api/v1/account, which is how routes.go builds
+// the account API. Debug logging is turned on for the duration of the test.
+func debugAPIRouter(t *testing.T, method, pattern string, handler http.HandlerFunc) *chi.Mux {
+	t.Helper()
+	withDebugAPIRequests(t, true)
+
+	router := chi.NewRouter()
+	router.Route("/api/v1/account", func(r chi.Router) {
+		r.Use(APIDebugMiddleware())
+		r.Method(method, pattern, handler)
+	})
+	return router
+}
+
+// GET /api/v1/account/otp/enrollment returns the TOTP seed twice: once as secretKey
+// and once inside base64Image, which is a QR of the otpauth:// URL the seed is in.
+// Both must be gone from the log, and the client must still receive exactly what the
+// handler wrote.
+func TestAPIDebugMiddleware_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
+	logged := captureSlog(t)
+
+	generator := otp.OTPSecretGenerator{}
+	base64Image, secretKey, err := generator.GenerateOTPSecret("seam2@example.com", "Goiabada")
+	assert.NoError(t, err)
+
+	// What the handler wrote, captured as it writes it, so the comparison below is
+	// against the real bytes rather than against a second encode of the same struct.
+	var written bytes.Buffer
+	router := debugAPIRouter(t, http.MethodGet, "/otp/enrollment", func(w http.ResponseWriter, r *http.Request) {
+		resp := api.AccountOTPEnrollmentResponse{Base64Image: base64Image, SecretKey: secretKey}
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(io.MultiWriter(w, &written)).Encode(resp)
+		assert.NoError(t, err)
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/account/otp/enrollment", nil))
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.NotEmpty(t, written.Bytes(),
+		"the handler must have run, or the comparison below holds between two empty slices")
+	assert.Equal(t, written.Bytes(), recorder.Body.Bytes(),
+		"buffering the response for the log must not change a byte of what the client receives")
+
+	output := logged.String()
+	assert.NotContains(t, output, secretKey,
+		"the TOTP seed must not reach the log")
+	// Asserted on a prefix rather than the whole string: a bug that logged only the
+	// first part of the image would pass a whole-string check and still publish the
+	// seed to anyone who reassembled it.
+	assert.NotContains(t, output, base64Image[:64],
+		"nor the QR code, which is the same seed in another form")
+
+	// Absence alone would also hold with the whole response body dropped, which is not
+	// what this change does: the shape of the body stays readable.
+	assert.Contains(t, output, "secretKey")
+	assert.Contains(t, output, "base64Image")
+	assert.Contains(t, output, redactedValue)
+}
+
+// PUT /api/v1/account/otp carries three credentials up: the account password, a live
+// TOTP code and the seed it was generated from. None may reach the log, and all three
+// must still reach the handler, which is the half that makes the middleware safe to
+// mount in front of a real endpoint rather than merely quiet.
+func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
+	logged := captureSlog(t)
+
+	generator := otp.OTPSecretGenerator{}
+	_, secretKey, err := generator.GenerateOTPSecret("seam2@example.com", "Goiabada")
+	assert.NoError(t, err)
+
+	otpCode, err := totp.GenerateCode(secretKey, time.Now())
+	assert.NoError(t, err)
+
+	sent := api.UpdateAccountOTPRequest{
+		Enabled:   true,
+		Password:  "SENTINEL-account-password",
+		OtpCode:   otpCode,
+		SecretKey: secretKey,
+	}
+	body, err := json.Marshal(sent)
+	assert.NoError(t, err)
+
+	router := debugAPIRouter(t, http.MethodPut, "/otp", func(w http.ResponseWriter, r *http.Request) {
+		var received api.UpdateAccountOTPRequest
+		err := json.NewDecoder(r.Body).Decode(&received)
+		assert.NoError(t, err)
+		assert.Equal(t, sent, received,
+			"the handler must receive the credentials intact after the middleware read the body to log it")
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err = w.Write([]byte(`{"otpEnabled":true}`))
+		assert.NoError(t, err)
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPut, "/api/v1/account/otp", bytes.NewReader(body)))
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+
+	output := logged.String()
+	assert.NotContains(t, output, "SENTINEL-account-password",
+		"the account password must not reach the log")
+	assert.NotContains(t, output, otpCode,
+		"nor a live OTP code, which is usable until its step expires")
+	assert.NotContains(t, output, secretKey,
+		"nor the seed, which is usable indefinitely")
+
+	// The request body's one harmless field, asserted with its value and its opening
+	// quote. A bare "enabled" would also match the response's otpEnabled key, which
+	// the substring net redacts, so the case would pass with the request body dropped.
+	assert.Contains(t, output, `\"enabled\": true`,
+		"an ordinary field must survive, or the entry is worth nothing to debug with")
+	assert.Contains(t, output, "password")
+	assert.Contains(t, output, "otpCode")
+	assert.Contains(t, output, "secretKey")
+	assert.Contains(t, output, redactedValue)
 }
