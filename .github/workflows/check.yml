@@ -1,14 +1,18 @@
-# The PR check suite. Runs alongside the legacy run-tests.yml until stage 3 of
-# the CI/CD v2 plan retires it (docs/ci-v2-design.md).
+# The PR check suite. This is now the only thing gating a pull request: the
+# legacy run-tests.yml it ran beside has been retired, having agreed with this
+# workflow on every pull request from the day it was introduced.
 #
 # The point of the job split is visibility: GitHub renders two levels, jobs in
 # the sidebar and steps within a job, so the database goes on the job axis and
 # the test tier on the step axis. A red run then names the database without a
 # click and the tier with one.
 #
-# Actions are referenced by tag here, not SHA. Stage 8 pins them. That ordering
-# is deliberate: this workflow holds no credentials, while the release
-# workflows added in stage 5 do and are SHA-pinned at birth.
+# `main` is deliberately left unprotected. The consequence that matters --
+# shipping something broken -- is already prevented downstream: release.yml
+# re-runs this entire matrix against the tagged commit, refuses a tag that is
+# not reachable from origin/main, and gives registry credentials only to a job
+# that cannot start until those checks are green. Branch protection would move
+# detection earlier, not make it possible.
 
 name: Check
 
