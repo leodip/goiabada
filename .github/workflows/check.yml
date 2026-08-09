@@ -234,15 +234,16 @@ jobs:
     name: Vulnerabilities
     needs: versions
     runs-on: ubuntu-latest
-    # ADVISORY ONLY, and deliberately so. govulncheck currently reports
-    # GO-2025-3884 (github.com/gorilla/csrf) as reachable from core, authserver
-    # and adminconsole, and the advisory has no fixed version, so this job
-    # cannot pass today. Making it blocking would redden every PR on day one.
+    # Blocking. It was advisory only for as long as GO-2025-3884
+    # (github.com/gorilla/csrf) was reachable from core, authserver and
+    # adminconsole with no fixed version to move to; #155 removed the dependency
+    # from all three modules, and all four report "No vulnerabilities found".
     #
-    # Tracked in issue #155. When that is resolved, delete this line and add
-    # "Vulnerabilities" to the required checks. Until then it MUST NOT be added
-    # to the required-check list (docs/ci-v2-design.md 7).
-    continue-on-error: true
+    # This job is unlike every other one here: it fails when a third party
+    # publishes an advisory, not when this repository commits a defect, so it
+    # can redden a PR that changed nothing. That is intended. A scanner nobody
+    # has to act on is one nobody reads, and this gate exists because someone
+    # acted on it.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
