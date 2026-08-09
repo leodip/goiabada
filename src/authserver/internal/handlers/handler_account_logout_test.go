@@ -77,10 +77,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.On("GetFromUrlQueryOrFormPost", req, "client_id").Return("")
 		httpHelper.On("GetFromUrlQueryOrFormPost", req, "ui_locales").Return("")
 		httpHelper.On("LookupFromUrlQueryOrFormPost", req, "state").Return("", false)
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/logout_consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			_, hasCsrfField := data["csrfField"]
-			return hasCsrfField
-		})).Return(nil)
+		// This subtest owns the status code and the template choice only. The bind's contents are
+		// pinned key by key in the sibling below, which is where the interesting claim lives.
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/logout_consent.html",
+			mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -127,6 +127,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		assert.Equal(t, true, bound["statePresent"])
 		assert.Equal(t, "pt-BR", bound["uiLocales"])
 		assert.NotContains(t, bound, "idTokenHint")
+		// Exactly the six above, asserted by count as well as by name. Naming six keys says nothing
+		// about a seventh, so without this the sibling subtest below can drop to mock.Anything only
+		// on the claim that this one pins the whole render, and that claim would be false: a
+		// reintroduced csrfField, or any other stray bind, would pass every assertion above (#155).
+		assert.Len(t, bound, 6, "the consent render binds exactly these six keys and nothing else")
 		httpHelper.AssertExpectations(t)
 	})
 
@@ -1451,16 +1456,22 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	// Decision 18. The CSRF exemption the POST binding needs keys on the hint being PRESENT, because
-	// middleware cannot judge whether one is genuine, and gorilla/csrf returns on that skip flag before
-	// it saves the cookie and attaches the token. So a consent page rendered on this request would
-	// carry no token and its own hintless confirming POST would be refused, leaving the End-User on a
-	// page they cannot submit while still signed in. The 303 sends them to the GET binding, which is
-	// never exempt and therefore renders a page that works.
+	// Decision 18, and the reason behind it has since changed. The CSRF exemption the POST binding
+	// needs keys on the hint being PRESENT, because middleware cannot judge whether one is genuine.
+	// Under gorilla/csrf the middleware returned on that skip flag before saving its cookie and
+	// attaching its token, so a consent page rendered on this request carried no token while its own
+	// hintless confirming POST was refused: an End-User stranded on a page they could not submit
+	// while still signed in. There is no token now (#155), and a page rendered here would be a
+	// document at our own origin whose confirming POST is same-origin, so that trap is gone. The 303
+	// remains what decision 18 landed and what this case pins, because the shape a relying party
+	// observes is part of the contract.
 	//
 	// The two parameters dropped are the point of the case. id_token_hint, because carrying it back
-	// would land here again forever; client_id, because the follow-up GET is the hint-absent shape,
-	// where client_id authorizes the redirect a rejected hint is specifically denied (decision 15).
+	// would put an ID token in the address bar of a top-level navigation, its history and its
+	// referrers, which is the exposure the POST binding exists to avoid; client_id, because the
+	// follow-up GET is the hint-absent shape, where client_id authorizes the redirect a rejected hint
+	// is specifically denied (decision 15). Not to prevent a loop: the follow-up is a GET, and a
+	// rejected hint on a GET renders the consent page rather than redirecting again.
 	t.Run("A POST whose hint is rejected is sent to the GET binding", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
@@ -1491,7 +1502,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusSeeOther, rr.Code,
-			"303, because the browser has to re-request by GET for the consent page to carry a token")
+			"303, so the End-User ends on a GET and a reload does not resubmit the failed POST")
 		location := mustParseURL(t, rr.Header().Get("Location"))
 		assert.Equal(t, "/auth/logout", location.Path)
 		assert.Equal(t, hintedRegisteredURI, location.Query().Get("post_logout_redirect_uri"))
@@ -1500,7 +1511,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		assert.Equal(t, "pt-BR", location.Query().Get("ui_locales"),
 			"the locale survives, or the consent page comes back in a different language from the one asked for")
 		_, hintCarried := location.Query()["id_token_hint"]
-		assert.False(t, hintCarried, "carrying the hint back would land on this branch again, forever")
+		assert.False(t, hintCarried,
+			"carrying the hint back would put an ID token in the address bar, its history and its referrers")
 		_, clientIdCarried := location.Query()["client_id"]
 		assert.False(t, clientIdCarried,
 			"a rejected hint's client_id must not survive, or it authorizes the redirect decision 15 denies")

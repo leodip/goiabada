@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
@@ -35,9 +34,7 @@ func HandleAccountRegisterGet(
 			return
 		}
 
-		bind := map[string]interface{}{
-			"csrfField": csrf.TemplateField(r),
-		}
+		bind := map[string]interface{}{}
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
 		if err != nil {
@@ -71,9 +68,8 @@ func HandleAccountRegisterPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"email":     email,
-				"error":     message,
-				"csrfField": csrf.TemplateField(r),
+				"email": email,
+				"error": message,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -208,8 +204,7 @@ func HandleAccountRegisterPost(
 			}
 
 			bind = map[string]interface{}{
-				"email":     email,
-				"csrfField": csrf.TemplateField(r),
+				"email": email,
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation.html", bind)

@@ -12,7 +12,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -123,7 +122,6 @@ func HandleConsentGet(
 			displayInfo := getClientDisplayInfo(database, client)
 
 			bind := map[string]interface{}{
-				"csrfField":         csrf.TemplateField(r),
 				"showClientSection": displayInfo.ShowSection,
 				"clientName":        displayInfo.ClientName,
 				"clientDescription": displayInfo.Description,

@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -71,7 +70,6 @@ func forgotPasswordCodeMatches(storedCode string, suppliedCode string) bool {
 func renderResetPasswordCodeInvalid(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, httpStatus int) {
 	bind := map[string]interface{}{
 		"codeInvalidOrExpired": true,
-		"csrfField":            csrf.TemplateField(r),
 	}
 	if httpStatus != 0 {
 		bind["_httpStatus"] = httpStatus
@@ -142,9 +140,7 @@ func HandleResetPasswordGet(
 			return
 		}
 
-		bind := map[string]interface{}{
-			"csrfField": csrf.TemplateField(r),
-		}
+		bind := map[string]interface{}{}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 		if err != nil {
@@ -165,8 +161,7 @@ func HandleResetPasswordPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":     message,
-				"csrfField": csrf.TemplateField(r),
+				"error": message,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)

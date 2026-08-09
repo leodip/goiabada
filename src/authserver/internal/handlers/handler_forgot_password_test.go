@@ -13,7 +13,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 
-	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
@@ -39,8 +38,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 			"/forgot_password.html",
 			mock.MatchedBy(func(data map[string]interface{}) bool {
 				_, hasError := data["error"]
-				csrfField, hasCsrfField := data["csrfField"]
-				return hasError && hasCsrfField && csrfField != nil
+				return hasError
 			}),
 		).Return(nil)
 
@@ -77,33 +75,6 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
-	})
-
-	t.Run("CSRF field is included", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-
-		handler := HandleForgotPasswordGet(httpHelper)
-
-		req, err := http.NewRequest("GET", "/forgot-password", nil)
-		assert.NoError(t, err)
-
-		rr := httptest.NewRecorder()
-
-		httpHelper.On("RenderTemplate",
-			rr,
-			req,
-			"/layouts/auth_layout.html",
-			"/forgot_password.html",
-			mock.MatchedBy(func(data map[string]interface{}) bool {
-				csrfField, hasCsrfField := data["csrfField"]
-				return hasCsrfField && csrfField == csrf.TemplateField(req)
-			}),
-		).Return(nil)
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
 		httpHelper.AssertExpectations(t)
 	})
 }
