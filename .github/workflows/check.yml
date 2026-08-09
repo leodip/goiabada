@@ -158,13 +158,22 @@ jobs:
           go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${{ needs.versions.outputs.golangci }}
           go install mvdan.cc/unparam@v${{ needs.versions.outputs.unparam }}
 
-      # Fails loudly if the cache restored something unusable, rather than
-      # letting a later step fail with a confusing "command not found".
+      # Fails loudly if the cache restored something unusable or stale, rather
+      # than letting a later step fail with a confusing "command not found".
+      #
+      # `go version -m` reads the module version recorded in the binary, which
+      # is what actually proves the cached copy is the pinned one. unparam has
+      # no --version flag, and piping its usage output through `head` is a trap:
+      # head closes the pipe, unparam takes SIGPIPE, and under `pipefail` the
+      # step fails with exit 141 even though the tool is fine.
       - name: Confirm the linters are the pinned versions
         run: |
           set -euo pipefail
           golangci-lint --version
-          unparam -h 2>&1 | head -1
+          for tool in golangci-lint unparam; do
+            path=$(command -v "$tool") || { echo "::error::$tool not on PATH"; exit 1; }
+            go version -m "$path" | awk -v t="$tool" '$1 == "mod" { print t ": " $2 " " $3 }'
+          done
 
       # The standalone staticcheck binary is deliberately not run. It does not
       # ship the QF (quickfix) checks that golangci-lint's bundled copy
