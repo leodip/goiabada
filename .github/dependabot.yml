@@ -1,0 +1,51 @@
+# Dependabot keeps the pins from going stale. Unattended stale pins are worse
+# than moving tags: they look deliberate.
+#
+# Deliberately NOT covered here: the Go toolchain version, the Tailwind CLI,
+# mockery, staticcheck, unparam, govulncheck and the CDN script tags. Dependabot
+# cannot see any of them -- they are shell downloads, Dockerfile pins and script
+# tags in HTML rather than package manifests. Those stay
+# `./version-manager.sh check` territory. The two tools are complementary, not
+# overlapping (docs/ci-v2-design.md 5.9).
+
+version: 2
+
+updates:
+  # The SHA pins in the workflows. Without this they would be frozen forever,
+  # which is the failure mode pinning is accused of and this avoids.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+
+  # One entry per module: Dependabot does not discover Go workspaces
+  # recursively, and each go.mod is its own dependency graph.
+  - package-ecosystem: gomod
+    directory: /src/core
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: gomod
+    directory: /src/authserver
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: gomod
+    directory: /src/adminconsole
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: gomod
+    directory: /src/cmd/goiabada-setup
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
