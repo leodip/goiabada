@@ -1,0 +1,75 @@
+# The documentation image. Decoupled from releases, so a typo fix ships when it
+# is merged rather than waiting for the next release or a remembered manual
+# dispatch. The path filter means Go-only PRs, the large majority, never pay for
+# it (docs/ci-v2-design.md 4.9).
+#
+# This workflow owns EVERY docs build. An earlier draft had publish.yml dispatch
+# it as well, which meant a stable release built and pushed the docs image
+# twice, concurrently, racing on the same tag.
+
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths: ['site/**']
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Docs
+    runs-on: ubuntu-latest
+    # Mandatory: the Docker credentials exist only in this environment.
+    environment: prod
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # The prerelease guard belongs on the TAG LIST, not on the job. A
+      # job-level `if` would skip the whole job for an rc, pushing nothing at
+      # all -- while the intent is that an rc still produces a versioned docs
+      # image (which is what makes an rc reviewable), just without moving what
+      # users read.
+      - name: Compute tags
+        id: tags
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+          TAGS=()
+          case "$EVENT" in
+            push|workflow_dispatch)
+              TAGS+=("docs-latest")
+              ;;
+            release)
+              VERSION="${TAG_NAME#v}"
+              TAGS+=("docs-${VERSION}")
+              [ "$PRERELEASE" = "true" ] || TAGS+=("docs-latest")
+              ;;
+          esac
+          [ ${#TAGS[@]} -gt 0 ] || { echo "::error::no tags computed for event '$EVENT'"; exit 1; }
+
+          args=""
+          for t in "${TAGS[@]}"; do args="$args -t leodip/goiabada:$t"; done
+          echo "args=$args" >> "$GITHUB_OUTPUT"
+          echo "Pushing: ${TAGS[*]}"
+
+      - name: Build and push
+        working-directory: site
+        run: |
+          set -euo pipefail
+          docker build ${{ steps.tags.outputs.args }} .
+          for t in $(echo "${{ steps.tags.outputs.args }}" | tr ' ' '\n' | grep -v '^-t$' | grep -v '^$'); do
+            docker push "$t"
+          done
