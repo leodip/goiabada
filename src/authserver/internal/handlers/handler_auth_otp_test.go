@@ -298,6 +298,38 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authHelper.AssertExpectations(t)
 	})
 
+	// A missing auth context is what someone with an absent or expired session
+	// cookie hits, and it is the branch the OTP rate limiter now hands through to
+	// rather than answering itself (#114). It must redirect, not error.
+	t.Run("No auth context redirects to the profile URL", func(t *testing.T) {
+		previousBaseURL := config.GetAdminConsole().BaseURL
+		t.Cleanup(func() { config.GetAdminConsole().BaseURL = previousBaseURL })
+		config.GetAdminConsole().BaseURL = "https://admin.example.com"
+
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
+
+		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		rr := httptest.NewRecorder()
+
+		authHelper.On("GetAuthContext", mock.Anything).Return(nil, customerrors.ErrNoAuthContext)
+
+		// No InternalServerError expectation is set, so the mock fails this subtest
+		// if the handler takes the other branch. Location is asserted against the
+		// literal rather than GetProfileURL(), which would move with the function it
+		// is meant to check; GetProfileURL is pinned by TestGetProfileURL.
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, "https://admin.example.com/account/profile", rr.Header().Get("Location"))
+		authHelper.AssertExpectations(t)
+	})
+
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)

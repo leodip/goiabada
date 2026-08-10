@@ -4,8 +4,29 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+
+	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
+
+// stubAuthHelper stands in for the real AuthHelper, which needs a session store
+// and a cookie to answer. It reads the user id from the request's query string so
+// one middleware instance can be driven with several users, which is what shows
+// the OTP budget is keyed per user rather than globally. A non-nil err is
+// returned for every request, standing for an unreadable auth context.
+type stubAuthHelper struct {
+	err error
+}
+
+func (s stubAuthHelper) GetAuthContext(r *http.Request) (*oauth.AuthContext, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	userId, _ := strconv.ParseInt(r.URL.Query().Get("userId"), 10, 64)
+	return &oauth.AuthContext{UserId: userId}, nil
+}
 
 // TestGetClientIPFromRequest verifies the rate-limit key is derived from
 // RemoteAddr only, ignoring spoofable X-Forwarded-For / X-Real-IP headers.
@@ -161,6 +182,82 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 		for i := 0; i < 40; i++ {
 			if run(m, "x@example.com", "203.0.113.1:5000") != http.StatusOK {
 				t.Fatal("disabled limiter should never block")
+			}
+		}
+	})
+}
+
+// TestLimitOtp_PerUserAndMissingAuthContext verifies the OTP limiter keys its
+// budget on the user id, and that a request whose auth context cannot be read
+// reaches the handler instead of being answered with a blank 200 (#114).
+//
+// The handler stub writes 418 rather than 200 on purpose: a middleware that
+// writes nothing produces exactly 200 with an empty body, so 418 is what tells
+// "the handler ran" apart from "nothing was written", and from 429.
+func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
+	run := func(m *RateLimiterMiddleware, userId int) (int, bool) {
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/auth/otp?userId=%d", userId), nil)
+		rr := httptest.NewRecorder()
+		reached := false
+		m.LimitOtp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		return rr.Code, reached
+	}
+
+	t.Run("unreadable auth context reaches the handler", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(stubAuthHelper{err: customerrors.ErrNoAuthContext}, true)
+		// Well past the 10/min budget: the pass-through is deliberately not
+		// bounded by this middleware, since there is no user to key a bucket on.
+		for i := 0; i < 20; i++ {
+			code, reached := run(m, 0)
+			if code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+	})
+
+	t.Run("a readable auth context still spends the budget", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(stubAuthHelper{}, true)
+		for i := 0; i < 10; i++ {
+			if code, reached := run(m, 42); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, 42); code != http.StatusTooManyRequests || reached {
+			t.Errorf("11th attempt: got code %d, handler reached %v; want %d and false",
+				code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("each user id has its own budget", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(stubAuthHelper{}, true)
+		blocked := false
+		for i := 0; i < 11; i++ {
+			if code, _ := run(m, 42); code == http.StatusTooManyRequests {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			t.Fatal("expected user 42 to be limited within 11 attempts")
+		}
+		// Same middleware instance, different user: a global key would block this.
+		if code, reached := run(m, 43); code != http.StatusTeapot || !reached {
+			t.Errorf("second user: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(stubAuthHelper{}, false)
+		for i := 0; i < 60; i++ {
+			if code, reached := run(m, 42); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
 			}
 		}
 	})
