@@ -71,7 +71,7 @@ GET /auth/authorize?
 ```
 
 - If the user has a session matching the hint → SSO succeeds
-- If the user has a session for a different user → re-authentication required
+- If the user has a session for a different user → re-authentication required, and once the hinted user signs in, the session that was in the browser is ended and replaced (see [User sessions](/concepts/user-sessions/))
 - If no session → normal login flow (only hinted user can complete)
 
 ## Error responses
