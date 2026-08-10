@@ -394,10 +394,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	// The one classification failure that is not a rejection. A database fault while deciding whether
-	// an expired hint's session is still alive has a different answer from a row that is not there:
-	// reading it as "no such session" would decide whether the hint is honoured on the database's
-	// health, and silently widen the teardown at the same time.
+	// A classification failure rather than a rejection, which the classifier reserves for the lookups
+	// that decide whether the hint's session may be trusted. A database fault there has a different
+	// answer from a row that is not there: reading it as "no such session" would decide whether the
+	// hint is honoured on the database's health, and silently widen the teardown at the same time.
 	t.Run("A database fault while judging an expired hint is a 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
@@ -747,8 +747,14 @@ const (
 	hintedIssuer        = "https://hinted-issuer.example"
 	hintedClientId      = "hinted_client"
 	hintedSessionId     = "hinted-session"
+	hintedSubject       = "the-user"
 	hintedToken         = "a.signed.hint"
 	hintedRegisteredURI = "https://example.com/out"
+	// The user hintedSubject names, and the owner of the session hintedSessionId names. One constant
+	// for both, because the classifier now compares them: a fixture that left the session's UserId
+	// unrelated to the hint's sub would make the ownership gate refuse every case here, and one that
+	// left it zero would satisfy the gate without either value meaning anything.
+	hintedUserId int64 = 123
 )
 
 // hintedClaims is the claim set of a hint that validates. Every numeric claim is a float64 because
@@ -758,7 +764,7 @@ func hintedClaims() map[string]interface{} {
 	now := time.Now().UTC()
 	return map[string]interface{}{
 		"iss": hintedIssuer,
-		"sub": "the-user",
+		"sub": hintedSubject,
 		"iat": float64(now.Add(-2 * time.Minute).Unix()),
 		"exp": float64(now.Add(2 * time.Minute).Unix()),
 		"aud": hintedClientId,
@@ -799,6 +805,11 @@ func hintedRequest(t *testing.T, method string, form url.Values, sessionIdentifi
 //
 // The literal false on the parse is decision 14's whole mechanism: claims validation is off, and the
 // classifier checks exp by hand so it can tolerate a past one while the session lives.
+//
+// The user behind the hint's sub is Maybe(), because the ownership gate is reached only when the
+// session lookup produced a row and one case here makes that lookup fail. What the gate does is seam
+// 7's to prove, in the classifier's own table; these cases exist for what a confirmed or a rejected
+// hint causes downstream, and they need the gate to pass rather than to be observed (#133).
 func stubConfirmedHint(
 	httpHelper *mocks_handlerhelpers.HttpHelper,
 	database *mocks_data.Database,
@@ -812,6 +823,8 @@ func stubConfirmedHint(
 	tokenParser.On("DecodeAndValidateTokenString", hintedToken, (*rsa.PublicKey)(nil), false).
 		Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: claims}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, hintedClientId).Return(client, nil)
+	database.On("GetUserBySubject", mock.Anything, hintedSubject).
+		Return(&models.User{Id: hintedUserId}, nil).Maybe()
 
 	return client
 }
@@ -837,8 +850,11 @@ func stubPerClientTeardown(
 	sessionIdentifier string,
 ) {
 	userSession := &models.UserSession{
-		Id:      42,
-		UserId:  123,
+		Id: 42,
+		// The hint's own subject, corrected from a bare 123 that matched nothing. This one expectation
+		// serves two calls now, the classifier's ownership lookup and the teardown's, so a session
+		// owned by somebody else would refuse the hint before the teardown ran at all (#133).
+		UserId:  hintedUserId,
 		Clients: []models.UserSessionClient{{Id: 7, ClientId: client.Id, Client: *client}},
 	}
 
@@ -1865,12 +1881,19 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		theIssuer    = "https://issuer.example"
 		theClientId  = "test_client"
 		theSessionId = "test-session"
+		theSubject   = "the-user"
 		theHint      = "a.signed.hint"
 		// The persisted row ID, distinct from the identifier, because the two are not
 		// interchangeable downstream: ClientLoadRedirectURIs queries by Client.Id, so a classifier
 		// that rebuilt the client from the identifier alone would carry Id 0 and every registered
 		// redirect URI would come back empty (#109).
 		theClientDbId int64 = 11
+		// The user theSubject names. theOtherUserDbId is anybody else, and the pair is what the
+		// ownership gate compares: a row owned by theUserDbId confirms and one owned by
+		// theOtherUserDbId is refused. Neither is zero, so a gate that compared two unset fields
+		// could not pass by accident (#133).
+		theUserDbId      int64 = 5
+		theOtherUserDbId int64 = 9
 	)
 
 	now := time.Now().UTC()
@@ -1881,7 +1904,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	confirmedClaims := func() map[string]interface{} {
 		return map[string]interface{}{
 			"iss": theIssuer,
-			"sub": "the-user",
+			"sub": theSubject,
 			"iat": float64(now.Add(-2 * time.Minute).Unix()),
 			"nbf": float64(now.Add(-2 * time.Minute).Unix()),
 			"exp": float64(now.Add(2 * time.Minute).Unix()),
@@ -1901,11 +1924,44 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, theClientId).Return(newClient(), nil).Maybe()
 	}
 
-	// A live session for decision 14's tolerance lookup, which only an expired row reaches.
+	// The default database for a row that reaches the sid gate: the session sid names, owned by the
+	// user sub names. Both are Maybe() for the same reason the client lookup is, and both are now
+	// reached by every confirming row rather than only by an expired one, because the session lookup
+	// has moved out of the expiry branch (#133).
+	// Split from the client lookup so a row that stubs its own client, which the JWE rows do to give it
+	// a secret, can still reach the sid gate.
+	resolvesOwnedSessionRows := func(database *mocks_data.Database) {
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).
+			Return(&models.UserSession{Id: 7, UserId: theUserDbId}, nil).Maybe()
+		database.On("GetUserBySubject", mock.Anything, theSubject).
+			Return(&models.User{Id: theUserDbId}, nil).Maybe()
+	}
+	resolvesOwnedSession := func(database *mocks_data.Database) {
+		resolvesClient(database)
+		resolvesOwnedSessionRows(database)
+	}
+
+	// A session for decision 14's tolerance lookup, required rather than Maybe so the row proves the
+	// lookup ran. Its owner is left as the hint's own subject, since these rows are about expiry and a
+	// foreign owner would refuse them one gate later for a reason they are not testing.
 	resolvesClientAndSession := func(userSession *models.UserSession, err error) func(*mocks_data.Database) {
 		return func(database *mocks_data.Database) {
 			resolvesClient(database)
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).Return(userSession, err)
+			database.On("GetUserBySubject", mock.Anything, theSubject).
+				Return(&models.User{Id: theUserDbId}, nil).Maybe()
+		}
+	}
+
+	// The ownership gate's own fixture: who owns the row sid names, and what sub resolves to. Neither
+	// lookup is Maybe, so a row using this fails outright if the gate stops making them rather than
+	// quietly agreeing with whatever the classifier decided for another reason.
+	resolvesOwnership := func(sessionUserId int64, user *models.User, userErr error) func(*mocks_data.Database) {
+		return func(database *mocks_data.Database) {
+			resolvesClient(database)
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).
+				Return(&models.UserSession{Id: 7, UserId: sessionUserId}, nil)
+			database.On("GetUserBySubject", mock.Anything, theSubject).Return(user, userErr)
 		}
 	}
 
@@ -1989,6 +2045,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 				assert.NoError(t, err)
 				database.On("GetClientByClientIdentifier", mock.Anything, theClientId).
 					Return(&models.Client{Id: theClientDbId, ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
+				resolvesOwnedSessionRows(database)
 			},
 			want: hintConfirmed, wantSid: theSessionId,
 		},
@@ -2170,8 +2227,13 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// With no cookie the hint's own sid names the session, which is what makes RP-initiated
 			// logout work at all from an RP the browser is not currently at. The assertion that
 			// proves seeding happened is wantSid: without it the identifier would come back empty.
+			//
+			// The ownership fixture is strict rather than the table's Maybe default, so this row also
+			// proves the seeded identifier travels through both ownership lookups. Left optional, a
+			// gate that only ran when the middleware had supplied an identifier would pass here.
 			name: "no browser session, so sid seeds the identifier", gate: "sid",
 			noSession: true,
+			stubDB:    resolvesOwnership(theUserDbId, &models.User{Id: theUserDbId}, nil),
 			want:      hintConfirmed, wantSid: theSessionId,
 		},
 		{
@@ -2181,7 +2243,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			mutate: func(claims map[string]interface{}) {
 				claims["exp"] = float64(now.Add(-1 * time.Minute).Unix())
 			},
-			stubDB: resolvesClientAndSession(&models.UserSession{Id: 7, UserId: 3}, nil),
+			stubDB: resolvesClientAndSession(&models.UserSession{Id: 7, UserId: theUserDbId}, nil),
 			want:   hintConfirmed, wantSid: theSessionId,
 		},
 		{
@@ -2193,14 +2255,84 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			want:   hintRejected,
 		},
 		{
-			// The one failure that is not a rejection. A database error and a row that is not there
-			// have different answers, so reading this as "no such session" would decide the tolerance
-			// on the database's health (decision 8's rule for this handler).
+			// One of the failures that propagate rather than rejecting; the ownership rows below cover
+			// the rest. A database error and a row that is not there have different answers, so
+			// reading this as "no such session" would decide the tolerance on the database's health.
 			name: "expired, and the session lookup fails", gate: "expiry tolerance",
 			mutate: func(claims map[string]interface{}) {
 				claims["exp"] = float64(now.Add(-1 * time.Minute).Unix())
 			},
 			stubDB:  resolvesClientAndSession(nil, errors.New("the database is on fire")),
+			want:    hintRejected,
+			wantErr: true,
+		},
+		{
+			// The gate the whole stage is about. A hint signed for one user over another user's session
+			// is what RP-Initiated Logout 1.0 section 2 calls an ID Token that "does not belong to the
+			// ... currently logged in End-User", and the section makes asking the End-User a MUST in
+			// that case. Rejecting is how this endpoint asks, so the refusal here IS the conformance.
+			name: "sid names a session belonging to another user", gate: "session ownership",
+			stubDB: resolvesOwnership(theOtherUserDbId, &models.User{Id: theUserDbId}, nil),
+			want:   hintRejected,
+		},
+		{
+			// The same refusal reached through the other identifier source. The classifier takes the
+			// identifier from the middleware when a cookie exists and from the hint's own sid when one
+			// does not, and this is the second: a caller with no browser session presenting a pre-fix
+			// cross-bound hint directly. It is paired with the row above deliberately, because a gate
+			// that ran only for a middleware-supplied identifier would refuse that one, confirm this
+			// one, and leave the whole suite green.
+			name: "no browser session, and sid names a session belonging to another user", gate: "session ownership",
+			noSession: true,
+			stubDB:    resolvesOwnership(theOtherUserDbId, &models.User{Id: theUserDbId}, nil),
+			want:      hintRejected,
+		},
+		{
+			// The positive half, and the only row that proves both lookups happen on a hint that has
+			// not expired: the fixture is not Maybe, so a build that left the session lookup inside the
+			// expiry branch would find no call for it and fail here.
+			name: "sid names a session belonging to sub", gate: "session ownership",
+			stubDB: resolvesOwnership(theUserDbId, &models.User{Id: theUserDbId}, nil),
+			want:   hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			// A signature this server produced over a subject that is no longer a user. Ownership
+			// cannot be established, so it is refused for the same reason a mismatch is, rather than
+			// skipped as unknowable. It is separate from the row above because a comparison written as
+			// user != nil && mismatch would pass this one while failing that one.
+			name: "sub names no user at this server", gate: "session ownership",
+			stubDB: resolvesOwnership(theUserDbId, nil, nil),
+			want:   hintRejected,
+		},
+		{
+			// Propagated, like the session lookup and unlike the client lookup. Both of these decide
+			// whether the hint's session may be trusted, and reading a failure as "no such user" would
+			// answer that on the database's health.
+			name: "the user lookup fails", gate: "session ownership",
+			stubDB:  resolvesOwnership(theUserDbId, nil, errors.New("the database is on fire")),
+			want:    hintRejected,
+			wantErr: true,
+		},
+		{
+			// The deliberate limit, and the same one decision 8 set on the token endpoint: ownership
+			// needs the session row, sessions are swept after hours, and the artifacts naming them last
+			// far longer. A swept session is the ordinary state of a healthy older hint, so it confirms.
+			name: "sid names no session at all", gate: "session ownership",
+			stubDB: func(database *mocks_data.Database) {
+				resolvesClient(database)
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).Return(nil, nil)
+			},
+			want: hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			// Newly reachable, because the lookup no longer sits inside the expiry branch. Before the
+			// move a database failure on an unexpired hint could not be observed here at all.
+			name: "the session lookup fails on a hint that has not expired", gate: "session ownership",
+			stubDB: func(database *mocks_data.Database) {
+				resolvesClient(database)
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).
+					Return(nil, errors.New("the database is on fire"))
+			},
 			want:    hintRejected,
 			wantErr: true,
 		},
@@ -2256,14 +2388,14 @@ func TestClassifyIdTokenHint(t *testing.T) {
 
 			stubDB := tc.stubDB
 			if stubDB == nil {
-				stubDB = resolvesClient
+				stubDB = resolvesOwnedSession
 			}
 			stubDB(database)
 
 			got, err := classifyIdTokenHint(req, httpHelper, database, tokenParser)
 
 			if tc.wantErr {
-				assert.Error(t, err, "a database failure in the expiry lookup must propagate")
+				assert.Error(t, err, "a database failure in either lookup that decides whether the hint's session may be trusted must propagate")
 			} else {
 				assert.NoError(t, err)
 			}

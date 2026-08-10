@@ -210,14 +210,15 @@ var nonIdTokenTypValues = map[string]bool{
 // classifyIdTokenHint decides whether a request's id_token_hint can be trusted, and returns which of
 // the three states it is in along with the client and session a confirmed hint names.
 //
-// The error return is reserved for one thing: a database failure while deciding whether an expired
-// hint's session is still alive. Every other failure is a rejection, because a hint the OP cannot
-// confirm is not an error to report, it is a reason to ask the End-User. RP-Initiated Logout 1.0
-// section 2: "the OP MUST ask the End-User this question if an id_token_hint was not provided or if
-// the supplied ID Token does not belong to the current OP session with the RP and/or currently
-// logged in End-User".
+// The error return is reserved for the two lookups that decide whether the hint's session may be
+// trusted: the session the hint's sid names, and the user its sub names. Every other failure is a
+// rejection, because a hint the OP cannot confirm is not an error to report, it is a reason to ask
+// the End-User. RP-Initiated Logout 1.0 section 2: "the OP MUST ask the End-User this question if an
+// id_token_hint was not provided or if the supplied ID Token does not belong to the current OP
+// session with the RP and/or currently logged in End-User".
 //
-// Two properties are worth stating because losing either turns this into a hole rather than a bug.
+// Three properties are worth stating because losing any of them turns this into a hole rather than a
+// bug.
 //
 // The hint is read for PRESENCE, not for a value. An id_token_hint supplied empty is Rejected rather
 // than Absent, because the CSRF middleware exempts a cross-site POST on presence and cannot judge
@@ -232,6 +233,11 @@ var nonIdTokenTypValues = map[string]bool{
 // 1.0 section 2: "The OP SHOULD accept ID Tokens when the RP identified by the ID Token's aud claim
 // and/or sid claim has a current session or had a recent session at the OP, even when the exp time
 // has passed."
+//
+// A confirmed hint's sub OWNS the session its sid names. Confirming one that does not lets a hint
+// signed for one user tear down another user's session, silently, because the confirmed branch is the
+// one that skips the consent page. That is the ownership gate at the bottom, and it is the reason the
+// session is now looked up whether or not the hint has expired (#133).
 func classifyIdTokenHint(
 	r *http.Request,
 	httpHelper HttpHelper,
@@ -293,7 +299,11 @@ func classifyIdTokenHint(
 	// Logout 1.0 section 2 defines this parameter as an "ID Token previously issued by the OP", so
 	// establishing ID-Token shape belongs here. They do not close the access-token hole above on
 	// their own, since an access token carries both.
-	if len(idToken.GetStringClaim("sub")) == 0 {
+	//
+	// Kept rather than measured and discarded: the ownership gate at the bottom compares it against
+	// the owner of the session sid names.
+	subject := idToken.GetStringClaim("sub")
+	if len(subject) == 0 {
 		return reject("ID-Token shape", "reason", "sub is missing or empty")
 	}
 	if _, ok := idToken.GetIntClaim("iat"); !ok {
@@ -394,21 +404,58 @@ func classifyIdTokenHint(
 		return reject("sid", "reason", "sid names a different session than the browser's")
 	}
 
+	// One lookup, read by the expiry-tolerance branch below and by the ownership gate after it. It
+	// used to sit inside that branch, so a hint that had not expired never loaded the session at all
+	// and there was nothing to compare its sub against.
+	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+	if err != nil {
+		// Propagated rather than read as "no such session". A database failure and a row that is
+		// not there have different answers, and conflating them would decide whether an expired
+		// hint is honoured, and whether an ownership mismatch is seen, on the database's health. The
+		// caller surfaces this as a 500, and the teardown reads the same row through the same call,
+		// so it would have failed anyway.
+		return hintClassification{}, err
+	}
+
 	if time.Unix(exp, 0).Before(now) {
-		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
-		if err != nil {
-			// Propagated rather than read as "no such session". A database failure and a row that is
-			// not there have different answers, and conflating them would decide whether an expired
-			// hint is honoured on the database's health. The caller surfaces this as a 500, and the
-			// teardown reads the same row through the same call, so it would have failed anyway.
-			return hintClassification{}, err
-		}
 		if userSession == nil {
 			return reject("expiry tolerance", "reason", "exp has passed and sid names no live session")
 		}
 		// "Recent session" has exactly one meaning in this codebase: the row is still there.
 		slog.Info("logout: accepting an expired id_token_hint because its session is still live",
 			"aud", clientIdentifier)
+	}
+
+	// Does the session this hint names belong to the End-User the hint is signed over? An artifact
+	// carrying both a user identity and a session identifier may act on that session only when the
+	// two agree, and until this gate existed nothing here compared them: sub was read for presence
+	// and sid was read for whether it matched the browser's cookie, never for whose it was.
+	//
+	// Rejecting is the required outcome and not merely the cautious one. RP-Initiated Logout 1.0
+	// section 2: "the OP MUST ask the End-User this question if an id_token_hint was not provided or
+	// if the supplied ID Token does not belong to the current OP session with the RP and/or currently
+	// logged in End-User". A hint signed for one user over another user's session is exactly that,
+	// and hintConfirmed is the one branch that does not ask. The same section adds that a sid not
+	// corresponding to a session at the OP SHOULD be treated as suspect.
+	//
+	// A session row that is not there skips the gate, deliberately. Ownership cannot be decided
+	// without it, sessions are swept after hours while the grants naming them last far longer, and a
+	// swept session is the ordinary state of a healthy older hint (#133).
+	//
+	// Nothing legitimate reaches the refusal: a code's user and the owner of the session it names
+	// always agree once the ceremony is bound to a session it owns, and session ownership never
+	// changes afterwards, so only an artifact issued before that rule existed can disagree.
+	if userSession != nil {
+		user, err := database.GetUserBySubject(nil, subject)
+		if err != nil {
+			// Propagated, like the session lookup above and unlike the client lookup further up. Both
+			// of these decide whether the hint's session may be trusted at all, and answering that on
+			// the database's health is what the comment above refuses to do.
+			return hintClassification{}, err
+		}
+		if user == nil || user.Id != userSession.UserId {
+			return reject("session ownership", "reason", "sid names a session that does not belong to sub")
+		}
 	}
 
 	return hintClassification{
@@ -533,8 +580,9 @@ func doLogout(
 	// 1. Classify.
 	hint, err := classifyIdTokenHint(r, httpHelper, database, tokenParser)
 	if err != nil {
-		// The single failure classification propagates instead of rejecting: a database fault while
-		// deciding whether an expired hint's session is still alive. Everything else is a rejection,
+		// Classification propagates a failure instead of rejecting for one narrow reason: a database
+		// fault in either of the two lookups that decide whether the hint's session may be trusted,
+		// the session its sid names and the user its sub names. Everything else is a rejection,
 		// because a hint the OP cannot confirm is a reason to ask rather than an error to report.
 		httpHelper.InternalServerError(w, r, err)
 		return
