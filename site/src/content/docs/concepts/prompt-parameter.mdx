@@ -97,12 +97,21 @@ Use `prompt=login` when you want to ensure the user actively authenticates, rega
 
 ### How it works
 
-When `prompt=login` is included, Goiabada ignores any existing session and starts a fresh authentication flow. The user must enter their credentials again.
+When `prompt=login` is included, Goiabada never uses an existing session to skip authentication. Whoever is at the keyboard has to enter their credentials.
 
 After re-authentication, the `auth_time` claim in the ID token will reflect the new authentication time, which will be later than any previous `auth_time`.
 
+What happens to the session that was already in the browser depends on who signs in:
+
+| Who signs in | What happens to the existing session |
+| ------------ | ------------------------------------ |
+| The same user | It is kept and reused, as long as it is still valid. Its `auth_time` is refreshed to this authentication. A session that has already idled out, reached its maximum lifetime, or fallen outside a requested `max_age` is replaced by a new one, with nothing revoked |
+| A different user | It is ended and replaced by a session for the new user |
+
+Ending it is a full termination rather than a plain delete: the refresh tokens and the unredeemed authorization codes that came from that session are revoked with it. The browser has changed hands, so the grants that browser was holding are now in someone else's reach. Sessions the previous user has on other devices are untouched. See [User sessions](/concepts/user-sessions/).
+
 <Aside type="tip">
-The existing session is not invalidated — other clients using it will continue to work. Only the current authorization request requires fresh authentication.
+When the **same** user re-authenticates and their session is still valid, it is not invalidated: other clients using it will continue to work, and only the current authorization request requires fresh authentication. A session that is no longer valid for this request is replaced by a new one instead, as the table above describes, so that assurance does not apply to it.
 </Aside>
 
 ### Example

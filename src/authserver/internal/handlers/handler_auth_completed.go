@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/pkg/errors"
@@ -74,6 +75,15 @@ func HandleAuthCompletedGet(
 
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
 		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
+		// Validity and ownership are separate questions and both have to be yes before this
+		// ceremony may reuse the session the browser arrived with. The browser can still be
+		// carrying user A's cookie while user B authenticates: prompt=login and an id_token_hint
+		// naming someone else both redirect to the login page without clearing it, and a session
+		// row that has stopped being valid keeps its cookie too. Reusing A's session for B's
+		// ceremony bumps A's row with B's methods and stamps A's session identifier onto B's
+		// authorization code, so B's grant is bound to a session B does not own and A's next
+		// request resumes a session B's ceremony rewrote (#133).
+		sessionBelongsToCeremony := authContext.OwnsSession(userSession)
 		// authContext.AuthenticatedAt is set when the user actually enters credentials in
 		// this ceremony, by the password handler and by the OTP handler. It is nil for SSO
 		// session reuse (existing session flows through level1completed without hitting
@@ -81,7 +91,12 @@ func HandleAuthCompletedGet(
 		// it is NOT proof of level 1, since OTP alone sets it (#129 decision 15).
 		userReallyAuthenticated := authContext.AuthenticatedAt != nil && !authContext.AuthenticatedAt.IsZero()
 
-		if hasValidUserSession {
+		// The session this ceremony actually bound to, which is what the ACR below is taken
+		// against. It is the bumped row on the reuse arm and the freshly created row on the
+		// create arm, never the ambient one the browser happened to carry (#133).
+		var boundSession *models.UserSession
+
+		if hasValidUserSession && sessionBelongsToCeremony {
 			// Bump session with current auth context's methods and target ACR level.
 			// This handles step-up authentication: if the user had a level1 session but just
 			// completed OTP for a level2 client, the session's AuthMethods and AcrLevel
@@ -121,8 +136,11 @@ func HandleAuthCompletedGet(
 				"userId":   authContext.UserId,
 				"clientId": client.Id,
 			})
+
+			boundSession = bumpedSession
 		} else {
-			// No valid session. Only level 1 authentication performed in THIS ceremony
+			// No session this ceremony may reuse: there is none, it is no longer valid, or it
+			// belongs to somebody else. Only level 1 authentication performed in THIS ceremony
 			// justifies creating one: without this gate StartNewUserSession below mints a
 			// session from authContext.UserId with no proof anyone authenticated, so a
 			// ceremony whose session was ended mid-flight silently recreates it (#129
@@ -152,6 +170,67 @@ func HandleAuthCompletedGet(
 				return
 			}
 
+			// The browser changed hands, so the session it was carrying is ended rather than
+			// left behind. StartNewUserSession below does not do this: it sweeps sibling
+			// sessions of the NEW user, so the previous user's row is never a candidate and
+			// would survive orphaned, its refresh tokens still working and still bumping it
+			// while nobody can reach it through this browser. Termination is the #129 path, so
+			// the codes and refresh tokens that session authorized are revoked with it: they are
+			// grants this browser holds, and this browser now belongs to someone else. Only
+			// grants originating from this session are touched, since both sweeps key on the
+			// session identifier, so the previous user's other devices are unaffected (#133).
+			//
+			// This runs for an invalid foreign session as well as a valid one. The browser
+			// carries the cookie either way, and leaving a row that can never be resumed
+			// achieves nothing while its offline grants keep working.
+			//
+			// It sits AFTER the level 1 gate above, deliberately: destroying somebody's session
+			// must follow a real authentication in this ceremony, never a ceremony that merely
+			// arrived here. A failure returns 500 with the browser still cookied to the old
+			// session and no new session and no code minted, which is the fail-closed direction.
+			if userSession != nil && !sessionBelongsToCeremony {
+				terminationResult, err := TerminateUserSessionTx(database, userSession)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+
+				// Three events, all of them after the commit and none before it, so nothing here
+				// can attest to a termination that rolled back.
+				//
+				// This one comes first because it is the reason the other two happened. It
+				// attests the handover and the ending, and deliberately not that a replacement
+				// now exists: StartNewUserSession below can still fail and return a 500, and
+				// started_new_user_session is what attests the replacement. Its absence after
+				// this event is how an operator sees a handover that did not complete. Emitting
+				// this one after the creation instead would leave that failure recorded as a
+				// termination with no actor and no reason, which is the worse trade (#133).
+				//
+				// Both events below carry "" for loggedInUser rather than
+				// authHelper.GetLoggedInSubject(r), which reads the cookie: at this instant the
+				// cookie still names the user being terminated, so passing it would record the
+				// party losing the session as the actor who ended it. The actor is this event's
+				// userId, which is where an auditor reads it.
+				auditLogger.Log(constants.AuditCrossUserSessionReplaced, map[string]interface{}{
+					"userId":                    authContext.UserId,
+					"previousUserId":            userSession.UserId,
+					"previousSessionIdentifier": userSession.SessionIdentifier,
+					"clientId":                  client.Id,
+				})
+
+				// deleted_user_session beside terminated_user_session, the pairing every caller of
+				// TerminateUserSessionTx writes (#129 decision 9): the lifecycle record that a
+				// session row is gone, next to the security record of what its grants authorized.
+				// Emitting one without the other would make a browser handover the only
+				// termination that never reaches a consumer watching the lifecycle stream, and it
+				// would falsify the promise that ending a session always writes both.
+				auditLogger.Log(constants.AuditDeletedUserSession, map[string]interface{}{
+					"userSessionId": userSession.Id,
+					"loggedInUser":  "",
+				})
+				LogTerminatedUserSession(auditLogger, userSession, "", terminationResult)
+			}
+
 			// start new session
 			newSession, err := userSessionManager.StartNewUserSession(
 				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String(),
@@ -174,10 +253,19 @@ func HandleAuthCompletedGet(
 				"userId":   authContext.UserId,
 				"clientId": client.Id,
 			})
+
+			boundSession = newSession
 		}
 
 		// set the acr level in the auth context
-		err = authContext.SetAcrLevel(targetAcrLevel, userSession)
+		//
+		// Against the session this ceremony bound to, not the one the browser arrived with. The
+		// two differ whenever the create arm ran with an ambient session present, and the ACR is
+		// the maximum of the two arguments, so feeding the ambient row lets a session this
+		// ceremony did not bind to raise the acr claim of a token bound to a different session:
+		// another user's completed second factor, or this user's own expired one, would satisfy
+		// a level 2 client that this ceremony only ever answered with a password (#133).
+		err = authContext.SetAcrLevel(targetAcrLevel, boundSession)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

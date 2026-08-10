@@ -214,6 +214,31 @@ const (
 	// event here lists code ids, and a count answers the only question an auditor has, whether
 	// anything was revoked.
 	AuditTerminatedUserSession = "terminated_user_session"
+	// AuditCrossUserSessionReplaced records that a different user signed in on a browser that was
+	// still carrying someone else's session cookie, so that session was ended. The browser reaches
+	// that state through prompt=login, through an id_token_hint naming another user, or simply by
+	// arriving with a session row that has stopped being valid; in each case the cookie survives
+	// the redirect to the login page (#133).
+	//
+	// It answers WHY, beside the deleted_user_session and terminated_user_session pair for the
+	// session that was ended and what its grants authorized, and started_new_user_session for what
+	// replaced it. Emitted only after TerminateUserSessionTx commits, so it never attests to a
+	// termination that rolled back.
+	//
+	// It attests the handover and the ending, and deliberately NOT that a replacement exists: it is
+	// written before the new session is created, which can still fail and return a 500.
+	// started_new_user_session is the event that attests the replacement, and its absence after
+	// this one is how an operator sees a handover that did not complete. Writing this one after the
+	// creation instead would leave that failure recorded as a termination with no actor and no
+	// reason.
+	//
+	// Its payload carries userId (the user who just authenticated), previousUserId and
+	// previousSessionIdentifier (the session that was ended) and clientId. previousUserId is the
+	// field that makes this event what it is: without it an operator reading the two older events
+	// cannot tell a browser changing hands from an administrator ending a session, which is why
+	// reusing that pair was rejected. Nothing links them, and they are emitted in that same order
+	// by ordinary session housekeeping.
+	AuditCrossUserSessionReplaced = "cross_user_session_replaced"
 
 	AuditEnabledOTP                     = "enabled_otp"
 	AuditDisabledOTP                    = "disabled_otp"
@@ -250,6 +275,7 @@ var AuditEventTypes = []string{
 	AuditCreatedPreRegistration,
 	AuditCreatedResource,
 	AuditCreatedUser,
+	AuditCrossUserSessionReplaced,
 	AuditDeletedClient,
 	AuditDeletedClientLogo,
 	AuditDeletedGroup,

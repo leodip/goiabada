@@ -82,12 +82,14 @@ If any check fails, the error is redirected to the client. No UI is shown.
 
 ### Branch B: prompt=login (force re-authentication)
 
-Goiabada ignores any existing session entirely and starts a fresh authentication flow. The user must enter their credentials again.
+Goiabada never uses an existing session to skip authentication here, so the user must enter their credentials again.
 
 After authentication, the flow continues normally through post-authentication checks (including consent, if `prompt=login consent` was requested).
 
+If the same user signs in, the session that was already in the browser is reused, as long as it is still valid; one that has idled out, reached its maximum lifetime, or fallen outside a requested `max_age` is simply replaced, with nothing revoked. If a **different** user signs in, that session is ended and replaced: it is deleted, and the refresh tokens and unredeemed authorization codes that came from it are revoked. See [Prompt parameter](/concepts/prompt-parameter/).
+
 <Aside>
-The existing session is not invalidated. Other clients using it continue to work. Only this authorization request requires fresh credentials.
+When the same user re-authenticates and their session is still valid, it is not invalidated. Other clients using it continue to work, and only this authorization request requires fresh credentials. A session that is no longer valid for this request is replaced by a new one instead, so that assurance does not apply to it.
 </Aside>
 
 ### Branch C: Normal flow (no prompt, or prompt=consent only)
@@ -193,7 +195,7 @@ Both can force re-authentication, but they work differently:
 |-----------|-------------------------------|
 | `max_age=N` | Only if the session started more than N seconds ago |
 | `prompt=login` | Always, regardless of session age |
-| Both present | `prompt=login` takes precedence (session is ignored entirely) |
+| Both present | `prompt=login` takes precedence (the session is never used to skip authentication) |
 
 ### max_age vs session idle timeout vs max lifetime
 

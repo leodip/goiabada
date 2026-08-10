@@ -83,6 +83,28 @@ An access token that was already issued for an offline grant keeps working until
 
 The bound is the access token's own expiration, 5 minutes by default. If you have raised **Token expiration** substantially, you have widened it.
 
+## A different user signs in on the same browser
+
+Sessions belong to a browser as much as to a person, so a shared or borrowed browser can arrive at the login page still carrying someone else's session. That happens whenever a client sends [`prompt=login`](/concepts/prompt-parameter/) or [`id_token_hint`](/concepts/id-token-hint/), and whenever the session that was there has simply stopped being valid.
+
+When the person who then signs in is a **different** user, Goiabada treats it as the browser changing hands:
+
+| What | Effect |
+| ---- | ------ |
+| The previous session | Ended, exactly as if it had been ended explicitly: deleted, with its refresh tokens and unredeemed authorization codes revoked |
+| The new sign-in | Gets a session of its own. It never reuses the one that was there |
+| The previous user's other devices | Untouched. Only grants that came from this browser's session are revoked |
+
+The reason for revoking rather than simply deleting is that the browser is now in someone else's hands, and the grants it was holding were reachable from it. An offline refresh token obtained through that session would otherwise keep working in the background indefinitely.
+
+Nothing is inherited across the handover. The new user's authentication stands on its own: if the client asks for a second factor, they are asked for it, regardless of how the previous user had authenticated, and the `acr` and `amr` claims in their tokens describe only what they proved.
+
+Each handover writes a `cross_user_session_replaced` entry to the [audit log](/concepts/audit-log/), naming both users and the session that was ended, alongside the `terminated_user_session` and `deleted_user_session` entries for the session itself and the `started_new_user_session` entry for its replacement. It is the entry that distinguishes a browser changing hands from an administrator ending a session.
+
+<Aside type="note">
+When the **same** user signs in again, none of this applies. Their existing session is reused for as long as it is still valid, and re-authenticating simply refreshes it. If it has already idled out, reached its maximum lifetime, or fallen outside a requested `max_age`, they get a new session like anyone else, and nothing is revoked.
+</Aside>
+
 ## Forcing re-authentication
 
 There are two ways to force re-authentication in an authorization request:

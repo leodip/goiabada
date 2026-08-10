@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -99,6 +100,662 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// =====================================================================================
+	// A ceremony binds only to a session belonging to the user it authenticated (#133).
+	//
+	// The three subtests below are one condition seen from its three sides: a foreign session
+	// that is still valid, a foreign session that is not, and a same-user session that is not.
+	// The first two must be terminated and replaced, the third must be replaced and NOT
+	// terminated, and it is the third that stops termination from widening into "any session
+	// the create arm found", which would revoke a user's own offline grants on an ordinary
+	// expired-session login.
+	//
+	// Every one of them gives the ambient session a HIGHER ACR than the target, which is what
+	// makes the acr assertion mean something: with the ambient session fed to SetAcrLevel the
+	// context would leave carrying level2_mandatory, and with the bound session it leaves
+	// carrying level1, the only level anyone proved in this ceremony.
+	// =====================================================================================
+
+	// crossUserTerminateTx is an opaque non-nil transaction. Letting BeginTransaction return nil
+	// would exercise a shape production never runs.
+	crossUserTerminateTx := &sql.Tx{}
+
+	// stubCrossUserTermination registers the six calls TerminateUserSessionTx and
+	// revokeRefreshTokens make for one session. Thin on purpose: revocation_test.go owns the
+	// exhaustive termination table, and restating it here would mean two places to update.
+	// RollbackTransaction is included because the deferred rollback runs on the success path too,
+	// where it is a no-op against a committed transaction; a test omitting it fails on the strict
+	// mock.
+	//
+	// record, when non-nil, is called with "commit" at the moment CommitTransaction returns, so a
+	// subtest can pin the audit events against the transaction boundary they are documented to
+	// follow. Nothing else observes ordering: the strict mock records that a call happened, not
+	// when.
+	stubCrossUserTermination := func(database *mocks_data.Database, userSession *models.UserSession,
+		revokedCodeCount int64, tokens []*models.RefreshToken, record func(string)) {
+
+		database.On("BeginTransaction").Return(crossUserTerminateTx, nil).Once()
+		database.On("RevokeCodesBySessionIdentifier", crossUserTerminateTx, userSession.SessionIdentifier).
+			Return(revokedCodeCount, nil).Once()
+		database.On("GetRefreshTokensBySessionIdentifier", crossUserTerminateTx, userSession.SessionIdentifier).
+			Return(tokens, nil).Once()
+		for i := range tokens {
+			jti := tokens[i].RefreshTokenJti
+			database.On("UpdateRefreshToken", crossUserTerminateTx, mock.MatchedBy(func(rt *models.RefreshToken) bool {
+				return rt.RefreshTokenJti == jti
+			})).Return(nil).Once()
+		}
+		database.On("DeleteUserSession", crossUserTerminateTx, userSession.Id).Return(nil).Once()
+		database.On("CommitTransaction", crossUserTerminateTx).Return(nil).
+			Run(func(mock.Arguments) {
+				if record != nil {
+					record("commit")
+				}
+			}).Once()
+		database.On("RollbackTransaction", crossUserTerminateTx).Return(nil).Once()
+	}
+
+	t.Run("Valid session belonging to another user is terminated and replaced", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		// User 2 authenticated in this ceremony, on a browser still cookied to user 1's
+		// session: prompt=login and an id_token_hint naming someone else both arrive here
+		// in exactly this shape.
+		pwdAuthTime := time.Now().UTC()
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              2,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd",
+			AuthStateGeneration: 3,
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
+		}
+
+		sessionIdentifier := "session-of-user-1"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		foreignSession := &models.UserSession{
+			Id:                7,
+			UserId:            1,
+			SessionIdentifier: sessionIdentifier,
+			AcrLevel:          enums.AcrLevel2Mandatory.String(),
+			AuthMethods:       "pwd otp",
+			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(foreignSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, foreignSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		// True, so ownership is the only thing keeping this ceremony off the reuse arm. No
+		// BumpUserSession expectation is registered anywhere in this subtest, and the mock is
+		// strict, so reusing the other user's session fails the case.
+		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(true)
+
+		// The order in which the handover is written down, which the strict mock does not
+		// observe on its own: every audit event has to follow the commit, or an event attests
+		// to a termination that could still have rolled back.
+		var sequence []string
+
+		stubCrossUserTermination(database, foreignSession, 2, []*models.RefreshToken{
+			{Id: 11, RefreshTokenJti: "rt-of-user-1"},
+		}, func(step string) { sequence = append(sequence, step) })
+
+		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(0).(string)) }
+
+		var replacedPayload map[string]interface{}
+		auditLogger.On("Log", constants.AuditCrossUserSessionReplaced, mock.Anything).
+			Run(func(args mock.Arguments) {
+				recordEvent(args)
+				replacedPayload = args.Get(1).(map[string]interface{})
+			}).Return().Once()
+		var deletedPayload map[string]interface{}
+		auditLogger.On("Log", constants.AuditDeletedUserSession, mock.Anything).
+			Run(func(args mock.Arguments) {
+				recordEvent(args)
+				deletedPayload = args.Get(1).(map[string]interface{})
+			}).Return().Once()
+		var terminatedPayload map[string]interface{}
+		auditLogger.On("Log", constants.AuditTerminatedUserSession, mock.Anything).
+			Run(func(args mock.Arguments) {
+				recordEvent(args)
+				terminatedPayload = args.Get(1).(map[string]interface{})
+			}).Return().Once()
+		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).
+			Run(recordEvent).Return().Once()
+
+		newAuthTime := time.Now().UTC()
+		newSession := &models.UserSession{
+			Id:       8,
+			UserId:   2,
+			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: newAuthTime,
+		}
+		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
+			enums.AcrLevel1.String(), int64(3)).
+			Run(func(mock.Arguments) { sequence = append(sequence, "session-created") }).
+			Return(newSession, nil)
+
+		user := &models.User{Id: 2, Enabled: true}
+		database.On("GetUserById", mock.Anything, int64(2)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+
+		// level1, the target, rather than the maximum taken with the other user's
+		// level2_mandatory. This is the assertion the higher ambient ACR above exists for.
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode &&
+				ac.AcrLevel == enums.AcrLevel1.String() &&
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+		// The event exists to name both parties: without previousUserId an operator cannot tell
+		// a browser changing hands from an administrator ending a session.
+		assert.Equal(t, int64(2), replacedPayload["userId"])
+		assert.Equal(t, int64(1), replacedPayload["previousUserId"])
+		assert.Equal(t, sessionIdentifier, replacedPayload["previousSessionIdentifier"])
+		assert.Equal(t, int64(1), replacedPayload["clientId"])
+
+		// The terminated event reports the session that was ended, and its loggedInUser is
+		// deliberately empty: the cookie still named user 1 at that instant, so recording it
+		// would name the party being terminated as the actor.
+		assert.Equal(t, int64(1), terminatedPayload["userId"])
+		assert.Equal(t, int64(7), terminatedPayload["userSessionId"])
+		assert.Equal(t, sessionIdentifier, terminatedPayload["sessionIdentifier"])
+		assert.Equal(t, "", terminatedPayload["loggedInUser"])
+		assert.Equal(t, int64(2), terminatedPayload["revokedCodeCount"])
+		assert.Equal(t, []string{"rt-of-user-1"}, terminatedPayload["revokedRefreshTokenJtis"])
+
+		// deleted_user_session beside it, the lifecycle record every other caller of
+		// TerminateUserSessionTx writes. Without it a handover is the one termination a consumer
+		// watching that stream never sees. Its loggedInUser is empty for the same reason.
+		assert.Equal(t, int64(7), deletedPayload["userSessionId"])
+		assert.Equal(t, "", deletedPayload["loggedInUser"])
+
+		// No audit event before the commit, and the reason before the replacement. An event
+		// written before the transaction commits would attest to a termination that could still
+		// roll back; started_new_user_session is the only event that says a replacement exists,
+		// so it has to follow the session that was actually created.
+		assert.Equal(t, []string{
+			"commit",
+			constants.AuditCrossUserSessionReplaced,
+			constants.AuditDeletedUserSession,
+			constants.AuditTerminatedUserSession,
+			"session-created",
+			constants.AuditStartedNewUserSesson,
+		}, sequence)
+
+		// The other user's row is not written to, only deleted. A bump would leave it alive
+		// carrying this ceremony's auth methods.
+		assertNotAttempted(t, database, "UpdateUserSession")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// The entry path section 1 of the agreement did not name. MiddlewareSessionIdentifier
+	// publishes the ambient identifier whenever the row exists, applying no idle, max lifetime
+	// or max_age test, so a session that has stopped being valid still reaches this handler with
+	// its cookie intact. Termination must not be nested under validity: a row nobody can resume
+	// still has offline refresh tokens that work, and the browser it belongs to has changed
+	// hands either way.
+	t.Run("Session belonging to another user is terminated even when it is no longer valid", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		pwdAuthTime := time.Now().UTC()
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              2,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd",
+			AuthStateGeneration: 3,
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
+		}
+
+		sessionIdentifier := "expired-session-of-user-1"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		foreignSession := &models.UserSession{
+			Id:                7,
+			UserId:            1,
+			SessionIdentifier: sessionIdentifier,
+			AcrLevel:          enums.AcrLevel2Mandatory.String(),
+			AuthMethods:       "pwd otp",
+			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(foreignSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, foreignSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		// Both false this time, which is the whole point of the row.
+		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(false)
+
+		// No refresh tokens, so the sweep finds nothing and the event still attests that the
+		// action happened.
+		stubCrossUserTermination(database, foreignSession, 0, nil, nil)
+
+		auditLogger.On("Log", constants.AuditCrossUserSessionReplaced, mock.Anything).Return().Once()
+		auditLogger.On("Log", constants.AuditDeletedUserSession, mock.Anything).Return().Once()
+		auditLogger.On("Log", constants.AuditTerminatedUserSession, mock.Anything).Return().Once()
+		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return().Once()
+
+		newAuthTime := time.Now().UTC()
+		newSession := &models.UserSession{
+			Id:       8,
+			UserId:   2,
+			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: newAuthTime,
+		}
+		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
+			enums.AcrLevel1.String(), int64(3)).Return(newSession, nil)
+
+		user := &models.User{Id: 2, Enabled: true}
+		database.On("GetUserById", mock.Anything, int64(2)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode &&
+				ac.AcrLevel == enums.AcrLevel1.String() &&
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// The control that bounds the termination above. An ordinary sign-in on a session that has
+	// idled out arrives here with a non-nil ambient session too, and that one belongs to the
+	// person signing in. Terminating it would revoke their own offline refresh tokens and any
+	// authorization code they had not yet redeemed, on nothing more than an expired session.
+	t.Run("Own session that is no longer valid is replaced but not terminated", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		pwdAuthTime := time.Now().UTC()
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              1,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd",
+			AuthStateGeneration: 3,
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
+		}
+
+		sessionIdentifier := "expired-session-of-user-1"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		ownSession := &models.UserSession{
+			Id:                7,
+			UserId:            1,
+			SessionIdentifier: sessionIdentifier,
+			AcrLevel:          enums.AcrLevel2Mandatory.String(),
+			AuthMethods:       "pwd otp",
+			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(ownSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, ownSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, ownSession, mock.AnythingOfType("*int")).Return(false)
+
+		// No termination expectations at all. The mock is strict, so any of the six calls
+		// TerminateUserSessionTx makes fails this case, and no cross_user_session_replaced or
+		// terminated_user_session event is permitted either.
+		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return().Once()
+
+		newAuthTime := time.Now().UTC()
+		newSession := &models.UserSession{
+			Id:       8,
+			UserId:   1,
+			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: newAuthTime,
+		}
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd",
+			enums.AcrLevel1.String(), int64(3)).Return(newSession, nil)
+
+		user := &models.User{Id: 1, Enabled: true}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+
+		// The same-user half of decision 3: the expired row's level2_mandatory does not raise
+		// the acr of a token bound to the level1 session this ceremony just created.
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode &&
+				ac.AcrLevel == enums.AcrLevel1.String() &&
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+		assertNotAttempted(t, database, "BeginTransaction", "RevokeCodesBySessionIdentifier",
+			"GetRefreshTokensBySessionIdentifier", "DeleteUserSession")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// The failure side of the same condition. A termination that did not commit must stop the
+	// ceremony dead: the previous user's grants are still live, so minting a replacement session
+	// and an authorization code on top of them would hand the browser to the new user while
+	// leaving the old user's refresh tokens working. Both other callers of TerminateUserSessionTx
+	// pin exactly this, in TestHandleAPIUserSessionDelete_TerminationFailureIsA500 and
+	// TestHandleAPIAccountSessionDelete_TerminationFailureIsA500, and it is the audit suppression
+	// that matters as much as the 500: an event written on a rolled-back termination is a false
+	// security record.
+	t.Run("Termination failure is a 500 with nothing audited and no replacement", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		pwdAuthTime := time.Now().UTC()
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              2,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd",
+			AuthStateGeneration: 3,
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
+		}
+
+		sessionIdentifier := "session-of-user-1"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		foreignSession := &models.UserSession{
+			Id:                7,
+			UserId:            1,
+			SessionIdentifier: sessionIdentifier,
+			AcrLevel:          enums.AcrLevel2Mandatory.String(),
+			AuthMethods:       "pwd otp",
+			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(foreignSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, foreignSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(true)
+
+		// The code sweep fails, which is the first write inside the transaction, so the deferred
+		// rollback runs and nothing was committed. Same failure point the two API callers use.
+		sweepError := errors.New("the code sweep failed")
+		database.On("BeginTransaction").Return(crossUserTerminateTx, nil).Once()
+		database.On("RevokeCodesBySessionIdentifier", crossUserTerminateTx, sessionIdentifier).
+			Return(int64(0), sweepError).Once()
+		database.On("RollbackTransaction", crossUserTerminateTx).Return(nil).Once()
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err.Error() == sweepError.Error()
+		})).Return().Once()
+
+		handler.ServeHTTP(rr, req)
+
+		// No redirect to /auth/issue, so no code can be minted from this ceremony.
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, "", rr.Header().Get("Location"))
+
+		// Nothing committed, nothing deleted, and no replacement session. The browser is left
+		// cookied to the session that is still there, which is the fail-closed direction.
+		assertNotAttempted(t, database, "CommitTransaction", "DeleteUserSession",
+			"GetRefreshTokensBySessionIdentifier", "UpdateRefreshToken", "UpdateUserSession")
+		userSessionManager.AssertNotCalled(t, "StartNewUserSession", mock.Anything, mock.Anything,
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything,
+			mock.Anything, mock.Anything, mock.Anything)
+		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+
+		// Not one audit event. cross_user_session_replaced or terminated_user_session written
+		// here would attest to a revocation that rolled back.
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// The other failure side, and the one the audit placement above rests on. Here the
+	// termination has already committed and its three events are already written when
+	// StartNewUserSession fails, so the handover is on the record and no replacement exists.
+	// That asymmetry is deliberate: cross_user_session_replaced attests the ending and its
+	// reason, started_new_user_session attests the replacement, and the absence of the second
+	// after the first is how an operator sees a handover that did not complete. The ceremony
+	// still has to stop dead, because it now has no session at all to bind a code to.
+	t.Run("Replacement failure after a committed termination is a 500 with the handover recorded", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		pwdAuthTime := time.Now().UTC()
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              2,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd",
+			AuthStateGeneration: 3,
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
+		}
+
+		sessionIdentifier := "session-of-user-1"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		foreignSession := &models.UserSession{
+			Id:                7,
+			UserId:            1,
+			SessionIdentifier: sessionIdentifier,
+			AcrLevel:          enums.AcrLevel2Mandatory.String(),
+			AuthMethods:       "pwd otp",
+			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(foreignSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, foreignSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(true)
+
+		var sequence []string
+		stubCrossUserTermination(database, foreignSession, 2, []*models.RefreshToken{
+			{Id: 11, RefreshTokenJti: "rt-of-user-1"},
+		}, func(step string) { sequence = append(sequence, step) })
+
+		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(0).(string)) }
+
+		// Once each: the termination committed, so all three are owed exactly one time even
+		// though the ceremony is about to fail.
+		auditLogger.On("Log", constants.AuditCrossUserSessionReplaced, mock.Anything).Run(recordEvent).Return().Once()
+		auditLogger.On("Log", constants.AuditDeletedUserSession, mock.Anything).Run(recordEvent).Return().Once()
+		auditLogger.On("Log", constants.AuditTerminatedUserSession, mock.Anything).Run(recordEvent).Return().Once()
+
+		startError := errors.New("the replacement session could not be created")
+		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
+			enums.AcrLevel1.String(), int64(3)).Return(nil, startError)
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err.Error() == startError.Error()
+		})).Return().Once()
+
+		handler.ServeHTTP(rr, req)
+
+		// No redirect, so nothing is issued on a ceremony left with no session.
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, "", rr.Header().Get("Location"))
+
+		// The handover is recorded and the replacement is not, which is the whole shape of this
+		// outcome. started_new_user_session claims a session exists, and none does.
+		assert.Equal(t, []string{
+			"commit",
+			constants.AuditCrossUserSessionReplaced,
+			constants.AuditDeletedUserSession,
+			constants.AuditTerminatedUserSession,
+		}, sequence)
+		auditLogger.AssertNotCalled(t, "Log", constants.AuditStartedNewUserSesson, mock.Anything)
+
+		// The ceremony stops at the failure: no ACR is saved and no user is loaded, so nothing
+		// downstream can act as though a session were bound.
+		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		assertNotAttempted(t, database, "GetUserById", "UpdateUserSession")
+		userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything,
+			mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
