@@ -439,7 +439,9 @@ With no `post_logout_redirect_uri`, or when the URI cannot be validated, the use
 
 ### When the id_token_hint cannot be used
 
-Goiabada checks the hint's signature, issuer, audience, session and expiry, and that `client_id` matches the audience when you send both. If any of those fail, the request is not an error: the user sees the logout consent screen, and once they confirm, they are logged out.
+Goiabada checks the hint's signature, issuer, audience, session and expiry, that the session it names belongs to the user it names, and that `client_id` matches the audience when you send both. If any of those fail, the request is not an error: the user sees the logout consent screen, and once they confirm, they are logged out.
+
+The session check has two halves. The hint must name a session, and that session must belong to the user the hint is about, so a hint cannot end a session that was never its user's. Sending back a hint you were issued satisfies both without thinking about it. The spec requires the user to be asked whenever a hint does not belong to the session or the user currently signed in, and asking is exactly what a hint Goiabada cannot confirm gets.
 
 A hint that fails these checks earns no redirect, even if you also sent `client_id` and a registered `post_logout_redirect_uri`. The user is logged out and lands on the logged-out page with the note. Send a hint you can vouch for, or send none at all and let `client_id` authorize the redirect.
 
