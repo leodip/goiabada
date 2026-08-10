@@ -102,21 +102,10 @@ func HandleIssueGet(
 			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
-		// Check if this is an implicit flow request
-		if oauth.ParseResponseType(authContext.ResponseType).IsImplicitFlow() {
-			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, authHelper, tokenIssuer, database, auditLogger)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-			}
-			return
-		}
-
-		// Authorization Code Flow
-
 		// A ceremony must not bind a grant to a session that no longer exists (#129
 		// decision 6, second half). The session was alive at /auth/completed, which bumped
 		// or created it, and the user may then have spent minutes on the consent screen;
-		// if it was ended in between, the code minted below is brand new and no marker
+		// if it was ended in between, the grant minted below is brand new and no marker
 		// written by the termination can reach it, because the row did not exist yet.
 		//
 		// An EMPTY identifier is the shape that case actually arrives in, not a stale one.
@@ -133,21 +122,59 @@ func HandleIssueGet(
 		// RefreshTokenOfflineMaxLifetimeInSeconds whether or not offline_access was asked
 		// for.
 		//
-		// This is deliberately a LIVENESS check and not a validity one: it asks whether the
-		// row resolves, and leaves idle timeout and max age to /auth/completed, which has
-		// already applied them. Restarting level 1 rather than failing to the client is
-		// decision 6's answer for the same reason the gate at /auth/completed uses it, and
-		// the second pass mints a session of its own before arriving back here.
-		sessionIsLive := false
+		// Liveness is not enough, though, which is what #133 adds: the row can resolve and
+		// still belong to somebody else. User A is signed in, the browser holds A's session
+		// cookie, and prompt=login or an id_token_hint sends user B through a fresh
+		// authentication without the cookie ever being cleared. Binding B's grant to A's
+		// session hands B a code or a token stamped with A's session identifier, which then
+		// governs B's access by A's lifetimes and dies when A's session does. So the
+		// question here is ownership, and liveness is the half of it that a missing row
+		// already answers.
+		//
+		// Neither check is a validity check: they ask whether the row resolves and whose it
+		// is, and leave idle timeout and max age to /auth/completed, which has already
+		// applied them. Restarting level 1 rather than failing to the client is decision 6's
+		// answer for the same reason the gate at /auth/completed uses it, and the second
+		// pass mints a session of its own before arriving back here. It cannot loop: the
+		// second visit to /auth/completed terminates the foreign session and starts one
+		// owned by this ceremony.
+		var ambientSession *models.UserSession
 		if sessionIdentifier != "" {
-			userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+			ambientSession, err = database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			sessionIsLive = userSession != nil
 		}
-		if !sessionIsLive {
+
+		// The gate sits ABOVE the response-type dispatch on purpose. handleImplicitFlow
+		// copies sessionIdentifier straight into ImplicitGrantInput.SessionIdentifier and
+		// never loads the session, so a response_type of token, id_token or id_token token
+		// would otherwise mint a signed token for B carrying A's sid with every check in
+		// this handler above it. The later backstops cannot cover that: a third-party
+		// resource server validating an already-signed token has no way to compare the
+		// session's owner against the token's subject (#133).
+		isImplicitFlow := oauth.ParseResponseType(authContext.ResponseType).IsImplicitFlow()
+
+		mayBind := authContext.OwnsSession(ambientSession)
+		if isImplicitFlow && sessionIdentifier == "" {
+			// No ambient session at all, so there is nothing to cross-bind to. The code flow
+			// still refuses here, because #129 showed an empty identifier there produces an
+			// Offline refresh token that outlives the session it came from. The implicit
+			// flow issues no refresh token and its access token carries the identifier only
+			// as a claim, so refusing would change behaviour in a case where no session is
+			// being taken over. Whether implicit should require a session at all is a
+			// separate question from this one (#133).
+			mayBind = true
+		}
+
+		if !mayBind {
+			// A session that resolves but belongs to another user gets its own line: "the
+			// session backing this ceremony is gone" would be the wrong sentence, and an
+			// operator reading it needs to see the two user ids that failed to match
+			// (#133 decision 7).
+			sessionIsForeign := ambientSession != nil
+
 			// prompt=none is the one ceremony that cannot be restarted: /auth/level1 sends the
 			// browser to /auth/pwd, which renders a form, and this request forbids any UI at
 			// all (OIDC Core 3.1.2.1, and concepts/prompt-parameter.mdx says the same). Nothing
@@ -159,8 +186,15 @@ func HandleIssueGet(
 			// cannot tell the two apart and does not need to. No code is minted on either
 			// branch, so the fail-open decision 6 closes stays closed.
 			if authContext.HasPromptValue("none") {
-				slog.Warn("the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
-					"sessionIdentifier", sessionIdentifier)
+				if sessionIsForeign {
+					slog.Warn("the session in this browser belongs to a different user, returning login_required instead of binding this silent ceremony to it",
+						"sessionIdentifier", sessionIdentifier,
+						"sessionUserId", ambientSession.UserId,
+						"ceremonyUserId", authContext.UserId)
+				} else {
+					slog.Warn("the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
+						"sessionIdentifier", sessionIdentifier)
+				}
 				// The clear goes FIRST, which is the order the code path below uses too.
 				// ClearAuthContext persists the deletion through a Set-Cookie on w, and
 				// redirToClientWithError commits the response in every response mode, so
@@ -197,8 +231,15 @@ func HandleIssueGet(
 				return
 			}
 
-			slog.Warn("the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
-				"sessionIdentifier", sessionIdentifier)
+			if sessionIsForeign {
+				slog.Warn("the session in this browser belongs to a different user, restarting level 1 instead of binding this ceremony to it",
+					"sessionIdentifier", sessionIdentifier,
+					"sessionUserId", ambientSession.UserId,
+					"ceremonyUserId", authContext.UserId)
+			} else {
+				slog.Warn("the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
+					"sessionIdentifier", sessionIdentifier)
+			}
 			authContext.AuthState = oauth.AuthStateRequiresLevel1
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
@@ -208,6 +249,16 @@ func HandleIssueGet(
 			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
 			return
 		}
+
+		if isImplicitFlow {
+			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, authHelper, tokenIssuer, database, auditLogger)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
+			return
+		}
+
+		// Authorization Code Flow
 
 		createCodeInput := &oauth.CreateCodeInput{
 			AuthContext:       *authContext,

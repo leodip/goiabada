@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -116,7 +118,7 @@ func TestHandleIssueGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
-		stubLiveSession(database)
+		stubLiveSession(database, 123)
 
 		// Mock code creation
 		mockCode := &models.Code{
@@ -558,7 +560,7 @@ func TestHandleIssueGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
-		stubLiveSession(database)
+		stubLiveSession(database, 123)
 
 		mockCode := &models.Code{
 			Id:          1,
@@ -590,6 +592,370 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 }
 
+// =============================================================================
+// #133: the browser's ambient session belongs to somebody else
+//
+// The last gate before an identifier is stamped onto a grant. User A is signed in, the cookie
+// still names A's session, and user B has just authenticated through prompt=login or an
+// id_token_hint. After stages 1 and 2 nothing reaches this state, which is the point of a
+// backstop, so these drive the handler directly rather than through the flow.
+//
+// One case per issuance family, because one shared gate is only worth what its weakest branch
+// is: the code flow reaches CreateAuthCode, and the three implicit response types reach
+// GenerateTokenResponseForImplicit through a dispatch that used to sit ABOVE this check and
+// never loaded the session at all. An implicit token is signed and handed to a resource server
+// that cannot look the session up, so nothing downstream can catch it later.
+//
+// "Nothing was issued" is enforced rather than asserted: the strict CodeIssuer and TokenIssuer
+// carry no expectations in the refusal rows, so reaching either fails the case on its own. The
+// explicit AssertNotCalled lines are there to name what is being claimed.
+// =============================================================================
+
+// foreignSessionUserId owns the ambient session in the refusal rows below. It differs from
+// every ceremony's UserId, which is the only thing making the gate refuse.
+const foreignSessionUserId int64 = 999
+
+func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
+	// Each row is a different issuance family reached from the same gate. ResponseMode is left
+	// as the client would send it: empty on the implicit rows, which is what makes
+	// redirToClientWithError default them to a fragment in the prompt=none case below.
+	issuanceFamilies := []struct {
+		name         string
+		responseType string
+		responseMode string
+	}{
+		{name: "code flow", responseType: "code", responseMode: "query"},
+		{name: "implicit, token", responseType: "token", responseMode: ""},
+		{name: "implicit, id_token", responseType: "id_token", responseMode: ""},
+		{name: "implicit, id_token token", responseType: "id_token token", responseMode: ""},
+	}
+
+	for _, family := range issuanceFamilies {
+		t.Run("Foreign ambient session restarts level 1: "+family.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			templateFS := &mocks_test.TestFS{}
+			codeIssuer := mocks_oauth.NewCodeIssuer(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+			logs := captureLogs(t)
+			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+			rr := httptest.NewRecorder()
+
+			authContext := &oauth.AuthContext{
+				AuthState:    oauth.AuthStateReadyToIssueCode,
+				ClientId:     "test-client",
+				UserId:       123,
+				ResponseMode: family.responseMode,
+				ResponseType: family.responseType,
+				RedirectURI:  "https://example.com/callback",
+				State:        "test-state",
+			}
+			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+			// The row resolves, so this is not the liveness case #129 closed. It simply
+			// belongs to someone else.
+			stubLiveSession(database, foreignSessionUserId)
+
+			var savedAuthContext *oauth.AuthContext
+			authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+				savedAuthContext = ac
+				return ac.AuthState == oauth.AuthStateRequiresLevel1
+			})).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusFound, rr.Code)
+			assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
+			assert.NotNil(t, savedAuthContext)
+			assert.Equal(t, oauth.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+
+			// Nothing may be handed to the client on the way past.
+			location := rr.Header().Get("Location")
+			assert.NotContains(t, location, "code=")
+			assert.NotContains(t, location, "access_token=")
+			assert.NotContains(t, location, "id_token=")
+			codeIssuer.AssertNotCalled(t, "CreateAuthCode")
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
+
+			assertWarnedForeignSession(t, logs, authContext.UserId)
+
+			// The ceremony is restarted rather than ended, so the context survives to be
+			// rebuilt at /auth/level1.
+			authHelper.AssertNotCalled(t, "ClearAuthContext")
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+			codeIssuer.AssertExpectations(t)
+			tokenIssuer.AssertExpectations(t)
+		})
+	}
+
+	// prompt=none forbids UI, so the refusal cannot be a redirect to a password form. Two rows
+	// rather than one, because the error has to reach the client in the response mode its
+	// family uses: a query for the code flow, and a fragment for implicit, which
+	// redirToClientWithError picks from the response type when no mode was requested (RFC 6749
+	// 4.2.2.1, OIDC Core 3.2.2.5).
+	promptNoneFamilies := []struct {
+		name          string
+		responseType  string
+		responseMode  string
+		wantSeparator string
+	}{
+		{name: "code flow, query", responseType: "code", responseMode: "query", wantSeparator: "?"},
+		{name: "implicit, fragment", responseType: "id_token token", responseMode: "", wantSeparator: "#"},
+	}
+
+	for _, family := range promptNoneFamilies {
+		t.Run("Foreign ambient session and prompt=none returns login_required: "+family.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			templateFS := &mocks_test.TestFS{}
+			codeIssuer := mocks_oauth.NewCodeIssuer(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+			logs := captureLogs(t)
+			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+			rr := httptest.NewRecorder()
+
+			authContext := &oauth.AuthContext{
+				AuthState:    oauth.AuthStateReadyToIssueCode,
+				ClientId:     "test-client",
+				UserId:       123,
+				ResponseMode: family.responseMode,
+				ResponseType: family.responseType,
+				RedirectURI:  "https://example.com/callback",
+				State:        "test-state",
+				Prompt:       "none",
+			}
+			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+			stubLiveSession(database, foreignSessionUserId)
+			authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusFound, rr.Code)
+			location := rr.Header().Get("Location")
+			assert.Contains(t, location, "https://example.com/callback"+family.wantSeparator)
+			assert.Contains(t, location, "error=login_required")
+			assert.Contains(t, location, "state=test-state")
+			assert.NotContains(t, location, "/auth/level1")
+			assert.NotContains(t, location, "code=")
+			assert.NotContains(t, location, "access_token=")
+
+			codeIssuer.AssertNotCalled(t, "CreateAuthCode")
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
+
+			assertWarnedForeignSession(t, logs, authContext.UserId)
+
+			// A silent ceremony ends here rather than restarting, so no state is saved.
+			authHelper.AssertNotCalled(t, "SaveAuthContext")
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+			codeIssuer.AssertExpectations(t)
+			tokenIssuer.AssertExpectations(t)
+		})
+	}
+
+	// The control for the implicit family. "Successfully issues a code" is the code flow's, and
+	// without one here every implicit row above would pass against a gate that refused implicit
+	// outright. It also pins that the identifier still reaches the token when the session is the
+	// ceremony's own, which is what the whole change is careful not to break.
+	t.Run("Own ambient session still issues implicit tokens carrying its identifier", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "fragment",
+			ResponseType: "token",
+			RedirectURI:  "https://example.com/callback",
+			Scope:        "openid",
+			State:        "test-state",
+			AuthMethods:  "pwd",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		stubLiveSession(database, 123)
+
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+			Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}, nil)
+		database.On("GetUserById", mock.Anything, int64(123)).
+			Return(&models.User{Id: 123, Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111"), Enabled: true}, nil)
+
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *oauth.ImplicitGrantInput) bool {
+			return input.User.Id == int64(123) && input.SessionIdentifier == liveSessionIdentifier
+		}), true, false).Return(&oauth.ImplicitGrantResponse{
+			AccessToken: "access-token-123",
+			TokenType:   "Bearer",
+			ExpiresIn:   3600,
+			Scope:       "openid",
+		}, nil)
+
+		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com/callback#")
+		assert.Contains(t, location, "access_token=access-token-123")
+		assert.NotContains(t, location, "/auth/level1")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		tokenIssuer.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+}
+
+// =============================================================================
+// #133 stage 3: where the implicit carve-out stops.
+//
+// mayBind is forced true for an implicit request only when the identifier is EMPTY, meaning
+// the browser carries no ambient session at all and there is nothing to cross-bind to. A
+// NON-EMPTY identifier whose row has vanished is a different shape and is refused, which is the
+// answer the code flow has given since #129: MiddlewareSessionIdentifier publishes the
+// identifier only when the row exists, so arriving here with one that no longer resolves means
+// the session was ended during this very request.
+//
+// The distinction is what these two rows exist to hold. Widening the carve-out to "implicit and
+// no session was loaded" reads as an equivalent simplification and is not: it swallows the
+// vanished-row case, and that is the shape no later backstop can reach, because an implicit
+// token is signed and handed to a resource server with no way to look the session up.
+// =============================================================================
+func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
+	t.Run("Implicit request whose session row has vanished restarts level 1", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		logs := captureLogs(t)
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseType: "token",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		// Non-empty identifier, no row. The carve-out asks about the identifier, so it does
+		// not apply here, and OwnsSession(nil) is false.
+		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
+
+		var savedAuthContext *oauth.AuthContext
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			savedAuthContext = ac
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "/auth/level1")
+		assert.NotContains(t, location, "access_token=")
+		assert.NotContains(t, location, "id_token=")
+		assert.NotNil(t, savedAuthContext)
+		assert.Equal(t, oauth.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
+		// No owner to name, so this takes #129's line rather than decision 7's.
+		assertWarnedSessionGone(t, logs)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		tokenIssuer.AssertExpectations(t)
+	})
+
+	t.Run("Implicit request whose session row has vanished and prompt=none returns login_required", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		logs := captureLogs(t)
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseType: "id_token token",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+			Prompt:       "none",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com/callback#")
+		assert.Contains(t, location, "error=login_required")
+		assert.Contains(t, location, "state=test-state")
+		assert.NotContains(t, location, "access_token=")
+		assert.NotContains(t, location, "id_token=")
+
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
+		authHelper.AssertNotCalled(t, "SaveAuthContext")
+		assertWarnedSessionGone(t, logs)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		tokenIssuer.AssertExpectations(t)
+	})
+}
+
 // liveSessionIdentifier is the session identifier the code-flow subtests put in the request
 // context. Any non-empty value does, since the liveness check asks the database rather than
 // parsing it.
@@ -607,11 +973,149 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 		constants.ContextKeySessionIdentifier, sessionIdentifier))
 }
 
-// stubLiveSession makes the liveness check pass, which is the precondition for reaching
-// CreateAuthCode at all after #129 stage 6.
-func stubLiveSession(database *mocks_data.Database) {
+// stubLiveSession makes the ownership check pass, which is the precondition for reaching
+// CreateAuthCode or GenerateTokenResponseForImplicit at all. Liveness alone was enough after
+// #129 stage 6; #133 added the owner comparison, so the caller has to say which user the row
+// belongs to and a subtest that wants the gate to pass has to name its own ceremony's user.
+func stubLiveSession(database *mocks_data.Database, ownerUserId int64) {
 	database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
-		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier}, nil)
+		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: ownerUserId}, nil)
+}
+
+// capturedLogs holds the slog records emitted while one subtest runs. Whole records rather than
+// the flattened text buffer this replaced, because two of the properties decision 7's line is
+// owed cannot be seen in a buffer at all: that the record is a WARNING, and that the message and
+// the two user ids sit on the SAME record. Both gaps were demonstrated against the buffer
+// version: demoting slog.Warn to slog.Info, and splitting the message away from the ids into a
+// second unrelated record, each left every assertion green (#133).
+type capturedLogs struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (c *capturedLogs) add(record slog.Record) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.records = append(c.records, record)
+}
+
+func (c *capturedLogs) all() []slog.Record {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]slog.Record(nil), c.records...)
+}
+
+// recordingHandler is the slog.Handler side of capturedLogs. WithAttrs is carried forward so a
+// logger built through slog.With records what it would print; nothing under test opens a group,
+// so WithGroup is the identity and grouped key qualification is not modelled.
+type recordingHandler struct {
+	logs  *capturedLogs
+	attrs []slog.Attr
+}
+
+func (h *recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *recordingHandler) Handle(_ context.Context, record slog.Record) error {
+	// Clone before keeping it: a Record's attributes may share backing storage with the caller's.
+	kept := record.Clone()
+	kept.AddAttrs(h.attrs...)
+	h.logs.add(kept)
+	return nil
+}
+
+func (h *recordingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	carried := append(append([]slog.Attr(nil), h.attrs...), attrs...)
+	return &recordingHandler{logs: h.logs, attrs: carried}
+}
+
+func (h *recordingHandler) WithGroup(string) slog.Handler { return h }
+
+// captureLogs sends the default slog logger into a recorder for one subtest and restores it
+// afterwards. The refusal arms below answer a foreign session and a missing one identically
+// from the client's side, deliberately, so what was logged is the only place the two can be
+// told apart and the only place an assertion can reach them.
+func captureLogs(t *testing.T) *capturedLogs {
+	t.Helper()
+	logs := &capturedLogs{}
+	previous := slog.Default()
+	slog.SetDefault(slog.New(&recordingHandler{logs: logs}))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return logs
+}
+
+// warningSaying returns the one WARN record whose message carries the discriminator, and fails
+// when there is not exactly one. The level is asserted rather than assumed: an operator
+// filtering at warning level is the reader this line was written for, so a record quietly
+// demoted to Info would be invisible to them while every text assertion still passed.
+func warningSaying(t *testing.T, logs *capturedLogs, discriminator string) (slog.Record, bool) {
+	t.Helper()
+	captured := logs.all()
+	var matched []slog.Record
+	for _, record := range captured {
+		if record.Level == slog.LevelWarn && strings.Contains(record.Message, discriminator) {
+			matched = append(matched, record)
+		}
+	}
+	if !assert.Len(t, matched, 1,
+		"want exactly one WARN record saying %q, out of %d captured", discriminator, len(captured)) {
+		return slog.Record{}, false
+	}
+	return matched[0], true
+}
+
+// attrsOf flattens ONE record's attributes, which is the whole point of it taking a record: an
+// assertion has to name where it read a value, or two unrelated records satisfy it between them.
+func attrsOf(record slog.Record) map[string]any {
+	attrs := make(map[string]any)
+	record.Attrs(func(attr slog.Attr) bool {
+		attrs[attr.Key] = attr.Value.Resolve().Any()
+		return true
+	})
+	return attrs
+}
+
+// noRecordSays fails when any captured record carries the phrase, at any level. The two refusal
+// arms are one discrimination, so the wrong sentence appearing anywhere in a refusal is the
+// failure, not merely its appearance on the record examined above.
+func noRecordSays(t *testing.T, logs *capturedLogs, phrase string) {
+	t.Helper()
+	for _, record := range logs.all() {
+		assert.NotContains(t, record.Message, phrase, "no record should say %q here", phrase)
+	}
+}
+
+// assertWarnedForeignSession pins decision 7's own log line. An operator looking at a refusal
+// has to be able to tell "this browser's session belongs to someone else" from "this ceremony's
+// session is gone", and to see the two user ids that failed to match, because those ids are the
+// whole record of an account takeover attempt that got as far as issuance (#133).
+func assertWarnedForeignSession(t *testing.T, logs *capturedLogs, ceremonyUserId int64) {
+	t.Helper()
+	record, ok := warningSaying(t, logs, "belongs to a different user")
+	if !ok {
+		return
+	}
+	attrs := attrsOf(record)
+	assert.Equal(t, foreignSessionUserId, attrs["sessionUserId"],
+		"the ambient session's owner, on the record that names the refusal")
+	assert.Equal(t, ceremonyUserId, attrs["ceremonyUserId"],
+		"the user this ceremony authenticated, on that same record")
+	// #129's sentence, which is the wrong one here: the row resolved.
+	noRecordSays(t, logs, "is gone")
+}
+
+// assertWarnedSessionGone is the other side of the same discrimination: a row that did not
+// resolve has no owner to name, so #129's line stands verbatim and neither user id appears on
+// it. An operator handed one here would be reading an owner nothing established.
+func assertWarnedSessionGone(t *testing.T, logs *capturedLogs) {
+	t.Helper()
+	record, ok := warningSaying(t, logs, "is gone")
+	if !ok {
+		return
+	}
+	attrs := attrsOf(record)
+	assert.NotContains(t, attrs, "sessionUserId")
+	assert.NotContains(t, attrs, "ceremonyUserId")
+	noRecordSays(t, logs, "belongs to a different user")
 }
 
 func TestIsImplicitFlow(t *testing.T) {
@@ -1587,7 +2091,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(mockUser, nil)
 
-		stubLiveSession(database)
+		stubLiveSession(database, 1)
 
 		// Mock code creation
 		mockCode := &models.Code{
@@ -1920,7 +2424,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Do NOT mock database.GetUserById - it should not be called when IdTokenHintSub is empty
 
-		stubLiveSession(database)
+		stubLiveSession(database, 1)
 
 		// Mock code creation
 		mockCode := &models.Code{
