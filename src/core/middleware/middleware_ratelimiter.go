@@ -82,7 +82,13 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 
 		authContext, err := m.authHelper.GetAuthContext(r)
 		if err != nil {
-			slog.Error("Rate limiter - unable to get auth context", "error", err)
+			// No readable auth context means there is no user to key a bucket on, so hand
+			// the request to the handler, which answers a missing auth context the same way
+			// every other step of the auth flow does. It rejects the request before reaching
+			// the OTP secret or the database, so the skipped limit costs nothing. Returning
+			// here instead writes no response at all, which net/http turns into a blank 200
+			// (#114).
+			next.ServeHTTP(w, r)
 			return
 		}
 
