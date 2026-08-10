@@ -152,6 +152,20 @@ func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *m
 	return nil
 }
 
+// OwnsSession reports whether the browser's ambient session belongs to the user this ceremony
+// authenticated. A ceremony may read, mutate or bind to that session only when it does: the
+// browser can still be carrying user A's session cookie while user B authenticates (prompt=login,
+// or an id_token_hint naming someone else), and reusing A's session for B's ceremony skips B's
+// second factor, mints a code stamped with A's session identifier and overwrites A's session row.
+//
+// Both zero cases return false, which is the safe direction: a ceremony with no session and a
+// ceremony with no authenticated user each have nothing to reuse. The UserId != 0 check in
+// particular stops a future auth state reaching a call site before the user is known and matching
+// an unsaved session by accident, since two zeros are not a match (#133).
+func (ac *AuthContext) OwnsSession(userSession *models.UserSession) bool {
+	return userSession != nil && ac.UserId != 0 && userSession.UserId == ac.UserId
+}
+
 func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []enums.AcrLevel {
 	arr := []enums.AcrLevel{}
 	acrValues := ac.AcrValuesFromAuthorizeRequest

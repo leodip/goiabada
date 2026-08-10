@@ -108,7 +108,7 @@ The user enters their email and password. If credentials are valid, the flow mov
 
 ### Level 1 completion: deciding if level 2 is needed
 
-Goiabada determines the **target ACR level** and compares it against the session's current ACR.
+Goiabada determines the **target ACR level** and compares it against the session's current ACR. Only a session belonging to the user who just authenticated counts here. If the browser still holds a session for a different user, that session contributes no ACR and the target alone decides, exactly as it would for a user with no session at all.
 
 **How the target ACR is determined:**
 1. If `acr_values` is in the authorization request, use the first value

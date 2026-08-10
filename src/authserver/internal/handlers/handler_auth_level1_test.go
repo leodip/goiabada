@@ -171,6 +171,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel1PasswordCompleted,
 			ClientId:  "test-client",
+			UserId:    1,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -226,6 +227,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel1PasswordCompleted,
 			ClientId:  "test-client",
+			UserId:    1,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -279,6 +281,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel1PasswordCompleted,
 			ClientId:  "test-client",
+			UserId:    1,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -332,6 +335,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel1PasswordCompleted,
 			ClientId:  "test-client",
+			UserId:    1,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -467,6 +471,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				authContext := &oauth.AuthContext{
 					AuthState: oauth.AuthStateLevel1PasswordCompleted,
 					ClientId:  "test-client",
+					UserId:    1,
 				}
 				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -511,6 +516,122 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 				assert.Equal(t, http.StatusFound, rr.Code)
 				assert.Equal(t, config.GetAuthServer().BaseURL+tt.expectedRedirect, rr.Header().Get("Location"))
+
+				httpHelper.AssertExpectations(t)
+				authHelper.AssertExpectations(t)
+				userSessionManager.AssertExpectations(t)
+				database.AssertExpectations(t)
+			})
+		}
+	})
+
+	// The browser still holds user 1's session cookie while user 2 authenticates. The session is
+	// valid throughout (HasValidUserSession is stubbed true in every row), so ownership is the only
+	// thing separating these from the rows above: a session belonging to someone else contributes
+	// no ACR, so the target alone decides step-up, and nothing writes to the other user's row (#133).
+	t.Run("Foreign session does not decide step-up", func(t *testing.T) {
+		tests := []struct {
+			name                    string
+			sessionAcrLevel         enums.AcrLevel
+			targetAcrLevel          enums.AcrLevel
+			level2AuthConfigChanged bool
+			expectedRedirect        string
+			description             string
+		}{
+			{
+				name:             "foreign session at the target still prompts for level2",
+				sessionAcrLevel:  enums.AcrLevel2Optional,
+				targetAcrLevel:   enums.AcrLevel2Optional,
+				expectedRedirect: "/auth/level2",
+				description:      "the second-factor bypass: user 1's ACR must not satisfy user 2's step-up",
+			},
+			{
+				name:             "foreign mandatory session still prompts for level2",
+				sessionAcrLevel:  enums.AcrLevel2Mandatory,
+				targetAcrLevel:   enums.AcrLevel2Mandatory,
+				expectedRedirect: "/auth/level2",
+				description:      "the same bypass at the mandatory level, where the second factor is not optional",
+			},
+			{
+				name:             "level1 target is not raised by a foreign session",
+				sessionAcrLevel:  enums.AcrLevel2Mandatory,
+				targetAcrLevel:   enums.AcrLevel1,
+				expectedRedirect: "/auth/completed",
+				description:      "the guard must not invent a second factor a level1 client never asked for",
+			},
+			{
+				name:             "foreign session below the target",
+				sessionAcrLevel:  enums.AcrLevel1,
+				targetAcrLevel:   enums.AcrLevel2Optional,
+				expectedRedirect: "/auth/level2",
+				description:      "control: the target arm already handled this, so a failure here means it broke",
+			},
+			{
+				name:                    "the other user's config-changed flag is left alone",
+				sessionAcrLevel:         enums.AcrLevel2Optional,
+				targetAcrLevel:          enums.AcrLevel2Optional,
+				level2AuthConfigChanged: true,
+				expectedRedirect:        "/auth/level2",
+				description:             "no UpdateUserSession is registered below, so any write to the other user's row fails this row",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				userSessionManager := mocks_user.NewUserSessionManager(t)
+				database := mocks_data.NewDatabase(t)
+
+				handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
+
+				req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
+				rr := httptest.NewRecorder()
+
+				authContext := &oauth.AuthContext{
+					AuthState: oauth.AuthStateLevel1PasswordCompleted,
+					ClientId:  "test-client",
+					UserId:    2,
+				}
+				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+				sessionIdentifier := "test-session"
+				ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+				req = req.WithContext(ctx)
+
+				userSession := &models.UserSession{
+					Id:                         1,
+					UserId:                     1,
+					AcrLevel:                   tt.sessionAcrLevel.String(),
+					Level2AuthConfigHasChanged: tt.level2AuthConfigChanged,
+				}
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
+				database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+				client := &models.Client{
+					Id:               1,
+					ClientIdentifier: "test-client",
+					DefaultAcrLevel:  tt.targetAcrLevel,
+				}
+				database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+				userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+				expectedAuthState := oauth.AuthStateAuthenticationCompleted
+				if tt.expectedRedirect == "/auth/level2" {
+					expectedAuthState = oauth.AuthStateRequiresLevel2
+				}
+
+				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+					return ac.AuthState == expectedAuthState
+				})).Return(nil)
+
+				handler.ServeHTTP(rr, req)
+
+				assert.Equal(t, http.StatusFound, rr.Code)
+				assert.Equal(t, config.GetAuthServer().BaseURL+tt.expectedRedirect, rr.Header().Get("Location"), tt.description)
+				assert.True(t, userSession.Level2AuthConfigHasChanged == tt.level2AuthConfigChanged,
+					"the other user's session must not be modified in memory either")
 
 				httpHelper.AssertExpectations(t)
 				authHelper.AssertExpectations(t)
