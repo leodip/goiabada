@@ -282,6 +282,45 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				"Code is invalid.", http.StatusBadRequest)
 		}
 
+		// The ownership boundary (#133). A ceremony can no longer bind a code to a session
+		// belonging to somebody else, so nothing minted after that fix can reach this. What it
+		// catches is a code minted before it, in the window between an account switch and the
+		// upgrade: the browser held A's session, B authenticated, and the code carries B as its
+		// user with A's session identifier stamped on it.
+		//
+		// Redeeming one yields tokens that name B correctly, and only one claim on them is
+		// wrong. amr and auth_time came from B's own ceremony: the password handler set
+		// AuthenticatedAt, and BumpUserSession overwrote the session's methods with B's.
+		// acr is the inherited one, because SetAcrLevel took the maximum of the target and
+		// A's session level, so the grant can claim a second factor B never presented.
+		// createTokenInputFromCode re-copies the code's acr on every rotation, so that one
+		// false claim persists for the life of the grant rather than decaying.
+		//
+		// Three conditions, and the last two are what stop this refusing anything legitimate:
+		// the code names a session at all, that row still exists, and it belongs to someone
+		// else. A missing row is accepted DELIBERATELY. Sessions are swept once they idle out
+		// or reach their maximum lifetime, so "gone" is the ordinary state of the session
+		// behind an older grant, and refusing on absence would break every one of them. The
+		// cost of that choice is stated: this reaches a pre-fix grant only while its session
+		// row survives, which by default is two hours of idling or twenty-four of lifetime.
+		//
+		// Placed here rather than in the !wasReused block above for the same reason the revoked
+		// check is: that block runs before client authentication and PKCE, so anything added to
+		// it tells an unauthenticated presenter something about the grant's state (#137).
+		//
+		// Both columns compared are NOT NULL, so the zero-equals-zero vacuity that an
+		// incomplete test fixture can produce cannot arise against a real database.
+		if codeEntity.SessionIdentifier != "" {
+			codeSession, err := val.database.GetUserSessionBySessionIdentifier(nil, codeEntity.SessionIdentifier)
+			if err != nil {
+				return nil, err
+			}
+			if codeSession != nil && codeSession.UserId != codeEntity.UserId {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					"Code is invalid.", http.StatusBadRequest)
+			}
+		}
+
 		return &ValidateTokenRequestResult{
 			CodeEntity: codeEntity,
 		}, nil
@@ -567,6 +606,23 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
 					http.StatusBadRequest)
 			}
+
+			// The session has to belong to the grant's user. Without this a token bound to
+			// someone else's session refreshes indefinitely and bumps that session as it
+			// goes, so the wrong person's activity keeps the session alive and the wrong
+			// person's logout ends the grant (#133).
+			//
+			// tokenUserId is the code's user on this arm, and only auth code flow reaches
+			// it: ROPC refresh tokens are typed Offline unconditionally because there is no
+			// browser session to bind to (generateRefreshTokenForROPC).
+			//
+			// The shared message again, deliberately. "Expired or terminated" already covers
+			// both ways a session stops backing a grant, and a third wording here would tell
+			// a presenter that the session exists and belongs to someone else.
+			if userSession.UserId != tokenUserId {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
+					http.StatusBadRequest)
+			}
 		case "Offline":
 			// this is an offline refresh token
 			// its lifetime is not linked to the user session
@@ -580,6 +636,40 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"The refresh token is invalid because it has expired (offline_access_max_lifetime).",
 					http.StatusBadRequest)
+			}
+
+			// The ownership boundary (#133), the half the Refresh arm cannot reach. An offline
+			// grant is meant to outlive its session, which is why this arm otherwise never
+			// looks at one, and that deliberate silence is what a grant cross-bound before the
+			// fix slips through: it keeps rotating for the offline maximum lifetime, seeded at
+			// a year, re-copying the code's acr each time. That is the single claim the old
+			// path took from a session belonging to somebody else; amr and auth_time always
+			// described the ceremony that actually happened.
+			//
+			// Read from the CODE, not from the token row. Only a Refresh token stores a session
+			// identifier of its own; for an Offline one the issuer records the max lifetime in
+			// that column instead, so refreshToken.SessionIdentifier is empty here and the
+			// grant's session is the one its code was stamped with.
+			//
+			// Refuses only while the row is still there and its owner differs, exactly as the
+			// code branch does, and for the same reason: absence is the ordinary state of a
+			// healthy offline grant, so absence must not refuse. That is also the precise limit
+			// of what this reaches, since the session sweep removes the evidence long before
+			// the grant expires.
+			//
+			// Placed after the max-lifetime check so an already-expired token is refused
+			// without a lookup, and ROPC excluded for the same reason as the revoked check
+			// above: code_id is NULL, refreshToken.Code is the zero value, and there was never
+			// a session to own the grant.
+			if !isROPCToken && refreshToken.Code.SessionIdentifier != "" {
+				codeSession, err := val.database.GetUserSessionBySessionIdentifier(nil, refreshToken.Code.SessionIdentifier)
+				if err != nil {
+					return nil, err
+				}
+				if codeSession != nil && codeSession.UserId != tokenUserId {
+					return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+						invalidTokenMessage, http.StatusBadRequest)
+				}
 			}
 		default:
 			return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not contain a valid typ claim"))

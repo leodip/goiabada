@@ -173,15 +173,18 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 // RequireValidSession rejects bearer tokens that no longer represent live, current
 // authentication state.
 //
-// Three things are checked, and which of them apply depends on the token:
+// Four things are checked, and which of them apply depends on the token:
 //
 //  1. The account is still enabled. Verified that NO handler under /api/v1/account/*
 //     checks this for itself, so without it a disabled user keeps working access for the
 //     remainder of their access token's lifetime (#106 decision 6).
-//  2. For a token carrying a `sid`, the session still exists and is within its idle and
-//     max-lifetime bounds. This is what makes deleting a session take effect immediately
-//     despite the JWT remaining cryptographically valid.
-//  3. The authentication generation still matches. This is the boundary that survives a
+//  2. For a token carrying a `sid`, the session still exists and belongs to the token's
+//     own user. The owner comparison backs up issuance rather than duplicating it: a
+//     ceremony can no longer bind a grant to someone else's session, so anything reaching
+//     this check was minted before the fix (#133).
+//  3. That session is within its idle and max-lifetime bounds. This is what makes deleting
+//     a session take effect immediately despite the JWT remaining cryptographically valid.
+//  4. The authentication generation still matches. This is the boundary that survives a
 //     credential change: a token authenticated under generation N stops working once the
 //     user advances to N+1 (#106 decision 11).
 //
@@ -284,6 +287,27 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 			if session == nil {
 				slog.Warn("rejecting bearer token: underlying user session has been terminated",
 					"sid", sid)
+				rejectInvalidToken(w, "Session has been terminated")
+				return
+			}
+
+			// The session has to belong to the token's user. Nothing else here compares the
+			// two: the lifetime check reads dates and the generation check reads a counter,
+			// so a token whose `sid` names another user's session would otherwise be governed
+			// by that session in every respect, ending when its owner's session ends and
+			// staying alive while its owner keeps using the browser (#133).
+			//
+			// Placed before the settings lookup, not merely before the lifetime check it
+			// guards: this comparison needs no settings, so a cross-bound token is refused
+			// even on the path where missing settings would otherwise produce a 500.
+			//
+			// Reuses "Session has been terminated" rather than naming the mismatch. A
+			// presenter has already proven it holds the token, but the wording still reaches
+			// a caller, and a distinct message would say which sessions exist.
+			if session.UserId != user.Id {
+				slog.Warn("rejecting bearer token: session belongs to a different user",
+					"sid", sid, "sessionId", session.Id, "sessionUserId", session.UserId,
+					"userId", user.Id)
 				rejectInvalidToken(w, "Session has been terminated")
 				return
 			}

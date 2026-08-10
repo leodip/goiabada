@@ -105,6 +105,30 @@ Each handover writes a `cross_user_session_replaced` entry to the [audit log](/c
 When the **same** user signs in again, none of this applies. Their existing session is reused for as long as it is still valid, and re-authenticating simply refreshes it. If it has already idled out, reached its maximum lifetime, or fallen outside a requested `max_age`, they get a new session like anyone else, and nothing is revoked.
 </Aside>
 
+### Grants issued before this behaviour existed
+
+Earlier versions of Goiabada did not make this comparison, so a handover on a shared browser could leave a sign-in tied to the previous person's session. If you are upgrading, a few grants of that kind may already be out there.
+
+Goiabada turns them away as they are presented. An authorization code, and any refresh token descended from one, is checked against the session it names, and one naming a session that belongs to somebody else is refused. Access tokens get the same treatment at Goiabada's own endpoints, but only when they carry a session reference: an offline grant's access token carries none, and a resource server of your own validating the signature by itself never consults Goiabada's sessions at all.
+
+That check needs the previous session to still be there, and sessions do not last: they are deleted once they idle out or reach their maximum lifetime, two hours and twenty-four hours by default. After that there is nothing left to compare against. An offline refresh token can outlive that by a long way, since its maximum lifetime defaults to a year, so one issued before the upgrade can keep working after the evidence has gone.
+
+It is worth being precise about what such a grant carries, because it is narrower than it sounds. Its tokens name the right person, so it is not access to the previous user's account, and the `amr` and `auth_time` claims describe the sign-in that really happened. What is wrong is `acr`: it could be raised to the level the previous user's session had reached, higher than anything its holder actually presented, and it goes on claiming that through every refresh.
+
+If your applications make authorization decisions from `acr`, and shared browsers are a realistic possibility in your deployment, this is what closes one:
+
+| Situation | What to do |
+| ---- | ------ |
+| The session it came from is still there | End that session, from the user page or the user's own sessions page. That revokes the refresh tokens and unredeemed codes that came from it, offline ones included |
+| The session has already gone | Revoke the client's consent, from the user page or the user's own consents page. An offline grant is checked against consent every time it is refreshed, so this stops it at the next one |
+| Nothing above fits | Set a new password for the user, or disable them. Either stops every grant that user holds, on every device |
+
+Revoking consent is the option that still works once the session has been swept, and it has two edges worth knowing. It covers every grant that user holds for that client rather than only the one you are worried about, so they will be asked to consent again. And an access token already in flight keeps working until it expires, the same [gap](#what-ending-a-session-does-not-cover) that ending a session leaves.
+
+Lowering the offline maximum lifetime on **Settings → Tokens** does **not** close these. That setting is read when a grant is first issued, and every refresh afterwards carries the deadline the grant was born with, so lowering it changes nothing for grants that already exist. There is no way to revoke a single token on its own either: Goiabada has no token revocation endpoint.
+
+Deployments where every user has their own browser have nothing to do.
+
 ## Forcing re-authentication
 
 There are two ways to force re-authentication in an authorization request:

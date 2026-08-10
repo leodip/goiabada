@@ -2671,6 +2671,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		expiredSession := &models.UserSession{
 			SessionIdentifier: "expired_session",
+			UserId:            1,                                     // owned by the code's user, so expiry is what refuses it
 			Started:           time.Now().UTC().Add(-48 * time.Hour), // Started 2 days ago
 			LastAccessed:      time.Now().UTC().Add(-25 * time.Hour), // Last accessed 25 hours ago
 		}
@@ -2909,6 +2910,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
+				UserId:   1,
 				Scope:    "openid profile email", // Original scopes
 				User: models.User{
 					Id:      1,
@@ -2919,6 +2921,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		userSession := &models.UserSession{
 			SessionIdentifier: "test_session",
+			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
 			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
@@ -3136,6 +3139,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		userSession := &models.UserSession{
 			SessionIdentifier: "test_session",
+			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
 			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
@@ -3211,6 +3215,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		userSession := &models.UserSession{
 			SessionIdentifier: "test_session",
+			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
 			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
@@ -3288,6 +3293,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		userSession := &models.UserSession{
 			SessionIdentifier: "test_session",
+			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
 			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
@@ -3371,6 +3377,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		userSession := &models.UserSession{
 			SessionIdentifier: "test_session",
+			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
 			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
@@ -5004,7 +5011,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 					now := time.Now().UTC()
 					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
 						Return(&models.UserSession{
-							Id: 9, SessionIdentifier: "sid-1",
+							Id: 9, SessionIdentifier: "sid-1", UserId: 7,
 							Started: now.Add(-10 * time.Minute), LastAccessed: now,
 						}, nil)
 					mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil)
@@ -5519,6 +5526,11 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
 			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+			// #133's ownership check on the Offline arm looks the code's session up. It
+			// belongs to user 7, the grant's own user, so it accepts and the row still
+			// measures what it was written to measure.
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
+				Return(&models.UserSession{SessionIdentifier: "sid-1", UserId: 7}, nil)
 			mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil)
 			// An Offline refresh always re-checks consent, whatever the client's
 			// ConsentRequired says, so the accepted path needs a live consent row covering
@@ -5610,5 +5622,435 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
+	})
+}
+
+// TestValidateTokenRequest_RefreshToken_SessionOwnership covers the refresh half of #133's
+// post-issuance backstop: a normal refresh token names a session in its `sid`, and until this
+// check nothing on the path compared that session's owner with the grant's user.
+//
+// The two subtests differ in exactly one field, the session's UserId, so neither can pass with
+// the comparison removed. Everything else is the ordinary auth code flow refresh: the grant
+// belongs to user 1, the client matches, the session is well inside both its idle timeout and
+// its max lifetime.
+//
+// A cross-bound grant is no longer reachable through issuance, so what this protects is the
+// tokens minted before that fix. Left unchecked they refresh indefinitely against a stranger's
+// session and bump it on the way, which both keeps that session alive on someone else's
+// activity and ends the grant when its owner signs out.
+func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
+	const grantUserId = int64(1)
+
+	setup := func(t *testing.T, sessionUserId int64) (*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+		t.Helper()
+
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			UserSessionIdleTimeoutInSeconds: 3600,
+			UserSessionMaxLifetimeInSeconds: 86400,
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+
+		refreshTokenJwt := &oauth.JwtToken{
+			Claims: jwt.MapClaims{
+				"jti": "ownership_jti",
+				"typ": "Refresh",
+				"sub": "user123",
+			},
+		}
+
+		refreshToken := &models.RefreshToken{
+			RefreshTokenJti:   "ownership_jti",
+			SessionIdentifier: "session_of_interest",
+			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // auth code flow token
+			Code: models.Code{
+				ClientId: 1,
+				UserId:   grantUserId,
+				Scope:    "openid",
+				User: models.User{
+					Id:      grantUserId,
+					Enabled: true,
+				},
+			},
+		}
+
+		userSession := &models.UserSession{
+			SessionIdentifier: "session_of_interest",
+			UserId:            sessionUserId,
+			Started:           time.Now().UTC().Add(-30 * time.Minute),
+			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
+		}
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", "ownership_refresh_token", (*rsa.PublicKey)(nil), true).
+			Return(refreshTokenJwt, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, "ownership_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "session_of_interest").
+			Return(userSession, nil)
+		// Only reached once the session is accepted, so the refusing subtest never calls it.
+		mockDB.On("GetUserBySubject", mock.Anything, "user123").
+			Return(&models.User{Id: grantUserId, Enabled: true}, nil).Maybe()
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "refresh_token",
+			ClientId:     "client1",
+			RefreshToken: "ownership_refresh_token",
+		}
+
+		return validator, input, ctx
+	}
+
+	t.Run("a session belonging to the grant's user is accepted", func(t *testing.T) {
+		validator, input, ctx := setup(t, grantUserId)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("a session belonging to another user is refused", func(t *testing.T) {
+		validator, input, ctx := setup(t, grantUserId+1)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		assert.Error(t, err)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		// The same wording an expired or terminated session gets. A distinct message here
+		// would tell the presenter that the session exists and belongs to someone else.
+		assert.Contains(t, customErr.GetDescription(),
+			"the associated session has expired or been terminated")
+	})
+}
+
+// TestValidateTokenRequest_AuthorizationCode_SessionOwnership covers the redemption half of
+// #133's post-issuance backstop (decision 8, option B). A code carries the session identifier
+// its ceremony was bound to, and until this check the authorization_code branch never loaded
+// that session at all, so a code minted for user 1 carrying user 2's session identifier
+// redeemed like any other.
+//
+// Issuance can no longer produce one, so what this reaches is the population minted in the
+// window between an account switch and the upgrade. It is a small window by construction:
+// authCodeExpirationInSeconds is 60.
+//
+// Three rows, and the middle one is the deliberate limit rather than an oversight. Sessions
+// are swept once they idle out or reach their maximum lifetime, so a code whose session row
+// has gone is the ordinary state of an older grant and MUST still redeem. That is exactly why
+// this cannot be complete, and the residual is documented in concepts/user-sessions.mdx.
+//
+// A fourth case is covered without a row here: a code with no session identifier performs no
+// lookup at all. Every other authorization_code test in this file leaves SessionIdentifier
+// empty and mocks no lookup, and the database mock is strict, so a lookup on the empty path
+// would fail all of them.
+func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
+	const grantUserId = int64(1)
+	const sid = "sid-of-the-browser"
+
+	// setup returns a validator whose code names `sid`. sessionOwner nil means the row is
+	// gone, which is the swept case; otherwise it is the user the row belongs to. A non-nil
+	// lookupErr makes the lookup itself fail, which is a third outcome and not a fourth
+	// flavour of absence.
+	setup := func(t *testing.T, sessionOwner *int64, lookupErr error) (*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+		t.Helper()
+
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+
+		codeEntity := &models.Code{
+			CodeHash:          "hash_of_valid_code",
+			RedirectURI:       "https://example.com/callback",
+			SessionIdentifier: sid,
+			// Both sides of the comparison are non-zero, so the accept row is a real match
+			// rather than the zero-to-zero one an incomplete fixture would give.
+			UserId: grantUserId,
+			Client: models.Client{ClientIdentifier: "client1"},
+			User:   models.User{Id: grantUserId, Enabled: true},
+			CreatedAt: sql.NullTime{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		}
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).
+			Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+		switch {
+		case lookupErr != nil:
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).Return(nil, lookupErr).Once()
+		case sessionOwner == nil:
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).Return(nil, nil).Once()
+		default:
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+				Return(&models.UserSession{SessionIdentifier: sid, UserId: *sessionOwner}, nil).Once()
+		}
+
+		input := &ValidateTokenRequestInput{
+			GrantType:   "authorization_code",
+			ClientId:    "client1",
+			Code:        "valid_code",
+			RedirectURI: "https://example.com/callback",
+		}
+
+		return validator, input, ctx
+	}
+
+	owner := func(id int64) *int64 { return &id }
+
+	t.Run("a session belonging to the code's user is accepted", func(t *testing.T) {
+		validator, input, ctx := setup(t, owner(grantUserId), nil)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("a session that has already been swept is accepted", func(t *testing.T) {
+		// The deliberate hole, asserted so nobody closes it by accident. Refusing on a
+		// missing row would refuse every grant whose session has simply timed out, which is
+		// most of them.
+		validator, input, ctx := setup(t, nil, nil)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("a failed lookup is propagated, not read as a swept session", func(t *testing.T) {
+		// The row above is accepted when it is genuinely absent. A lookup that FAILED says
+		// nothing about whether the session exists, so treating the two alike would let an
+		// unreachable database wave every cross-bound code through. This is the case that
+		// pins the difference: the same error comes back, unwrapped into an OAuth refusal.
+		lookupErr := errors.New("database is down")
+		validator, input, ctx := setup(t, nil, lookupErr)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, lookupErr)
+		_, isErrorDetail := err.(*customerrors.ErrorDetail)
+		assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
+	})
+
+	t.Run("a session belonging to another user is refused", func(t *testing.T) {
+		validator, input, ctx := setup(t, owner(grantUserId+1), nil)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		assert.Error(t, err)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		// The wording a revoked code and a superseded generation already share. A message
+		// naming the mismatch would tell the presenter that the session exists and belongs
+		// to somebody else.
+		assert.Equal(t, "Code is invalid.", customErr.GetDescription())
+	})
+}
+
+// TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership covers the last shape #133's
+// decision 8 reaches: an offline refresh token descended from a cross-bound authorization
+// code. The Offline arm deliberately never consults the session, because an offline grant is
+// meant to outlive the browser session it came from, and that silence is what a pre-fix
+// cross-bound grant rode for the whole offline maximum lifetime, seeded at a year, re-copying
+// the code's inherited acr on every rotation. Only acr was inherited: amr and auth_time
+// described the ceremony that actually happened.
+//
+// The three rows are the same three the code branch has, and the middle one carries the same
+// weight for a stronger reason here: "the session is gone" is not an edge case for an offline
+// grant, it is the steady state, so the swept row is what proves this check did not quietly
+// tie offline tokens back to a session.
+//
+// The session identifier is read from the CODE, not from the token row. Only a Refresh token
+// stores one of its own; for an Offline token the issuer puts the max lifetime in that column
+// instead, which is why the fixture leaves RefreshToken.SessionIdentifier empty.
+func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T) {
+	const grantUserId = int64(7)
+	const sid = "sid-of-the-browser"
+
+	// lookupErr makes the session lookup fail. expired puts the grant past its offline
+	// maximum lifetime and registers NO lookup at all, so the strict mock is what asserts
+	// the ordering: reaching the session before rejecting an expired token is a failure,
+	// not a slower pass.
+	setup := func(t *testing.T, sessionOwner *int64, lookupErr error, expired bool) (*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+		t.Helper()
+
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test_client",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+		user := models.User{Id: grantUserId, Enabled: true}
+
+		refreshToken := &models.RefreshToken{
+			RefreshTokenJti: "the-jti",
+			CodeId:          sql.NullInt64{Int64: 5, Valid: true},
+			// Empty, and that is production's shape for an Offline token rather than a
+			// shortcut: the issuer stores the max lifetime in this column instead.
+			SessionIdentifier: "",
+			Code: models.Code{
+				Id: 5, ClientId: 1, UserId: grantUserId, Scope: "openid offline_access",
+				SessionIdentifier: sid,
+				User:              user,
+			},
+		}
+
+		maxLifetime := time.Now().UTC().Add(24 * time.Hour)
+		if expired {
+			maxLifetime = time.Now().UTC().Add(-1 * time.Hour)
+		}
+		offlineClaims := &oauth.JwtToken{Claims: jwt.MapClaims{
+			"jti": "the-jti", "typ": "Offline", "sub": "user_subject",
+			"offline_access_max_lifetime": float64(maxLifetime.Unix()),
+		}}
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+			Return(offlineClaims, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+
+		switch {
+		case expired:
+			// Deliberately no expectation. mocks_data.Database is strict, so a lookup here
+			// fails the test, which is the whole assertion.
+		case lookupErr != nil:
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).Return(nil, lookupErr).Once()
+		case sessionOwner == nil:
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).Return(nil, nil).Once()
+		default:
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+				Return(&models.UserSession{SessionIdentifier: sid, UserId: *sessionOwner}, nil).Once()
+		}
+
+		// Only the accepted rows reach these two: an Offline refresh always re-checks
+		// consent, whatever the client's ConsentRequired says.
+		mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil).Maybe()
+		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, grantUserId, int64(1)).
+			Return(&models.UserConsent{UserId: grantUserId, ClientId: 1, Scope: "openid offline_access"}, nil).Maybe()
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "refresh_token",
+			ClientId:     "test_client",
+			RefreshToken: "the-refresh-token",
+		}
+
+		return validator, input, ctx
+	}
+
+	owner := func(id int64) *int64 { return &id }
+
+	t.Run("a session belonging to the grant's user is accepted", func(t *testing.T) {
+		validator, input, ctx := setup(t, owner(grantUserId), nil, false)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("a session that has already been swept is accepted", func(t *testing.T) {
+		// An offline grant outliving its session is the whole point of the type. This row
+		// is what pins that the new check did not change that.
+		validator, input, ctx := setup(t, nil, nil, false)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("a failed lookup is propagated, not read as a swept session", func(t *testing.T) {
+		// Absence accepts, and for an offline grant absence is the steady state, so the
+		// temptation to treat a failed lookup as one more way of being absent is real here.
+		// It must not be: a database that cannot answer has not said the session is gone.
+		lookupErr := errors.New("database is down")
+		validator, input, ctx := setup(t, nil, lookupErr, false)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, lookupErr)
+		_, isErrorDetail := err.(*customerrors.ErrorDetail)
+		assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
+	})
+
+	t.Run("an expired grant is refused before the session is ever looked up", func(t *testing.T) {
+		// The ordering the agreement requires, and the one shape that can observe it: an
+		// affected grant, so its code carries a session identifier, that is already past its
+		// offline maximum lifetime. Every other expired-offline fixture in this file has an
+		// empty code sid and so performs no lookup whatever the order. The strict mock
+		// carries the assertion; the error only confirms which gate did the refusing.
+		validator, input, ctx := setup(t, owner(grantUserId+1), nil, true)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Contains(t, customErr.GetDescription(), "offline_access_max_lifetime")
+	})
+
+	t.Run("a session belonging to another user is refused", func(t *testing.T) {
+		validator, input, ctx := setup(t, owner(grantUserId+1), nil, false)
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		assert.Error(t, err)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		// The shared session message, the same one a revoked code gets on this arm.
+		assert.Contains(t, customErr.GetDescription(),
+			"the associated session has expired or been terminated")
 	})
 }

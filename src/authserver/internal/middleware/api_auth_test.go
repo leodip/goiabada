@@ -897,6 +897,7 @@ func TestRequireValidSession(t *testing.T) {
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-abc").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-abc",
+				UserId:            1, // the same user the sub resolves to; see the owner check
 				Started:           now.Add(-1 * time.Hour),
 				LastAccessed:      now.Add(-5 * time.Minute),
 			}, nil)
@@ -970,6 +971,7 @@ func TestRequireValidSession(t *testing.T) {
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-expired").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-expired",
+				UserId:            1, // owned by the caller, so expiry is what refuses it
 				Started:           now.Add(-2 * time.Hour),
 				LastAccessed:      now.Add(-2 * time.Hour), // older than 1h idle timeout
 			}, nil)
@@ -1013,6 +1015,7 @@ func TestRequireValidSession(t *testing.T) {
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-no-settings").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-no-settings",
+				UserId:            1, // owned by the caller, so the settings gate is what fails
 				Started:           time.Now().UTC().Add(-100 * time.Hour),
 				LastAccessed:      time.Now().UTC().Add(-100 * time.Hour),
 			}, nil)
@@ -1051,6 +1054,7 @@ func TestRequireValidSession(t *testing.T) {
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-bad-settings").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-bad-settings",
+				UserId:            1, // owned by the caller, so the settings gate is what fails
 				Started:           time.Now().UTC(),
 				LastAccessed:      time.Now().UTC(),
 			}, nil)
@@ -1157,7 +1161,11 @@ func TestRequireValidSession(t *testing.T) {
 // covers the full matrix once the Enabled and generation checks are in play.
 //
 // Every negative row varies exactly ONE field from a passing row, so none of them can pass
-// with its gate removed. The gate each row is meant to hit is named in its label.
+// with its gate removed. The gate each row is meant to hit is named in its label. The one
+// deliberate exception is "foreign session is refused before the settings gate is reached",
+// which varies two because its subject is the ORDER of two gates rather than either gate:
+// it differs by one field from the foreign-session row above it, and what it adds is the
+// missing settings that would otherwise produce a 500.
 //
 // Two rows will look wrong to a reader and must not be "cleaned up":
 //
@@ -1172,11 +1180,17 @@ func TestRequireValidSession(t *testing.T) {
 func TestRequireValidSession_Table(t *testing.T) {
 	const sid = "sid-table"
 
+	// Every user fixture in this table is Id 1, so a session left at the zero UserId would
+	// read as belonging to somebody else. The harness gives each returned session the
+	// caller's id unless the row asks for a foreign one.
+	const callerId = int64(1)
+
 	type sessionSpec struct {
 		missing    bool
 		lookupErrs bool
 		generation int64
 		expired    bool
+		foreign    bool
 	}
 
 	tests := []struct {
@@ -1191,6 +1205,11 @@ func TestRequireValidSession_Table(t *testing.T) {
 		session    *sessionSpec
 		wantStatus int
 		wantNext   bool
+		// When set, the row also pins the refusal a caller actually sees: the RFC 6750
+		// challenge and the JSON body, both carrying this exact description. Status alone
+		// cannot tell one 401 from another, so a row whose subject is "this branch must
+		// not get its own oracle" has to say what the oracle may say.
+		wantDescription string
 	}{
 		// Pass-through gates: nothing to enforce, so no database call at all.
 		{label: "no bearer token in context", noBearer: true, wantStatus: http.StatusOK, wantNext: true},
@@ -1272,6 +1291,33 @@ func TestRequireValidSession_Table(t *testing.T) {
 			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
 			session:    &sessionSpec{expired: true},
 			wantStatus: http.StatusUnauthorized,
+		},
+		// #133. A token whose sid names a session belonging to someone else. Issuance can no
+		// longer produce one, so this is the backstop for grants minted before that fix.
+		//
+		// Both rows assert the description as well as the status, and that is the point of
+		// them rather than belt and braces. The refusal deliberately reuses the wording a
+		// deleted session and a superseded generation already use, so a presenter cannot
+		// learn from it that the session exists and belongs to somebody else. A branch-
+		// specific message would be an invisible regression: it would keep the 401 and keep
+		// the next handler unreached, so nothing but this assertion can catch it.
+		{
+			label:           "session belongs to a different user",
+			claims:          map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			session:         &sessionSpec{foreign: true},
+			wantStatus:      http.StatusUnauthorized,
+			wantDescription: "Session has been terminated",
+		},
+		{
+			// Pins the placement, not just the comparison: the owner check runs before the
+			// settings lookup, so a foreign session is refused on the path that would
+			// otherwise 500 for want of settings to measure the lifetime against.
+			label:           "foreign session is refused before the settings gate is reached",
+			claims:          map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
+			session:         &sessionSpec{foreign: true},
+			noSettings:      true,
+			wantStatus:      http.StatusUnauthorized,
+			wantDescription: "Session has been terminated",
 		},
 		{
 			label:      "session generation behind the user's",
@@ -1446,10 +1492,15 @@ func TestRequireValidSession_Table(t *testing.T) {
 						// Past the 3600s idle timeout the harness puts in context.
 						lastAccessed = now.Add(-2 * time.Hour)
 					}
+					owner := callerId
+					if tc.session.foreign {
+						owner = callerId + 1
+					}
 					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
 						Return(&models.UserSession{
 							Id:                  9,
 							SessionIdentifier:   sid,
+							UserId:              owner,
 							Started:             now.Add(-1 * time.Hour),
 							LastAccessed:        lastAccessed,
 							AuthStateGeneration: tc.session.generation,
@@ -1484,6 +1535,20 @@ func TestRequireValidSession_Table(t *testing.T) {
 
 			assert.Equal(t, tc.wantStatus, rr.Code, "status")
 			assert.Equal(t, tc.wantNext, nextCalled, "next handler called")
+
+			if tc.wantDescription != "" {
+				// Both surfaces, because rejectInvalidToken writes the description twice
+				// and a specialised message could be introduced in either one alone.
+				assert.Equal(t,
+					`Bearer error="invalid_token", error_description="`+tc.wantDescription+`"`,
+					rr.Header().Get("WWW-Authenticate"), "challenge")
+
+				var body api.ErrorResponse
+				assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body),
+					"response body should be the standard error envelope")
+				assert.Equal(t, "INVALID_TOKEN", body.ErrorCode, "error_code")
+				assert.Equal(t, tc.wantDescription, body.ErrorDescription, "error_description")
+			}
 		})
 	}
 }
