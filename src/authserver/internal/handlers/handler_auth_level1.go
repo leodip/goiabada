@@ -110,7 +110,13 @@ func HandleAuthLevel1CompletedGet(
 
 		// should we redirect to level 2 auth?
 		shouldRedirectToLevel2 := false
-		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
+		// The session only counts when it belongs to the user this ceremony authenticated. The
+		// browser may still hold user A's session cookie while user B signs in, and the block below
+		// would then decide B's step-up from A's ACR: an A session already at or above the target
+		// sends B straight to /auth/completed with a password only, skipping the second factor a
+		// level2 client asked for. A session belonging to anyone else is treated as no session, so
+		// the target alone decides, and A's Level2AuthConfigHasChanged flag is left alone (#133).
+		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge()) && authContext.OwnsSession(userSession)
 
 		if hasValidUserSession {
 			// Parse the session's ACR level

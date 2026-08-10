@@ -120,6 +120,8 @@ If you request multiple ACR values separated by spaces, Goiabada will use the fi
 
 When a user has an active session (SSO), Goiabada checks if the session's ACR level is sufficient for the new request.
 
+The session must belong to the user who just authenticated. If the browser still holds a session for a different user, that session is treated as no session at all: it contributes no ACR level, so the requested ACR alone decides whether a second factor is needed.
+
 ### Session reuse (no re-authentication needed)
 
 If the session's ACR is **equal to or higher** than the requested ACR, the user doesn't need to re-authenticate.

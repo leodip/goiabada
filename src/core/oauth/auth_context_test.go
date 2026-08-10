@@ -304,6 +304,76 @@ func TestSetAcrLevel_InvalidSessionAcrReturnsError(t *testing.T) {
 }
 
 // =============================================================================
+// Tests for OwnsSession
+//
+// The predicate every ambient-session read consults: a ceremony may reuse the
+// browser's session only when that session belongs to the user the ceremony
+// authenticated. Both zero cases are false, so this table is exhaustive over
+// the two inputs and no caller re-tests the combinations.
+// =============================================================================
+
+func TestOwnsSession(t *testing.T) {
+	testCases := []struct {
+		name          string
+		contextUserId int64
+		session       *models.UserSession
+		want          bool
+		description   string
+	}{
+		{
+			name:          "nil session with a known user",
+			contextUserId: 1,
+			session:       nil,
+			want:          false,
+			description:   "there is no session to own",
+		},
+		{
+			name:          "nil session with no user",
+			contextUserId: 0,
+			session:       nil,
+			want:          false,
+			description:   "neither side is known",
+		},
+		{
+			name:          "both zero",
+			contextUserId: 0,
+			session:       &models.UserSession{UserId: 0},
+			want:          false,
+			description:   "two zeros are not a match: an unidentified ceremony must not match an unsaved session",
+		},
+		{
+			name:          "no user with a real session",
+			contextUserId: 0,
+			session:       &models.UserSession{UserId: 1},
+			want:          false,
+			description:   "a ceremony that has not authenticated anyone owns nothing",
+		},
+		{
+			name:          "same user",
+			contextUserId: 1,
+			session:       &models.UserSession{UserId: 1},
+			want:          true,
+			description:   "the ordinary SSO path, the only true row",
+		},
+		{
+			name:          "different user",
+			contextUserId: 2,
+			session:       &models.UserSession{UserId: 1},
+			want:          false,
+			description:   "B's ceremony must not reuse A's session",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ac := &AuthContext{UserId: tc.contextUserId}
+
+			assert.Equal(t, tc.want, ac.OwnsSession(tc.session), tc.description)
+		})
+	}
+}
+
+// =============================================================================
 // Tests for ParseRequestedMaxAge
 //
 // max_age arrives as a raw query-string value and feeds
