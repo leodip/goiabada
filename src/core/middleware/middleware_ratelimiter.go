@@ -31,11 +31,11 @@ type RateLimiterMiddleware struct {
 
 func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddleware {
 	return &RateLimiterMiddleware{
-		authHelper:      authHelper,
-		enabled:         enabled,
-		pwdLimiter:      httprate.NewRateLimiter(15, 1*time.Minute), // per-email: bounds brute force on one account
-		pwdIpLimiter:    httprate.NewRateLimiter(30, 1*time.Minute), // per-IP: stops one host hammering many accounts
-		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
+		authHelper:   authHelper,
+		enabled:      enabled,
+		pwdLimiter:   httprate.NewRateLimiter(15, 1*time.Minute), // per-email: bounds brute force on one account
+		pwdIpLimiter: httprate.NewRateLimiter(30, 1*time.Minute), // per-IP: stops one host hammering many accounts
+		otpLimiter:   httprate.NewRateLimiter(10, 1*time.Minute),
 		// per-IP: 10 activation operations per 5 minutes, at the two requests an activation
 		// now costs (the link's GET, the clean GET). The same operation rate as
 		// resetPwdLimiter over a chain one request shorter (#112)
