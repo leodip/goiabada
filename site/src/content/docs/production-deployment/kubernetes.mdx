@@ -368,17 +368,23 @@ Run one version at a time. A rolling update keeps the old pods serving until the
      strategy:
        type: Recreate
    ```
-   Or scale to zero by hand before applying:
+   Or scale to zero by hand. `kubectl scale` returns as soon as the API accepts the change, not when the pods are gone, so wait for them to be deleted before you go any further. Applying while an old pod is still terminating starts the new version alongside it, which is the state this whole section exists to avoid:
    ```bash
    kubectl scale deployment goiabada-authserver goiabada-adminconsole -n goiabada --replicas=0
+   kubectl wait --for=delete pod -l app=goiabada-authserver -n goiabada --timeout=120s
+   kubectl wait --for=delete pod -l app=goiabada-adminconsole -n goiabada --timeout=120s
+   kubectl get pods -n goiabada
    ```
+   `kubectl wait` reporting that no matching resources were found means the pods have already gone, which is the answer you want. Check that `kubectl get pods` lists no auth server or admin console pod before continuing.
 3. Apply changes:
    ```bash
    kubectl apply -f goiabada-k8s.yaml
    ```
-4. Monitor rollout, and scale back up if you scaled to zero:
+4. Monitor the rollout:
    ```bash
    kubectl rollout status deployment/goiabada-authserver -n goiabada
+   kubectl rollout status deployment/goiabada-adminconsole -n goiabada
    ```
+   Applying the manifest restores the replica counts written in it, which is one of each in the generated file, so scaling to zero by hand needs no matching scale back up. If you run more replicas than the manifest declares, set them again here.
 
 There's a short outage while nothing is running. The first pod of the new version applies the database migrations as it starts.
