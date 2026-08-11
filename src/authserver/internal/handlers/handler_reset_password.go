@@ -33,9 +33,9 @@ const forgotPasswordCodeLifetime = 5 * time.Minute
 // URL with no query at all, so four of those five are no longer determinable and naming them
 // would have the entry assert causes the handler cannot know.
 //
-// Three more live on LinkMarkerRejection (marker_missing, marker_wrong_flow, marker_expired),
-// which is what GetLinkMarker returns, so the handler records what the helper decided rather
-// than re-deriving it from the same state.
+// Four more live on LinkMarkerRejection (marker_missing, marker_wrong_flow, marker_expired,
+// and continuation_in_flight), which is what GetLinkMarker and SaveLinkMarker return, so the
+// handler records what the helper decided rather than re-deriving it from the same state.
 const (
 	// auditReasonUnknownCode is a code that resolves to no outstanding reset. Emitted on
 	// the first hop only, which after this change is the only request where an
@@ -98,9 +98,10 @@ func forgotPasswordCodeMatches(storedCode string, suppliedCode string) bool {
 // renderResetPasswordCodeInvalid renders the reset form in its "invalid or
 // expired" state.
 //
-// Every condition attributable to the link goes through here: an unknown or expired code on
-// the first hop, and a missing, expired or wrong-flow marker, a code hash that no longer
-// resolves, or a lost claim on the two steps after it. Because they all produce the same
+// Every condition attributable to the link goes through here: an unknown or expired code, or
+// another continuation already in flight, on the first hop, and a missing, expired or
+// wrong-flow marker, a code hash that no longer resolves, or a lost claim on the two steps
+// after it. Because they all produce the same
 // response, the endpoint cannot be used to work out which of them happened, and in
 // particular cannot be used to discover whether an email address has an account.
 //
@@ -302,8 +303,24 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 
 	// The marker names the code hash, not only the user: see resolveResetPasswordMarker for
 	// why a marker naming a durable id alone would be weaker than the flow it replaces.
-	if err := SaveLinkMarker(httpSession, w, r, LinkMarkerFlowResetPassword, user.Id, codeHash); err != nil {
+	rejection, err := SaveLinkMarker(httpSession, w, r, LinkMarkerFlowResetPassword, user.Id, codeHash)
+	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
+		return
+	}
+
+	// A second, different reset link followed while one is still live. The first
+	// continuation keeps the session and this one is refused, because one session holds one
+	// marker and the form does not name the marker that rendered it: replacing here would
+	// let a form already on screen write its password into this account instead. The userId
+	// is this link's, which resolved; the account holding the live marker is not named.
+	//
+	// Audited rather than silently rendered, because a burst of these is what someone
+	// pinning a victim's session looks like, and this response is otherwise identical to
+	// every other refusal. Status zero, like the other first-hop rejections: the page was
+	// served, it is the link that was refused.
+	if rejection != "" {
+		rejectResetPassword(httpHelper, auditLogger, w, r, user.Id, string(rejection), 0)
 		return
 	}
 

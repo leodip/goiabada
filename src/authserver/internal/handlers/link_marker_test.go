@@ -56,6 +56,17 @@ func writeRawMarker(t *testing.T, store sessions.Store, value interface{}) *http
 	return requestCarrying(t, rr)
 }
 
+// requireMarkerSaved writes a marker and fails if it was refused, for the cases whose
+// subject is something other than the refusal rule.
+func requireMarkerSaved(t *testing.T, store sessions.Store, rr *httptest.ResponseRecorder,
+	r *http.Request, flow LinkMarkerFlow, id int64, codeHash string) {
+	t.Helper()
+
+	rejection, err := SaveLinkMarker(store, rr, r, flow, id, codeHash)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+}
+
 func marshalMarker(t *testing.T, marker *LinkMarker) string {
 	t.Helper()
 	data, err := json.Marshal(marker)
@@ -70,8 +81,9 @@ func TestSaveAndGetLinkMarker(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	before := time.Now().UTC()
-	err := SaveLinkMarker(store, rr, req, LinkMarkerFlowResetPassword, 42, "the-code-hash")
+	rejection, err := SaveLinkMarker(store, rr, req, LinkMarkerFlowResetPassword, 42, "the-code-hash")
 	require.NoError(t, err)
+	require.Empty(t, rejection)
 	after := time.Now().UTC()
 
 	marker, rejection, err := GetLinkMarker(store, requestCarrying(t, rr), LinkMarkerFlowResetPassword)
@@ -88,6 +100,114 @@ func TestSaveAndGetLinkMarker(t *testing.T) {
 	// A fresh window from validation, not the code's remaining lifetime.
 	assert.False(t, marker.ExpiresAt.Before(before.Add(linkMarkerLifetime)))
 	assert.False(t, marker.ExpiresAt.After(after.Add(linkMarkerLifetime)))
+}
+
+// The refusal rule itself, and the defect it exists for. One session holds one marker and
+// the reset form names nothing about the marker that rendered it, so a second reset link
+// followed between a form rendering and its submit used to retarget that submit into the
+// second account. First writer wins instead (#112).
+func TestSaveLinkMarkerRefusesASecondLiveContinuation(t *testing.T) {
+	store := newMarkerTestStore()
+
+	first := httptest.NewRecorder()
+	requireMarkerSaved(t, store, first,
+		httptest.NewRequest("GET", "/reset-password?code=first", nil),
+		LinkMarkerFlowResetPassword, 42, "hash-a")
+
+	second := httptest.NewRecorder()
+	rejection, err := SaveLinkMarker(store, second, requestCarrying(t, first),
+		LinkMarkerFlowResetPassword, 99, "hash-b")
+
+	require.NoError(t, err)
+	assert.Equal(t, LinkMarkerContinuationInFlight, rejection)
+	assert.Empty(t, second.Result().Cookies(),
+		"a refused save must not write the session back")
+
+	// The browser still holds the first continuation, so the form already on screen keeps
+	// resolving to the account whose link produced it.
+	marker, rejection, err := GetLinkMarker(store, requestCarrying(t, first), LinkMarkerFlowResetPassword)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+	assert.Equal(t, "hash-a", marker.CodeHash)
+	assert.Equal(t, int64(42), marker.Id)
+}
+
+// The same link followed twice is one continuation, not two, and gets a fresh window. The
+// seeded marker has a second left, so a replacement is visible as an ExpiresAt a full
+// lifetime out rather than being indistinguishable from leaving it alone.
+func TestSaveLinkMarkerRefreshesTheSameContinuation(t *testing.T) {
+	store := newMarkerTestStore()
+
+	req := writeRawMarker(t, store, marshalMarker(t, &LinkMarker{
+		Flow:      LinkMarkerFlowResetPassword,
+		Id:        42,
+		CodeHash:  "hash-a",
+		ExpiresAt: time.Now().UTC().Add(time.Second),
+	}))
+
+	rr := httptest.NewRecorder()
+	before := time.Now().UTC()
+	requireMarkerSaved(t, store, rr, req, LinkMarkerFlowResetPassword, 42, "hash-a")
+
+	marker, rejection, err := GetLinkMarker(store, requestCarrying(t, rr), LinkMarkerFlowResetPassword)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+	assert.Equal(t, "hash-a", marker.CodeHash)
+	assert.False(t, marker.ExpiresAt.Before(before.Add(linkMarkerLifetime)),
+		"following the same link again must refresh the window rather than keep the old one")
+}
+
+// An expired marker is replaceable, which is what bounds the refusal: nobody is locked out
+// of a reset for longer than linkMarkerLifetime by a continuation they abandoned.
+func TestSaveLinkMarkerReplacesAnExpiredMarker(t *testing.T) {
+	store := newMarkerTestStore()
+
+	req := writeRawMarker(t, store, expiredResetMarker(t, "hash-a"))
+
+	rr := httptest.NewRecorder()
+	requireMarkerSaved(t, store, rr, req, LinkMarkerFlowResetPassword, 99, "hash-b")
+
+	marker, rejection, err := GetLinkMarker(store, requestCarrying(t, rr), LinkMarkerFlowResetPassword)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+	assert.Equal(t, "hash-b", marker.CodeHash)
+}
+
+// A marker from the other flow is replaceable, deliberately. It cannot retarget anything in
+// the first place: every consuming step of either flow refuses a wrong-flow marker rather
+// than acting on it, so the refusal rule is scoped to the flow that can actually be confused.
+func TestSaveLinkMarkerReplacesTheOtherFlowsMarker(t *testing.T) {
+	store := newMarkerTestStore()
+
+	activation := httptest.NewRecorder()
+	requireMarkerSaved(t, store, activation,
+		httptest.NewRequest("GET", "/account/activate?code=first", nil),
+		LinkMarkerFlowAccountActivate, 7, "hash-a")
+
+	rr := httptest.NewRecorder()
+	requireMarkerSaved(t, store, rr, requestCarrying(t, activation),
+		LinkMarkerFlowResetPassword, 42, "hash-b")
+
+	marker, rejection, err := GetLinkMarker(store, requestCarrying(t, rr), LinkMarkerFlowResetPassword)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+	assert.Equal(t, "hash-b", marker.CodeHash)
+}
+
+// expiredResetMarker is a reset marker already past its window, which SaveLinkMarker cannot
+// write.
+func expiredResetMarker(t *testing.T, codeHash string) string {
+	t.Helper()
+	return marshalMarker(t, &LinkMarker{
+		Flow:      LinkMarkerFlowResetPassword,
+		Id:        42,
+		CodeHash:  codeHash,
+		ExpiresAt: time.Now().UTC().Add(-time.Second),
+	})
 }
 
 func TestGetLinkMarkerMissing(t *testing.T) {
@@ -109,7 +229,7 @@ func TestGetLinkMarkerWrongFlow(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/account/activate?code=abc123", nil)
 	rr := httptest.NewRecorder()
-	require.NoError(t, SaveLinkMarker(store, rr, req, LinkMarkerFlowAccountActivate, 7, "the-code-hash"))
+	requireMarkerSaved(t, store, rr, req, LinkMarkerFlowAccountActivate, 7, "the-code-hash")
 
 	// Both flows share one session key, so an activation marker is what a reset
 	// request finds when the user was mid-activation.
@@ -184,7 +304,7 @@ func TestClearLinkMarker(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/reset-password?code=abc123", nil)
 	rr := httptest.NewRecorder()
-	require.NoError(t, SaveLinkMarker(store, rr, req, LinkMarkerFlowResetPassword, 42, "the-code-hash"))
+	requireMarkerSaved(t, store, rr, req, LinkMarkerFlowResetPassword, 42, "the-code-hash")
 
 	clearReq := requestCarrying(t, rr)
 	clearRr := httptest.NewRecorder()
@@ -206,7 +326,7 @@ func TestClearedLinkMarkerSurvivesInACapturedCookie(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/reset-password?code=abc123", nil)
 	rr := httptest.NewRecorder()
-	require.NoError(t, SaveLinkMarker(store, rr, req, LinkMarkerFlowResetPassword, 42, "the-code-hash"))
+	requireMarkerSaved(t, store, rr, req, LinkMarkerFlowResetPassword, 42, "the-code-hash")
 
 	// What an attacker holding the pre-clear cookies would replay.
 	captured := requestCarrying(t, rr)
@@ -266,11 +386,12 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 		store := mocks_sessionstore.NewStore(t)
 		store.On("Get", mock.Anything, constants.AuthServerSessionName).Return(nil, expectedError)
 
-		err := SaveLinkMarker(store, httptest.NewRecorder(),
+		rejection, err := SaveLinkMarker(store, httptest.NewRecorder(),
 			httptest.NewRequest("GET", "/reset-password", nil),
 			LinkMarkerFlowResetPassword, 42, "the-code-hash")
 
 		assert.ErrorIs(t, err, expectedError)
+		assert.Empty(t, rejection)
 	})
 
 	t.Run("get", func(t *testing.T) {

@@ -120,7 +120,9 @@ func withMarker(t *testing.T, store sessions.Store, req *http.Request, flow Link
 	t.Helper()
 
 	rr := httptest.NewRecorder()
-	require.NoError(t, SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash))
+	rejection, err := SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
 	for _, c := range rr.Result().Cookies() {
 		req.AddCookie(c)
 	}
@@ -330,6 +332,50 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 			auditLogger.AssertExpectations(t)
 		})
 	}
+}
+
+// The wrong-account credential write, closed at its source. One session holds one marker and
+// the form names nothing about the marker that rendered it, so a second link followed while
+// one is live is refused rather than allowed to retarget a form already on screen. Without
+// this the password typed for the first account is written into the second (#112 decision 13).
+func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
+	const secondCode = "the-second-links-code"
+
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	store := newMarkerTestStore()
+
+	// The second link is entirely valid on its own: it is refused for the marker it would
+	// have replaced, not for anything wrong with it.
+	secondUser, secondHash := userWithCode(t, 99, secondCode, time.Now().UTC().Add(-time.Minute))
+	database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), secondHash).Return(secondUser, nil).Once()
+
+	// The entry names the link that was refused, which did resolve. The account holding the
+	// live marker is not in the payload.
+	expectAuditFailedCode(auditLogger, string(LinkMarkerContinuationInFlight), 99)
+	expectRenderedCodeInvalid(httpHelper, 0)
+
+	req := withMarker(t, store, linkFollowedRequest(secondCode), LinkMarkerFlowResetPassword, 42, "the-first-hash")
+
+	handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused second link must not redirect")
+
+	// The first continuation survives untouched, so the form on screen still writes into the
+	// account whose link produced it.
+	marker, rejection, err := GetLinkMarker(store, nextBrowserRequest(t, req, rr), LinkMarkerFlowResetPassword)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+	assert.Equal(t, "the-first-hash", marker.CodeHash)
+	assert.Equal(t, int64(42), marker.Id)
+
+	httpHelper.AssertExpectations(t)
+	database.AssertExpectations(t)
+	auditLogger.AssertExpectations(t)
 }
 
 // The code's own lifetime is enforced on the first hop and nowhere else, so the boundary

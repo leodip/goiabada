@@ -192,16 +192,28 @@ func TestGetPreRegistrationByVerificationCodeHash(t *testing.T) {
 // carry the empty string and CREATE UNIQUE INDEX would abort at startup on any
 // deployment holding two.
 func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T) {
+	// A fixed address rather than a random one, so this case can find and remove its own
+	// leftovers. The shared test database outlives the run and the UNIQUE index allows one
+	// '' row at a time, so a run interrupted before the cleanup below would otherwise leave
+	// this case failing on every later run against that database, with no way to identify
+	// the offending row through the interface: the lookup refuses '' by design, so nothing
+	// can find it by hash.
+	const dormantEmail = "dormant-code-hash@goiabada.test"
+	deleteDormant := func() {
+		if leftover, err := database.GetPreRegistrationByEmail(nil, dormantEmail); err == nil && leftover != nil {
+			_ = database.DeletePreRegistration(nil, leftover.Id)
+		}
+	}
+	deleteDormant()
+	t.Cleanup(deleteDormant)
+
 	dormant := &models.PreRegistration{
-		Email:        gofakeit.Email(),
+		Email:        dormantEmail,
 		PasswordHash: gofakeit.Password(true, true, true, true, false, 16),
 	}
 	if err := database.CreatePreRegistration(nil, dormant); err != nil {
 		t.Fatalf("Failed to create the dormant pre-registration: %v", err)
 	}
-	// The shared test database outlives this test, and the UNIQUE index allows only one
-	// '' row at a time, so leaving it behind would break the next run of this case.
-	t.Cleanup(func() { _ = database.DeletePreRegistration(nil, dormant.Id) })
 
 	if dormant.VerificationCodeHash != "" {
 		t.Fatalf("a pre-registration written without a code hash must carry '', got %q", dormant.VerificationCodeHash)
