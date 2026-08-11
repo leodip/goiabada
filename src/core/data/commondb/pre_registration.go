@@ -126,6 +126,35 @@ func (d *CommonDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int
 	return nil
 }
 
+// GetPreRegistrationByVerificationCodeHash finds the pre-registration an activation code
+// belongs to, by an unsalted SHA-256 of that code. It is what lets the activation link
+// carry the code and nothing else, so no email address travels in it and no part of the
+// link ever needs percent-encoding (#112).
+//
+// Locating the row is not authenticating it. The caller still compares the submitted code
+// against the encrypted column and checks the code's expiry.
+func (d *CommonDatabase) GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, codeHash string) (*models.PreRegistration, error) {
+
+	// As on the user lookup: '' is the dormant value, so an empty codeHash reaching the
+	// query could match a row nobody supplied a code for.
+	if codeHash == "" {
+		return nil, nil
+	}
+
+	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
+		For(d.Flavor)
+
+	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
+	selectBuilder.Where(selectBuilder.Equal("verification_code_hash", codeHash))
+
+	preRegistration, err := d.getPreRegistrationCommon(tx, selectBuilder, preRegistrationStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return preRegistration, nil
+}
+
 func (d *CommonDatabase) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*models.PreRegistration, error) {
 
 	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).

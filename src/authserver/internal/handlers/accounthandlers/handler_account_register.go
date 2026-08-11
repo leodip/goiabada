@@ -161,12 +161,22 @@ func HandleAccountRegisterPost(
 				return
 			}
 
+			// The hash is how the activation link finds this row again, since the link
+			// carries the code and no email address (#112). The encryption above stays: it
+			// is what proves a submitted code matches, where the hash only locates the row.
+			verificationCodeHash, err := hashutil.HashString(verificationCode)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
 			utcNow := time.Now().UTC()
 			preRegistration := &models.PreRegistration{
 				Email:                     email,
 				PasswordHash:              passwordHash,
 				VerificationCodeEncrypted: verificationCodeEncrypted,
 				VerificationCodeIssuedAt:  sql.NullTime{Time: utcNow, Valid: true},
+				VerificationCodeHash:      verificationCodeHash,
 			}
 
 			err = database.CreatePreRegistration(nil, preRegistration)

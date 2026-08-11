@@ -73,8 +73,10 @@ CREATE TABLE `pre_registrations` (
   `password_hash` varchar(64) NOT NULL,
   `verification_code_encrypted` longblob,
   `verification_code_issued_at` datetime(6) DEFAULT NULL,
+  `verification_code_hash` varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
-  KEY `idx_pre_reg_email` (`email`)
+  KEY `idx_pre_reg_email` (`email`),
+  UNIQUE KEY `idx_pre_reg_verification_code_hash` (`verification_code_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `resources` (
@@ -171,13 +173,15 @@ CREATE TABLE `users` (
   `forgot_password_code_issued_at` datetime(6) DEFAULT NULL,
   `auth_state_generation` bigint NOT NULL DEFAULT 0,
   `last_otp_step` bigint NOT NULL DEFAULT 0,
+  `forgot_password_code_hash` varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_subject` (`subject`),
   UNIQUE KEY `idx_email` (`email`),
   KEY `idx_username` (`username`),
   KEY `idx_given_name` (`given_name`),
   KEY `idx_middle_name` (`middle_name`),
-  KEY `idx_family_name` (`family_name`)
+  KEY `idx_family_name` (`family_name`),
+  KEY `idx_users_forgot_password_code_hash` (`forgot_password_code_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Tables with foreign key dependencies (level 1 - depend on base tables)

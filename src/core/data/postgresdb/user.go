@@ -110,6 +110,10 @@ func (d *PostgresDatabase) GetUserByEmail(tx *sql.Tx, email string) (*models.Use
 	return d.CommonDB.GetUserByEmail(tx, email)
 }
 
+func (d *PostgresDatabase) GetUserByForgotPasswordCodeHash(tx *sql.Tx, codeHash string) (*models.User, error) {
+	return d.CommonDB.GetUserByForgotPasswordCodeHash(tx, codeHash)
+}
+
 func (d *PostgresDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error) {
 	return d.CommonDB.GetLastUserWithOTPState(tx, otpEnabledState)
 }
@@ -128,6 +132,11 @@ func (d *PostgresDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId i
 
 func (d *PostgresDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error {
 	return d.CommonDB.SetUserPasswordHash(tx, userId, passwordHash)
+}
+
+func (d *PostgresDatabase) TryConsumeForgotPasswordCode(tx *sql.Tx, userId int64, codeHash string,
+	passwordHash string) (bool, error) {
+	return d.CommonDB.TryConsumeForgotPasswordCode(tx, userId, codeHash, passwordHash)
 }
 
 func (d *PostgresDatabase) TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {

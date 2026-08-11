@@ -48,6 +48,14 @@ type User struct {
 	OTPEnabled                           bool         `db:"otp_enabled"`
 	ForgotPasswordCodeEncrypted          []byte       `db:"forgot_password_code_encrypted"`
 	ForgotPasswordCodeIssuedAt           sql.NullTime `db:"forgot_password_code_issued_at"`
+	// ForgotPasswordCodeHash is an unsalted SHA-256 of the outstanding reset code, and
+	// the only way the reset link finds this row: the link carries the code and nothing
+	// else, so no email address travels in it and no part of it needs percent-encoding
+	// (#112). Empty means no code is outstanding, which is unreachable from any real
+	// code because SHA-256 hex is always 64 characters. The encrypted column beside it
+	// stays: it is what proves a submitted code matches, where this one only locates the
+	// row.
+	ForgotPasswordCodeHash string `db:"forgot_password_code_hash"`
 	// AuthStateGeneration is the authoritative per-user authentication generation:
 	// credentials authenticated under generation N cannot create or use
 	// authentication state once the user advances to N+1. Tagged dont-update because

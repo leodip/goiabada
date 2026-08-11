@@ -10,11 +10,15 @@ import (
 	"testing"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_communication "github.com/leodip/goiabada/core/communication/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -292,4 +296,68 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	assert.Equal(t, []string{"begin", "update", "reset", "commit"}, calls,
 		"both writes belong inside one transaction, otp_enabled first per decision 10, commit last")
 	assert.False(t, user.OTPEnabled)
+}
+
+// TestHandleAPIUserCreatePost_StoresResetCodeHash covers the admin user-create path, which
+// is one of the three places Goiabada issues a password-reset link and the only one with
+// no unit coverage of the email branch before this.
+//
+// The property: the hash stored beside the encrypted code is the hash of the code that
+// actually went into the link. It is the only thing that will find this row when the link
+// comes back, since the link carries the code and no email address (#112), so a hash of
+// anything else leaves the new user unable to set a password at all.
+func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	database := mocks_data.NewDatabase(t)
+	userCreator := mocks_users.NewUserCreator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	emailSender := mocks_communication.NewEmailSender(t)
+
+	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
+		validators.NewEmailValidator(database),
+		validators.NewProfileValidator(database),
+		validators.NewPasswordValidator(),
+		auditLogger, emailSender)
+
+	body, err := json.Marshal(map[string]interface{}{
+		"email":           "newuser@example.com",
+		"setPasswordType": "email",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+		&models.Settings{AppName: "TestApp", SMTPEnabled: true}))
+
+	// The handler mutates this model in place before writing it, so it is what the
+	// assertions below read.
+	createdUser := &models.User{Id: 7, Email: "newuser@example.com"}
+
+	database.On("GetUserByEmail", mock.Anything, "newuser@example.com").Return(nil, nil)
+	userCreator.On("CreateUser", mock.Anything).Return(createdUser, nil)
+	database.On("UpdateUser", mock.Anything, createdUser).Return(nil)
+	auditLogger.On("Log", constants.AuditCreatedUser, mock.Anything).Return()
+	httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+		"/emails/email_newuser_set_password.html", mock.Anything).Return(&bytes.Buffer{}, nil)
+	emailSender.On("SendEmail", mock.Anything, mock.Anything).Return(nil)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusCreated, rr.Code, rr.Body.String())
+
+	// Derived from the code the handler issued, decrypted out of the column it wrote,
+	// rather than from a value this test chose.
+	issuedCode, err := encryption.DecryptData(createdUser.ForgotPasswordCodeEncrypted)
+	require.NoError(t, err)
+	expectedHash, err := hashutil.HashString(issuedCode)
+	require.NoError(t, err)
+	assert.Equal(t, expectedHash, createdUser.ForgotPasswordCodeHash,
+		"the stored hash must be the hash of the code that was issued")
+
+	httpHelper.AssertExpectations(t)
+	database.AssertExpectations(t)
+	emailSender.AssertExpectations(t)
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 
 	"github.com/stretchr/testify/assert"
@@ -458,6 +459,16 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			decryptedCode, err := encryption.DecryptData(preReg.VerificationCodeEncrypted)
 			assert.NoError(t, err)
 			capturedVerificationCode = decryptedCode
+
+			// The hash stored beside the encrypted code is the only thing that will find
+			// this row when the link comes back, since the link carries the code and no
+			// address (#112). Derived from the code the handler actually issued rather
+			// than from a value the test chose: a hash of anything else would leave the
+			// registration unactivatable.
+			expectedHash, err := hashutil.HashString(decryptedCode)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedHash, preReg.VerificationCodeHash,
+				"the stored hash must be the hash of the code that was issued")
 		})
 
 		auditLogger.On("Log", constants.AuditCreatedPreRegistration, mock.MatchedBy(func(details map[string]interface{}) bool {

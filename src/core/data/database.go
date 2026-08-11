@@ -45,6 +45,12 @@ type Database interface {
 	GetUserByUsername(tx *sql.Tx, username string) (*models.User, error)
 	GetUserBySubject(tx *sql.Tx, subject string) (*models.User, error)
 	GetUserByEmail(tx *sql.Tx, email string) (*models.User, error)
+	// GetUserByForgotPasswordCodeHash finds the user holding an outstanding reset code,
+	// by an unsalted SHA-256 of that code. This is what lets the reset link carry the
+	// code and nothing else, so no email address travels in it (#112). An empty codeHash
+	// returns (nil, nil) without querying: '' is the dormant value on every row with no
+	// code outstanding, so a query would match one of them.
+	GetUserByForgotPasswordCodeHash(tx *sql.Tx, codeHash string) (*models.User, error)
 	GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error)
 	SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error)
 	DeleteUser(tx *sql.Tx, userId int64) error
@@ -62,6 +68,18 @@ type Database interface {
 	// forgot-password code in the same statement. Narrow rather than a full-row
 	// update, so a concurrent admin disable cannot be undone by it (#106).
 	SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error
+	// TryConsumeForgotPasswordCode writes a password hash and claims the outstanding
+	// reset code in one conditional UPDATE, reporting whether this call is the one that
+	// made the transition. Compare-and-set for the same reason MarkCodeAsUsed is: a
+	// read-then-unconditional-write lets two concurrent requests both believe they
+	// completed the reset.
+	//
+	// Separate from SetUserPasswordHash rather than a fourth parameter on it, because
+	// its other two callers (admin user create, account password change) hold no
+	// outstanding code and would have to pass a meaningless predicate. An empty codeHash
+	// or a zero userId is an error rather than a false: '' is the dormant value on every
+	// row with no code outstanding, so an empty predicate would claim one of them (#112).
+	TryConsumeForgotPasswordCode(tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
 	// TrySetUserEnabled flips enabled from expected to desired, reporting whether this
 	// call made the transition. Compare-and-set for the same reason MarkCodeAsUsed is.
 	// The disable direction's return gates the revocation sweep (#106).
@@ -259,6 +277,12 @@ type Database interface {
 	UpdatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error
 	GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*models.PreRegistration, error)
 	GetPreRegistrationByEmail(tx *sql.Tx, email string) (*models.PreRegistration, error)
+	// GetPreRegistrationByVerificationCodeHash finds the pre-registration an activation
+	// code belongs to, by an unsalted SHA-256 of that code. This is what lets the
+	// activation link carry the code and nothing else, so no email address travels in it
+	// (#112). An empty codeHash returns (nil, nil) without querying, as the user lookup
+	// does.
+	GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, codeHash string) (*models.PreRegistration, error)
 	DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error
 
 	CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error

@@ -142,6 +142,7 @@ CREATE TABLE [pre_registrations] (
     [password_hash] NVARCHAR(64) NOT NULL,
     [verification_code_encrypted] VARBINARY(MAX) NULL,
     [verification_code_issued_at] DATETIME2(6) NULL,
+    [verification_code_hash] NVARCHAR(64) NOT NULL CONSTRAINT [df_pre_registrations_verification_code_hash] DEFAULT '',
     CONSTRAINT [PK_pre_registrations] PRIMARY KEY ([id])
 );
 
@@ -364,6 +365,7 @@ CREATE TABLE [users] (
     [forgot_password_code_issued_at] DATETIME2(6) NULL,
     [auth_state_generation] BIGINT NOT NULL CONSTRAINT [df_users_auth_state_generation] DEFAULT 0,
     [last_otp_step] BIGINT NOT NULL CONSTRAINT [df_users_last_otp_step] DEFAULT 0,
+    [forgot_password_code_hash] NVARCHAR(64) NOT NULL CONSTRAINT [df_users_forgot_password_code_hash] DEFAULT '',
     CONSTRAINT [PK_users] PRIMARY KEY ([id])
 );
 
@@ -430,6 +432,8 @@ CREATE UNIQUE INDEX [idx_group_identifier] ON [groups] (group_identifier);
 CREATE INDEX [idx_state] ON [key_pairs] (state);
 CREATE UNIQUE INDEX [idx_permission_identifier_resource] ON [permissions] (permission_identifier, resource_id);
 CREATE INDEX [idx_pre_reg_email] ON [pre_registrations] (email);
+CREATE UNIQUE INDEX [idx_pre_reg_verification_code_hash] ON [pre_registrations] ([verification_code_hash]);
+CREATE INDEX [idx_users_forgot_password_code_hash] ON [users] ([forgot_password_code_hash]);
 CREATE UNIQUE INDEX [idx_refresh_token_jti] ON [refresh_tokens] (refresh_token_jti);
 CREATE INDEX [idx_refresh_tokens_user_id] ON [refresh_tokens] ([user_id]);
 CREATE INDEX [idx_refresh_tokens_client_id] ON [refresh_tokens] ([client_id]);

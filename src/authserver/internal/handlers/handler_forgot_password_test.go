@@ -15,6 +15,8 @@ import (
 
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -209,6 +211,18 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
+
+		// The hash stored beside the encrypted code is the only thing that will find this
+		// row when the link comes back, since the link carries the code and no address
+		// (#112). Derived from the code the handler actually issued, decrypted out of the
+		// column it wrote, rather than from a value the test chose: a hash of anything
+		// else would leave the user unable to reset at all.
+		issuedCode, err := encryption.DecryptData(user.ForgotPasswordCodeEncrypted)
+		assert.NoError(t, err)
+		expectedHash, err := hashutil.HashString(issuedCode)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedHash, user.ForgotPasswordCodeHash,
+			"the stored hash must be the hash of the code that was issued")
 
 		httpHelper.AssertExpectations(t)
 		database.AssertExpectations(t)

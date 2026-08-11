@@ -22,6 +22,10 @@ func (d *SQLiteDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int
 	return d.CommonDB.DeletePreRegistration(tx, preRegistrationId)
 }
 
+func (d *SQLiteDatabase) GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, codeHash string) (*models.PreRegistration, error) {
+	return d.CommonDB.GetPreRegistrationByVerificationCodeHash(tx, codeHash)
+}
+
 func (d *SQLiteDatabase) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*models.PreRegistration, error) {
 	return d.CommonDB.GetPreRegistrationByEmail(tx, email)
 }
