@@ -16,7 +16,7 @@ A new version can add columns, indexes and constraints the old one knows nothing
 If you run a single container or a single binary, you already do this. Replacing it stops the old version before the new one starts.
 
 <Aside type="caution">
-On Kubernetes, a rolling update deliberately runs both versions side by side until the rollout finishes. Set the deployment's strategy to `Recreate`, or scale it to zero and apply once the old pods are gone. `kubectl scale` returns before they are, so that path needs an explicit wait: [Updating Goiabada](/production-deployment/kubernetes/#updating-goiabada) has the commands.
+On Kubernetes, a rolling update deliberately runs both versions side by side until the rollout finishes. Scale both deployments to zero, wait for every pod to go, then apply. `kubectl scale` returns before the pods are gone, so that wait isn't optional, and a `Recreate` strategy doesn't cover it either: `Recreate` orders one deployment's own pods, and Goiabada runs two. [Updating Goiabada](/production-deployment/kubernetes/#updating-goiabada) has the commands.
 </Aside>
 
 Back up your database first. Migrations only run forward, and some of them delete rows, so a downgrade won't always give you what you had.

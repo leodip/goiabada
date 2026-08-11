@@ -362,13 +362,7 @@ Both services expose health checks used by Kubernetes probes:
 Run one version at a time. A rolling update keeps the old pods serving until the new ones are ready, so both versions talk to the same database at once, and that isn't supported. See [Upgrading](/production-deployment/upgrading/) for what it can break.
 
 1. Update image tags in your manifest or regenerate with the setup wizard
-2. Set the deployment strategy so the old pods go away before the new ones start:
-   ```yaml
-   spec:
-     strategy:
-       type: Recreate
-   ```
-   Or scale to zero by hand. `kubectl scale` returns as soon as the API accepts the change, not when the pods are gone, so wait for them to be deleted before you go any further. Applying while an old pod is still terminating starts the new version alongside it, which is the state this whole section exists to avoid:
+2. Scale both deployments to zero and wait for every pod to go. `kubectl scale` returns as soon as the API accepts the change, not when the pods are gone, so the wait isn't optional. Applying while an old pod is still terminating starts the new version alongside it, which is the state this whole section exists to avoid:
    ```bash
    kubectl scale deployment goiabada-authserver goiabada-adminconsole -n goiabada --replicas=0
    kubectl wait --for=delete pod -l app=goiabada-authserver -n goiabada --timeout=120s
@@ -376,6 +370,8 @@ Run one version at a time. A rolling update keeps the old pods serving until the
    kubectl get pods -n goiabada
    ```
    `kubectl wait` reporting that no matching resources were found means the pods have already gone, which is the answer you want. Check that `kubectl get pods` lists no auth server or admin console pod before continuing.
+
+   A `Recreate` deployment strategy doesn't replace this step. It stops the old pods before starting the new ones inside a single deployment, and Goiabada runs two of them: the auth server and the admin console. Nothing coordinates the pair, so either one can start its new pod while the other is still serving the old version.
 3. Apply changes:
    ```bash
    kubectl apply -f goiabada-k8s.yaml
