@@ -71,6 +71,10 @@ func (d *MsSQLDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int6
 	return d.CommonDB.DeletePreRegistration(tx, preRegistrationId)
 }
 
+func (d *MsSQLDatabase) GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, codeHash string) (*models.PreRegistration, error) {
+	return d.CommonDB.GetPreRegistrationByVerificationCodeHash(tx, codeHash)
+}
+
 func (d *MsSQLDatabase) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*models.PreRegistration, error) {
 	return d.CommonDB.GetPreRegistrationByEmail(tx, email)
 }

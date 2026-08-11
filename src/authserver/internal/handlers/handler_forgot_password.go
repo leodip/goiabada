@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/stringutil"
 )
@@ -73,7 +74,17 @@ func HandleForgotPasswordPost(
 				return
 			}
 
+			// The hash is how the reset link finds this row again, since the link carries
+			// the code and no email address (#112). The encryption above stays: it is what
+			// proves a submitted code matches, where the hash only locates the row.
+			verificationCodeHash, err := hashutil.HashString(verificationCode)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
 			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
+			user.ForgotPasswordCodeHash = verificationCodeHash
 			utcNow := time.Now().UTC()
 			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
 			err = database.UpdateUser(nil, user)

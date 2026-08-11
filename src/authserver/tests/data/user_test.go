@@ -12,6 +12,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -1043,5 +1044,459 @@ func TestUpdateUser_DoesNotClobberLastOTPStep(t *testing.T) {
 	}
 	if after.GivenName != "Changed" {
 		t.Errorf("the rest of the update must still apply, GivenName = %q", after.GivenName)
+	}
+}
+
+// codeHashOf is what the three issue sites store: an unsalted SHA-256 hex of the code
+// that went into the link. The tests use real hashes rather than short literals because
+// the column's meaning depends on the shape. The empty string reads as "no code
+// outstanding" precisely
+// because SHA-256 hex is always 64 characters, so a table built on "abc" would not
+// exercise the same distinction (#112).
+func codeHashOf(t *testing.T, code string) string {
+	t.Helper()
+	hash, err := hashutil.HashString(code)
+	if err != nil {
+		t.Fatalf("HashString: %v", err)
+	}
+	return hash
+}
+
+// createUserWithResetCode returns a saved user carrying an outstanding forgot-password
+// code, plus the hash the reset link would find it by. createTestUser leaves the hash at
+// its empty default, so an ordinary test user is a dormant row for these lookups.
+func createUserWithResetCode(t *testing.T) (*models.User, string) {
+	t.Helper()
+	user := createTestUser(t)
+	hash := codeHashOf(t, uuid.NewString())
+	user.ForgotPasswordCodeEncrypted = []byte("PENDINGRESETCODE")
+	user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
+	user.ForgotPasswordCodeHash = hash
+	if err := database.UpdateUser(nil, user); err != nil {
+		t.Fatalf("Failed to seed an outstanding reset code: %v", err)
+	}
+	return user, hash
+}
+
+// TestGetUserByForgotPasswordCodeHash is the identity half of seam 2 for the reset flow:
+// the link carries the code and no address, so this lookup is the only thing that says
+// which user a reset link belongs to (#112).
+//
+// The dormant-row cases are the ones that matter. Every user with no outstanding code
+// carries the empty string, so a lookup reaching the query with an empty hash would hand back
+// somebody else's account.
+func TestGetUserByForgotPasswordCodeHash(t *testing.T) {
+	user, hash := createUserWithResetCode(t)
+
+	// 1. The hash that was stored finds the row it was stored on.
+	found, err := database.GetUserByForgotPasswordCodeHash(nil, hash)
+	if err != nil {
+		t.Fatalf("lookup by the stored hash failed: %v", err)
+	}
+	if found == nil {
+		t.Fatal("the stored hash must find the user it was stored on")
+	}
+	if found.Id != user.Id {
+		t.Errorf("found user id %d, want %d", found.Id, user.Id)
+	}
+	if found.ForgotPasswordCodeHash != hash {
+		t.Errorf("round-tripped hash = %q, want %q", found.ForgotPasswordCodeHash, hash)
+	}
+
+	// 2. A hash no row carries is a miss, not an error. The handler renders the same
+	// indistinguishable page for a miss as for a wrong code, so a spurious error here
+	// would surface as a 500 and tell an attacker the difference.
+	missing, err := database.GetUserByForgotPasswordCodeHash(nil, codeHashOf(t, uuid.NewString()))
+	if err != nil {
+		t.Errorf("a hash no row carries must not be an error, got: %v", err)
+	}
+	if missing != nil {
+		t.Errorf("a hash no row carries must return nil, got user id %d", missing.Id)
+	}
+}
+
+// TestGetUserByForgotPasswordCodeHash_EmptyNeverMatches is case 3 and case 4 of the
+// table, and the pair is deliberate. Case 3 proves an empty hash finds nothing with several dormant
+// rows in place; case 4 proves the same from the other side, that a real 64-hex hash
+// still misses while those dormant rows exist. Without case 4 a lookup could be passing
+// case 3 purely on the empty-code guard while the query itself matched dormant rows.
+func TestGetUserByForgotPasswordCodeHash_EmptyNeverMatches(t *testing.T) {
+	// Three users with no outstanding code, so the '' value is present several times
+	// over. The plain (non-UNIQUE) index on this column is what makes that legal, and
+	// this is the case that would find a UNIQUE one.
+	dormant := make([]*models.User, 0, 3)
+	for i := 0; i < 3; i++ {
+		u := createTestUser(t)
+		if u.ForgotPasswordCodeHash != "" {
+			t.Fatalf("a fresh user must carry no code hash, got %q", u.ForgotPasswordCodeHash)
+		}
+		dormant = append(dormant, u)
+	}
+
+	// 3. The empty hash matches none of them.
+	found, err := database.GetUserByForgotPasswordCodeHash(nil, "")
+	if err != nil {
+		t.Errorf("an empty hash must not be an error, got: %v", err)
+	}
+	if found != nil {
+		t.Errorf("an empty hash matched user id %d; every user with no outstanding code carries '' and none of them may be findable",
+			found.Id)
+	}
+
+	// 4. A real hash nobody holds still misses, with those same dormant rows present.
+	found, err = database.GetUserByForgotPasswordCodeHash(nil, codeHashOf(t, "a code no user was ever issued"))
+	if err != nil {
+		t.Errorf("a hash no row carries must not be an error, got: %v", err)
+	}
+	if found != nil {
+		t.Errorf("a hash no row carries matched user id %d", found.Id)
+	}
+
+	for _, u := range dormant {
+		reloaded, err := database.GetUserById(nil, u.Id)
+		if err != nil {
+			t.Fatalf("Failed to reload a dormant user: %v", err)
+		}
+		if reloaded.ForgotPasswordCodeHash != "" {
+			t.Errorf("a dormant user's hash changed to %q; nothing in this test writes it", reloaded.ForgotPasswordCodeHash)
+		}
+	}
+}
+
+// TestSetUserPasswordHash_ClearsCodeHash is case 5: setting a password makes the
+// outstanding code's hash unfindable. The expiry check would still refuse a used code,
+// but the row should not be locatable by that hash at all.
+//
+// The lookup runs before and after on purpose. Asserting only the "after" would pass with
+// the clear reverted if the hash had never been findable to begin with.
+func TestSetUserPasswordHash_ClearsCodeHash(t *testing.T) {
+	user, hash := createUserWithResetCode(t)
+
+	before, err := database.GetUserByForgotPasswordCodeHash(nil, hash)
+	if err != nil || before == nil {
+		t.Fatalf("the seeded hash must be findable before the password write: user=%v err=%v", before, err)
+	}
+
+	if err := database.SetUserPasswordHash(nil, user.Id, "newhash"); err != nil {
+		t.Fatalf("SetUserPasswordHash failed: %v", err)
+	}
+
+	after, err := database.GetUserByForgotPasswordCodeHash(nil, hash)
+	if err != nil {
+		t.Fatalf("lookup after the password write failed: %v", err)
+	}
+	if after != nil {
+		t.Errorf("the hash still finds user id %d after the password was set; SetUserPasswordHash must clear it in the same statement",
+			after.Id)
+	}
+
+	reloaded, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if reloaded.ForgotPasswordCodeHash != "" {
+		t.Errorf("forgot_password_code_hash = %q after the password write, want the dormant ''",
+			reloaded.ForgotPasswordCodeHash)
+	}
+}
+
+// TestGetUserByForgotPasswordCodeHash_Transaction is cases 6 and 7: the lookup runs on
+// the caller's transaction, and a failure propagates as an error rather than as a benign
+// "no such code".
+//
+// It reads only THROUGH the transaction while that transaction is open, never around it.
+// A second connection reading the same row cannot run on all four engines: sqlite is
+// limited to one connection (SetMaxOpenConns(1)) so the outside read would queue rather
+// than fail, and SQL Server's READ COMMITTED takes shared row locks rather than reading a
+// snapshot, so it would block. transaction_test.go documents both. The outside read here
+// happens only after the transaction is finished, which needs no second connection.
+func TestGetUserByForgotPasswordCodeHash_Transaction(t *testing.T) {
+	hash := codeHashOf(t, uuid.NewString())
+
+	// The user is created BEFORE the transaction opens. sqlite runs with
+	// SetMaxOpenConns(1), so a pooled write while a transaction holds that one connection
+	// waits for a connection that cannot be released until the transaction ends, and the
+	// test hangs rather than failing.
+	user := createTestUser(t)
+
+	tx := beginTx(t)
+
+	user.ForgotPasswordCodeHash = hash
+	if err := database.UpdateUser(tx, user); err != nil {
+		t.Fatalf("Failed to write the code hash inside the transaction: %v", err)
+	}
+
+	// 6. Visible through the transaction that wrote it. A method ignoring its tx would
+	// query the pool, which cannot see this write.
+	inTx, err := database.GetUserByForgotPasswordCodeHash(tx, hash)
+	if err != nil {
+		t.Fatalf("lookup through the writing transaction failed: %v", err)
+	}
+	if inTx == nil {
+		t.Fatal("a row written in this transaction must be visible through it (did the lookup ignore its tx?)")
+	}
+	if inTx.Id != user.Id {
+		t.Errorf("found user id %d through the transaction, want %d", inTx.Id, user.Id)
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction failed: %v", err)
+	}
+
+	// 7a. Rolled back, so nothing carries the hash any more.
+	afterRollback, err := database.GetUserByForgotPasswordCodeHash(nil, hash)
+	if err != nil {
+		t.Fatalf("lookup after rollback failed: %v", err)
+	}
+	if afterRollback != nil {
+		t.Errorf("a rolled-back write must leave no findable hash, found user id %d", afterRollback.Id)
+	}
+
+	// 7b. The finished transaction is the forced fault. A driver failure must not
+	// collapse into "no such code": the reset flow reads that as a wrong code and
+	// refuses, which is safe, but it is a 500 and the record must say so.
+	failed, err := database.GetUserByForgotPasswordCodeHash(tx, hash)
+	if err == nil {
+		t.Error("a lookup through a finished transaction must return an error, not a benign nil")
+	}
+	if failed != nil {
+		t.Error("a failed lookup must never return a user")
+	}
+}
+
+// TestTryConsumeForgotPasswordCode is cases 16 to 19: the claim table for the conditional
+// write that ends a password reset.
+//
+// The second call is the case the whole method turns on. The reset flow's "this code was
+// validated" marker lives in a client-side encrypted session cookie, so clearing it in a
+// response cannot invalidate a copy an attacker kept; what refuses the replay is that the
+// claim's predicate no longer matches (#112).
+func TestTryConsumeForgotPasswordCode(t *testing.T) {
+	user, hash := createUserWithResetCode(t)
+
+	// 16. The stored hash claims, writes the password, and clears all three code columns.
+	claimed, err := database.TryConsumeForgotPasswordCode(nil, user.Id, hash, "firstpassword")
+	if err != nil {
+		t.Fatalf("the first claim failed: %v", err)
+	}
+	if !claimed {
+		t.Fatal("the first claim of an outstanding code must report the transition")
+	}
+
+	after, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if after.PasswordHash != "firstpassword" {
+		t.Errorf("PasswordHash = %q, want %q", after.PasswordHash, "firstpassword")
+	}
+	if len(after.ForgotPasswordCodeEncrypted) != 0 {
+		t.Error("the encrypted code must be cleared in the same statement")
+	}
+	if after.ForgotPasswordCodeIssuedAt.Valid {
+		t.Error("the issued-at must be cleared in the same statement")
+	}
+	if after.ForgotPasswordCodeHash != "" {
+		t.Errorf("the code hash must be cleared in the same statement, got %q", after.ForgotPasswordCodeHash)
+	}
+
+	// 17. The same hash again claims nothing and leaves the first password standing.
+	// Without the hash in the WHERE clause this returns true and overwrites it.
+	replayed, err := database.TryConsumeForgotPasswordCode(nil, user.Id, hash, "replayedpassword")
+	if err != nil {
+		t.Fatalf("the replayed claim errored rather than reporting false: %v", err)
+	}
+	if replayed {
+		t.Error("a second claim of a consumed code must report false")
+	}
+
+	afterReplay, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if afterReplay.PasswordHash != "firstpassword" {
+		t.Errorf("a replayed claim rewrote the password to %q; it must leave the first one in place",
+			afterReplay.PasswordHash)
+	}
+
+	// 18. A real hash the row does not carry changes nothing either.
+	other, otherHash := createUserWithResetCode(t)
+	wrong, err := database.TryConsumeForgotPasswordCode(nil, other.Id, codeHashOf(t, uuid.NewString()), "wrongpassword")
+	if err != nil {
+		t.Fatalf("a claim with a non-matching hash errored: %v", err)
+	}
+	if wrong {
+		t.Error("a claim with a hash the row does not carry must report false")
+	}
+	otherAfter, err := database.GetUserById(nil, other.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload the second user: %v", err)
+	}
+	if otherAfter.PasswordHash == "wrongpassword" {
+		t.Error("a claim with a non-matching hash wrote the password anyway")
+	}
+	if otherAfter.ForgotPasswordCodeHash != otherHash {
+		t.Errorf("a claim with a non-matching hash cleared the outstanding one, got %q want %q",
+			otherAfter.ForgotPasswordCodeHash, otherHash)
+	}
+
+	// 19. Both guards are errors rather than a benign false, and neither touches the row.
+	// '' is the dormant value on every user with no code outstanding, so an empty
+	// predicate would claim one of them and set a password on an account nobody asked to
+	// reset.
+	if _, err := database.TryConsumeForgotPasswordCode(nil, other.Id, "", "guardedpassword"); err == nil {
+		t.Error("an empty code hash must return an error")
+	}
+	if _, err := database.TryConsumeForgotPasswordCode(nil, 0, otherHash, "guardedpassword"); err == nil {
+		t.Error("a zero user id must return an error")
+	}
+	guarded, err := database.GetUserById(nil, other.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload the second user: %v", err)
+	}
+	if guarded.PasswordHash == "guardedpassword" || guarded.ForgotPasswordCodeHash != otherHash {
+		t.Error("a guarded call must not touch the row")
+	}
+}
+
+// TestTryConsumeForgotPasswordCode_EnlistsInTransactionAndFailsClosed is case 20, and it
+// is the property the sequential table above cannot reach.
+//
+// Stage 3 calls this method inside the transaction that also revokes the user's sessions
+// and refresh tokens. A claim that ignored its tx would commit the new password and clear
+// the reset code while that sweep rolled back, leaving the user with a new password and
+// every stolen session still live.
+func TestTryConsumeForgotPasswordCode_EnlistsInTransactionAndFailsClosed(t *testing.T) {
+	user, hash := createUserWithResetCode(t)
+	originalPassword := user.PasswordHash
+
+	tx := beginTx(t)
+	claimed, err := database.TryConsumeForgotPasswordCode(tx, user.Id, hash, "committedpassword")
+	if err != nil {
+		t.Fatalf("claim inside a transaction failed: %v", err)
+	}
+	if !claimed {
+		t.Fatal("claim inside a transaction should report the transition")
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction failed: %v", err)
+	}
+
+	reloaded, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if reloaded.PasswordHash != originalPassword {
+		t.Errorf("a rolled-back claim persisted the password (%q); did the method escape its transaction?",
+			reloaded.PasswordHash)
+	}
+	if reloaded.ForgotPasswordCodeHash != hash {
+		t.Errorf("a rolled-back claim cleared the outstanding code hash, got %q want %q",
+			reloaded.ForgotPasswordCodeHash, hash)
+	}
+
+	// The code is claimable again, which is the same fact from the other side.
+	afterRollback, err := database.TryConsumeForgotPasswordCode(nil, user.Id, hash, "secondpassword")
+	if err != nil {
+		t.Fatalf("claim after rollback failed: %v", err)
+	}
+	if !afterRollback {
+		t.Error("a rolled-back claim must leave the code claimable")
+	}
+
+	// The finished transaction is the forced fault: an error, never a benign false.
+	failed, err := database.TryConsumeForgotPasswordCode(tx, user.Id, hash, "faultedpassword")
+	if err == nil {
+		t.Error("a claim through a finished transaction must return an error, not a benign false")
+	}
+	if failed {
+		t.Error("a failed claim must never report true")
+	}
+}
+
+// TestTryConsumeForgotPasswordCode_ConcurrentCallersProduceOneWinner is case 21, and the
+// only case that can refuse a read-then-unconditional-write: cases 16 to 19 are all
+// sequential and such an implementation satisfies every one of them while still letting
+// two concurrent submissions of one reset link both set a password.
+//
+// Follows TestTryConsumeUserOTPStep_ConcurrentCallersProduceOneWinner, including its
+// honesty: overlap can be made likely but not forced, so a green run detects a broken
+// implementation probabilistically rather than certifying atomicity. A lock-wait timeout
+// counts as "did not claim", because in production it is a 500 and the reset is refused.
+func TestTryConsumeForgotPasswordCode_ConcurrentCallersProduceOneWinner(t *testing.T) {
+	if dbType() == "sqlite" || dbType() == "" {
+		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so callers queue " +
+			"rather than contend; the test would pass without ever creating overlap")
+	}
+
+	const (
+		callers = 8
+		rounds  = 5
+	)
+
+	for round := 0; round < rounds; round++ {
+		// A fresh user and a fresh code per round, so each round is a first claim.
+		user, hash := createUserWithResetCode(t)
+
+		type outcome struct {
+			claimed  bool
+			err      error
+			password string
+		}
+		outcomes := make([]outcome, callers)
+
+		// Every caller waits on the same barrier so they hit the row together, and each
+		// carries a distinct candidate password so the winner is identifiable.
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+
+		for i := 0; i < callers; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				password := fmt.Sprintf("password-%d-%d", round, i)
+				<-start
+				claimed, err := database.TryConsumeForgotPasswordCode(nil, user.Id, hash, password)
+				outcomes[i] = outcome{claimed: claimed, err: err, password: password}
+			}(i)
+		}
+
+		close(start)
+		wg.Wait()
+
+		wins, failures := 0, 0
+		winner := ""
+		for _, o := range outcomes {
+			if o.err != nil {
+				failures++
+				continue
+			}
+			if o.claimed {
+				wins++
+				winner = o.password
+			}
+		}
+
+		if wins != 1 {
+			t.Fatalf("round %d: expected exactly 1 winner among %d concurrent claims, got %d (%d errored)",
+				round, callers, wins, failures)
+		}
+		if failures > 0 {
+			t.Logf("round %d: 1 winner, %d lock contention errors (acceptable)", round, failures)
+		}
+
+		reloaded, err := database.GetUserById(nil, user.Id)
+		if err != nil {
+			t.Fatalf("round %d: Failed to reload user: %v", round, err)
+		}
+		if reloaded.PasswordHash != winner {
+			t.Fatalf("round %d: stored password = %q, want the winner's %q",
+				round, reloaded.PasswordHash, winner)
+		}
+		if reloaded.ForgotPasswordCodeHash != "" {
+			t.Fatalf("round %d: the winning claim must clear the code hash, got %q",
+				round, reloaded.ForgotPasswordCodeHash)
+		}
 	}
 }

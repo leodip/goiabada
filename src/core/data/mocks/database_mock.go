@@ -6143,6 +6143,74 @@ func (_c *Database_GetPreRegistrationById_Call) RunAndReturn(run func(tx *sql.Tx
 	return _c
 }
 
+// GetPreRegistrationByVerificationCodeHash provides a mock function for the type Database
+func (_mock *Database) GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, codeHash string) (*models.PreRegistration, error) {
+	ret := _mock.Called(tx, codeHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPreRegistrationByVerificationCodeHash")
+	}
+
+	var r0 *models.PreRegistration
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (*models.PreRegistration, error)); ok {
+		return returnFunc(tx, codeHash)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) *models.PreRegistration); ok {
+		r0 = returnFunc(tx, codeHash)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.PreRegistration)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
+		r1 = returnFunc(tx, codeHash)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetPreRegistrationByVerificationCodeHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPreRegistrationByVerificationCodeHash'
+type Database_GetPreRegistrationByVerificationCodeHash_Call struct {
+	*mock.Call
+}
+
+// GetPreRegistrationByVerificationCodeHash is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - codeHash string
+func (_e *Database_Expecter) GetPreRegistrationByVerificationCodeHash(tx any, codeHash any) *Database_GetPreRegistrationByVerificationCodeHash_Call {
+	return &Database_GetPreRegistrationByVerificationCodeHash_Call{Call: _e.mock.On("GetPreRegistrationByVerificationCodeHash", tx, codeHash)}
+}
+
+func (_c *Database_GetPreRegistrationByVerificationCodeHash_Call) Run(run func(tx *sql.Tx, codeHash string)) *Database_GetPreRegistrationByVerificationCodeHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetPreRegistrationByVerificationCodeHash_Call) Return(preRegistration *models.PreRegistration, err error) *Database_GetPreRegistrationByVerificationCodeHash_Call {
+	_c.Call.Return(preRegistration, err)
+	return _c
+}
+
+func (_c *Database_GetPreRegistrationByVerificationCodeHash_Call) RunAndReturn(run func(tx *sql.Tx, codeHash string) (*models.PreRegistration, error)) *Database_GetPreRegistrationByVerificationCodeHash_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRedirectURIById provides a mock function for the type Database
 func (_mock *Database) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error) {
 	ret := _mock.Called(tx, redirectURIId)
@@ -7091,6 +7159,74 @@ func (_c *Database_GetUserByEmail_Call) Return(user *models.User, err error) *Da
 }
 
 func (_c *Database_GetUserByEmail_Call) RunAndReturn(run func(tx *sql.Tx, email string) (*models.User, error)) *Database_GetUserByEmail_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetUserByForgotPasswordCodeHash provides a mock function for the type Database
+func (_mock *Database) GetUserByForgotPasswordCodeHash(tx *sql.Tx, codeHash string) (*models.User, error) {
+	ret := _mock.Called(tx, codeHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserByForgotPasswordCodeHash")
+	}
+
+	var r0 *models.User
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (*models.User, error)); ok {
+		return returnFunc(tx, codeHash)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) *models.User); ok {
+		r0 = returnFunc(tx, codeHash)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.User)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
+		r1 = returnFunc(tx, codeHash)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetUserByForgotPasswordCodeHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserByForgotPasswordCodeHash'
+type Database_GetUserByForgotPasswordCodeHash_Call struct {
+	*mock.Call
+}
+
+// GetUserByForgotPasswordCodeHash is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - codeHash string
+func (_e *Database_Expecter) GetUserByForgotPasswordCodeHash(tx any, codeHash any) *Database_GetUserByForgotPasswordCodeHash_Call {
+	return &Database_GetUserByForgotPasswordCodeHash_Call{Call: _e.mock.On("GetUserByForgotPasswordCodeHash", tx, codeHash)}
+}
+
+func (_c *Database_GetUserByForgotPasswordCodeHash_Call) Run(run func(tx *sql.Tx, codeHash string)) *Database_GetUserByForgotPasswordCodeHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetUserByForgotPasswordCodeHash_Call) Return(user *models.User, err error) *Database_GetUserByForgotPasswordCodeHash_Call {
+	_c.Call.Return(user, err)
+	return _c
+}
+
+func (_c *Database_GetUserByForgotPasswordCodeHash_Call) RunAndReturn(run func(tx *sql.Tx, codeHash string) (*models.User, error)) *Database_GetUserByForgotPasswordCodeHash_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -10315,6 +10451,84 @@ func (_c *Database_TryClaimCleanupRun_Call) Return(b bool, err error) *Database_
 }
 
 func (_c *Database_TryClaimCleanupRun_Call) RunAndReturn(run func(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)) *Database_TryClaimCleanupRun_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TryConsumeForgotPasswordCode provides a mock function for the type Database
+func (_mock *Database) TryConsumeForgotPasswordCode(tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error) {
+	ret := _mock.Called(tx, userId, codeHash, passwordHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryConsumeForgotPasswordCode")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, string, string) (bool, error)); ok {
+		return returnFunc(tx, userId, codeHash, passwordHash)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, string, string) bool); ok {
+		r0 = returnFunc(tx, userId, codeHash, passwordHash)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64, string, string) error); ok {
+		r1 = returnFunc(tx, userId, codeHash, passwordHash)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryConsumeForgotPasswordCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryConsumeForgotPasswordCode'
+type Database_TryConsumeForgotPasswordCode_Call struct {
+	*mock.Call
+}
+
+// TryConsumeForgotPasswordCode is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+//   - codeHash string
+//   - passwordHash string
+func (_e *Database_Expecter) TryConsumeForgotPasswordCode(tx any, userId any, codeHash any, passwordHash any) *Database_TryConsumeForgotPasswordCode_Call {
+	return &Database_TryConsumeForgotPasswordCode_Call{Call: _e.mock.On("TryConsumeForgotPasswordCode", tx, userId, codeHash, passwordHash)}
+}
+
+func (_c *Database_TryConsumeForgotPasswordCode_Call) Run(run func(tx *sql.Tx, userId int64, codeHash string, passwordHash string)) *Database_TryConsumeForgotPasswordCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryConsumeForgotPasswordCode_Call) Return(b bool, err error) *Database_TryConsumeForgotPasswordCode_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryConsumeForgotPasswordCode_Call) RunAndReturn(run func(tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)) *Database_TryConsumeForgotPasswordCode_Call {
 	_c.Call.Return(run)
 	return _c
 }

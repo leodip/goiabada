@@ -101,7 +101,7 @@ CREATE TABLE users (
   forgot_password_code_encrypted BLOB,
   forgot_password_code_issued_at DATETIME
 , phone_number_country_uniqueid TEXT, phone_number_country_callingcode TEXT
-, auth_state_generation INTEGER NOT NULL DEFAULT 0, last_otp_step INTEGER NOT NULL DEFAULT 0);
+, auth_state_generation INTEGER NOT NULL DEFAULT 0, last_otp_step INTEGER NOT NULL DEFAULT 0, forgot_password_code_hash TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE codes (
   `id` integer PRIMARY KEY AUTOINCREMENT,
@@ -185,7 +185,7 @@ CREATE TABLE pre_registrations (
   password_hash TEXT NOT NULL,
   verification_code_encrypted BLOB,
   verification_code_issued_at DATETIME
-);
+, verification_code_hash TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE redirect_uris (
   `id` integer PRIMARY KEY AUTOINCREMENT,
@@ -312,6 +312,8 @@ CREATE UNIQUE INDEX `idx_code_hash` ON `codes`(`code_hash`);
 CREATE UNIQUE INDEX `idx_group_identifier` ON `groups`(`group_identifier`);
 CREATE INDEX `idx_state` ON `key_pairs`(`state`);
 CREATE INDEX `idx_pre_reg_email` ON `pre_registrations`(`email`);
+CREATE INDEX idx_users_forgot_password_code_hash ON users(forgot_password_code_hash);
+CREATE UNIQUE INDEX idx_pre_reg_verification_code_hash ON pre_registrations(verification_code_hash);
 CREATE UNIQUE INDEX `idx_refresh_token_jti` ON `refresh_tokens`(`refresh_token_jti`);
 CREATE UNIQUE INDEX `idx_session_identifier` ON `user_sessions`(`session_identifier`);
 CREATE UNIQUE INDEX idx_permission_identifier_resource ON permissions(permission_identifier, resource_id);

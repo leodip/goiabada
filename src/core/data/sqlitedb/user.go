@@ -66,6 +66,10 @@ func (d *SQLiteDatabase) GetUserByEmail(tx *sql.Tx, email string) (*models.User,
 	return d.CommonDB.GetUserByEmail(tx, email)
 }
 
+func (d *SQLiteDatabase) GetUserByForgotPasswordCodeHash(tx *sql.Tx, codeHash string) (*models.User, error) {
+	return d.CommonDB.GetUserByForgotPasswordCodeHash(tx, codeHash)
+}
+
 func (d *SQLiteDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error) {
 	return d.CommonDB.GetLastUserWithOTPState(tx, otpEnabledState)
 }
@@ -84,6 +88,11 @@ func (d *SQLiteDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId int
 
 func (d *SQLiteDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error {
 	return d.CommonDB.SetUserPasswordHash(tx, userId, passwordHash)
+}
+
+func (d *SQLiteDatabase) TryConsumeForgotPasswordCode(tx *sql.Tx, userId int64, codeHash string,
+	passwordHash string) (bool, error) {
+	return d.CommonDB.TryConsumeForgotPasswordCode(tx, userId, codeHash, passwordHash)
 }
 
 func (d *SQLiteDatabase) TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {

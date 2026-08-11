@@ -118,11 +118,15 @@ func TestDeletePreRegistration(t *testing.T) {
 }
 
 func createTestPreRegistration(t *testing.T) *models.PreRegistration {
+	// The code hash is unique per row and never empty, which is what the production
+	// caller does: verification_code_hash is UNIQUE, so two rows sharing the '' default
+	// would be refused by the index (#112).
 	preReg := &models.PreRegistration{
 		Email:                     gofakeit.Email(),
 		PasswordHash:              gofakeit.Password(true, true, true, true, false, 16),
 		VerificationCodeEncrypted: []byte(gofakeit.UUID()),
 		VerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		VerificationCodeHash:      codeHashOf(t, gofakeit.UUID()),
 	}
 	err := database.CreatePreRegistration(nil, preReg)
 	if err != nil {
@@ -146,5 +150,156 @@ func validatePreRegistration(t *testing.T, expected, actual *models.PreRegistrat
 	}
 	if !actual.VerificationCodeIssuedAt.Time.Equal(expected.VerificationCodeIssuedAt.Time) {
 		t.Errorf("Expected VerificationCodeIssuedAt %v, got %v", expected.VerificationCodeIssuedAt, actual.VerificationCodeIssuedAt)
+	}
+	if actual.VerificationCodeHash != expected.VerificationCodeHash {
+		t.Errorf("Expected VerificationCodeHash %s, got %s", expected.VerificationCodeHash, actual.VerificationCodeHash)
+	}
+}
+
+// TestGetPreRegistrationByVerificationCodeHash is the identity half of seam 2 for the
+// activation flow: the link carries the code and no address, so this lookup is the only
+// thing that says which pending registration an activation link belongs to (#112).
+func TestGetPreRegistrationByVerificationCodeHash(t *testing.T) {
+	preReg := createTestPreRegistration(t)
+
+	// 8. The hash that was stored finds the row it was stored on.
+	found, err := database.GetPreRegistrationByVerificationCodeHash(nil, preReg.VerificationCodeHash)
+	if err != nil {
+		t.Fatalf("lookup by the stored hash failed: %v", err)
+	}
+	if found == nil {
+		t.Fatal("the stored hash must find the pre-registration it was stored on")
+	}
+	validatePreRegistration(t, preReg, found)
+
+	// 9. A hash no row carries is a miss, not an error.
+	missing, err := database.GetPreRegistrationByVerificationCodeHash(nil, codeHashOf(t, gofakeit.UUID()))
+	if err != nil {
+		t.Errorf("a hash no row carries must not be an error, got: %v", err)
+	}
+	if missing != nil {
+		t.Errorf("a hash no row carries must return nil, got pre-registration id %d", missing.Id)
+	}
+}
+
+// TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches is case 10: the dormant
+// empty value is not findable.
+//
+// Exactly ONE dormant row is seeded, unlike the users mirror, because
+// verification_code_hash is UNIQUE and a second empty value would be refused by the
+// index. That is
+// the whole reason migration 000028 empties the table: rows written before it would all
+// carry the empty string and CREATE UNIQUE INDEX would abort at startup on any
+// deployment holding two.
+func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T) {
+	dormant := &models.PreRegistration{
+		Email:        gofakeit.Email(),
+		PasswordHash: gofakeit.Password(true, true, true, true, false, 16),
+	}
+	if err := database.CreatePreRegistration(nil, dormant); err != nil {
+		t.Fatalf("Failed to create the dormant pre-registration: %v", err)
+	}
+	// The shared test database outlives this test, and the UNIQUE index allows only one
+	// '' row at a time, so leaving it behind would break the next run of this case.
+	t.Cleanup(func() { _ = database.DeletePreRegistration(nil, dormant.Id) })
+
+	if dormant.VerificationCodeHash != "" {
+		t.Fatalf("a pre-registration written without a code hash must carry '', got %q", dormant.VerificationCodeHash)
+	}
+
+	found, err := database.GetPreRegistrationByVerificationCodeHash(nil, "")
+	if err != nil {
+		t.Errorf("an empty hash must not be an error, got: %v", err)
+	}
+	if found != nil {
+		t.Errorf("an empty hash matched pre-registration id %d; the dormant value must never be findable", found.Id)
+	}
+
+	// The same fact from the other side: a real hash nobody holds still misses while the
+	// dormant row is present, so the guard is not the only thing answering.
+	found, err = database.GetPreRegistrationByVerificationCodeHash(nil, codeHashOf(t, "a code nobody was ever issued"))
+	if err != nil {
+		t.Errorf("a hash no row carries must not be an error, got: %v", err)
+	}
+	if found != nil {
+		t.Errorf("a hash no row carries matched pre-registration id %d", found.Id)
+	}
+}
+
+// TestGetPreRegistrationByVerificationCodeHash_Transaction is cases 11 and 12: the lookup
+// runs on the caller's transaction, and a failure propagates as an error rather than as a
+// benign "no such code". It reads only through the transaction while that transaction is
+// open, for the reasons the users mirror documents.
+func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
+	hash := codeHashOf(t, gofakeit.UUID())
+
+	tx := beginTx(t)
+
+	preReg := &models.PreRegistration{
+		Email:                     gofakeit.Email(),
+		PasswordHash:              gofakeit.Password(true, true, true, true, false, 16),
+		VerificationCodeEncrypted: []byte(gofakeit.UUID()),
+		VerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		VerificationCodeHash:      hash,
+	}
+	if err := database.CreatePreRegistration(tx, preReg); err != nil {
+		t.Fatalf("Failed to create the pre-registration inside the transaction: %v", err)
+	}
+
+	// 11. Visible through the transaction that wrote it. A method ignoring its tx would
+	// query the pool, which cannot see this write.
+	inTx, err := database.GetPreRegistrationByVerificationCodeHash(tx, hash)
+	if err != nil {
+		t.Fatalf("lookup through the writing transaction failed: %v", err)
+	}
+	if inTx == nil {
+		t.Fatal("a row written in this transaction must be visible through it (did the lookup ignore its tx?)")
+	}
+	if inTx.Id != preReg.Id {
+		t.Errorf("found pre-registration id %d through the transaction, want %d", inTx.Id, preReg.Id)
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction failed: %v", err)
+	}
+
+	// 12a. Rolled back, so nothing carries the hash any more.
+	afterRollback, err := database.GetPreRegistrationByVerificationCodeHash(nil, hash)
+	if err != nil {
+		t.Fatalf("lookup after rollback failed: %v", err)
+	}
+	if afterRollback != nil {
+		t.Errorf("a rolled-back write must leave no findable hash, found pre-registration id %d", afterRollback.Id)
+	}
+
+	// 12b. The finished transaction is the forced fault.
+	failed, err := database.GetPreRegistrationByVerificationCodeHash(tx, hash)
+	if err == nil {
+		t.Error("a lookup through a finished transaction must return an error, not a benign nil")
+	}
+	if failed != nil {
+		t.Error("a failed lookup must never return a pre-registration")
+	}
+}
+
+// TestCreatePreRegistration_DistinctCodeHashesCoexist is case 13, and it is what pins the
+// index shape §4 chose. The UNIQUE index on verification_code_hash has to accept two rows
+// carrying different hashes on all four engines; every other case in this file would pass
+// with no index at all.
+func TestCreatePreRegistration_DistinctCodeHashesCoexist(t *testing.T) {
+	first := createTestPreRegistration(t)
+	second := createTestPreRegistration(t)
+
+	if first.VerificationCodeHash == second.VerificationCodeHash {
+		t.Fatal("the two seeded rows must carry different hashes for this case to prove anything")
+	}
+
+	foundFirst, err := database.GetPreRegistrationByVerificationCodeHash(nil, first.VerificationCodeHash)
+	if err != nil || foundFirst == nil || foundFirst.Id != first.Id {
+		t.Fatalf("the first hash must find the first row: row=%v err=%v", foundFirst, err)
+	}
+	foundSecond, err := database.GetPreRegistrationByVerificationCodeHash(nil, second.VerificationCodeHash)
+	if err != nil || foundSecond == nil || foundSecond.Id != second.Id {
+		t.Fatalf("the second hash must find the second row: row=%v err=%v", foundSecond, err)
 	}
 }

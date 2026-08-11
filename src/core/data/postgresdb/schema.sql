@@ -345,7 +345,8 @@ CREATE TABLE public.pre_registrations (
     email character varying(64),
     password_hash character varying(64) NOT NULL,
     verification_code_encrypted bytea,
-    verification_code_issued_at timestamp(6) without time zone
+    verification_code_issued_at timestamp(6) without time zone,
+    verification_code_hash character varying(64) DEFAULT ''::character varying NOT NULL
 );
 
 
@@ -813,7 +814,8 @@ CREATE TABLE public.users (
     forgot_password_code_encrypted bytea,
     forgot_password_code_issued_at timestamp(6) without time zone,
     auth_state_generation bigint DEFAULT 0 NOT NULL,
-    last_otp_step bigint DEFAULT 0 NOT NULL
+    last_otp_step bigint DEFAULT 0 NOT NULL,
+    forgot_password_code_hash character varying(64) DEFAULT ''::character varying NOT NULL
 );
 
 
@@ -1367,6 +1369,20 @@ CREATE UNIQUE INDEX idx_permission_identifier_resource ON public.permissions USI
 --
 
 CREATE INDEX idx_pre_reg_email ON public.pre_registrations USING btree (email);
+
+
+--
+-- Name: idx_pre_reg_verification_code_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_pre_reg_verification_code_hash ON public.pre_registrations USING btree (verification_code_hash);
+
+
+--
+-- Name: idx_users_forgot_password_code_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_forgot_password_code_hash ON public.users USING btree (forgot_password_code_hash);
 
 
 --

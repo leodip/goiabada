@@ -354,6 +354,40 @@ func (d *CommonDatabase) GetUserByEmail(tx *sql.Tx, email string) (*models.User,
 	return user, nil
 }
 
+// GetUserByForgotPasswordCodeHash finds the user holding an outstanding reset code, by
+// an unsalted SHA-256 of that code. It is what lets the reset link carry the code and
+// nothing else, so no email address travels in it and no part of the link ever needs
+// percent-encoding (#112). Follows GetCodeByCodeHash, which looks a row up by the same
+// kind of hash.
+//
+// Locating the row is not authenticating it. The caller still compares the submitted
+// code against the encrypted column in constant time and checks the code's expiry; this
+// only says which row to compare against.
+func (d *CommonDatabase) GetUserByForgotPasswordCodeHash(tx *sql.Tx, codeHash string) (*models.User, error) {
+
+	// The dormant value is '' on every user with no code outstanding, so an empty
+	// codeHash reaching the query would match one of them and hand the caller somebody
+	// else's account. Refused here rather than trusted to callers, which is a second
+	// line behind the fact that SHA-256 hex is always 64 characters and so no supplied
+	// code can produce ''.
+	if codeHash == "" {
+		return nil, nil
+	}
+
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
+		For(d.Flavor)
+
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("forgot_password_code_hash", codeHash))
+
+	user, err := d.getUserCommon(tx, selectBuilder, userStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (d *CommonDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error) {
 	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
@@ -580,16 +614,22 @@ func (d *CommonDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordH
 
 	ub := d.Flavor.NewUpdateBuilder()
 	ub.Update("users")
-	// The two clears are raw SQL rather than Assign(..., nil). sqlbuilder sends an
+	// The clears are raw SQL rather than Assign(..., nil). sqlbuilder sends an
 	// untyped Go nil as a parameter, and the SQL Server driver types it as nvarchar,
 	// which it then refuses to convert implicitly to varbinary(max):
 	// "Implicit conversion from data type nvarchar to varbinary(max) is not allowed".
 	// A literal NULL has no parameter type to get wrong and is portable across all four
 	// engines.
+	//
+	// The hash clears to '' rather than NULL because its column is NOT NULL, '' being
+	// the dormant value meaning no code outstanding. Clearing it matters for the same
+	// reason clearing the encrypted code does: the expiry check would still refuse a
+	// used code, but the row should not be findable by that hash at all (#112).
 	ub.Set(
 		ub.Assign("password_hash", passwordHash),
 		"forgot_password_code_encrypted = NULL",
 		"forgot_password_code_issued_at = NULL",
+		"forgot_password_code_hash = ''",
 		ub.Assign("updated_at", time.Now().UTC()),
 	)
 	ub.Where(ub.Equal("id", userId))
@@ -601,6 +641,82 @@ func (d *CommonDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordH
 	}
 
 	return nil
+}
+
+// TryConsumeForgotPasswordCode writes a new password hash and claims the outstanding
+// reset code in one conditional UPDATE, reporting whether this call is the one that made
+// the transition. The claim is codeHash matching what the row still carries, so a second
+// call with the same hash matches no row, returns false, and leaves the first call's
+// password in place.
+//
+// Compare-and-set for the same reason MarkCodeAsUsed, TrySetUserEnabled and
+// TryConsumeUserOTPStep are: a read-then-unconditional-write lets two concurrent
+// requests both believe they performed the transition. Here that would mean two
+// submissions of one reset link both setting a password, with the later one winning.
+//
+// **Why the predicate is the code hash and not just the user id.** The reset flow keeps
+// its "this code was validated" marker in the session, which is a client-side encrypted
+// cookie: clearing it in a response replaces the browser's copy and cannot invalidate a
+// copy an attacker kept. A marker naming only the durable user id would therefore
+// outlive the password write, a newly issued code, and any other password change. Naming
+// the hash and claiming it here is what keeps a replayed marker from setting a password
+// a second time, which is the property the encrypted column's NULLing already gives the
+// pre-#112 flow.
+//
+// **A false return is not proof of replay**, the same imprecision MarkCodeAsUsed
+// documents: the code may have been consumed already, cleared by an unrelated password
+// change, superseded by a newly issued one, or the user row may be gone. The caller
+// responds identically in all of them.
+//
+// Separate from SetUserPasswordHash rather than a fourth parameter on it: its other two
+// callers, the admin user-create path and the account password-change API, hold no
+// outstanding code and would have to pass a meaningless predicate.
+func (d *CommonDatabase) TryConsumeForgotPasswordCode(tx *sql.Tx, userId int64, codeHash string,
+	passwordHash string) (bool, error) {
+
+	if userId == 0 {
+		return false, errors.WithStack(errors.New("can't consume a forgot password code for user with id 0"))
+	}
+	// An error rather than a benign false, and it is not defensive: '' is the dormant
+	// value on every user with no code outstanding, so an empty predicate would claim
+	// one of them and set a password on an account nobody asked to reset.
+	if codeHash == "" {
+		return false, errors.WithStack(errors.New("can't consume an empty forgot password code hash"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	// The same narrow write SetUserPasswordHash performs, plus the hash clear. Narrow
+	// rather than a full-row UpdateUser so a concurrent admin disable cannot be undone
+	// by it (#106). See SetUserPasswordHash for why the clears are raw SQL.
+	ub.Set(
+		ub.Assign("password_hash", passwordHash),
+		"forgot_password_code_encrypted = NULL",
+		"forgot_password_code_issued_at = NULL",
+		"forgot_password_code_hash = ''",
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("forgot_password_code_hash", codeHash),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to consume forgot password code")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "unable to get rows affected when consuming forgot password code")
+	}
+
+	// rowsAffected == 1 means this call transitioned the row on all four engines: the
+	// predicate requires a non-empty hash and the SET clears it to '', so the row always
+	// changes and MySQL's changed-rows accounting agrees with matched rows. That is the
+	// trap RevokeCodesBySessionIdentifier documents, and it does not bite here.
+	return rowsAffected == 1, nil
 }
 
 // TrySetUserEnabled flips enabled from expected to desired, reporting whether this
