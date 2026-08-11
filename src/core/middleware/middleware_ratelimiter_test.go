@@ -73,8 +73,8 @@ func TestGetClientIPFromRequest(t *testing.T) {
 				req.Header.Set(k, v)
 			}
 
-			if got := getClientIPFromRequest(req); got != tt.want {
-				t.Errorf("getClientIPFromRequest(%q) = %q, want %q", tt.remoteAddr, got, tt.want)
+			if got := GetClientIPFromRequest(req); got != tt.want {
+				t.Errorf("GetClientIPFromRequest(%q) = %q, want %q", tt.remoteAddr, got, tt.want)
 			}
 		})
 	}
@@ -182,6 +182,93 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 		for i := 0; i < 40; i++ {
 			if run(m, "x@example.com", "203.0.113.1:5000") != http.StatusOK {
 				t.Fatal("disabled limiter should never block")
+			}
+		}
+	})
+}
+
+// TestLimitResetPwd_PerIP verifies the reset-password limiter's budget and, above all, its
+// key. It had no test at all until #112, which is why the value it enforced was free to
+// change without anything noticing.
+//
+// The key is the point: the reset link no longer carries ?email=, and the two steps after it
+// run on a URL with no query, so the old key would evaluate to the empty string on every
+// request and the whole deployment would share one bucket. Keying on the client IP is what
+// stops that being a denial of service on password reset (#112 decision 4).
+//
+// The budget is exact rather than approximate, because it is published policy: 30 requests
+// per 5 minutes, which is 10 reset operations at the three requests a reset now costs
+// (decision 11). An off-by-one here is a user locked out or a host given more room than the
+// documentation promises, so the boundary is asserted on both sides.
+//
+// The handler stub writes 418 rather than 200 on purpose: a middleware that writes nothing
+// produces exactly 200 with an empty body, so 418 is what tells "the handler ran" apart from
+// "nothing was written", and from 429.
+func TestLimitResetPwd_PerIP(t *testing.T) {
+	const budget = 30
+
+	run := func(m *RateLimiterMiddleware, target, ip string) (int, bool) {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		reached := false
+		m.LimitResetPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		return rr.Code, reached
+	}
+
+	t.Run("the budget is exactly 30 per IP", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached := run(m, "/reset-password", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, "/reset-password", "203.0.113.7:5000"); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a second client IP has an independent bucket", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		for i := 0; i < budget+1; i++ {
+			run(m, "/reset-password", "203.0.113.7:5000")
+		}
+		// Same middleware instance, different host: a global key would block this, which is
+		// exactly what an empty key would produce.
+		if code, reached := run(m, "/reset-password", "198.51.100.9:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second IP: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("the address in the query no longer keys anything", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		// A distinct address per request used to buy a fresh bucket each time. From one host
+		// they now share one, which is what makes the rekey observable.
+		blocked := false
+		for i := 0; i < budget+1; i++ {
+			target := fmt.Sprintf("/reset-password?email=user%d@example.com", i)
+			if code, _ := run(m, target, "203.0.113.7:5000"); code == http.StatusTooManyRequests {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			t.Errorf("expected one host to be limited within %d requests regardless of the address", budget+1)
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, false)
+		for i := 0; i < budget*2; i++ {
+			if code, reached := run(m, "/reset-password", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
 			}
 		}
 	})

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers"
 	mocks_communication "github.com/leodip/goiabada/core/communication/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -339,8 +340,12 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	userCreator.On("CreateUser", mock.Anything).Return(createdUser, nil)
 	database.On("UpdateUser", mock.Anything, createdUser).Return(nil)
 	auditLogger.On("Log", constants.AuditCreatedUser, mock.Anything).Return()
+	var emailedLink string
 	httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-		"/emails/email_newuser_set_password.html", mock.Anything).Return(&bytes.Buffer{}, nil)
+		"/emails/email_newuser_set_password.html", mock.Anything).
+		Run(func(args mock.Arguments) {
+			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
+		}).Return(&bytes.Buffer{}, nil)
 	emailSender.On("SendEmail", mock.Anything, mock.Anything).Return(nil)
 
 	rr := httptest.NewRecorder()
@@ -356,6 +361,12 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, expectedHash, createdUser.ForgotPasswordCodeHash,
 		"the stored hash must be the hash of the code that was issued")
+
+	// This site's only job is to hand the issued code to the shared builder; the link's shape
+	// and the absence of an address in it belong to ResetPasswordLink's own tests (#112
+	// decision 5).
+	assert.Equal(t, handlers.ResetPasswordLink(issuedCode), emailedLink,
+		"the emailed link must be the shared builder's output for the code that was issued")
 
 	httpHelper.AssertExpectations(t)
 	database.AssertExpectations(t)

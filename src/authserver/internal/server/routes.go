@@ -71,8 +71,8 @@ func (s *Server) initRoutes() {
 	s.router.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
 	s.router.Get("/forgot-password", handlers.HandleForgotPasswordGet(httpHelper))
 	s.router.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", handlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender))
-	s.router.With(rateLimiter.LimitResetPwd).Get("/reset-password", handlers.HandleResetPasswordGet(httpHelper, s.database))
-	s.router.With(rateLimiter.LimitResetPwd).Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.database, passwordValidator, auditLogger))
+	s.router.With(rateLimiter.LimitResetPwd).Get("/reset-password", handlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger))
+	s.router.With(rateLimiter.LimitResetPwd).Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger))
 	s.router.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper))
 	s.router.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
 	// RequireUserBoundToken comes AFTER the scope check so an insufficient-scope caller still

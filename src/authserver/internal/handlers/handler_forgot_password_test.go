@@ -191,7 +191,11 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// (i18n.EmailContext) before rendering the email body, so the request
 		// pointer differs from the original. mock.Anything keeps the
 		// expectation focused on the layout / template / bind args.
-		httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).Return(&bytes.Buffer{}, nil)
+		var emailedLink string
+		httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).
+			Run(func(args mock.Arguments) {
+				emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
+			}).Return(&bytes.Buffer{}, nil)
 
 		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *communication.SendEmailInput) bool {
 			return input.To == "existing@example.com" && input.Subject == "Password reset"
@@ -223,6 +227,13 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedHash, user.ForgotPasswordCodeHash,
 			"the stored hash must be the hash of the code that was issued")
+
+		// This site's only job is to hand the issued code to the shared builder; the link's
+		// shape and the absence of an address in it belong to ResetPasswordLink's own tests
+		// (#112 decision 5). Asserting the exact string here would pin the shape in a
+		// second place and let the two disagree.
+		assert.Equal(t, ResetPasswordLink(issuedCode), emailedLink,
+			"the emailed link must be the shared builder's output for the code that was issued")
 
 		httpHelper.AssertExpectations(t)
 		database.AssertExpectations(t)

@@ -31,13 +31,16 @@ type RateLimiterMiddleware struct {
 
 func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddleware {
 	return &RateLimiterMiddleware{
-		authHelper:         authHelper,
-		enabled:            enabled,
-		pwdLimiter:         httprate.NewRateLimiter(15, 1*time.Minute), // per-email: bounds brute force on one account
-		pwdIpLimiter:       httprate.NewRateLimiter(30, 1*time.Minute), // per-IP: stops one host hammering many accounts
-		otpLimiter:         httprate.NewRateLimiter(10, 1*time.Minute),
-		activateLimiter:    httprate.NewRateLimiter(5, 5*time.Minute),
-		resetPwdLimiter:    httprate.NewRateLimiter(5, 5*time.Minute),
+		authHelper:      authHelper,
+		enabled:         enabled,
+		pwdLimiter:      httprate.NewRateLimiter(15, 1*time.Minute), // per-email: bounds brute force on one account
+		pwdIpLimiter:    httprate.NewRateLimiter(30, 1*time.Minute), // per-IP: stops one host hammering many accounts
+		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
+		activateLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
+		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
+		// costs (the link's GET, the clean GET, the clean POST). Half of what
+		// forgotPwdIpLimiter allows, which is the only other endpoint with an IP tier (#112)
+		resetPwdLimiter:    httprate.NewRateLimiter(30, 5*time.Minute),
 		forgotPwdLimiter:   httprate.NewRateLimiter(5, 5*time.Minute),  // per-email: mail-bomb protection
 		forgotPwdIpLimiter: httprate.NewRateLimiter(20, 5*time.Minute), // per-IP: resource DoS protection
 		dcrLimiter:         httprate.NewRateLimiter(10, 1*time.Minute), // RFC 7591 §3 DoS protection
@@ -55,7 +58,7 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 
 		// Per-IP ceiling first: stops a single host from hammering many distinct
 		// accounts. The client IP is trustworthy here (resolved by MiddlewareRealIP).
-		clientIP := getClientIPFromRequest(r)
+		clientIP := GetClientIPFromRequest(r)
 		if m.pwdIpLimiter.RespondOnLimit(w, r, clientIP) {
 			slog.Error("Rate limiter - limit reached (pwd, by IP)", "ip", clientIP)
 			return
@@ -123,6 +126,17 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 	})
 }
 
+// LimitResetPwd rate limits the password reset endpoint, on the client IP.
+//
+// It used to key on ?email=, which the reset link no longer carries: the link holds the
+// verification code alone, and the two steps after it run on a URL with no query at all
+// (#112). Left as it was, every request would key on the empty string and the whole
+// deployment would share one bucket, which is a denial of service on password reset.
+//
+// The threat model moved with it. The code is now the sole credential at 193 bits of
+// entropy, so blind guessing is infeasible and the per-account tier was never what bounded
+// it; what is left to bound is one host driving unauthenticated work, which an IP key does.
+// Matches the pwdIpLimiter and forgotPwdIpLimiter precedent.
 func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
@@ -131,10 +145,10 @@ func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 			return
 		}
 
-		email := r.URL.Query().Get("email")
-
-		if m.resetPwdLimiter.RespondOnLimit(w, r, email) {
-			slog.Error("Rate limiter - limit reached (resetPwd)", "email", email)
+		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
+		clientIP := GetClientIPFromRequest(r)
+		if m.resetPwdLimiter.RespondOnLimit(w, r, clientIP) {
+			slog.Error("Rate limiter - limit reached (resetPwd, by IP)", "ip", clientIP)
 			return
 		}
 
@@ -156,7 +170,7 @@ func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
 
 		// Per-IP ceiling: stops one host from mail-bombing many addresses. The
 		// client IP is trustworthy here (resolved by MiddlewareRealIP).
-		clientIP := getClientIPFromRequest(r)
+		clientIP := GetClientIPFromRequest(r)
 		if m.forgotPwdIpLimiter.RespondOnLimit(w, r, clientIP) {
 			slog.Error("Rate limiter - limit reached (forgot-password, by IP)", "ip", clientIP)
 			return
@@ -183,7 +197,7 @@ func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 		}
 
 		// Use IP address as rate limit key
-		clientIP := getClientIPFromRequest(r)
+		clientIP := GetClientIPFromRequest(r)
 
 		if m.dcrLimiter.RespondOnLimit(w, r, clientIP) {
 			slog.Error("Rate limiter - limit reached (DCR)", "ip", clientIP)
@@ -194,13 +208,18 @@ func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 	})
 }
 
-// getClientIPFromRequest extracts the client IP used as a rate-limit key.
+// GetClientIPFromRequest extracts the client IP used as a rate-limit key.
 //
 // It reads only r.RemoteAddr, which MiddlewareRealIP has already resolved to the
 // trustworthy client IP (from the socket peer and, when configured, the trusted
 // forwarded headers). It never re-parses X-Forwarded-For / X-Real-IP here, which
 // would reintroduce a spoofable path.
-func getClientIPFromRequest(r *http.Request) string {
+//
+// Exported because the reset-password handler audits the same value the limiter keys on
+// (#112): the failed-reset audit entry no longer has an address to record, so the client IP
+// is the identifier an administrator watching for probing has. A second copy of these three
+// lines in the handler package would be free to drift from this one.
+func GetClientIPFromRequest(r *http.Request) string {
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return host
 	}
@@ -238,7 +257,7 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 		// 3. Distributed attacks on a single user
 		username := r.PostFormValue("username")
 		clientId := r.PostFormValue("client_id")
-		clientIP := getClientIPFromRequest(r)
+		clientIP := GetClientIPFromRequest(r)
 
 		// Use composite key for more precise rate limiting
 		key := fmt.Sprintf("ropc_%s_%s_%s", clientId, username, clientIP)
