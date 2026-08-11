@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -253,6 +254,36 @@ func TestRequestTargetForLog_WholeTargetCap(t *testing.T) {
 			// 4096 retained + 32 for "[truncated, 4096 of 20006 bytes]".
 			wantLen: 4128,
 			wantEnd: "[truncated, 4096 of 20006 bytes]",
+		},
+		// The path is rendered under its own bound and handed to the assembly as a
+		// clipped prefix plus a length, so these three rows are what stop that length
+		// going astray: the marker's total is the only place a path longer than the
+		// cap is still reported, and each row reaches it down a different branch of
+		// the escaping.
+		{
+			name:   "a 20000-byte path with a query after it",
+			target: "/auth/" + strings.Repeat("p", 20000) + "?client_id=c",
+			// 20006 path + 12 for "?client_id=c", then 4096 retained + a 32-byte marker.
+			wantLen: 4128,
+			wantEnd: "[truncated, 4096 of 20018 bytes]",
+			note:    "the query is counted past the cap even though the path filled it",
+		},
+		{
+			name:   "a path that triples when escaped, with a query after it",
+			target: "/auth/" + strings.Repeat("\x80", 2000) + "?client_id=c",
+			// The bytes escape to %80 each, so 6 + 6000 rendered path + 12 of query.
+			wantLen: 4127,
+			wantEnd: "[truncated, 4096 of 6018 bytes]",
+			note:    "the length counted is the RENDERED one, three bytes per raw byte",
+		},
+		{
+			name:   "a path already encoded on the wire, with a query after it",
+			target: "/auth/" + strings.Repeat("%8a", 2000) + "?client_id=c",
+			// Lowercase hex is not what net/url would write, so RawPath is kept and
+			// returned verbatim: 6006 bytes of path, unchanged, plus 12 of query.
+			wantLen: 4127,
+			wantEnd: "[truncated, 4096 of 6018 bytes]",
+			note:    "EscapedPath's other branch, where the client's own encoding survives",
 		},
 	}
 
@@ -805,6 +836,120 @@ func TestQueryEscapedLen_MatchesTheStandardLibrary(t *testing.T) {
 	}
 }
 
+// The path escaper is the one piece of net/url this file reproduces rather than
+// calls, because the package exports no whole-path escaper: url.PathEscape uses
+// the path-segment rule and escapes "/" too. So it is pinned twice, once per
+// byte against EscapedPath and once over both of EscapedPath's branches, and the
+// second is what covers the RawPath half that no length table can reach.
+
+func TestPathEscapedLen_MatchesTheStandardLibrary(t *testing.T) {
+	// "a"+c rather than c alone, because EscapedPath answers "*" for a path of
+	// exactly "*" without escaping it, which would make one byte look safe when
+	// the escaper renders it as %2A. escapedPathForLog carries that special case
+	// separately and TestEscapedPathForLog_MatchesEscapedPath covers it.
+	for b := 0; b < 256; b++ {
+		s := "a" + string([]byte{byte(b)})
+		escaped := (&url.URL{Path: s}).EscapedPath()
+
+		assert.Equal(t, len(escaped), pathEscapedLen(s), "byte 0x%02X escapes to %q", b, escaped)
+		assert.Equal(t, escaped, escapePathForLog(s), "byte 0x%02X", b)
+	}
+
+	for _, s := range renderingCorpus() {
+		assert.Equal(t, len((&url.URL{Path: s}).EscapedPath()), pathEscapedLen(s),
+			"input of %d bytes", len(s))
+	}
+}
+
+// pathCorpus covers both of EscapedPath's branches and the ways the RawPath one
+// is rejected, since a wrongly ACCEPTED RawPath would log bytes the standard
+// library would have escaped. The rejections are the interesting rows: a
+// truncated escape, a non-hex digit, a byte validEncoded refuses, and a RawPath
+// that is a valid encoding of something other than Path.
+func pathCorpus() []*url.URL {
+	long := strings.Repeat("\x80", 3000)
+
+	return []*url.URL{
+		{Path: ""},
+		{Path: "/"},
+		{Path: "*"},
+		{Path: "/auth/authorize"},
+		{Path: "/auth/a b"},
+		{Path: "/auth/\r\nFAKE"},
+		{Path: "/auth/é"},
+		{Path: "/$&+,/:;=@-_.~"},
+		{Path: "/a?b"},
+		{Path: "/" + long},
+		{Path: "/" + strings.Repeat("a", 5000)},
+		// RawPath accepted: a valid encoding that decodes to Path.
+		{Path: "/auth/\r\nFAKE", RawPath: "/auth/%0d%0aFAKE"},
+		{Path: "/auth/a b", RawPath: "/auth/a%20b"},
+		{Path: "/auth/!'()*[]", RawPath: "/auth/!'()*[]"},
+		{Path: "/auth/A", RawPath: "/auth/%41"},
+		{Path: "/" + long, RawPath: "/" + strings.Repeat("%80", 3000)},
+		// RawPath rejected: truncated escape, non-hex digit, a byte validEncoded
+		// refuses, and a valid encoding of the wrong string.
+		{Path: "/auth/x", RawPath: "/auth/%4"},
+		{Path: "/auth/x", RawPath: "/auth/%zz"},
+		{Path: "/auth/x", RawPath: "/auth/x?y"},
+		{Path: "/auth/x", RawPath: "/auth/y"},
+		{Path: "/auth/x", RawPath: "/auth/xy"},
+		{Path: "/auth/xy", RawPath: "/auth/x"},
+	}
+}
+
+func TestEscapedPathForLog_MatchesEscapedPath(t *testing.T) {
+	for _, u := range pathCorpus() {
+		// The right-hand side is verbatim what this file did before the path
+		// rendering was bounded. The bound is a cost property and must not become
+		// an output one.
+		want := u.EscapedPath()
+		head, total := escapedPathForLog(u, maxLoggedTarget)
+
+		assert.Equal(t, len(want), total, "Path=%q RawPath=%q", u.Path, u.RawPath)
+		assert.Equal(t, truncate(want, maxLoggedTarget), truncateCounted(head, maxLoggedTarget, total),
+			"Path=%q RawPath=%q", u.Path, u.RawPath)
+	}
+}
+
+// The hand-written corpus above covers the shapes worth naming. This covers the
+// ones nobody thought of, which is what the RawPath branch needs: whether a
+// given RawPath is a valid encoding of a given Path is a property of two strings
+// at once, and the accepting and rejecting cases are one byte apart.
+func TestEscapedPathForLog_MatchesEscapedPathOnRandomInput(t *testing.T) {
+	// A fixed seed, so a failure is reproducible and the suite cannot go flaky.
+	random := rand.New(rand.NewSource(159))
+	// Bytes chosen to land on every decision in the two escapers: escaped and
+	// unescaped, the sub-delims validEncoded admits but the escaper does not, the
+	// percent that starts an escape, and the hex digits that finish one.
+	alphabet := []byte("aZ0-_.~$&+,/:;=@?!'()*[]% \x00\x80\xff\r\nA9fFzZ")
+
+	for i := 0; i < 5000; i++ {
+		raw := make([]byte, random.Intn(24))
+		for j := range raw {
+			raw[j] = alphabet[random.Intn(len(alphabet))]
+		}
+
+		// Both halves independently: a RawPath net/url itself produced, and one
+		// paired with an unrelated Path, which is the case EscapedPath rejects.
+		u := &url.URL{Path: string(raw)}
+		if random.Intn(2) == 0 {
+			decoded, err := url.PathUnescape(string(raw))
+			if err != nil {
+				decoded = string(raw)
+			}
+			u = &url.URL{Path: decoded, RawPath: string(raw)}
+		}
+
+		want := u.EscapedPath()
+		head, total := escapedPathForLog(u, maxLoggedTarget)
+
+		assert.Equal(t, len(want), total, "case %d: Path=%q RawPath=%q", i, u.Path, u.RawPath)
+		assert.Equal(t, truncate(want, maxLoggedTarget), truncateCounted(head, maxLoggedTarget, total),
+			"case %d: Path=%q RawPath=%q", i, u.Path, u.RawPath)
+	}
+}
+
 func TestSafeLogValueLen_MatchesSafeLogValue(t *testing.T) {
 	for b := 0; b < 256; b++ {
 		s := string([]byte{byte(b)})
@@ -925,6 +1070,36 @@ func TestRequestTargetForLog_CountsWhatItDiscardsRatherThanBuildingIt(t *testing
 
 		assert.Less(t, rendering, parsing+uint64(64*1024),
 			"rendering allocated %d bytes over ParseQuery's own %d", rendering-parsing, parsing)
+	})
+
+	// The path is the one component no query parsing has to touch first, so nothing
+	// else pays for it and the whole cost is the logger's own. Before the bound,
+	// u.EscapedPath() rendered all 900000 bytes into %XX and threw away everything
+	// past 4096, at 5,416,840 B a request. Both of EscapedPath's branches are
+	// guarded, because they allocate for different reasons: one escapes, one only
+	// has to avoid decoding what it validates.
+	t.Run("an enormous path, escaped", func(t *testing.T) {
+		u := &url.URL{Path: "/" + strings.Repeat("\x80", 900000)}
+
+		allocated := allocatedBytesPerCall(t, 20, func() { renderSink = RequestTargetForLog(u) })
+
+		assert.Less(t, allocated, uint64(64*1024),
+			"escaping must stop at the target cap, but %d bytes were allocated", allocated)
+	})
+
+	t.Run("an enormous path, already encoded on the wire", func(t *testing.T) {
+		// What net/http itself builds: a request target whose escaping differs from
+		// net/url's own arrives with RawPath set and valid, so EscapedPath returns it
+		// verbatim. Validating it must not decode it, which is what net/url does
+		// before comparing. Lowercase hex is the everyday way to reach this branch,
+		// net/url writing %8A where a client wrote %8a.
+		r := httptest.NewRequest(http.MethodGet, "/"+strings.Repeat("%8a", 300000), nil)
+		assert.NotEmpty(t, r.URL.RawPath, "the test needs the branch where RawPath is used")
+
+		allocated := allocatedBytesPerCall(t, 20, func() { renderSink = RequestTargetForLog(r.URL) })
+
+		assert.Less(t, allocated, uint64(64*1024),
+			"validating must not decode, but %d bytes were allocated", allocated)
 	})
 
 	t.Run("many parameters, assembled past the whole-target cap", func(t *testing.T) {
