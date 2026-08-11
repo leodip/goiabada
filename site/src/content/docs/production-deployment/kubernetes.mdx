@@ -359,12 +359,26 @@ Both services expose health checks used by Kubernetes probes:
 
 ## Updating Goiabada
 
+Run one version at a time. A rolling update keeps the old pods serving until the new ones are ready, so both versions talk to the same database at once, and that isn't supported. See [Upgrading](/production-deployment/upgrading/) for what it can break.
+
 1. Update image tags in your manifest or regenerate with the setup wizard
-2. Apply changes:
+2. Set the deployment strategy so the old pods go away before the new ones start:
+   ```yaml
+   spec:
+     strategy:
+       type: Recreate
+   ```
+   Or scale to zero by hand before applying:
+   ```bash
+   kubectl scale deployment goiabada-authserver goiabada-adminconsole -n goiabada --replicas=0
+   ```
+3. Apply changes:
    ```bash
    kubectl apply -f goiabada-k8s.yaml
    ```
-3. Monitor rollout:
+4. Monitor rollout, and scale back up if you scaled to zero:
    ```bash
    kubectl rollout status deployment/goiabada-authserver -n goiabada
    ```
+
+There's a short outage while nothing is running. The first pod of the new version applies the database migrations as it starts.
