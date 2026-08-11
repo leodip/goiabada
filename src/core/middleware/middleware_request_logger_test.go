@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -697,6 +698,31 @@ func TestMiddlewareRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 	}
 }
 
+func TestMiddlewareRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *testing.T) {
+	// The one attribute whose value depends on WHEN it is read. Both servers
+	// register chi's StripSlashes immediately after this middleware, and it edits
+	// r.URL.Path in place, so a logger that rendered the target on the way out
+	// would record a path the client never sent. Every other assertion in this file
+	// passes either way, which is what makes this case worth its own test rather
+	// than a comment.
+	buf := captureSlog(t)
+
+	var seenByHandler string
+	chain := MiddlewareRequestLogger(true)(
+		chimiddleware.StripSlashes(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			seenByHandler = r.URL.Path
+			w.WriteHeader(http.StatusOK)
+		})))
+
+	chain.ServeHTTP(httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodGet, "/auth/authorize/?client_id=c", nil))
+
+	assert.Equal(t, "/auth/authorize", seenByHandler, "StripSlashes really does rewrite the path")
+	// Quoted because slog's text handler quotes any value holding an "="".
+	assert.Contains(t, buf.String(), `target="/auth/authorize/?client_id=c"`,
+		"the log must carry the target that arrived, trailing slash and all")
+}
+
 func TestMiddlewareRequestLogger_LogsARequestThatPanics(t *testing.T) {
 	// This is what pins the deferred write, which is otherwise invisible: chi's
 	// logger produced a line for a panicking request and so must this one.
@@ -715,4 +741,212 @@ func TestMiddlewareRequestLogger_LogsARequestThatPanics(t *testing.T) {
 	// not written anything yet when the deferred record runs. That is what chi
 	// logged too, and it is #203 rather than this change.
 	assert.Contains(t, buf.String(), "status=0")
+}
+
+// -----------------------------------------------------------------------------
+// The caps run during rendering, not after it
+//
+// Every cap in this file used to be applied to a fully built string, which let an
+// unauthenticated client buy work far out of proportion to the ~4 KB that reaches
+// the log: 900000 non-printable bytes in an X-Request-Id header cost 31 ms of CPU
+// and 10.3 MB of allocation to render 128 bytes (#159). The rendering is now
+// bounded, and the output has to be exactly what the unbounded version produced,
+// so these tests come in pairs: one pinning the output against the straightforward
+// "render it all, then clip" expression, one pinning the bound itself.
+// -----------------------------------------------------------------------------
+
+// renderingCorpus exercises both sides of every bound and both branches of every
+// escaper: nothing to escape, everything to escape, a multi-byte rune, a space
+// (the one byte QueryEscape maps to a single different byte), and inputs landing
+// exactly on, just under and just over each limit.
+func renderingCorpus() []string {
+	return []string{
+		"",
+		"a",
+		"client_id",
+		"openid profile email",
+		"a b+c%20d",
+		"\x80",
+		"a\x80b",
+		"  ",
+		"scope=openid&x=1",
+		jwtLike,
+		strings.Repeat("a", maxLoggedField-1),
+		strings.Repeat("a", maxLoggedField),
+		strings.Repeat("a", maxLoggedField+1),
+		strings.Repeat("\x80", maxLoggedField/3),
+		strings.Repeat("\x80", maxLoggedField),
+		strings.Repeat("a", maxLoggedQueryComponent-1),
+		strings.Repeat("a", maxLoggedQueryComponent),
+		strings.Repeat("a", maxLoggedQueryComponent+1),
+		strings.Repeat(" ", maxLoggedQueryComponent+1),
+		strings.Repeat("\x80", maxLoggedQueryComponent/3),
+		strings.Repeat("\x80", maxLoggedQueryComponent),
+		strings.Repeat("é", maxLoggedQueryComponent),
+	}
+}
+
+// The two length functions replace a call to the thing they measure, so they
+// carry the whole risk of the bounded rendering: a length one byte out puts a
+// wrong number in a truncation marker, which is the one part of the output a
+// reader is asked to trust. Both are pinned over every byte value rather than a
+// sample, so a toolchain that ever changed url.QueryEscape's table fails here
+// rather than silently mis-reporting a length.
+
+func TestQueryEscapedLen_MatchesTheStandardLibrary(t *testing.T) {
+	for b := 0; b < 256; b++ {
+		s := string([]byte{byte(b)})
+		assert.Equal(t, len(url.QueryEscape(s)), queryEscapedLen(s),
+			"byte 0x%02X: url.QueryEscape renders it as %q", b, url.QueryEscape(s))
+	}
+
+	for _, s := range renderingCorpus() {
+		assert.Equal(t, len(url.QueryEscape(s)), queryEscapedLen(s), "input of %d bytes", len(s))
+	}
+}
+
+func TestSafeLogValueLen_MatchesSafeLogValue(t *testing.T) {
+	for b := 0; b < 256; b++ {
+		s := string([]byte{byte(b)})
+		assert.Equal(t, len(safeLogValue(s)), safeLogValueLen(s), "byte 0x%02X", b)
+	}
+
+	for _, s := range renderingCorpus() {
+		assert.Equal(t, len(safeLogValue(s)), safeLogValueLen(s), "input of %d bytes", len(s))
+	}
+}
+
+func TestQueryComponentForLog_MatchesEscapeThenClip(t *testing.T) {
+	for _, s := range renderingCorpus() {
+		// The right-hand side is verbatim what this file did before the rendering
+		// was bounded. The bound is a cost property and must not become an output
+		// one.
+		assert.Equal(t, truncate(url.QueryEscape(s), maxLoggedQueryComponent), queryComponentForLog(s),
+			"input of %d bytes", len(s))
+	}
+}
+
+func TestQueryComponentLen_MatchesQueryComponentForLog(t *testing.T) {
+	// Once the target is full the renderer stops escaping and measures instead, so
+	// these two must agree exactly: a component counted one byte short of what it
+	// would have rendered puts a wrong total in the target's truncation marker.
+	for _, s := range renderingCorpus() {
+		assert.Equal(t, len(queryComponentForLog(s)), queryComponentLen(s), "input of %d bytes", len(s))
+	}
+}
+
+func TestFieldForLog_MatchesEscapeThenClip(t *testing.T) {
+	for _, s := range renderingCorpus() {
+		assert.Equal(t, truncate(safeLogValue(s), maxLoggedField), fieldForLog(s),
+			"input of %d bytes", len(s))
+	}
+}
+
+func TestClipped_MatchesConcatenateThenClip(t *testing.T) {
+	// clipped assembles the whole target, so what it must guarantee is that a
+	// sequence of writes renders exactly as concatenating them and truncating
+	// would. These straddle the boundary: a write landing short of the limit, one
+	// crossing it, and writes after it that reach no output but must still be
+	// counted, since the target's marker reports their bytes.
+	writeSets := [][]string{
+		{},
+		{""},
+		{"/auth/authorize"},
+		{strings.Repeat("a", maxLoggedTarget)},
+		{strings.Repeat("a", maxLoggedTarget), "b"},
+		{strings.Repeat("a", maxLoggedTarget-1), "bc", "def"},
+		{strings.Repeat("a", maxLoggedTarget+1), "b"},
+		{"/p", "?", strings.Repeat("x", maxLoggedTarget), "&", strings.Repeat("y", 100)},
+	}
+
+	for _, writes := range writeSets {
+		c := clipped{limit: maxLoggedTarget}
+		for _, w := range writes {
+			c.writeString(w)
+		}
+
+		assert.Equal(t, truncate(strings.Join(writes, ""), maxLoggedTarget), c.string(),
+			"%d writes totalling %d bytes", len(writes), len(strings.Join(writes, "")))
+	}
+}
+
+// allocatedBytesPerCall reports what f allocates on average. The bound is
+// measured rather than asserted structurally because the defect it closes was
+// invisible in the output: every equivalence test above passes on the unbounded
+// code too.
+func allocatedBytesPerCall(t *testing.T, iterations int, f func()) uint64 {
+	t.Helper()
+
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	for i := 0; i < iterations; i++ {
+		f()
+	}
+	runtime.ReadMemStats(&after)
+
+	return (after.TotalAlloc - before.TotalAlloc) / uint64(iterations)
+}
+
+// renderSink defeats dead-store elimination, so the work under measurement
+// actually happens.
+var renderSink string
+
+func TestFieldForLog_CountsWhatItDiscardsRatherThanBuildingIt(t *testing.T) {
+	// The reachable shape: chi's RequestID middleware is mounted ahead of the
+	// logger in both servers and adopts an inbound X-Request-Id verbatim, and
+	// net/http admits bytes above 0x7e in a header value. Each costs three bytes to
+	// escape, so before the bound this allocated 10.3 MB and burned 31 ms of CPU to
+	// keep 128 bytes, for any unauthenticated request.
+	huge := strings.Repeat("\x80", 900000)
+
+	allocated := allocatedBytesPerCall(t, 20, func() { renderSink = fieldForLog(huge) })
+
+	assert.Less(t, allocated, uint64(8192),
+		"escaping must stop at the clip, but %d bytes were allocated", allocated)
+	// And the output is unchanged, marker and all.
+	assert.Equal(t, strings.Repeat("%80", maxLoggedField/3)+"%8[truncated, 128 of 2700000 bytes]",
+		fieldForLog(huge))
+}
+
+func TestRequestTargetForLog_CountsWhatItDiscardsRatherThanBuildingIt(t *testing.T) {
+	t.Run("one enormous allowlisted value", func(t *testing.T) {
+		// The misbuilt-RP shape at scale. url.ParseQuery has to unescape the whole
+		// value before this code sees it, so what is bounded is what the RENDERING
+		// adds on top: escaping 300000 bytes into 900000 in order to keep 512.
+		raw := "client_id=" + url.QueryEscape(strings.Repeat("\x80", 300000))
+		u := &url.URL{Path: "/auth/authorize", RawQuery: raw}
+
+		rendering := allocatedBytesPerCall(t, 20, func() { renderSink = RequestTargetForLog(u) })
+		parsing := allocatedBytesPerCall(t, 20, func() {
+			values, _ := url.ParseQuery(raw)
+			renderSink = values.Get("client_id")
+		})
+
+		assert.Less(t, rendering, parsing+uint64(64*1024),
+			"rendering allocated %d bytes over ParseQuery's own %d", rendering-parsing, parsing)
+	})
+
+	t.Run("many parameters, assembled past the whole-target cap", func(t *testing.T) {
+		// 9000 names, each expanding threefold when escaped, assemble to about
+		// 900 KB before 4096 bytes of it are kept. Once the target is full the
+		// renderer measures the rest instead of escaping it, so what is left is
+		// url.ParseQuery's own cost and almost nothing on top.
+		parts := make([]string, 0, 9000)
+		for i := 0; i < 9000; i++ {
+			parts = append(parts, fmt.Sprintf("%s%d=1", strings.Repeat("\x80", 30), i))
+		}
+		raw := strings.Join(parts, "&")
+		u := &url.URL{Path: "/auth/authorize", RawQuery: raw}
+
+		rendering := allocatedBytesPerCall(t, 20, func() { renderSink = RequestTargetForLog(u) })
+		parsing := allocatedBytesPerCall(t, 20, func() {
+			values, _ := url.ParseQuery(raw)
+			renderSink = values.Get("x")
+		})
+
+		assert.Less(t, rendering, parsing+uint64(256*1024),
+			"rendering allocated %d bytes over ParseQuery's own %d, for a %d-byte query",
+			rendering-parsing, parsing, len(raw))
+	})
 }
