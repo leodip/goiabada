@@ -346,6 +346,63 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 		"a replayed marker must not create a second account")
 }
 
+// The activation half of the same defect (#112 decision 13). Two pending registrations and
+// one cookie jar: the clean hop reads the marker alone, so before the first-writer-wins rule
+// the redirect already in flight activated whichever link had been followed last, creating an
+// account nobody in that browser had asked for and leaving the intended one pending.
+func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T) {
+	defer saveAndRestoreRegSettings(t)()
+	defer useMailpitSMTP(t)()
+	setRegSettings(t, true, true, true)
+
+	browser := createHttpClient(t)
+	loadRegisterPage(t, browser)
+
+	firstEmail := registerPlusAddress()
+	firstResp := postRegister(t, browser, firstEmail, "Password123!", "Password123!")
+	_ = firstResp.Body.Close()
+	require.Equal(t, http.StatusOK, firstResp.StatusCode)
+
+	// A second registration, made from somewhere else entirely.
+	elsewhere := createHttpClient(t)
+	loadRegisterPage(t, elsewhere)
+
+	secondEmail := registerPlusAddress()
+	secondResp := postRegister(t, elsewhere, secondEmail, "Password123!", "Password123!")
+	_ = secondResp.Body.Close()
+	require.Equal(t, http.StatusOK, secondResp.StatusCode)
+
+	// The first link's redirect is in flight: followed, but its clean hop not yet made.
+	cleanURL := followActivationLink(t, browser, latestActivationLink(t, firstEmail))
+
+	// The steered navigation: the second link, followed in the first browser's jar.
+	steeredResp := loadPage(t, browser, latestActivationLink(t, secondEmail))
+	steeredBody := bodyString(t, steeredResp)
+	_ = steeredResp.Body.Close()
+
+	assert.NotEqual(t, http.StatusSeeOther, steeredResp.StatusCode,
+		"a second link followed while one is live must not take over the session")
+	assert.Contains(t, steeredBody, activationExpiredText)
+
+	// The redirect in flight completes, and activates the registration that produced it.
+	activateResp := loadPage(t, browser, cleanURL)
+	activationBody := bodyString(t, activateResp)
+	_ = activateResp.Body.Close()
+	require.Contains(t, activationBody, activationSucceededText)
+
+	first, err := database.GetUserByEmail(nil, firstEmail)
+	require.NoError(t, err)
+	assert.NotNil(t, first, "the registration whose link produced the redirect is the one activated")
+
+	second, err := database.GetUserByEmail(nil, secondEmail)
+	require.NoError(t, err)
+	assert.Nil(t, second, "the second registration must not have been activated")
+
+	stillPending, err := database.GetPreRegistrationByEmail(nil, secondEmail)
+	require.NoError(t, err)
+	assert.NotNil(t, stillPending, "the second registration must still be pending, so its own link still works")
+}
+
 // Scenario 5a: POST while self-registration is disabled returns the error
 // page. We load the form while it is enabled, then disable.
 func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {

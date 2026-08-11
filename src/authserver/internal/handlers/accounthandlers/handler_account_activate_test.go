@@ -63,7 +63,9 @@ func withMarker(t *testing.T, store sessions.Store, req *http.Request, flow hand
 	t.Helper()
 
 	rr := httptest.NewRecorder()
-	require.NoError(t, handlers.SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash))
+	rejection, err := handlers.SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
 	for _, c := range rr.Result().Cookies() {
 		req.AddCookie(c)
 	}
@@ -271,6 +273,47 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, handlers.LinkMarkerMissing, rejection,
 			"a refused code must not leave a usable marker behind")
+
+		database.AssertExpectations(t)
+		httpHelper.AssertExpectations(t)
+	})
+
+	// The activation half of the same defect: the clean hop reads the marker alone, so two
+	// interleaved first hops used to make the redirect already in flight activate the other
+	// registration. First writer wins instead (#112 decision 13).
+	t.Run("a second link followed while one is in flight is refused", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		store := newMarkerTestStore()
+
+		// The second link is valid on its own: it is refused for the marker it would have
+		// replaced, not for anything wrong with it.
+		preReg, codeHash := preRegistrationWithCode(t, 99, "second@example.com", code, time.Now().UTC().Add(-time.Minute))
+		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+		expectRenderedLinkExpired(httpHelper)
+
+		sent := withMarker(t, store, linkFollowedRequest(code),
+			handlers.LinkMarkerFlowAccountActivate, 7, "the-first-hash")
+
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, sent)
+
+		assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused second link must not redirect")
+		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything)
+		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
+
+		// The first continuation survives, so the redirect already in flight still activates
+		// the registration whose link produced it.
+		marker, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
+			handlers.LinkMarkerFlowAccountActivate)
+		require.NoError(t, err)
+		require.Empty(t, rejection)
+		require.NotNil(t, marker)
+		assert.Equal(t, "the-first-hash", marker.CodeHash)
+		assert.Equal(t, int64(7), marker.Id)
 
 		database.AssertExpectations(t)
 		httpHelper.AssertExpectations(t)

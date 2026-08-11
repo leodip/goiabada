@@ -34,10 +34,12 @@ const verificationCodeLifetime = 5 * time.Minute
 // Every marker-attributable refusal on the clean hop comes here: no marker, a marker left by
 // the reset flow, an expired marker, and a marker whose code hash no longer resolves to a
 // pre-registration. That last one is what refuses a replayed marker, since the session is a
-// client-side encrypted cookie and clearing it cannot invalidate a copy somebody kept.
+// client-side encrypted cookie and clearing it cannot invalidate a copy somebody kept. The
+// first hop uses it for an expired code, and for a link followed while another continuation
+// is still live.
 //
 // It is an existing rendering rather than a new state on purpose: the page already tells the
-// reader to register again, which is the right instruction for all four (#112).
+// reader to register again, which is the right instruction for every one of them (#112).
 func renderActivationLinkExpired(httpHelper handlers.HttpHelper, w http.ResponseWriter, r *http.Request) {
 	bind := map[string]interface{}{
 		"linkHasExpired": true,
@@ -138,9 +140,21 @@ func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession se
 	// The marker names the code hash, not only the pre-registration id: a marker naming a
 	// durable id alone would still resolve after the row was deleted, where the hash stops
 	// resolving the moment the activation completes. See handleActivationCleanHop.
-	if err := handlers.SaveLinkMarker(httpSession, w, r, handlers.LinkMarkerFlowAccountActivate,
-		preRegistration.Id, codeHash); err != nil {
+	rejection, err := handlers.SaveLinkMarker(httpSession, w, r, handlers.LinkMarkerFlowAccountActivate,
+		preRegistration.Id, codeHash)
+	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
+		return
+	}
+
+	// A second, different activation link followed while one is still live. The first
+	// continuation keeps the session and this one is refused: the clean hop reads the
+	// marker alone, so replacing here would make the redirect already in flight activate
+	// this registration instead of the one that authorized it. Nothing is audited, because
+	// this handler has no failed-activation event to record it under; the reset side, which
+	// has one, audits the same refusal as continuation_in_flight.
+	if rejection != "" {
+		renderActivationLinkExpired(httpHelper, w, r)
 		return
 	}
 

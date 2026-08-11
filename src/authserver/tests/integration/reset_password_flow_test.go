@@ -379,6 +379,68 @@ func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
 		"a marker superseded by a newer code must not change the password")
 }
 
+// The wrong-account credential write, in the tier that shows it: one cookie jar, two
+// accounts, and a form already on screen (#112 decision 13).
+//
+// One session holds one marker and the form names nothing about the marker that rendered it,
+// so before the first-writer-wins rule a reset link followed between the form rendering and
+// its submit retargeted that submit. SameSite=Lax sends the session cookie on a top-level GET
+// navigation, so one steered click was enough for the password a victim typed to be written
+// into an account somebody else controls, with the victim shown the ordinary success page and
+// their own password left unchanged.
+//
+// Nothing below this tier can see it: it needs two live continuations in one real cookie jar.
+func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
+	defer useMailpitSMTP(t)()
+
+	victimEmail := plusAddress()
+	victim, victimOldPassword := createResetTestUser(t, victimEmail)
+
+	otherEmail := plusAddress()
+	other, otherOldPassword := createResetTestUser(t, otherEmail)
+
+	browser := createHttpClient(t)
+	requestPasswordReset(t, browser, victimEmail)
+	cleanURL := followResetLink(t, browser, latestResetLink(t, victimEmail))
+
+	// The victim's form is on screen.
+	formResp := loadPage(t, browser, cleanURL)
+	formBody := bodyString(t, formResp)
+	_ = formResp.Body.Close()
+	require.Contains(t, formBody, `name="password"`)
+
+	// The steered navigation: a reset link for the other account, followed in the same jar.
+	// Issued from elsewhere, because what matters is where it is FOLLOWED.
+	requestPasswordReset(t, createHttpClient(t), otherEmail)
+
+	steeredResp := loadPage(t, browser, latestResetLink(t, otherEmail))
+	steeredBody := bodyString(t, steeredResp)
+	_ = steeredResp.Body.Close()
+
+	assert.NotEqual(t, http.StatusSeeOther, steeredResp.StatusCode,
+		"a second link followed while one is live must not take over the session")
+	assert.Contains(t, steeredBody, resetCodeInvalidText)
+
+	// The victim submits the form they were already looking at.
+	const newPassword = "V1ctim!Choice"
+	resp := postCleanReset(t, browser, cleanURL, newPassword)
+	body := bodyString(t, resp)
+	_ = resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, body, resetSucceededText)
+
+	victimHash := passwordHashOf(t, victim.Id)
+	assert.True(t, hashutil.VerifyPasswordHash(victimHash, newPassword),
+		"the password typed must land in the account whose link rendered the form")
+	assert.False(t, hashutil.VerifyPasswordHash(victimHash, victimOldPassword))
+
+	otherHash := passwordHashOf(t, other.Id)
+	assert.True(t, hashutil.VerifyPasswordHash(otherHash, otherOldPassword),
+		"the second account must be untouched")
+	assert.False(t, hashutil.VerifyPasswordHash(otherHash, newPassword))
+}
+
 // Two clients holding one copied marker, submitting different passwords. Exactly one may
 // win: the password write claims the code hash in the same conditional UPDATE, so the second
 // matches no row. Without the claim both would set a password and the later would silently
