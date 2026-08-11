@@ -90,13 +90,13 @@ var loggableQueryParams = map[string]struct{}{
 // It is exported because the API debug middleware in the auth server logs a
 // request target too and must not do it differently (#159).
 func RequestTargetForLog(u *url.URL) string {
-	// EscapedPath and never Path: Path is decoded, so a request for
+	// The escaped path and never u.Path: Path is decoded, so a request for
 	// /auth/%0d%0aFAKE reaches a handler carrying a real CRLF. slog's handlers
 	// escape that today, but slog.SetDefault is process-global and a log line that
 	// is safe only because of the handler currently installed is safe by accident.
-	path := u.EscapedPath()
+	pathHead, pathLen := escapedPathForLog(u, maxLoggedTarget)
 	if u.RawQuery == "" {
-		return truncate(path, maxLoggedTarget)
+		return truncateCounted(pathHead, maxLoggedTarget, pathLen)
 	}
 
 	values, err := url.ParseQuery(u.RawQuery)
@@ -107,7 +107,7 @@ func RequestTargetForLog(u *url.URL) string {
 		// r.FormValue alike, and a renderer that split the raw query instead would
 		// log that whole token as one value under the safe name client_id.
 		target := clipped{limit: maxLoggedTarget}
-		target.writeString(path)
+		target.writeCounted(pathHead, pathLen)
 		target.writeString(fmt.Sprintf("?[unparsable query, %d bytes]", len(u.RawQuery)))
 		return target.string()
 	}
@@ -119,7 +119,7 @@ func RequestTargetForLog(u *url.URL) string {
 	sort.Strings(names)
 
 	target := clipped{limit: maxLoggedTarget}
-	target.writeString(path)
+	target.writeCounted(pathHead, pathLen)
 	target.writeString("?")
 	first := true
 	for _, name := range names {
@@ -167,12 +167,17 @@ type clipped struct {
 }
 
 func (c *clipped) writeString(s string) {
-	c.n += len(s)
+	c.writeCounted(s, len(s))
+}
+
+// writeCounted writes a fragment the caller has already clipped itself, counting
+// the total it stands for rather than the bytes handed over. It is how a
+// component deliberately never rendered in full still reaches the target's
+// truncation marker with its true length.
+func (c *clipped) writeCounted(head string, total int) {
+	c.n += total
 	if room := c.limit - c.b.Len(); room > 0 {
-		if len(s) > room {
-			s = s[:room]
-		}
-		c.b.WriteString(s)
+		c.b.WriteString(clip(head, room))
 	}
 }
 
@@ -192,6 +197,14 @@ func (c *clipped) writeQueryComponent(s string) {
 
 func (c *clipped) string() string {
 	return truncateCounted(c.b.String(), c.limit, c.n)
+}
+
+// clip returns the first limit bytes of s, and s itself when it is shorter.
+func clip(s string, limit int) string {
+	if len(s) > limit {
+		return s[:limit]
+	}
+	return s
 }
 
 // truncate returns s unchanged when it fits, and otherwise the retained prefix
@@ -266,6 +279,171 @@ func queryEscapedLen(s string) int {
 		n += 3
 	}
 	return n
+}
+
+// escapedPathForLog renders u's path exactly as u.EscapedPath() would, but keeps
+// only the first limit bytes of it and returns the true rendered length
+// alongside, so the caller's truncation marker can still report it.
+//
+// It exists because EscapedPath renders the whole path however long that is: a
+// 900000-byte path of bytes needing escaping cost 5,416,840 B of allocation to
+// produce the 4096 that reach the log. net/http allocates a comparable amount
+// parsing that same request before any of this runs, which is what bounds the
+// input, but that is a reason to keep this proportionate rather than a licence to
+// pay it a second time: with logging on, the process paid it twice (#159).
+//
+// The semantics have to match EscapedPath byte for byte, so net/url's two
+// branches are reproduced rather than approximated, and
+// TestEscapedPathForLog_MatchesEscapedPath pins the whole function against the
+// standard library over both of them.
+func escapedPathForLog(u *url.URL, limit int) (head string, total int) {
+	// Branch one: the request carried an encoding of its own and it is a valid
+	// one, so EscapedPath hands it straight back and nothing needs rendering. This
+	// is the branch every request through net/http takes whose path holds a byte
+	// the default escaping would write differently.
+	if u.RawPath != "" && rawPathEncodes(u.RawPath, u.Path) {
+		return clip(u.RawPath, limit), len(u.RawPath)
+	}
+	if u.Path == "*" {
+		// The asterisk-form request target, which net/url leaves alone.
+		return "*", 1
+	}
+
+	// Branch two: escape u.Path, but only as far as the clip reaches. Each byte
+	// escapes independently to one or three bytes, so the first limit input bytes
+	// always yield at least limit output bytes, and they are exactly the ones kept.
+	return clip(escapePathForLog(clip(u.Path, limit)), limit), pathEscapedLen(u.Path)
+}
+
+// rawPathEncodes reports what url.URL.EscapedPath's first branch decides: that
+// rawPath is a valid path encoding and that unescaping it yields exactly path,
+// in which case EscapedPath returns rawPath untouched.
+//
+// net/url reaches that answer as validEncoded followed by unescape, which builds
+// the decoded string only to compare it and throw it away. This walks the two
+// strings together and allocates nothing.
+func rawPathEncodes(rawPath, path string) bool {
+	decoded := 0
+	for i := 0; i < len(rawPath); {
+		var b byte
+		switch c := rawPath[i]; {
+		case c == '%':
+			if i+2 >= len(rawPath) || !isHexDigit(rawPath[i+1]) || !isHexDigit(rawPath[i+2]) {
+				return false
+			}
+			b = unhexDigit(rawPath[i+1])<<4 | unhexDigit(rawPath[i+2])
+			i += 3
+		case rawPathByteIsLiteral(c):
+			b = c
+			i++
+		default:
+			return false
+		}
+		if decoded >= len(path) || path[decoded] != b {
+			return false
+		}
+		decoded++
+	}
+	return decoded == len(path)
+}
+
+// escapePathForLog is net/url's whole-path escaper, which the package does not
+// export: url.PathEscape uses the path-SEGMENT rule and escapes "/" as well, so
+// it renders a different string.
+func escapePathForLog(s string) string {
+	n := pathEscapedLen(s)
+	if n == len(s) {
+		// The common case, an ordinary request path: allocates nothing.
+		return s
+	}
+
+	var b strings.Builder
+	b.Grow(n)
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if pathSafeBytes[c] {
+			b.WriteByte(c)
+			continue
+		}
+		b.WriteByte('%')
+		b.WriteByte(hexDigits[c>>4])
+		b.WriteByte(hexDigits[c&0x0f])
+	}
+	return b.String()
+}
+
+// pathEscapedLen returns the length escapePathForLog(s) would have, without
+// building it.
+func pathEscapedLen(s string) int {
+	n := 0
+	for i := 0; i < len(s); i++ {
+		if pathSafeBytes[s[i]] {
+			n++
+			continue
+		}
+		n += 3
+	}
+	return n
+}
+
+// pathSafeBytes is pathByteIsSafe as a lookup, derived from it rather than
+// written out again, so the rule is still stated in exactly one place.
+//
+// It exists because this scan is the one part of rendering that stays
+// proportional to the whole path however little of it is kept: the truncation
+// marker reports the true escaped length, so every byte has to be looked at even
+// when 4096 of them survive. Measured on 900000 bytes needing escaping, the
+// thirteen-case switch took 505 microseconds and the lookup 317 (#159).
+var pathSafeBytes = func() (safe [256]bool) {
+	for c := 0; c < 256; c++ {
+		safe[c] = pathByteIsSafe(byte(c))
+	}
+	return
+}()
+
+// pathByteIsSafe reports whether net/url leaves c as it is when escaping a whole
+// path: the RFC 3986 section 2.3 unreserved characters, plus the reserved
+// characters it allows in a path, which is every one of "$&+,/:;=@" and not "?".
+//
+// That table is duplicated here rather than called, so
+// TestPathEscapedLen_MatchesTheStandardLibrary pins it against EscapedPath for
+// all 256 byte values: a toolchain that ever changed the rule fails that test
+// rather than silently mis-reporting a length in a truncation marker.
+func pathByteIsSafe(c byte) bool {
+	switch {
+	case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9':
+		return true
+	}
+	switch c {
+	case '-', '_', '.', '~', '$', '&', '+', ',', '/', ':', ';', '=', '@':
+		return true
+	}
+	return false
+}
+
+// rawPathByteIsLiteral reports whether net/url's validEncoded accepts c in a
+// path without escaping. It is pathByteIsSafe plus the RFC 3986 sub-delims and
+// the brackets that validEncoded lists explicitly.
+func rawPathByteIsLiteral(c byte) bool {
+	switch c {
+	case '!', '\'', '(', ')', '*', '[', ']':
+		return true
+	}
+	return pathByteIsSafe(c)
+}
+
+func isHexDigit(c byte) bool {
+	return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'
+}
+
+func unhexDigit(c byte) byte {
+	switch {
+	case '0' <= c && c <= '9':
+		return c - '0'
+	case 'a' <= c && c <= 'f':
+		return c - 'a' + 10
+	}
+	return c - 'A' + 10
 }
 
 // safeLogValue keeps the printable ASCII bytes of s and percent-escapes every
