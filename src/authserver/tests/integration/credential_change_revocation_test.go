@@ -12,6 +12,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -491,40 +492,32 @@ func (g *offlineGrant) refresh(t *testing.T) map[string]interface{} {
 
 // resetPasswordFor drives the forgot-password reset to completion for a user, which is call site 1
 // and the only one reachable without a bearer token.
+//
+// It seeds the code directly rather than going through POST /forgot-password and mailpit, because
+// what these tests are about is what a completed reset does to sessions and tokens, not how the code
+// was issued. The link itself comes from the shared builder, so this fixture cannot drift from the
+// shape the handler redirects to; and the code hash is seeded beside the encrypted code because that
+// is what the link is looked up by now (#112).
 func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	t.Helper()
 
 	code := gofakeit.LetterN(32)
 	encrypted, err := encryption.EncryptData(code)
 	require.NoError(t, err)
+	codeHash, err := hashutil.HashString(code)
+	require.NoError(t, err)
 
 	fresh, err := database.GetUserById(nil, user.Id)
 	require.NoError(t, err)
 	fresh.ForgotPasswordCodeEncrypted = encrypted
+	fresh.ForgotPasswordCodeHash = codeHash
 	fresh.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 	require.NoError(t, database.UpdateUser(nil, fresh))
 
 	httpClient := createHttpClient(t)
-	resetURL := config.GetAuthServer().BaseURL + "/reset-password?code=" +
-		url.QueryEscape(code) + "&email=" + url.QueryEscape(fresh.Email)
+	cleanURL := followResetLink(t, httpClient, handlers.ResetPasswordLink(code))
 
-	resp := loadPage(t, httpClient, resetURL)
-	_ = resp.Body.Close()
-
-	form := url.Values{
-		"code":                 {code},
-		"email":                {fresh.Email},
-		"password":             {newPassword},
-		"passwordConfirmation": {newPassword},
-	}
-	req, err := http.NewRequest("POST", resetURL, strings.NewReader(form.Encode()))
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Referer", resetURL)
-	req.Header.Set("Origin", config.GetAuthServer().BaseURL)
-
-	resp, err = httpClient.Do(req)
-	require.NoError(t, err)
+	resp := postCleanReset(t, httpClient, cleanURL, newPassword)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)

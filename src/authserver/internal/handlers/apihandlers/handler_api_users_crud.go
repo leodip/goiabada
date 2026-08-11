@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/communication"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
@@ -441,7 +440,7 @@ func HandleAPIUserCreatePost(
 
 			bind := map[string]interface{}{
 				"name": name,
-				"link": config.GetAuthServer().BaseURL + "/reset-password?email=" + createdUser.Email + "&code=" + verificationCode,
+				"link": handlers.ResetPasswordLink(verificationCode),
 			}
 
 			// Newly-created user has no stored Locale yet; render the
