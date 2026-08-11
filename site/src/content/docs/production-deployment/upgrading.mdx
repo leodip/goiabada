@@ -16,7 +16,7 @@ A new version can add columns, indexes and constraints the old one knows nothing
 If you run a single container or a single binary, you already do this. Replacing it stops the old version before the new one starts.
 
 <Aside type="caution">
-On Kubernetes, a rolling update deliberately runs both versions side by side until the rollout finishes. Set the deployment's strategy to `Recreate`, or scale it to zero, apply, and scale back up.
+On Kubernetes, a rolling update deliberately runs both versions side by side until the rollout finishes. Set the deployment's strategy to `Recreate`, or scale it to zero and apply once the old pods are gone. `kubectl scale` returns before they are, so that path needs an explicit wait: [Updating Goiabada](/production-deployment/kubernetes/#updating-goiabada) has the commands.
 </Aside>
 
 Back up your database first. Migrations only run forward, and some of them delete rows, so a downgrade won't always give you what you had.
@@ -27,7 +27,9 @@ Password reset and account activation links changed shape. They now carry a veri
 
 Four things happen at the moment you cut over.
 
-**Links emailed before the upgrade stop working.** The server finds the account from the code itself now, and a link the older version sent can't be matched that way. Both kinds of link expire five minutes after they're sent, so this only reaches people who asked for one in the last few minutes. They get the usual page saying the code is invalid or expired, and asking for another link works normally.
+**Links emailed before the upgrade stop working.** The server finds the account from the code itself now, and a link the older version sent can't be matched that way. Both kinds of link expire five minutes after they're sent, so this only reaches people who asked for one in the last few minutes.
+
+The two flows say so differently. An old password reset link reaches the usual page saying the code is invalid or expired, and asking for another link works normally. An old activation link has nothing left to point at, because the migration below deletes the pending registration it names, so it reaches the generic error page instead and the server logs an error carrying that request's id. Those log entries are expected during the cutover, and the person registers again rather than asking for another link.
 
 **Pending self-registrations are cleared.** The migration empties the table holding registrations that are waiting for someone to click their activation link, because those rows can't be matched either. Anyone in that state registers again. A pending registration also lives five minutes, so it's the same handful of people.
 
