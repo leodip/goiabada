@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -887,6 +888,12 @@ func pathCorpus() []*url.URL {
 		{Path: "/auth/!'()*[]", RawPath: "/auth/!'()*[]"},
 		{Path: "/auth/A", RawPath: "/auth/%41"},
 		{Path: "/" + long, RawPath: "/" + strings.Repeat("%80", 3000)},
+		// Accepted and not canonical, which is the shape that keeps the two
+		// branches apart: escaping Path renders an upper-case escape and only where
+		// one is needed, so these are RawPaths the standard library keeps and never
+		// ones it would produce.
+		{Path: "/A/\x8a", RawPath: "/%41/%8a"},
+		{Path: "/a b", RawPath: "/%61%20b"},
 		// RawPath rejected: truncated escape, non-hex digit, a byte validEncoded
 		// refuses, and a valid encoding of the wrong string.
 		{Path: "/auth/x", RawPath: "/auth/%4"},
@@ -898,17 +905,35 @@ func pathCorpus() []*url.URL {
 	}
 }
 
-func TestEscapedPathForLog_MatchesEscapedPath(t *testing.T) {
-	for _, u := range pathCorpus() {
-		// The right-hand side is verbatim what this file did before the path
-		// rendering was bounded. The bound is a cost property and must not become
-		// an output one.
-		want := u.EscapedPath()
-		head, total := escapedPathForLog(u, maxLoggedTarget)
+// assertRendersLikeEscapedPath is the equivalence itself, in one place, so that
+// every table below states only what it varies.
+//
+// The right-hand side is verbatim what this file did before the path rendering
+// was bounded. The bound is a cost property and must not become an output one.
+// Several limits rather than the real one alone, because a cut lands inside a
+// %XX escape at some of these and the marker still has to report the true
+// length rather than the retained head's.
+func assertRendersLikeEscapedPath(t *testing.T, u *url.URL, label string, limits ...int) {
+	t.Helper()
 
-		assert.Equal(t, len(want), total, "Path=%q RawPath=%q", u.Path, u.RawPath)
-		assert.Equal(t, truncate(want, maxLoggedTarget), truncateCounted(head, maxLoggedTarget, total),
-			"Path=%q RawPath=%q", u.Path, u.RawPath)
+	if len(limits) == 0 {
+		limits = []int{0, 1, 3, 4, 5, 17, maxLoggedTarget}
+	}
+
+	want := u.EscapedPath()
+	for _, limit := range limits {
+		head, total := escapedPathForLog(u, limit)
+
+		assert.Equal(t, len(want), total,
+			"%s at limit %d: Path=%q RawPath=%q", label, limit, u.Path, u.RawPath)
+		assert.Equal(t, truncate(want, limit), truncateCounted(head, limit, total),
+			"%s at limit %d: Path=%q RawPath=%q", label, limit, u.Path, u.RawPath)
+	}
+}
+
+func TestEscapedPathForLog_MatchesEscapedPath(t *testing.T) {
+	for i, u := range pathCorpus() {
+		assertRendersLikeEscapedPath(t, u, fmt.Sprintf("corpus row %d", i))
 	}
 }
 
@@ -941,12 +966,83 @@ func TestEscapedPathForLog_MatchesEscapedPathOnRandomInput(t *testing.T) {
 			u = &url.URL{Path: decoded, RawPath: string(raw)}
 		}
 
-		want := u.EscapedPath()
-		head, total := escapedPathForLog(u, maxLoggedTarget)
+		assertRendersLikeEscapedPath(t, u, fmt.Sprintf("case %d", i))
+	}
+}
 
-		assert.Equal(t, len(want), total, "case %d: Path=%q RawPath=%q", i, u.Path, u.RawPath)
-		assert.Equal(t, truncate(want, maxLoggedTarget), truncateCounted(head, maxLoggedTarget, total),
-			"case %d: Path=%q RawPath=%q", i, u.Path, u.RawPath)
+// The random corpus above covers the shapes nobody thought of, but only the ones
+// its alphabet can spell. The RawPath branch is three decisions duplicated out of
+// net/url, each over a finite domain: which bytes may stand for themselves, which
+// bytes are hex digits, and what each hex digit is worth. So each is pinned over
+// the whole of its domain rather than over a sample. A wrong answer on some byte
+// nobody sampled is silent, and what it costs is the guarantee this whole file
+// exists for: the log would say the request carried a path it did not, with a
+// truncation marker reporting a length that was never true.
+
+func TestEscapedPathForLog_MatchesEscapedPathOnEveryLiteralByte(t *testing.T) {
+	for b := 0; b < 256; b++ {
+		// Path and RawPath the same string, which is the shape that asks whether
+		// this byte may stand for itself: net/url hands the RawPath back when it
+		// may and escapes the Path when it may not, so admitting one byte too many
+		// writes a byte the standard library would have escaped.
+		s := "/a" + string([]byte{byte(b)})
+		assertRendersLikeEscapedPath(t, &url.URL{Path: s, RawPath: s},
+			fmt.Sprintf("literal byte 0x%02X", b))
+	}
+}
+
+func TestEscapedPathForLog_MatchesEscapedPathOnEveryEscapedByte(t *testing.T) {
+	for b := 0; b < 256; b++ {
+		for _, format := range []string{"%%%02X", "%%%02x"} {
+			escape := fmt.Sprintf(format, b)
+			// The trailing %61 is a canary. Without it the two branches agree
+			// whenever the escape is already canonical: rejecting the RawPath falls
+			// back to escaping the Path, which writes the same upper-case %XX, so a
+			// decoder that got this byte wrong would rejoin the right answer and
+			// look sound. 'a' needs no escape, so %61 is a RawPath the standard
+			// library keeps and never one it produces.
+			u := &url.URL{
+				Path:    "/" + string([]byte{byte(b)}) + "/a",
+				RawPath: "/" + escape + "/%61",
+			}
+			assertRendersLikeEscapedPath(t, u, fmt.Sprintf("byte 0x%02X escaped as %s", b, escape))
+		}
+	}
+}
+
+// Every candidate hex digit against every byte it could be taken to mean. A
+// classifier that admits a byte net/url refuses decodes it to something, and
+// whichever byte that turns out to be, the Path that makes it observable is a row
+// of this table: accepting the RawPath returns it verbatim while rejecting it
+// escapes the Path, and the canary keeps those two answers apart.
+//
+// One limit only. Clipping is orthogonal to the decision under test and the
+// tables above vary it.
+func TestEscapedPathForLog_MatchesEscapedPathOnEveryHexCandidate(t *testing.T) {
+	for digit := 0; digit < 256; digit++ {
+		rawPath := "/%4" + string([]byte{byte(digit)}) + "/%61"
+		for decoded := 0; decoded < 256; decoded++ {
+			u := &url.URL{Path: "/" + string([]byte{byte(decoded)}) + "/a", RawPath: rawPath}
+			assertRendersLikeEscapedPath(t, u,
+				fmt.Sprintf("second digit 0x%02X decoding to 0x%02X", digit, decoded),
+				maxLoggedTarget)
+		}
+	}
+}
+
+// isHexDigit and unhexDigit are net/url's ishex and unhex, which the package does
+// not export either. The tables above make a wrong answer observable; this one
+// says what the right answer is, against strconv, which parses exactly the sixteen
+// hex digits and nothing else.
+func TestHexDigits_MatchTheStandardLibrary(t *testing.T) {
+	for b := 0; b < 256; b++ {
+		c := byte(b)
+		value, err := strconv.ParseUint(string([]byte{c}), 16, 8)
+
+		assert.Equal(t, err == nil, isHexDigit(c), "byte 0x%02X", b)
+		if err == nil {
+			assert.Equal(t, byte(value), unhexDigit(c), "byte 0x%02X", b)
+		}
 	}
 }
 
