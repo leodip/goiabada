@@ -274,6 +274,92 @@ func TestLimitResetPwd_PerIP(t *testing.T) {
 	})
 }
 
+// TestLimitActivate_PerIP verifies the activation limiter's budget and its key, the same
+// pair TestLimitResetPwd_PerIP covers for the other emailed-link flow. It had no test at all
+// until #112 either.
+//
+// The key is the point: the activation link no longer carries ?email=, and the step after it
+// runs on a URL with no query, so the old key would evaluate to the empty string on every
+// request and one deployment-wide bucket of 5 per 5 minutes would stop everyone activating an
+// account.
+//
+// The budget is exact because it is published policy: 20 requests per 5 minutes, which is 10
+// activation operations at the two requests an activation now costs, the same operation rate
+// as reset over a chain one request shorter (decision 11).
+//
+// The handler stub writes 418 rather than 200 on purpose: a middleware that writes nothing
+// produces exactly 200 with an empty body, so 418 is what tells "the handler ran" apart from
+// "nothing was written", and from 429.
+func TestLimitActivate_PerIP(t *testing.T) {
+	const budget = 20
+
+	run := func(m *RateLimiterMiddleware, target, ip string) (int, bool) {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		reached := false
+		m.LimitActivate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		return rr.Code, reached
+	}
+
+	t.Run("the budget is exactly 20 per IP", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached := run(m, "/account/activate", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, "/account/activate", "203.0.113.7:5000"); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a second client IP has an independent bucket", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		for i := 0; i < budget+1; i++ {
+			run(m, "/account/activate", "203.0.113.7:5000")
+		}
+		// Same middleware instance, different host: a global key would block this, which is
+		// exactly what an empty key would produce.
+		if code, reached := run(m, "/account/activate", "198.51.100.9:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second IP: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("the address in the query no longer keys anything", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		// A distinct address per request used to buy a fresh bucket each time. From one host
+		// they now share one, which is what makes the rekey observable.
+		blocked := false
+		for i := 0; i < budget+1; i++ {
+			target := fmt.Sprintf("/account/activate?email=user%d@example.com", i)
+			if code, _ := run(m, target, "203.0.113.7:5000"); code == http.StatusTooManyRequests {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			t.Errorf("expected one host to be limited within %d requests regardless of the address", budget+1)
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, false)
+		for i := 0; i < budget*2; i++ {
+			if code, reached := run(m, "/account/activate", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
 // TestLimitOtp_PerUserAndMissingAuthContext verifies the OTP limiter keys its
 // budget on the user id, and that a request whose auth context cannot be read
 // reaches the handler instead of being answered with a blank 200 (#114).

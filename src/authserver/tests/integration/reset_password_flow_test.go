@@ -112,6 +112,14 @@ var resetLinkPattern = regexp.MustCompile(`https?://[^"'<>\s]+/reset-password[^"
 // emailedResetLinks returns every reset link Goiabada has sent to an address, newest first.
 func emailedResetLinks(t *testing.T, to string) []string {
 	t.Helper()
+	return emailedLinksMatching(t, to, resetLinkPattern)
+}
+
+// emailedLinksMatching returns every link matching pattern that Goiabada has sent to an
+// address, newest first. Shared with the activation flow, which reads its own links back out
+// of mailpit exactly the same way rather than rebuilding them (#112 decision 6).
+func emailedLinksMatching(t *testing.T, to string, pattern *regexp.Regexp) []string {
+	t.Helper()
 
 	resp, err := http.Get("http://mailpit:8025/api/v1/messages?limit=200")
 	require.NoError(t, err)
@@ -148,7 +156,7 @@ func emailedResetLinks(t *testing.T, to string) []string {
 		var message testutil.MailpitMessage
 		require.NoError(t, json.Unmarshal(detailBody, &message))
 
-		if found := resetLinkPattern.FindString(message.HTML + " " + message.Text); found != "" {
+		if found := pattern.FindString(message.HTML + " " + message.Text); found != "" {
 			links = append(links, found)
 		}
 	}

@@ -36,7 +36,10 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterM
 		pwdLimiter:      httprate.NewRateLimiter(15, 1*time.Minute), // per-email: bounds brute force on one account
 		pwdIpLimiter:    httprate.NewRateLimiter(30, 1*time.Minute), // per-IP: stops one host hammering many accounts
 		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
-		activateLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
+		// per-IP: 10 activation operations per 5 minutes, at the two requests an activation
+		// now costs (the link's GET, the clean GET). The same operation rate as
+		// resetPwdLimiter over a chain one request shorter (#112)
+		activateLimiter: httprate.NewRateLimiter(20, 5*time.Minute),
 		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
 		// costs (the link's GET, the clean GET, the clean POST). Half of what
 		// forgotPwdIpLimiter allows, which is the only other endpoint with an IP tier (#112)
@@ -107,6 +110,17 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 	})
 }
 
+// LimitActivate rate limits the account activation endpoint, on the client IP.
+//
+// It used to key on ?email=, which the activation link no longer carries: the link holds the
+// verification code alone, and the step after it runs on a URL with no query at all (#112).
+// Left as it was, every request would key on the empty string and the whole deployment would
+// share one bucket, which would stop anyone activating an account once a handful of people
+// had.
+//
+// The threat model moved with it, as it did for LimitResetPwd. The code is the sole
+// credential at 193 bits of entropy, so blind guessing is infeasible; what is left to bound is
+// one host driving unauthenticated account creation, which an IP key does.
 func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
@@ -115,10 +129,10 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 			return
 		}
 
-		email := r.URL.Query().Get("email")
-
-		if m.activateLimiter.RespondOnLimit(w, r, email) {
-			slog.Error("Rate limiter - limit reached (activate)", "email", email)
+		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
+		clientIP := GetClientIPFromRequest(r)
+		if m.activateLimiter.RespondOnLimit(w, r, clientIP) {
+			slog.Error("Rate limiter - limit reached (activate, by IP)", "ip", clientIP)
 			return
 		}
 

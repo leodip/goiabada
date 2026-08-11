@@ -190,7 +190,11 @@ func HandleAccountRegisterPost(
 			})
 
 			bind := map[string]interface{}{
-				"link": config.GetAuthServer().BaseURL + "/account/activate?email=" + email + "&code=" + verificationCode,
+				// The code and nothing else: the address used to travel here too, which broke
+				// every '+' and '%xx' address under form-urlencoded query parsing (#112). The
+				// helper also owns the path the activation handler redirects back to, so the
+				// two cannot drift.
+				"link": handlers.AccountActivateLink(verificationCode),
 			}
 			// Pre-registration recipient has no stored locale yet; render in
 			// the originating request's locale so the activation email matches
