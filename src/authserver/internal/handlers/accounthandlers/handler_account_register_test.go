@@ -480,7 +480,11 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			if !ok {
 				return false
 			}
-			expectedLink := fmt.Sprintf("%s/account/activate?email=test@example.com&code=%s", config.GetAuthServer().BaseURL, capturedVerificationCode)
+			// The code and nothing else. The address used to be in here, which is what
+			// #112 reports: form-urlencoded query parsing turns a '+' into a space, so a
+			// '+' address could never be activated. Asserted at seam 1 as well, which
+			// owns the shape; this is the build site agreeing with it.
+			expectedLink := fmt.Sprintf("%s/account/activate?code=%s", config.GetAuthServer().BaseURL, capturedVerificationCode)
 			return link == expectedLink
 		})).Return(bytes.NewBuffer([]byte("email content")), nil)
 
