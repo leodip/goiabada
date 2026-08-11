@@ -787,3 +787,66 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 	assert.Contains(t, output, "secretKey")
 	assert.Contains(t, output, redactedValue)
 }
+
+// -----------------------------------------------------------------------------
+// The request URL line
+//
+// #145 redacted the bodies at this seam and left the URL line alone: it passed
+// r.URL.String(), query string and all. That is the same defect under a second
+// flag, so the target now goes through the auth server's own request-log
+// redactor (#159).
+//
+// Two cases, one accept and one reject, thin on purpose: the exhaustive table
+// belongs to RequestTargetForLog in src/core/middleware, which owns the rule.
+//
+// Both drive APIDebugMiddleware rather than calling debugLog directly, and that
+// is load-bearing. debugLog takes the URL as a string parameter, so a test
+// calling it passes whatever string it likes and would still pass with the call
+// site handing over r.URL.String(). The change under test is the call site.
+// -----------------------------------------------------------------------------
+
+func TestAPIDebugMiddleware_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
+	logged := captureSlog(t)
+
+	router := debugAPIRouter(t, http.MethodGet, "/users", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/account/users?page=2&size=10", nil))
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	// page and size are two of the twelve names the redactor keeps, and they are
+	// what an operator reads off this surface, so the change must not have cost
+	// the debug log its pagination.
+	assert.Contains(t, logged.String(), "/api/v1/account/users?page=2&size=10")
+}
+
+// The reject. `query` is the admin API's free-text user search, so it carries
+// whatever was typed into the box, an email address here. The gate that rejects
+// it is the allowlist miss: `query` is not one of the twelve.
+//
+// The page=2 beside it is what makes the absence attributable. A line that was
+// never written, or a request that never reached the middleware, would satisfy
+// "the search string is absent" perfectly.
+func TestAPIDebugMiddleware_DoesNotLogAUserSearchStringFromTheQuery(t *testing.T) {
+	logged := captureSlog(t)
+
+	router := debugAPIRouter(t, http.MethodGet, "/users", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet,
+		"/api/v1/account/users?page=2&query=alice%40example.com", nil))
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+
+	output := logged.String()
+	assert.Contains(t, output, "page=2", "the line must have been written at all")
+	assert.Contains(t, output, "query="+redactedValue)
+	assert.NotContains(t, output, "alice@example.com",
+		"a user search string must not reach the log")
+	assert.NotContains(t, output, "alice%40example.com",
+		"nor in the form it arrived in, which a redactor working on the decoded value would miss")
+}

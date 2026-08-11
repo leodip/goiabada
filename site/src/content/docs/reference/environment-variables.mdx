@@ -271,7 +271,7 @@ See [Customizations](/reference/customizations/) for details on how to customize
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS</code><br/><code>--authserver-log-http-requests</code></td>
       <td><code>false</code></td>
-      <td>Log HTTP requests</td>
+      <td>Log HTTP requests, one record per request on the application log (stderr). Query parameter values are redacted apart from a short assessed-safe list. See <a href="/reference/security/">Security</a>.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LOG_SQL</code><br/><code>--authserver-log-sql</code></td>
@@ -515,7 +515,7 @@ See [Customizations](/reference/customizations/) for details on how to customize
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS</code><br/><code>--adminconsole-log-http-requests</code></td>
       <td><code>false</code></td>
-      <td>Log HTTP requests</td>
+      <td>Log HTTP requests, one record per request on the application log (stderr). Query parameter values are redacted apart from a short assessed-safe list. See <a href="/reference/security/">Security</a>.</td>
     </tr>
   </tbody>
 </table>
