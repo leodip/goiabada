@@ -94,6 +94,17 @@
 "auth_error.ceremony_mismatch.title" = "This request is no longer active"
 "auth_error.ceremony_mismatch.message" = "This page belongs to a sign-in request that is no longer the one in progress. Another one was started in this browser, so this form can no longer be submitted. Go back to the application you were signing in to and start again."
 
+# --- Withheld redirect for a self-registered client (auth_redirect_blocked.html)
+# Neutral about why the request stopped on purpose: this page is reached both by someone who
+# declined and by someone whose request the server refused, and it must not tell the second group
+# they refused something.
+
+"auth_redirect_blocked.page_title" = "Authorization stopped"
+"auth_redirect_blocked.title" = "You have not been sent anywhere"
+"auth_redirect_blocked.destination" = "This application asked to send you to {{.destination}}."
+"auth_redirect_blocked.unverified" = "It registered itself with this server, so nobody here has checked who it is or where it wants to send you."
+"auth_redirect_blocked.closing" = "The request stops here. You can close this window."
+
 # --- Self-registration (account/register) -----------------------------------
 
 "account.register.page_title" = "Register"

@@ -213,8 +213,12 @@ func HandleAuthorizeGet(
 				// Read from the request rather than from authContext: this closure runs before the
 				// second SaveAuthContext below, and two of its call sites run before the context
 				// has been populated with the validated values at all.
-				err = redirToClientWithError(w, r, templateFS, redirectErrorInput{
-					client:       client,
+				err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
+					client: client,
+					// Silence comes off the raw parameter here, not off authContext.Prompt: this
+					// closure runs before ValidatePrompt has assigned it, so the ceremony holds
+					// nothing to read yet (#108).
+					silent:       promptRequestsSilence(r.FormValue("prompt")),
 					code:         "server_error",
 					description:  "Internal server error",
 					responseMode: r.FormValue("response_mode"),
@@ -229,8 +233,9 @@ func HandleAuthorizeGet(
 				return
 			}
 
-			err = redirToClientWithError(w, r, templateFS, redirectErrorInput{
+			err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
 				client:       client,
+				silent:       promptRequestsSilence(r.FormValue("prompt")),
 				code:         validationError.GetCode(),
 				description:  validationError.GetDescription(),
 				responseMode: r.FormValue("response_mode"),
@@ -453,7 +458,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 			// which on a genuine server fault is the accurate instruction of the two.
 			slog.Error("failed to clear the auth context, answering the client with server_error",
 				"error", err)
-			err = redirToClientWithError(w, r, templateFS,
+			err = redirToClientWithError(w, r, httpHelper, templateFS,
 				redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
 			if err != nil {
 				// Nowhere left to send the client, so the 500 is the last resort here.
@@ -462,7 +467,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 			return
 		}
 
-		err = redirToClientWithError(w, r, templateFS,
+		err = redirToClientWithError(w, r, httpHelper, templateFS,
 			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -655,6 +660,17 @@ type redirectErrorInput struct {
 	// untrusted case rather than an exempt one.
 	client *models.Client
 
+	// silent records that this ceremony asked for silent authentication. OIDC Core 3.1.2.1 says
+	// the authorization server "MUST NOT display any authentication or consent user interface
+	// pages" for prompt=none, so a silent request is answered by redirect even when the client
+	// registered itself. It is the "silent authentication use case" RFC 9700 4.11.2 carves out of
+	// its own requirement, so this is not a hole in the trust decision but the shape of it.
+	//
+	// Read per site rather than from one source: from the ceremony wherever the ceremony holds a
+	// validated prompt, and from the raw request parameter at the two sites inside
+	// HandleAuthorizeGet's closure that run before it does.
+	silent bool
+
 	code         string
 	description  string
 	responseMode string
@@ -671,7 +687,12 @@ func redirectErrorFromAuthContext(authContext *oauth.AuthContext, client *models
 	code string, description string) redirectErrorInput {
 
 	return redirectErrorInput{
-		client:       client,
+		client: client,
+		// From the ceremony, never from the request. Two of the four caller files dispatch on a
+		// POST /auth/consent and a GET /auth/issue, and neither request carries a prompt parameter
+		// at all, so reading the request there would report a silent ceremony as interactive and
+		// render a page for it. The ceremony is where prompt lives by then.
+		silent:       authContext.HasPromptValue("none"),
 		code:         code,
 		description:  description,
 		responseMode: authContext.ResponseMode,
@@ -699,7 +720,26 @@ func clientProvenance(database data.Database, clientIdentifier string) *models.C
 }
 
 func redirToClientWithError(w http.ResponseWriter, r *http.Request,
-	templateFS fs.FS, input redirectErrorInput) error {
+	httpHelper HttpHelper, templateFS fs.FS, input redirectErrorInput) error {
+
+	// RFC 9700 4.11.2: an attacker who registers a client anonymously can use this server's own
+	// error redirect to deliver a victim to a host they control, either by getting the user to
+	// decline (attack 2) or by sending a deliberately invalid request (attack 1). The RFC leaves
+	// "trusted" to the server and names the source of the redirect URI among its inputs, so a
+	// client that registered itself is the untrusted case and an administrator-registered one,
+	// whose redirect URI a human vetted, is not. An unresolved client is untrusted too: the
+	// question is where the redirect URI came from, and "we could not find out" is not an answer
+	// that justifies using it.
+	//
+	// It sits above the response-mode dispatch so it covers query, fragment and form_post alike,
+	// and it can only ever withhold a redirect. Nothing below it is reached, no state is written
+	// and no route is added, so there is nothing here for an attacker to drive (#108).
+	//
+	// Silent authentication is exempt: OIDC Core 3.1.2.1 forbids showing any UI there, and RFC
+	// 9700 4.11.2 excepts the same case from its own requirement.
+	if !input.silent && (input.client == nil || input.client.CreatedViaDCR) {
+		return renderRedirectBlocked(httpHelper, w, r, input)
+	}
 
 	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment
 	// Determine if this is an implicit flow by checking response_type
