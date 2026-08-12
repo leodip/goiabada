@@ -90,6 +90,8 @@
 # --- OAuth/internal error page (auth_error.html) ----------------------------
 
 "auth_error.page_title" = "Error"
+"auth_error.ceremony_mismatch.title" = "This request is no longer active"
+"auth_error.ceremony_mismatch.message" = "This page belongs to a sign-in request that is no longer the one in progress. Another one was started in this browser, so this form can no longer be submitted. Go back to the application you were signing in to and start again."
 
 # --- Self-registration (account/register) -----------------------------------
 

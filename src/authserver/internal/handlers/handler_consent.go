@@ -129,6 +129,10 @@ func HandleConsentGet(
 				"clientWebsiteUrl":  displayInfo.WebsiteURL,
 				"hasLogo":           displayInfo.HasLogo,
 				"scopes":            scopeInfoArr,
+				// The rendered form says which ceremony rendered it, and HandleConsentPost
+				// refuses a submission naming any other one. The checkbox indices are only
+				// meaningful against this ceremony's scope list (#79).
+				"ceremonyId": authContext.CeremonyId,
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/consent.html", bind)
@@ -166,6 +170,19 @@ func HandleConsentPost(
 			} else {
 				httpHelper.InternalServerError(w, r, err)
 			}
+			return
+		}
+
+		// Before the AuthState check, so a form left open in another tab gets the 400 mismatch
+		// page rather than the 500 that a replaced context's state would produce. Before the
+		// btnSubmit/btnCancel dispatch too, so a stale cancel cannot clear the auth context of
+		// the ceremony that is actually current (#79).
+		//
+		// r.PostFormValue rather than r.FormValue: this form posts to action="", so r.Form
+		// would let /auth/consent?ceremonyId=... supply the id, and only the submitted body is
+		// a submission. Same reasoning as the checkbox selection below.
+		if !ceremonyMatches(authContext.CeremonyId, r.PostFormValue(ceremonyIdField)) {
+			rejectCeremonyMismatch(httpHelper, auditLogger, w, r, authContext)
 			return
 		}
 

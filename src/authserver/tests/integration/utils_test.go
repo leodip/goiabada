@@ -141,6 +141,39 @@ func getOtpSecretFromEnrollmentPage(t *testing.T, response *http.Response) strin
 	return secret.Text()
 }
 
+// getCeremonyIdFromPage reads the hidden ceremony id out of a rendered auth-flow page, so the
+// tests post the value the server actually rendered rather than one they made up. A field rename
+// on one side alone then fails here instead of passing silently (#79).
+//
+// The selector is scoped to inside the form, and matching anything other than exactly once is a
+// failure. That is the whole point of it: a hidden input placed OUTSIDE the <form> element is not
+// submitted by any browser, so every real submission would be refused, while a helper that finds
+// the value anywhere on the page and posts it by hand would sail past.
+//
+// The body is re-buffered, as getOtpSecretFromEnrollmentPage does, so a later reader of the same
+// response still sees it.
+func getCeremonyIdFromPage(t *testing.T, response *http.Response) string {
+	byteArr, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body = io.NopCloser(bytes.NewReader(byteArr))
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(byteArr)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	field := doc.Find(`form input[name="ceremonyId"]`)
+	if field.Length() != 1 {
+		t.Fatalf("expecting exactly one ceremonyId input inside the form, found %d", field.Length())
+	}
+	ceremonyId, ok := field.Attr("value")
+	if !ok || ceremonyId == "" {
+		t.Fatal("the ceremonyId input carries no value")
+	}
+	return ceremonyId
+}
+
 func getCodeAndStateFromUrl(t *testing.T, resp *http.Response) (code string, state string) {
 	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {
@@ -246,9 +279,14 @@ func assignPermissionToUser(t *testing.T, userId int64, permissionId int64) {
 	}
 }
 
-func postConsent(t *testing.T, client *http.Client, destUrl string, consents []int) (resp *http.Response) {
+// postConsent submits the consent form. consentPage is the response that rendered it, and the
+// ceremony id is read out of it rather than constructed, so the submission carries what a browser
+// on that page would carry (#79).
+func postConsent(t *testing.T, client *http.Client, destUrl string, consentPage *http.Response,
+	consents []int) (resp *http.Response) {
 
 	formData := url.Values{}
+	formData.Add("ceremonyId", getCeremonyIdFromPage(t, consentPage))
 	for _, consent := range consents {
 		formData.Add(fmt.Sprintf("consent%d", consent), "[on]")
 	}

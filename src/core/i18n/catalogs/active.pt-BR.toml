@@ -88,6 +88,8 @@
 # --- Página de erro OAuth/interno (auth_error.html) --------------------------
 
 "auth_error.page_title" = "Erro"
+"auth_error.ceremony_mismatch.title" = "Esta solicitação não está mais ativa"
+"auth_error.ceremony_mismatch.message" = "Esta página pertence a uma solicitação de acesso que não é mais a que está em andamento. Outra foi iniciada neste navegador, portanto este formulário não pode mais ser enviado. Volte para o aplicativo em que você estava entrando e comece de novo."
 
 # --- Cadastro próprio (account/register) -------------------------------------
 

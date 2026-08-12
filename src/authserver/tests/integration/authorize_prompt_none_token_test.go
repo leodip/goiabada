@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -998,28 +997,9 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	// offline_access always shows consent form, so we must submit it
-	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
-	consentForm := url.Values{
-		"btnSubmit": {"submit"},
-		"consent0":  {"on"},
-		"consent1":  {"on"},
-		"consent2":  {"on"},
-	}
-	consentFormString := consentForm.Encode()
-	consentReqBody := strings.NewReader(consentFormString)
-	consentReq, err := http.NewRequest("POST", consentEndpoint, consentReqBody)
-	if err != nil {
-		t.Fatal(err)
-	}
-	consentReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	consentReq.Header.Set("Referer", consentEndpoint)
-	consentReq.Header.Set("Origin", config.GetAuthServer().BaseURL)
-
-	resp, err = httpClient.Do(consentReq)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// offline_access always shows consent form, so we must submit it. Through the shared helper,
+	// so the ceremony id comes off the page just rendered rather than being omitted (#79).
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")

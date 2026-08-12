@@ -860,7 +860,7 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Get consent page and submit consent for all scopes (openid, profile, resource:permission)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")

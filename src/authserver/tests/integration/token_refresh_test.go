@@ -518,7 +518,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Provide consent
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2, 3})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -647,7 +647,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")

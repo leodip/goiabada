@@ -116,7 +116,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -251,7 +251,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -394,7 +394,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -535,7 +535,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	defer func() { _ = resp.Body.Close() }()
 
 	// Partially grant consent (only for openid, email, and one resource permission)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -700,7 +700,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -863,7 +863,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	defer func() { _ = resp.Body.Close() }()
 
 	// Simulate partial consent by only consenting to some scopes
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1019,7 +1019,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1173,7 +1173,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	defer func() { _ = resp.Body.Close() }()
 
 	// Partially grant consent (only for openid, email, and the second resource/permission)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1338,7 +1338,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1501,7 +1501,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	defer func() { _ = resp.Body.Close() }()
 
 	// Partially grant consent (only for openid, email, and the second resource/permission)
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 4})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 2, 4})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
@@ -1643,7 +1643,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 	resp = loadPage(t, httpClient, consentUrl)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	resp = postConsent(t, httpClient, consentUrl, []int{}) // Cancel consent
+	resp = postConsent(t, httpClient, consentUrl, resp, []int{}) // Cancel consent
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -1774,7 +1774,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{}) // Cancel consent
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -1914,7 +1914,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{}) // Cancel consent
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -2045,7 +2045,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{}) // Cancel consent
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -2185,7 +2185,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = postConsent(t, httpClient, redirectLocation, []int{}) // Cancel consent
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -2309,7 +2309,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 	defer func() { _ = resp.Body.Close() }()
 
 	// Every box but index 1, which is profile.
-	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
