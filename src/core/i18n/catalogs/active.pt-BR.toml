@@ -473,6 +473,7 @@
 "adminconsole.admin_clients.list.col_public" = "Público/confidencial"
 "adminconsole.admin_clients.list.enabled" = "Habilitado"
 "adminconsole.admin_clients.list.disabled" = "Desabilitado"
+"adminconsole.admin_clients.list.self_registered" = "Autorregistrado"
 "adminconsole.admin_clients.list.public" = "Público"
 "adminconsole.admin_clients.list.confidential" = "Confidencial"
 "adminconsole.admin_clients.list.manage_link" = "Gerenciar"

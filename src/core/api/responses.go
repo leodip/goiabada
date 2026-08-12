@@ -934,25 +934,30 @@ type UpdateGroupAttributeResponse struct {
 }
 
 type ClientResponse struct {
-	Id                       int64      `json:"id"`
-	CreatedAt                *time.Time `json:"createdAt"`
-	UpdatedAt                *time.Time `json:"updatedAt"`
-	ClientIdentifier         string     `json:"clientIdentifier"`
-	ClientSecret             string     `json:"clientSecret,omitempty"` // Only in detail API
-	Description              string     `json:"description"`
-	WebsiteURL               string     `json:"websiteUrl"`
-	DisplayName              string     `json:"displayName"`
-	Enabled                  bool       `json:"enabled"`
-	ConsentRequired          bool       `json:"consentRequired"`
-	ShowLogo                 bool       `json:"showLogo"`
-	ShowDisplayName          bool       `json:"showDisplayName"`
-	ShowDescription          bool       `json:"showDescription"`
-	ShowWebsiteURL           bool       `json:"showWebsiteUrl"`
-	IsPublic                 bool       `json:"isPublic"`
-	IsSystemLevelClient      bool       `json:"isSystemLevelClient"`
-	AuthorizationCodeEnabled bool       `json:"authorizationCodeEnabled"`
-	ClientCredentialsEnabled bool       `json:"clientCredentialsEnabled"`
-	PKCERequired             *bool      `json:"pkceRequired"`
+	Id               int64      `json:"id"`
+	CreatedAt        *time.Time `json:"createdAt"`
+	UpdatedAt        *time.Time `json:"updatedAt"`
+	ClientIdentifier string     `json:"clientIdentifier"`
+	ClientSecret     string     `json:"clientSecret,omitempty"` // Only in detail API
+	Description      string     `json:"description"`
+	WebsiteURL       string     `json:"websiteUrl"`
+	DisplayName      string     `json:"displayName"`
+	Enabled          bool       `json:"enabled"`
+	ConsentRequired  bool       `json:"consentRequired"`
+	// CreatedViaDCR is read-only on purpose. It records that the client registered itself through
+	// /connect/register, which is a fact about where the client came from rather than a setting, so
+	// ClientUpdateRequest deliberately does not carry it and neither an administrator nor the client
+	// itself can clear the marking. The setting an administrator does get is ConsentRequired (#108).
+	CreatedViaDCR            bool  `json:"createdViaDcr"`
+	ShowLogo                 bool  `json:"showLogo"`
+	ShowDisplayName          bool  `json:"showDisplayName"`
+	ShowDescription          bool  `json:"showDescription"`
+	ShowWebsiteURL           bool  `json:"showWebsiteUrl"`
+	IsPublic                 bool  `json:"isPublic"`
+	IsSystemLevelClient      bool  `json:"isSystemLevelClient"`
+	AuthorizationCodeEnabled bool  `json:"authorizationCodeEnabled"`
+	ClientCredentialsEnabled bool  `json:"clientCredentialsEnabled"`
+	PKCERequired             *bool `json:"pkceRequired"`
 	// ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
 	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
 	ImplicitGrantEnabled *bool `json:"implicitGrantEnabled"`
@@ -983,6 +988,7 @@ func ToClientResponse(client *models.Client) *ClientResponse {
 		DisplayName:                             client.DisplayName,
 		Enabled:                                 client.Enabled,
 		ConsentRequired:                         client.ConsentRequired,
+		CreatedViaDCR:                           client.CreatedViaDCR,
 		ShowLogo:                                client.ShowLogo,
 		ShowDisplayName:                         client.ShowDisplayName,
 		ShowDescription:                         client.ShowDescription,

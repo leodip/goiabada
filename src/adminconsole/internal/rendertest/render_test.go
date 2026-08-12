@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	web "github.com/leodip/goiabada/adminconsole/web"
@@ -104,6 +105,28 @@ func TestRender_AccountProfile(t *testing.T) {
 	out := render(t, "/account_profile.html", bind)
 	assert.Contains(t, out, "português (Brasil) (Portuguese (Brazil))") // LocaleLabel
 	assert.Contains(t, out, "Estados Unidos")                           // RefTimezone country portion localized
+}
+
+// TestRender_AdminClients is the template hop of the self-registered badge. The pipeline from the
+// database to this page is the client row, then api.ToClientResponse, then that value straight into
+// the template, since HandleAdminClientsGet binds "clients" and does no adminconsole-side mapping.
+// So rendering the real page over two real api.ClientResponse values is what proves the badge is
+// driven by CreatedViaDCR: an ordinary client next to a self-registered one is the case that fails
+// if the conditional is dropped and every client gets marked (#108).
+func TestRender_AdminClients(t *testing.T) {
+	bind := map[string]interface{}{
+		"clients": []api.ClientResponse{
+			{Id: 1, ClientIdentifier: "dcr_a3f9e1b2", Enabled: true, CreatedViaDCR: true},
+			{Id: 2, ClientIdentifier: "web-app", Enabled: true, CreatedViaDCR: false},
+		},
+	}
+	out := render(t, "/admin_clients.html", bind)
+
+	// Both clients render, so the count is what carries the claim: one badge, not two and not zero.
+	assert.Equal(t, 1, strings.Count(out, "Autorregistrado"),
+		"the self-registered badge must appear for the DCR client and only for it")
+	assert.Contains(t, out, "dcr_a3f9e1b2")
+	assert.Contains(t, out, "web-app")
 }
 
 // TestRender_JSBootstrapNoKeyLeak guards the window.i18n bootstrap: every value

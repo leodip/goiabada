@@ -682,6 +682,7 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 		DisplayName:                             "Web App",
 		Enabled:                                 true,
 		ConsentRequired:                         true,
+		CreatedViaDCR:                           true,
 		ShowLogo:                                true,
 		IsPublic:                                false,
 		AuthorizationCodeEnabled:                true,
@@ -705,6 +706,7 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 	assert.Equal(t, "Web App", resp.DisplayName)
 	assert.True(t, resp.Enabled)
 	assert.True(t, resp.ConsentRequired)
+	assert.True(t, resp.CreatedViaDCR)
 	assert.True(t, resp.ShowLogo)
 	assert.False(t, resp.IsPublic)
 	assert.True(t, resp.AuthorizationCodeEnabled)
@@ -719,6 +721,16 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 	assert.Equal(t, client.RedirectURIs, resp.RedirectURIs)
 	assert.Equal(t, client.WebOrigins, resp.WebOrigins)
 	assert.Equal(t, client.IsSystemLevelClient(), resp.IsSystemLevelClient)
+}
+
+// TestToClientResponse_CreatedViaDCRIsCopiedNotAssumed pins the other half of the mapping. The
+// fixture above is self-registered, so a mapper that hardcoded true would satisfy it; an
+// administrator-created client is what says the value is read off the client. The admin console
+// badges self-registered clients straight off this field, so a mapper stuck on either value would
+// mark every client or none of them (#108).
+func TestToClientResponse_CreatedViaDCRIsCopiedNotAssumed(t *testing.T) {
+	resp := ToClientResponse(&models.Client{ClientIdentifier: "web-app", CreatedViaDCR: false})
+	assert.False(t, resp.CreatedViaDCR)
 }
 
 // =============================================================================
