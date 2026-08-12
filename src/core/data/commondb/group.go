@@ -379,7 +379,9 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	selectBuilder := userStruct.SelectFrom("users")
 	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
 	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
-	selectBuilder.OrderByAsc("users.given_name")
+	// given_name does not order the rows totally, so paging over it alone can repeat a user on
+	// the next page and skip another. See SearchUsersPaginated in user.go for the full reason (#112).
+	selectBuilder.OrderByAsc("users.given_name").OrderByAsc("users.id")
 	selectBuilder.Offset((page - 1) * pageSize)
 	selectBuilder.Limit(pageSize)
 
