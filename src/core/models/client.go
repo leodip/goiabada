@@ -8,23 +8,27 @@ import (
 )
 
 type Client struct {
-	Id                       int64        `db:"id" fieldtag:"pk"`
-	CreatedAt                sql.NullTime `db:"created_at" fieldtag:"dont-update"`
-	UpdatedAt                sql.NullTime `db:"updated_at"`
-	ClientIdentifier         string       `db:"client_identifier"`
-	ClientSecretEncrypted    []byte       `db:"client_secret_encrypted"`
-	Description              string       `db:"description"`
-	WebsiteURL               string       `db:"website_url"`
-	DisplayName              string       `db:"display_name"`
-	Enabled                  bool         `db:"enabled"`
-	ConsentRequired          bool         `db:"consent_required"`
-	ShowLogo                 bool         `db:"show_logo"`
-	ShowDisplayName          bool         `db:"show_display_name"`
-	ShowDescription          bool         `db:"show_description"`
-	ShowWebsiteURL           bool         `db:"show_website_url"`
-	IsPublic                 bool         `db:"is_public"`
-	AuthorizationCodeEnabled bool         `db:"authorization_code_enabled"`
-	ClientCredentialsEnabled bool         `db:"client_credentials_enabled"`
+	Id                    int64        `db:"id" fieldtag:"pk"`
+	CreatedAt             sql.NullTime `db:"created_at" fieldtag:"dont-update"`
+	UpdatedAt             sql.NullTime `db:"updated_at"`
+	ClientIdentifier      string       `db:"client_identifier"`
+	ClientSecretEncrypted []byte       `db:"client_secret_encrypted"`
+	Description           string       `db:"description"`
+	WebsiteURL            string       `db:"website_url"`
+	DisplayName           string       `db:"display_name"`
+	Enabled               bool         `db:"enabled"`
+	ConsentRequired       bool         `db:"consent_required"`
+	// CreatedViaDCR records that this client registered itself through /connect/register rather
+	// than being created by an administrator. It is the enforced form of what the dcr_ identifier
+	// prefix only suggests, and it is what the consent screen's unverified marking reads (#108).
+	CreatedViaDCR            bool `db:"created_via_dcr"`
+	ShowLogo                 bool `db:"show_logo"`
+	ShowDisplayName          bool `db:"show_display_name"`
+	ShowDescription          bool `db:"show_description"`
+	ShowWebsiteURL           bool `db:"show_website_url"`
+	IsPublic                 bool `db:"is_public"`
+	AuthorizationCodeEnabled bool `db:"authorization_code_enabled"`
+	ClientCredentialsEnabled bool `db:"client_credentials_enabled"`
 	// PKCERequired overrides global setting if set.
 	// nil = use global setting, true = PKCE required, false = PKCE optional
 	PKCERequired *bool `db:"pkce_required"`

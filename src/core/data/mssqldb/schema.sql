@@ -31,6 +31,7 @@ CREATE TABLE [clients] (
     [implicit_grant_enabled] BIT DEFAULT NULL,
     [resource_owner_password_credentials_enabled] BIT DEFAULT NULL,
     [include_open_id_connect_claims_in_id_token] VARCHAR(10) NOT NULL DEFAULT 'default',
+    [created_via_dcr] BIT NOT NULL CONSTRAINT [df_clients_created_via_dcr] DEFAULT 0,
     CONSTRAINT [PK_clients] PRIMARY KEY ([id])
 );
 
