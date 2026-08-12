@@ -228,6 +228,58 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.AssertExpectations(t)
 	})
 
+	// This is the only place an auth context is created, so it is the only place a ceremony id
+	// can be minted. Every bound form renders it and every bound POST checks it, so a context
+	// saved without one would render forms whose every submission is refused (#79).
+	//
+	// The request is deliberately made to fail validation straight afterwards: what is under test
+	// is the id on the FIRST context saved, and stopping there keeps the setup to the two calls
+	// that matter.
+	t.Run("The saved auth context names a fresh ceremony", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		seen := map[string]bool{}
+		for i := 0; i < 2; i++ {
+			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
+			assert.NoError(t, err)
+			rr := httptest.NewRecorder()
+
+			var saved *oauth.AuthContext
+			authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+				saved = ac
+				return true
+			})).Return(nil).Once()
+
+			validationError := customerrors.NewErrorDetail("", "Invalid client or redirect URI")
+			authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(validationError).Once()
+			httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).Return(nil).Once()
+
+			handler.ServeHTTP(rr, req)
+
+			if assert.NotNil(t, saved) {
+				assert.Len(t, saved.CeremonyId, ceremonyIdLength,
+					"the ceremony id must be generated at the full length, not left empty")
+				// A ceremony id shared between two authorization requests would bind neither:
+				// the second request's form would satisfy the first's check.
+				assert.False(t, seen[saved.CeremonyId], "each authorization request gets its own ceremony id")
+				seen[saved.CeremonyId] = true
+			}
+		}
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
 	t.Run("Invalid request", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)

@@ -9,6 +9,8 @@
     <h2 class='mb-2 text-2xl font-semibold text-center'>{{ T $.ctx "consent.title" }}</h2>
     <form action="" method="post">
 
+        <input type="hidden" name="ceremonyId" value="{{.ceremonyId}}" />
+
         <div class="mb-3">
 
             <p class="mt-2">{{ T $.ctx "consent.intro" }}</p>

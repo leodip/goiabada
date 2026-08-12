@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -504,26 +503,10 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	// Submit consent form with decline (btn=cancel)
-	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
-	form := url.Values{
-		"btn": {"cancel"},
-	}
-
-	formDataString := form.Encode()
-	requestBody := strings.NewReader(formDataString)
-	request, err := http.NewRequest("POST", consentEndpoint, requestBody)
-	if err != nil {
-		t.Fatal(err)
-	}
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.Header.Set("Referer", consentEndpoint)
-	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
-
-	resp, err = httpClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Submit consent form with decline. Through the shared helper, which sends btnCancel and the
+	// ceremony id off the page just rendered: a hand-built body names no ceremony and is refused
+	// before the cancel is ever read (#79).
+	resp = postConsent(t, httpClient, redirectLocation, resp, []int{})
 	defer func() { _ = resp.Body.Close() }()
 
 	// Should redirect to client with access_denied error

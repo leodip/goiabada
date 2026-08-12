@@ -3,7 +3,6 @@ package integrationtests
 import (
 	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -284,9 +283,9 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Consent, not /auth/issue: the ceremony now waits for a person.
-	redirectLocation = assertRedirect(t, resp, "/auth/consent")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	consentUrl := assertRedirect(t, resp, "/auth/consent")
+	consentPage := loadPage(t, httpClient, consentUrl)
+	defer func() { _ = consentPage.Body.Close() }()
 
 	// The session exists at this point, created by /auth/completed while it was legitimately
 	// reached. Ending it is what the rest of the case turns on.
@@ -300,21 +299,10 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	err = database.DeleteUserSession(nil, userSessions[0].Id)
 	assert.NoError(t, err)
 
-	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
-	consentForm := url.Values{
-		"btnSubmit": {"submit"},
-		"consent0":  {"on"},
-		"consent1":  {"on"},
-		"consent2":  {"on"},
-	}
-	consentReq, err := http.NewRequest("POST", consentEndpoint, strings.NewReader(consentForm.Encode()))
-	assert.NoError(t, err)
-	consentReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	consentReq.Header.Set("Referer", consentEndpoint)
-	consentReq.Header.Set("Origin", config.GetAuthServer().BaseURL)
-
-	resp, err = httpClient.Do(consentReq)
-	assert.NoError(t, err)
+	// Through the shared helper rather than a hand-built body, so the ceremony id comes off the
+	// consent page this ceremony rendered. Deleting the session row does not disturb it: the
+	// binding is carried by the auth context, not by the session (#79).
+	resp = postConsent(t, httpClient, consentUrl, consentPage, []int{0, 1, 2})
 	defer func() { _ = resp.Body.Close() }()
 
 	// The consent submission itself succeeds, and asserting that is deliberate: it reads no

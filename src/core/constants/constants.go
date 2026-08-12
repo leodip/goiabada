@@ -251,6 +251,15 @@ const (
 	AuditUpdatedClientLogo              = "updated_client_logo"
 	AuditDeletedClientLogo              = "deleted_client_logo"
 	AuditGeneratedEmailVerificationCode = "generated_email_verification_code"
+	// AuditAuthCeremonyMismatch records a form in the authorization flow submitted with a
+	// ceremony id the browser's auth context no longer holds, which means a second
+	// /auth/authorize replaced the ceremony the page was rendered for. The submission is
+	// refused with a 400 and the current ceremony is left alone (#79).
+	//
+	// Ordinary in a browser the user runs two authorizations in, so a row on its own is not an
+	// attack. A run of them against one client is worth looking at: this is the event that
+	// fires when a page tries to act on an authorization request its user never saw.
+	AuditAuthCeremonyMismatch = "auth_ceremony_mismatch"
 )
 
 // AuditEventTypes is the canonical list of all audit event type strings.
@@ -261,6 +270,7 @@ var AuditEventTypes = []string{
 	AuditAddedGroupPermission,
 	AuditAddedUserAttribute,
 	AuditAddedUserPermission,
+	AuditAuthCeremonyMismatch,
 	AuditAuthCodeReuseDetected,
 	AuditAuthFailedOtp,
 	AuditAuthFailedPwd,

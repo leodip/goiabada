@@ -66,6 +66,23 @@ type AuthContext struct {
 	// user mid-ceremony: doing that would launder a ceremony that began before a
 	// credential change into the generation that change established (#106 decision 11).
 	AuthStateGeneration int64
+	// CeremonyId names this authorization ceremony, so a form this ceremony rendered can say
+	// which ceremony rendered it and be refused once the browser's single auth context slot
+	// holds another one.
+	//
+	// A browser holds ONE auth context, so a second /auth/authorize replaces it while every
+	// form already on screen still posts to the same URL. No rule about WRITING the context
+	// can bind a page that is already rendered, which is why the page has to carry the id and
+	// the POST has to check it: without that, a consent screen naming client A resolves its
+	// checkbox indices against client B's scope list, and a password submitted at A's screen
+	// finishes B's authorization outright (#79, the shape #112 records for emailed links).
+	//
+	// Generated only in HandleAuthorizeGet, the sole creation site, so no other path can mint
+	// one. Absent from a context written by an older binary it unmarshals as "", which
+	// ceremonyMatches refuses rather than matching against an empty submission: a user mid-flow
+	// across a deploy is refused once and restarts the authorization, bounded by the session
+	// cookie's life. That is the fail-closed direction.
+	CeremonyId string
 	// UILocales carries the OIDC ui_locales hint as captured on /auth/authorize,
 	// preserving the RP's stated preference across the multi-step auth flow.
 	// Sanitized before storage (BCP 47 shape filter, capped at 10 tags / 256 bytes).

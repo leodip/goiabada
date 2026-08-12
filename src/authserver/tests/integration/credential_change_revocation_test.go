@@ -241,25 +241,12 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/consent")
-	resp = loadPage(t, httpClient, location)
-	_ = resp.Body.Close()
+	consentPage := loadPage(t, httpClient, location)
 
-	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
-	consentForm := url.Values{
-		"btnSubmit": {"submit"},
-		"consent0":  {"on"},
-		"consent1":  {"on"},
-		"consent2":  {"on"},
-		"consent3":  {"on"},
-	}
-	consentReq, err := http.NewRequest("POST", consentEndpoint, strings.NewReader(consentForm.Encode()))
-	require.NoError(t, err)
-	consentReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	consentReq.Header.Set("Referer", consentEndpoint)
-	consentReq.Header.Set("Origin", config.GetAuthServer().BaseURL)
-
-	resp, err = httpClient.Do(consentReq)
-	require.NoError(t, err)
+	// Through the shared helper rather than a hand-built body, so the ceremony id comes off the
+	// rendered page. A form built by hand here would name no ceremony and be refused (#79).
+	resp = postConsent(t, httpClient, location, consentPage, []int{0, 1, 2, 3})
+	_ = consentPage.Body.Close()
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/issue")
@@ -416,25 +403,12 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/consent")
-	resp = loadPage(t, httpClient, location)
-	_ = resp.Body.Close()
+	consentPage := loadPage(t, httpClient, location)
 
-	consentEndpoint := config.GetAuthServer().BaseURL + "/auth/consent"
-	consentForm := url.Values{
-		"btnSubmit": {"submit"},
-		"consent0":  {"on"},
-		"consent1":  {"on"},
-		"consent2":  {"on"},
-		"consent3":  {"on"},
-	}
-	consentReq, err := http.NewRequest("POST", consentEndpoint, strings.NewReader(consentForm.Encode()))
-	require.NoError(t, err)
-	consentReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	consentReq.Header.Set("Referer", consentEndpoint)
-	consentReq.Header.Set("Origin", config.GetAuthServer().BaseURL)
-
-	resp, err = httpClient.Do(consentReq)
-	require.NoError(t, err)
+	// Through the shared helper rather than a hand-built body, so the ceremony id comes off the
+	// rendered page. A form built by hand here would name no ceremony and be refused (#79).
+	resp = postConsent(t, httpClient, location, consentPage, []int{0, 1, 2, 3})
+	_ = consentPage.Body.Close()
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/issue")
