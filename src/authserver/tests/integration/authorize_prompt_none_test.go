@@ -284,6 +284,187 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 }
 
 // =============================================================================
+// prompt=none for self-registered (DCR) clients
+//
+// These two are deliberately thin. TestPromptNone_ConsentRequired_ReturnsConsentRequired and
+// TestPromptNone_ConsentExists_Success above already own how prompt=none behaves for a client
+// that requires consent. What is new is only that a client which registered itself through
+// /connect/register is now one of those, which is the visible consequence of the flip for an
+// operator running silent renewal: the first silent request after registration fails with
+// consent_required until the user has been through the consent screen once (#108).
+// =============================================================================
+
+// walkDCRClientToConsentScreen registers a client through /connect/register, creates a user, and
+// drives the interactive flow until it stops. It returns the client, its redirect URI, the user,
+// and the http client holding the resulting session.
+//
+// Where the flow stops is itself the security property this issue exists for: a self-registered
+// client reaches /auth/consent, never /auth/issue. Seam 4 owns that as a claim about the rendered
+// page; here it is a precondition, asserted so a regression shows up as this helper failing
+// rather than as a confusing prompt=none result further down.
+func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client, *models.Client, *models.RedirectURI, *models.User) {
+	t.Helper()
+
+	client := registerDCRClient(t, clientName, "https://dcr-app.example.com/callback")
+
+	redirectURIs, err := database.GetRedirectURIsByClientId(nil, client.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(redirectURIs) != 1 {
+		t.Fatalf("expected exactly one redirect URI, got %d", len(redirectURIs))
+	}
+	redirectUri := &redirectURIs[0]
+
+	password := gofakeit.Password(true, true, true, true, false, 8)
+	passwordHashed, err := hashutil.HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	user := &models.User{
+		Subject:      uuid.New(),
+		Enabled:      true,
+		Email:        gofakeit.Email(),
+		PasswordHash: passwordHashed,
+	}
+	err = database.CreateUser(nil, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	httpClient := createHttpClient(t)
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&scope=" + url.QueryEscape("openid profile") +
+		"&state=" + gofakeit.LetterN(8) +
+		"&nonce=" + gofakeit.LetterN(8)
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// DCR registers clients at level2_optional and this user has no OTP, so level2 falls straight
+	// through rather than prompting.
+	redirectLocation = assertRedirect(t, resp, "/auth/level2")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	_ = assertRedirect(t, resp, "/auth/consent")
+
+	return httpClient, client, redirectUri, user
+}
+
+func TestPromptNone_DCRClient_NoConsent_ReturnsConsentRequired(t *testing.T) {
+	enableDCR(t)
+	defer disableDCR(t)
+
+	httpClient, client, redirectUri, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
+
+	// The session exists and is valid; the only thing missing is a consent row. OIDC Core 3.1.2.1
+	// forbids showing a consent page here, and 3.1.2.6 supplies the error for exactly this case.
+	requestState := gofakeit.LetterN(8)
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&scope=" + url.QueryEscape("openid profile") +
+		"&state=" + requestState +
+		"&prompt=none"
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+
+	errorCode, _, state := getErrorFromUrl(t, resp)
+
+	assert.Equal(t, "consent_required", errorCode)
+	assert.Equal(t, requestState, state)
+}
+
+func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
+	enableDCR(t)
+	defer disableDCR(t)
+
+	httpClient, client, redirectUri, user := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
+
+	consent := &models.UserConsent{
+		UserId:    user.Id,
+		ClientId:  client.Id,
+		Scope:     "openid profile",
+		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+	}
+	err := database.CreateUserConsent(nil, consent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	requestState := gofakeit.LetterN(8)
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&scope=" + url.QueryEscape("openid profile") +
+		"&state=" + requestState +
+		"&nonce=" + gofakeit.LetterN(8) +
+		"&prompt=none"
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation := assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+
+	redirectURL, err := url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	codeVal := redirectURL.Query().Get("code")
+	assert.NotEmpty(t, codeVal, "code should be present")
+	assert.Empty(t, redirectURL.Query().Get("error"), "error should not be present")
+
+	code := loadCodeFromDatabase(t, codeVal)
+	assert.Equal(t, user.Id, code.User.Id)
+}
+
+// =============================================================================
 // Phase 2: Extended prompt=none Tests
 // =============================================================================
 

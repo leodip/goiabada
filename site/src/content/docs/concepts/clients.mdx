@@ -41,6 +41,8 @@ When the client is affiliated with the same organization as the authorization se
 
 However, for clients from third-party organizations, configure the client to request user consent. This ensures that users are aware of who is accessing their tokens.
 
+**The default differs by how the client was created.** A client an administrator creates, through the admin console or the admin API, starts with consent off: an administrator vouched for it. A client that registered itself through [dynamic client registration](#dynamic-client-registration-rfc-7591) starts with consent **on**, because nobody has reviewed it. You can untick it for a self-registered client you have reviewed, on that client's settings page, and that is the intended way to grant one an exemption.
+
 ## Default ACR level
 
 ACR stands for "Authentication Context Class Reference." It specifies the level of authentication assurance or the strength of the authentication method used to authenticate the end-user.
@@ -217,6 +219,16 @@ When enabled, any application can register as a client. Consider these security 
 - **Review client metadata** - Check redirect URIs and other metadata of self-registered clients
 - **Disable untrusted clients** - Clients can be disabled through the admin console if needed
 
+**Self-registered clients require consent by default.** Goiabada sets [Consent required](#consent-required) on every client created through this endpoint, so the first time a user authorizes one they are shown a consent screen naming the application and the access it is asking for. Clients an administrator creates are unaffected and keep their existing default of consent off.
+
+This is the control that makes the rest of the list worth having. Without it, an application that registered itself a moment ago can obtain a code for every scope the user is entitled to, with nothing rendered to the user at all if they already have a session on this server.
+
+<Aside type="caution">
+**For operators upgrading:** this changes the behaviour of clients that are already registered. The migration turns consent on for every existing self-registered client, so a client relying on silent renewal with `prompt=none` starts receiving `consent_required` until its user has been through the consent screen once. That is the correct behaviour and it is a visible change: an integration that has been renewing tokens silently will need one interactive authorization per user before it renews silently again.
+
+If you have reviewed a specific self-registered client and want it back the way it was, open it in the admin console and untick **Consent required**.
+</Aside>
+
 ### Redirect URI rules
 
 Dynamic registration validates redirect URIs more strictly than the admin console does, because the caller is anonymous. What is accepted depends on whether the client is public, which is determined by `token_endpoint_auth_method`:
@@ -240,7 +252,7 @@ For loopback redirect URIs, the port flexibility described under [Loopback redir
 <Aside type="caution">
 Public clients registered through dynamic registration cannot use an `https` redirect URI. This is a deliberate Goiabada restriction rather than a rule from the specifications, and it is stricter than most identity providers.
 
-**It is a conservative policy, not a security boundary.** It does not prevent an anonymous caller from registering an attacker-controlled `https` callback: the same caller can choose a confidential `token_endpoint_auth_method` instead, register any `https` URI, and receive the generated client secret in the response. Nothing about the public-client rule closes that. The control that binds a client's identity to a user's authority is the consent screen, and for self-registered clients that is tracked in [issue #108](https://github.com/leodip/goiabada/issues/108).
+**It is a conservative policy, not a security boundary.** It does not prevent an anonymous caller from registering an attacker-controlled `https` callback: the same caller can choose a confidential `token_endpoint_auth_method` instead, register any `https` URI, and receive the generated client secret in the response. Nothing about the public-client rule closes that. The control that binds a client's identity to a user's authority is the consent screen, which is why every self-registered client [requires consent by default](#security-considerations).
 
 Two consequences follow from the restriction. A browser-based single-page app cannot register itself through this endpoint at all, since it needs an `https` redirect URI. And a native app cannot use the claimed-`https` pattern that [RFC 8252 section 7.2](https://datatracker.ietf.org/doc/html/rfc8252#section-7.2) recommends, and should use a loopback or custom-scheme redirect URI instead. In both cases, register the client through the admin console rather than through dynamic registration.
 </Aside>

@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,7 +92,8 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 	assert.Equal(t, "MCP Remote Client", client.Description)
 	assert.True(t, client.IsPublic)
 	assert.True(t, client.Enabled)
-	assert.False(t, client.ConsentRequired)
+	assert.True(t, client.ConsentRequired, "A self-registered client asks the user before it receives their authority (#108)")
+	assert.True(t, client.CreatedViaDCR, "Registration is the only thing that sets this column (#108)")
 	assert.True(t, client.AuthorizationCodeEnabled)
 	assert.False(t, client.ClientCredentialsEnabled)
 	assert.Nil(t, client.ClientSecretEncrypted)
@@ -174,6 +176,12 @@ func TestDCR_DefaultValues_Applied(t *testing.T) {
 	assert.False(t, client.IsPublic)
 	assert.True(t, client.AuthorizationCodeEnabled)
 	assert.False(t, client.ClientCredentialsEnabled)
+
+	// Registration stamps both columns, and it is the only thing that does. Consent on means
+	// the client reaches /auth/consent rather than /auth/issue, and created_via_dcr is what the
+	// consent screen's unverified marking and the refusal interstitial read (#108).
+	assert.True(t, client.ConsentRequired, "Self-registered clients require consent by default")
+	assert.True(t, client.CreatedViaDCR, "Self-registration is recorded in a column, not in the identifier prefix")
 }
 
 // TestDCR_RedirectURI_Validation tests RFC 7591 §5 redirect URI validation
@@ -643,6 +651,31 @@ func makeDCRRequest(t *testing.T, body api.DynamicClientRegistrationRequest) *ht
 	require.NoError(t, err)
 
 	return resp
+}
+
+// registerDCRClient registers a client through POST /connect/register and returns the persisted
+// row. Going through the endpoint rather than calling database.CreateClient is the point: a test
+// about how a self-registered client behaves has to get its defaults from the registration
+// handler, or it is asserting against defaults the test itself chose (#108).
+//
+// The caller owns the setting: call enableDCR before, and defer disableDCR.
+func registerDCRClient(t *testing.T, clientName string, redirectURI string) *models.Client {
+	resp := makeDCRRequest(t, api.DynamicClientRegistrationRequest{
+		RedirectURIs: []string{redirectURI},
+		ClientName:   clientName,
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var response api.DynamicClientRegistrationResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
+
+	client, err := database.GetClientByClientIdentifier(nil, response.ClientID)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	return client
 }
 
 // enableDCR enables Dynamic Client Registration for a test

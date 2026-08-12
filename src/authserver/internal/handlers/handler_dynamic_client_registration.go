@@ -81,12 +81,24 @@ func HandleDynamicClientRegistrationPost(
 
 		// 9. Create client model
 		client := &models.Client{
-			ClientIdentifier:                        clientIdentifier,
-			ClientSecretEncrypted:                   clientSecretEncrypted,
-			Description:                             req.ClientName,
-			IsPublic:                                isPublic,
-			Enabled:                                 true,
-			ConsentRequired:                         false,
+			ClientIdentifier:      clientIdentifier,
+			ClientSecretEncrypted: clientSecretEncrypted,
+			Description:           req.ClientName,
+			IsPublic:              isPublic,
+			Enabled:               true,
+			// A self-registered client is one nobody here has vetted, and RFC 7591 section 5
+			// requires all of its metadata be treated as self-asserted. Consent is the only
+			// control that binds such a client's identity to the user's authority, so it is on
+			// by default: RFC 6749 section 10.2 says the server SHOULD engage the resource owner
+			// to identify a client it cannot authenticate, and SHOULD NOT process repeated
+			// authorization requests without active resource owner interaction. An administrator
+			// who has reviewed a specific client can untick it on the client settings page.
+			// Turning this back off by default makes every self-registered client silently
+			// grantable for any scope the user holds (#108).
+			ConsentRequired: true,
+			// Set here and nowhere else. Nothing on the update path can change it, deliberately:
+			// it is a fact about where the client came from, not a trust setting (#108).
+			CreatedViaDCR:                           true,
 			AuthorizationCodeEnabled:                containsGrantType(req.GrantTypes, "authorization_code"),
 			ClientCredentialsEnabled:                containsGrantType(req.GrantTypes, "client_credentials"),
 			DefaultAcrLevel:                         enums.AcrLevel2Optional,
@@ -323,6 +335,12 @@ func validateRedirectURI(uri string, isPublic bool) error {
 }
 
 // generateDCRClientIdentifier generates unique client identifier (RFC 7591 §3.2.1)
+//
+// The dcr_ prefix is cosmetic: it is useful to a human reading a client list or a log line, and
+// nothing may depend on it. An administrator can name a client dcr_anything through the admin
+// console, so testing the prefix answers "was this named like a self-registered client", not
+// "did this client register itself". The clients.created_via_dcr column answers the second, and
+// it is what every such test reads (#108).
 func generateDCRClientIdentifier() string {
 	return "dcr_" + uuid.NewString()
 }
