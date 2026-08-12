@@ -1127,7 +1127,7 @@ func TestRedirToClientWithError_QueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, nil, testRedirectError("invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code"))
+	err := redirToClientWithError(w, r, nil, testRedirectError("invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1138,7 +1138,7 @@ func TestRedirToClientWithError_FragmentResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, nil, testRedirectError("unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code"))
+	err := redirToClientWithError(w, r, nil, testRedirectError("unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1159,7 +1159,7 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 		},
 	}
 
-	err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code"))
+	err := redirToClientWithError(w, r, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -1190,7 +1190,7 @@ func TestRedirToClientWithError_FormPostExecutionFailureLeavesResponseUncommitte
 		},
 	}
 
-	err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("server_error", "Internal server error",
+	err := redirToClientWithError(w, r, templateFS, testRedirectError("server_error", "Internal server error",
 		"form_post", "https://example.com/callback", "def456", "code"))
 
 	require.Error(t, err)
@@ -1218,7 +1218,7 @@ func TestRedirToClientWithError_FormPostWriteFailureIsReported(t *testing.T) {
 		},
 	}
 
-	err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("server_error", "Internal server error",
+	err := redirToClientWithError(w, r, templateFS, testRedirectError("server_error", "Internal server error",
 		"form_post", "https://example.com/callback", "def456", "code"))
 
 	require.Error(t, err)
@@ -1229,7 +1229,7 @@ func TestRedirToClientWithError_DefaultToQueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, nil, testRedirectError("server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code"))
+	err := redirToClientWithError(w, r, nil, testRedirectError("server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1255,7 +1255,7 @@ func TestRedirToClientWithError_ImplicitFlow_DefaultsToFragment(t *testing.T) {
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
 			// No response_mode specified, should default to fragment for implicit flow
-			err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
+			err := redirToClientWithError(w, r, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
 
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusFound, w.Code)
@@ -1274,7 +1274,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token"))
+		err := redirToClientWithError(w, r, nil, testRedirectError("invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -1295,7 +1295,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 			},
 		}
 
-		err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token"))
+		err := redirToClientWithError(w, r, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -1321,7 +1321,7 @@ func TestRedirToClientWithError_HybridFlow_UsesQuery(t *testing.T) {
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
 			// No response_mode specified, should default to query for hybrid flow (contains code)
-			err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
+			err := redirToClientWithError(w, r, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
 
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusFound, w.Code)
@@ -1337,7 +1337,7 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "", "code"))
+		err := redirToClientWithError(w, r, nil, testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "", "code"))
 
 		require.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -1348,7 +1348,7 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token"))
+		err := redirToClientWithError(w, r, nil, testRedirectError("access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token"))
 
 		require.NoError(t, err)
 		location := w.Header().Get("Location")
