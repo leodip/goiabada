@@ -86,7 +86,6 @@ export default defineConfig({
 						{ label: 'Kubernetes', slug: 'production-deployment/kubernetes' },
 						{ label: 'Native binaries', slug: 'production-deployment/native-binaries' },
 						{ label: 'Production checklist', slug: 'production-deployment/production-checklist' },
-						{ label: 'Upgrading', slug: 'production-deployment/upgrading' },
 					],
 				},
 				{
