@@ -203,6 +203,61 @@ func TestSearchUsersPaginated(t *testing.T) {
 	}
 }
 
+// A page is a slice of an order, so paging is only correct when that order is total.
+// given_name is not unique, and ties are the norm rather than the exception here: every
+// self-registered user has an empty given name, as does the seeded admin. Where a tie group
+// straddles a page boundary and nothing breaks the tie, the database may arrange those rows one
+// way for the page-1 query and another way for the page-2 query, so one user comes back on both
+// pages and another is never returned at all. This pins the total order the fix establishes,
+// given_name then id, which is what makes the pages a partition of the result set (#112).
+func TestSearchUsersPaginated_TiedGivenNamesStillPageAsAPartition(t *testing.T) {
+	// One given name shared by every user, which is the worst case: the entire result set is a
+	// single tie group. The random suffix is what keeps the search matching only these rows.
+	givenName := "TiedPage" + gofakeit.LetterN(10)
+
+	const userCount = 7
+	wantIds := make([]int64, 0, userCount)
+	for i := 0; i < userCount; i++ {
+		wantIds = append(wantIds, createUserWithGivenName(t, givenName).Id)
+	}
+
+	// Ids ascend with creation, so the order the fix establishes is the order they were made in.
+	// Postgres is the engine that actually rearranges tied rows, so it is the one that catches a
+	// missing tiebreaker; the others read these back in primary-key order anyway and the assertion
+	// holds there either way. Running the data tier on all four is what makes the coverage real.
+	const pageSize = 3
+	gotIds := make([]int64, 0, userCount)
+	for page := 1; page <= userCount; page++ {
+		users, total, err := database.SearchUsersPaginated(nil, givenName, page, pageSize)
+		if err != nil {
+			t.Fatalf("Failed to search users on page %d: %v", page, err)
+		}
+		if total != userCount {
+			t.Fatalf("Expected a total of %d on page %d, got %d", userCount, page, total)
+		}
+		if len(users) == 0 {
+			break
+		}
+		if len(users) > pageSize {
+			t.Fatalf("Expected at most %d users on page %d, got %d", pageSize, page, len(users))
+		}
+		for _, user := range users {
+			gotIds = append(gotIds, user.Id)
+		}
+	}
+
+	if len(gotIds) != len(wantIds) {
+		t.Fatalf("Expected paging to return each of the %d users exactly once, got %d rows: %v",
+			len(wantIds), len(gotIds), gotIds)
+	}
+	for i := range wantIds {
+		if gotIds[i] != wantIds[i] {
+			t.Fatalf("Expected the pages to concatenate into ascending id order %v, got %v",
+				wantIds, gotIds)
+		}
+	}
+}
+
 func TestDeleteUser(t *testing.T) {
 	user := createTestUser(t)
 

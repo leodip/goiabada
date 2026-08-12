@@ -437,7 +437,14 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 			),
 		)
 	}
-	selectBuilder.OrderByAsc("users.given_name")
+	// given_name is not unique, so it does not order the rows totally, and a page is a slice
+	// of an order. Where tied rows straddle a page boundary the database is free to arrange
+	// them differently for the page-1 query than for the page-2 query, which shows one user on
+	// both pages and omits another entirely. The ties are the common case rather than the
+	// exception: every self-registered user has an empty given name, as does the seeded admin.
+	// Ordering by the primary key as well makes the order total, which is what makes paging
+	// through it correct. Same reason audit_log.go pages by created_at DESC, id DESC (#112).
+	selectBuilder.OrderByAsc("users.given_name").OrderByAsc("users.id")
 	selectBuilder.Offset((page - 1) * pageSize)
 	selectBuilder.Limit(pageSize)
 

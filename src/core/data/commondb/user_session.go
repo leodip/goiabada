@@ -152,7 +152,10 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
 	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "user_session_clients", "user_sessions.id = user_session_clients.user_session_id")
 	selectBuilder.Where(selectBuilder.Equal("user_session_clients.client_id", clientId))
-	selectBuilder.OrderByDesc("user_sessions.last_accessed")
+	// last_accessed does not order the rows totally: two sessions touched in the same instant tie,
+	// and paging over a non-total order can repeat one session on the next page and skip another.
+	// See SearchUsersPaginated in user.go for the full reason (#112).
+	selectBuilder.OrderByDesc("user_sessions.last_accessed").OrderByDesc("user_sessions.id")
 	selectBuilder.Offset((page - 1) * pageSize)
 	selectBuilder.Limit(pageSize)
 
