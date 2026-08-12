@@ -87,6 +87,10 @@ https://my-app.com/callback?error=login_required&error_description=User+authenti
 | `interaction_required` | ACR step-up is needed, OTP enrollment is required, or OTP configuration has changed |
 | `access_denied` | User account is disabled, or the user is not authorized for any of the requested scopes |
 
+<Aside>
+A client that registered itself through [dynamic client registration](/concepts/clients/#dynamic-client-registration-rfc-7591) requires consent by default, so its first silent request for a user returns `consent_required`. Send the user through an ordinary authorization once, without `prompt=none`, and silent renewal works from then on for the scopes they consented to.
+</Aside>
+
 ## prompt=login (force re-authentication)
 
 Use `prompt=login` when you want to ensure the user actively authenticates, regardless of their current session. This is useful for:
