@@ -147,12 +147,16 @@ func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession se
 		return
 	}
 
-	// A second, different activation link followed while one is still live. The first
+	// A second, different link followed while one is still live, of either flow. The first
 	// continuation keeps the session and this one is refused: the clean hop reads the
 	// marker alone, so replacing here would make the redirect already in flight activate
 	// this registration instead of the one that authorized it. Nothing is audited, because
 	// this handler has no failed-activation event to record it under; the reset side, which
 	// has one, audits the same refusal as continuation_in_flight.
+	//
+	// Activation carries no continuation id, unlike the reset form: its continuation is the
+	// browser following a 303 with no page in between, so there is nothing on screen to be
+	// retargeted later and nowhere to put an id that would not go back into the URL.
 	if rejection != "" {
 		renderActivationLinkExpired(httpHelper, w, r)
 		return

@@ -319,6 +319,45 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
+	// The same refusal against a live marker of the OTHER flow. Scoping the rule to one flow
+	// left a bridge: one cross-flow replacement is harmless because every consuming step
+	// refuses a wrong-flow marker, but a second replacement puts the slot back into the flow
+	// it started in, which is the retarget in three navigations rather than one
+	// (#112 decision 14).
+	t.Run("a link followed while a reset continuation is in flight is refused", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		store := newMarkerTestStore()
+
+		preReg, codeHash := preRegistrationWithCode(t, 99, "second@example.com", code, time.Now().UTC().Add(-time.Minute))
+		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+		expectRenderedLinkExpired(httpHelper)
+
+		sent := withMarker(t, store, linkFollowedRequest(code),
+			handlers.LinkMarkerFlowResetPassword, 42, "the-reset-hash")
+
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, sent)
+
+		assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused link must not redirect")
+		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything)
+		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
+
+		marker, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
+			handlers.LinkMarkerFlowResetPassword)
+		require.NoError(t, err)
+		require.Empty(t, rejection)
+		require.NotNil(t, marker)
+		assert.Equal(t, "the-reset-hash", marker.CodeHash,
+			"the reset continuation must still own the session")
+
+		database.AssertExpectations(t)
+		httpHelper.AssertExpectations(t)
+	})
+
 	t.Run("an expired code deletes the pending registration and asks for another", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
