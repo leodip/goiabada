@@ -89,7 +89,12 @@ func HandleAuthOtpGet(
 			}
 
 			bind := map[string]interface{}{
-				"error":                   nil,
+				"error": nil,
+				// The rendered form says which ceremony rendered it, and HandleAuthOtpPost refuses
+				// a submission naming any other one. A code entered here after a second
+				// /auth/authorize replaced the auth context would otherwise complete that other
+				// request's level 2 (#79).
+				"ceremonyId":              authContext.CeremonyId,
 				"layoutShowClientSection": displayInfo.ShowSection,
 				"layoutClientName":        displayInfo.ClientName,
 				"layoutHasClientLogo":     displayInfo.HasLogo,
@@ -116,6 +121,7 @@ func HandleAuthOtpGet(
 
 			bind := map[string]interface{}{
 				"error":                   nil,
+				"ceremonyId":              authContext.CeremonyId,
 				"base64Image":             base64Image,
 				"secretKey":               secretKey,
 				"layoutShowClientSection": displayInfo.ShowSection,
@@ -166,6 +172,19 @@ func HandleAuthOtpPost(
 			return
 		}
 
+		// Before the AuthState check, so an OTP prompt left open in another tab gets the 400
+		// mismatch page rather than the 500 that a replaced context's state would produce. And
+		// before the code is looked at: MatchStep is never reached, so TryConsumeUserOTPStep is
+		// never reached either, and a stale submission cannot burn a step of a passcode the
+		// ceremony the user is actually on still needs (#79, #111 decision 3).
+		//
+		// r.PostFormValue rather than r.FormValue, as on the other two bound forms: this form
+		// posts to action="" and only the submitted body is a submission.
+		if !ceremonyMatches(authContext.CeremonyId, r.PostFormValue(ceremonyIdField)) {
+			rejectCeremonyMismatch(httpHelper, auditLogger, w, r, authContext)
+			return
+		}
+
 		requiredState := oauth.AuthStateLevel2OTP
 		if authContext.AuthState != requiredState {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
@@ -211,7 +230,11 @@ func HandleAuthOtpPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":                   message,
+				"error": message,
+				// In the shared part of the map rather than in the enrollment-only half below,
+				// because both templates carry the hidden input. Without it a single mistyped
+				// code would end the ceremony: the retry would name no ceremony and be refused.
+				"ceremonyId":              authContext.CeremonyId,
 				"layoutShowClientSection": displayInfo.ShowSection,
 				"layoutClientName":        displayInfo.ClientName,
 				"layoutHasClientLogo":     displayInfo.HasLogo,

@@ -77,12 +77,19 @@ func loadPage(t *testing.T, client *http.Client, url string) *http.Response {
 	return resp
 }
 
+// authenticateWithPassword submits the login form. pwdPage is the response that rendered it, and
+// the ceremony id is read out of it rather than constructed, so the submission carries what a
+// browser on that page would carry (#79).
+//
+// Where a submission follows a refused one, the page to pass is the refusal's own re-render, which
+// is what the user is looking at by then.
 func authenticateWithPassword(t *testing.T, client *http.Client, destUrl string,
-	email string, password string) *http.Response {
+	pwdPage *http.Response, email string, password string) *http.Response {
 
 	formData := url.Values{
-		"email":    {email},
-		"password": {password},
+		"email":      {email},
+		"password":   {password},
+		"ceremonyId": {getCeremonyIdFromPage(t, pwdPage)},
 	}
 
 	formDataString := formData.Encode()
@@ -102,9 +109,14 @@ func authenticateWithPassword(t *testing.T, client *http.Client, destUrl string,
 	return resp
 }
 
-func authenticateWithOtp(t *testing.T, client *http.Client, destUrl string, otp string) *http.Response {
+// authenticateWithOtp submits the OTP form, verification or enrollment. otpPage is the response
+// that rendered it, read the same way authenticateWithPassword reads its own (#79).
+func authenticateWithOtp(t *testing.T, client *http.Client, destUrl string, otpPage *http.Response,
+	otp string) *http.Response {
+
 	formData := url.Values{
-		"otp": {otp},
+		"otp":        {otp},
+		"ceremonyId": {getCeremonyIdFromPage(t, otpPage)},
 	}
 
 	formDataString := formData.Encode()
@@ -385,7 +397,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -494,7 +506,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -619,7 +631,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -638,7 +650,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -759,7 +771,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Clie
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -899,7 +911,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1484,8 +1496,11 @@ func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *models.C
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, redirectLocation)
 
-	_ = resp.Body.Close()
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	// The password page is held rather than closed here: the submission reads the ceremony id out
+	// of it, and a closed body cannot be read (#79).
+	pwdPage := resp
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, pwdPage, user.Email, password)
+	_ = pwdPage.Body.Close()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	_ = resp.Body.Close()
@@ -1535,8 +1550,11 @@ func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *mode
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, redirectLocation)
 
-	_ = resp.Body.Close()
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	// The password page is held rather than closed here: the submission reads the ceremony id out
+	// of it, and a closed body cannot be read (#79).
+	pwdPage := resp
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, pwdPage, user.Email, password)
+	_ = pwdPage.Body.Close()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	_ = resp.Body.Close()

@@ -149,10 +149,12 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/pwd")
-	resp = loadPage(t, httpClient, location)
-	_ = resp.Body.Close()
+	// The password page is held rather than closed here: the submission reads the ceremony id
+	// out of it, and a closed body cannot be read (#79).
+	pwdPage := loadPage(t, httpClient, location)
 
-	resp = authenticateWithPassword(t, httpClient, location, grant.user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, location, pwdPage, grant.user.Email, password)
+	_ = pwdPage.Body.Close()
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/level1completed")
@@ -226,10 +228,12 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/pwd")
-	resp = loadPage(t, httpClient, location)
-	_ = resp.Body.Close()
+	// The password page is held rather than closed here: the submission reads the ceremony id
+	// out of it, and a closed body cannot be read (#79).
+	pwdPage := loadPage(t, httpClient, location)
 
-	resp = authenticateWithPassword(t, httpClient, location, base.user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, location, pwdPage, base.user.Email, password)
+	_ = pwdPage.Body.Close()
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/level1completed")
@@ -388,10 +392,12 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/pwd")
-	resp = loadPage(t, httpClient, location)
-	_ = resp.Body.Close()
+	// The password page is held rather than closed here: the submission reads the ceremony id
+	// out of it, and a closed body cannot be read (#79).
+	pwdPage := loadPage(t, httpClient, location)
 
-	resp = authenticateWithPassword(t, httpClient, location, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, location, pwdPage, user.Email, password)
+	_ = pwdPage.Body.Close()
 	_ = resp.Body.Close()
 
 	location = assertRedirect(t, resp, "/auth/level1completed")

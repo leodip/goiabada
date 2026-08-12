@@ -106,7 +106,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -229,7 +229,7 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -350,7 +350,7 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -393,7 +393,7 @@ func TestPromptLogin_PreservesNonce(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -488,7 +488,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -551,7 +551,7 @@ func TestPromptLogin_WrongPassword(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Submit wrong password
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, "wrongpassword123")
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, "wrongpassword123")
 	defer func() { _ = resp.Body.Close() }()
 
 	// Should stay on password page with error (HTTP 200, not redirect)
@@ -606,7 +606,7 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Submit correct password for disabled user
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Should stay on password page with disabled error (HTTP 200, not redirect)
@@ -696,7 +696,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -762,7 +762,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	resp2 = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp2 = authenticateWithPassword(t, httpClient, redirectLocation, resp2, user.Email, password)
 	defer func() { _ = resp2.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/level1completed")

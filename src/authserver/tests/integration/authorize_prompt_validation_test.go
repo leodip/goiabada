@@ -158,7 +158,7 @@ func TestPromptLogin_WithSession_ForcesReAuth(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Re-authenticate
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")

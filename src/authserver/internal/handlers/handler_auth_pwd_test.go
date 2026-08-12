@@ -89,8 +89,9 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel1Password,
-			ClientId:  "my-app",
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "my-app",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -188,6 +189,52 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
+
+	// The rendered form has to name the ceremony it was rendered for, or every submission of it is
+	// refused by HandleAuthPwdPost. Asserted as an equality rather than as "not empty", because the
+	// value has to be THIS ceremony's (#79 seam 4).
+	t.Run("The render names the ceremony", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+
+		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
+
+		req, err := http.NewRequest("GET", "/auth/pwd", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "my-app",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		database.On("GetClientByClientIdentifier", mock.Anything, "my-app").
+			Return(&models.Client{ClientIdentifier: "my-app"}, nil)
+
+		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{})
+		req = req.WithContext(ctx)
+
+		var rendered map[string]interface{}
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html",
+			mock.MatchedBy(func(data map[string]interface{}) bool {
+				rendered = data
+				return true
+			})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		if assert.NotNil(t, rendered) {
+			assert.Equal(t, testCeremonyId, rendered["ceremonyId"])
+		}
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+	})
 }
 
 func TestHandleAuthPwdPost(t *testing.T) {
@@ -223,11 +270,17 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
 
-		req, _ := http.NewRequest("POST", "/auth/pwd", nil)
+		// The ceremony matches, so the state check is what answers. Without an id in the body the
+		// submission would be refused one gate earlier and this case would stop proving anything.
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateInitial,
+			AuthState:  oauth.AuthStateInitial,
+			CeremonyId: testCeremonyId,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -241,6 +294,95 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		authHelper.AssertExpectations(t)
 	})
 
+	// A login form left open in another tab, submitted after a second /auth/authorize replaced the
+	// ceremony it was rendered for. Every one of these is the mismatch page at 400.
+	//
+	// Every case carries a real email and the correct password, and the database mock is given NO
+	// expectations at all. That is the assertion that matters here and it is why the credentials are
+	// correct: if the check ever moved below GetUserByEmail or VerifyPasswordHash, the mock would be
+	// called and the test would fail. A stale form must not authenticate anybody for anything, and
+	// with a client requiring no consent the authorization it would finish is one the user never saw
+	// a screen for (#79 decisions 5 and 6).
+	t.Run("Stale ceremony", func(t *testing.T) {
+		const password = "testpassword"
+
+		staleCases := []struct {
+			name string
+			// stored is the id the browser's current auth context holds.
+			stored string
+			// submitted is what the stale page posts; the empty string means the field is absent.
+			submitted string
+			authState string
+		}{
+			{
+				// The defect's own shape: the password screen of the request that was replaced.
+				name: "a different ceremony's id", stored: testCeremonyId,
+				submitted: "another-ceremony-0123456789abcde",
+				authState: oauth.AuthStateLevel1Password,
+			},
+			{
+				// A hand-built body, or a template that lost the hidden input.
+				name: "no ceremony field at all", stored: testCeremonyId,
+				submitted: "", authState: oauth.AuthStateLevel1Password,
+			},
+			{
+				// The upgrade case: an auth context written before this change carries no id, so
+				// the ceremony is refused once and the user starts again. Refused rather than
+				// matched against an empty submission, which is the fail-closed direction.
+				name: "an auth context from before the ceremony id existed", stored: "",
+				submitted: "", authState: oauth.AuthStateLevel1Password,
+			},
+			{
+				// The check runs before the AuthState check, so the replaced ceremony's state
+				// produces the 400 mismatch page rather than a 500 naming an internal invariant.
+				name: "a replaced ceremony that has moved on", stored: testCeremonyId,
+				submitted: "another-ceremony-0123456789abcde",
+				authState: oauth.AuthStateRequiresConsent,
+			},
+		}
+
+		for _, tc := range staleCases {
+			t.Run(tc.name, func(t *testing.T) {
+				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				database := mocks_data.NewDatabase(t)
+				auditLogger := mocks_audit.NewAuditLogger(t)
+
+				handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+
+				form := url.Values{}
+				form.Add("email", "test@example.com")
+				form.Add("password", password)
+				if tc.submitted != "" {
+					form.Add(ceremonyIdField, tc.submitted)
+				}
+				req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				rr := httptest.NewRecorder()
+
+				authContext := &oauth.AuthContext{
+					AuthState:  tc.authState,
+					CeremonyId: tc.stored,
+					ClientId:   "test-client",
+				}
+				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+				expectCeremonyMismatch(t, httpHelper, auditLogger, rr, req)
+
+				handler.ServeHTTP(rr, req)
+
+				// Nothing was saved and nowhere was redirected to: the auth context is untouched,
+				// so the ceremony the user is actually on is still theirs to finish.
+				assert.Empty(t, rr.Header().Get("Location"))
+
+				httpHelper.AssertExpectations(t)
+				authHelper.AssertExpectations(t)
+				database.AssertExpectations(t)
+				auditLogger.AssertExpectations(t)
+			})
+		}
+	})
+
 	t.Run("Missing email", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -250,14 +392,16 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel1Password,
-			ClientId:  "my-app",
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "my-app",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -298,14 +442,16 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("email", "test@example.com")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel1Password,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -320,8 +466,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
 
+		// The validation-error re-render is a path no happy-path case sees, and it has to carry the
+		// ceremony id: without it a single mistyped password would end the ceremony, because the
+		// retry would name no ceremony and be refused (#79 seam 4).
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "Password is required."
+			return data["error"] == "Password is required." &&
+				data["ceremonyId"] == testCeremonyId
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -339,6 +489,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("email", "test@example.com")
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -346,8 +497,9 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel1Password,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -393,6 +545,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		assert.NoError(t, err)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("email", "test@example.com")
 		form.Add("password", password)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -400,8 +553,9 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel1Password,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -473,6 +627,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		assert.NoError(t, err)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("email", "disabled@example.com")
 		form.Add("password", password)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -480,8 +635,9 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel1Password,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
