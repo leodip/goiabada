@@ -1054,11 +1054,80 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 }
 
+// stubClientProvenanceLookup answers the client load that a handler performs before dispatching an
+// error redirect, so that the redirect knows whose redirect URI it is about to use. It answers with
+// an administrator-created client, the case in which weighing provenance changes nothing, so a
+// refusal case still asserts the redirect it was written to assert (#108).
+func stubClientProvenanceLookup(database *mocks_data.Database) {
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything).
+		Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+}
+
+// testRedirectError builds the input the cases below vary, naming an administrator-created client.
+// Every one of them is about the shape of the response an error takes, and the error redirect now
+// also carries the client it is answering so that its provenance can be weighed; an
+// administrator-created client is the case in which that weighing changes nothing, which is what
+// keeps these cases about the response (#108).
+func testRedirectError(code string, description string, responseMode string, redirectURI string,
+	state string, responseType string) redirectErrorInput {
+
+	return redirectErrorInput{
+		client:       &models.Client{ClientIdentifier: "test-client"},
+		code:         code,
+		description:  description,
+		responseMode: responseMode,
+		redirectURI:  redirectURI,
+		state:        state,
+		responseType: responseType,
+	}
+}
+
+// redirectErrorFromAuthContext is what fourteen of the sixteen error redirects are built by, and
+// the client it carries is the whole reason it exists: the redirect weighs where the redirect URI
+// came from before using it. Nothing downstream reads that client yet, so a version of this
+// function that quietly dropped it would pass every other test in this package. It is pure, so a
+// table here is the cheapest place to say it must not (#108).
+func TestRedirectErrorFromAuthContext(t *testing.T) {
+	authContext := &oauth.AuthContext{
+		ResponseMode: "form_post",
+		RedirectURI:  "https://example.com/callback",
+		State:        "test-state",
+		ResponseType: "id_token token",
+	}
+
+	t.Run("carries the client it was handed", func(t *testing.T) {
+		client := &models.Client{Id: 7, ClientIdentifier: "test-client"}
+
+		input := redirectErrorFromAuthContext(authContext, client, "access_denied", "Access denied")
+
+		assert.Same(t, client, input.client)
+	})
+
+	t.Run("carries nil when provenance could not be resolved", func(t *testing.T) {
+		// The handlers that cannot resolve a client hand nil rather than skipping the redirect,
+		// and nil has to survive the trip as nil: it means "unknown", which is the untrusted case.
+		input := redirectErrorFromAuthContext(authContext, nil, "access_denied", "Access denied")
+
+		assert.Nil(t, input.client)
+	})
+
+	t.Run("takes the response parameters from the ceremony and the error from its arguments", func(t *testing.T) {
+		input := redirectErrorFromAuthContext(authContext, nil, "server_error", "Internal server error")
+
+		assert.Equal(t, "server_error", input.code)
+		assert.Equal(t, "Internal server error", input.description)
+		assert.Equal(t, "form_post", input.responseMode)
+		assert.Equal(t, "https://example.com/callback", input.redirectURI)
+		assert.Equal(t, "test-state", input.state)
+		assert.Equal(t, "id_token token", input.responseType)
+	})
+}
+
 func TestRedirToClientWithError_QueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, "invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code")
+	err := redirToClientWithError(w, r, nil, nil, testRedirectError("invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1069,7 +1138,7 @@ func TestRedirToClientWithError_FragmentResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, "unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code")
+	err := redirToClientWithError(w, r, nil, nil, testRedirectError("unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1090,7 +1159,7 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 		},
 	}
 
-	err := redirToClientWithError(w, r, templateFS, "access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code")
+	err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -1121,8 +1190,8 @@ func TestRedirToClientWithError_FormPostExecutionFailureLeavesResponseUncommitte
 		},
 	}
 
-	err := redirToClientWithError(w, r, templateFS, "server_error", "Internal server error", "form_post",
-		"https://example.com/callback", "def456", "code")
+	err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("server_error", "Internal server error",
+		"form_post", "https://example.com/callback", "def456", "code"))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to execute template")
@@ -1149,8 +1218,8 @@ func TestRedirToClientWithError_FormPostWriteFailureIsReported(t *testing.T) {
 		},
 	}
 
-	err := redirToClientWithError(w, r, templateFS, "server_error", "Internal server error", "form_post",
-		"https://example.com/callback", "def456", "code")
+	err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("server_error", "Internal server error",
+		"form_post", "https://example.com/callback", "def456", "code"))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to write the form_post response")
@@ -1160,7 +1229,7 @@ func TestRedirToClientWithError_DefaultToQueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, "server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code")
+	err := redirToClientWithError(w, r, nil, nil, testRedirectError("server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1186,7 +1255,7 @@ func TestRedirToClientWithError_ImplicitFlow_DefaultsToFragment(t *testing.T) {
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
 			// No response_mode specified, should default to fragment for implicit flow
-			err := redirToClientWithError(w, r, nil, "access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType)
+			err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
 
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusFound, w.Code)
@@ -1205,7 +1274,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, "invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token")
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -1226,7 +1295,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 			},
 		}
 
-		err := redirToClientWithError(w, r, templateFS, "access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token")
+		err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -1252,7 +1321,7 @@ func TestRedirToClientWithError_HybridFlow_UsesQuery(t *testing.T) {
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
 			// No response_mode specified, should default to query for hybrid flow (contains code)
-			err := redirToClientWithError(w, r, nil, "access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType)
+			err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
 
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusFound, w.Code)
@@ -1268,7 +1337,7 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, "access_denied", "Access denied", "query", "https://example.com/callback", "", "code")
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "", "code"))
 
 		require.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -1279,7 +1348,7 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, "access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token")
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token"))
 
 		require.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -2559,6 +2628,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 
+		// The client load moved above the error-redirect closure, so it now runs before this
+		// validator's error is dispatched (#108).
+		stubClientProvenanceLookup(database)
+
 		validationError := customerrors.NewErrorDetailWithHttpStatusCode("request_not_supported", "The request parameter is not supported.", http.StatusBadRequest)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.MatchedBy(func(input *validators.ValidateUnsupportedRequestParametersInput) bool {
 			return input.HasRequest == true && input.HasRequestURI == false
@@ -2603,6 +2676,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 
+		// The client load moved above the error-redirect closure, so it now runs before this
+		// validator's error is dispatched (#108).
+		stubClientProvenanceLookup(database)
+
 		validationError := customerrors.NewErrorDetailWithHttpStatusCode("request_uri_not_supported", "The request_uri parameter is not supported.", http.StatusBadRequest)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.MatchedBy(func(input *validators.ValidateUnsupportedRequestParametersInput) bool {
 			return input.HasRequest == false && input.HasRequestURI == true
@@ -2645,6 +2722,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		// The client load moved above the error-redirect closure, so it now runs before this
+		// validator's error is dispatched (#108).
+		stubClientProvenanceLookup(database)
 
 		validationError := customerrors.NewErrorDetailWithHttpStatusCode("request_not_supported", "The request parameter is not supported.", http.StatusBadRequest)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.MatchedBy(func(input *validators.ValidateUnsupportedRequestParametersInput) bool {

@@ -176,6 +176,27 @@ func HandleAuthorizeGet(
 			}
 		}
 
+		// The client is loaded here rather than after the unsupported-parameter check below,
+		// because the closure declared next dispatches an error redirect and every error redirect
+		// now carries the client it is answering: RFC 9700 4.11.2 hands the trust decision to the
+		// server and names the source of the redirect URI as one of its inputs, so the redirect
+		// has to know which client asked for it. A closure declared above this load cannot
+		// reference the variable at all, which is why the load moved rather than the closure
+		// (#108).
+		//
+		// Nothing is lost by the move: ValidateClientAndRedirectURI ran directly above and returns
+		// an error unless the client exists and is enabled, so the only way this finds nothing is a
+		// client deleted between the two lookups, which answered 500 before the move as well.
+		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
+			return
+		}
+
 		redirToClientWithError := func(validationError *customerrors.ErrorDetail) {
 			// The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie
 			// on w, and redirToClientWithError commits the response in every response mode, so
@@ -189,9 +210,18 @@ func HandleAuthorizeGet(
 				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 				slog.Error("failed to clear the auth context, answering the client with server_error",
 					"error", err)
-				err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
-					r.FormValue("response_mode"), r.FormValue("redirect_uri"), r.FormValue("state"),
-					r.FormValue("response_type"))
+				// Read from the request rather than from authContext: this closure runs before the
+				// second SaveAuthContext below, and two of its call sites run before the context
+				// has been populated with the validated values at all.
+				err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
+					client:       client,
+					code:         "server_error",
+					description:  "Internal server error",
+					responseMode: r.FormValue("response_mode"),
+					redirectURI:  r.FormValue("redirect_uri"),
+					state:        r.FormValue("state"),
+					responseType: r.FormValue("response_type"),
+				})
 				if err != nil {
 					// Nowhere left to send the client, so the 500 is the last resort here.
 					httpHelper.InternalServerError(w, r, err)
@@ -199,9 +229,15 @@ func HandleAuthorizeGet(
 				return
 			}
 
-			err = redirToClientWithError(w, r, templateFS, validationError.GetCode(), validationError.GetDescription(),
-				r.FormValue("response_mode"), r.FormValue("redirect_uri"), r.FormValue("state"),
-				r.FormValue("response_type"))
+			err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
+				client:       client,
+				code:         validationError.GetCode(),
+				description:  validationError.GetDescription(),
+				responseMode: r.FormValue("response_mode"),
+				redirectURI:  r.FormValue("redirect_uri"),
+				state:        r.FormValue("state"),
+				responseType: r.FormValue("response_type"),
+			})
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -222,17 +258,8 @@ func HandleAuthorizeGet(
 			return
 		}
 
-		// Load client and settings to determine PKCE requirement
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
-			return
-		}
-
+		// The client was loaded above the error-redirect closure, which needs it. Settings still
+		// come from the request context here, where the PKCE requirement is decided.
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		pkceRequired := client.IsPKCERequired(settings.PKCERequired)
 		implicitGrantEnabled := client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled)
@@ -426,8 +453,8 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 			// which on a genuine server fault is the accurate instruction of the two.
 			slog.Error("failed to clear the auth context, answering the client with server_error",
 				"error", err)
-			err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
-				authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+			err = redirToClientWithError(w, r, httpHelper, templateFS,
+				redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
 			if err != nil {
 				// Nowhere left to send the client, so the 500 is the last resort here.
 				httpHelper.InternalServerError(w, r, err)
@@ -435,8 +462,8 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 			return
 		}
 
-		err = redirToClientWithError(w, r, templateFS, errorCode, errorDescription,
-			authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+		err = redirToClientWithError(w, r, httpHelper, templateFS,
+			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -616,38 +643,96 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/issue", http.StatusFound)
 }
 
-func redirToClientWithError(w http.ResponseWriter, r *http.Request, templateFS fs.FS, code string,
-	description string, responseMode string, redirectURI string, state string, responseType string) error {
+// redirectErrorInput carries what an error response to a client is built from. It is a struct
+// rather than a longer parameter list because the redirect now has to know which client it is
+// answering as well as what to say: RFC 9700 4.11.2 hands the "is this redirection URI trusted"
+// decision to the server and names the source of the redirect URI among its inputs, and a
+// ten-argument call repeated across sixteen sites is not something anyone can read (#108).
+type redirectErrorInput struct {
+	// client is the client being answered, or nil when the handler could not resolve it before
+	// the error arose. Nil means "provenance unknown", never "there is no client": the trust
+	// decision is about where the redirect URI came from, so an unresolved client is the
+	// untrusted case rather than an exempt one.
+	client *models.Client
+
+	code         string
+	description  string
+	responseMode string
+	redirectURI  string
+	state        string
+	responseType string
+}
+
+// redirectErrorFromAuthContext builds the input for an error redirect whose response parameters
+// come from the stored ceremony, which is where fourteen of the sixteen take them from. The two
+// inside HandleAuthorizeGet's own closure run before the context holds the validated values and
+// read the request instead.
+func redirectErrorFromAuthContext(authContext *oauth.AuthContext, client *models.Client,
+	code string, description string) redirectErrorInput {
+
+	return redirectErrorInput{
+		client:       client,
+		code:         code,
+		description:  description,
+		responseMode: authContext.ResponseMode,
+		redirectURI:  authContext.RedirectURI,
+		state:        authContext.State,
+		responseType: authContext.ResponseType,
+	}
+}
+
+// clientProvenance loads the client behind a ceremony for the sole benefit of the trust decision in
+// redirToClientWithError, at the handlers that reach an error redirect without having loaded one.
+//
+// It answers nil instead of an error on purpose. Every caller is already on its way to returning an
+// error response to the client, so a lookup that fails must not turn a refusal that works today
+// into a 500; and unresolved provenance is the untrusted case, which errs towards withholding a
+// redirect rather than towards performing one (#108).
+func clientProvenance(database data.Database, clientIdentifier string) *models.Client {
+	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
+	if err != nil {
+		slog.Error("unable to load the client while answering it with an error, treating its provenance as unresolved",
+			"clientIdentifier", clientIdentifier, "error", err)
+		return nil
+	}
+	return client
+}
+
+// httpHelper has no reader here yet. It is threaded in now because the refusal interstitial renders
+// a page with i18n instead of redirecting, and doing that to sixteen call sites in the same change
+// as the behaviour would bury the behaviour (#108).
+func redirToClientWithError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper,
+	templateFS fs.FS, input redirectErrorInput) error {
 
 	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment
 	// Determine if this is an implicit flow by checking response_type
-	rtInfo := oauth.ParseResponseType(responseType)
+	rtInfo := oauth.ParseResponseType(input.responseType)
 	isImplicitFlow := rtInfo.IsImplicitFlow()
 
 	// For implicit flow, default to fragment response mode
-	effectiveResponseMode := responseMode
+	effectiveResponseMode := input.responseMode
 	if isImplicitFlow && effectiveResponseMode == "" {
 		effectiveResponseMode = "fragment"
 	}
 
 	if effectiveResponseMode == "fragment" {
 		values := url.Values{}
-		values.Add("error", code)
-		values.Add("error_description", description)
-		if len(strings.TrimSpace(state)) > 0 {
-			values.Add("state", state)
+		values.Add("error", input.code)
+		values.Add("error_description", input.description)
+		if len(strings.TrimSpace(input.state)) > 0 {
+			values.Add("state", input.state)
 		}
-		http.Redirect(w, r, redirectURI+"#"+values.Encode(), http.StatusFound)
+		http.Redirect(w, r, input.redirectURI+"#"+values.Encode(), http.StatusFound)
 		return nil
 	}
 
 	if effectiveResponseMode == "form_post" {
 		m := make(map[string]interface{})
-		m["redirectURI"] = redirectURI
-		m["error"] = code
-		m["error_description"] = description
-		if len(strings.TrimSpace(state)) > 0 {
-			m["state"] = state
+		m["redirectURI"] = input.redirectURI
+		m["error"] = input.code
+		m["error_description"] = input.description
+		if len(strings.TrimSpace(input.state)) > 0 {
+			m["state"] = input.state
 		}
 
 		t, err := template.ParseFS(templateFS, "form_post.html")
@@ -678,15 +763,15 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, templateFS f
 	}
 
 	// default to query
-	redirUrl, err := url.ParseRequestURI(redirectURI)
+	redirUrl, err := url.ParseRequestURI(input.redirectURI)
 	if err != nil {
 		return errors.Wrap(err, "unable to parse redirect URI")
 	}
 	values := redirUrl.Query()
-	values.Add("error", code)
-	values.Add("error_description", description)
-	if len(strings.TrimSpace(state)) > 0 {
-		values.Add("state", state)
+	values.Add("error", input.code)
+	values.Add("error_description", input.description)
+	if len(strings.TrimSpace(input.state)) > 0 {
+		values.Add("state", input.state)
 	}
 	redirUrl.RawQuery = values.Encode()
 

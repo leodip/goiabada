@@ -241,6 +241,12 @@ func HandleConsentPost(
 			// consented scope, which they read as "no consent screen was shown" and answer with
 			// the full requested scope (#79).
 			if len(grantedScopes) == 0 {
+				// A refusal answers the client with an error redirect, and an error redirect now
+				// carries the client it is answering, so provenance is resolved here rather than
+				// in the approval branch below where the load used to be the only one. The two
+				// branches are mutually exclusive, so no request loads the client twice (#108).
+				refusedClient := clientProvenance(database, authContext.ClientId)
+
 				// The clear goes FIRST. ClearAuthContext persists the deletion through a
 				// Set-Cookie on w, and redirToClientWithError commits the response in every
 				// response mode, so clearing afterwards leaves the header on a response already
@@ -256,8 +262,8 @@ func HandleConsentPost(
 					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 					slog.Error("failed to clear the auth context, answering the client with server_error",
 						"error", err)
-					err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
-						authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+					err = redirToClientWithError(w, r, httpHelper, templateFS,
+						redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
 					if err != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
 						httpHelper.InternalServerError(w, r, err)
@@ -265,8 +271,9 @@ func HandleConsentPost(
 					return
 				}
 
-				err = redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
-					authContext.RedirectURI, authContext.State, authContext.ResponseType)
+				err = redirToClientWithError(w, r, httpHelper, templateFS,
+					redirectErrorFromAuthContext(authContext, refusedClient,
+						"access_denied", "The user did not provide consent"))
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -344,6 +351,11 @@ func HandleConsentPost(
 			}
 		} else {
 
+			// Provenance is resolved here for the same reason as in the no-scopes-consented
+			// refusal above: this branch answers the client with an error redirect, and the
+			// redirect now carries the client it is answering (#108).
+			refusedClient := clientProvenance(database, authContext.ClientId)
+
 			// The clear goes FIRST, for the same reason as the no-scopes-consented refusal
 			// above: a Set-Cookie written after redirToClientWithError has committed never
 			// reaches the wire, so the browser keeps an auth context in requires_consent that
@@ -356,8 +368,8 @@ func HandleConsentPost(
 				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 				slog.Error("failed to clear the auth context, answering the client with server_error",
 					"error", err)
-				err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
-					authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
+				err = redirToClientWithError(w, r, httpHelper, templateFS,
+					redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
 				if err != nil {
 					// Nowhere left to send the client, so the 500 is the last resort here.
 					httpHelper.InternalServerError(w, r, err)
@@ -365,8 +377,9 @@ func HandleConsentPost(
 				return
 			}
 
-			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
-				authContext.RedirectURI, authContext.State, authContext.ResponseType)
+			err = redirToClientWithError(w, r, httpHelper, templateFS,
+				redirectErrorFromAuthContext(authContext, refusedClient,
+					"access_denied", "The user did not provide consent"))
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

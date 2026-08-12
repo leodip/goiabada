@@ -301,6 +301,7 @@ func TestHandleIssueGet(t *testing.T) {
 			Prompt:       "none",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		// Asserting that ClearAuthContext was called says nothing about whether the clear
 		// reaches the browser, because the real helper persists the deletion through a
@@ -364,6 +365,7 @@ func TestHandleIssueGet(t *testing.T) {
 			Prompt:       "none",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		// This site's ordering was already correct, so what changes here is only the failure
 		// branch: a failed clear writes no cookie, so the browser keeps the auth context whether
@@ -424,6 +426,7 @@ func TestHandleIssueGet(t *testing.T) {
 			Prompt:       "none",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
@@ -474,6 +477,7 @@ func TestHandleIssueGet(t *testing.T) {
 			Prompt:       "none",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		// The other half of the same family: the clear succeeds and it is the ordinary
 		// login_required refusal that cannot be committed. This 500 predates #141 and is pinned
@@ -740,6 +744,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 			stubLiveSession(database, foreignSessionUserId)
+			stubClientProvenanceLookup(database)
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 			handler.ServeHTTP(rr, req)
@@ -931,6 +936,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 			Prompt:       "none",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
@@ -2160,6 +2166,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			IdTokenHintSub: userASubject.String(), // Hint says user A
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		// Mock user lookup - authenticated user is user B (DIFFERENT)
 		mockUser := &models.User{
@@ -2234,6 +2241,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			IdTokenHintSub: userASubject.String(),
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		database.On("GetUserById", mock.Anything, int64(1)).Return(&models.User{
 			Id:      1,
@@ -2304,6 +2312,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			IdTokenHintSub: userASubject.String(),
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		database.On("GetUserById", mock.Anything, int64(1)).Return(&models.User{
 			Id:      1,
@@ -2366,6 +2375,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			IdTokenHintSub: userASubject.String(),
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		database.On("GetUserById", mock.Anything, int64(1)).Return(&models.User{
 			Id:      1,
@@ -2487,6 +2497,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		var savedAuthContext *oauth.AuthContext
 
 		authHelper.On("GetAuthContext", req).Run(func(args mock.Arguments) {
+			stubClientProvenanceLookup(database)
 			savedAuthContext = &oauth.AuthContext{
 				AuthState:      oauth.AuthStateReadyToIssueCode,
 				ClientId:       "test-client",
