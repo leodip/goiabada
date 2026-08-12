@@ -312,6 +312,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			stored string
 			// submitted is what the stale page posts; the empty string means the field is absent.
 			submitted string
+			// inQuery puts submitted in the URL query instead of the body.
+			inQuery   bool
 			authState string
 		}{
 			{
@@ -339,6 +341,15 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				submitted: "another-ceremony-0123456789abcde",
 				authState: oauth.AuthStateRequiresConsent,
 			},
+			{
+				// The id has to come from the body. This form posts to action="", so reading it
+				// with r.FormValue would let /auth/pwd?ceremonyId=... supply an id the submission
+				// never carried, and a page rendered for no ceremony at all would pass the gate
+				// (#79).
+				name: "the current id in the query alone", stored: testCeremonyId,
+				submitted: testCeremonyId, inQuery: true,
+				authState: oauth.AuthStateLevel1Password,
+			},
 		}
 
 		for _, tc := range staleCases {
@@ -353,10 +364,15 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				form := url.Values{}
 				form.Add("email", "test@example.com")
 				form.Add("password", password)
+				target := "/auth/pwd"
 				if tc.submitted != "" {
-					form.Add(ceremonyIdField, tc.submitted)
+					if tc.inQuery {
+						target += "?" + url.Values{ceremonyIdField: {tc.submitted}}.Encode()
+					} else {
+						form.Add(ceremonyIdField, tc.submitted)
+					}
 				}
-				req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
+				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				rr := httptest.NewRecorder()
 
