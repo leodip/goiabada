@@ -13,11 +13,24 @@
 -- enabled dynamic registration. A forward-looking-only fix would leave the defect
 -- standing where it has already been exploited.
 --
--- The prefix is a sound signal in one direction only. Every client created through
--- /connect/register has carried it since the feature shipped, so there are no false
--- negatives. The one error it can make is a false positive, an administrator who
--- named a client dcr_something by hand, and that costs one unnecessary consent
--- screen which the per-client consent toggle in the admin console turns off.
+-- The prefix can miss, in one supported way, and this is the known limit of the
+-- backfill rather than an oversight. Every client created through /connect/register
+-- is given the prefix, but until this release an administrator could rename any
+-- client through the admin console, and a self-registered client renamed before the
+-- upgrade no longer matches here. It keeps created_via_dcr = 0 and consent_required
+-- = 0, which is the defect this migration exists to remove, and an operator has to
+-- tick "Consent required" on it by hand. Reaching that state needs an authenticated
+-- administrator to have renamed it first, so nothing an outsider can steer, and the
+-- alternatives were worse: no other column distinguishes a self-registered client,
+-- so a broader rule turns consent on for administrator-created clients too, and an
+-- audit-assisted pass recovers only registrations inside the 180-day default
+-- retention, which starts after audit rows began being persisted in 2026-02-11 and
+-- so misses most of the affected window anyway. The client update API blocks the
+-- rename from this release on, so the gap cannot widen (#108, decision 16).
+--
+-- The other direction is a false positive, an administrator who named a client
+-- dcr_something by hand, and that costs one unnecessary consent screen which the
+-- per-client consent toggle in the admin console turns off.
 --
 -- ESCAPE '!' , never ESCAPE '\' : the backslash escapes the closing quote inside a
 -- MySQL string literal, so that spelling is a syntax error on MySQL and parses fine

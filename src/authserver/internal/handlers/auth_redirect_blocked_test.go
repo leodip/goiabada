@@ -54,32 +54,3 @@ func TestRedirectDestinationLabel(t *testing.T) {
 		})
 	}
 }
-
-// promptRequestsSilence carries the OIDC Core 3.1.2.1 exemption at the two sites where the ceremony
-// has not been given a validated prompt yet. Answering true wrongly delivers a user agent to a
-// self-registered client's host, which is the whole attack; answering false wrongly renders a page
-// for a silent request, which the spec forbids with a MUST NOT. Both directions matter, so both are
-// here (#108).
-func TestPromptRequestsSilence(t *testing.T) {
-	tests := []struct {
-		prompt string
-		want   bool
-		why    string
-	}{
-		{prompt: "none", want: true, why: "the plain silent request"},
-		{prompt: "none login", want: true, why: "still asks for none, whatever else it asks for"},
-		{prompt: "  none  ", want: true, why: "surrounding whitespace is not part of the value"},
-		{prompt: "login", want: false, why: "an interactive prompt is not exempt"},
-		{prompt: "consent", want: false, why: "an interactive prompt is not exempt"},
-		{prompt: "", want: false, why: "no prompt at all is the ordinary interactive request"},
-		{prompt: "nonetheless", want: false,
-			why: "matched as a whole field, never as a substring, or a request asking for nothing would be exempt"},
-		{prompt: "NONE", want: false, why: "prompt values are case sensitive per OIDC Core 3.1.2.1"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.prompt, func(t *testing.T) {
-			assert.Equal(t, tt.want, promptRequestsSilence(tt.prompt), tt.why)
-		})
-	}
-}

@@ -3,21 +3,21 @@ package handlers
 import (
 	"net/http"
 	"net/url"
-	"strings"
 )
 
 // This file is the refusal interstitial: the page a user is shown instead of being redirected to a
 // client that registered itself. redirToClientWithError decides when it renders; everything here is
-// what it renders and the two pure predicates behind that decision.
+// what it renders and the pure function behind the one thing on it a user can act on.
 //
-// RFC 9700 section 4.11.2 describes the attack it answers. An attacker registers a client
-// anonymously, pointing its redirect URI at a host it controls, and then either gets a user to
-// decline the authorization (attack 2) or sends a deliberately invalid request (attack 1). Either
-// way this server's own error redirect delivers the user agent to the attacker's host, and attack 1
-// needs no victim interaction at all. The RFC answers with "The authorization server MUST take
-// precautions to prevent these threats" and then declines to define "trusted", handing the
-// judgement to the server and naming "the source of the redirection URI and other client data"
-// among its inputs. created_via_dcr is that source, recorded (#108).
+// RFC 9700 section 4.11.2 describes the attacks it answers, and it lists three. An attacker
+// registers a client anonymously, pointing its redirect URI at a host it controls, and then either
+// gets a user to decline the authorization (attack 2), sends a deliberately invalid request
+// (attack 1), or sends a valid silent request with prompt=none (attack 3). Either way this server's
+// own error redirect delivers the user agent to the attacker's host, and attacks 1 and 3 need no
+// victim interaction at all. The RFC answers with "The authorization server MUST take precautions
+// to prevent these threats" and then declines to define "trusted", handing the judgement to the
+// server and naming "the source of the redirection URI and other client data" among its inputs.
+// created_via_dcr is that source, recorded (#108).
 
 // redirectDestinationLabel names, for a user, where a client asked to send them. It is the host
 // alone for an ordinary web redirect URI, because the path and query are noise nobody can evaluate
@@ -34,28 +34,6 @@ func redirectDestinationLabel(redirectURI string) string {
 		return redirectURI
 	}
 	return parsed.Host
-}
-
-// promptRequestsSilence reports whether a raw prompt parameter, straight off the request, asks for
-// silent authentication.
-//
-// It exists because the two error redirects inside HandleAuthorizeGet's own closure run before
-// authContext.Prompt has been validated and assigned, so the stored ceremony cannot answer this
-// question there. Everywhere the ceremony can answer it, it does, through
-// redirectErrorFromAuthContext: POST /auth/consent and GET /auth/issue carry no prompt parameter of
-// their own, so reading the request at those sites would report every silent ceremony as
-// interactive and render a page OIDC Core 3.1.2.1 forbids (#108).
-//
-// The split on whitespace matches AuthContext.HasPromptValue, and matching whole fields rather than
-// searching for a substring is what keeps "nonetheless" from exempting a request that asked for
-// nothing.
-func promptRequestsSilence(prompt string) bool {
-	for _, value := range strings.Fields(prompt) {
-		if value == "none" {
-			return true
-		}
-	}
-	return false
 }
 
 // renderRedirectBlocked renders the terminal page that replaces an error redirect to a client this

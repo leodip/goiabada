@@ -357,6 +357,85 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 	assert.Contains(t, errResp.ErrorDescription, "identifier of a system-level client cannot be changed")
 }
 
+// TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked is decision 16's D half. Until
+// created_via_dcr existed, the dcr_ prefix was the only record that a client had registered itself,
+// and this endpoint would rename any client that was not the admin console's own. A self-registered
+// client renamed that way is invisible to migration 000029's backfill, so it keeps consent off and
+// goes on issuing codes with no consent screen, which is the defect this whole change exists to
+// remove.
+func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testing.T) {
+	enableDCR(t)
+	defer disableDCR(t)
+
+	accessToken, _ := createAdminClientWithToken(t)
+	client := registerDCRClient(t, "Renameable Portal", "https://dcr-rename.example.com/callback")
+	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "looks-administrator-created", Description: "renamed"}
+	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var errResp api.ErrorResponse
+	err := json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.NoError(t, err)
+	assert.Contains(t, errResp.ErrorDescription, "identifier of a self-registered client cannot be changed")
+
+	// The refusal has to leave the row alone as well as answer 400: a guard that rejects the
+	// response after writing the rename would report a block it did not perform.
+	refreshed, err := database.GetClientById(nil, client.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, client.ClientIdentifier, refreshed.ClientIdentifier)
+	assert.Equal(t, client.Description, refreshed.Description,
+		"and nothing else in the refused request lands either")
+}
+
+// TestAPIClientUpdatePut_SelfRegisteredClientRemainsEditable owns two properties that both have to
+// hold for the escape hatch to exist, and it is the case that fails if either is lost.
+//
+// The first is decision 16's guard being a rename block rather than an update block. Consent
+// required is what decision 1 rejected a global setting in favour of, precisely because an
+// administrator can untick it on one client they have reviewed, so a guard that refused the update
+// outright would take the remedy away along with the risk.
+//
+// The second is decision 17. A self-registered client's identifier is "dcr_" plus a UUID, which is
+// 40 characters, and ValidateIdentifier caps an identifier at 38. While the update re-checked an
+// unchanged identifier, that arithmetic rejected every update to every self-registered client, so
+// this screen could not save anything at all: not consent, not Enabled, nothing. The length is
+// asserted here rather than assumed, because it is the whole reason the check has to be
+// conditional and a shorter generated identifier would quietly retire the regression.
+func TestAPIClientUpdatePut_SelfRegisteredClientRemainsEditable(t *testing.T) {
+	enableDCR(t)
+	defer disableDCR(t)
+
+	accessToken, _ := createAdminClientWithToken(t)
+	client := registerDCRClient(t, "Reviewed Portal", "https://dcr-reviewed.example.com/callback")
+	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	assert.True(t, client.ConsentRequired, "registration turns consent on, which is what is being turned off here")
+	assert.Greater(t, len(client.ClientIdentifier), 38,
+		"a generated identifier is longer than ValidateIdentifier accepts, which is what makes this the regression guard")
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	reqBody := api.UpdateClientSettingsRequest{
+		ClientIdentifier: client.ClientIdentifier, // unchanged, which is all the guard asks
+		Description:      "an administrator reviewed this one",
+		DisplayName:      "Reviewed Portal",
+		ShowDisplayName:  true,
+		Enabled:          true,
+		ConsentRequired:  false,
+	}
+	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	refreshed, err := database.GetClientById(nil, client.Id)
+	assert.NoError(t, err)
+	assert.False(t, refreshed.ConsentRequired, "an administrator can still untick consent for a client they reviewed")
+	assert.Equal(t, "Reviewed Portal", refreshed.DisplayName)
+	assert.True(t, refreshed.CreatedViaDCR, "and how it was created is not something the update can rewrite")
+}
+
 func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 

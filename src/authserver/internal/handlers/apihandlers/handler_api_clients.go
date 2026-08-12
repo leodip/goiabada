@@ -365,22 +365,44 @@ func HandleAPIClientUpdatePut(
 			return
 		}
 
-		// Validate identifier format
-		if err := identifierValidator.ValidateIdentifier(updateReq.ClientIdentifier, true); err != nil {
-			writeValidationError(w, r, err)
-			return
-		}
+		// Sanitize and prepare the new identifier value
+		sanitizedClientIdentifier := strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ClientIdentifier))
 
-		// Check uniqueness excluding current client
-		existingClient, err := database.GetClientByClientIdentifier(nil, updateReq.ClientIdentifier)
-		if err != nil {
-			slog.Error("AuthServer API: Database error checking client existence by identifier for update", "error", err, "clientIdentifier", updateReq.ClientIdentifier, "clientId", client.Id)
-			writeJSONError(w, "Failed to check client existence", "INTERNAL_ERROR", http.StatusInternalServerError)
-			return
-		}
-		if existingClient != nil && existingClient.Id != client.Id {
-			writeJSONError(w, "The client identifier is already in use.", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
+		// The identifier is checked only when the request actually submits a different one, and
+		// that is load bearing rather than an optimisation. A client that registered itself is
+		// given "dcr_" plus a UUID, which is 40 characters, and ValidateIdentifier caps an
+		// identifier at 38: re-checking an unchanged value therefore rejected every update to every
+		// self-registered client, whatever the request was trying to change. That made the escape
+		// hatch this change depends on unusable, since turning consent off for one reviewed client
+		// is done on the same form (#108, decision 17).
+		//
+		// Compared byte for byte against what is stored, deliberately, rather than against the
+		// sanitized value. "  same-identifier  " has always been refused as an invalid format and
+		// still is; only a request submitting exactly what is already there skips the check. That
+		// also makes the skip provably safe: an identifier that is already stored passed this same
+		// validator, so it holds no character the sanitizer would touch, and the assignment below
+		// writes back the bytes that are already in the row.
+		//
+		// Skipping the uniqueness query alongside it changes nothing either: it excludes the
+		// current client, so an unchanged identifier can only ever match the row being updated.
+		if updateReq.ClientIdentifier != client.ClientIdentifier {
+			// Validate identifier format
+			if err := identifierValidator.ValidateIdentifier(updateReq.ClientIdentifier, true); err != nil {
+				writeValidationError(w, r, err)
+				return
+			}
+
+			// Check uniqueness excluding current client
+			existingClient, err := database.GetClientByClientIdentifier(nil, updateReq.ClientIdentifier)
+			if err != nil {
+				slog.Error("AuthServer API: Database error checking client existence by identifier for update", "error", err, "clientIdentifier", updateReq.ClientIdentifier, "clientId", client.Id)
+				writeJSONError(w, "Failed to check client existence", "INTERNAL_ERROR", http.StatusInternalServerError)
+				return
+			}
+			if existingClient != nil && existingClient.Id != client.Id {
+				writeJSONError(w, "The client identifier is already in use.", "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
 		}
 
 		// ACR level validation depending on AuthorizationCodeEnabled
@@ -408,12 +430,27 @@ func HandleAPIClientUpdatePut(
 			}
 		}
 
-		// Sanitize and prepare the new identifier value
-		sanitizedClientIdentifier := strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ClientIdentifier))
-
 		// System-level client protection: block identifier changes
 		if client.IsSystemLevelClient() && sanitizedClientIdentifier != client.ClientIdentifier {
 			writeJSONError(w, "The identifier of a system-level client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// Self-registered client protection: block identifier changes too. Until the created_via_dcr
+		// column existed, the dcr_ identifier prefix was the only record that a client had
+		// registered itself, so renaming one here erased that fact permanently: migration 000029
+		// backfills from the prefix, and a client renamed before the upgrade is left unmarked, with
+		// consent off, still issuing codes with no consent screen. The column makes new renames
+		// harmless to the backfill, and blocking the rename keeps the prefix and the column saying
+		// the same thing for anything that still reads a client identifier, a log line or an
+		// operator's eye included (#108, decision 16).
+		//
+		// It blocks the rename and nothing else. Every other setting on a self-registered client
+		// stays editable, Consent required above all: unticking it for one reviewed client is the
+		// escape hatch this whole change rests on, so a guard that refused the update outright
+		// would take away the remedy along with the risk.
+		if client.CreatedViaDCR && sanitizedClientIdentifier != client.ClientIdentifier {
+			writeJSONError(w, "The identifier of a self-registered client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

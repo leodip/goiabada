@@ -221,6 +221,8 @@ When enabled, any application can register as a client. Consider these security 
 - **Review client metadata** - Check redirect URIs and other metadata of self-registered clients
 - **Disable untrusted clients** - Clients can be disabled through the admin console if needed
 
+A self-registered client's **identifier cannot be changed**, in the same way the [system-level client](#system-level-client)'s cannot. Every other setting can, including **Consent required**. The identifier is how a client is known to everything that has already been told about it, and how it is recognised in a log; a self-registered one is generated rather than chosen, so keeping it fixed costs nothing and means the name in your client list is the name the client actually authenticates under.
+
 **Self-registered clients require consent by default.** Goiabada sets [Consent required](#consent-required) on every client created through this endpoint, so the first time a user authorizes one they are shown a consent screen naming the application and the access it is asking for. Clients an administrator creates are unaffected and keep their existing default of consent off.
 
 This is the control that makes the rest of the list worth having. Without it, an application that registered itself a moment ago can obtain a code for every scope the user is entitled to, with nothing rendered to the user at all if they already have a session on this server.
@@ -229,16 +231,20 @@ This is the control that makes the rest of the list worth having. Without it, an
 
 **A refused authorization is not redirected back to a self-registered client.** Anyone can register a client and point it at any address, so an error response is an instruction to send someone's browser to a site nobody here has checked. When Goiabada refuses an authorization for a self-registered client, whether the user declined it or the request was invalid, it shows the user a page naming the application and the address it asked to send them to, and the request stops there. Clients an administrator created keep the ordinary redirect.
 
+This holds for [silent authentication](/concepts/prompt-parameter/) too. A `prompt=none` request that fails is the cheapest version of the same attack, because it needs no session and nothing from the user at all, so a self-registered client's silent request that cannot be completed gets no redirect either. The page renders where a browser would show it, and inside the hidden iframe silent renewal normally runs in, nothing is displayed to anyone.
+
 <Aside type="caution">
-**If you build a self-registered client:** it receives no error response in that case. There is no redirect, so an authorization the user declines or the server refuses simply never completes, and your client should treat an authorization that does not return within a reasonable time as abandoned rather than waiting indefinitely. A `prompt=none` request is the exception and still receives its error by redirect, because [silent authentication](/concepts/prompt-parameter/) must not display anything to the user.
+**If you build a self-registered client:** it receives no error response in any of those cases. There is no redirect, so an authorization the user declines or the server refuses simply never completes, and your client should treat an authorization that does not return within a reasonable time as abandoned rather than waiting indefinitely. That applies to `prompt=none`: a silent request that cannot be completed times out rather than returning `consent_required`, so send the user through one ordinary authorization when a silent one does not come back.
 
 An administrator who has reviewed your client can give it a display name, which changes what the page says, but the redirect is withheld either way. If your integration needs the error response, it needs a client an administrator registered.
 </Aside>
 
 <Aside type="caution">
-**For operators upgrading:** this changes the behaviour of clients that are already registered. The migration turns consent on for every existing self-registered client, so a client relying on silent renewal with `prompt=none` starts receiving `consent_required` until its user has been through the consent screen once. That is the correct behaviour and it is a visible change: an integration that has been renewing tokens silently will need one interactive authorization per user before it renews silently again.
+**For operators upgrading:** this changes the behaviour of clients that are already registered. The migration turns consent on for every existing self-registered client, so a client relying on silent renewal with `prompt=none` stops renewing until its user has been through the consent screen once. That is a visible change and it is not a graceful one: the silent request does not come back with `consent_required`, it does not come back at all, so an integration that has been renewing tokens silently needs one interactive authorization per user before it renews silently again.
 
 If you have reviewed a specific self-registered client and want it back the way it was, open it in the admin console and untick **Consent required**.
+
+**One case the migration cannot find.** It marks existing self-registered clients by their `dcr_` identifier prefix, which is all there was to go on before this release. If an administrator renamed a self-registered client in the admin console before upgrading, it no longer carries that prefix, so it is not marked, not badged, and consent stays off for it. Look for it in the client list and tick **Consent required** by hand. Renaming a self-registered client is refused from this release on, so the gap cannot grow after you upgrade.
 </Aside>
 
 ### Redirect URI rules
