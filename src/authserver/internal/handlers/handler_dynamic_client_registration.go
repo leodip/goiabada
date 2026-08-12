@@ -341,6 +341,11 @@ func validateRedirectURI(uri string, isPublic bool) error {
 // console, so testing the prefix answers "was this named like a self-registered client", not
 // "did this client register itself". The clients.created_via_dcr column answers the second, and
 // it is what every such test reads (#108).
+//
+// The identifier a client is registered under is fixed from here on: HandleAPIClientUpdatePut
+// refuses to rename a client whose created_via_dcr is set. That is not what makes the prefix
+// trustworthy, since it never was; it keeps the prefix and the column from drifting apart for
+// the human reading them, which is the only thing the prefix is for (#108, decision 16).
 func generateDCRClientIdentifier() string {
 	return "dcr_" + uuid.NewString()
 }

@@ -288,10 +288,11 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 //
 // These two are deliberately thin. TestPromptNone_ConsentRequired_ReturnsConsentRequired and
 // TestPromptNone_ConsentExists_Success above already own how prompt=none behaves for a client
-// that requires consent. What is new is only that a client which registered itself through
-// /connect/register is now one of those, which is the visible consequence of the flip for an
-// operator running silent renewal: the first silent request after registration fails with
-// consent_required until the user has been through the consent screen once (#108).
+// that requires consent. What is new is what changes for a client which registered itself through
+// /connect/register, and it is the visible consequence of this change for an operator running
+// silent renewal: the first silent request after registration no longer completes, and no longer
+// says why, until the user has been through the consent screen once. Once they have, silent
+// renewal works exactly as it did before (#108, decisions 7 and 15).
 // =============================================================================
 
 // walkDCRClientToConsentScreen registers a client through /connect/register, creates a user, and
@@ -379,22 +380,33 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 	return httpClient, client, redirectUri, user
 }
 
-func TestPromptNone_DCRClient_NoConsent_ReturnsConsentRequired(t *testing.T) {
+// TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld is where the flip and decision 15 meet, and
+// it is the sharpest edge of this whole change for anybody running silent renewal today.
+//
+// The flip alone would have this return consent_required, which is what OIDC Core 3.1.2.6 supplies
+// the error for and what a client could act on. Decision 15 then established that answering a
+// prompt=none error by redirecting to a self-registered client's own URI is RFC 9700 4.11.2's
+// attack 3, so the error is withheld like every other one: the client is told nothing and the
+// browser goes nowhere. A silent renewal that used to work now fails as a timeout in the iframe
+// rather than as a readable error, and recovering means one interactive authorization per user.
+//
+// TestDCR_Refusal_SilentAdministratorClientStillRedirects is the other half: an administrator's
+// client keeps its readable consent_required, so this is the price of anonymous registration
+// rather than the price of prompt=none.
+func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 	enableDCR(t)
 	defer disableDCR(t)
 
 	httpClient, client, redirectUri, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 
-	// The session exists and is valid; the only thing missing is a consent row. OIDC Core 3.1.2.1
-	// forbids showing a consent page here, and 3.1.2.6 supplies the error for exactly this case.
-	requestState := gofakeit.LetterN(8)
+	// The session exists and is valid; the only thing missing is a consent row.
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + gofakeit.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile") +
-		"&state=" + requestState +
+		"&state=" + gofakeit.LetterN(8) +
 		"&prompt=none"
 
 	resp, err := httpClient.Get(destUrl)
@@ -403,12 +415,11 @@ func TestPromptNone_DCRClient_NoConsent_ReturnsConsentRequired(t *testing.T) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-
-	errorCode, _, state := getErrorFromUrl(t, resp)
-
-	assert.Equal(t, "consent_required", errorCode)
-	assert.Equal(t, requestState, state)
+	parsedRedirect, err := url.Parse(redirectUri.URI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertRedirectWasWithheld(t, resp, parsedRedirect.Host)
 }
 
 func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {

@@ -16,9 +16,11 @@ import (
 // not delivered by redirecting the user's browser to that client's host. It is shown to the user
 // instead, on a page with nothing on it to press, and the authorization ends there.
 //
-// RFC 9700 section 4.11.2 lists both attacks it closes. Attack 2 needs a user to decline; attack 1
-// needs nothing but a link with an invalid scope in it, which is why the control sits inside
-// redirToClientWithError rather than on the decline path (#108).
+// RFC 9700 section 4.11.2 lists all three attacks it closes. Attack 2 needs a user to decline;
+// attack 1 needs nothing but a link with an invalid scope in it; attack 3 needs only a prompt=none
+// request from a browser with no session at all. Two of the three are cheaper than the one a
+// control on the decline path would catch, which is why the control sits inside
+// redirToClientWithError instead (#108).
 
 // The English copy for the interstitial, written out rather than read back through i18n.T: this
 // test process never loads the catalogs, so T would answer with the key itself and every assertion
@@ -163,15 +165,22 @@ func TestDCR_Refusal_UnresolvedClientIsNotRedirectedEither(t *testing.T) {
 	assertRedirectWasWithheld(t, resp, parsedRedirect.Host)
 }
 
-// TestDCR_Refusal_SilentRequestStillRedirects is the case that fails if the OIDC Core 3.1.2.1
-// exemption is lost. It deliberately takes the error at a site inside HandleAuthorizeGet, where
-// the ceremony has not yet been given a validated prompt: silence has to be read off the raw
-// request parameter there or a silent renewal iframe is answered with a page it cannot read,
-// which "MUST NOT display any authentication or consent user interface pages" forbids.
+// TestDCR_Refusal_SilentRequestIsNotDeliveredByRedirect is RFC 9700 4.11.2 attack 3, and it is the
+// case this file asserted the opposite of until decision 15 was answered.
 //
-// TestPromptNone_DCRClient_NoConsent_ReturnsConsentRequired owns the other half, the sites where
-// the ceremony does hold the prompt and is what must be read instead.
-func TestDCR_Refusal_SilentRequestStillRedirects(t *testing.T) {
+// The attack is the exemption written out: "Intentionally send a valid silent authentication
+// request (prompt=none) with client_id and redirect_uri controlled by the attacker. In this case,
+// the authorization server will automatically redirect the user agent to the phishing site." The
+// http client here never authenticates and holds no session, so this is the whole attack with no
+// victim interaction at all, which makes it cheaper than attacks 1 and 2 rather than a corner of
+// them.
+//
+// The exception clause the earlier reading leaned on, "with the exception of the silent
+// authentication use case", sits inside that section's requirement to prompt for credentials, not
+// inside "MUST take precautions to prevent these threats", and attack 3 is one of those threats.
+// OIDC Core 3.1.2.1's "MUST NOT display any authentication or consent user interface pages" is
+// untouched by rendering here: the page asks for neither.
+func TestDCR_Refusal_SilentRequestIsNotDeliveredByRedirect(t *testing.T) {
 	enableDCR(t)
 	defer disableDCR(t)
 
@@ -179,15 +188,35 @@ func TestDCR_Refusal_SilentRequestStillRedirects(t *testing.T) {
 	client := registerDCRClient(t, "Silent Portal", redirectURI)
 
 	httpClient := createHttpClient(t)
-	requestState := gofakeit.LetterN(8)
 
 	resp, err := httpClient.Get(authorizeURLWithScope(client.ClientIdentifier, redirectURI,
+		"openid nonsense", gofakeit.LetterN(8)) + "&prompt=none")
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	assertRedirectWasWithheld(t, resp, "dcr-silent-scope.example.com")
+}
+
+// TestDCR_Refusal_SilentAdministratorClientStillRedirects is what keeps the case above from being
+// satisfied by withholding every silent error response. Silent renewal is a real thing real
+// integrations depend on, and dropping the trust signal to close attack 3 would break it for every
+// client on the server rather than for the ones nobody vetted.
+//
+// It is also the half of decision 15's cost that stays paid for: an administrator-created client
+// still gets its consent_required, or any other error, back where its code can read it.
+func TestDCR_Refusal_SilentAdministratorClientStillRedirects(t *testing.T) {
+	client, redirectUri := createConsentClient(t)
+
+	httpClient := createHttpClient(t)
+	requestState := gofakeit.LetterN(8)
+
+	resp, err := httpClient.Get(authorizeURLWithScope(client.ClientIdentifier, redirectUri.URI,
 		"openid nonsense", requestState) + "&prompt=none")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode,
-		"a silent request is answered by redirect even for a self-registered client")
+		"a client an administrator registered keeps the ordinary error redirect, silent or not")
 
 	errorCode, _, state := getErrorFromUrl(t, resp)
 	assert.Equal(t, "invalid_scope", errorCode)

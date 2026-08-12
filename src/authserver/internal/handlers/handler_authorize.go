@@ -214,11 +214,7 @@ func HandleAuthorizeGet(
 				// second SaveAuthContext below, and two of its call sites run before the context
 				// has been populated with the validated values at all.
 				err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
-					client: client,
-					// Silence comes off the raw parameter here, not off authContext.Prompt: this
-					// closure runs before ValidatePrompt has assigned it, so the ceremony holds
-					// nothing to read yet (#108).
-					silent:       promptRequestsSilence(r.FormValue("prompt")),
+					client:       client,
 					code:         "server_error",
 					description:  "Internal server error",
 					responseMode: r.FormValue("response_mode"),
@@ -235,7 +231,6 @@ func HandleAuthorizeGet(
 
 			err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
 				client:       client,
-				silent:       promptRequestsSilence(r.FormValue("prompt")),
 				code:         validationError.GetCode(),
 				description:  validationError.GetDescription(),
 				responseMode: r.FormValue("response_mode"),
@@ -660,17 +655,6 @@ type redirectErrorInput struct {
 	// untrusted case rather than an exempt one.
 	client *models.Client
 
-	// silent records that this ceremony asked for silent authentication. OIDC Core 3.1.2.1 says
-	// the authorization server "MUST NOT display any authentication or consent user interface
-	// pages" for prompt=none, so a silent request is answered by redirect even when the client
-	// registered itself. It is the "silent authentication use case" RFC 9700 4.11.2 carves out of
-	// its own requirement, so this is not a hole in the trust decision but the shape of it.
-	//
-	// Read per site rather than from one source: from the ceremony wherever the ceremony holds a
-	// validated prompt, and from the raw request parameter at the two sites inside
-	// HandleAuthorizeGet's closure that run before it does.
-	silent bool
-
 	code         string
 	description  string
 	responseMode string
@@ -687,12 +671,7 @@ func redirectErrorFromAuthContext(authContext *oauth.AuthContext, client *models
 	code string, description string) redirectErrorInput {
 
 	return redirectErrorInput{
-		client: client,
-		// From the ceremony, never from the request. Two of the four caller files dispatch on a
-		// POST /auth/consent and a GET /auth/issue, and neither request carries a prompt parameter
-		// at all, so reading the request there would report a silent ceremony as interactive and
-		// render a page for it. The ceremony is where prompt lives by then.
-		silent:       authContext.HasPromptValue("none"),
+		client:       client,
 		code:         code,
 		description:  description,
 		responseMode: authContext.ResponseMode,
@@ -735,9 +714,22 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 	// and it can only ever withhold a redirect. Nothing below it is reached, no state is written
 	// and no route is added, so there is nothing here for an attacker to drive (#108).
 	//
-	// Silent authentication is exempt: OIDC Core 3.1.2.1 forbids showing any UI there, and RFC
-	// 9700 4.11.2 excepts the same case from its own requirement.
-	if !input.silent && (input.client == nil || input.client.CreatedViaDCR) {
+	// A silent request is NOT exempt, and an earlier version of this guard had it the other way
+	// round. RFC 9700 4.11.2 lists three attacks, and the third is the exemption written out:
+	// "Intentionally send a valid silent authentication request (prompt=none) with client_id and
+	// redirect_uri controlled by the attacker. In this case, the authorization server will
+	// automatically redirect the user agent to the phishing site." It needs neither a session nor
+	// any victim interaction, which makes it the cheapest of the three rather than a corner. The
+	// exception clause in the same section, "with the exception of the silent authentication use
+	// case", sits inside the requirement to prompt for credentials, not inside the "MUST take
+	// precautions to prevent these threats" that governs the list attack 3 is in.
+	//
+	// OIDC Core 3.1.2.1 is not violated by rendering here: it forbids displaying "any
+	// authentication or consent user interface pages", and this page asks for neither. What it
+	// costs is real and was accepted knowingly: a self-registered client's silent renewal stops
+	// receiving a readable consent_required and has to fall back to an interactive authorization
+	// (#108, decision 15).
+	if input.client == nil || input.client.CreatedViaDCR {
 		return renderRedirectBlocked(httpHelper, w, r, input)
 	}
 
