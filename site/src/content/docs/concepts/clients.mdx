@@ -90,6 +90,8 @@ Each client can be configured with display metadata that is shown to users durin
 
 Each of these has a corresponding **visibility toggle** (`showDisplayName`, `showDescription`, `showWebsiteURL`) that controls whether it appears on auth/consent screens. There is also a `showLogo` toggle for controlling logo visibility (see below).
 
+**Self-registered clients are named differently on the consent screen.** A client created through [dynamic client registration](#dynamic-client-registration-rfc-7591) supplies its own name at registration, and the consent screen shows that name with a note saying it has not been verified. Give the client a display name and turn on `showDisplayName` to replace it: an administrator picked that one, so it is shown on its own with no note. The password and OTP screens are not affected and keep showing whatever the display settings above select.
+
 These settings can be managed through the admin console under the client's **Settings** tab, or via the [REST API](/integration/rest-api/#update-client-settings).
 
 ## Client logo
@@ -222,6 +224,8 @@ When enabled, any application can register as a client. Consider these security 
 **Self-registered clients require consent by default.** Goiabada sets [Consent required](#consent-required) on every client created through this endpoint, so the first time a user authorizes one they are shown a consent screen naming the application and the access it is asking for. Clients an administrator creates are unaffected and keep their existing default of consent off.
 
 This is the control that makes the rest of the list worth having. Without it, an application that registered itself a moment ago can obtain a code for every scope the user is entitled to, with nothing rendered to the user at all if they already have a session on this server.
+
+**The consent screen says the name is unverified.** A self-registered client picks its own `client_name`, and nobody here has checked it, so the consent screen shows that name with a note saying the application registered itself and has not been verified. Without the note the screen would be presenting a name the application chose for itself as though this server vouched for it, which is the impersonation risk RFC 7591 warns about. If you review a self-registered client and give it a display name in the admin console, that name is shown instead and the note goes away, because at that point a person has vouched for it.
 
 <Aside type="caution">
 **For operators upgrading:** this changes the behaviour of clients that are already registered. The migration turns consent on for every existing self-registered client, so a client relying on silent renewal with `prompt=none` starts receiving `consent_required` until its user has been through the consent screen once. That is the correct behaviour and it is a visible change: an integration that has been renewing tokens silently will need one interactive authorization per user before it renews silently again.

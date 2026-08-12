@@ -62,6 +62,7 @@
 "consent.page_title" = "Authorize"
 "consent.title" = "Authorize client"
 "consent.intro" = "The client below has requested the following permissions. Please take a moment to review them and give your consent if they are acceptable."
+"consent.client_unverified" = "This application registered itself and has not been verified."
 "consent.button.cancel" = "Cancel consent"
 "consent.button.submit" = "Give consent"
 "consent.scope.openid.description" = "Authenticate your user and identify you via a unique ID"
