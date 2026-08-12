@@ -1246,6 +1246,39 @@ func TestHandleConsentPost(t *testing.T) {
 				granted: nil,
 			},
 			{
+				// The value is checked, not merely the key's presence. consent.html sends
+				// btnSubmit=submit and nothing else does, so anything carrying the key with
+				// another value is hand-built and is refused. Without this case the predicate
+				// weakens to PostForm.Has("btnSubmit") and the suite stays green (#79).
+				name: "btnSubmit carrying a value no button sends", scopeCount: 3,
+				body: url.Values{
+					"btnSubmit": {"yes"}, ceremonyIdField: {testCeremonyId}, "consent0": {"[on]"},
+				},
+				granted: nil,
+			},
+			{
+				// Fails closed on the action too, not only on the selection: a body naming
+				// neither control is not a click on anything, so it grants nothing however many
+				// boxes it carries. Without this case a predicate that approves when both keys
+				// are absent stays green (#79).
+				name: "neither action button in the body", scopeCount: 3,
+				body: url.Values{
+					ceremonyIdField: {testCeremonyId}, "consent0": {"[on]"},
+				},
+				granted: nil,
+			},
+			{
+				// The mirror of the cancel case above, and the direction that costs a grant
+				// rather than leaking one: a crafted /auth/consent?btnCancel=cancel must not
+				// turn the user's real click on Submit into a refusal. Reading the cancel
+				// control from merged r.Form rather than the body would do exactly that, and
+				// nothing else in the table notices (#79).
+				name: "a cancel control in the query beside a real submission", scopeCount: 3,
+				query:   url.Values{"btnCancel": {"cancel"}},
+				body:    checked(0),
+				granted: []int{0},
+			},
+			{
 				// An unparsed body leaves r.PostForm empty, so nothing is granted. Since the
 				// ceremony binding landed the refusal happens one gate earlier and shows the
 				// mismatch page instead of access_denied: the ceremony id is read from the body
