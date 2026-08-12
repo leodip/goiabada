@@ -400,6 +400,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			stored string
 			// submitted is what the stale page posts; the empty string means the field is absent.
 			submitted string
+			// inQuery puts submitted in the URL query instead of the body.
+			inQuery   bool
 			authState string
 		}{
 			{
@@ -426,6 +428,15 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				submitted: "another-ceremony-0123456789abcde",
 				authState: oauth.AuthStateRequiresConsent,
 			},
+			{
+				// The id has to come from the body. Both templates this handler serves post to
+				// action="", so reading it with r.FormValue would let /auth/otp?ceremonyId=...
+				// supply an id the submission never carried, and a page rendered for no ceremony
+				// at all would pass the gate (#79).
+				name: "the current id in the query alone", stored: testCeremonyId,
+				submitted: testCeremonyId, inQuery: true,
+				authState: oauth.AuthStateLevel2OTP,
+			},
 		}
 
 		for _, tc := range staleCases {
@@ -440,10 +451,15 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 				form := url.Values{}
 				form.Add("otp", "123456")
+				target := "/auth/otp"
 				if tc.submitted != "" {
-					form.Add(ceremonyIdField, tc.submitted)
+					if tc.inQuery {
+						target += "?" + url.Values{ceremonyIdField: {tc.submitted}}.Encode()
+					} else {
+						form.Add(ceremonyIdField, tc.submitted)
+					}
 				}
-				req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				rr := httptest.NewRecorder()
 

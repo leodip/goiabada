@@ -499,6 +499,8 @@ func TestHandleConsentPost(t *testing.T) {
 			stored string
 			// submitted is what the stale page posts; the empty string means the field is absent.
 			submitted string
+			// inQuery puts submitted in the URL query instead of the body.
+			inQuery   bool
 			authState string
 			btn       string
 		}{
@@ -519,6 +521,15 @@ func TestHandleConsentPost(t *testing.T) {
 				// matched against an empty submission, which is the fail-closed direction.
 				name: "an auth context from before the ceremony id existed", stored: "",
 				submitted: "", authState: oauth.AuthStateRequiresConsent, btn: "btnSubmit",
+			},
+			{
+				// The id has to come from the body. This form posts to action="", so reading it
+				// with r.FormValue would let /auth/consent?ceremonyId=... supply an id the
+				// submission never carried, and a page rendered for no ceremony at all would
+				// pass the gate (#79).
+				name: "the current id in the query alone", stored: testCeremonyId,
+				submitted: testCeremonyId, inQuery: true,
+				authState: oauth.AuthStateRequiresConsent, btn: "btnSubmit",
 			},
 			{
 				// The check runs before the btnSubmit/btnCancel dispatch, so a stale CANCEL
@@ -554,10 +565,15 @@ func TestHandleConsentPost(t *testing.T) {
 				} else {
 					form.Add("btnCancel", "cancel")
 				}
+				target := "/auth/consent"
 				if tc.submitted != "" {
-					form.Add(ceremonyIdField, tc.submitted)
+					if tc.inQuery {
+						target += "?" + url.Values{ceremonyIdField: {tc.submitted}}.Encode()
+					} else {
+						form.Add(ceremonyIdField, tc.submitted)
+					}
 				}
-				req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				rr := httptest.NewRecorder()
 
@@ -1202,6 +1218,32 @@ func TestHandleConsentPost(t *testing.T) {
 				name: "a consent key in the query beside a real submission", scopeCount: 3,
 				query: url.Values{"consent1": {"[on]"}},
 				body:  checked(0), granted: []int{0},
+			},
+			{
+				// The action controls come from the body too. This is a click on Cancel with every
+				// box still checked, which is what the browser posts, on a consent screen reached
+				// at /auth/consent?btnSubmit=submit. r.FormValue found the query's btnSubmit where
+				// the body carried only btnCancel, so the user's refusal granted all three scopes.
+				// The database mock has no expectations, so persisting anything fails this case
+				// rather than merely changing the redirect (#79).
+				name: "a cancel submission with btnSubmit in the query", scopeCount: 3,
+				query: url.Values{"btnSubmit": {"submit"}},
+				body: url.Values{
+					"btnCancel": {"cancel"}, ceremonyIdField: {testCeremonyId},
+					"consent0": {"[on]"}, "consent1": {"[on]"}, "consent2": {"[on]"},
+				},
+				granted: nil,
+			},
+			{
+				// No browser sends both controls, so a body that does is hand-built. Approval
+				// needs the submit control alone and this is refused rather than resolved in
+				// favour of granting (#79).
+				name: "both action buttons in the body", scopeCount: 3,
+				body: url.Values{
+					"btnSubmit": {"submit"}, "btnCancel": {"cancel"},
+					ceremonyIdField: {testCeremonyId}, "consent0": {"[on]"},
+				},
+				granted: nil,
 			},
 			{
 				// An unparsed body leaves r.PostForm empty, so nothing is granted. Since the

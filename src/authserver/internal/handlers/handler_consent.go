@@ -192,12 +192,18 @@ func HandleConsentPost(
 			return
 		}
 
-		btn := r.FormValue("btnSubmit")
-		if len(btn) == 0 {
-			btn = r.FormValue("btnCancel")
-		}
+		// Both action controls are read from the submitted body, for the same reason as the
+		// checkbox selection below: this form posts to action="", so r.Form would merge the URL
+		// query in, and a button that was not clicked sends no key at all. A consent screen
+		// reached at /auth/consent?btnSubmit=submit would therefore turn the user's click on
+		// Cancel into a grant of every box the form still had checked, since r.FormValue found
+		// the query's btnSubmit where the body had only btnCancel (#79).
+		//
+		// Approval needs the submit control alone. A body carrying both, which no browser sends,
+		// is refused rather than resolved in favour of granting.
+		approved := r.PostForm.Get("btnSubmit") == "submit" && !r.PostForm.Has("btnCancel")
 
-		if btn == "submit" {
+		if approved {
 
 			// The checkbox names are positional, consent0 .. consentN, so the key is matched
 			// exactly. strings.Contains found "consent1" inside "consent10" and granted a scope
