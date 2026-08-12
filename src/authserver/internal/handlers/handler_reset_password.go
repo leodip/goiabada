@@ -55,7 +55,19 @@ const (
 	// same imprecision one step later: a concurrent submission won, or the code stopped
 	// being outstanding between the lookup and the write.
 	auditReasonClaimLost = "claim_lost"
+	// auditReasonContinuationMismatch is a submitted form naming a continuation other than
+	// the one the session now holds, which is what refuses a page rendered for one account
+	// from acting on another. Determinable and distinct from every other rejection, so it
+	// gets its own name rather than being folded into one of them.
+	auditReasonContinuationMismatch = "continuation_mismatch"
 )
+
+// continuationIdField is the hidden form field carrying the continuation id, and its name
+// is duplicated in reset_password.html because a template cannot read a Go constant. A
+// rename in one place alone renders a form whose every submission is refused, which the
+// integration cases catch: they read the field out of the rendered page rather than
+// building the form themselves.
+const continuationIdField = "continuationId"
 
 // errResetPasswordClaimLost is returned out of the RevokeUserAuthStateTx callback when the
 // conditional password write claims no row. It is not a server fault: it rolls the whole
@@ -95,13 +107,32 @@ func forgotPasswordCodeMatches(storedCode string, suppliedCode string) bool {
 	return subtle.ConstantTimeCompare([]byte(storedCode), []byte(suppliedCode)) == 1
 }
 
+// continuationMatches reports whether a submitted form belongs to the continuation the
+// session currently holds.
+//
+// This is what binds a rendered page to the account whose link authorized it, and it is
+// needed on top of SaveLinkMarker's first-writer-wins rule because that rule governs
+// writes and this refusal is about a page that is already on screen. A marker may be
+// replaced legitimately once it expires, so a form rendered at t=0 and submitted at
+// t=5min would otherwise act on whatever marker the session holds by then (#112).
+//
+// An empty stored id is refused rather than matched against an empty submission: only a
+// marker written by an older binary can carry one, and treating "" as equal to "" would
+// make such a marker accept a form that names no continuation at all.
+func continuationMatches(markerContinuationId string, submitted string) bool {
+	if markerContinuationId == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(markerContinuationId), []byte(submitted)) == 1
+}
+
 // renderResetPasswordCodeInvalid renders the reset form in its "invalid or
 // expired" state.
 //
 // Every condition attributable to the link goes through here: an unknown or expired code, or
 // another continuation already in flight, on the first hop, and a missing, expired or
-// wrong-flow marker, a code hash that no longer resolves, or a lost claim on the two steps
-// after it. Because they all produce the same
+// wrong-flow marker, a code hash that no longer resolves, a form naming a continuation the
+// session no longer holds, or a lost claim on the two steps after it. Because they all produce the same
 // response, the endpoint cannot be used to work out which of them happened, and in
 // particular cannot be used to discover whether an email address has an account.
 //
@@ -238,12 +269,16 @@ func HandleResetPasswordGet(
 			return
 		}
 
-		_, user := resolveResetPasswordMarker(httpHelper, httpSession, database, auditLogger, w, r, 0)
+		marker, user := resolveResetPasswordMarker(httpHelper, httpSession, database, auditLogger, w, r, 0)
 		if user == nil {
 			return
 		}
 
-		bind := map[string]interface{}{}
+		// The form carries the continuation id back, which is what ties this rendering to
+		// the marker that produced it once the session moves on.
+		bind := map[string]interface{}{
+			"continuationId": marker.ContinuationId,
+		}
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 		if err != nil {
@@ -342,6 +377,12 @@ func HandleResetPasswordPost(
 		renderError := func(message string) {
 			bind := map[string]interface{}{
 				"error": message,
+				// Echoed from the submission rather than read from the marker, because
+				// these rejections happen before the marker is resolved. A mistyped
+				// confirmation must not cost the user their continuation, and echoing is
+				// safe: the value authorizes nothing until it is checked against the
+				// marker on the next submission.
+				"continuationId": r.FormValue(continuationIdField),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
@@ -381,6 +422,21 @@ func HandleResetPasswordPost(
 		marker, user := resolveResetPasswordMarker(httpHelper, httpSession, database, auditLogger,
 			w, r, http.StatusBadRequest)
 		if user == nil {
+			return
+		}
+
+		// The form names the marker that rendered it, and this refuses a form rendered for
+		// one account from writing into another. Reachable whenever the session's marker
+		// changed between the rendering and the submit: the previous marker expired and a
+		// newer link took the slot, the reset that rendered this form already completed and
+		// cleared it, or two first hops left the browser at once and the later Set-Cookie
+		// won. SaveLinkMarker cannot cover any of those, because they act after the write.
+		//
+		// The userId audited is the marker's, which resolved: it names the account this
+		// submission would have written into, which is the useful half of the entry.
+		if !continuationMatches(marker.ContinuationId, r.FormValue(continuationIdField)) {
+			rejectResetPassword(httpHelper, auditLogger, w, r, user.Id,
+				auditReasonContinuationMismatch, http.StatusBadRequest)
 			return
 		}
 

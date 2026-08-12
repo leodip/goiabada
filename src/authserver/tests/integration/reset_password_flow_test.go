@@ -211,14 +211,44 @@ func followResetLink(t *testing.T, client *http.Client, link string) string {
 	return config.GetAuthServer().BaseURL + location.Path
 }
 
+var continuationIdPattern = regexp.MustCompile(
+	`<input[^>]*name="continuationId"[^>]*value="([^"]*)"`)
+
+// continuationIdIn reads the hidden field out of a rendered form, which is the only place
+// a browser gets it from. Parsing the page rather than reaching into the session is what
+// makes these cases able to fail: a template that stopped emitting the field, or a handler
+// that stopped binding it, breaks the flow here exactly as it would in a browser (#112).
+func continuationIdIn(t *testing.T, formBody string) string {
+	t.Helper()
+
+	match := continuationIdPattern.FindStringSubmatch(formBody)
+	require.NotNil(t, match, "the reset form must carry the continuation id it was rendered from")
+	require.NotEmpty(t, match[1])
+	return match[1]
+}
+
+// loadResetForm fetches the clean URL and returns the continuation id its form carries.
+func loadResetForm(t *testing.T, client *http.Client, cleanURL string) string {
+	t.Helper()
+
+	resp := loadPage(t, client, cleanURL)
+	body := bodyString(t, resp)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Contains(t, body, `name="password"`)
+	return continuationIdIn(t, body)
+}
+
 // postCleanReset submits the form to the clean URL, which is where the template's empty
-// action sends it.
-func postCleanReset(t *testing.T, client *http.Client, cleanURL string, password string) *http.Response {
+// action sends it, carrying the continuation id the rendered form held.
+func postCleanReset(t *testing.T, client *http.Client, cleanURL string, password string,
+	continuationId string) *http.Response {
 	t.Helper()
 
 	form := url.Values{
 		"password":             {password},
 		"passwordConfirmation": {password},
+		"continuationId":       {continuationId},
 	}
 	req, err := http.NewRequest("POST", cleanURL, strings.NewReader(form.Encode()))
 	require.NoError(t, err)
@@ -290,7 +320,7 @@ func TestResetPassword_PlusAddressCompletesTheFlowFromTheEmailedLink(t *testing.
 	assert.NotContains(t, formBody, resetCodeInvalidText)
 
 	const newPassword = "N3wP4ss!word"
-	resp := postCleanReset(t, client, cleanURL, newPassword)
+	resp := postCleanReset(t, client, cleanURL, newPassword, continuationIdIn(t, formBody))
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -314,12 +344,13 @@ func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
 	client := createHttpClient(t)
 	requestPasswordReset(t, client, email)
 	cleanURL := followResetLink(t, client, latestResetLink(t, email))
+	continuationId := loadResetForm(t, client, cleanURL)
 
 	// Taken while the marker is still live and usable.
 	captured := capturedSessionCookies(t, client)
 
 	const newPassword = "N3wP4ss!word"
-	resp := postCleanReset(t, client, cleanURL, newPassword)
+	resp := postCleanReset(t, client, cleanURL, newPassword, continuationId)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 
@@ -335,7 +366,9 @@ func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
 	assert.Contains(t, getBody, resetCodeInvalidText)
 
 	// And the submission is refused, with the password left exactly as the real reset set it.
-	postResp := postCleanReset(t, attacker, cleanURL, "Att4cker!Pass")
+	// The replay carries the captured continuation id as well as the captured cookies, so
+	// what refuses it is the code hash no longer resolving rather than a missing field.
+	postResp := postCleanReset(t, attacker, cleanURL, "Att4cker!Pass", continuationId)
 	postBody := bodyString(t, postResp)
 	_ = postResp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, postResp.StatusCode)
@@ -358,6 +391,7 @@ func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
 	first := createHttpClient(t)
 	requestPasswordReset(t, first, email)
 	cleanURL := followResetLink(t, first, latestResetLink(t, email))
+	continuationId := loadResetForm(t, first, cleanURL)
 
 	// A second request replaces the outstanding code, and with it the hash the first marker
 	// names.
@@ -369,7 +403,7 @@ func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
 	_ = getResp.Body.Close()
 	assert.Contains(t, getBody, resetCodeInvalidText)
 
-	postResp := postCleanReset(t, first, cleanURL, "St4le!Marker")
+	postResp := postCleanReset(t, first, cleanURL, "St4le!Marker", continuationId)
 	postBody := bodyString(t, postResp)
 	_ = postResp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, postResp.StatusCode)
@@ -403,11 +437,12 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 	requestPasswordReset(t, browser, victimEmail)
 	cleanURL := followResetLink(t, browser, latestResetLink(t, victimEmail))
 
-	// The victim's form is on screen.
+	// The victim's form is on screen, carrying the continuation it was rendered from.
 	formResp := loadPage(t, browser, cleanURL)
 	formBody := bodyString(t, formResp)
 	_ = formResp.Body.Close()
 	require.Contains(t, formBody, `name="password"`)
+	continuationId := continuationIdIn(t, formBody)
 
 	// The steered navigation: a reset link for the other account, followed in the same jar.
 	// Issued from elsewhere, because what matters is where it is FOLLOWED.
@@ -423,7 +458,7 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 
 	// The victim submits the form they were already looking at.
 	const newPassword = "V1ctim!Choice"
-	resp := postCleanReset(t, browser, cleanURL, newPassword)
+	resp := postCleanReset(t, browser, cleanURL, newPassword, continuationId)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
 
@@ -441,6 +476,69 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 	assert.False(t, hashutil.VerifyPasswordHash(otherHash, newPassword))
 }
 
+// The retarget that survives every rule about WRITING the marker, and the reason the form
+// carries a continuation id (#112 decision 14).
+//
+// One browser, two tabs on the same reset. Tab 1 completes, which clears the marker, so the
+// slot is free and a second account's link legitimately takes it. Tab 2 is still on screen,
+// names nothing but its own continuation, and posts to the identical clean URL. Without the
+// binding the password typed for the victim's own reset is written into the other account.
+//
+// This is leg 2 of the family reached without a clock: the marker's five-minute expiry
+// produces exactly this state, a live marker for another account under a form rendered from
+// a marker that is gone, and a completed reset produces it in seconds instead.
+func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation(t *testing.T) {
+	defer useMailpitSMTP(t)()
+
+	victimEmail := plusAddress()
+	victim, _ := createResetTestUser(t, victimEmail)
+
+	otherEmail := plusAddress()
+	other, otherOldPassword := createResetTestUser(t, otherEmail)
+
+	browser := createHttpClient(t)
+	requestPasswordReset(t, browser, victimEmail)
+	cleanURL := followResetLink(t, browser, latestResetLink(t, victimEmail))
+
+	// Two tabs on one reset, so both forms carry the same continuation.
+	staleTabContinuationId := loadResetForm(t, browser, cleanURL)
+	activeTabContinuationId := loadResetForm(t, browser, cleanURL)
+	require.Equal(t, staleTabContinuationId, activeTabContinuationId,
+		"one link followed once is one continuation, however many times its form is rendered")
+
+	const victimPassword = "V1ctim!Choice"
+	resp := postCleanReset(t, browser, cleanURL, victimPassword, activeTabContinuationId)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+
+	victimHash := passwordHashOf(t, victim.Id)
+	require.True(t, hashutil.VerifyPasswordHash(victimHash, victimPassword))
+
+	// The slot is free now, so the other account's link takes it legitimately: this is not
+	// the refused second link, it is the session moving on.
+	requestPasswordReset(t, createHttpClient(t), otherEmail)
+	otherCleanURL := followResetLink(t, browser, latestResetLink(t, otherEmail))
+	require.Equal(t, cleanURL, otherCleanURL, "both flows land on the same clean URL, which is the whole problem")
+
+	// The stale tab submits. It names a continuation the session no longer holds.
+	const typedInTheStaleTab = "St4le!TabChoice"
+	staleResp := postCleanReset(t, browser, cleanURL, typedInTheStaleTab, staleTabContinuationId)
+	staleBody := bodyString(t, staleResp)
+	_ = staleResp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, staleResp.StatusCode)
+	assert.Contains(t, staleBody, resetCodeInvalidText)
+
+	otherHash := passwordHashOf(t, other.Id)
+	assert.True(t, hashutil.VerifyPasswordHash(otherHash, otherOldPassword),
+		"a form rendered for one account must not write into the account the session moved on to")
+	assert.False(t, hashutil.VerifyPasswordHash(otherHash, typedInTheStaleTab))
+
+	// And the account the stale form did belong to is untouched too: its reset already
+	// completed, and this submission changed nothing.
+	assert.Equal(t, victimHash, passwordHashOf(t, victim.Id))
+}
+
 // Two clients holding one copied marker, submitting different passwords. Exactly one may
 // win: the password write claims the code hash in the same conditional UPDATE, so the second
 // matches no row. Without the claim both would set a password and the later would silently
@@ -454,17 +552,20 @@ func TestResetPassword_OneCopiedMarkerLeavesExactlyOnePasswordChange(t *testing.
 	client := createHttpClient(t)
 	requestPasswordReset(t, client, email)
 	cleanURL := followResetLink(t, client, latestResetLink(t, email))
+	continuationId := loadResetForm(t, client, cleanURL)
 
 	copied := clientCarrying(t, capturedSessionCookies(t, client))
 
 	const firstPassword = "F1rst!Winner"
 	const secondPassword = "S3cond!Loser"
 
-	firstResp := postCleanReset(t, client, cleanURL, firstPassword)
+	// Both submissions name the same continuation, because both hold the same marker. What
+	// separates them is the conditional claim, which is the subject here.
+	firstResp := postCleanReset(t, client, cleanURL, firstPassword, continuationId)
 	firstBody := bodyString(t, firstResp)
 	_ = firstResp.Body.Close()
 
-	secondResp := postCleanReset(t, copied, cleanURL, secondPassword)
+	secondResp := postCleanReset(t, copied, cleanURL, secondPassword, continuationId)
 	secondBody := bodyString(t, secondResp)
 	_ = secondResp.Body.Close()
 

@@ -103,13 +103,49 @@ func cleanGetRequest() *http.Request {
 // postResetRequest builds the form submission. It carries no query either: the template's
 // empty action re-submits to whatever URL the GET was served from, which after the redirect
 // is the clean one.
-func postResetRequest(password, passwordConfirmation string) *http.Request {
+// continuationId is the hidden field the rendered form carries; pass "" for the states
+// that never reach the check, and a wrong value for the retarget cases.
+func postResetRequest(password, passwordConfirmation, continuationId string) *http.Request {
 	form := url.Values{}
 	form.Set("password", password)
 	form.Set("passwordConfirmation", passwordConfirmation)
+	if continuationId != "" {
+		form.Set(continuationIdField, continuationId)
+	}
 
 	req := httptest.NewRequest("POST", ResetPasswordPath, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req
+}
+
+// postWithMarker is the ordinary submission: the cookies a first hop of flow set, and the
+// continuation id the form rendered from that marker would have carried. Built together
+// because the id only exists once the marker does, which is exactly the coupling the check
+// enforces at runtime.
+func postWithMarker(t *testing.T, store sessions.Store, password, passwordConfirmation string,
+	flow LinkMarkerFlow, id int64, codeHash string) *http.Request {
+	t.Helper()
+
+	rr := httptest.NewRecorder()
+	rejection, err := SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+
+	// Read the id back the way the clean GET does, so the test cannot invent one the
+	// handler would never have rendered.
+	carrying := cleanGetRequest()
+	for _, c := range rr.Result().Cookies() {
+		carrying.AddCookie(c)
+	}
+	marker, rejection, err := GetLinkMarker(store, carrying, flow)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+
+	req := postResetRequest(password, passwordConfirmation, marker.ContinuationId)
+	for _, c := range rr.Result().Cookies() {
+		req.AddCookie(c)
+	}
 	return req
 }
 
@@ -378,6 +414,45 @@ func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
+// The same refusal against a live marker of the OTHER flow. Scoping the rule to one flow
+// left a bridge: a wrong-flow marker is refused by every consuming step, so one
+// replacement is harmless, but replacing an activation marker over a live reset one and
+// then a reset marker over that puts the slot back into the reset flow naming an account
+// the rendered form knows nothing about (#112 decision 14).
+func TestHandleResetPasswordGet_SecondLinkWhileAnActivationIsInFlight(t *testing.T) {
+	const secondCode = "the-second-links-code"
+
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	store := newMarkerTestStore()
+
+	secondUser, secondHash := userWithCode(t, 99, secondCode, time.Now().UTC().Add(-time.Minute))
+	database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), secondHash).Return(secondUser, nil).Once()
+
+	expectAuditFailedCode(auditLogger, string(LinkMarkerContinuationInFlight), 99)
+	expectRenderedCodeInvalid(httpHelper, 0)
+
+	req := withMarker(t, store, linkFollowedRequest(secondCode), LinkMarkerFlowAccountActivate, 7, "the-activation-hash")
+
+	handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused second link must not redirect")
+
+	marker, rejection, err := GetLinkMarker(store, nextBrowserRequest(t, req, rr), LinkMarkerFlowAccountActivate)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+	assert.Equal(t, "the-activation-hash", marker.CodeHash,
+		"the activation continuation must still own the session")
+
+	httpHelper.AssertExpectations(t)
+	database.AssertExpectations(t)
+	auditLogger.AssertExpectations(t)
+}
+
 // The code's own lifetime is enforced on the first hop and nowhere else, so the boundary
 // belongs here. The two steps after the redirect are bounded by the marker's fresh window
 // instead (#112 decision 7).
@@ -438,17 +513,30 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 
 		database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
 			Return(&models.User{Id: 1}, nil).Once()
+		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
+		req := withMarker(t, store, cleanGetRequest(), LinkMarkerFlowResetPassword, 1, codeHash)
+
+		// The id the marker actually holds, so the assertion below cannot pass against a
+		// handler binding some other value.
+		marker, rejection, err := GetLinkMarker(store, req, LinkMarkerFlowResetPassword)
+		require.NoError(t, err)
+		require.Empty(t, rejection)
+		require.NotEmpty(t, marker.ContinuationId)
+
 		httpHelper.On("RenderTemplate",
 			mock.Anything, mock.Anything,
 			"/layouts/auth_layout.html", "/reset_password.html",
 			mock.MatchedBy(func(data map[string]interface{}) bool {
 				invalid, ok := data["codeInvalidOrExpired"].(bool)
-				return !ok || !invalid
+				if ok && invalid {
+					return false
+				}
+				// The form must carry the continuation back, or every submission of it is
+				// refused by the check the POST applies.
+				return data["continuationId"] == marker.ContinuationId
 			}),
 		).Return(nil).Once()
 
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
-		req := withMarker(t, store, cleanGetRequest(), LinkMarkerFlowResetPassword, 1, codeHash)
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 
 		httpHelper.AssertExpectations(t)
@@ -523,7 +611,11 @@ func assertCleanGetRefused(t *testing.T, wantReason string,
 
 // expectRenderedFormError matches a re-render of the form carrying a non-empty
 // error message, without coupling the test to the localized text.
-func expectRenderedFormError(httpHelper *mocks_handlerhelpers.HttpHelper) {
+//
+// It also requires the continuation id to come back, which is not incidental: a mistyped
+// confirmation re-renders the form, and a re-render that dropped the hidden field would
+// make the user's next submission refused with no way to recover but the emailed link.
+func expectRenderedFormError(httpHelper *mocks_handlerhelpers.HttpHelper, wantContinuationId string) {
 	httpHelper.On("RenderTemplate",
 		mock.Anything,
 		mock.Anything,
@@ -531,7 +623,7 @@ func expectRenderedFormError(httpHelper *mocks_handlerhelpers.HttpHelper) {
 		"/reset_password.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			msg, ok := data["error"].(string)
-			return ok && msg != ""
+			return ok && msg != "" && data["continuationId"] == wantContinuationId
 		}),
 	).Return(nil).Once()
 }
@@ -574,12 +666,14 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
+			const continuationId = "the-continuation-the-form-carried"
+
 			tc.arrange(passwordValidator)
-			expectRenderedFormError(httpHelper)
+			expectRenderedFormError(httpHelper, continuationId)
 
 			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 			handler.ServeHTTP(httptest.NewRecorder(),
-				postResetRequest(tc.password, tc.passwordConfirmation))
+				postResetRequest(tc.password, tc.passwordConfirmation, continuationId))
 
 			httpHelper.AssertExpectations(t)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
@@ -599,20 +693,23 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		// wantReason is the cause recorded in the audit entry. The response is the
 		// same either way, so this is the only place the difference shows.
 		wantReason string
+		// wantUserId is 0 where nothing about the request established an account, and the
+		// resolved id where the marker did resolve one before the rejection.
+		wantUserId int64
 		arrange    func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request
 	}{
 		{
 			name:       "no marker at all",
 			wantReason: string(LinkMarkerMissing),
 			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
-				return postResetRequest(newPassword, newPassword)
+				return postResetRequest(newPassword, newPassword, "")
 			},
 		},
 		{
 			name:       "a marker left by the activation flow",
 			wantReason: string(LinkMarkerWrongFlow),
 			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
-				return withMarker(t, store, postResetRequest(newPassword, newPassword),
+				return postWithMarker(t, store, newPassword, newPassword,
 					LinkMarkerFlowAccountActivate, 7, codeHash)
 			},
 		},
@@ -620,7 +717,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			name:       "a marker past its window",
 			wantReason: string(LinkMarkerExpired),
 			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
-				return withRawMarker(t, store, postResetRequest(newPassword, newPassword),
+				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),
 					expiredMarkerJSON(t, LinkMarkerFlowResetPassword, 1, codeHash))
 			},
 		},
@@ -630,8 +727,55 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
-				return withMarker(t, store, postResetRequest(newPassword, newPassword),
+				return postWithMarker(t, store, newPassword, newPassword,
 					LinkMarkerFlowResetPassword, 1, codeHash)
+			},
+		},
+		// The retarget the continuation id exists for, and the reason no rule about
+		// WRITING the marker can close it: the session legitimately holds a live marker
+		// naming a different account, because the one that rendered this form expired,
+		// completed, or lost a race, and the form is still on screen posting to the
+		// identical clean URL (#112).
+		{
+			name:       "the form names a continuation the session has moved on from",
+			wantReason: auditReasonContinuationMismatch,
+			wantUserId: 1,
+			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+					Return(&models.User{Id: 1}, nil).Once()
+				return withMarker(t, store,
+					postResetRequest(newPassword, newPassword, "a-continuation-that-is-gone"),
+					LinkMarkerFlowResetPassword, 1, codeHash)
+			},
+		},
+		{
+			name:       "the form names no continuation at all",
+			wantReason: auditReasonContinuationMismatch,
+			wantUserId: 1,
+			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+					Return(&models.User{Id: 1}, nil).Once()
+				return withMarker(t, store, postResetRequest(newPassword, newPassword, ""),
+					LinkMarkerFlowResetPassword, 1, codeHash)
+			},
+		},
+		// A marker carrying no id is what a cookie written by an older binary looks like.
+		// Two empty strings compare equal, so this is the case that would fail OPEN if the
+		// check were a bare comparison.
+		{
+			name:       "the marker itself carries no continuation id",
+			wantReason: auditReasonContinuationMismatch,
+			wantUserId: 1,
+			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+					Return(&models.User{Id: 1}, nil).Once()
+				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),
+					marshalMarker(t, &LinkMarker{
+						Flow:      LinkMarkerFlowResetPassword,
+						Id:        1,
+						CodeHash:  codeHash,
+						ExpiresAt: time.Now().UTC().Add(linkMarkerLifetime),
+					}))
 			},
 		},
 	}
@@ -646,7 +790,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 
 			passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
 			req := tc.arrange(t, store, database)
-			expectAuditFailedCode(auditLogger, tc.wantReason, 0)
+			expectAuditFailedCode(auditLogger, tc.wantReason, tc.wantUserId)
 			expectRenderedCodeInvalid(httpHelper, http.StatusBadRequest)
 
 			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
@@ -699,7 +843,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 
 	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 	rr := httptest.NewRecorder()
-	req := withMarker(t, store, postResetRequest(newPassword, newPassword),
+	req := postWithMarker(t, store, newPassword, newPassword,
 		LinkMarkerFlowResetPassword, 1, codeHash)
 	handler.ServeHTTP(rr, req)
 
@@ -752,7 +896,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 
 	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 	handler.ServeHTTP(httptest.NewRecorder(),
-		withMarker(t, store, postResetRequest(newPassword, newPassword),
+		postWithMarker(t, store, newPassword, newPassword,
 			LinkMarkerFlowResetPassword, 1, codeHash))
 
 	httpHelper.AssertExpectations(t)
@@ -790,7 +934,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 
 	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 	handler.ServeHTTP(httptest.NewRecorder(),
-		withMarker(t, store, postResetRequest("Str0ngP4ss!", "Str0ngP4ss!"),
+		postWithMarker(t, store, "Str0ngP4ss!", "Str0ngP4ss!",
 			LinkMarkerFlowResetPassword, 1, codeHash))
 
 	httpHelper.AssertExpectations(t)
@@ -901,7 +1045,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 
 			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 			handler.ServeHTTP(httptest.NewRecorder(),
-				withMarker(t, store, postResetRequest(newPassword, newPassword),
+				postWithMarker(t, store, newPassword, newPassword,
 					LinkMarkerFlowResetPassword, 1, codeHash))
 
 			httpHelper.AssertExpectations(t)
@@ -1072,7 +1216,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				expectAuditFailedCode(auditLogger, string(LinkMarkerMissing), 0)
 				bind := captureResetRender(t, httpHelper)
 				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
-				req := postResetRequest(newPassword, newPassword)
+				req := postResetRequest(newPassword, newPassword, "")
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
 		},
@@ -1092,7 +1236,29 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				expectAuditFailedCode(auditLogger, auditReasonCodeNoLongerOutstanding, 0)
 				bind := captureResetRender(t, httpHelper)
 				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
-				req := withMarker(t, store, postResetRequest(newPassword, newPassword),
+				req := postWithMarker(t, store, newPassword, newPassword,
+					LinkMarkerFlowResetPassword, 1, codeHash)
+				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
+			},
+		},
+		{
+			name:       "POST, the form names another continuation",
+			handler:    "POST",
+			wantStatus: http.StatusBadRequest,
+			setup: func(t *testing.T) (*map[string]interface{}, func()) {
+				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				database := mocks_data.NewDatabase(t)
+				passwordValidator := mocks_validators.NewPasswordValidator(t)
+				auditLogger := mocks_audit.NewAuditLogger(t)
+				store := newMarkerTestStore()
+				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+					Return(&models.User{Id: 1}, nil).Once()
+				expectAuditFailedCode(auditLogger, auditReasonContinuationMismatch, 1)
+				bind := captureResetRender(t, httpHelper)
+				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+				req := withMarker(t, store,
+					postResetRequest(newPassword, newPassword, "a-continuation-that-is-gone"),
 					LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
@@ -1117,7 +1283,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				expectAuditFailedCode(auditLogger, auditReasonClaimLost, 1)
 				bind := captureResetRender(t, httpHelper)
 				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
-				req := withMarker(t, store, postResetRequest(newPassword, newPassword),
+				req := postWithMarker(t, store, newPassword, newPassword,
 					LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},

@@ -517,7 +517,9 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	httpClient := createHttpClient(t)
 	cleanURL := followResetLink(t, httpClient, handlers.ResetPasswordLink(code))
 
-	resp := postCleanReset(t, httpClient, cleanURL, newPassword)
+	// The form is rendered first, because the submission has to carry the continuation id
+	// the form held, exactly as a browser does.
+	resp := postCleanReset(t, httpClient, cleanURL, newPassword, loadResetForm(t, httpClient, cleanURL))
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
