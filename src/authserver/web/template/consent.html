@@ -24,6 +24,7 @@
                 </div>
                 {{end}}
                 {{if .clientName}}<span class="mt-1 text-sm text-base-content/80">{{.clientName}}</span>{{end}}
+                {{if .clientNameUnverified}}<span class="mt-0.5 text-xs text-warning">{{ T $.ctx "consent.client_unverified" }}</span>{{end}}
                 {{if .clientDescription}}<span class="mt-0.5 text-xs text-base-content/60">{{.clientDescription}}</span>{{end}}
                 {{if .clientWebsiteUrl}}<a href="{{.clientWebsiteUrl}}" target="_blank" rel="noopener noreferrer"
                      class="mt-0.5 text-xs link link-primary">{{.clientWebsiteUrl}}</a>{{end}}

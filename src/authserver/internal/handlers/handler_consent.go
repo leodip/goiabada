@@ -121,14 +121,31 @@ func HandleConsentGet(
 		if !scopesFullyConsented || authContext.HasScope(oidc.OfflineAccessScope) || authContext.HasPromptValue("consent") {
 			displayInfo := getClientDisplayInfo(database, client)
 
+			// The consent screen names the client through its own rule rather than through
+			// displayInfo.ClientName, which falls back to the raw identifier and would show a
+			// self-registered client as dcr_<uuid>. A prompt nobody can evaluate defeats the point
+			// of prompting (#108).
+			clientName, clientNameUnverified := consentClientName(client)
+
+			clientDescription := displayInfo.Description
+			if clientNameUnverified {
+				// The name and the description are both the client's self-asserted client_name in
+				// this case, so an administrator who ticked "show description" on a self-registered
+				// client would otherwise read the same string twice (#108).
+				clientDescription = ""
+			}
+
 			bind := map[string]interface{}{
 				"showClientSection": displayInfo.ShowSection,
-				"clientName":        displayInfo.ClientName,
-				"clientDescription": displayInfo.Description,
-				"clientLogoUrl":     displayInfo.LogoURL,
-				"clientWebsiteUrl":  displayInfo.WebsiteURL,
-				"hasLogo":           displayInfo.HasLogo,
-				"scopes":            scopeInfoArr,
+				"clientName":        clientName,
+				// Whether the name above is the client's own claim about itself. The template
+				// renders the unverified notice under the name when this is set.
+				"clientNameUnverified": clientNameUnverified,
+				"clientDescription":    clientDescription,
+				"clientLogoUrl":        displayInfo.LogoURL,
+				"clientWebsiteUrl":     displayInfo.WebsiteURL,
+				"hasLogo":              displayInfo.HasLogo,
+				"scopes":               scopeInfoArr,
 				// The rendered form says which ceremony rendered it, and HandleConsentPost
 				// refuses a submission naming any other one. The checkbox indices are only
 				// meaningful against this ceremony's scope list (#79).

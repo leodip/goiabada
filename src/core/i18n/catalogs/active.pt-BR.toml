@@ -60,6 +60,7 @@
 "consent.page_title" = "Autorizar"
 "consent.title" = "Autorizar cliente"
 "consent.intro" = "O cliente abaixo solicitou as permissões a seguir. Revise-as e dê seu consentimento se estiverem aceitáveis."
+"consent.client_unverified" = "Este aplicativo se registrou sozinho e não foi verificado."
 "consent.button.cancel" = "Cancelar consentimento"
 "consent.button.submit" = "Dar consentimento"
 "consent.scope.openid.description" = "Autenticar seu usuário e identificá-lo por um ID único"
