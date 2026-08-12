@@ -119,7 +119,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	respA = loadPage(t, httpClientA, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
-	respA = authenticateWithPassword(t, httpClientA, redirectLocation, userA.Email, passwordA)
+	respA = authenticateWithPassword(t, httpClientA, redirectLocation, respA, userA.Email, passwordA)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/level1completed")
@@ -194,7 +194,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	respB = loadPage(t, httpClientB, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
-	respB = authenticateWithPassword(t, httpClientB, redirectLocation, userB.Email, passwordB)
+	respB = authenticateWithPassword(t, httpClientB, redirectLocation, respB, userB.Email, passwordB)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/level1completed")
@@ -321,7 +321,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	resp = loadPage(t, httpClient1, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient1, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient1, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -394,7 +394,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	resp2 = loadPage(t, httpClient2, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	resp2 = authenticateWithPassword(t, httpClient2, redirectLocation, user.Email, password)
+	resp2 = authenticateWithPassword(t, httpClient2, redirectLocation, resp2, user.Email, password)
 	defer func() { _ = resp2.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/level1completed")
@@ -520,7 +520,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	respA = loadPage(t, httpClientA, redirectLocation)
 	defer func() { _ = respA.Body.Close() }()
 
-	respA = authenticateWithPassword(t, httpClientA, redirectLocation, userA.Email, passwordA)
+	respA = authenticateWithPassword(t, httpClientA, redirectLocation, respA, userA.Email, passwordA)
 	defer func() { _ = respA.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, respA, "/auth/level1completed")
@@ -582,7 +582,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	respB = loadPage(t, httpClientB, redirectLocation)
 	defer func() { _ = respB.Body.Close() }()
 
-	respB = authenticateWithPassword(t, httpClientB, redirectLocation, userB.Email, passwordB)
+	respB = authenticateWithPassword(t, httpClientB, redirectLocation, respB, userB.Email, passwordB)
 	defer func() { _ = respB.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, respB, "/auth/level1completed")

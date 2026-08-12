@@ -24,25 +24,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// testCeremonyId is the id these cases share: the auth context holds it and the submitted form
-// names it, which is what a browser posting a page that ceremony rendered sends. A case that means
-// to be refused departs from it deliberately (#79).
-const testCeremonyId = "test-ceremony-id-0123456789abcd"
-
-// expectCeremonyMismatch sets the two calls rejectCeremonyMismatch makes, and asserts the page it
-// renders is the 400 error page rather than anything belonging to the consent flow.
-func expectCeremonyMismatch(t *testing.T, httpHelper *mocks_handlerhelpers.HttpHelper,
-	auditLogger *mocks_audit.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request) {
-	t.Helper()
-
-	auditLogger.On("Log", constants.AuditAuthCeremonyMismatch, mock.Anything).Return().Once()
-	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
-		mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["_httpStatus"] == http.StatusBadRequest &&
-				data["title"] != "" && data["error"] != ""
-		})).Return(nil).Once()
-}
-
 func TestBuildScopeInfoArray(t *testing.T) {
 	t.Run("Empty scope", func(t *testing.T) {
 		result := buildScopeInfoArray(context.Background(), "", nil)

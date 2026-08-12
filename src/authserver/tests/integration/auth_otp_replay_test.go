@@ -142,8 +142,11 @@ func startOtpCeremony(t *testing.T, client *models.Client, redirectUri *models.R
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, redirectLocation)
 
-	_ = resp.Body.Close()
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	// The password page is held rather than closed here: the submission reads the ceremony id out
+	// of it, and a closed body cannot be read (#79).
+	pwdPage := resp
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, pwdPage, user.Email, password)
+	_ = pwdPage.Body.Close()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	_ = resp.Body.Close()
@@ -243,28 +246,30 @@ func nextStepCode(t *testing.T, secret string, consumed string) string {
 func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 	client, redirectUri, user, password := createLevel2MandatoryUser(t, true)
 
-	httpClient, resp, otpUrl := startOtpCeremony(t, client, redirectUri, user, password)
-	_ = resp.Body.Close()
+	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password)
 
 	codeC, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
+	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
+	_ = otpPage.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
 	// Second ceremony, fresh cookie jar, same code.
-	httpClient, resp, otpUrl = startOtpCeremony(t, client, redirectUri, user, password)
-	_ = resp.Body.Close()
+	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, password)
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
-	assertOtpRefused(t, resp)
-	_ = resp.Body.Close()
+	refused := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
+	_ = otpPage.Body.Close()
+	assertOtpRefused(t, refused)
 
-	// Control: the ceremony is alive and the form works, so only the replay was refused.
-	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, user.OTPSecret, codeC))
+	// Control: the ceremony is alive and the form works, so only the replay was refused. It posts
+	// the page the refusal rerendered, which is the page a user who mistyped a code is actually
+	// looking at, so this also requires that rerender to carry the ceremony id (#79).
+	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, nextStepCode(t, user.OTPSecret, codeC))
+	_ = refused.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 }
@@ -281,16 +286,16 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	client, redirectUri, user, password := createLevel2MandatoryUser(t, false)
 
-	httpClient, resp, otpUrl := startOtpCeremony(t, client, redirectUri, user, password)
-	secret := getOtpSecretFromEnrollmentPage(t, resp)
-	_ = resp.Body.Close()
+	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password)
+	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
 
 	codeC, err := totp.GenerateCode(secret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
+	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
+	_ = otpPage.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
@@ -302,14 +307,14 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 
 	// Second ceremony, fresh cookie jar. The user is enrolled now, so this is the
 	// verification branch validating C against the secret it just stored.
-	httpClient, resp, otpUrl = startOtpCeremony(t, client, redirectUri, user, password)
-	_ = resp.Body.Close()
+	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, password)
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
-	assertOtpRefused(t, resp)
-	_ = resp.Body.Close()
+	refused := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
+	_ = otpPage.Body.Close()
+	assertOtpRefused(t, refused)
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, secret, codeC))
+	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, nextStepCode(t, secret, codeC))
+	_ = refused.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 }
@@ -364,14 +369,14 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	// Now the browser prompt, where the user is enrolled and codeC is checked against the
 	// secret the API just stored.
 	client, redirectUri := createLevel2MandatoryClient(t)
-	httpClient, resp, otpUrl := startOtpCeremony(t, client, redirectUri, enrolled, "Correct1!")
-	_ = resp.Body.Close()
+	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, enrolled, "Correct1!")
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, codeC)
-	assertOtpRefused(t, resp)
-	_ = resp.Body.Close()
+	refused := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
+	_ = otpPage.Body.Close()
+	assertOtpRefused(t, refused)
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, nextStepCode(t, secret, codeC))
+	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, nextStepCode(t, secret, codeC))
+	_ = refused.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 }

@@ -1,10 +1,38 @@
 package handlers
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	"github.com/leodip/goiabada/core/constants"
+	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
+
+// testCeremonyId is the id the bound handlers' cases share: the auth context holds it and the
+// submitted form names it, which is what a browser posting a page that ceremony rendered sends. A
+// case that means to be refused departs from it deliberately (#79).
+//
+// Here rather than in one handler's test file, because the consent, password and OTP cases all use
+// it and none of the three owns the mechanism.
+const testCeremonyId = "test-ceremony-id-0123456789abcd"
+
+// expectCeremonyMismatch sets the two calls rejectCeremonyMismatch makes, and asserts the page it
+// renders is the 400 error page rather than anything belonging to the flow that was submitted.
+func expectCeremonyMismatch(t *testing.T, httpHelper *mocks_handlerhelpers.HttpHelper,
+	auditLogger *mocks_audit.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request) {
+	t.Helper()
+
+	auditLogger.On("Log", constants.AuditAuthCeremonyMismatch, mock.Anything).Return().Once()
+	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+		mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["_httpStatus"] == http.StatusBadRequest &&
+				data["title"] != "" && data["error"] != ""
+		})).Return(nil).Once()
+}
 
 // The whole comparison table for the ceremony binding. The function is pure, so the table costs
 // nothing and every caller then needs only one accept and one reject (#79 seam 3).

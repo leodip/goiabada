@@ -111,9 +111,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -138,10 +139,15 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			"/layouts/auth_layout.html",
 			"/auth_otp.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				if len(bind) != 7 {
+				if len(bind) != 8 {
 					return false
 				}
 				if err, ok := bind["error"]; !ok || err != nil {
+					return false
+				}
+				// The rendered form has to name THIS ceremony, or every submission of it is
+				// refused by HandleAuthOtpPost (#79 seam 4).
+				if bind["ceremonyId"] != testCeremonyId {
 					return false
 				}
 				if _, ok := bind["layoutShowClientSection"]; !ok {
@@ -193,9 +199,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -225,10 +232,15 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			"/layouts/auth_layout.html",
 			"/auth_otp_enrollment.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				if len(bind) != 9 {
+				if len(bind) != 10 {
 					return false
 				}
 				if err, ok := bind["error"]; !ok || err != nil {
+					return false
+				}
+				// The enrollment form is bound too: it is a form in the ceremony like any other,
+				// and a user enrolling is the one case where nothing else guards the submission.
+				if bind["ceremonyId"] != testCeremonyId {
 					return false
 				}
 				if base64Image, ok := bind["base64Image"]; !ok || base64Image != "base64Image" {
@@ -282,7 +294,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
-		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		// The ceremony matches, so the gate below is what answers. Without an id in the body the
+		// submission would be refused one gate earlier and this case would stop proving anything.
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		expectedError := errors.New("auth context error")
@@ -314,7 +331,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
-		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		// The ceremony matches, so the gate below is what answers. Without an id in the body the
+		// submission would be refused one gate earlier and this case would stop proving anything.
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(nil, customerrors.ErrNoAuthContext)
@@ -339,11 +361,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
-		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		// The ceremony matches, so the gate below is what answers. Without an id in the body the
+		// submission would be refused one gate earlier and this case would stop proving anything.
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateInitial,
+			AuthState:  oauth.AuthStateInitial,
+			CeremonyId: testCeremonyId,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -357,6 +385,93 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authHelper.AssertExpectations(t)
 	})
 
+	// An OTP prompt left open in another tab, submitted after a second /auth/authorize replaced the
+	// ceremony it was rendered for. Every one of these is the mismatch page at 400.
+	//
+	// The httpSession and database mocks are given NO expectations, which is the assertion that
+	// carries this case: the check sits above httpSession.Get, above GetUserById and therefore above
+	// otp.MatchStep and TryConsumeUserOTPStep. A stale submission that reached the claim would burn
+	// a step of a passcode the ceremony the user is actually on still needs, so a forgotten tab
+	// could make a correct code stop working (#79 decision 5, #111 decision 3).
+	t.Run("Stale ceremony", func(t *testing.T) {
+		staleCases := []struct {
+			name string
+			// stored is the id the browser's current auth context holds.
+			stored string
+			// submitted is what the stale page posts; the empty string means the field is absent.
+			submitted string
+			authState string
+		}{
+			{
+				// The defect's own shape: the OTP prompt of the request that was replaced.
+				name: "a different ceremony's id", stored: testCeremonyId,
+				submitted: "another-ceremony-0123456789abcde",
+				authState: oauth.AuthStateLevel2OTP,
+			},
+			{
+				// A hand-built body, or a template that lost the hidden input.
+				name: "no ceremony field at all", stored: testCeremonyId,
+				submitted: "", authState: oauth.AuthStateLevel2OTP,
+			},
+			{
+				// The upgrade case: an auth context written before this change carries no id, so
+				// the ceremony is refused once and the user starts again.
+				name: "an auth context from before the ceremony id existed", stored: "",
+				submitted: "", authState: oauth.AuthStateLevel2OTP,
+			},
+			{
+				// The check runs before the AuthState check, so the replaced ceremony's state
+				// produces the 400 mismatch page rather than a 500 naming an internal invariant.
+				name: "a replaced ceremony that has moved on", stored: testCeremonyId,
+				submitted: "another-ceremony-0123456789abcde",
+				authState: oauth.AuthStateRequiresConsent,
+			},
+		}
+
+		for _, tc := range staleCases {
+			t.Run(tc.name, func(t *testing.T) {
+				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpSession := mocks_sessionstore.NewStore(t)
+				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				database := mocks_data.NewDatabase(t)
+				auditLogger := mocks_audit.NewAuditLogger(t)
+
+				handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
+
+				form := url.Values{}
+				form.Add("otp", "123456")
+				if tc.submitted != "" {
+					form.Add(ceremonyIdField, tc.submitted)
+				}
+				req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				rr := httptest.NewRecorder()
+
+				authContext := &oauth.AuthContext{
+					AuthState:  tc.authState,
+					CeremonyId: tc.stored,
+					UserId:     1,
+					ClientId:   "test-client",
+				}
+				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+				expectCeremonyMismatch(t, httpHelper, auditLogger, rr, req)
+
+				handler.ServeHTTP(rr, req)
+
+				// Nothing was saved and nowhere was redirected to: the auth context is untouched,
+				// so the ceremony the user is actually on is still theirs to finish.
+				assert.Empty(t, rr.Header().Get("Location"))
+
+				httpHelper.AssertExpectations(t)
+				httpSession.AssertExpectations(t)
+				authHelper.AssertExpectations(t)
+				database.AssertExpectations(t)
+				auditLogger.AssertExpectations(t)
+			})
+		}
+	})
+
 	t.Run("User not found", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
@@ -366,12 +481,18 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
-		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		// The ceremony matches, so the gate below is what answers. Without an id in the body the
+		// submission would be refused one gate earlier and this case would stop proving anything.
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -400,13 +521,19 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
-		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		// The ceremony matches, so the gate below is what answers. Without an id in the body the
+		// submission would be refused one gate earlier and this case would stop proving anything.
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -445,13 +572,19 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
-		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		// The ceremony matches, so the gate below is what answers. Without an id in the body the
+		// submission would be refused one gate earlier and this case would stop proving anything.
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -488,15 +621,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -518,7 +653,66 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).Return(nil)
+		// The error re-render is a path no happy-path case sees, and it has to carry the ceremony
+		// id: without it a single mistyped code would end the ceremony, because the retry would
+		// name no ceremony and be refused (#79 seam 4).
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
+			mock.MatchedBy(func(bind map[string]interface{}) bool {
+				return bind["ceremonyId"] == testCeremonyId && bind["error"] != nil
+			})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	// The other template the error path can pick. renderError chooses the enrollment form when the
+	// session holds both the image and the secret, which the enrolled case above never does, so this
+	// is the only case that observes the ceremony id on that branch (#79 seam 4).
+	t.Run("Invalid OTP code while enrolling rerenders the enrollment form", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
+
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("otp", "123456")
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		session.Values[constants.SessionKeyOTPSecret] = "test-secret"
+		session.Values[constants.SessionKeyOTPImage] = "test-image"
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
+
+		database.On("GetUserById", mock.Anything, int64(1)).
+			Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+
+		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
+
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
+			"/auth_otp_enrollment.html", mock.MatchedBy(func(bind map[string]interface{}) bool {
+				return bind["ceremonyId"] == testCeremonyId &&
+					bind["secretKey"] == "test-secret" && bind["base64Image"] == "test-image"
+			})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -538,15 +732,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -597,15 +793,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Nil(t, err)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -674,15 +872,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Nil(t, err)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -761,15 +961,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Nil(t, err)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -829,15 +1031,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Nil(t, err)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -918,15 +1122,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Nil(t, err)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -982,15 +1188,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Nil(t, err)
 
 		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateLevel2OTP,
-			UserId:    1,
-			ClientId:  "test-client",
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 

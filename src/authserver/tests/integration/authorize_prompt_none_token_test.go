@@ -349,7 +349,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -503,7 +503,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -660,7 +660,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -820,7 +820,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -981,7 +981,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1158,7 +1158,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -1305,7 +1305,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")

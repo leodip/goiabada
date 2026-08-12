@@ -93,7 +93,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -159,7 +159,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 
 	// Step 6: Submit credentials
 
-	resp2 = authenticateWithPassword(t, httpClient, redirectLocation2, user.Email, password)
+	resp2 = authenticateWithPassword(t, httpClient, redirectLocation2, resp2, user.Email, password)
 	defer func() { _ = resp2.Body.Close() }()
 
 	// Step 7: CRITICAL TEST - After the fix, login should succeed
@@ -271,7 +271,7 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	// A password IS entered here, unlike the OTP case below. That is what makes this ceremony
 	// legitimate up to the consent screen and what makes /auth/issue the only hop that can
 	// refuse it.
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -418,7 +418,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, otpCode)
+	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	// The OTP itself is accepted: the handler reads no session row, so it cannot see the

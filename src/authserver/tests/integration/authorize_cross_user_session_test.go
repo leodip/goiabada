@@ -219,7 +219,7 @@ func signInWithPassword(t *testing.T, jar *http.Client, destUrl string,
 	resp = loadPage(t, jar, loc)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	resp = authenticateWithPassword(t, jar, loc, email, password)
+	resp = authenticateWithPassword(t, jar, loc, resp, email, password)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	loc = assertRedirect(t, resp, "/auth/level1completed")
@@ -239,7 +239,7 @@ func signInWithPassword(t *testing.T, jar *http.Client, destUrl string,
 
 		otpCode, err := totp.GenerateCode(otpSecret, time.Now())
 		require.NoError(t, err)
-		resp = authenticateWithOtp(t, jar, loc, otpCode)
+		resp = authenticateWithOtp(t, jar, loc, resp, otpCode)
 		defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 	}
 
