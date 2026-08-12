@@ -92,6 +92,16 @@
 "auth_error.ceremony_mismatch.title" = "Esta solicitação não está mais ativa"
 "auth_error.ceremony_mismatch.message" = "Esta página pertence a uma solicitação de acesso que não é mais a que está em andamento. Outra foi iniciada neste navegador, portanto este formulário não pode mais ser enviado. Volte para o aplicativo em que você estava entrando e comece de novo."
 
+# --- Redirecionamento retido para cliente auto-registrado (auth_redirect_blocked.html)
+# Neutro de propósito quanto ao motivo: esta página é vista tanto por quem recusou quanto por quem
+# teve a solicitação recusada pelo servidor, e não pode dizer ao segundo grupo que ele recusou algo.
+
+"auth_redirect_blocked.page_title" = "Autorização interrompida"
+"auth_redirect_blocked.title" = "Você não foi enviado a lugar nenhum"
+"auth_redirect_blocked.destination" = "Este aplicativo pediu para enviar você para {{.destination}}."
+"auth_redirect_blocked.unverified" = "Ele se registrou sozinho neste servidor, portanto ninguém aqui verificou quem ele é nem para onde ele quer enviar você."
+"auth_redirect_blocked.closing" = "A solicitação termina aqui. Você pode fechar esta janela."
+
 # --- Cadastro próprio (account/register) -------------------------------------
 
 "account.register.page_title" = "Cadastro"

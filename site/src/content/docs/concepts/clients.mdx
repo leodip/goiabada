@@ -227,6 +227,14 @@ This is the control that makes the rest of the list worth having. Without it, an
 
 **The consent screen says the name is unverified.** A self-registered client picks its own `client_name`, and nobody here has checked it, so the consent screen shows that name with a note saying the application registered itself and has not been verified. Without the note the screen would be presenting a name the application chose for itself as though this server vouched for it, which is the impersonation risk RFC 7591 warns about. If you review a self-registered client and give it a display name in the admin console, that name is shown instead and the note goes away, because at that point a person has vouched for it.
 
+**A refused authorization is not redirected back to a self-registered client.** Anyone can register a client and point it at any address, so an error response is an instruction to send someone's browser to a site nobody here has checked. When Goiabada refuses an authorization for a self-registered client, whether the user declined it or the request was invalid, it shows the user a page naming the application and the address it asked to send them to, and the request stops there. Clients an administrator created keep the ordinary redirect.
+
+<Aside type="caution">
+**If you build a self-registered client:** it receives no error response in that case. There is no redirect, so an authorization the user declines or the server refuses simply never completes, and your client should treat an authorization that does not return within a reasonable time as abandoned rather than waiting indefinitely. A `prompt=none` request is the exception and still receives its error by redirect, because [silent authentication](/concepts/prompt-parameter/) must not display anything to the user.
+
+An administrator who has reviewed your client can give it a display name, which changes what the page says, but the redirect is withheld either way. If your integration needs the error response, it needs a client an administrator registered.
+</Aside>
+
 <Aside type="caution">
 **For operators upgrading:** this changes the behaviour of clients that are already registered. The migration turns consent on for every existing self-registered client, so a client relying on silent renewal with `prompt=none` starts receiving `consent_required` until its user has been through the consent screen once. That is the correct behaviour and it is a visible change: an integration that has been renewing tokens silently will need one interactive authorization per user before it renews silently again.
 

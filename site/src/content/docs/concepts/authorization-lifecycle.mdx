@@ -171,6 +171,19 @@ Consent is checked if the client has consent enabled, `offline_access` is in the
 | Client does not require consent, no `offline_access`, no `prompt=consent` | Skip consent, proceed to code issuance |
 | All effective scopes already consented, no `offline_access`, no `prompt=consent` | Skip consent, proceed to code issuance |
 
+#### Declining
+
+Choosing **Cancel** on the consent screen ends the authorization. What the user sees next depends on who registered the client:
+
+| Client | What happens |
+|--------|--------------|
+| Created by an administrator | The browser is redirected to the client's redirect URI with `error=access_denied`, and the client shows its own message |
+| [Self-registered](/concepts/clients/#dynamic-client-registration-rfc-7591) | The browser stays on Goiabada. A page names the application and the address it asked to send the user to, and the request stops there |
+
+The second case exists because the redirect itself can be the attack. Anyone can register a client and point it at any address, so an error response is an instruction to send someone's browser to a site nobody here has checked. A user who has just refused an application they did not recognise should not then be delivered to it. The same page is shown whenever Goiabada refuses a self-registered client's authorization for any reason, including reasons the user never sees, such as an invalid scope; a request asking for [silent authentication](/concepts/prompt-parameter/) with `prompt=none` is the one exception, because that mode must not display anything at all.
+
+The client receives nothing in this case. See [dynamic client registration](/concepts/clients/#security-considerations) for what that means if you build one.
+
 ## Stage 5: Code issuance
 
 The authorization code is generated and delivered to the client using the response mode:
