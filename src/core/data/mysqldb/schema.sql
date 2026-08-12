@@ -32,6 +32,7 @@ CREATE TABLE `clients` (
   `implicit_grant_enabled` tinyint(1) DEFAULT NULL,
   `resource_owner_password_credentials_enabled` tinyint(1) DEFAULT NULL,
   `include_open_id_connect_claims_in_id_token` varchar(10) NOT NULL DEFAULT 'default',
+  `created_via_dcr` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_client_identifier` (`client_identifier`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

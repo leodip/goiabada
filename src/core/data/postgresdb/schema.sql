@@ -56,7 +56,8 @@ CREATE TABLE public.clients (
     pkce_required boolean,
     implicit_grant_enabled boolean,
     resource_owner_password_credentials_enabled boolean,
-    include_open_id_connect_claims_in_id_token character varying(10) DEFAULT 'default'::character varying NOT NULL
+    include_open_id_connect_claims_in_id_token character varying(10) DEFAULT 'default'::character varying NOT NULL,
+    created_via_dcr boolean DEFAULT false NOT NULL
 );
 
 

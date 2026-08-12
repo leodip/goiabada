@@ -32,7 +32,8 @@ CREATE TABLE clients (
   default_acr_level TEXT NOT NULL,
   pkce_required BOOLEAN DEFAULT NULL,
   implicit_grant_enabled BOOLEAN DEFAULT NULL,
-  resource_owner_password_credentials_enabled INTEGER DEFAULT NULL
+  resource_owner_password_credentials_enabled INTEGER DEFAULT NULL,
+  created_via_dcr numeric NOT NULL DEFAULT 0
 );
 
 CREATE TABLE resources (
