@@ -213,7 +213,7 @@ func HandleAuthorizeGet(
 				// Read from the request rather than from authContext: this closure runs before the
 				// second SaveAuthContext below, and two of its call sites run before the context
 				// has been populated with the validated values at all.
-				err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
+				err = redirToClientWithError(w, r, templateFS, redirectErrorInput{
 					client:       client,
 					code:         "server_error",
 					description:  "Internal server error",
@@ -229,7 +229,7 @@ func HandleAuthorizeGet(
 				return
 			}
 
-			err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
+			err = redirToClientWithError(w, r, templateFS, redirectErrorInput{
 				client:       client,
 				code:         validationError.GetCode(),
 				description:  validationError.GetDescription(),
@@ -453,7 +453,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 			// which on a genuine server fault is the accurate instruction of the two.
 			slog.Error("failed to clear the auth context, answering the client with server_error",
 				"error", err)
-			err = redirToClientWithError(w, r, httpHelper, templateFS,
+			err = redirToClientWithError(w, r, templateFS,
 				redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
 			if err != nil {
 				// Nowhere left to send the client, so the 500 is the last resort here.
@@ -462,7 +462,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 			return
 		}
 
-		err = redirToClientWithError(w, r, httpHelper, templateFS,
+		err = redirToClientWithError(w, r, templateFS,
 			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -698,10 +698,7 @@ func clientProvenance(database data.Database, clientIdentifier string) *models.C
 	return client
 }
 
-// httpHelper has no reader here yet. It is threaded in now because the refusal interstitial renders
-// a page with i18n instead of redirecting, and doing that to sixteen call sites in the same change
-// as the behaviour would bury the behaviour (#108).
-func redirToClientWithError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper,
+func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 	templateFS fs.FS, input redirectErrorInput) error {
 
 	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment
