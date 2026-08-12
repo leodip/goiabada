@@ -634,6 +634,7 @@ func TestHandleConsentPost(t *testing.T) {
 			State:        "test-state",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		// The clear has to reach the browser, so it must happen before the response is
 		// committed. rr.Header() is the live map the handler and this stub share, so it shows
@@ -679,6 +680,7 @@ func TestHandleConsentPost(t *testing.T) {
 			State:        "test-state",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
@@ -732,6 +734,7 @@ func TestHandleConsentPost(t *testing.T) {
 			State:        "test-state",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
@@ -781,6 +784,7 @@ func TestHandleConsentPost(t *testing.T) {
 			State:        "test-state",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// refusal that cannot be committed. This is the site's second and pre-existing 500,
@@ -944,6 +948,7 @@ func TestHandleConsentPost(t *testing.T) {
 			State:        "test-state",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		// Same sentinel as the cancel case, for the second refusal in this handler. This one is
 		// reached with btnSubmit and no consent boxes ticked rather than with btnCancel.
@@ -987,6 +992,7 @@ func TestHandleConsentPost(t *testing.T) {
 			State:        "test-state",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
@@ -1033,6 +1039,7 @@ func TestHandleConsentPost(t *testing.T) {
 			State:        "test-state",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
@@ -1077,6 +1084,7 @@ func TestHandleConsentPost(t *testing.T) {
 			State:        "test-state",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
 
 		// The clear succeeds here and the ordinary refusal is what cannot be committed, which
 		// is this site's pre-existing 500. It is pinned separately from the last-resort one so
@@ -1358,6 +1366,7 @@ func TestHandleConsentPost(t *testing.T) {
 					// having no expectation for either call.
 					assert.Empty(t, rr.Header().Get("Location"))
 				} else if tc.granted == nil {
+					stubClientProvenanceLookup(database)
 					authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 					handler.ServeHTTP(rr, req)

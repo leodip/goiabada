@@ -60,6 +60,11 @@ func HandleIssueGet(
 			if user == nil || user.Subject.String() != authContext.IdTokenHintSub {
 				// Cannot issue tokens for a different user than the hint identifies.
 				//
+				// This handler issues codes and tokens rather than loading clients, so the only
+				// client load in the file sits inside handleImplicitFlow, far below and in a
+				// different function. An error redirect now carries the client it is answering, so
+				// provenance is resolved here, ahead of the dispatch (#108).
+				//
 				// The clear goes FIRST, the order the prompt=none refusal below and the success
 				// path both use. ClearAuthContext persists the deletion through a Set-Cookie on
 				// w, and redirToClientWithError commits the response in every response mode, so
@@ -67,6 +72,8 @@ func HandleIssueGet(
 				// the one refusal that leaves the context in ready_to_issue_code, the state that
 				// mints codes, so a browser keeping it can replay this endpoint with only the
 				// comparison above standing between the replay and a code (#141).
+				refusedClient := clientProvenance(database, authContext.ClientId)
+
 				err := authHelper.ClearAuthContext(w, r)
 				if err != nil {
 					// The clear failed, so Save wrote no cookie and the browser still holds the
@@ -75,9 +82,8 @@ func HandleIssueGet(
 					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 					slog.Error("failed to clear the auth context, answering the client with server_error",
 						"error", err)
-					err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
-						authContext.ResponseMode, authContext.RedirectURI, authContext.State,
-						authContext.ResponseType)
+					err = redirToClientWithError(w, r, httpHelper, templateFS,
+						redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
 					if err != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
 						httpHelper.InternalServerError(w, r, err)
@@ -85,10 +91,9 @@ func HandleIssueGet(
 					return
 				}
 
-				err = redirToClientWithError(w, r, templateFS, constants.ErrorLoginRequired,
-					"The authenticated user does not match the id_token_hint",
-					authContext.ResponseMode, authContext.RedirectURI, authContext.State,
-					authContext.ResponseType)
+				err = redirToClientWithError(w, r, httpHelper, templateFS,
+					redirectErrorFromAuthContext(authContext, refusedClient, constants.ErrorLoginRequired,
+						"The authenticated user does not match the id_token_hint"))
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -200,6 +205,11 @@ func HandleIssueGet(
 				// redirToClientWithError commits the response in every response mode, so
 				// clearing afterwards leaves the header on a response already written and
 				// the browser keeps a ready_to_issue_code context it can replay.
+				//
+				// Provenance is resolved before the dispatch, for the same reason as at the
+				// id_token_hint refusal above: this handler holds no client of its own (#108).
+				refusedClient := clientProvenance(database, authContext.ClientId)
+
 				err := authHelper.ClearAuthContext(w, r)
 				if err != nil {
 					// Every error return in ChunkedCookieStore.Save is above its first
@@ -211,19 +221,17 @@ func HandleIssueGet(
 					// condition (#141).
 					slog.Error("failed to clear the auth context, answering the client with server_error",
 						"error", err)
-					err = redirToClientWithError(w, r, templateFS, "server_error", "Internal server error",
-						authContext.ResponseMode, authContext.RedirectURI, authContext.State,
-						authContext.ResponseType)
+					err = redirToClientWithError(w, r, httpHelper, templateFS,
+						redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
 					if err != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
 						httpHelper.InternalServerError(w, r, err)
 					}
 					return
 				}
-				err = redirToClientWithError(w, r, templateFS, constants.ErrorLoginRequired,
-					"User authentication is required",
-					authContext.ResponseMode, authContext.RedirectURI, authContext.State,
-					authContext.ResponseType)
+				err = redirToClientWithError(w, r, httpHelper, templateFS,
+					redirectErrorFromAuthContext(authContext, refusedClient, constants.ErrorLoginRequired,
+						"User authentication is required"))
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
