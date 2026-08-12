@@ -51,6 +51,9 @@
                     {{else}}
                     <span class="badge badge-danger">{{ T $.ctx "adminconsole.admin_clients.list.disabled" }}</span>
                     {{end}}
+                    {{if .CreatedViaDCR}}
+                    <span class="badge badge-warning">{{ T $.ctx "adminconsole.admin_clients.list.self_registered" }}</span>
+                    {{end}}
                 </td>
                 <td>
                     {{if .IsPublic}}
