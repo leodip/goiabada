@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -2198,4 +2199,146 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 
 	assert.Equal(t, "access_denied", errorCode)
 	assert.Equal(t, "The user did not provide consent", errorDescription)
+}
+
+// Eleven scopes is the smallest count at which the old substring match over-granted: the
+// checkbox names are positional, so unchecking index 1 left "consent1" matching inside
+// "consent10" and the denied scope was granted anyway. This walks the real form end to end and
+// asserts the denial survives into both the code the client is handed and the persisted consent
+// row, which is the part no mock-backed test reaches (#79).
+func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScopes_DeniedScopeIsNotGranted(t *testing.T) {
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		ConsentRequired:          true,
+		DefaultAcrLevel:          enums.AcrLevel1,
+	}
+
+	err := database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	redirectUri := &models.RedirectURI{
+		ClientId: client.Id,
+		URI:      gofakeit.URL(),
+	}
+
+	err = database.CreateRedirectURI(nil, redirectUri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	password := gofakeit.Password(true, true, true, true, false, 8)
+	passwordHashed, err := hashutil.HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	user := &models.User{
+		Subject:      uuid.New(),
+		Enabled:      true,
+		Email:        gofakeit.Email(),
+		PasswordHash: passwordHashed,
+	}
+
+	err = database.CreateUser(nil, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Eight resource-permission pairs on top of openid, profile and email is 11 scopes,
+	// indices 0 to 10.
+	permissionScopes := make([]string, 0, 8)
+	for i := 0; i < 8; i++ {
+		resource := createResource(t)
+		permission := createPermission(t, resource.Id)
+		assignPermissionToUser(t, user.Id, permission.Id)
+		permissionScopes = append(permissionScopes,
+			resource.ResourceIdentifier+":"+permission.PermissionIdentifier)
+	}
+
+	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := gofakeit.LetterN(8)
+	requestNonce := gofakeit.LetterN(8)
+
+	// SetScope deduplicates and collapses whitespace but never sorts, so the consent screen's
+	// index space is this order.
+	requestedScopes := append([]string{"openid", "profile", "email"}, permissionScopes...)
+	requestScope := strings.Join(requestedScopes, " ")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + requestCodeChallenge +
+		"&scope=" + url.QueryEscape(requestScope) +
+		"&state=" + requestState +
+		"&nonce=" + requestNonce
+
+	httpClient := createHttpClient(t)
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/consent")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// Every box but index 1, which is profile.
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	assert.Equal(t, requestState, stateVal)
+
+	code := loadCodeFromDatabase(t, codeVal)
+
+	expectedScope := strings.Join(append([]string{"openid", "email"}, permissionScopes...), " ")
+
+	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
+	assert.Equal(t, expectedScope, code.Scope)
+	assert.NotContains(t, strings.Split(code.Scope, " "), "profile")
+	assert.Equal(t, requestState, code.State)
+	assert.Equal(t, requestNonce, code.Nonce)
+	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, false, code.Used)
+
+	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotNil(t, consent)
+	assert.Equal(t, user.Id, consent.UserId)
+	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, expectedScope, consent.Scope)
+	assert.NotContains(t, strings.Split(consent.Scope, " "), "profile")
 }

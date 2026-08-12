@@ -182,15 +182,25 @@ func HandleConsentPost(
 
 		if btn == "submit" {
 
-			consented := ""
-			for key := range r.Form {
-				if strings.HasPrefix(key, "consent") {
-					consented = consented + " " + key
+			// The checkbox names are positional, consent0 .. consentN, so the key is matched
+			// exactly. strings.Contains found "consent1" inside "consent10" and granted a scope
+			// the user had unchecked, from 11 scopes upwards (#79).
+			//
+			// r.PostForm rather than r.Form: r.Form merges the URL query, and this form posts to
+			// action="", so a crafted /auth/consent?consent5=on would otherwise count as a tick.
+			scopeInfoArr := buildScopeInfoArray(r.Context(), authContext.Scope, nil)
+			grantedScopes := make([]string, 0, len(scopeInfoArr))
+			for idx, scopeInfo := range scopeInfoArr {
+				if r.PostForm.Has(fmt.Sprintf("consent%d", idx)) {
+					grantedScopes = append(grantedScopes, scopeInfo.Scope)
 				}
 			}
-			consented = strings.TrimSpace(consented)
 
-			if len(consented) == 0 {
+			// Refusal is decided by what was consented to, not by whether a key named consent...
+			// arrived. A submission matching no scope used to reach the issuers with an empty
+			// consented scope, which they read as "no consent screen was shown" and answer with
+			// the full requested scope (#79).
+			if len(grantedScopes) == 0 {
 				// The clear goes FIRST. ClearAuthContext persists the deletion through a
 				// Set-Cookie on w, and redirToClientWithError commits the response in every
 				// response mode, so clearing afterwards leaves the header on a response already
@@ -256,18 +266,11 @@ func HandleConsentPost(
 						ClientId:  client.Id,
 						GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 					}
-				} else {
-					consent.Scope = ""
 				}
 
-				scopeInfoArr := buildScopeInfoArray(r.Context(), authContext.Scope, consent)
-
-				for idx, scope := range scopeInfoArr {
-					if strings.Contains(consented, fmt.Sprintf("consent%v", idx)) {
-						consent.Scope = consent.Scope + " " + scope.Scope
-					}
-				}
-				consent.Scope = strings.TrimSpace(consent.Scope)
+				// The join assigns the whole selection, so an existing consent is replaced rather
+				// than appended to.
+				consent.Scope = strings.Join(grantedScopes, " ")
 
 				if consent.Id > 0 {
 					err = database.UpdateUserConsent(nil, consent)

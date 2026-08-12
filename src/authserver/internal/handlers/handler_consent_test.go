@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -898,5 +899,299 @@ func TestHandleConsentPost(t *testing.T) {
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
+	})
+
+	// The consent checkboxes are named positionally, consent0 .. consentN, and the handler used
+	// to match them with strings.Contains against one joined string of every submitted key.
+	// "consent1" is a substring of "consent10", so a scope the user had unchecked was granted
+	// from 11 scopes upwards. These cases pin the exact-key lookup, the body-only source and the
+	// refusal gate that decides on matched scopes rather than on submitted keys (#79).
+	t.Run("Exact-key consent selection", func(t *testing.T) {
+
+		// Indices 0 to 2 are real OIDC scopes and the rest are resource:permission pairs, which
+		// is the shape of a request large enough to collide: eight permissions on top of the
+		// three built-in scopes is 11.
+		scopeList := func(n int) []string {
+			scopes := make([]string, 0, n)
+			for i := 0; i < n; i++ {
+				switch i {
+				case 0:
+					scopes = append(scopes, "openid")
+				case 1:
+					scopes = append(scopes, "profile")
+				case 2:
+					scopes = append(scopes, "email")
+				default:
+					scopes = append(scopes, fmt.Sprintf("resource%d:permission%d", i, i))
+				}
+			}
+			return scopes
+		}
+
+		allBut := func(n int, denied int) []int {
+			indices := make([]int, 0, n-1)
+			for i := 0; i < n; i++ {
+				if i != denied {
+					indices = append(indices, i)
+				}
+			}
+			return indices
+		}
+
+		// A submitted body carrying btnSubmit and one key per checked index, which is what the
+		// browser sends for consent.html.
+		checked := func(indices ...int) url.Values {
+			form := url.Values{}
+			form.Add("btnSubmit", "submit")
+			for _, idx := range indices {
+				form.Add(fmt.Sprintf("consent%d", idx), "[on]")
+			}
+			return form
+		}
+
+		type consentCase struct {
+			name        string
+			scopeCount  int
+			query       url.Values // keys in the URL query, never in the body
+			body        url.Values // keys in the POST body
+			rawBody     string     // wins over body, for orderings url.Values.Encode cannot express
+			contentType string     // empty means application/x-www-form-urlencoded
+			granted     []int      // indices expected to be granted; nil means the request is refused
+		}
+
+		cases := []consentCase{
+			{
+				// The regression guard. Under the substring match index 1 was granted anyway,
+				// because "consent1" appears inside consent10.
+				name: "11 scopes, index 1 denied", scopeCount: 11,
+				body: checked(allBut(11, 1)...), granted: allBut(11, 1),
+			},
+			{
+				// Two collisions at once: consent1 sits inside consent10..19 and the count
+				// crosses 20 as well.
+				name: "21 scopes, index 1 denied", scopeCount: 21,
+				body: checked(allBut(21, 1)...), granted: allBut(21, 1),
+			},
+			{
+				// The second over-granting pair the probe found: consent2 inside consent20.
+				name: "21 scopes, index 2 denied", scopeCount: 21,
+				body: checked(allBut(21, 2)...), granted: allBut(21, 2),
+			},
+			{
+				// The control, one below the boundary. It passes under the old match too, and
+				// it is here to say where the boundary is rather than to catch anything.
+				name: "10 scopes, index 1 denied, below the collision boundary", scopeCount: 10,
+				body: checked(allBut(10, 1)...), granted: allBut(10, 1),
+			},
+			{
+				name: "one box checked", scopeCount: 3,
+				body: checked(0), granted: []int{0},
+			},
+			{
+				name: "every box checked", scopeCount: 3,
+				body: checked(0, 1, 2), granted: []int{0, 1, 2},
+			},
+			{
+				// The granted order comes from the scope list, never from the body.
+				name: "indices submitted out of order", scopeCount: 3,
+				rawBody: "consent2=%5Bon%5D&consent0=%5Bon%5D&btnSubmit=submit", granted: []int{0, 2},
+			},
+			{
+				// Fails closed: nothing beginning consent arrived at all.
+				name: "no box checked", scopeCount: 11,
+				body: url.Values{"btnSubmit": {"submit"}}, granted: nil,
+			},
+			{
+				// A key naming no index used to pass the refusal gate, persist an empty consent
+				// and leave the issuers to fall back to the full requested scope.
+				name: "a key naming no index", scopeCount: 3,
+				body: checked(99), granted: nil,
+			},
+			{
+				name: "a non-numeric consent key", scopeCount: 3,
+				body: url.Values{"btnSubmit": {"submit"}, "consentX": {"[on]"}}, granted: nil,
+			},
+			{
+				// The query cannot grant on its own: this form posts to action="", so r.Form
+				// would have merged /auth/consent?consent1=on into the submission.
+				name: "a consent key in the query alone", scopeCount: 3,
+				query: url.Values{"consent1": {"[on]"}},
+				body:  url.Values{"btnSubmit": {"submit"}}, granted: nil,
+			},
+			{
+				// The other direction: a real submission does not launder the query key
+				// travelling alongside it.
+				name: "a consent key in the query beside a real submission", scopeCount: 3,
+				query: url.Values{"consent1": {"[on]"}},
+				body:  checked(0), granted: []int{0},
+			},
+			{
+				// An unparsed body leaves r.PostForm empty, so the request is refused rather
+				// than granted. btnSubmit rides in the query, otherwise the handler would not
+				// reach the submit branch at all and the refusal would prove nothing.
+				name: "a body Go will not parse", scopeCount: 3,
+				query: url.Values{"btnSubmit": {"submit"}},
+				//nolint:goconst // the body is deliberately spelled out here
+				rawBody: "consent0=%5Bon%5D", contentType: "text/plain", granted: nil,
+			},
+		}
+
+		// Case 2 of the plan's table: every index of an 11-scope request denied in turn, so the
+		// whole collision boundary is covered rather than only its first member.
+		for denied := 0; denied < 11; denied++ {
+			cases = append(cases, consentCase{
+				name:       fmt.Sprintf("11 scopes, only index %d denied", denied),
+				scopeCount: 11,
+				body:       checked(allBut(11, denied)...),
+				granted:    allBut(11, denied),
+			})
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				database := mocks_data.NewDatabase(t)
+				auditLogger := mocks_audit.NewAuditLogger(t)
+
+				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+
+				scopes := scopeList(tc.scopeCount)
+
+				target := "/auth/consent"
+				if len(tc.query) > 0 {
+					target += "?" + tc.query.Encode()
+				}
+				body := tc.rawBody
+				if body == "" {
+					body = tc.body.Encode()
+				}
+				contentType := tc.contentType
+				if contentType == "" {
+					contentType = "application/x-www-form-urlencoded"
+				}
+				req, _ := http.NewRequest("POST", target, strings.NewReader(body))
+				req.Header.Add("Content-Type", contentType)
+				rr := httptest.NewRecorder()
+
+				authContext := &oauth.AuthContext{
+					AuthState:    oauth.AuthStateRequiresConsent,
+					UserId:       1,
+					ClientId:     "test-client",
+					Scope:        strings.Join(scopes, " "),
+					ResponseMode: "query",
+					RedirectURI:  "https://example.com/callback",
+					State:        "test-state",
+				}
+				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+				if tc.granted == nil {
+					authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+					handler.ServeHTTP(rr, req)
+
+					assert.Equal(t, http.StatusFound, rr.Code)
+					assert.Contains(t, rr.Header().Get("Location"),
+						"https://example.com/callback?error=access_denied")
+				} else {
+					grantedScopes := make([]string, 0, len(tc.granted))
+					for _, idx := range tc.granted {
+						grantedScopes = append(grantedScopes, scopes[idx])
+					}
+					expectedScope := strings.Join(grantedScopes, " ")
+
+					client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+					database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+					database.On("GetUserById", mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
+					database.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(nil, nil)
+
+					var persisted *models.UserConsent
+					database.On("CreateUserConsent", mock.Anything, mock.MatchedBy(func(consent *models.UserConsent) bool {
+						persisted = consent
+						return true
+					})).Return(nil)
+
+					auditLogger.On("Log", constants.AuditSavedConsent, mock.Anything).Return()
+
+					var saved *oauth.AuthContext
+					authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+						saved = ac
+						return true
+					})).Return(nil)
+
+					handler.ServeHTTP(rr, req)
+
+					assert.Equal(t, http.StatusFound, rr.Code)
+					assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+					if assert.NotNil(t, persisted) {
+						assert.Equal(t, expectedScope, persisted.Scope)
+						assert.Equal(t, int64(1), persisted.UserId)
+						assert.Equal(t, int64(1), persisted.ClientId)
+					}
+					if assert.NotNil(t, saved) {
+						assert.Equal(t, oauth.AuthStateReadyToIssueCode, saved.AuthState)
+						assert.Equal(t, expectedScope, saved.ConsentedScope)
+					}
+				}
+
+				httpHelper.AssertExpectations(t)
+				authHelper.AssertExpectations(t)
+				database.AssertExpectations(t)
+				auditLogger.AssertExpectations(t)
+			})
+		}
+	})
+
+	// An existing consent row is replaced by the new selection rather than appended to, which is
+	// what the now-deleted consent.Scope = "" blanking used to ensure (#79).
+	t.Run("Existing consent is replaced, not appended to", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		form.Add("consent2", "[on]")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState: oauth.AuthStateRequiresConsent,
+			UserId:    1,
+			ClientId:  "test-client",
+			Scope:     "openid profile email",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+		database.On("GetUserById", mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
+		database.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).
+			Return(&models.UserConsent{Id: 1, UserId: 1, ClientId: 1, Scope: "openid profile"}, nil)
+
+		database.On("UpdateUserConsent", mock.Anything, mock.MatchedBy(func(consent *models.UserConsent) bool {
+			return consent.Scope == "email"
+		})).Return(nil)
+
+		auditLogger.On("Log", constants.AuditSavedConsent, mock.Anything).Return()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.ConsentedScope == "email"
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
 	})
 }
