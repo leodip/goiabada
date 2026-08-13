@@ -220,6 +220,8 @@ Common error codes:
 - `consent_required` - User consent is required (typically with `prompt=none`)
 - `interaction_required` - User interaction is required, such as ACR step-up (typically with `prompt=none`)
 
+A client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) receives none of these. Goiabada withholds its error redirects and shows the user a page instead, so an authorization that fails never returns to the client at all.
+
 ### Token errors
 
 Errors during token exchange return a JSON response with cache prevention headers per [RFC 6749 Section 5.2](https://datatracker.ietf.org/doc/html/rfc6749#section-5.2):
