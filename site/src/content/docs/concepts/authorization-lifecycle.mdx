@@ -49,7 +49,7 @@ These checks run first, before any session or authentication logic.
 <Aside type="caution">
 If the client or redirect URI is invalid, the error is shown on a page. Goiabada will **never** redirect to an unregistered URI. All other validation errors are redirected to the client's `redirect_uri`.
 
-That last sentence has one exception, and it covers every error redirect described on this page, silent requests included: a client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) never receives one. Goiabada shows the user a page naming the address the client asked to send them to, and the request stops there. See [Declining](#declining) for why.
+That last sentence has one exception: a client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) never receives an error redirect, silent requests included. Goiabada shows the user a page naming the address the client asked to send them to, and the request stops there. See [Declining](#declining).
 </Aside>
 
 Key details:
@@ -182,9 +182,7 @@ Choosing **Cancel** on the consent screen ends the authorization. What the user 
 | Created by an administrator | The browser is redirected to the client's redirect URI with `error=access_denied`, and the client shows its own message |
 | [Self-registered](/concepts/clients/#dynamic-client-registration-rfc-7591) | The browser stays on Goiabada. A page names the application and the address it asked to send the user to, and the request stops there |
 
-The second case exists because the redirect itself can be the attack. Anyone can register a client and point it at any address, so an error response is an instruction to send someone's browser to a site nobody here has checked. A user who has just refused an application they did not recognise should not then be delivered to it. The same page is shown whenever Goiabada refuses a self-registered client's authorization for any reason, including reasons the user never sees, such as an invalid scope. A request asking for [silent authentication](/concepts/prompt-parameter/) with `prompt=none` is covered rather than exempt: it needs no session and nothing at all from the user, which makes it the cheapest way of the three to ask this server for a redirect. The page renders where a browser would show it, and inside the hidden iframe silent renewal normally runs in, nothing is displayed to anyone.
-
-The client receives nothing in this case. See [dynamic client registration](/concepts/clients/#security-considerations) for what that means if you build one.
+The redirect is withheld because anyone can register a client and choose where it points: a user who has just refused an application they did not recognise should not then be delivered to it. The same page is shown whenever Goiabada refuses a self-registered client's authorization for any reason, `prompt=none` included, and the client receives nothing. See [dynamic client registration](/concepts/clients/#security-considerations) for the full rule and what it means if you build one.
 
 ## Stage 5: Code issuance
 

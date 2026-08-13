@@ -88,9 +88,9 @@ https://my-app.com/callback?error=login_required&error_description=User+authenti
 | `access_denied` | User account is disabled, or the user is not authorized for any of the requested scopes |
 
 <Aside type="caution">
-**A self-registered client gets no error back at all.** A client that registered itself through [dynamic client registration](/concepts/clients/#dynamic-client-registration-rfc-7591) requires consent by default, so its first silent request for a user cannot be completed. None of the errors above are delivered for it: an error response is a redirect to an address nobody here has checked, and a `prompt=none` request is the cheapest way to ask for one, so Goiabada [withholds the redirect](/concepts/clients/#dynamic-client-registration-rfc-7591) instead. The request simply does not come back.
+**A self-registered client gets no error back at all.** A client that registered itself through [dynamic client registration](/concepts/clients/#dynamic-client-registration-rfc-7591) requires consent by default, so its first silent request for a user cannot be completed, and Goiabada [withholds its error redirects](/concepts/clients/#security-considerations) rather than delivering any of the errors above. The request simply does not come back.
 
-Treat a silent request that does not return as "send the user through an ordinary authorization". Do that once, without `prompt=none`, and silent renewal works from then on for the scopes they consented to. Clients an administrator registered are unaffected and receive every error in the table above.
+Treat a silent request that does not return as "send the user through an ordinary authorization". Do that once, without `prompt=none`, and silent renewal works from then on for the scopes they consented to. Clients an administrator registered are unaffected.
 </Aside>
 
 ## prompt=login (force re-authentication)
