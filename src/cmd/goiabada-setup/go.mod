@@ -1,6 +1,6 @@
 module github.com/leodip/goiabada/goiabada-setup
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/chzyer/readline v1.5.1

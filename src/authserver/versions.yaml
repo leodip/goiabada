@@ -35,7 +35,7 @@
 # is pinned to a pseudo-version and every upstream commit will show up as an
 # available update.
 tools:
-  go: "1.26.5"
+  go: "1.26.6"
   tailwind: "4.3.3"
   golangci-lint: "2.12.2"
   mockery: "3.7.2"
