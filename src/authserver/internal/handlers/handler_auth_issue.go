@@ -1,13 +1,12 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/core/config"
@@ -421,27 +420,46 @@ func issueImplicitTokens(
 		return err
 	}
 
-	values := url.Values{}
+	// The response's parameters, in the order they reach the client. Each carries the condition it
+	// already had; what changed is the construction underneath and the rule for state.
+	//
+	// state is appended on its value being non-empty and nothing else. There is no TrimSpace: RFC
+	// 6749 section 3.1 says "Parameters sent without a value MUST be treated as if they were
+	// omitted from the request", so "?state=" and "?state" are requests that carried no state, and
+	// Appendix A.5's "state = 1*VSCHAR" admits no empty value in the response either. Space is
+	// %x20 and so is VSCHAR, so a whitespace-only state is a value the client chose and section
+	// 4.2.2 requires "the exact value received from the client": trimming it away substituted this
+	// server's judgement for the client's (#146).
+	params := make([]responseParam, 0, 6)
 
 	if tokenResponse.AccessToken != "" {
-		values.Add("access_token", tokenResponse.AccessToken)
-		values.Add("token_type", tokenResponse.TokenType)
-		values.Add("expires_in", fmt.Sprintf("%d", tokenResponse.ExpiresIn))
+		params = append(params,
+			responseParam{"access_token", tokenResponse.AccessToken},
+			responseParam{"token_type", tokenResponse.TokenType},
+			responseParam{"expires_in", fmt.Sprintf("%d", tokenResponse.ExpiresIn)},
+		)
 	}
 
 	if tokenResponse.IdToken != "" {
-		values.Add("id_token", tokenResponse.IdToken)
+		params = append(params, responseParam{"id_token", tokenResponse.IdToken})
 	}
 
 	if tokenResponse.Scope != "" {
-		values.Add("scope", tokenResponse.Scope)
+		params = append(params, responseParam{"scope", tokenResponse.Scope})
 	}
 
-	if strings.TrimSpace(state) != "" {
-		values.Add("state", state)
+	if state != "" {
+		params = append(params, responseParam{"state", state})
 	}
 
-	http.Redirect(w, r, redirectURI+"#"+values.Encode(), http.StatusFound)
+	// Appended rather than written through writeResponseParams, for the same reason the error
+	// emitter's fragment branch appends: the redirect URI cannot carry a fragment of its own for
+	// these fields to collide with, since RFC 6749 3.1.2 forbids one and checkRedirectURIEmittable
+	// refuses one just above. Its query, if it registered one, is left exactly as it stands.
+	//
+	// Field order is now declaration order rather than Encode's alphabetical sort. Nothing depends
+	// on it: RFC 6749 4.2.2 defines a set of parameters and not a sequence.
+	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
 	return nil
 }
 
@@ -463,18 +481,41 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 		responseMode = "query"
 	}
 
+	// The response's parameters, in the order they reach the client, built once for all three
+	// response modes because all three answer with the same two fields.
+	//
+	// state is appended on its value being non-empty and nothing else, the same rule the error
+	// emitter states at length: RFC 6749 section 3.1 makes a parameter sent without a value an
+	// omitted one, and Appendix A.5's "state = 1*VSCHAR" admits no empty value in the response. A
+	// whitespace-only state is a real value, because space is %x20 and so is VSCHAR, and section
+	// 4.1.2 requires "the exact value received from the client", so the TrimSpace that used to drop
+	// it is gone (#146).
+	params := []responseParam{{"code", code.Code}}
+	if code.State != "" {
+		params = append(params, responseParam{"state", code.State})
+	}
+
 	if responseMode == "fragment" {
-		values := url.Values{}
-		values.Add("code", code.Code)
-		values.Add("state", code.State)
-		http.Redirect(w, r, code.RedirectURI+"#"+values.Encode(), http.StatusFound)
+		// Appended rather than written through writeResponseParams: a redirect URI cannot carry a
+		// fragment of its own for these fields to collide with, so there is no registered field
+		// list here to preserve or replace, and its query is left exactly as registered.
+		http.Redirect(w, r, code.RedirectURI+"#"+encodeResponseParams(params), http.StatusFound)
 		return nil
 	}
 	if responseMode == "form_post" {
 		m := make(map[string]interface{})
 		m["redirectURI"] = code.RedirectURI
 		m["code"] = code.Code
-		if len(strings.TrimSpace(code.State)) > 0 {
+		// The same rule as the params slice above, restated because this branch answers through a
+		// bind map rather than a field list. What the client actually receives is then decided by
+		// form_post.html, whose {{if .state}} omits the input entirely.
+		//
+		// {{.state}} and {{if .state}} cannot tell an absent key from a key holding "", but a
+		// template that enumerates the map can: range yields the key only when it is present, and
+		// len counts it. form_post.html is operator supplied whenever GOIABADA_AUTHSERVER_TEMPLATEDIR
+		// is set, so that is a real reader, and it is what pins this guard in
+		// TestFormPostBindMapOmitsAnAbsentState (#146).
+		if code.State != "" {
 			m["state"] = code.State
 		}
 
@@ -482,22 +523,59 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 		if err != nil {
 			return errors.Wrap(err, "unable to parse template")
 		}
-		err = t.Execute(w, m)
+
+		// Render into a buffer, not straight to w, matching the error emitter's twin. Execute
+		// writes as it walks the template, so a template that parses and then fails part way
+		// through leaves a partial body and an implicit 200 already on the wire; the caller answers
+		// an error from here with httpHelper.InternalServerError, and a WriteHeader after the
+		// response is committed changes nothing, so the client would be told 200 for a page that
+		// was never finished. Here that half-written page would be a form carrying an
+		// authorization code with no submit to deliver it. form_post.html is operator supplied
+		// whenever GOIABADA_AUTHSERVER_TEMPLATEDIR is set, so this is reachable in a real
+		// deployment rather than only in tests (#141, #146 decision 10).
+		var rendered bytes.Buffer
+		err = t.Execute(&rendered, m)
 		if err != nil {
 			return errors.Wrap(err, "unable to execute template")
+		}
+		// OAuth 2.0 Form Post Response Mode section 2: "Because the Authorization Response is
+		// intended to be used only once, the Authorization Server MUST instruct the User Agent (and
+		// any intermediaries) not to store or reuse the content of the response." This page carries
+		// an authorization code and the client's state, so a cached or reused copy is a replayable
+		// response sitting in an intermediary. This pair is what the rest of this codebase already
+		// writes for a no-store response (#146).
+		//
+		// Set here rather than before Execute deliberately: a render that fails must leave the
+		// response completely untouched, so the caller's last-resort InternalServerError owns every
+		// header as well as the status (#141).
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+
+		_, err = w.Write(rendered.Bytes())
+		if err != nil {
+			// The connection itself failed. Nothing can be recovered from here, including the
+			// caller's 500, but the error is still worth reporting rather than swallowing.
+			return errors.Wrap(err, "unable to write the form_post response")
 		}
 		return nil
 	}
 
 	// default to query
-	redirUrl, err := url.ParseRequestURI(code.RedirectURI)
+	//
+	// writeResponseParams, not ParseRequestURI() then Query() then Encode(). That sequence seeded
+	// url.Values from the registered redirect URI's own query and Add'ed on top of it, so a client
+	// that had registered "?state=fixed" got back two state parameters and Go's own
+	// url.Values.Get answers with the first, which is the registered one. This is the redirect
+	// carrying the authorization code, so it is the response an RP's RFC 9700 2.1 CSRF check exists
+	// to guard, and unlike the error path it fired on every successful authorization rather than
+	// only on a refusal. Re-encoding also rewrote the registered query in five separate ways,
+	// against RFC 6749 3.1.2's "MUST be retained". Both are the shared helper's to prevent, and its
+	// comment carries the detail (#146).
+	location, err := writeResponseParams(code.RedirectURI, params)
 	if err != nil {
-		return errors.Wrap(err, "unable to parse redirect URI")
+		return errors.Wrap(err, "unable to build the authorization code redirect")
 	}
-	values := redirUrl.Query()
-	values.Add("code", code.Code)
-	values.Add("state", code.State)
-	redirUrl.RawQuery = values.Encode()
-	http.Redirect(w, r, redirUrl.String(), http.StatusFound)
+
+	http.Redirect(w, r, location, http.StatusFound)
 	return nil
 }
