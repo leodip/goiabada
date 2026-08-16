@@ -733,6 +733,21 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 		return renderRedirectBlocked(httpHelper, w, r, input)
 	}
 
+	// Gate 4, the last resort, and a separate statement from the guard above rather than a third
+	// clause on it: that one weighs where the redirect URI came from, this one weighs whether the
+	// string can name the host it appears to. An administrator-registered client passes the
+	// provenance test and can still hold a row stored before these rules existed, which is the case
+	// the guard above cannot cover and this one does.
+	//
+	// It sits above the response-mode dispatch for the same reason, so query, fragment and form_post
+	// are all covered, and it ends in the same place: the interstitial names the destination and the
+	// authorization stops, rather than this server forwarding a browser to a host of somebody else's
+	// choosing on a request it just refused. Unreachable once the authorization endpoint has refused
+	// the URI, and kept so that a test enforces it (#122).
+	if err := checkRedirectURIEmittable("redirToClientWithError", input.redirectURI); err != nil {
+		return renderRedirectBlocked(httpHelper, w, r, input)
+	}
+
 	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment
 	// Determine if this is an implicit flow by checking response_type
 	rtInfo := oauth.ParseResponseType(input.responseType)

@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/pkg/errors"
 )
 
@@ -824,6 +825,14 @@ func clientForPostLogoutRedirect(clientId string, database data.Database) *model
 // the client's OAuth redirect URIs. The spec permits that: the value "MUST have been previously
 // registered with the OP, either using the post_logout_redirect_uris Registration parameter or via
 // other mechanisms". Registering the two separately is tracked as its own change.
+//
+// A registered URI that is not an absolute URI earns no redirect either, which is the third way of
+// returning "" and the only one where the request is otherwise in order. Matching the same rows as
+// the authorization endpoint means inheriting the same defect: a row stored before those rules
+// existed can be scheme-relative, or can carry a scheme with no authority, and this endpoint would
+// then emit it verbatim as a Location the user agent resolves against a host nobody registered. The
+// authorization endpoint's own gate does not cover this one, because the value never passes through
+// it (#122).
 func postLogoutRedirectLocation(
 	r *http.Request,
 	httpHelper HttpHelper,
@@ -832,6 +841,18 @@ func postLogoutRedirectLocation(
 	postLogoutRedirectURI string,
 ) string {
 	if client == nil {
+		return ""
+	}
+
+	// Ahead of the load, so a value that can never be redirected to costs no query. The reason is
+	// its own line rather than a reuse of the "is not registered" warning below: this URI may well
+	// be registered, and telling an operator it is not would send them to fix the wrong thing. The
+	// URI itself is not logged, for the reason decision 4 gives at the authorization endpoint: it is
+	// unbounded caller-controlled input, and the client identifier is the bounded value that finds
+	// the offending row (#122).
+	if !urlutil.IsAbsoluteRedirectURI(postLogoutRedirectURI) {
+		slog.Warn("logout: post_logout_redirect_uri is not an absolute URI, not redirecting",
+			"clientIdentifier", client.ClientIdentifier)
 		return ""
 	}
 

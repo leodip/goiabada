@@ -1360,6 +1360,68 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 	})
 }
 
+// Gate 4's third site (#122). An error redirect is the open-redirect vector on this endpoint: the
+// request has already been refused, and forwarding the browser anyway is this server sending a user
+// somewhere on the strength of a stored string. #108's guard above covers only clients that
+// registered themselves, so a client an administrator created, holding a row stored before these
+// rules existed, walks straight past it.
+//
+// Every case below therefore carries the administrator-created client testRedirectError supplies. A
+// case built on a nil or self-registered client would render the same page for #108's reason and go
+// on passing with this guard deleted.
+//
+// These are also the only cases in this file that reach the renderer, which is why they are the only
+// ones with a real httpHelper: its ten siblings pass nil precisely to say they never withhold a
+// redirect.
+func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		redirectURI string
+		destination string
+		why         string
+	}{
+		{
+			name:        "scheme-relative",
+			redirectURI: "//evil.example/cb",
+			destination: "evil.example",
+			why:         "url.Parse reads the authority, so the page names the host the browser would have gone to",
+		},
+		{
+			name:        "https with no authority",
+			redirectURI: "https:///evil.example/cb",
+			destination: "https:///evil.example/cb",
+			why: "decision 8's family. redirectDestinationLabel falls back to the whole URI when url.Parse " +
+				"finds no host, which is what happens here, so the page shows the registered string rather " +
+				"than evil.example. That is the documented fallback rather than a defect, and it still " +
+				"puts the host in front of the user",
+		},
+		{
+			name:        "carrying a fragment",
+			redirectURI: "https://legit.example/cb#frag",
+			destination: "legit.example",
+			why:         "a legitimate host whose callback the fragment breaks, so the redirect is withheld and the host named",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest("GET", "/authorize", nil)
+
+			httpHelper.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
+				mock.MatchedBy(func(data map[string]interface{}) bool {
+					return data["destination"] == tc.destination
+				})).Return(nil)
+
+			err := redirToClientWithError(w, r, httpHelper, nil,
+				testRedirectError("access_denied", "Access denied", "query", tc.redirectURI, "abc123", "code"))
+
+			require.NoError(t, err)
+			assert.Empty(t, w.Header().Get("Location"), "a withheld redirect must never become a Location: %s", tc.why)
+			httpHelper.AssertExpectations(t)
+		})
+	}
+}
+
 func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	t.Run("Valid implicit flow request with token response type", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
