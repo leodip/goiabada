@@ -9,6 +9,15 @@ import (
 var (
 	ErrNoAuthContext = NewErrorDetail("no_auth_context", "no auth context in session")
 	ErrUserDisabled  = NewErrorDetailWithHttpStatusCode("invalid_grant", "The user account is disabled.", 400)
+	// ErrClientDisabled is a comparison target, like ErrUserDisabled: the token validator
+	// constructs this same value and IsError matches it by value.
+	//
+	// It exists because it is the one invalid_grant a password grant can produce without any
+	// credential having been read. The check runs before the grant-type switch, so treating
+	// every invalid_grant on a password grant as a guess against the account would charge an
+	// account's failure budget, and write a ropc_auth_failed audit row naming a username
+	// nothing ever compared, for a request that merely named a disabled client (#219).
+	ErrClientDisabled = NewErrorDetailWithHttpStatusCode("invalid_grant", "Client is disabled.", 400)
 )
 
 type ErrorDetail struct {

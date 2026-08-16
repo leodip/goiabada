@@ -53,12 +53,16 @@ const (
 //
 // The pairing is the point. httprate.WithLimitHandler takes an http.HandlerFunc, so a
 // reject reached through it learns neither which limiter tripped nor which bucket, and the
-// audit event needs both while the log line needs the name. Holding them together means a
-// limiter cannot be wired to another limiter's gate or another route's response shape.
+// audit event needs both while the log line needs the name.
+//
+// The reject class is deliberately NOT here, and it used to be. A bucket can serve two
+// routes whose callers parse different things: accountFailureGate is shared by the browser
+// password form and the ROPC grant, so a class held on the tier would answer the token
+// endpoint with an HTML error page. The shape of a refusal belongs to the caller being
+// refused, so every refusal names it (#219).
 type tier struct {
-	rl    *httprate.RateLimiter
-	name  string
-	class rejectClass
+	rl   *httprate.RateLimiter
+	name string
 	// keyField is the slog attribute the bucket key is logged under, empty when the key
 	// names a person. The request logger in this package establishes that identifiers are
 	// kept out of logs by allowlist rather than by denylist, and email is deliberately not
@@ -90,11 +94,10 @@ var rateLimitHeaders = httprate.WithResponseHeaders(httprate.ResponseHeaders{
 	RetryAfter: "Retry-After",
 })
 
-func newTier(name string, class rejectClass, keyField string, limit int, window time.Duration) *tier {
+func newTier(name string, keyField string, limit int, window time.Duration) *tier {
 	return &tier{
 		rl:        httprate.NewRateLimiter(limit, window, rateLimitHeaders),
 		name:      name,
-		class:     class,
 		keyField:  keyField,
 		auditGate: httprate.NewRateLimiter(1, window, rateLimitHeaders),
 		window:    window,
@@ -124,11 +127,9 @@ type failureTier struct {
 	inFlight map[string]int
 }
 
-func newFailureTier(name string, class rejectClass, keyField string, limit int,
-	window time.Duration) *failureTier {
-
+func newFailureTier(name string, keyField string, limit int, window time.Duration) *failureTier {
 	return &failureTier{
-		tier:     *newTier(name, class, keyField, limit, window),
+		tier:     *newTier(name, keyField, limit, window),
 		limit:    limit,
 		inFlight: map[string]int{},
 	}
@@ -270,7 +271,7 @@ type RateLimiterMiddleware struct {
 	forgotPwd   *tier
 	forgotPwdIp *tier
 	dcr         *tier
-	ropc        *tier // RFC 6749 §4.3.2 MUST protect against brute force
+	ropcIp      *tier // RFC 6749 §4.3.2 MUST protect against brute force
 }
 
 func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, auditLogger AuditLogger,
@@ -289,34 +290,39 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 		// 800-63B §3.2.2 names. Both count failures only, so a user who signs in spends
 		// nothing (#219).
 		pwdAccount: &accountFailureGate{
-			tight:    newFailureTier("pwd_account_net", rejectBrowser, "", 10, 15*time.Minute),
-			backstop: newFailureTier("pwd_account", rejectBrowser, "", 100, 60*time.Minute),
+			tight:    newFailureTier("pwd_account_net", "", 10, 15*time.Minute),
+			backstop: newFailureTier("pwd_account", "", 100, 60*time.Minute),
 		},
 		// per-IP: stops one host hammering many accounts
-		pwdIp: newTier("pwd_ip", rejectBrowser, "ip", 30, 1*time.Minute),
+		pwdIp: newTier("pwd_ip", "ip", 30, 1*time.Minute),
 		// per-user OTP failures. 5 per 15 minutes is 480 guesses a day against the 14,400
 		// the 10 a minute it replaces allowed, which takes the chance of a hit over a
 		// month from 72.6% to 4.2% against an attacker who already holds the password.
 		// Five rather than three because the same limiter covers enrollment, where
 		// pointing the wrong entry in an authenticator app at the form burns codes, and a
 		// resubmitted code is refused as a replay and so counts as a failure too (#219).
-		otp: newFailureTier("otp", rejectBrowser, "", 5, 15*time.Minute),
+		otp: newFailureTier("otp", "", 5, 15*time.Minute),
 		// per-IP: 10 activation operations per 5 minutes, at the two requests an activation
 		// now costs (the link's GET, the clean GET). The same operation rate as
 		// resetPwd over a chain one request shorter (#112)
-		activate: newTier("activate", rejectBrowser, "ip", 20, 5*time.Minute),
+		activate: newTier("activate", "ip", 20, 5*time.Minute),
 		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
 		// costs (the link's GET, the clean GET, the clean POST). Half of what
 		// forgotPwdIp allows, which is the only other endpoint with an IP tier (#112)
-		resetPwd: newTier("reset_pwd", rejectBrowser, "ip", 30, 5*time.Minute),
+		resetPwd: newTier("reset_pwd", "ip", 30, 5*time.Minute),
 		// per-email: mail-bomb protection
-		forgotPwd: newTier("forgot_pwd_email", rejectBrowser, "", 5, 5*time.Minute),
+		forgotPwd: newTier("forgot_pwd_email", "", 5, 5*time.Minute),
 		// per-IP: resource DoS protection
-		forgotPwdIp: newTier("forgot_pwd_ip", rejectBrowser, "ip", 20, 5*time.Minute),
+		forgotPwdIp: newTier("forgot_pwd_ip", "ip", 20, 5*time.Minute),
 		// RFC 7591 §3 DoS protection
-		dcr: newTier("dcr", rejectOAuth, "ip", 10, 1*time.Minute),
-		// RFC 6749 §4.3.2 brute force protection
-		ropc: newTier("ropc", rejectOAuth, "", 5, 1*time.Minute),
+		dcr: newTier("dcr", "ip", 10, 1*time.Minute),
+		// per-IP: stops one host spraying passwords across many accounts through the
+		// password grant, exactly as pwdIp does for the browser form, and at the same
+		// budget. Its account half is pwdAccount above, shared rather than mirrored: the
+		// composite ropc_<clientId>_<username>_<ip> key this replaces gave every client
+		// and every source address a fresh budget against one account, so the per-account
+		// ceiling RFC 6749 §4.3.2 makes a MUST did not exist at all (#107, #219).
+		ropcIp: newTier("ropc_ip", "ip", 30, 1*time.Minute),
 	}
 }
 
@@ -332,12 +338,12 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 // neighbours in the audit log already carry for the same event: the email for account
 // tiers, the user id for the OTP tier, the client block for IP tiers.
 func (m *RateLimiterMiddleware) tripped(w http.ResponseWriter, r *http.Request, t *tier, key string,
-	details map[string]interface{}) bool {
+	class rejectClass, details map[string]interface{}) bool {
 
 	if !t.rl.OnLimit(w, r, key) {
 		return false
 	}
-	m.refuse(w, r, t, key, details)
+	m.refuse(w, r, t, key, class, details)
 	return true
 }
 
@@ -350,12 +356,15 @@ func (m *RateLimiterMiddleware) tripped(w http.ResponseWriter, r *http.Request, 
 // answer without the header. One function rather than two is also what keeps a failures-only
 // tier from quietly returning httprate's plain text with everything around it apparently
 // wired up (#219).
+// class comes from the caller rather than from the tier because one bucket can serve two
+// routes: pwdAccount is shared by the browser password form and the ROPC grant, and each has
+// to answer in the shape its own caller parses.
 func (m *RateLimiterMiddleware) refuse(w http.ResponseWriter, r *http.Request, t *tier, key string,
-	details map[string]interface{}) {
+	class rejectClass, details map[string]interface{}) {
 
 	w.Header().Set("Retry-After", strconv.Itoa(int(t.window.Seconds())))
 	m.reportTrip(r, t, key, details)
-	m.reject(w, r, t.class)
+	m.reject(w, r, class)
 }
 
 // reportTrip writes the two records a rejection leaves: a warning line every time, and an
@@ -457,7 +466,7 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 		// Per-IP ceiling first: stops a single host from hammering many distinct
 		// accounts. The client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.pwdIp, ipKey, map[string]interface{}{"ip": ipKey}) {
+		if m.tripped(w, r, m.pwdIp, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
@@ -467,7 +476,7 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 		accountKey := accountRateLimitKey(r.FormValue("email"))
 		networkKey := accountNetworkRateLimitKey(r, accountKey)
 		if t, key := m.pwdAccount.reserve(r, networkKey, accountKey); t != nil {
-			m.refuse(w, r, &t.tier, key, map[string]interface{}{"email": accountKey, "ip": ipKey})
+			m.refuse(w, r, &t.tier, key, rejectBrowser, map[string]interface{}{"email": accountKey, "ip": ipKey})
 			return
 		}
 
@@ -511,7 +520,7 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 		key := fmt.Sprintf("user_%d", authContext.UserId)
 
 		if !m.otp.Reserve(key) {
-			m.refuse(w, r, &m.otp.tier, key, map[string]interface{}{"userId": authContext.UserId})
+			m.refuse(w, r, &m.otp.tier, key, rejectBrowser, map[string]interface{}{"userId": authContext.UserId})
 			return
 		}
 
@@ -546,7 +555,7 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 
 		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.activate, ipKey, map[string]interface{}{"ip": ipKey}) {
+		if m.tripped(w, r, m.activate, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
@@ -575,7 +584,7 @@ func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 
 		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.resetPwd, ipKey, map[string]interface{}{"ip": ipKey}) {
+		if m.tripped(w, r, m.resetPwd, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
@@ -598,13 +607,13 @@ func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
 		// Per-IP ceiling: stops one host from mail-bombing many addresses. The
 		// client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.forgotPwdIp, ipKey, map[string]interface{}{"ip": ipKey}) {
+		if m.tripped(w, r, m.forgotPwdIp, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
 		// Per-email limit: prevents mail-bombing a specific address.
 		emailKey := accountRateLimitKey(r.FormValue("email"))
-		if m.tripped(w, r, m.forgotPwd, emailKey, map[string]interface{}{"email": emailKey}) {
+		if m.tripped(w, r, m.forgotPwd, emailKey, rejectBrowser, map[string]interface{}{"email": emailKey}) {
 			return
 		}
 
@@ -624,7 +633,7 @@ func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 		// Use IP address as rate limit key
 		ipKey := clientIPRateLimitKey(r)
 
-		if m.tripped(w, r, m.dcr, ipKey, map[string]interface{}{"ip": ipKey}) {
+		if m.tripped(w, r, m.dcr, ipKey, rejectOAuth, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
@@ -696,6 +705,17 @@ func accountNetworkRateLimitKey(r *http.Request, identifier string) string {
 // RFC 6749 Section 4.3.2 MUST: "the authorization server MUST protect the endpoint
 // against brute force attacks (e.g., using rate-limitation or generating alerts)."
 // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
+//
+// The same three tiers the browser password form carries, and the account pair is literally
+// the same pair of buckets rather than a copy of its budget: a password guessed against one
+// account is one event wherever it arrives, so an attacker cannot get a second allowance by
+// moving from the form to the grant. It also means the ceiling holds when a deployment turns
+// only one of the two paths off.
+//
+// What it replaces is a key of ropc_<clientId>_<username>_<ip>. Folding the client id into a
+// per-account budget meant an attacker escaped the ceiling by naming a second client, and
+// folding in the address meant they escaped it by moving host, so the per-account ceiling
+// RFC 6749 Section 4.3.2 makes a MUST did not exist at all (#107, #219).
 func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
@@ -711,29 +731,41 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 			return
 		}
 
+		// The other grants carry no resource-owner password, so this limiter has nothing to
+		// bound on them and counting them would throttle every token refresh a busy client
+		// makes.
 		if r.PostFormValue("grant_type") != "password" {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// Rate limit by combination of username + client_id + IP
-		// This prevents:
-		// 1. Brute force on a specific user account
-		// 2. Enumeration attacks across users from same IP
-		// 3. Distributed attacks on a single user
-		username := r.PostFormValue("username")
-		clientId := r.PostFormValue("client_id")
+		// Per-IP ceiling first: stops a single host spraying passwords across many distinct
+		// accounts. The client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
-
-		// Use composite key for more precise rate limiting
-		key := fmt.Sprintf("ropc_%s_%s_%s", clientId, username, ipKey)
-
-		if m.tripped(w, r, m.ropc, key, map[string]interface{}{
-			"email":    accountRateLimitKey(username),
-			"clientId": clientId,
-		}) {
+		if m.tripped(w, r, m.ropcIp, ipKey, rejectOAuth, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
+
+		// Per-account limit, in the two tiers accountFailureGate documents. Only a wrong
+		// credential spends it, so a machine-driven integration authenticating one account
+		// over and over is never refused by it. client_id is deliberately absent from the
+		// key: a ceiling an attacker escapes by registering a second client is not a ceiling.
+		accountKey := accountRateLimitKey(r.PostFormValue("username"))
+		networkKey := accountNetworkRateLimitKey(r, accountKey)
+		if t, key := m.pwdAccount.reserve(r, networkKey, accountKey); t != nil {
+			m.refuse(w, r, &t.tier, key, rejectOAuth,
+				map[string]interface{}{"email": accountKey, "ip": ipKey})
+			return
+		}
+
+		// HandleTokenPost converts this reservation by calling RecordCredentialFailure, and
+		// only where the validator answered invalid_grant for a password grant. The defer
+		// charges it or drops it.
+		reservation := &credentialReservation{}
+		r = withCredentialReservation(r, reservation)
+		defer func() {
+			m.pwdAccount.release(r, networkKey, accountKey, reservation.failed.Load())
+		}()
 
 		next.ServeHTTP(w, r)
 	})

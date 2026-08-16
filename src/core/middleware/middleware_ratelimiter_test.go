@@ -552,7 +552,7 @@ func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 // true on a counter error would leave every other case in this file green while the gate
 // failed open for the duration of a storage fault (#219).
 func TestFailureTier_FailsClosedOnACounterError(t *testing.T) {
-	f := newFailureTier("test", rejectBrowser, "", 5, time.Minute)
+	f := newFailureTier("test", "", 5, time.Minute)
 	f.rl = httprate.NewRateLimiter(5, time.Minute, httprate.WithLimitCounter(&erroringLimitCounter{}))
 
 	if f.Reserve("anyone@example.com") {
@@ -1309,106 +1309,298 @@ func TestLimitDCR_PerIP(t *testing.T) {
 	})
 }
 
-// TestLimitROPC_CompositeKeyAndGrantType is LimitROPC's first test, the other half of
-// #195's remainder. RFC 6749 section 4.3.2 makes protecting this endpoint against brute
-// force a MUST.
+// runROPC drives one request through LimitROPC and reports the status, whether the handler
+// ran, and the response.
 //
-// It pins the composite key as it stands rather than as it should be. Folding the client
-// id and the client IP into a per-account budget is the defect #107 filed and decision 7
-// settles, and stage 4 deletes this key outright; the two cases below are what will show
-// that stage actually changed the key rather than merely the budget.
-func TestLimitROPC_CompositeKeyAndGrantType(t *testing.T) {
-	const budget = 5
+// failed is what the token handler found when it checked the credential: HandleTokenPost
+// calls RecordCredentialFailure only where ValidateTokenRequest answered invalid_grant for a
+// password grant. A case that drives requests without it is measuring ropc_ip, whatever it
+// says it is measuring (#219).
+func runROPC(m *RateLimiterMiddleware, grantType, username, clientId, ip string,
+	failed bool) (int, bool, *httptest.ResponseRecorder) {
 
-	run := func(m *RateLimiterMiddleware, grantType, username, clientId, ip string) (int, bool) {
-		form := url.Values{
-			"grant_type": {grantType},
-			"username":   {username},
-			"client_id":  {clientId},
+	form := url.Values{
+		"grant_type": {grantType},
+		"username":   {username},
+		"client_id":  {clientId},
+	}
+	req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.RemoteAddr = ip
+	rr := httptest.NewRecorder()
+	reached := false
+	m.LimitROPC(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		if failed {
+			m.RecordCredentialFailure(r)
 		}
-		req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.RemoteAddr = ip
-		rr := httptest.NewRecorder()
-		reached := false
-		m.LimitROPC(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			reached = true
-			w.WriteHeader(http.StatusTeapot)
-		})).ServeHTTP(rr, req)
-		return rr.Code, reached
+		w.WriteHeader(http.StatusTeapot)
+	})).ServeHTTP(rr, req)
+	return rr.Code, reached, rr
+}
+
+// TestLimitROPC_PerIP verifies the password grant's per-IP tier, which stops one host
+// spraying passwords across many accounts and is the tier that counts every request. It
+// mirrors pwd_ip exactly, at the same 30 per minute per /64.
+//
+// The account tiers are in TestLimitROPC_AccountFailureBudget, since only a failed
+// credential spends those. RFC 6749 section 4.3.2 makes protecting this endpoint against
+// brute force a MUST, and before this the endpoint carried a single composite bucket that
+// bounded neither account nor host (#107, #195, #219).
+func TestLimitROPC_PerIP(t *testing.T) {
+	const ipBudget = 30
+
+	run := func(m *RateLimiterMiddleware, username, ip string) (int, bool) {
+		code, reached, _ := runROPC(m, "password", username, "app", ip, false)
+		return code, reached
 	}
 
-	t.Run("the budget is exactly 5", func(t *testing.T) {
+	t.Run("the per-IP budget is exactly 30, from varied usernames", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
-		for i := 0; i < budget; i++ {
-			if code, reached := run(m, "password", "victim@example.com", "app", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+		for i := 0; i < ipBudget; i++ {
+			// Distinct accounts so no account bucket trips.
+			username := fmt.Sprintf("user%d@example.com", i)
+			if code, reached := run(m, username, "198.51.100.7:5000"); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
 					i+1, code, reached, http.StatusTeapot)
 			}
 		}
-		if code, reached := run(m, "password", "victim@example.com", "app", "203.0.113.7:5000"); code != http.StatusTooManyRequests || reached {
+		if code, reached := run(m, "last@example.com", "198.51.100.7:5000"); code != http.StatusTooManyRequests || reached {
 			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
-				budget+1, code, reached, http.StatusTooManyRequests)
+				ipBudget+1, code, reached, http.StatusTooManyRequests)
 		}
 	})
 
-	t.Run("a second client id buys a fresh budget for the same account", func(t *testing.T) {
-		// This is #107, asserted rather than assumed: the account ceiling RFC 6749
-		// section 4.3.2 makes a MUST does not exist while the key carries the client id.
-		// Stage 4 removes it and this case is expected to be rewritten there.
+	t.Run("addresses inside one /64 share the bucket, a second /64 does not", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
-		for i := 0; i < budget+1; i++ {
-			run(m, "password", "victim@example.com", "app", "203.0.113.7:5000")
+		addr := func(i int) string { return fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1) }
+		for i := 0; i < ipBudget; i++ {
+			if code, reached := run(m, fmt.Sprintf("user%d@example.com", i), addr(i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d from %s: got code %d, handler reached %v; want %d and true",
+					i+1, addr(i), code, reached, http.StatusTeapot)
+			}
 		}
-		if code, reached := run(m, "password", "victim@example.com", "other-app", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
-			t.Errorf("second client id: got code %d, handler reached %v; want %d and true",
-				code, reached, http.StatusTeapot)
+		if code, reached := run(m, "last@example.com", addr(ipBudget)); code != http.StatusTooManyRequests || reached {
+			t.Fatalf("request %d from a fresh address in the same /64: got code %d, handler reached %v; want %d and false",
+				ipBudget+1, code, reached, http.StatusTooManyRequests)
 		}
-	})
-
-	t.Run("a second network buys a fresh budget for the same account", func(t *testing.T) {
-		m := newTestMiddleware(nil, true)
-		for i := 0; i < budget+1; i++ {
-			run(m, "password", "victim@example.com", "app", "203.0.113.7:5000")
-		}
-		if code, reached := run(m, "password", "victim@example.com", "app", "198.51.100.9:5000"); code != http.StatusTeapot || !reached {
-			t.Errorf("second network: got code %d, handler reached %v; want %d and true",
+		// A neighbouring /64 is a different client. Without this the case above would
+		// also pass for a key that collapsed every IPv6 address into one bucket.
+		if code, reached := run(m, "elsewhere@example.com", "[2001:db8:1:3::1]:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second /64: got code %d, handler reached %v; want %d and true",
 				code, reached, http.StatusTeapot)
 		}
 	})
 
 	t.Run("only the password grant is limited", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
-		// Well past the budget. The other grants carry no resource-owner password, so
-		// this limiter has nothing to bound; a limiter that counted them would throttle
-		// every token refresh in the deployment from one host.
-		for i := 0; i < budget*4; i++ {
-			if code, reached := run(m, "refresh_token", "", "app", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("refresh_token request %d: got code %d, handler reached %v; want %d and true",
+		// Well past both budgets, and recording a failure on every one of them, so a
+		// limiter that reached either tier for these would refuse long before the end. The
+		// other grants carry no resource-owner password, so this limiter has nothing to
+		// bound on them; counting them would throttle every token refresh in the deployment
+		// from one host.
+		for _, grant := range []string{"refresh_token", "authorization_code", "client_credentials"} {
+			for i := 0; i < ipBudget*2; i++ {
+				code, reached, _ := runROPC(m, grant, "victim@example.com", "app", "203.0.113.7:5000", true)
+				if code != http.StatusTeapot || !reached {
+					t.Fatalf("%s request %d: got code %d, handler reached %v; want %d and true",
+						grant, i+1, code, reached, http.StatusTeapot)
+				}
+			}
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < ipBudget*4; i++ {
+			if code, reached, _ := runROPC(m, "password", "victim@example.com", "app",
+				"203.0.113.7:5000", true); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
+// TestLimitROPC_AccountFailureBudget verifies the password grant reaches the same two-tier
+// account gate the browser form does, at the same budgets and on the same buckets.
+//
+// It replaces the composite ropc_<clientId>_<username>_<ip> key, and two cases here are the
+// exact inverse of what the old key allowed, which is what shows this stage changed the key
+// rather than only the budget: a second client id no longer buys a fresh allowance (#107),
+// while a second /64 still does, because that is decision 17's tight tier doing its job
+// rather than the ceiling failing.
+//
+// Every case stays under ropc_ip's 30 per minute, which is checked first: a case that
+// crossed it would be measuring the per-IP tier while claiming to measure the account gate.
+func TestLimitROPC_AccountFailureBudget(t *testing.T) {
+	const tightBudget = 10
+	const backstop = 100
+
+	// One fixed host, so the tight tier is the one under test.
+	const attacker = "203.0.113.7:5000"
+
+	t.Run("the tight budget is exactly 10 failures", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < tightBudget; i++ {
+			if code, reached, _ := runROPC(m, "password", "victim@example.com", "app", attacker, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := runROPC(m, "password", "victim@example.com", "app", attacker, true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("failure %d: got code %d, handler reached %v; want %d and false",
+				tightBudget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	// #107, inverted. The old composite key put client_id in the bucket, so an attacker
+	// escaped the account ceiling RFC 6749 section 4.3.2 makes a MUST by naming a second
+	// client, which costs nothing when registration is open. This is the case that fails if
+	// the client id ever creeps back into the key.
+	t.Run("a second client id does not buy a fresh budget for the same account", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < tightBudget; i++ {
+			if code, _, _ := runROPC(m, "password", "victim@example.com", "app", attacker, true); code != http.StatusTeapot {
+				t.Fatalf("failure %d: got code %d, want %d", i+1, code, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := runROPC(m, "password", "victim@example.com", "other-app", attacker, true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("second client id: got code %d, handler reached %v; want %d and false",
+				code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	// The other half, and why the case above is not just the ceiling being coarse: a
+	// different network is a different tight bucket, which is what stops an attacker who
+	// knows an address from denying its owner the grant.
+	t.Run("a second network does buy a fresh tight budget for the same account", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < tightBudget+1; i++ {
+			runROPC(m, "password", "victim@example.com", "app", attacker, true)
+		}
+		if code, reached, _ := runROPC(m, "password", "victim@example.com", "app", "198.51.100.9:5000", true); code != http.StatusTeapot || !reached {
+			t.Errorf("second network: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("ten case and whitespace variants of one username share the bucket", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		spellings := spellingsOf("victim", "example.com")
+		for i := 0; i < tightBudget; i++ {
+			if code, reached, _ := runROPC(m, "password", spellings[i%len(spellings)], "app", attacker, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("spelling %q (failure %d): got code %d, handler reached %v; want %d and true",
+					spellings[i%len(spellings)], i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := runROPC(m, "password", spellings[tightBudget%len(spellings)], "app", attacker, true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("failure %d: got code %d, handler reached %v; want %d and false",
+				tightBudget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a successful grant spends nothing", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// A machine-driven integration authenticating one account over and over. Under the
+		// 5 per minute this replaces it was refused on the sixth request of every minute,
+		// which is what made the old budget unusable and this one safe.
+		for i := 0; i < 25; i++ { // under ropc_ip's 30, which counts every request
+			if code, reached, _ := runROPC(m, "password", "service@example.com", "app", attacker, false); code != http.StatusTeapot || !reached {
+				t.Fatalf("grant %d: got code %d, handler reached %v; want %d and true",
 					i+1, code, reached, http.StatusTeapot)
 			}
 		}
 	})
 
-	t.Run("the rejection is the oauth shape", func(t *testing.T) {
+	// And the ceiling behind the tight tier, without which an attacker with a /48 owns
+	// 65,536 buckets and the account-wide MUST is gone again.
+	t.Run("failures spread across networks still reach the account-wide backstop", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		admitted := 0
+		for net := 0; net < backstop/tightBudget; net++ {
+			ip := fmt.Sprintf("[2001:db8:%x::1]:5000", net)
+			for i := 0; i < tightBudget; i++ {
+				if code, _, _ := runROPC(m, "password", "victim@example.com", "app", ip, true); code == http.StatusTeapot {
+					admitted++
+				}
+			}
+		}
+		if admitted != backstop {
+			t.Fatalf("%d failures admitted across %d networks, want exactly %d",
+				admitted, backstop/tightBudget, backstop)
+		}
+		if code, reached, _ := runROPC(m, "password", "victim@example.com", "app", "[2001:db8:ff::1]:5000", true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("failure %d, from a fresh network: got code %d, handler reached %v; want %d and false",
+				backstop+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	// The case decision 7 exists for, and the one a second set of limiter instances would
+	// silently break while every other case here stayed green: one password guessed against
+	// one account is one event whichever door it arrives at.
+	t.Run("failures at the password form are visible to the grant, and back", func(t *testing.T) {
+		t.Run("pwd spends, ropc is refused", func(t *testing.T) {
+			m := newTestMiddleware(nil, true)
+			for i := 0; i < tightBudget; i++ {
+				if code, _, _ := runPwd(m, "victim@example.com", attacker, true); code != http.StatusTeapot {
+					t.Fatalf("pwd failure %d: got code %d, want %d", i+1, code, http.StatusTeapot)
+				}
+			}
+			if code, reached, _ := runROPC(m, "password", "victim@example.com", "app", attacker, true); code != http.StatusTooManyRequests || reached {
+				t.Errorf("the grant after ten form failures: got code %d, handler reached %v; want %d and false",
+					code, reached, http.StatusTooManyRequests)
+			}
+		})
+
+		t.Run("ropc spends, pwd is refused", func(t *testing.T) {
+			m := newTestMiddleware(nil, true)
+			for i := 0; i < tightBudget; i++ {
+				if code, _, _ := runROPC(m, "password", "victim@example.com", "app", attacker, true); code != http.StatusTeapot {
+					t.Fatalf("grant failure %d: got code %d, want %d", i+1, code, http.StatusTeapot)
+				}
+			}
+			if code, reached, _ := runPwd(m, "victim@example.com", attacker, true); code != http.StatusTooManyRequests || reached {
+				t.Errorf("the form after ten grant failures: got code %d, handler reached %v; want %d and false",
+					code, reached, http.StatusTooManyRequests)
+			}
+		})
+
+		// The spellings differ on each side, which is the other half of sharing: the two
+		// routes have to agree about which account a request is, not merely about the
+		// budget. LimitPwd reads "email" and LimitROPC reads "username", so a normalization
+		// that lived in one of them and not the other would split the bucket here.
+		t.Run("across a respelled address", func(t *testing.T) {
+			m := newTestMiddleware(nil, true)
+			for i := 0; i < tightBudget; i++ {
+				if code, _, _ := runPwd(m, "  Victim@Example.COM ", attacker, true); code != http.StatusTeapot {
+					t.Fatalf("pwd failure %d: got code %d, want %d", i+1, code, http.StatusTeapot)
+				}
+			}
+			if code, reached, _ := runROPC(m, "password", "VICTIM@example.com", "app", attacker, true); code != http.StatusTooManyRequests || reached {
+				t.Errorf("the grant under another spelling: got code %d, handler reached %v; want %d and false",
+					code, reached, http.StatusTooManyRequests)
+			}
+		})
+	})
+
+	t.Run("the refusal is the oauth shape, with Retry-After and no rate-limit headers", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		var rr *httptest.ResponseRecorder
-		for i := 0; i < budget+1; i++ {
-			form := url.Values{"grant_type": {"password"}, "username": {"v@example.com"}, "client_id": {"app"}}
-			req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(form.Encode()))
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			req.RemoteAddr = "203.0.113.7:5000"
-			rr = httptest.NewRecorder()
-			m.LimitROPC(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusTeapot)
-			})).ServeHTTP(rr, req)
+		for i := 0; i < tightBudget+1; i++ {
+			_, _, rr = runROPC(m, "password", "victim@example.com", "app", attacker, true)
 		}
 		if rr.Code != http.StatusTooManyRequests {
 			t.Fatalf("got code %d, want %d", rr.Code, http.StatusTooManyRequests)
 		}
-		// A token endpoint answering a 429 in HTML is unparseable to every OAuth2 client.
+		// The gate is shared with the browser password form, whose refusal renders HTML.
+		// A token endpoint answering a 429 in HTML is unparseable to every OAuth2 client,
+		// so this is the case that fails if the shared tier picks the shape (#219).
 		if got := rr.Header().Get("Content-Type"); got != "application/json" {
 			t.Errorf("Content-Type = %q, want application/json", got)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "900" {
+			t.Errorf("Retry-After = %q, want 900, the tight tier's 15 minute window", got)
 		}
 		var body map[string]string
 		if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
@@ -1417,15 +1609,6 @@ func TestLimitROPC_CompositeKeyAndGrantType(t *testing.T) {
 		if body["error"] != "invalid_request" {
 			t.Errorf(`error = %q, want "invalid_request"`, body["error"])
 		}
-	})
-
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
-		m := newTestMiddleware(nil, false)
-		for i := 0; i < budget*4; i++ {
-			if code, reached := run(m, "password", "victim@example.com", "app", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
-					i+1, code, reached)
-			}
-		}
+		assertNoRateLimitHeaders(t, rr, "ropc failures-only rejection")
 	})
 }
