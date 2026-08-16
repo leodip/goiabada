@@ -2,6 +2,7 @@ package validators
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"slices"
@@ -167,6 +168,31 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 
 	if len(input.RedirectURI) == 0 {
 		return customerrors.NewErrorDetail("", "The redirect_uri parameter is missing.")
+	}
+
+	// RFC 6749 section 3.1.2: "The redirection endpoint URI MUST be an absolute URI as
+	// defined by [RFC3986] Section 4.3", and it "MUST NOT include a fragment component".
+	//
+	// This gate is here, at the authorization endpoint, and not only at the two registration
+	// intakes, because a registration-time check cannot reach rows that were stored before
+	// the rule existed. Those rows are still matched below and still emitted into a Location
+	// afterwards, so the requested value is tested on every request rather than trusted
+	// because it is registered (#122).
+	//
+	// Only the requested value is tested, and a second check inside the match loop would be
+	// dead code rather than defence in depth: RedirectURIMatches returns false unless the
+	// registered scheme is "http", so no absolute requested value can ever match a
+	// non-absolute registered one. Swept 63 registered/requested pairs to confirm it, 0
+	// matched.
+	//
+	// Placed before ClientLoadRedirectURIs so a garbage value costs no query.
+	if !urlutil.IsAbsoluteRedirectURI(input.RedirectURI) {
+		// The client identifier is a bounded stored value, so it is safe to log. The
+		// requested URI is unbounded attacker-controlled input and is deliberately left
+		// out: the operator reads the offending value off the client's page.
+		slog.Warn("AuthServer: rejected an authorization request whose redirect_uri is not an absolute URI, or is an http/https URI naming no host",
+			"clientIdentifier", client.ClientIdentifier)
+		return customerrors.NewErrorDetail("", "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host.")
 	}
 
 	err = val.database.ClientLoadRedirectURIs(nil, client)

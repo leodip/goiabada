@@ -95,6 +95,20 @@ func TestValidateRedirectURI(t *testing.T) {
 		{"/relative/cb", true, false, "path-absolute, no scheme"},
 		{"relative/cb", true, false, "rejected by ParseRequestURI, before the absolute-URI gate"},
 
+		// --- rejected by the empty-host rule the predicate gained in #122
+		//
+		// These are valid absolute-URIs, so the grammar rule accepts all of them and only
+		// the host rule refuses them. The confidential rows are the ones that changed
+		// behaviour here: that branch returns without a host check, so before #122 this
+		// endpoint registered them for any confidential client, and a browser resolving the
+		// emitted Location navigates to evil.example. The public rows were already refused,
+		// by IsLoopbackHost(""), and are kept to show the two branches now agree.
+		{"https:///evil.example/cb", false, false, "empty authority on the confidential branch; was accepted before #122"},
+		{"https:/evil.example/cb", false, false, "path-absolute https on the confidential branch; was accepted before #122"},
+		{"https://///evil.example/cb", false, false, "more slashes, same empty host"},
+		{"http:///evil.example/cb", true, false, "empty authority, public branch"},
+		{"HTTPS:///evil.example/cb", false, false, "url.Parse lowercases the scheme, so the rule still sees https"},
+
 		// Fragments. Each of these has a non-empty scheme, so each passes a scheme-only
 		// test: they are the rows that catch that mistake. They also already malfunction
 		// today, since the code is delivered to /cb%23frag rather than to the callback.

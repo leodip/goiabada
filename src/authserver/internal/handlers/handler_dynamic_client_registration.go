@@ -261,15 +261,18 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	}
 
 	// RFC 6749 section 3.1.2 requires an absolute-URI (RFC 3986 section 4.3) and forbids a
-	// fragment. Both are checked by the shared predicate. Without this, "//evil.example/cb"
-	// registers cleanly and is later emitted as a protocol-relative Location, handing the
-	// authorization code to that host.
+	// fragment. The shared predicate checks both, and also refuses an http or https URI with
+	// no host, which is a value the grammar admits but a browser resolves to somewhere else
+	// entirely. Without it, "//evil.example/cb" and "https:///evil.example/cb" register
+	// cleanly and are later emitted verbatim into a Location, handing the authorization code
+	// to that host.
 	//
-	// This is the registration half only. Stored rows and rows added through the admin API
-	// are not re-validated, so the gate that closes every entry point belongs in
-	// ValidateClientAndRedirectURI. See issue #122.
+	// This is one of three intakes rather than the only one. The admin API applies the same
+	// predicate, and the authorization endpoint applies it to the requested URI before
+	// matching, which is what covers rows stored before any of these rules existed. Keep the
+	// rule in the predicate rather than here, so the three cannot drift (#122).
 	if !urlutil.IsAbsoluteRedirectURI(uri) {
-		return fmt.Errorf("redirect_uri must be an absolute URI: a scheme is required, a fragment is not permitted, and percent-escapes must be well formed: %s", uri)
+		return fmt.Errorf("redirect_uri must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host: %s", uri)
 	}
 
 	// Characters RFC 3986 excludes from URIs entirely. A redirect URI carrying them is

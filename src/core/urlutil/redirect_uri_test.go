@@ -82,9 +82,11 @@ func TestIsLoopbackHost(t *testing.T) {
 	}
 }
 
-// TestIsAbsoluteRedirectURI owns the absolute-URI rule from RFC 6749 section 3.1.2. Both
-// call sites consume it: DCR registration (#105) and, once it lands, authorization-time
-// validation (#122), so the exhaustive table lives here rather than at either caller.
+// TestIsAbsoluteRedirectURI owns the absolute-URI rule from RFC 6749 section 3.1.2 and the
+// empty-host rule that closes the gap between that grammar and where a browser actually
+// navigates (#122). Every call site consumes the predicate rather than repeating it: DCR
+// registration (#105), authorization-time validation and the admin API, so the exhaustive
+// table lives here and each caller carries only a thin accept/reject pair.
 func TestIsAbsoluteRedirectURI(t *testing.T) {
 	tests := []struct {
 		uri  string
@@ -96,11 +98,27 @@ func TestIsAbsoluteRedirectURI(t *testing.T) {
 		{"https://app.example.com/callback", true},
 		{"http://[::1]:9000/cb", true},
 
-		// absolute, private-use schemes for native apps
+		// absolute, private-use schemes for native apps.
+		//
+		// KEEP THESE. The hostless rows are the conformance boundary of the empty-host rule
+		// below, not decoration: RFC 8252 section 7.1's complete example of a native-app
+		// redirect URI is "com.example.app:/oauth2redirect/example-provider", one slash and
+		// no authority. Anyone "simplifying" that rule into a bare u.Host == "" test refuses
+		// every one of these and breaks every native and MCP client. These rows are the only
+		// thing that catches it mechanically.
 		{"myapp://callback", true},
 		{"myapp:/cb", true},
 		{"com.example.app:/oauth", true},
 		{"org.example.app.oauth://redirect", true},
+
+		// RFC 8252's own example redirect URIs, quoted verbatim from the document: section
+		// 7.1 (private-use scheme), 7.2 (claimed https) and 7.3 (loopback IPv4 and IPv6).
+		// Refusing any of these is non-conformance, which is why they are asserted as
+		// themselves rather than paraphrased into a shorter host.
+		{"com.example.app:/oauth2redirect/example-provider", true},
+		{"https://app.example.com/oauth2redirect/example-provider", true},
+		{"http://127.0.0.1:51004/oauth2redirect/example-provider", true},
+		{"http://[::1]:61023/oauth2redirect/example-provider", true},
 
 		// a query is explicitly permitted by the production
 		{"http://127.0.0.1/cb?a=1", true},
@@ -113,6 +131,30 @@ func TestIsAbsoluteRedirectURI(t *testing.T) {
 		{"/relative/cb", false},
 		{"relative/cb", false},
 		{"", false},
+
+		// http and https with no host. Every one of these IS a valid absolute-URI, so the
+		// grammar rule accepts them all and only the empty-host rule refuses them: Go parses
+		// them with Host == "" and a user agent re-reads them as an authority, delivering the
+		// authorization code to evil.example (#122). One row per parser shape rather than one
+		// representative, because they reach Host == "" by different routes: path-absolute,
+		// opaque, empty authority, and backslashes a browser folds to slashes.
+		{"http:/evil.example/cb", false},
+		{"http:evil.example/cb", false},
+		{"http:///evil.example/cb", false},
+		{"http:////evil.example/cb", false},
+		{"https:/evil.example/cb", false},
+		{"https:evil.example/cb", false},
+		{"https:///evil.example/cb", false},
+		{`http:\\evil.example\cb`, false},
+		{`http:\/evil.example/cb`, false},
+		{`https:\\evil.example\cb`, false},
+
+		// the same family with the scheme cased. url.Parse lowercases the scheme, so these
+		// reach the rule as "http" and "https"; an implementation comparing the raw scheme
+		// passes every row above and fails exactly these two. A user agent lowercases the
+		// scheme too, so without them the rule is evaded by pressing shift.
+		{"HTTP:///evil.example/cb", false},
+		{"HttpS:///evil.example/cb", false},
 
 		// a fragment is not permitted. Each of these has a non-empty scheme, so each one
 		// passes a scheme-only test: they are the rows that catch that mistake.
