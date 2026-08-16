@@ -1334,6 +1334,23 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		return code
 	}
 
+	// wrongCode is six digits this secret refuses at this instant. A literal cannot be
+	// assumed wrong: TOTP emits every six-digit value, and MatchStep accepts the current
+	// step plus one either side, so a fixed "000000" is the right answer about three runs
+	// in a million and the case then takes the success or replay path instead of the
+	// rejection it claims to drive. Confirmed against the matcher the handler itself
+	// uses, which is the only thing that can establish it (#219).
+	wrongCode := func(t *testing.T) string {
+		t.Helper()
+		for _, candidate := range []string{"000000", "111111", "222222"} {
+			if _, matched := otp.MatchStep(candidate, key.Secret(), time.Now().UTC()); !matched {
+				return candidate
+			}
+		}
+		t.Fatal("could not find a six-digit code that the secret refuses")
+		return ""
+	}
+
 	// Each of the four cases below drives one credential-rejection branch. They are separate
 	// call sites, so a mutation deleting any one recording call has to fail exactly one of
 	// them; a single case covering "the OTP form charges failures" would leave the other
@@ -1341,9 +1358,9 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	t.Run("wrong codes fill the budget and the next attempt is refused", func(t *testing.T) {
 		handler, _ := newHandler(t, true, true)
 		for i := 0; i < budget; i++ {
-			assert.Equal(t, http.StatusOK, post(handler, "000000"), "attempt %d should reach the handler", i+1)
+			assert.Equal(t, http.StatusOK, post(handler, wrongCode(t)), "attempt %d should reach the handler", i+1)
 		}
-		assert.Equal(t, http.StatusTooManyRequests, post(handler, "000000"),
+		assert.Equal(t, http.StatusTooManyRequests, post(handler, wrongCode(t)),
 			"attempt %d should be refused by the limiter", budget+1)
 	})
 
@@ -1361,9 +1378,9 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	t.Run("a wrong enrollment code fills the budget", func(t *testing.T) {
 		handler, _ := newHandler(t, false, true)
 		for i := 0; i < budget; i++ {
-			assert.Equal(t, http.StatusOK, post(handler, "000000"), "attempt %d should reach the handler", i+1)
+			assert.Equal(t, http.StatusOK, post(handler, wrongCode(t)), "attempt %d should reach the handler", i+1)
 		}
-		assert.Equal(t, http.StatusTooManyRequests, post(handler, "000000"),
+		assert.Equal(t, http.StatusTooManyRequests, post(handler, wrongCode(t)),
 			"attempt %d should be refused by the limiter", budget+1)
 	})
 
