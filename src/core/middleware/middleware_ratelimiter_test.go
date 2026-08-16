@@ -552,7 +552,7 @@ func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 // true on a counter error would leave every other case in this file green while the gate
 // failed open for the duration of a storage fault (#219).
 func TestFailureTier_FailsClosedOnACounterError(t *testing.T) {
-	f := newFailureTier("test", "", 5, time.Minute)
+	f := newFailureTier("test", 5, time.Minute)
 	f.rl = httprate.NewRateLimiter(5, time.Minute, httprate.WithLimitCounter(&erroringLimitCounter{}))
 
 	if f.Reserve("anyone@example.com") {
