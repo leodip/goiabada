@@ -125,7 +125,7 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger)
+	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "sid": callerSid, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -186,7 +186,7 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger)
+	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -229,7 +229,7 @@ func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	database.On("RollbackTransaction", apiRevokeTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger)
+	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": "the-subject", "sid": "sid-caller", "auth_time": float64(1)},
 		currentPassword, "N3wP4ss!word"))

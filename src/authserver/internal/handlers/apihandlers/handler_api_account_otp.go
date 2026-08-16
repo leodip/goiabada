@@ -73,6 +73,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 func HandleAPIAccountOTPPut(
 	database data.Database,
 	auditLogger handlers.AuditLogger,
+	credentialFailures handlers.CredentialFailureRecorder,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Token and scope are enforced by middleware; extract validated token
@@ -112,6 +113,14 @@ func HandleAPIAccountOTPPut(
 			return
 		}
 		if !hashutil.VerifyPasswordHash(user.PasswordHash, req.Password) {
+			// The one branch here that is a guess at the password, and so the only one that
+			// spends the budget shared with PUT /api/v1/account/password. The blank check
+			// above compares nothing, and the enable branch's wrong code and replay below are
+			// deliberately unbounded: that code is verified against the secret the caller
+			// supplied in the same request, so guessing it gains nothing. This check is what
+			// guards disabling OTP, which takes no code at all (#113, #219).
+			credentialFailures.RecordCredentialFailure(r)
+
 			writeJSONError(w, "Authentication failed. Check your password and try again.", "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}

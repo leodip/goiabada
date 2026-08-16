@@ -277,13 +277,16 @@ type RateLimiterMiddleware struct {
 	otp        *failureTier
 	// emailVerification bounds guessing at the account's own email verification code.
 	emailVerification *failureTier
-	activate          *tier
-	register          *tier
-	resetPwd          *tier
-	forgotPwd         *tier
-	forgotPwdIp       *tier
-	dcr               *tier
-	ropcIp            *tier // RFC 6749 §4.3.2 MUST protect against brute force
+	// accountPassword bounds guessing at the account's own password, at the two account API
+	// routes that verify it. One tier rather than two because it is one secret.
+	accountPassword *failureTier
+	activate        *tier
+	register        *tier
+	resetPwd        *tier
+	forgotPwd       *tier
+	forgotPwdIp     *tier
+	dcr             *tier
+	ropcIp          *tier // RFC 6749 §4.3.2 MUST protect against brute force
 }
 
 func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, auditLogger AuditLogger,
@@ -322,6 +325,18 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 		// address the attacker does not control. Failures only, so a user reading the code
 		// out of their inbox spends nothing (#219).
 		emailVerification: newFailureTier("email_verification", 5, 15*time.Minute),
+		// per-subject account password failures, one bucket for the two routes that check
+		// that password: PUT /api/v1/account/password and PUT /api/v1/account/otp. Both
+		// verify the same secret, so separate buckets would hand an attacker ten guesses by
+		// alternating between them.
+		//
+		// Five rather than the ten the sign-in gate allows because the consequences are
+		// asymmetric. A lockout here costs a signed-in user a 15 minute wait on a change they
+		// can retry, where a lockout at sign-in denies access outright, and the payoff is
+		// higher: the password is the only credential guarding the removal of the account's
+		// second factor, since the disable branch takes no OTP code at all. Failures only, so
+		// a user changing their password successfully spends nothing (#113, #219).
+		accountPassword: newFailureTier("account_password", 5, 15*time.Minute),
 		// per-IP: 10 activation operations per 5 minutes, at the two requests an activation
 		// now costs (the link's GET, the clean GET). The same operation rate as
 		// resetPwd over a chain one request shorter (#112)
@@ -622,6 +637,54 @@ func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.H
 		r = withCredentialReservation(r, reservation)
 		defer func() {
 			m.emailVerification.Release(r, key, reservation.failed.Load())
+		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// LimitAccountPassword rate limits the account's own password check, on the subject of the
+// access token presented. One middleware over two routes, PUT /api/v1/account/password and
+// PUT /api/v1/account/otp, which is what makes the bucket shared: the sharing is a property
+// of there being one tier rather than of two handlers agreeing on a key.
+//
+// Both routes verified the password with an unbounded bcrypt and no failure counter, and the
+// OTP one is the only credential guarding the removal of the account's second factor: its
+// disable branch takes no OTP code, so guessing the password there is enough to strip 2FA
+// (#113, #219).
+//
+// The OTP code on the enable branch is deliberately outside this bound. It is verified
+// against the secret the caller supplied in the same request, so guessing it gains nothing
+// and only the password check spends the budget.
+//
+// The subject rather than the client IP, for LimitEmailVerification's reason: the budget has
+// to follow the account being attacked, and reaching either route needs a valid access token
+// for that account. A request with no readable token passes through to the handler, which
+// answers ACCESS_TOKEN_REQUIRED before touching the password.
+func (m *RateLimiterMiddleware) LimitAccountPassword(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		key, ok := tokenSubjectRateLimitKey(r)
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if !m.accountPassword.Reserve(key) {
+			m.refuse(w, r, &m.accountPassword.tier, key, rejectAPI,
+				map[string]interface{}{"loggedInUser": key})
+			return
+		}
+
+		reservation := &credentialReservation{}
+		r = withCredentialReservation(r, reservation)
+		defer func() {
+			m.accountPassword.Release(r, key, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)

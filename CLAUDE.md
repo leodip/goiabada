@@ -244,7 +244,7 @@ Three test types:
 
 1. **Handler signature**: `HandleXxxGet/Post(dependencies...) http.HandlerFunc`
 2. **Audit logging**: All security events logged via `auditLogger` (see `constants/constants.go` for event names)
-3. **Rate limiting**: Applied to sensitive endpoints (password, OTP, ROPC, DCR, activation)
+3. **Rate limiting**: Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, account password and OTP changes, email verification, forgot/reset password, self-registration, activation, DCR). Credential checks count failures only, so a successful attempt spends nothing
 4. **Permissions model**: Resources contain Permissions; Users/Groups/Clients can have Permissions
 
 ## API Routes

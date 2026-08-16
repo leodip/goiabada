@@ -1219,6 +1219,183 @@ func TestLimitEmailVerification_PerSubject(t *testing.T) {
 	})
 }
 
+// accountPasswordRequest builds a request at one of the two routes LimitAccountPassword
+// covers, carrying the validated token the account API's authentication middleware leaves on
+// the context. target is what tells the two routes apart, and the cases below use it to show
+// the bucket does not. A blank subject omits the token entirely.
+func accountPasswordRequest(target, subject string) *http.Request {
+	req := limiterRequest(http.MethodPut, target, nil)
+	if subject == "" {
+		return req
+	}
+	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken,
+		oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+}
+
+// runAccountPassword drives one request through LimitAccountPassword and reports the status,
+// whether the handler ran, and the response. failed is what the handler found when it
+// verified the password, which is the only thing that spends this budget.
+func runAccountPassword(m *RateLimiterMiddleware, target, subject string, failed bool) (int, bool, *httptest.ResponseRecorder) {
+	rr := httptest.NewRecorder()
+	reached := false
+	m.LimitAccountPassword(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		if failed {
+			m.RecordCredentialFailure(r)
+		}
+		w.WriteHeader(http.StatusTeapot)
+	})).ServeHTTP(rr, accountPasswordRequest(target, subject))
+	return rr.Code, reached, rr
+}
+
+const (
+	accountPasswordRoute = "/api/v1/account/password"
+	accountOTPRoute      = "/api/v1/account/otp"
+)
+
+// TestLimitAccountPassword_PerSubject is seam 1 for the account password check, which both
+// routes performed with an unbounded bcrypt and no failure counter (#113, #219).
+//
+// The budget is asserted exactly, on both sides, because it is published policy in the
+// reference documentation.
+func TestLimitAccountPassword_PerSubject(t *testing.T) {
+	const budget = 5
+	const subject = "44444444-4444-4444-4444-444444444444"
+
+	t.Run("the budget is exactly 5 failures", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached, _ := runAccountPassword(m, accountPasswordRoute, subject, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := runAccountPassword(m, accountPasswordRoute, subject, true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("failure %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("the route in the path does not key anything", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// Split across the two routes this middleware covers. One bucket is the whole point:
+		// they verify the same secret, so a key carrying the path would hand an attacker ten
+		// guesses by alternating between them.
+		for i := 0; i < budget; i++ {
+			target := accountPasswordRoute
+			if i%2 == 1 {
+				target = accountOTPRoute
+			}
+			if code, _, _ := runAccountPassword(m, target, subject, true); code != http.StatusTeapot {
+				t.Fatalf("failure %d at %s: got code %d, want %d", i+1, target, code, http.StatusTeapot)
+			}
+		}
+		if code, _, _ := runAccountPassword(m, accountOTPRoute, subject, true); code != http.StatusTooManyRequests {
+			t.Errorf("the OTP route after %d failures split across both: got code %d, want %d",
+				budget, code, http.StatusTooManyRequests)
+		}
+		if code, _, _ := runAccountPassword(m, accountPasswordRoute, subject, true); code != http.StatusTooManyRequests {
+			t.Errorf("the password route after %d failures split across both: got code %d, want %d",
+				budget, code, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a correct password spends nothing, and hands its slot back", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// Well past the budget, every one of them verified. A tier that counted every request
+		// would refuse the sixth, which is a user locked out of changing their own password
+		// by having changed it.
+		for i := 0; i < budget*4; i++ {
+			if code, reached, _ := runAccountPassword(m, accountPasswordRoute, subject, false); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		// And the full budget is still there, which a leaked reservation would have shrunk.
+		for i := 0; i < budget; i++ {
+			if code, _, _ := runAccountPassword(m, accountPasswordRoute, subject, true); code != http.StatusTeapot {
+				t.Fatalf("failure %d after the successful run: got code %d, want %d",
+					i+1, code, http.StatusTeapot)
+			}
+		}
+		if code, _, _ := runAccountPassword(m, accountPasswordRoute, subject, true); code != http.StatusTooManyRequests {
+			t.Errorf("failure %d: got code %d, want %d", budget+1, code, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("each subject has its own budget", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget+1; i++ {
+			runAccountPassword(m, accountPasswordRoute, subject, true)
+		}
+		if code, _, _ := runAccountPassword(m, accountPasswordRoute, subject, true); code != http.StatusTooManyRequests {
+			t.Fatalf("the exhausted subject got code %d, want %d", code, http.StatusTooManyRequests)
+		}
+		// Same middleware instance, a different account: a global key would refuse this.
+		if code, reached, _ := runAccountPassword(m, accountPasswordRoute, "55555555-5555-5555-5555-555555555555", true); code != http.StatusTeapot || !reached {
+			t.Errorf("second subject: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("a request carrying no token reaches the handler", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// With no subject there is no bucket, and the handler answers ACCESS_TOKEN_REQUIRED
+		// before it verifies anything, so the skipped limit costs nothing. Returning here
+		// instead would write no response at all.
+		for i := 0; i < budget*4; i++ {
+			if code, reached, _ := runAccountPassword(m, accountPasswordRoute, "", true); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+	})
+
+	t.Run("a token whose subject is blank reaches the handler", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget*4; i++ {
+			if code, reached, _ := runAccountPassword(m, accountOTPRoute, "   ", true); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+	})
+
+	t.Run("the refusal is the api shape, with Retry-After and no rate-limit headers", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		var rr *httptest.ResponseRecorder
+		for i := 0; i < budget+1; i++ {
+			_, _, rr = runAccountPassword(m, accountOTPRoute, subject, true)
+		}
+		if rr.Code != http.StatusTooManyRequests {
+			t.Fatalf("got code %d, want %d", rr.Code, http.StatusTooManyRequests)
+		}
+		var body struct {
+			ErrorCode string `json:"error_code"`
+		}
+		if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+			t.Fatalf("the body is not the API error envelope: %v (%q)", err, rr.Body.String())
+		}
+		if body.ErrorCode != "TOO_MANY_REQUESTS" {
+			t.Errorf("error_code = %q, want TOO_MANY_REQUESTS", body.ErrorCode)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "900" {
+			t.Errorf("Retry-After = %q, want 900, the 15 minute window in seconds", got)
+		}
+		assertNoRateLimitHeaders(t, rr, "the account password refusal")
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget*6; i++ {
+			if code, reached, _ := runAccountPassword(m, accountPasswordRoute, subject, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
 // -----------------------------------------------------------------------------
 // Seam 1, stage 2: what a rejection looks like, and that it leaves a trace.
 //
