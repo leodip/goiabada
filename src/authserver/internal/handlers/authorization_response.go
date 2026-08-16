@@ -119,7 +119,9 @@ func encodeResponseParams(params []responseParam) string {
 // bare "?". An empty params with a non-empty reservedNames still filters, so the reserved
 // names are gone from the query whichever response mode or path selected them; no
 // authorization emitter reaches that combination, because every response it can build
-// carries at least one parameter.
+// carries at least one parameter. Filtering can leave a single empty field as the whole
+// query, and the "?" that then carries it is restored explicitly, for the reason given
+// at the end of the body.
 func writeResponseParams(redirectURI string, params []responseParam, reservedNames []string) (string, error) {
 	redirUrl, err := url.Parse(redirectURI)
 	if err != nil {
@@ -159,6 +161,16 @@ func writeResponseParams(redirectURI string, params []responseParam, reservedNam
 	}
 
 	redirUrl.RawQuery = strings.Join(fields, "&")
+	// A surviving field list that joins to "" is exactly one empty field, and then the
+	// "?" is the only byte left carrying it. url.URL.String writes that delimiter only
+	// when RawQuery is non-empty or ForceQuery is set, so without this a registered
+	// "?state=fixed&" filtered down to its trailing empty field comes back as no query
+	// at all, which is a different target from the one that was registered and just
+	// matched exactly. Zero surviving fields is the opposite case and deliberately
+	// loses the "?": there is nothing left for it to delimit (#146).
+	if len(fields) > 0 && redirUrl.RawQuery == "" {
+		redirUrl.ForceQuery = true
+	}
 	return redirUrl.String(), nil
 }
 

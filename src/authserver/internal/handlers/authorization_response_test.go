@@ -172,6 +172,24 @@ func TestWriteResponseParams(t *testing.T) {
 			reserved:    authorizationResponseParamNames,
 			expected:    "https://app.example.com/cb?lang=en&code=fresh-code&state=client-csrf",
 		},
+		{
+			// One empty field left as the whole query is the only shape where the
+			// surviving field list joins to "", so the "?" is the only thing carrying
+			// it and ForceQuery is what keeps it. The row above removes every field and
+			// correctly loses the query with it; this one must not.
+			name:        "A lone surviving empty field keeps the query delimiter",
+			redirectURI: "https://app.example.com/cb?state=fixed&",
+			params:      nil,
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb?",
+		},
+		{
+			name:        "A surviving empty field keeps its separator in front of the params",
+			redirectURI: "https://app.example.com/cb?state=fixed&",
+			params:      []responseParam{{"code", "fresh-code"}},
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb?&code=fresh-code",
+		},
 	}
 
 	for _, tt := range tests {
