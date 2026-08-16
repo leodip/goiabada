@@ -112,6 +112,7 @@ func HandleAuthPwdPost(
 	authHelper AuthHelper,
 	database data.Database,
 	auditLogger AuditLogger,
+	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -225,6 +226,10 @@ func HandleAuthPwdPost(
 			// determining whether an email exists based on response timing differences.
 			hashutil.VerifyPasswordHash(hashutil.DummyPasswordHash, password)
 
+			// A guess against an address that names no account is still a guess, and
+			// charging it is also what keeps this branch from being a cheaper way to
+			// enumerate addresses than the branch below.
+			credentialFailures.RecordCredentialFailure(r)
 			auditLogger.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
@@ -233,6 +238,7 @@ func HandleAuthPwdPost(
 		}
 
 		if !hashutil.VerifyPasswordHash(user.PasswordHash, password) {
+			credentialFailures.RecordCredentialFailure(r)
 			auditLogger.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
@@ -245,6 +251,10 @@ func HandleAuthPwdPost(
 		// Skipped when explicit ?ui_locales / AuthContext.UILocales is in play.
 		r = i18n.RefineLocalizerWithUser(r, user)
 
+		// Deliberately not a credential failure: the password was right, so there is
+		// nothing here for the rate limiter to bound. The same holds for the missing-email
+		// and missing-password renders above, which verify nothing at all. Charging those
+		// would let anyone spend an account's failure budget without ever guessing (#219).
 		if !user.Enabled {
 			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,

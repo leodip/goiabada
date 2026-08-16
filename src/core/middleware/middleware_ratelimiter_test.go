@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,9 +12,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/fstest"
+	"time"
 
+	"github.com/go-chi/httprate"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/handlerhelpers"
@@ -200,14 +204,38 @@ func spellingsOf(local, domain string) []string {
 	}
 }
 
-// TestLimitPwd_PerEmailAndPerIP verifies the password limiter enforces both a
-// per-email budget (bounds brute force on one account) and a per-IP budget
-// (stops one host hammering many accounts), and that neither budget can be
-// escaped by respelling the address or by moving inside one's own /64 (#219).
+// runPwd drives one request through LimitPwd and reports the status, whether the handler
+// ran, and the response.
 //
-// Both budgets are asserted exactly, on both sides, because they are published
-// policy in the reference documentation. That is the convention
-// TestLimitResetPwd_PerIP established.
+// failed is what the handler found when it checked the credential, and it is the whole
+// point of the helper: a failures-only tier is spent by calling RecordCredentialFailure
+// from inside the handler, exactly as HandleAuthPwdPost does on a wrong password. A case
+// that drives requests without it is measuring the per-IP tier, whatever it says it is
+// measuring (#219).
+func runPwd(m *RateLimiterMiddleware, email, ip string, failed bool) (int, bool, *httptest.ResponseRecorder) {
+	form := url.Values{"email": {email}}
+	req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.RemoteAddr = ip
+	rr := httptest.NewRecorder()
+	reached := false
+	m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		if failed {
+			m.RecordCredentialFailure(r)
+		}
+		w.WriteHeader(http.StatusTeapot)
+	})).ServeHTTP(rr, req)
+	return rr.Code, reached, rr
+}
+
+// TestLimitPwd_PerIP verifies the password limiter's per-IP budget, which stops one
+// host hammering many accounts and is the tier that still counts every request. The
+// per-account tiers are in TestLimitPwd_AccountFailureBudget, since only a failure
+// spends those (#219).
+//
+// The budget is asserted exactly, on both sides, because it is published policy in the
+// reference documentation. That is the convention TestLimitResetPwd_PerIP established.
 //
 // The handler stub writes 418 rather than 200 on purpose: a middleware that writes
 // nothing produces exactly 200 with an empty body, so 418 is what tells "the handler
@@ -216,72 +244,13 @@ func spellingsOf(local, domain string) []string {
 // The request carries the address in a form body rather than a query string, which is
 // what the real route sends. A query target cannot express the whitespace spellings at
 // all: httptest.NewRequest parses its target as a request line and panics on one.
-func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
-	const emailBudget = 15
+func TestLimitPwd_PerIP(t *testing.T) {
 	const ipBudget = 30
 
 	run := func(m *RateLimiterMiddleware, email, ip string) (int, bool) {
-		form := url.Values{"email": {email}}
-		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.RemoteAddr = ip
-		rr := httptest.NewRecorder()
-		reached := false
-		m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			reached = true
-			w.WriteHeader(http.StatusTeapot)
-		})).ServeHTTP(rr, req)
-		return rr.Code, reached
+		code, reached, _ := runPwd(m, email, ip, false)
+		return code, reached
 	}
-
-	// A distinct IPv4 address per request, so only the account tier can trip.
-	freshIP := func(i int) string { return fmt.Sprintf("203.0.113.%d:5000", i+1) }
-
-	t.Run("the per-email budget is exactly 15, from varied IPs", func(t *testing.T) {
-		m := newTestMiddleware(nil, true)
-		for i := 0; i < emailBudget; i++ {
-			if code, reached := run(m, "victim@example.com", freshIP(i)); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
-					i+1, code, reached, http.StatusTeapot)
-			}
-		}
-		if code, reached := run(m, "victim@example.com", freshIP(emailBudget)); code != http.StatusTooManyRequests || reached {
-			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
-				emailBudget+1, code, reached, http.StatusTooManyRequests)
-		}
-	})
-
-	t.Run("ten case and whitespace variants of one address share the per-email bucket", func(t *testing.T) {
-		m := newTestMiddleware(nil, true)
-		spellings := spellingsOf("victim", "example.com")
-		// Refused by accountRateLimitKey lowercasing and trimming, not by the limiter
-		// merely working: without it each spelling is its own bucket and all 16 pass.
-		for i := 0; i < emailBudget; i++ {
-			if code, reached := run(m, spellings[i%len(spellings)], freshIP(i)); code != http.StatusTeapot || !reached {
-				t.Fatalf("spelling %q (request %d): got code %d, handler reached %v; want %d and true",
-					spellings[i%len(spellings)], i+1, code, reached, http.StatusTeapot)
-			}
-		}
-		if code, reached := run(m, spellings[emailBudget%len(spellings)], freshIP(emailBudget)); code != http.StatusTooManyRequests || reached {
-			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
-				emailBudget+1, code, reached, http.StatusTooManyRequests)
-		}
-	})
-
-	t.Run("a second address still has its own bucket", func(t *testing.T) {
-		m := newTestMiddleware(nil, true)
-		spellings := spellingsOf("victim", "example.com")
-		for i := 0; i < emailBudget+1; i++ {
-			run(m, spellings[i%len(spellings)], freshIP(i))
-		}
-		// Same middleware instance, a genuinely different account: a key that stopped
-		// distinguishing accounts at all would block this, so the case above cannot pass
-		// by the normalization being over-broad.
-		if code, reached := run(m, "other@example.com", freshIP(emailBudget+1)); code != http.StatusTeapot || !reached {
-			t.Errorf("second address: got code %d, handler reached %v; want %d and true",
-				code, reached, http.StatusTeapot)
-		}
-	})
 
 	t.Run("the per-IP budget is exactly 30, from varied emails", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
@@ -346,10 +315,271 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 }
 
+// TestLimitPwd_AccountFailureBudget verifies the two-tier account gate: a tight budget of
+// 10 failures per 15 minutes per (account, client block) and an account-wide backstop of
+// 100 per hour, both spent only by a credential check that failed (#219).
+//
+// Three separate properties live here and each has a case that fails on its own:
+//
+//   - Only failures count. Every tier before this one charged in middleware, before the
+//     handler knew whether the password was right, so a user signing in spent the same
+//     allowance an attacker did. That is what made a budget this tight unsafe.
+//   - The tight tier carries the network. Without it, ten failures from anyone who knows
+//     an address refuse the owner, which made denial cheaper than the 15 requests a minute
+//     it replaced rather than dearer.
+//   - The backstop exists. Without it an attacker with a /48 owns 65,536 buckets and the
+//     account-wide ceiling RFC 6749 Section 4.3.2 makes a MUST is gone.
+//
+// Every case stays under the per-IP tier's 30 per minute, which is checked first: a case
+// that crosses it would be measuring pwd_ip while claiming to measure the account gate.
+func TestLimitPwd_AccountFailureBudget(t *testing.T) {
+	const tightBudget = 10
+	const backstop = 100
+
+	// One fixed host, so the tight tier is the one under test.
+	const attacker = "203.0.113.7:5000"
+
+	t.Run("the tight budget is exactly 10 failures", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < tightBudget; i++ {
+			if code, reached, _ := runPwd(m, "victim@example.com", attacker, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := runPwd(m, "victim@example.com", attacker, true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("failure %d: got code %d, handler reached %v; want %d and false",
+				tightBudget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a successful sign-in spends nothing, and hands its slot back", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// Interleaved rather than grouped: a slot that leaked instead of being handed
+		// back would shrink the budget permanently, and the count below is what sees it.
+		for i := 0; i < 5; i++ {
+			if code, _, _ := runPwd(m, "owner@example.com", attacker, false); code != http.StatusTeapot {
+				t.Fatalf("success %d: got code %d, want %d", i+1, code, http.StatusTeapot)
+			}
+		}
+		for i := 0; i < tightBudget; i++ {
+			failed := i%2 == 0
+			code, _, _ := runPwd(m, "owner@example.com", attacker, failed)
+			if code != http.StatusTeapot {
+				t.Fatalf("request %d (failed=%v): got code %d, want %d", i+1, failed, code, http.StatusTeapot)
+			}
+		}
+		// 5 failures spent so far out of 10, so 5 more must still be admitted.
+		for i := 0; i < 5; i++ {
+			if code, _, _ := runPwd(m, "owner@example.com", attacker, true); code != http.StatusTeapot {
+				t.Fatalf("failure %d after the interleaved run: got code %d, want %d",
+					i+1, code, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := runPwd(m, "owner@example.com", attacker, true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("the 11th failure: got code %d, handler reached %v; want %d and false",
+				code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("ten case and whitespace variants of one address share the bucket", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		spellings := spellingsOf("victim", "example.com")
+		// Refused by accountRateLimitKey lowercasing and trimming, not by the limiter
+		// merely working: without it each spelling is its own bucket and all 11 pass.
+		for i := 0; i < tightBudget; i++ {
+			if code, reached, _ := runPwd(m, spellings[i%len(spellings)], attacker, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("spelling %q (failure %d): got code %d, handler reached %v; want %d and true",
+					spellings[i%len(spellings)], i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := runPwd(m, spellings[tightBudget%len(spellings)], attacker, true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("failure %d: got code %d, handler reached %v; want %d and false",
+				tightBudget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a second address still has its own bucket", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < tightBudget+1; i++ {
+			runPwd(m, "victim@example.com", attacker, true)
+		}
+		// A genuinely different account: a key that stopped distinguishing accounts at
+		// all would block this, so the case above cannot pass by over-normalizing.
+		if code, reached, _ := runPwd(m, "other@example.com", attacker, true); code != http.StatusTeapot || !reached {
+			t.Errorf("second address: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	// The case the two-tier shape exists for. Under a single account-wide tier this
+	// request is refused, which is a third party denying an account its login.
+	t.Run("an attacker exhausting one network leaves the owner's network allowed", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < tightBudget; i++ {
+			if code, _, _ := runPwd(m, "victim@example.com", attacker, true); code != http.StatusTeapot {
+				t.Fatalf("attacker failure %d: got code %d, want %d", i+1, code, http.StatusTeapot)
+			}
+		}
+		if code, _, _ := runPwd(m, "victim@example.com", attacker, true); code != http.StatusTooManyRequests {
+			t.Fatalf("the attacker's 11th failure was not refused: got code %d", code)
+		}
+		// The owner, in a different block, with the correct password.
+		if code, reached, _ := runPwd(m, "victim@example.com", "198.51.100.9:5000", false); code != http.StatusTeapot || !reached {
+			t.Errorf("the owner from another network: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	// And the other side of it: spreading across networks does not buy an unlimited
+	// number of guesses, because the account-wide backstop counts them all.
+	t.Run("failures spread across networks still reach the account-wide backstop", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		admitted := 0
+		for net := 0; net < backstop/tightBudget; net++ {
+			ip := fmt.Sprintf("[2001:db8:%x::1]:5000", net)
+			for i := 0; i < tightBudget; i++ {
+				if code, _, _ := runPwd(m, "victim@example.com", ip, true); code == http.StatusTeapot {
+					admitted++
+				}
+			}
+		}
+		if admitted != backstop {
+			t.Fatalf("%d failures admitted across %d networks, want exactly %d",
+				admitted, backstop/tightBudget, backstop)
+		}
+		// A fresh network, whose own tight bucket is untouched: only the backstop can
+		// refuse this, so removing the backstop makes the case fail here.
+		if code, reached, _ := runPwd(m, "victim@example.com", "[2001:db8:ff::1]:5000", true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("failure %d, from a fresh network: got code %d, handler reached %v; want %d and false",
+				backstop+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	// Decision 18's reservation, and the only case that can see it: sequential callers
+	// hold the budget under either design, because the defect lives in the window between
+	// reading the recorded rate and charging it.
+	t.Run("concurrent failures admit exactly the budget", func(t *testing.T) {
+		const callers = 25 // under the per-IP tier's 30, so only the account gate refuses
+		m := newTestMiddleware(nil, true)
+
+		release := make(chan struct{})
+		var entered, refused atomic.Int64
+		var start, done sync.WaitGroup
+		start.Add(1)
+		for i := 0; i < callers; i++ {
+			done.Add(1)
+			go func() {
+				defer done.Done()
+				start.Wait()
+
+				form := url.Values{"email": {"victim@example.com"}}
+				req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				req.RemoteAddr = attacker
+				rr := httptest.NewRecorder()
+				m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					entered.Add(1)
+					m.RecordCredentialFailure(r)
+					// Stands in for the bcrypt the handler is about to run, which is
+					// what makes the window wide enough to matter in production.
+					<-release
+					w.WriteHeader(http.StatusTeapot)
+				})).ServeHTTP(rr, req)
+				if rr.Code == http.StatusTooManyRequests {
+					refused.Add(1)
+				}
+			}()
+		}
+		start.Done()
+
+		// Hold every admitted caller inside the handler until all 25 have been through
+		// the gate, so no reservation is released before the last one is decided.
+		deadline := time.Now().Add(10 * time.Second)
+		for entered.Load()+refused.Load() < callers {
+			if time.Now().After(deadline) {
+				close(release)
+				t.Fatalf("only %d of %d callers reached a verdict", entered.Load()+refused.Load(), callers)
+			}
+			time.Sleep(time.Millisecond)
+		}
+		close(release)
+		done.Wait()
+
+		if entered.Load() != tightBudget {
+			t.Errorf("%d of %d concurrent callers were admitted, want exactly %d; a gate that "+
+				"reads the recorded rate without counting what is in flight admits all of them",
+				entered.Load(), callers, tightBudget)
+		}
+	})
+
+	t.Run("the refusal is the browser shape, with Retry-After and no rate-limit headers", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		var rr *httptest.ResponseRecorder
+		for i := 0; i < tightBudget+1; i++ {
+			_, _, rr = runPwd(m, "victim@example.com", attacker, true)
+		}
+		if rr.Code != http.StatusTooManyRequests {
+			t.Fatalf("got code %d, want %d", rr.Code, http.StatusTooManyRequests)
+		}
+		// The failures-only path never calls OnLimit on a refusal, so it writes this
+		// header itself. httprate would otherwise have written it and nothing here would
+		// notice it was gone.
+		if got := rr.Header().Get("Retry-After"); got != "900" {
+			t.Errorf("Retry-After = %q, want 900, the tier's 15 minute window", got)
+		}
+		if got := rr.Header().Get("Content-Type"); got != "text/html; charset=UTF-8" {
+			t.Errorf("Content-Type = %q, want text/html; charset=UTF-8", got)
+		}
+		assertNoRateLimitHeaders(t, rr, "failures-only rejection")
+	})
+
+	t.Run("disabled limiter never blocks, and a recorded failure is a no-op", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < tightBudget*4; i++ {
+			if code, reached, _ := runPwd(m, "victim@example.com", attacker, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
+// TestFailureTier_FailsClosedOnACounterError is the one case that reaches failureTier
+// directly, and the reason for the exception is that nothing else can reach this branch:
+// httprate's in-process counter documents that all its methods always return a nil error,
+// so no request through the middleware can produce one. An implementation that returned
+// true on a counter error would leave every other case in this file green while the gate
+// failed open for the duration of a storage fault (#219).
+func TestFailureTier_FailsClosedOnACounterError(t *testing.T) {
+	f := newFailureTier("test", rejectBrowser, "", 5, time.Minute)
+	f.rl = httprate.NewRateLimiter(5, time.Minute, httprate.WithLimitCounter(&erroringLimitCounter{}))
+
+	if f.Reserve("anyone@example.com") {
+		t.Error("Reserve returned true with the counter erroring; the gate must fail closed")
+	}
+}
+
+// erroringLimitCounter is a LimitCounter whose reads fail, standing in for a counter
+// implementation that can (unlike the in-process one).
+type erroringLimitCounter struct{}
+
+func (c *erroringLimitCounter) Config(requestLimit int, windowLength time.Duration) {}
+
+func (c *erroringLimitCounter) Increment(key string, currentWindow time.Time) error { return nil }
+
+func (c *erroringLimitCounter) IncrementBy(key string, currentWindow time.Time, amount int) error {
+	return nil
+}
+
+func (c *erroringLimitCounter) Get(key string, currentWindow, previousWindow time.Time) (int, int, error) {
+	return 0, 0, errors.New("counter unavailable")
+}
+
 // TestLimitForgotPwd_PerEmailAndPerIP verifies the forgot-password limiter bounds
 // both a single address (mail-bombing) and a single source IP, and that neither
 // budget can be escaped by respelling the address or by moving inside one's own
-// /64 (#219). Same conventions as TestLimitPwd_PerEmailAndPerIP: exact budgets, a
+// /64 (#219). Same conventions as TestLimitPwd_PerIP: exact budgets, a
 // 418 stub, and a form body rather than a query target.
 func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	const emailBudget = 5
@@ -637,19 +867,32 @@ func TestLimitActivate_PerIP(t *testing.T) {
 }
 
 // TestLimitOtp_PerUserAndMissingAuthContext verifies the OTP limiter keys its
-// budget on the user id, and that a request whose auth context cannot be read
-// reaches the handler instead of being answered with a blank 200 (#114).
+// budget on the user id, that only a wrong code spends it, and that a request whose auth
+// context cannot be read reaches the handler instead of being answered with a blank 200
+// (#114).
+//
+// Five failures per 15 minutes rather than the 10 requests a minute it replaces: with the
+// verifier accepting three of a million codes at any instant, the old budget was 14,400
+// guesses a day and a 72.6% chance of a hit within a month against an account whose
+// password the attacker already holds. Five is what enrollment needs rather than what
+// login needs, since the same limiter covers the form a user with no authenticator yet
+// sees (#219).
 //
 // The handler stub writes 418 rather than 200 on purpose: a middleware that
 // writes nothing produces exactly 200 with an empty body, so 418 is what tells
 // "the handler ran" apart from "nothing was written", and from 429.
 func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
-	run := func(m *RateLimiterMiddleware, userId int) (int, bool) {
+	const budget = 5
+
+	run := func(m *RateLimiterMiddleware, userId int, failed bool) (int, bool) {
 		req := limiterRequest(http.MethodPost, fmt.Sprintf("/auth/otp?userId=%d", userId), nil)
 		rr := httptest.NewRecorder()
 		reached := false
 		m.LimitOtp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reached = true
+			if failed {
+				m.RecordCredentialFailure(r)
+			}
 			w.WriteHeader(http.StatusTeapot)
 		})).ServeHTTP(rr, req)
 		return rr.Code, reached
@@ -657,10 +900,10 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 
 	t.Run("unreadable auth context reaches the handler", func(t *testing.T) {
 		m := newTestMiddleware(stubAuthHelper{err: customerrors.ErrNoAuthContext}, true)
-		// Well past the 10/min budget: the pass-through is deliberately not
+		// Well past the budget: the pass-through is deliberately not
 		// bounded by this middleware, since there is no user to key a bucket on.
 		for i := 0; i < 20; i++ {
-			code, reached := run(m, 0)
+			code, reached := run(m, 0, true)
 			if code != http.StatusTeapot || !reached {
 				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
 					i+1, code, reached, http.StatusTeapot)
@@ -668,34 +911,57 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 		}
 	})
 
-	t.Run("a readable auth context still spends the budget", func(t *testing.T) {
+	t.Run("the budget is exactly 5 failures", func(t *testing.T) {
 		m := newTestMiddleware(stubAuthHelper{}, true)
-		for i := 0; i < 10; i++ {
-			if code, reached := run(m, 42); code != http.StatusTeapot || !reached {
+		for i := 0; i < budget; i++ {
+			if code, reached := run(m, 42, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, 42, true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("failure %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a correct code spends nothing", func(t *testing.T) {
+		m := newTestMiddleware(stubAuthHelper{}, true)
+		// Well past the budget, all of them verified. A tier that still counted every
+		// request would refuse the sixth, which is what a user re-authenticating through
+		// a working authenticator would meet.
+		for i := 0; i < budget*4; i++ {
+			if code, reached := run(m, 42, false); code != http.StatusTeapot || !reached {
 				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
 					i+1, code, reached, http.StatusTeapot)
 			}
 		}
-		if code, reached := run(m, 42); code != http.StatusTooManyRequests || reached {
-			t.Errorf("11th attempt: got code %d, handler reached %v; want %d and false",
-				code, reached, http.StatusTooManyRequests)
+		// And the full budget is still there afterwards.
+		for i := 0; i < budget; i++ {
+			if code, _ := run(m, 42, true); code != http.StatusTeapot {
+				t.Fatalf("failure %d after the successful run: got code %d, want %d",
+					i+1, code, http.StatusTeapot)
+			}
+		}
+		if code, _ := run(m, 42, true); code != http.StatusTooManyRequests {
+			t.Errorf("failure %d: got code %d, want %d", budget+1, code, http.StatusTooManyRequests)
 		}
 	})
 
 	t.Run("each user id has its own budget", func(t *testing.T) {
 		m := newTestMiddleware(stubAuthHelper{}, true)
 		blocked := false
-		for i := 0; i < 11; i++ {
-			if code, _ := run(m, 42); code == http.StatusTooManyRequests {
+		for i := 0; i < budget+1; i++ {
+			if code, _ := run(m, 42, true); code == http.StatusTooManyRequests {
 				blocked = true
 				break
 			}
 		}
 		if !blocked {
-			t.Fatal("expected user 42 to be limited within 11 attempts")
+			t.Fatalf("expected user 42 to be limited within %d failures", budget+1)
 		}
 		// Same middleware instance, different user: a global key would block this.
-		if code, reached := run(m, 43); code != http.StatusTeapot || !reached {
+		if code, reached := run(m, 43, true); code != http.StatusTeapot || !reached {
 			t.Errorf("second user: got code %d, handler reached %v; want %d and true",
 				code, reached, http.StatusTeapot)
 		}
@@ -704,7 +970,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
 		m := newTestMiddleware(stubAuthHelper{}, false)
 		for i := 0; i < 60; i++ {
-			if code, reached := run(m, 42); code != http.StatusTeapot || !reached {
+			if code, reached := run(m, 42, true); code != http.StatusTeapot || !reached {
 				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
 					i+1, code, reached)
 			}
@@ -722,26 +988,24 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 // every route regardless of how much configuration surrounds it (#219).
 // -----------------------------------------------------------------------------
 
-// tripBrowser drives LimitPwd from one host until it is refused and returns the
-// refusal. The per-email budget of 15 is the tier that trips, since it is tighter
-// than the per-IP 30.
+// tripBrowser drives failed password checks at LimitPwd from one host until it is refused
+// and returns the refusal. The tight account tier of 10 failures is what trips, since it is
+// reached before the per-IP 30.
+//
+// Every request has to record a failure: since stage 3 the account tiers count nothing
+// else, so a loop of plain requests would drive the per-IP tier instead and the cases below
+// would silently be about a different limiter.
 func tripBrowser(t *testing.T, m *RateLimiterMiddleware) *httptest.ResponseRecorder {
 	t.Helper()
 	var last *httptest.ResponseRecorder
-	for i := 0; i < 17; i++ {
-		form := url.Values{"email": {"victim@example.com"}}
-		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.RemoteAddr = "203.0.113.7:5000"
-		last = httptest.NewRecorder()
-		m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusTeapot)
-		})).ServeHTTP(last, req)
+	for i := 0; i < 12; i++ {
+		_, _, rr := runPwd(m, "victim@example.com", "203.0.113.7:5000", true)
+		last = rr
 		if last.Code == http.StatusTooManyRequests {
 			return last
 		}
 	}
-	t.Fatalf("LimitPwd never refused within 17 requests; last code %d", last.Code)
+	t.Fatalf("LimitPwd never refused within 12 failures; last code %d", last.Code)
 	return nil
 }
 
@@ -779,9 +1043,9 @@ func TestRejection_BrowserClass(t *testing.T) {
 		t.Errorf("Cache-Control = %q, want no-store", got)
 	}
 	// RFC 6585 section 4 names Retry-After as what a 429 MAY carry, and it is the one
-	// header decision 13 keeps. httprate sets it from the window length, 60 seconds here.
-	if got := rr.Header().Get("Retry-After"); got != "60" {
-		t.Errorf("Retry-After = %q, want 60", got)
+	// header decision 13 keeps. It is the tier's window length, 15 minutes here.
+	if got := rr.Header().Get("Retry-After"); got != "900" {
+		t.Errorf("Retry-After = %q, want 900", got)
 	}
 	assertNoRateLimitHeaders(t, rr, "browser rejection")
 
@@ -866,31 +1130,21 @@ func TestRejection_HeadersAbsentOnAllowedRequests(t *testing.T) {
 // amplifier it exists to stop, since every write is a settings read plus an insert on
 // an unauthenticated path (#212).
 func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
-	post := func(m *RateLimiterMiddleware, email, ip string) int {
-		form := url.Values{"email": {email}}
-		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.RemoteAddr = ip
-		rr := httptest.NewRecorder()
-		m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusTeapot)
-		})).ServeHTTP(rr, req)
-		return rr.Code
-	}
-	// A distinct IPv4 per request, so only the per-email tier can trip and the counts
-	// below belong to one limiter rather than two.
-	freshIP := func(i int) string { return fmt.Sprintf("203.0.113.%d:5000", i+1) }
+	// One fixed host throughout, and never more than 30 requests to it, so the tight
+	// account tier is the only one that can trip and the counts below belong to one
+	// limiter rather than two.
+	const host = "203.0.113.7:5000"
 
 	t.Run("many rejections on one key produce one event", func(t *testing.T) {
 		m, audit := newAuditedTestMiddleware(nil, true)
 		refused := 0
-		for i := 0; i < 60; i++ {
-			if post(m, "victim@example.com", freshIP(i)) == http.StatusTooManyRequests {
+		for i := 0; i < 25; i++ {
+			if code, _, _ := runPwd(m, "victim@example.com", host, true); code == http.StatusTooManyRequests {
 				refused++
 			}
 		}
-		if refused < 40 {
-			t.Fatalf("only %d of 60 requests were refused; the case needs a burst of rejections", refused)
+		if refused < 10 {
+			t.Fatalf("only %d of 25 requests were refused; the case needs a burst of rejections", refused)
 		}
 		if got := audit.count(constants.AuditRateLimitExceeded); got != 1 {
 			t.Errorf("got %d rate_limit_exceeded events for %d rejections on one key, want exactly 1",
@@ -900,8 +1154,8 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 
 	t.Run("the event carries the limiter and the account", func(t *testing.T) {
 		m, audit := newAuditedTestMiddleware(nil, true)
-		for i := 0; i < 20; i++ {
-			post(m, "Victim@Example.com", freshIP(i))
+		for i := 0; i < 11; i++ {
+			runPwd(m, "Victim@Example.com", host, true)
 		}
 		audit.mu.Lock()
 		defer audit.mu.Unlock()
@@ -912,23 +1166,28 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 		if e.name != constants.AuditRateLimitExceeded {
 			t.Errorf("event name = %q, want %q", e.name, constants.AuditRateLimitExceeded)
 		}
-		if e.details["limiter"] != "pwd_email" {
-			t.Errorf("details[limiter] = %v, want pwd_email", e.details["limiter"])
+		if e.details["limiter"] != "pwd_account_net" {
+			t.Errorf("details[limiter] = %v, want pwd_account_net", e.details["limiter"])
 		}
 		// The normalized address, which is the identifier AuditAuthFailedPwd already
 		// records under the same name, and the one the log line no longer carries.
 		if e.details["email"] != "victim@example.com" {
 			t.Errorf("details[email] = %v, want victim@example.com", e.details["email"])
 		}
+		// And the block it was refused for, which is half of this tier's key: an
+		// administrator reading the event needs to know which network spent the budget.
+		if e.details["ip"] != "203.0.113.7" {
+			t.Errorf("details[ip] = %v, want 203.0.113.7", e.details["ip"])
+		}
 	})
 
 	t.Run("two keys produce two events", func(t *testing.T) {
 		m, audit := newAuditedTestMiddleware(nil, true)
-		for i := 0; i < 20; i++ {
-			post(m, "one@example.com", freshIP(i))
+		for i := 0; i < 11; i++ {
+			runPwd(m, "one@example.com", host, true)
 		}
-		for i := 20; i < 40; i++ {
-			post(m, "two@example.com", freshIP(i))
+		for i := 0; i < 11; i++ {
+			runPwd(m, "two@example.com", host, true)
 		}
 		// A gate keyed globally rather than per key would report the first account and
 		// go silent for the second, which is the failure that makes the bound useless.
@@ -940,7 +1199,7 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 	t.Run("no event when nothing is refused", func(t *testing.T) {
 		m, audit := newAuditedTestMiddleware(nil, true)
 		for i := 0; i < 10; i++ {
-			post(m, fmt.Sprintf("user%d@example.com", i), freshIP(i))
+			runPwd(m, fmt.Sprintf("user%d@example.com", i), host, true)
 		}
 		if got := audit.count(constants.AuditRateLimitExceeded); got != 0 {
 			t.Errorf("got %d events with nothing refused, want 0", got)
@@ -969,7 +1228,7 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 			t.Errorf("the trip was not logged at WARN; an auth server whose error log fills "+
 				"with expected events has no error log left:\n%s", out)
 		}
-		if !strings.Contains(out, `limiter=pwd_email`) {
+		if !strings.Contains(out, `limiter=pwd_account_net`) {
 			t.Errorf("the warning line does not name the limiter that tripped:\n%s", out)
 		}
 	})
