@@ -822,10 +822,17 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	passwordHash, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
+	knownAccount := func() *models.User {
+		return &models.User{Id: 1, Enabled: true, Email: email, PasswordHash: passwordHash}
+	}
+
 	// newHandler wires one handler and its limiter together, the way routes.go does. The
 	// auth context comes back so a case driving repeated sign-ins can reset the state the
 	// handler advances, which in production is a fresh ceremony each time.
-	newHandler := func(t *testing.T) (http.Handler, *mocks_data.Database, *oauth.AuthContext) {
+	//
+	// account is what GetUserByEmail answers with. A nil one is the address that names no
+	// account, which is its own rejection branch with its own recording call.
+	newHandler := func(t *testing.T, account *models.User) (http.Handler, *mocks_data.Database, *oauth.AuthContext) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
@@ -840,8 +847,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
-		database.On("GetUserByEmail", mock.Anything, email).
-			Return(&models.User{Id: 1, Enabled: true, Email: email, PasswordHash: passwordHash}, nil)
+		database.On("GetUserByEmail", mock.Anything, email).Return(account, nil)
 		auditLogger.On("Log", mock.Anything, mock.Anything).Return().Maybe()
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 			"/auth_pwd.html", mock.Anything).Return(nil).Maybe()
@@ -868,7 +874,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	}
 
 	t.Run("wrong passwords fill the budget and the next attempt is refused", func(t *testing.T) {
-		handler, database, _ := newHandler(t)
+		handler, database, _ := newHandler(t, knownAccount())
 		for i := 0; i < tightBudget; i++ {
 			assert.Equal(t, http.StatusOK, post(handler, "wrong"), "attempt %d should reach the handler", i+1)
 		}
@@ -879,8 +885,22 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		database.AssertNumberOfCalls(t, "GetUserByEmail", tightBudget)
 	})
 
+	// The unknown-account branch is a separate call site from the wrong-password one above,
+	// and it is the branch an attacker enumerating addresses lands on. If it stopped
+	// charging, guessing at an address that names no account would cost nothing, which is
+	// both an unbounded oracle and a cheaper probe than guessing at one that does (#219).
+	t.Run("an address naming no account spends the budget too", func(t *testing.T) {
+		handler, database, _ := newHandler(t, nil)
+		for i := 0; i < tightBudget; i++ {
+			assert.Equal(t, http.StatusOK, post(handler, "wrong"), "attempt %d should reach the handler", i+1)
+		}
+		assert.Equal(t, http.StatusTooManyRequests, post(handler, "wrong"),
+			"attempt %d should be refused by the limiter", tightBudget+1)
+		database.AssertNumberOfCalls(t, "GetUserByEmail", tightBudget)
+	})
+
 	t.Run("a correct password spends nothing", func(t *testing.T) {
-		handler, _, authContext := newHandler(t)
+		handler, _, authContext := newHandler(t, knownAccount())
 		// Well past the budget. A tier that counted every request would refuse the 11th,
 		// which is an account locked out of its own login by using it.
 		for i := 0; i < tightBudget*2; i++ {

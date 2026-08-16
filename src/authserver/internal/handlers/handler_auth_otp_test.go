@@ -1258,7 +1258,14 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
 	assert.Nil(t, err)
 
-	newHandler := func(t *testing.T) (http.Handler, *oauth.AuthContext) {
+	// newHandler wires one handler and its limiter together, the way routes.go does.
+	//
+	// enrolled picks which half of the handler runs: the enrolled half verifies the code
+	// against the user's stored secret, the enrollment half against the one the session is
+	// carrying. consumed is TryConsumeUserOTPStep's answer, and false is a step that has
+	// already been spent. The two flags together select one of the four credential-rejection
+	// branches, each of which is its own recording call site.
+	newHandler := func(t *testing.T, enrolled bool, consumed bool) (http.Handler, *oauth.AuthContext) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -1275,22 +1282,30 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		user := &models.User{Id: 1, Enabled: true, OTPEnabled: enrolled}
+		template := "/auth_otp.html"
+		if enrolled {
+			user.OTPSecretEncrypted = encryptOTPForTest(t, key.Secret())
+		} else {
+			// What HandleAuthOtpGet leaves behind for an enrolling user, and what puts the
+			// handler on its enrollment branch: the secret it verifies against comes from
+			// the session rather than from the user row.
+			session.Values[constants.SessionKeyOTPSecret] = key.Secret()
+			session.Values[constants.SessionKeyOTPImage] = "test-image"
+			template = "/auth_otp_enrollment.html"
+		}
 		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
-		user := &models.User{
-			Id:                 1,
-			Enabled:            true,
-			OTPEnabled:         true,
-			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
-		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
-		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, true).
-			Return(true, nil).Maybe()
+		// requireOTPEnabled mirrors enrolled: the enrolled half asserts an authenticator and
+		// the enrollment half establishes one (#111 decision 10).
+		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, enrolled).
+			Return(consumed, nil).Maybe()
 		auditLogger.On("Log", mock.Anything, mock.Anything).Return().Maybe()
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
-			"/auth_otp.html", mock.Anything).Return(nil).Maybe()
+			template, mock.Anything).Return(nil).Maybe()
 
 		rateLimiter := newTestRateLimiter(authHelper)
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger, rateLimiter)
@@ -1309,8 +1324,22 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		return rr.Code
 	}
 
+	// currentCode is the code an authenticator would be showing right now. The replay cases
+	// need a code that matches, since a replay is refused after the match rather than
+	// instead of it.
+	currentCode := func(t *testing.T) string {
+		t.Helper()
+		code, err := totp.GenerateCode(key.Secret(), time.Now())
+		assert.Nil(t, err)
+		return code
+	}
+
+	// Each of the four cases below drives one credential-rejection branch. They are separate
+	// call sites, so a mutation deleting any one recording call has to fail exactly one of
+	// them; a single case covering "the OTP form charges failures" would leave the other
+	// three branches free to stop charging without a test noticing (#219).
 	t.Run("wrong codes fill the budget and the next attempt is refused", func(t *testing.T) {
-		handler, _ := newHandler(t)
+		handler, _ := newHandler(t, true, true)
 		for i := 0; i < budget; i++ {
 			assert.Equal(t, http.StatusOK, post(handler, "000000"), "attempt %d should reach the handler", i+1)
 		}
@@ -1318,8 +1347,37 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			"attempt %d should be refused by the limiter", budget+1)
 	})
 
+	t.Run("a replayed code fills the budget", func(t *testing.T) {
+		// The code matches and the step is refused as already spent. A replay proves
+		// nothing about who is submitting it, so it costs what a wrong code costs.
+		handler, _ := newHandler(t, true, false)
+		for i := 0; i < budget; i++ {
+			assert.Equal(t, http.StatusOK, post(handler, currentCode(t)), "attempt %d should reach the handler", i+1)
+		}
+		assert.Equal(t, http.StatusTooManyRequests, post(handler, currentCode(t)),
+			"attempt %d should be refused by the limiter", budget+1)
+	})
+
+	t.Run("a wrong enrollment code fills the budget", func(t *testing.T) {
+		handler, _ := newHandler(t, false, true)
+		for i := 0; i < budget; i++ {
+			assert.Equal(t, http.StatusOK, post(handler, "000000"), "attempt %d should reach the handler", i+1)
+		}
+		assert.Equal(t, http.StatusTooManyRequests, post(handler, "000000"),
+			"attempt %d should be refused by the limiter", budget+1)
+	})
+
+	t.Run("a replayed enrollment code fills the budget", func(t *testing.T) {
+		handler, _ := newHandler(t, false, false)
+		for i := 0; i < budget; i++ {
+			assert.Equal(t, http.StatusOK, post(handler, currentCode(t)), "attempt %d should reach the handler", i+1)
+		}
+		assert.Equal(t, http.StatusTooManyRequests, post(handler, currentCode(t)),
+			"attempt %d should be refused by the limiter", budget+1)
+	})
+
 	t.Run("a correct code spends nothing", func(t *testing.T) {
-		handler, authContext := newHandler(t)
+		handler, authContext := newHandler(t, true, true)
 		// Well past the budget. The same limiter covers enrollment, where a user pointing
 		// an authenticator at the form legitimately submits several codes in a row.
 		for i := 0; i < budget*3; i++ {
