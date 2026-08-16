@@ -1336,6 +1336,15 @@ func TestRedirToClientWithError_HybridFlow_UsesQuery(t *testing.T) {
 	}
 }
 
+// Emptiness is the whole of the rule, and it is the whole of it in both directions. RFC 6749
+// section 3.1 makes "?state=" and "?state" requests that carried no state, so nothing is echoed;
+// Appendix A.5's "state = 1*VSCHAR" says the same of the response. But space is %x20, so it is
+// VSCHAR, and a whitespace-only state is a value the client chose and this server must return
+// unaltered per 4.1.2.1's "the exact value received from the client".
+//
+// The second subtest asserted the opposite until #146: the emitter guarded on
+// len(strings.TrimSpace(state)) > 0, so "   " was dropped entirely and an RP that sent it got a
+// response with no state to check at all.
 func TestRedirToClientWithError_NoState(t *testing.T) {
 	t.Run("empty state not included", func(t *testing.T) {
 		w := httptest.NewRecorder()
@@ -1348,17 +1357,184 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 		assert.NotContains(t, location, "state=")
 	})
 
-	t.Run("whitespace-only state not included", func(t *testing.T) {
+	t.Run("whitespace-only state echoed exactly", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
 		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token"))
 
 		require.NoError(t, err)
-		location := w.Header().Get("Location")
-		assert.NotContains(t, location, "state=")
+		assert.Equal(t, "https://example.com/callback#error=access_denied&error_description=Access+denied&state=+++",
+			w.Header().Get("Location"))
 	})
 }
+
+// The defect the issue is named for, at the emitter that reports it. A client may register a
+// redirect URI carrying a query (RFC 6749 3.1.2, and site/src/content/docs/concepts/clients.mdx
+// documents it as permitted), and the error branch used to seed url.Values from that query and Add
+// on top of it, so a registered "?state=fixed" came back alongside the state the client actually
+// sent. url.Values.Get returns the first of two, which is the registered value, so an RP following
+// RFC 9700 2.1 compared its CSRF token against a string it never generated.
+//
+// The registered-query shapes themselves are seam 1's exhaustive table, in
+// authorization_response_test.go. What these cases add is that the emitter reaches it: a version of
+// redirToClientWithError that went back to Query() and Encode() would pass every case in that table
+// and fail every one of these.
+func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
+	t.Run("query mode replaces a registered state and keeps the rest", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+			"query", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", "code"))
+
+		require.NoError(t, err)
+		// Whole-string, not url.Values: parsing is the step that hid the duplicate, since Get
+		// answers with the first of the two and reports nothing wrong.
+		assert.Equal(t, "https://example.com/callback?lang=en&error=access_denied&error_description=Access+denied&state=client-csrf-token",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("query mode preserves a registered query that does not round-trip", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		// The retention half of the fix, which has nothing to do with state. url.Query discards
+		// ParseQuery's error, so this field used to be deleted outright and the client was sent to
+		// a URI it had not registered.
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+			"query", "https://example.com/callback?lang=en;mode=dark", "abc123", "code"))
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback?lang=en;mode=dark&error=access_denied&error_description=Access+denied&state=abc123",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("fragment mode leaves the registered query alone", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		// The two branches construct differently and that difference is observable here: a
+		// registered "state=fixed" in the query is NOT replaced, because the response parameters
+		// are going into the fragment and the query is not the field list being written.
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+			"fragment", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", "token"))
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#error=access_denied&error_description=Access+denied&state=client-csrf-token",
+			w.Header().Get("Location"))
+	})
+}
+
+// RFC 6749 4.1.2.1 and 4.2.2.1 both require "the exact value received from the client", so every
+// byte a client can legally put in a state has to survive the trip. The characters below are the
+// ones a construction built out of string concatenation gets wrong: "+" decodes back as a space,
+// "/" and "=" are what base64 state values are full of, "#" truncates a query, and "&" splits one
+// field into two (#109 for the logout endpoint, #146 here).
+func TestRedirToClientWithError_ByteExactState(t *testing.T) {
+	const state = "a b+c/d=e#f&g=h"
+
+	t.Run("query mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+			"query", "https://example.com/callback", state, "code"))
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback?error=access_denied&error_description=Access+denied&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("fragment mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+			"fragment", "https://example.com/callback", state, "token"))
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback#error=access_denied&error_description=Access+denied&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("form_post mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		// form_post carries the value in a form field rather than a URI, so what has to survive is
+		// the raw string reaching the template, HTML-escaped by html/template and nothing else.
+		templateFS := &mocks.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<input name="state" value="{{.state}}">`,
+			},
+		}
+
+		err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied",
+			"form_post", "https://example.com/callback", state, "code"))
+
+		require.NoError(t, err)
+		// html/template escapes "+" as &#43; and "&" as &amp; in an attribute; both decode back to
+		// the byte the client sent, which is what "exact value" asks for in this transport.
+		assert.Equal(t, `<input name="state" value="a b&#43;c/d=e#f&amp;g=h">`, w.Body.String())
+	})
+}
+
+// The form_post response mode's own requirement, which neither branch met. OAuth 2.0 Form Post
+// Response Mode section 2: "Because the Authorization Response is intended to be used only once,
+// the Authorization Server MUST instruct the User Agent (and any intermediaries) not to store or
+// reuse the content of the response." The page carries the client's state, and its twin on the
+// success path carries an authorization code, and both were returned as a plain cacheable 200 with
+// no cache header anywhere on the /auth routes to supply one (#146).
+func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
+	t.Run("both headers are set on a rendered page", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		templateFS := &mocks.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form method="post" action="{{.redirectURI}}"></form>`,
+			},
+		}
+
+		err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied",
+			"form_post", "https://example.com/callback", "abc123", "code"))
+
+		require.NoError(t, err)
+		assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+		assert.Equal(t, "no-cache", w.Header().Get("Pragma"))
+	})
+
+	t.Run("neither header is set when the render failed", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		// The companion to the uncommitted-response case above. A failed render must leave the
+		// response completely untouched, headers included, so the caller's last-resort 500 is
+		// answering with its own headers rather than with those of a form_post page that was never
+		// sent. Setting these two above the Execute would break that (#141).
+		templateFS := &mocks.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form>{{index . "missing" 0}}</form>`,
+			},
+		}
+
+		err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("server_error", "Internal server error",
+			"form_post", "https://example.com/callback", "abc123", "code"))
+
+		require.Error(t, err)
+		assert.Empty(t, w.Header().Get("Cache-Control"))
+		assert.Empty(t, w.Header().Get("Pragma"))
+	})
+}
+
+// There is deliberately no case here pinning the form_post branch's "state" bind key to being
+// absent for an empty state, because no case can: to any template, a map key that is absent and a
+// map key holding "" are the same thing. Both {{.state}} and {{if .state}} answer identically for
+// the two, so a mutation that makes the guard unconditional survives every assertion that can be
+// written against the rendered page. The guard is kept anyway, for the reason stated where it sits.
+// What form_post actually does with an empty state is decided by form_post.html, and that is where
+// the coverage lives (#146).
 
 // Gate 4's third site (#122). An error redirect is the open-redirect vector on this endpoint: the
 // request has already been refused, and forwarding the browser anyway is this server sending a user
