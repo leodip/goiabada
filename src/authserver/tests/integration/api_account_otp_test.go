@@ -94,6 +94,30 @@ func skipIfOtpCodeOutsideWindow(t *testing.T, secret string, code string) {
 	}
 }
 
+// wrongOtpCodeFor is six digits that pass the handler's shape checks and that the matcher refuses for
+// this secret at this instant, so a case asserting "Incorrect OTP Code" fails only when the handler
+// stops refusing a code it should refuse.
+//
+// A fixed literal cannot do this job. TOTP emits every six-digit value eventually, so a hardcoded
+// "wrong" code is not wrong, it is one that has not come up yet: for JBSWY3DPEHPK3PXP the matcher
+// accepts 222222 from 2026-12-04T22:43:00Z, 111111 from 2027-10-31T16:26:00Z and 000000 from
+// 2028-04-13T15:03:00Z, and MatchStep accepts the step either side, so each is live for about 90
+// seconds and again at every later step that produces it. Walking the candidates and asking the
+// matcher is what makes the choice hold at any date. Same approach as wrongButWellFormedCode in
+// handler_api_account_otp_test.go.
+func wrongOtpCodeFor(t *testing.T, secret string) string {
+	t.Helper()
+
+	for _, candidate := range []string{"000000", "111111", "222222"} {
+		if _, matched := otp.MatchStep(candidate, secret, time.Now().UTC()); !matched {
+			return candidate
+		}
+	}
+
+	t.Fatal("could not find a six-digit code that the secret refuses")
+	return ""
+}
+
 func TestAPIAccountOTPEnrollmentGet_Success(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 	userId := getAccountUserId(t, accessToken)
@@ -260,8 +284,9 @@ func TestAPIAccountOTPPut_Enable_WrongCode(t *testing.T) {
 	userId := getAccountUserId(t, accessToken)
 	setUserPasswordForOTP(t, userId, "Correct1!")
 
-	// Valid-looking secret and code format, but wrong code for the secret
-	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: "000000", SecretKey: "JBSWY3DPEHPK3PXP"}
+	// Valid-looking secret and code format, but a code the matcher refuses for that secret right now
+	const secret = "JBSWY3DPEHPK3PXP"
+	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: wrongOtpCodeFor(t, secret), SecretKey: secret}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
