@@ -934,76 +934,40 @@ func finishLogout(
 // or "&" reach the RP altered or truncated, and let a registered URI that already
 // carried a query gain a second "?" (#109).
 //
-// The registered query is copied field by field, verbatim and in order, empty fields
-// included, and only the RP's state is encoded. Decoding it into url.Values and
-// re-encoding it, which is what
-// redirToClientWithError does in handler_authorize.go, does not round-trip: url.Query
-// discards the error from url.ParseQuery, so a field separated by a literal semicolon
-// ("?lang=en;mode=dark") is deleted outright and the caller never learns; Encode sorts
-// by key, so a query whose order the RP signs over comes back reordered; a valueless
-// field ("?flag") gains an "="; and percent-escapes are normalised ("%7E" to "~"). The
-// registered URI is an operator-registered target that was just matched exactly, so
-// altering its query sends the RP somewhere it did not register. None of those shapes is
-// rejected at registration: validateRedirectURI's excluded-character set is
-// "<>\"{}|\\^` " and admits a semicolon.
+// The construction itself is writeResponseParams, which every emitter in this package now
+// shares. Its comment carries why the registered query is copied field by field rather
+// than decoded and re-encoded. Keeping a second copy here is what produced #146: #109
+// fixed this site and left the authorization emitters running the broken shape, so the
+// defect outlived its own fix by one file.
 //
-// Copying registered bytes into a Location header is safe here because url.Parse above
-// rejects CR, LF and NUL outright ("net/url: invalid control character in URL"), so a
-// registered URI that reaches this point cannot carry a header-splitting byte. The RP's
-// state is attacker-influenced and is escaped, never copied.
+// Two properties are this site's own, so changing either back is a behaviour change
+// rather than a tidy-up:
 //
-// Three further properties, each load-bearing, so changing one back is a behaviour
-// change rather than a tidy-up:
-//
-//   - Exactly one state reaches the RP. Every registered field whose decoded name is
-//     "state" is dropped and one is appended, so the RP reads the value it sent rather
-//     than the registered one, and never both with the choice left to its parser.
 //   - No TrimSpace. OpenID Connect RP-Initiated Logout 1.0 section 2 calls state an
 //     "Opaque value used by the RP to maintain state between the logout request and the
 //     callback", so the OP has no licence to alter it. Trimming would turn a
 //     whitespace-only state into no state at all.
-//   - url.Parse rather than url.ParseRequestURI. A fragment is not part of an HTTP
-//     request URI, so ParseRequestURI keeps a literal "#" in the path and the result
-//     comes back as ".../out%23frag?state=abc". url.Parse still rejects the genuinely
-//     malformed, so the looser parse gives up nothing.
+//   - statePresent, rather than a len(state) > 0 guard, is what keeps three cases
+//     distinct: a state that was absent writes nothing, a state supplied empty comes back
+//     as "state=", and a whitespace-only state survives byte-identical. That differs from
+//     the authorization endpoint on purpose. RFC 6749 section 3.1 makes a valueless
+//     parameter an omitted one there, while RP-Initiated Logout 1.0 carries no such rule
+//     anywhere in the document, so the two endpoints answer "?state=" differently because
+//     their two specifications do (#146).
 //
-// statePresent, rather than a len(state) > 0 guard, is what keeps three cases distinct:
-// a state that was absent writes nothing, a state supplied empty comes back as "state=",
-// and a whitespace-only state survives byte-identical.
+// With statePresent false nothing is written, so a registered post-logout "?state=fixed"
+// is kept rather than filtered: an empty params replaces no field. That is the behaviour
+// this function had before it delegated, preserved deliberately.
 func buildPostLogoutRedirect(registeredURI string, state string, statePresent bool) (string, error) {
-	redirUrl, err := url.Parse(registeredURI)
+	var params []responseParam
+	if statePresent {
+		params = []responseParam{{"state", state}}
+	}
+
+	location, err := writeResponseParams(registeredURI, params)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to parse post-logout redirect URI")
 	}
 
-	if !statePresent {
-		return redirUrl.String(), nil
-	}
-
-	fields := make([]string, 0, 4)
-	// An empty RawQuery is the only field the loop must not see. strings.Split("", "&")
-	// yields one empty string rather than nothing, so iterating unconditionally would
-	// append a leading "&" to a URI that had no query at all. Guarding here rather than
-	// skipping empty fields inside the loop is what keeps the empty fields a registered
-	// query really did carry: "?a=1&&b=2" stays that way instead of collapsing to
-	// "?a=1&b=2", which is a different target from the one the operator registered and
-	// the OP just matched exactly (#109).
-	if redirUrl.RawQuery != "" {
-		for _, field := range strings.Split(redirUrl.RawQuery, "&") {
-			name := field
-			if i := strings.IndexByte(field, '='); i >= 0 {
-				name = field[:i]
-			}
-			// An unescapable name cannot be "state", and is kept as it stands rather than
-			// dropped, since the point is to preserve what was registered.
-			if decoded, err := url.QueryUnescape(name); err == nil && decoded == "state" {
-				continue
-			}
-			fields = append(fields, field)
-		}
-	}
-	fields = append(fields, "state="+url.QueryEscape(state))
-
-	redirUrl.RawQuery = strings.Join(fields, "&")
-	return redirUrl.String(), nil
+	return location, nil
 }
