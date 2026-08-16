@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -10,6 +11,37 @@ import (
 // responseParam is one parameter this server writes into a client's redirect URI: an
 // authorization response field such as "code", "state", "error" or "access_token".
 type responseParam struct{ name, value string }
+
+// authorizationResponseParamNames are the names an authorization response owns in the query
+// component of a client's redirect URI. A registered field carrying one of them is dropped
+// by writeResponseParams whether or not the selected response emits it.
+//
+// Filtering only what a response actually emits is not enough, and the difference is
+// observable at the client's callback. A client registering "?error=stale" and completing
+// an authorization successfully received "?error=stale&code=fresh&state=...", a response
+// that says success and failure at once, and an RP that checks for "error" before reading
+// "code" (the usual order) reads it as a refusal. A client registering "?state=fixed" and
+// sending no state of its own received "?state=fixed&code=fresh", putting a state in front
+// of the client on the redirect carrying the authorization code that the client never sent
+// and cannot have bound to its user agent (#146).
+//
+// The set is these four and not five: RFC 6749 section 4.1.2.1 also defines "error_uri",
+// but this server never emits it, so reserving it would only delete a registered field no
+// response of ours can collide with. Adding a name here is therefore a decision about what
+// this server emits, not a tidy-up, and it takes a field away from every client that
+// registered it.
+//
+// Nothing in RFC 6749 forces this. Section 3.1.2 says the registered query "MUST be
+// retained when adding additional query parameters", which argues the other way; section
+// 4.1.2 says only that "The client MUST ignore unrecognized response parameters", and these
+// are recognized ones. It was settled as a judgement call in #146: the two shapes above are
+// worth more than a registered fixed value, which a client can keep by choosing a name this
+// server does not emit.
+//
+// The end_session_endpoint deliberately reserves nothing, so buildPostLogoutRedirect passes
+// nil and a registered post-logout "?state=fixed" survives. See its comment: the two
+// endpoints differ because their specifications do.
+var authorizationResponseParamNames = []string{"code", "state", "error", "error_description"}
 
 // encodeResponseParams renders params as an "application/x-www-form-urlencoded" field
 // list, in the order given, and returns "" for an empty slice.
@@ -30,7 +62,12 @@ func encodeResponseParams(params []responseParam) string {
 
 // writeResponseParams returns redirectURI with params written into its query component:
 // every field the client registered is preserved byte for byte and in order, except those
-// params replaces, and the params are appended escaped.
+// params replaces or reservedNames claims, and the params are appended escaped.
+//
+// reservedNames are names the response owns whether or not it emits them, and it is the one
+// difference between the two endpoints that call this. The authorization emitters pass
+// authorizationResponseParamNames, whose comment carries why; buildPostLogoutRedirect passes
+// nil, so a registered field survives there unless the response actually replaces it.
 //
 // This is the one construction in this package that writes response parameters into a
 // client's redirect URI. Every emitter goes through it, which is the point: #146 exists
@@ -79,8 +116,11 @@ func encodeResponseParams(params []responseParam) string {
 // function's: it writes exactly what it is given. An empty params returns the URI with its
 // query rejoined unchanged, which is byte-identical to the input because
 // strings.Join(strings.Split(q, "&"), "&") == q and url.URL.ForceQuery keeps a registered
-// bare "?".
-func writeResponseParams(redirectURI string, params []responseParam) (string, error) {
+// bare "?". An empty params with a non-empty reservedNames still filters, so the reserved
+// names are gone from the query whichever response mode or path selected them; no
+// authorization emitter reaches that combination, because every response it can build
+// carries at least one parameter.
+func writeResponseParams(redirectURI string, params []responseParam, reservedNames []string) (string, error) {
 	redirUrl, err := url.Parse(redirectURI)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to parse redirect URI")
@@ -106,7 +146,8 @@ func writeResponseParams(redirectURI string, params []responseParam) (string, er
 			// unescapable name cannot decode to any parameter this server writes, and is
 			// kept as it stands rather than dropped, since the point is to preserve what
 			// was registered.
-			if decoded, err := url.QueryUnescape(name); err == nil && isResponseParamName(decoded, params) {
+			if decoded, err := url.QueryUnescape(name); err == nil &&
+				(isResponseParamName(decoded, params) || slices.Contains(reservedNames, decoded)) {
 				continue
 			}
 			fields = append(fields, field)

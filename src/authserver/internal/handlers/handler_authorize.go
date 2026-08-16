@@ -860,7 +860,13 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 	// generated, which is the defect this change exists to remove. Re-encoding also silently
 	// rewrote the registered query in five separate ways, against RFC 6749 3.1.2's "MUST be
 	// retained". Both are the shared helper's to prevent, and its comment carries the detail (#146).
-	location, err := writeResponseParams(input.redirectURI, params)
+	//
+	// authorizationResponseParamNames, so a registered "code" is dropped from an error response as
+	// well: without it a client registering "?code=stale" was refused with
+	// "?code=stale&error=access_denied&...", a response carrying an authorization code and an error
+	// at once. The reserved set is filtered whether or not this response emits the name, which is
+	// what makes that true (#146).
+	location, err := writeResponseParams(input.redirectURI, params, authorizationResponseParamNames)
 	if err != nil {
 		return errors.Wrap(err, "unable to build the error redirect")
 	}

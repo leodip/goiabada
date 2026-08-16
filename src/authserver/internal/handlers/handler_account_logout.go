@@ -956,15 +956,22 @@ func finishLogout(
 //     their two specifications do (#146).
 //
 // With statePresent false nothing is written, so a registered post-logout "?state=fixed"
-// is kept rather than filtered: an empty params replaces no field. That is the behaviour
-// this function had before it delegated, preserved deliberately.
+// is kept rather than filtered: an empty params replaces no field, and the nil reserved-name
+// set reserves none. That is the behaviour this function had before it delegated, preserved
+// deliberately, and it is where this site parts company with the authorization emitters:
+// they pass authorizationResponseParamNames and drop a registered "state" whether or not
+// they emit one, because a client that sent no state should not read one back off the
+// redirect carrying its authorization code. Here there is no such redirect and no such
+// code, and RP-Initiated Logout 1.0 says only "If included in the logout request, the OP
+// passes this value back to the RP", so a fixed post-logout state is a client's to keep
+// (#146).
 func buildPostLogoutRedirect(registeredURI string, state string, statePresent bool) (string, error) {
 	var params []responseParam
 	if statePresent {
 		params = []responseParam{{"state", state}}
 	}
 
-	location, err := writeResponseParams(registeredURI, params)
+	location, err := writeResponseParams(registeredURI, params, nil)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to parse post-logout redirect URI")
 	}

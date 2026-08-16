@@ -571,7 +571,14 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 	// only on a refusal. Re-encoding also rewrote the registered query in five separate ways,
 	// against RFC 6749 3.1.2's "MUST be retained". Both are the shared helper's to prevent, and its
 	// comment carries the detail (#146).
-	location, err := writeResponseParams(code.RedirectURI, params)
+	//
+	// authorizationResponseParamNames, so a registered "error" is dropped from a success response as
+	// well: without it a client registering "?error=stale" completed an authorization and received
+	// "?error=stale&code=fresh&state=...", which an RP checking for "error" before reading "code"
+	// reads as a refusal of the authorization it just granted. It is also what drops a registered
+	// "?state=fixed" when the request carried no state of its own, so the client is never handed a
+	// state on this redirect that it did not send (#146).
+	location, err := writeResponseParams(code.RedirectURI, params, authorizationResponseParamNames)
 	if err != nil {
 		return errors.Wrap(err, "unable to build the authorization code redirect")
 	}
