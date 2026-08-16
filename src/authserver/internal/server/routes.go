@@ -63,6 +63,8 @@ func (s *Server) initRoutes() {
 	authServerConfig := config.GetAuthServer()
 	rateLimiter := core_middleware.NewRateLimiterMiddleware(
 		authHelper,
+		httpHelper,
+		auditLogger,
 		authServerConfig.RateLimiterEnabled,
 	)
 

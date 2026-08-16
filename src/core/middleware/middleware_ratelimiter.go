@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/go-chi/httprate"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -16,41 +19,235 @@ type AuthHelper interface {
 	GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
 }
 
-type RateLimiterMiddleware struct {
-	authHelper         AuthHelper
-	enabled            bool
-	pwdLimiter         *httprate.RateLimiter
-	pwdIpLimiter       *httprate.RateLimiter
-	otpLimiter         *httprate.RateLimiter
-	activateLimiter    *httprate.RateLimiter
-	resetPwdLimiter    *httprate.RateLimiter
-	forgotPwdLimiter   *httprate.RateLimiter
-	forgotPwdIpLimiter *httprate.RateLimiter
-	dcrLimiter         *httprate.RateLimiter
-	ropcLimiter        *httprate.RateLimiter // RFC 6749 §4.3.2 MUST protect against brute force
+// ErrorRenderer renders an HTML error page. Declared here rather than imported for the
+// reason AuthHelper is: the concrete type lives in a module that depends on core, so core
+// can only name the shape it needs. *handlerhelpers.HttpHelper satisfies it.
+type ErrorRenderer interface {
+	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
+		data map[string]interface{}) error
 }
 
-func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddleware {
-	return &RateLimiterMiddleware{
-		authHelper:   authHelper,
-		enabled:      enabled,
-		pwdLimiter:   httprate.NewRateLimiter(15, 1*time.Minute), // per-email: bounds brute force on one account
-		pwdIpLimiter: httprate.NewRateLimiter(30, 1*time.Minute), // per-IP: stops one host hammering many accounts
-		otpLimiter:   httprate.NewRateLimiter(10, 1*time.Minute),
-		// per-IP: 10 activation operations per 5 minutes, at the two requests an activation
-		// now costs (the link's GET, the clean GET). The same operation rate as
-		// resetPwdLimiter over a chain one request shorter (#112)
-		activateLimiter: httprate.NewRateLimiter(20, 5*time.Minute),
-		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
-		// costs (the link's GET, the clean GET, the clean POST). Half of what
-		// forgotPwdIpLimiter allows, which is the only other endpoint with an IP tier (#112)
-		resetPwdLimiter:    httprate.NewRateLimiter(30, 5*time.Minute),
-		forgotPwdLimiter:   httprate.NewRateLimiter(5, 5*time.Minute),  // per-email: mail-bomb protection
-		forgotPwdIpLimiter: httprate.NewRateLimiter(20, 5*time.Minute), // per-IP: resource DoS protection
-		dcrLimiter:         httprate.NewRateLimiter(10, 1*time.Minute), // RFC 7591 §3 DoS protection
-		ropcLimiter:        httprate.NewRateLimiter(5, 1*time.Minute),  // RFC 6749 §4.3.2 brute force protection
+// AuditLogger records a security event. Same reasoning as ErrorRenderer: the concrete
+// logger lives in the authserver module.
+type AuditLogger interface {
+	Log(auditEvent string, details map[string]interface{})
+}
+
+// rejectClass is the shape a rejected caller can parse. A browser gets the error page it
+// would get from any other refusal; an OAuth2 or RFC 7591 client gets the JSON error
+// object it is already parsing at that endpoint. Answering every route in plain text, as
+// httprate's default does, breaks both machine callers (#219).
+type rejectClass int
+
+const (
+	rejectBrowser rejectClass = iota
+	rejectOAuth
+)
+
+// tier is one rate-limit bucket plus everything a rejection has to say about it.
+//
+// The pairing is the point. httprate.WithLimitHandler takes an http.HandlerFunc, so a
+// reject reached through it learns neither which limiter tripped nor which bucket, and the
+// audit event needs both while the log line needs the name. Holding them together means a
+// limiter cannot be wired to another limiter's gate or another route's response shape.
+type tier struct {
+	rl    *httprate.RateLimiter
+	name  string
+	class rejectClass
+	// keyField is the slog attribute the bucket key is logged under, empty when the key
+	// names a person. The request logger in this package establishes that identifiers are
+	// kept out of logs by allowlist rather than by denylist, and email is deliberately not
+	// on that list, so the account tiers log their limiter name and nothing else. The
+	// identifier is carried by the audit event instead, which is the surface built to hold
+	// one (#219).
+	keyField string
+	// auditGate bounds the audit writes to one event per key per window. Its budget is 1
+	// over the protected limiter's own window, so OnLimit returns false exactly once per
+	// key per window and that first call is the report. Per limiter rather than one shared
+	// gate: windows here are 1, 5 and 15 minutes, and a single shared duration would either
+	// under-report the short windows by up to 15x or over-report the long ones.
+	auditGate *httprate.RateLimiter
+}
+
+// rateLimitHeaders leaves Retry-After and blanks the four X-RateLimit-* names, which
+// httprate's setHeader skips when the configured name is empty.
+//
+// They rode every response including successful ones, so any caller could read the exact
+// budget, how much of it was left and whether the limiter was switched on at all without
+// tripping anything. And on a two-tier limiter the second OnLimit overwrote the first, so
+// /auth/pwd reported the per-email budget as though it were the per-IP one (#219).
+// Retry-After stays because RFC 6585 Section 4 names it as what a 429 MAY carry.
+var rateLimitHeaders = httprate.WithResponseHeaders(httprate.ResponseHeaders{
+	RetryAfter: "Retry-After",
+})
+
+func newTier(name string, class rejectClass, keyField string, limit int, window time.Duration) *tier {
+	return &tier{
+		rl:        httprate.NewRateLimiter(limit, window, rateLimitHeaders),
+		name:      name,
+		class:     class,
+		keyField:  keyField,
+		auditGate: httprate.NewRateLimiter(1, window, rateLimitHeaders),
 	}
 }
+
+type RateLimiterMiddleware struct {
+	authHelper  AuthHelper
+	renderer    ErrorRenderer
+	auditLogger AuditLogger
+	enabled     bool
+	pwdLimiter  *tier
+	pwdIp       *tier
+	otp         *tier
+	activate    *tier
+	resetPwd    *tier
+	forgotPwd   *tier
+	forgotPwdIp *tier
+	dcr         *tier
+	ropc        *tier // RFC 6749 §4.3.2 MUST protect against brute force
+}
+
+func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, auditLogger AuditLogger,
+	enabled bool) *RateLimiterMiddleware {
+
+	return &RateLimiterMiddleware{
+		authHelper:  authHelper,
+		renderer:    renderer,
+		auditLogger: auditLogger,
+		enabled:     enabled,
+		// per-email: bounds brute force on one account
+		pwdLimiter: newTier("pwd_email", rejectBrowser, "", 15, 1*time.Minute),
+		// per-IP: stops one host hammering many accounts
+		pwdIp: newTier("pwd_ip", rejectBrowser, "ip", 30, 1*time.Minute),
+		otp:   newTier("otp", rejectBrowser, "", 10, 1*time.Minute),
+		// per-IP: 10 activation operations per 5 minutes, at the two requests an activation
+		// now costs (the link's GET, the clean GET). The same operation rate as
+		// resetPwd over a chain one request shorter (#112)
+		activate: newTier("activate", rejectBrowser, "ip", 20, 5*time.Minute),
+		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
+		// costs (the link's GET, the clean GET, the clean POST). Half of what
+		// forgotPwdIp allows, which is the only other endpoint with an IP tier (#112)
+		resetPwd: newTier("reset_pwd", rejectBrowser, "ip", 30, 5*time.Minute),
+		// per-email: mail-bomb protection
+		forgotPwd: newTier("forgot_pwd_email", rejectBrowser, "", 5, 5*time.Minute),
+		// per-IP: resource DoS protection
+		forgotPwdIp: newTier("forgot_pwd_ip", rejectBrowser, "ip", 20, 5*time.Minute),
+		// RFC 7591 §3 DoS protection
+		dcr: newTier("dcr", rejectOAuth, "ip", 10, 1*time.Minute),
+		// RFC 6749 §4.3.2 brute force protection
+		ropc: newTier("ropc", rejectOAuth, "", 5, 1*time.Minute),
+	}
+}
+
+// tripped charges one request against the tier's bucket and, when that trips the budget,
+// reports the trip and writes the rejection. It returns true when the caller must stop.
+//
+// OnLimit rather than RespondOnLimit: RespondOnLimit's only addition is httprate's default
+// handler, which answers "Too Many Requests\n" as text/plain on every route, and dropping
+// it removes that default rather than overriding it. OnLimit sets Retry-After itself on the
+// reject path, which is the one header a 429 keeps.
+//
+// details carries the identifier the audit event records, which is the one this limiter's
+// neighbours in the audit log already carry for the same event: the email for account
+// tiers, the user id for the OTP tier, the client block for IP tiers.
+func (m *RateLimiterMiddleware) tripped(w http.ResponseWriter, r *http.Request, t *tier, key string,
+	details map[string]interface{}) bool {
+
+	if !t.rl.OnLimit(w, r, key) {
+		return false
+	}
+	m.reportTrip(r, t, key, details)
+	m.reject(w, r, t.class)
+	return true
+}
+
+// reportTrip writes the two records a rejection leaves: a warning line every time, and an
+// audit event at most once per key per window.
+//
+// Warn rather than Error because a limiter doing its job is an expected event, and an auth
+// server whose error log fills with them has no error log left.
+func (m *RateLimiterMiddleware) reportTrip(r *http.Request, t *tier, key string,
+	details map[string]interface{}) {
+
+	attrs := []any{"limiter", t.name}
+	if t.keyField != "" {
+		attrs = append(attrs, t.keyField, key)
+	}
+	slog.Warn("Rate limiter - limit reached", attrs...)
+
+	if m.auditLogger == nil {
+		return
+	}
+	// OnLimit is the only exported call that both reads and increments a bucket, so the
+	// gate is asked with a throwaway writer: false means this key has not been reported in
+	// this window yet, and that first call is the report.
+	if t.auditGate.OnLimit(&discardResponseWriter{}, r, t.name+"|"+key) {
+		return
+	}
+	if details == nil {
+		details = map[string]interface{}{}
+	}
+	details["limiter"] = t.name
+	m.auditLogger.Log(constants.AuditRateLimitExceeded, details)
+}
+
+// reject writes the 429 in the shape the route's caller parses.
+func (m *RateLimiterMiddleware) reject(w http.ResponseWriter, r *http.Request, class rejectClass) {
+	// RFC 6585 Section 4's "Responses with the 429 status code MUST NOT be stored by a
+	// cache" binds caches rather than this origin. Saying it in the response is free and
+	// makes the intent explicit to an intermediary that ignores the status code.
+	w.Header().Set("Cache-Control", "no-store")
+
+	if class == rejectOAuth {
+		// RFC 6749 Section 5.2 puts the token error parameters in "the "application/json"
+		// media type", and RFC 7591 Section 3.2.2 requires a registration error with
+		// "content type application/json". Go writes no header for a hand-encoded body, so
+		// without this the response would be JSON labelled text/plain.
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Pragma", "no-cache")
+		w.WriteHeader(http.StatusTooManyRequests)
+		// invalid_request because RFC 6749 Section 5.2 makes error "REQUIRED. A single
+		// ASCII error code from the following", a closed list extended only through the
+		// IANA registry, and it permits a status other than 400. slow_down is the
+		// registry's only token-endpoint entry about request rate and it means "the
+		// authorization request is still pending and polling should continue" (RFC 8628
+		// Section 3.5), which would tell a conformant client to keep polling a rejected
+		// request (#219).
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error":             "invalid_request",
+			"error_description": "Too many requests. Please wait and try again later.",
+		})
+		return
+	}
+
+	bind := map[string]interface{}{
+		"title":       i18n.T(r.Context(), "auth_error.rate_limited.title"),
+		"error":       i18n.T(r.Context(), "auth_error.rate_limited.message"),
+		"_httpStatus": http.StatusTooManyRequests,
+	}
+	if err := m.renderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
+		slog.Error("Rate limiter - unable to render the rejection page", "error", err)
+		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+	}
+}
+
+// discardResponseWriter absorbs what httprate writes when OnLimit is being used purely as
+// a counter. The audit gate calls it for its return value alone and must not touch the
+// real response.
+type discardResponseWriter struct {
+	header http.Header
+}
+
+func (d *discardResponseWriter) Header() http.Header {
+	if d.header == nil {
+		d.header = http.Header{}
+	}
+	return d.header
+}
+
+func (d *discardResponseWriter) Write(b []byte) (int, error) { return len(b), nil }
+
+func (d *discardResponseWriter) WriteHeader(int) {}
 
 func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -63,15 +260,13 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 		// Per-IP ceiling first: stops a single host from hammering many distinct
 		// accounts. The client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
-		if m.pwdIpLimiter.RespondOnLimit(w, r, ipKey) {
-			slog.Error("Rate limiter - limit reached (pwd, by IP)", "ip", ipKey)
+		if m.tripped(w, r, m.pwdIp, ipKey, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
 		// Per-account limit: bounds brute force against a single email.
 		emailKey := accountRateLimitKey(r.FormValue("email"))
-		if m.pwdLimiter.RespondOnLimit(w, r, emailKey) {
-			slog.Error("Rate limiter - limit reached (pwd, by email)", "email", emailKey)
+		if m.tripped(w, r, m.pwdLimiter, emailKey, map[string]interface{}{"email": emailKey}) {
 			return
 		}
 
@@ -102,8 +297,7 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 		// Use user ID as rate limit key since we already authenticated the user
 		key := fmt.Sprintf("user_%d", authContext.UserId)
 
-		if m.otpLimiter.RespondOnLimit(w, r, key) {
-			slog.Error("Rate limiter - limit reached (otp)", "userId", authContext.UserId)
+		if m.tripped(w, r, m.otp, key, map[string]interface{}{"userId": authContext.UserId}) {
 			return
 		}
 
@@ -132,8 +326,7 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 
 		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
-		if m.activateLimiter.RespondOnLimit(w, r, ipKey) {
-			slog.Error("Rate limiter - limit reached (activate, by IP)", "ip", ipKey)
+		if m.tripped(w, r, m.activate, ipKey, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
@@ -162,8 +355,7 @@ func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 
 		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
-		if m.resetPwdLimiter.RespondOnLimit(w, r, ipKey) {
-			slog.Error("Rate limiter - limit reached (resetPwd, by IP)", "ip", ipKey)
+		if m.tripped(w, r, m.resetPwd, ipKey, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
@@ -186,15 +378,13 @@ func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
 		// Per-IP ceiling: stops one host from mail-bombing many addresses. The
 		// client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
-		if m.forgotPwdIpLimiter.RespondOnLimit(w, r, ipKey) {
-			slog.Error("Rate limiter - limit reached (forgot-password, by IP)", "ip", ipKey)
+		if m.tripped(w, r, m.forgotPwdIp, ipKey, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
 		// Per-email limit: prevents mail-bombing a specific address.
 		emailKey := accountRateLimitKey(r.FormValue("email"))
-		if m.forgotPwdLimiter.RespondOnLimit(w, r, emailKey) {
-			slog.Error("Rate limiter - limit reached (forgot-password, by email)", "email", emailKey)
+		if m.tripped(w, r, m.forgotPwd, emailKey, map[string]interface{}{"email": emailKey}) {
 			return
 		}
 
@@ -214,8 +404,7 @@ func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 		// Use IP address as rate limit key
 		ipKey := clientIPRateLimitKey(r)
 
-		if m.dcrLimiter.RespondOnLimit(w, r, ipKey) {
-			slog.Error("Rate limiter - limit reached (DCR)", "ip", ipKey)
+		if m.tripped(w, r, m.dcr, ipKey, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
@@ -305,11 +494,10 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 		// Use composite key for more precise rate limiting
 		key := fmt.Sprintf("ropc_%s_%s_%s", clientId, username, ipKey)
 
-		if m.ropcLimiter.RespondOnLimit(w, r, key) {
-			slog.Error("Rate limiter - limit reached (ROPC)",
-				"username", username,
-				"clientId", clientId,
-				"ip", ipKey)
+		if m.tripped(w, r, m.ropc, key, map[string]interface{}{
+			"email":    accountRateLimitKey(username),
+			"clientId": clientId,
+		}) {
 			return
 		}
 

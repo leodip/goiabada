@@ -91,6 +91,8 @@
 "auth_error.page_title" = "Erro"
 "auth_error.ceremony_mismatch.title" = "Esta solicitação não está mais ativa"
 "auth_error.ceremony_mismatch.message" = "Esta página pertence a uma solicitação de acesso que não é mais a que está em andamento. Outra foi iniciada neste navegador, portanto este formulário não pode mais ser enviado. Volte para o aplicativo em que você estava entrando e comece de novo."
+"auth_error.rate_limited.title" = "Tentativas em excesso"
+"auth_error.rate_limited.message" = "Chegaram muitas solicitações deste navegador, ou para esta conta, em pouco tempo. Aguarde alguns minutos e tente novamente."
 
 # --- Redirecionamento retido para cliente auto-registrado (auth_redirect_blocked.html)
 # Neutro de propósito quanto ao motivo: esta página é vista tanto por quem recusou quanto por quem

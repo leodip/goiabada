@@ -93,6 +93,8 @@
 "auth_error.page_title" = "Error"
 "auth_error.ceremony_mismatch.title" = "This request is no longer active"
 "auth_error.ceremony_mismatch.message" = "This page belongs to a sign-in request that is no longer the one in progress. Another one was started in this browser, so this form can no longer be submitted. Go back to the application you were signing in to and start again."
+"auth_error.rate_limited.title" = "Too many attempts"
+"auth_error.rate_limited.message" = "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
 
 # --- Withheld redirect for a self-registered client (auth_redirect_blocked.html)
 # Neutral about why the request stopped on purpose: this page is reached both by someone who
