@@ -130,9 +130,15 @@ type failureTier struct {
 	inFlight map[string]int
 }
 
-func newFailureTier(name string, keyField string, limit int, window time.Duration) *failureTier {
+// newFailureTier takes no keyField, unlike newTier, because a failures-only tier is by
+// construction keyed on an identifier that names a person: only a credential check can
+// spend one, and the credential names the account. That is exactly the case tier.keyField
+// must be empty for, so the empty value is passed here rather than at each call site,
+// which makes the invariant structural instead of something every caller has to remember
+// (#219).
+func newFailureTier(name string, limit int, window time.Duration) *failureTier {
 	return &failureTier{
-		tier:     *newTier(name, keyField, limit, window),
+		tier:     *newTier(name, "", limit, window),
 		limit:    limit,
 		inFlight: map[string]int{},
 	}
@@ -272,12 +278,12 @@ type RateLimiterMiddleware struct {
 	// emailVerification bounds guessing at the account's own email verification code.
 	emailVerification *failureTier
 	activate          *tier
-	register    *tier
-	resetPwd    *tier
-	forgotPwd   *tier
-	forgotPwdIp *tier
-	dcr         *tier
-	ropcIp      *tier // RFC 6749 §4.3.2 MUST protect against brute force
+	register          *tier
+	resetPwd          *tier
+	forgotPwd         *tier
+	forgotPwdIp       *tier
+	dcr               *tier
+	ropcIp            *tier // RFC 6749 §4.3.2 MUST protect against brute force
 }
 
 func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, auditLogger AuditLogger,
@@ -296,8 +302,8 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 		// 800-63B §3.2.2 names. Both count failures only, so a user who signs in spends
 		// nothing (#219).
 		pwdAccount: &accountFailureGate{
-			tight:    newFailureTier("pwd_account_net", "", 10, 15*time.Minute),
-			backstop: newFailureTier("pwd_account", "", 100, 60*time.Minute),
+			tight:    newFailureTier("pwd_account_net", 10, 15*time.Minute),
+			backstop: newFailureTier("pwd_account", 100, 60*time.Minute),
 		},
 		// per-IP: stops one host hammering many accounts
 		pwdIp: newTier("pwd_ip", "ip", 30, 1*time.Minute),
@@ -307,7 +313,7 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 		// Five rather than three because the same limiter covers enrollment, where
 		// pointing the wrong entry in an authenticator app at the form burns codes, and a
 		// resubmitted code is refused as a replay and so counts as a failure too (#219).
-		otp: newFailureTier("otp", "", 5, 15*time.Minute),
+		otp: newFailureTier("otp", 5, 15*time.Minute),
 		// per-subject email verification failures. The code is four letters plus four
 		// digits, 26^4 x 10^4, so 5 failures per 15 minutes puts a hit on the far side of a
 		// human lifetime. It needs a bound at all because the chain in front of it is short:
@@ -315,7 +321,7 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 		// verified flag, so guessing the code from there buys email_verified: true on an
 		// address the attacker does not control. Failures only, so a user reading the code
 		// out of their inbox spends nothing (#219).
-		emailVerification: newFailureTier("email_verification", "", 5, 15*time.Minute),
+		emailVerification: newFailureTier("email_verification", 5, 15*time.Minute),
 		// per-IP: 10 activation operations per 5 minutes, at the two requests an activation
 		// now costs (the link's GET, the clean GET). The same operation rate as
 		// resetPwd over a chain one request shorter (#112)
