@@ -23,6 +23,7 @@ func HandleTokenPost(
 	tokenIssuer TokenIssuer,
 	tokenValidator TokenValidator,
 	auditLogger AuditLogger,
+	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
@@ -147,6 +148,42 @@ func HandleTokenPost(
 			// let anyone manufacture rows implicating a legitimate client. That degrades the exact
 			// signal this event exists to provide. A handler test asserts the ABSENCE of an event
 			// there; if it fails, do not "fix" it by adding the call.
+			// A resource-owner password guess that failed: charge the rate limiter's
+			// reservation and record the event RFC 6749 Section 4.3.2 contemplates when it
+			// names "generating alerts" beside rate limitation. Both belong here because
+			// this is the only place that knows the guess was wrong; the limiter reserved
+			// the account's slot before the handler ran and drops it silently otherwise.
+			//
+			// invalid_grant is the whole of the predicate, and it is narrower than it looks.
+			// The validator's other password-grant failures are unauthorized_client (the
+			// grant is switched off), invalid_request (a missing username or password) and
+			// invalid_client (client authentication), none of which compared a credential
+			// against an account, so charging them would let a caller spend an account's
+			// budget without guessing and would fill the audit log with rows naming a
+			// username nothing checked. What invalid_grant does cover is a wrong password,
+			// an unknown user, a disabled user and a 2FA-blocked user, which is exactly the
+			// set AuditROPCAuthFailed is documented to mean.
+			//
+			// ErrClientDisabled is the one exception, and it is the reason this is not a
+			// bare code test: that check runs before the grant-type switch and before any
+			// credential is read, so it is an invalid_grant that guessed nothing.
+			if errDetail, ok := err.(*customerrors.ErrorDetail); ok &&
+				input.GrantType == "password" && errDetail.GetCode() == "invalid_grant" &&
+				!errDetail.IsError(customerrors.ErrClientDisabled) {
+
+				credentialFailures.RecordCredentialFailure(r)
+				auditLogger.Log(constants.AuditROPCAuthFailed, map[string]interface{}{
+					// Normalized to what the limiter keyed its bucket on and to what every
+					// write path stores, so the audit row and the budget name one account.
+					"email": strings.ToLower(strings.TrimSpace(input.Username)),
+					// clientIdentifier, the string from the request, for the reason
+					// AuditTokenScopeDenied gives: the validator discards the client model on
+					// failure. A public client's identifier is caller-supplied, so read it as
+					// the client the caller named rather than as proof of who called.
+					"clientIdentifier": input.ClientId,
+				})
+			}
+
 			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.GetCode() == "invalid_scope" {
 				auditLogger.Log(constants.AuditTokenScopeDenied, map[string]interface{}{
 					// clientIdentifier, the string from the request, not the numeric clientId the

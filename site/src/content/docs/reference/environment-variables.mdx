@@ -222,9 +222,13 @@ When enabled, Goiabada applies rate limits to security-sensitive endpoints:
 | `GET` and `POST /reset-password` | 30 / 5min | every request | IP address (IPv6 grouped by /64) |
 | `GET /account/activate` | 20 / 5min | every request | IP address (IPv6 grouped by /64) |
 | `POST /connect/register` (DCR) | 10 / min | every request | IP address (IPv6 grouped by /64) |
-| `POST /auth/token` (ROPC grant) | 5 / min | every request | client_id + username + IP (IPv6 grouped by /64) |
+| `POST /auth/token` (ROPC grant) | 10 / 15min | failed sign-ins | IP address (IPv6 grouped by /64) + username (lowercased), shared with `POST /auth/pwd` |
+| `POST /auth/token` (ROPC grant) | 100 / 60min | failed sign-ins | username (lowercased), shared with `POST /auth/pwd` |
+| `POST /auth/token` (ROPC grant) | 30 / min | every request | IP address (IPv6 grouped by /64) |
 
 A limit that counts failures is not spent by a successful sign-in, so signing in normally never uses it up.
+
+Shared means one budget, not two of the same size: a wrong password counts the same whether it arrives at the login form or at the password grant.
 
 Counters are held in the process, so a deployment running several replicas multiplies every budget by the replica count and resets them on deploy.
 
