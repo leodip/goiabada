@@ -18,6 +18,7 @@ func TestWriteResponseParams(t *testing.T) {
 		name        string
 		redirectURI string
 		params      []responseParam
+		reserved    []string
 		expected    string
 		expectError bool
 	}{
@@ -111,11 +112,71 @@ func TestWriteResponseParams(t *testing.T) {
 			params:      []responseParam{{"state", "st"}},
 			expectError: true,
 		},
+		// Every row above leaves reserved nil, which is what buildPostLogoutRedirect passes:
+		// a registered field is replaced only when the response actually writes that name.
+		// The rows below are the authorization emitters' set, where the four names are the
+		// response's whether or not this particular response emits them. Each is a row of
+		// the table in decision 13 of #146, driven at the seam the emitters share.
+		{
+			name:        "An unsent state is dropped rather than answered from the registered query",
+			redirectURI: "https://app.example.com/cb?state=fixed&lang=en",
+			params:      []responseParam{{"code", "fresh-code"}},
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb?lang=en&code=fresh-code",
+		},
+		{
+			name:        "A registered error does not ride along with an authorization code",
+			redirectURI: "https://app.example.com/cb?error=stale&error_description=stale-detail&lang=en",
+			params:      []responseParam{{"code", "fresh-code"}, {"state", "client-csrf"}},
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb?lang=en&code=fresh-code&state=client-csrf",
+		},
+		{
+			name:        "A registered code does not ride along with an error",
+			redirectURI: "https://app.example.com/cb?code=stale&lang=en",
+			params:      []responseParam{{"error", "access_denied"}, {"error_description", "denied"}, {"state", "client-csrf"}},
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb?lang=en&error=access_denied&error_description=denied&state=client-csrf",
+		},
+		{
+			// error_uri is defined by RFC 6749 4.1.2.1 and is deliberately not in the set,
+			// because this server never emits it: reserving it would delete a registered
+			// field that no response of ours can collide with.
+			name:        "A registered error_uri survives, because no response emits one",
+			redirectURI: "https://app.example.com/cb?error_uri=https%3A%2F%2Fstale&lang=en",
+			params:      []responseParam{{"error", "access_denied"}, {"error_description", "denied"}},
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb?error_uri=https%3A%2F%2Fstale&lang=en&error=access_denied&error_description=denied",
+		},
+		{
+			name:        "A percent-encoded reserved name is dropped even when unsent",
+			redirectURI: "https://app.example.com/cb?%73tate=fixed&lang=en",
+			params:      []responseParam{{"code", "fresh-code"}},
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb?lang=en&code=fresh-code",
+		},
+		{
+			// No authorization emitter reaches this, since every response it builds carries
+			// at least one parameter. Pinned so the reserved filter is known to be
+			// independent of params rather than accidentally coupled to it.
+			name:        "Reserved names are dropped even with no params to write",
+			redirectURI: "https://app.example.com/cb?state=fixed&code=stale",
+			params:      nil,
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb",
+		},
+		{
+			name:        "A reserved name the response also emits is dropped exactly once",
+			redirectURI: "https://app.example.com/cb?state=fixed&lang=en",
+			params:      []responseParam{{"code", "fresh-code"}, {"state", "client-csrf"}},
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb?lang=en&code=fresh-code&state=client-csrf",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := writeResponseParams(tt.redirectURI, tt.params)
+			result, err := writeResponseParams(tt.redirectURI, tt.params, tt.reserved)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -153,7 +214,7 @@ func TestWriteResponseParams_ByteExactValues(t *testing.T) {
 			// the helper an empty state under RFC 6749 section 3.1: buildPostLogoutRedirect
 			// still can, because RP-Initiated Logout 1.0 carries no valueless-parameter
 			// rule and #109's presence flag is untouched.
-			result, err := writeResponseParams("https://app.example.com/cb", []responseParam{{"state", tt.state}})
+			result, err := writeResponseParams("https://app.example.com/cb", []responseParam{{"state", tt.state}}, nil)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, result)

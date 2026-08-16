@@ -1424,6 +1424,37 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#error=access_denied&error_description=Access+denied&state=client-csrf-token",
 			w.Header().Get("Location"))
 	})
+
+	// The reserved set reaches this emitter. Both cases turn on a name the error response does
+	// not itself emit, so filtering only what is being written leaves the registered field in
+	// place and both assertions fail (#146, decision 13).
+	t.Run("query mode drops a registered state the request did not supply", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+			"query", "https://example.com/callback?state=fixed&lang=en", "", "code"))
+
+		require.NoError(t, err)
+		// No state is emitted, because the request carried none, and the registered one does not
+		// stand in for it: a state on this redirect is the client's own or it is absent.
+		assert.Equal(t, "https://example.com/callback?lang=en&error=access_denied&error_description=Access+denied",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("query mode drops a registered code from an error response", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+			"query", "https://example.com/callback?code=stale&lang=en", "client-csrf-token", "code"))
+
+		require.NoError(t, err)
+		// Otherwise a refusal arrives carrying an authorization code, and an RP that reads "code"
+		// before "error" tries to redeem a value this server never issued on this request.
+		assert.Equal(t, "https://example.com/callback?lang=en&error=access_denied&error_description=Access+denied&state=client-csrf-token",
+			w.Header().Get("Location"))
+	})
 }
 
 // RFC 6749 4.1.2.1 and 4.2.2.1 both require "the exact value received from the client", so every

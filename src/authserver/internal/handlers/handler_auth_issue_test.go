@@ -2351,6 +2351,47 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#code=test_code&state=client-csrf-token",
 			w.Header().Get("Location"))
 	})
+
+	// The reserved set reaches this emitter. Both cases turn on a name the success response does
+	// not itself emit, so filtering only what is being written leaves the registered field in
+	// place and both assertions fail (#146, decision 13).
+	t.Run("query mode drops a registered state the request did not supply", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{
+			Code:        "test_code",
+			RedirectURI: "https://example.com/callback?state=fixed&lang=en",
+			State:       "",
+		}
+
+		err := issueAuthCode(w, r, nil, code, "query")
+
+		assert.NoError(t, err)
+		// This is the redirect carrying the authorization code, so a state on it is what an RP's
+		// RFC 9700 2.1 CSRF check compares against. A client that sent none must read none back
+		// rather than a value it never bound to the user agent.
+		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("query mode drops a registered error from a success response", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{
+			Code:        "test_code",
+			RedirectURI: "https://example.com/callback?error=stale&error_description=stale-detail&lang=en",
+			State:       "client-csrf-token",
+		}
+
+		err := issueAuthCode(w, r, nil, code, "query")
+
+		assert.NoError(t, err)
+		// Otherwise the callback says success and failure at once, and an RP that checks for
+		// "error" before reading "code", which is the usual order, treats the authorization the
+		// user just granted as a refusal.
+		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code&state=client-csrf-token",
+			w.Header().Get("Location"))
+	})
 }
 
 // Emptiness is the whole of the rule, in both directions, and it is the same rule the error emitter
