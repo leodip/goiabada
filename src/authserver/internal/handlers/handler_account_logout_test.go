@@ -1039,15 +1039,18 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	// signed-out page with the note, because whether a redirect can be honoured is a question about
 	// the response and never about whether the logout happens (#109).
 	//
-	// The table is three groups that fail for different reasons, and only the first is ordinary.
+	// The table is four groups that fail for different reasons, and only the first is ordinary.
 	// Rows 1 to 3 are plain refusals: the request did not earn a redirect. Rows 4 to 11 are near
 	// misses, where the requested URI differs from a registered one in a way exact string comparison
 	// catches and a looser one does not; they exist because no plain refusal can tell those apart,
 	// so every loose comparison listed below passed this table before its row was added. Rows 12 to
-	// 14 are faults, a database that will not answer and a registered URI that will not parse, and
-	// those are the shapes where a plausible future edit turns "lose the redirect" into "return a
-	// 500", which would put a user who is still signed in on a terminal page. Every row asserts the
-	// whole teardown and the absence of an InternalServerError, not just the absent Location.
+	// 14 are the opposite case, a requested URI that matches a registered one byte for byte and is
+	// refused anyway because the value cannot name the host it appears to; no comparison can catch
+	// those, and they are the rows the absolute-URI gate owns (#122). Rows 15 to 17 are faults, a
+	// database that will not answer and a registered URI that will not parse, and those are the
+	// shapes where a plausible future edit turns "lose the redirect" into "return a 500", which
+	// would put a user who is still signed in on a terminal page. Every row asserts the whole
+	// teardown and the absence of an InternalServerError, not just the absent Location.
 	//
 	// The near misses come in two families, and each row differs from its registration in exactly
 	// one respect so that it names the comparison it kills. Rows 4 to 6 kill comparisons that are
@@ -1076,6 +1079,21 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		// that state the property, rather than dying earlier on an unexpected mock call.
 		allowStateLookup := func(httpHelper *mocks_handlerhelpers.HttpHelper) {
 			httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("abc", true).Maybe()
+		}
+
+		// Same as registers, with the load optional, for the rows the absolute-URI gate refuses
+		// before the redirect URIs are ever fetched. Mandatory here would make the row pass on the
+		// mock rather than on the property, and would then fail the moment the gate was removed for
+		// a reason that says nothing about redirects (#122).
+		registersLoadOptional := func(uri string) func(*mocks_data.Database) {
+			return func(database *mocks_data.Database) {
+				client := &models.Client{
+					ClientIdentifier: "test_client",
+					RedirectURIs:     []models.RedirectURI{{URI: uri}},
+				}
+				database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+				database.On("ClientLoadRedirectURIs", mock.Anything, client).Return(nil).Maybe()
+			}
 		}
 
 		for _, tc := range []struct {
@@ -1190,6 +1208,43 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				stubHelper:  allowStateLookup,
 			},
 			{
+				// Rows 12 to 14 are a family of their own, and the one thing that separates them
+				// from every row above is that the requested URI IS registered, byte for byte. No
+				// comparison, loose or exact, can refuse them; only a rule about the shape of the
+				// value can. This endpoint matches the client's OAuth redirect_uris rows, so it
+				// inherits whatever the admin API accepted before #122 gated it, and none of that
+				// passes through the authorization endpoint's gate on its way here.
+				//
+				// Each is a Location today if the gate is absent: url.Parse accepts all three, so
+				// buildPostLogoutRedirect returns happily and the browser is forwarded.
+				name:        "the registered URI is scheme-relative, so the browser resolves it against this server's scheme",
+				clientId:    "test_client",
+				redirectURI: "//evil.example/cb",
+				stubDB:      registersLoadOptional("//evil.example/cb"),
+				stubHelper:  allowStateLookup,
+			},
+			{
+				// Decision 8's family. A valid RFC 3986 absolute-URI, which is exactly why the
+				// grammar rule alone does not catch it: Go parses no host and a user agent reading
+				// the emitted Location resolves it to evil.example on any deployment.
+				name:        "the registered URI is https with no authority",
+				clientId:    "test_client",
+				redirectURI: "https:///evil.example/cb",
+				stubDB:      registersLoadOptional("https:///evil.example/cb"),
+				stubHelper:  allowStateLookup,
+			},
+			{
+				// The host is the operator's own and the redirect still must not happen: url.Parse
+				// splits the fragment off, so the state written into the query lands before it and
+				// the RP is called at ".../out?state=abc#frag". A fragment is forbidden on a
+				// redirect URI by RFC 6749 section 3.1.2 for this reason.
+				name:        "the registered URI carries a fragment",
+				clientId:    "test_client",
+				redirectURI: "https://example.com/out#frag",
+				stubDB:      registersLoadOptional("https://example.com/out#frag"),
+				stubHelper:  allowStateLookup,
+			},
+			{
 				name:     "the client lookup fails",
 				clientId: "test_client",
 				stubDB: func(database *mocks_data.Database) {
@@ -1208,17 +1263,25 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				},
 			},
 			{
-				// The registered URI matches exactly and then fails to parse, so this row reaches
-				// buildPostLogoutRedirect's error return, which nothing else here does. A DEL byte
-				// is what url.Parse refuses; the shape is defensive rather than reachable through
-				// the admin UI, and defensive is exactly why it needs pinning.
+				// A registered URI that url.Parse refuses outright, a DEL byte being what it
+				// refuses. This row used to be the only one reaching buildPostLogoutRedirect's
+				// error return; the absolute-URI gate now takes it first, since that gate parses
+				// with the same parser and refuses what it cannot parse (#122). Two consequences,
+				// both deliberate.
+				//
+				// It is no longer a gate test, and the stubs say so by being optional: with the
+				// gate removed the row runs on, reaches buildPostLogoutRedirect, and still
+				// declines. What it states is a property of the handler that holds either way,
+				// which is that an unparseable target loses its redirect rather than becoming a
+				// 500 in front of a user who is still signed in.
+				//
+				// The pure function's error return is pinned by TestBuildPostLogoutRedirect's
+				// "://bad" row, which is where it belongs now that no handler path can reach it.
 				name:        "the redirect cannot be built from the registered URI",
 				clientId:    "test_client",
 				redirectURI: unparseableURI,
-				stubDB:      registers(unparseableURI),
-				stubHelper: func(httpHelper *mocks_handlerhelpers.HttpHelper) {
-					httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("abc", true)
-				},
+				stubDB:      registersLoadOptional(unparseableURI),
+				stubHelper:  allowStateLookup,
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {

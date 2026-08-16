@@ -412,6 +412,15 @@ func issueImplicitTokens(
 	state string,
 	tokenResponse *oauth.ImplicitGrantResponse,
 ) error {
+	// Gate 4, the last resort. This flow hands over access and ID tokens rather than a code, so a
+	// redirect URI that resolves to a host the operator never registered exfiltrates credentials
+	// directly rather than something still to be exchanged. Nothing can reach here with such a value
+	// once the authorization endpoint has refused it, and the check stays so that the property is
+	// enforced by a test rather than claimed by a comment (#122).
+	if err := checkRedirectURIEmittable("issueImplicitTokens", redirectURI); err != nil {
+		return err
+	}
+
 	values := url.Values{}
 
 	if tokenResponse.AccessToken != "" {
@@ -437,6 +446,18 @@ func issueImplicitTokens(
 }
 
 func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, code *models.Code, responseMode string) error {
+
+	// Gate 4, the last resort, ABOVE the response-mode dispatch so that it covers query, fragment
+	// and form_post alike. All three emit the stored value: the first two into a Location header,
+	// the third into the action of an auto-submitting form, which html/template's URL filter passes
+	// through untouched for a scheme-relative value. Unreachable once the authorization endpoint has
+	// refused the URI, and kept so that a test enforces it (#122).
+	//
+	// The caller answers a non-nil error with a 500, which leaves the code unredeemed rather than
+	// delivered to the wrong host; it expires in 60 seconds.
+	if err := checkRedirectURIEmittable("issueAuthCode", code.RedirectURI); err != nil {
+		return err
+	}
 
 	if responseMode == "" {
 		responseMode = "query"

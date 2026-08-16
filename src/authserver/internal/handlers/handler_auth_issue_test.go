@@ -1748,6 +1748,61 @@ func TestIssueImplicitTokens(t *testing.T) {
 		location := w.Header().Get("Location")
 		assert.NotContains(t, location, "scope=")
 	})
+
+	// Gate 4, the last resort (#122). The stake here is higher than at issueAuthCode: this function
+	// hands over the access and ID tokens themselves rather than a code still to be exchanged, so a
+	// redirect URI resolving to a host nobody registered exfiltrates the credentials directly and
+	// there is nothing left to expire.
+	//
+	// Not a validation case. The value has passed the authorization endpoint's gate by construction,
+	// and the property being stated is that no emission exists which is not downstream of one.
+	t.Run("A redirect URI that is not an absolute URI is refused", func(t *testing.T) {
+		for _, tc := range []struct {
+			name        string
+			redirectURI string
+			why         string
+		}{
+			{
+				name:        "scheme-relative",
+				redirectURI: "//evil.example/cb",
+				why:         "the user agent resolves it against the current scheme and delivers the tokens to evil.example",
+			},
+			{
+				name:        "https with no authority",
+				redirectURI: "https:///evil.example/cb",
+				why:         "decision 8's family: a valid absolute-URI that Go reads with no host and a browser reads as evil.example",
+			},
+			{
+				name:        "relative",
+				redirectURI: "/relative/cb",
+				why:         "the tokens arrive back at this authorization server rather than at any client",
+			},
+			{
+				name:        "carrying a fragment",
+				redirectURI: "https://legit.example/cb#frag",
+				why:         "this flow delivers in the fragment, so a registered fragment collides with the delivery itself",
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				r := httptest.NewRequest("GET", "/auth/issue", nil)
+
+				tokenResponse := &oauth.ImplicitGrantResponse{
+					AccessToken: "access-token-123",
+					TokenType:   "Bearer",
+					ExpiresIn:   3600,
+					IdToken:     "id-token-123",
+					Scope:       "openid",
+				}
+
+				err := issueImplicitTokens(w, r, tc.redirectURI, "test-state", tokenResponse)
+
+				assert.Error(t, err, tc.why)
+				assert.Empty(t, w.Header().Get("Location"), "no Location may be written for %q", tc.redirectURI)
+				assert.NotContains(t, w.Body.String(), "access-token-123", "the tokens must not reach the response at all")
+			})
+		}
+	})
 }
 
 func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
@@ -2052,6 +2107,105 @@ func TestIssueAuthCode(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to parse template")
+	})
+
+	// Gate 4, the last resort (#122). This function emits the stored redirect URI three different
+	// ways and the guard sits above the dispatch, so every mode gets a row: a guard written inside
+	// one branch would pass a table that exercised only that branch.
+	//
+	// These are not validation cases. Nothing here matches the value against anything, because this
+	// function is downstream of every gate that does; what the table states is the property that
+	// there is no way to reach an emission without having passed one, which is what a later refactor
+	// moving or bypassing a gate breaks.
+	t.Run("A redirect URI that is not an absolute URI is refused in every response mode", func(t *testing.T) {
+		for _, tc := range []struct {
+			name        string
+			redirectURI string
+			why         string
+		}{
+			{
+				name:        "scheme-relative",
+				redirectURI: "//evil.example/cb",
+				why:         "emitted verbatim it is a protocol-relative Location, which the user agent resolves against the current scheme and delivers the code to evil.example",
+			},
+			{
+				name:        "https with no authority",
+				redirectURI: "https:///evil.example/cb",
+				why:         "decision 8's family: Go parses no host, a browser reads evil.example, and the value is still a valid absolute-URI",
+			},
+			{
+				name:        "http with a single slash",
+				redirectURI: "http:/evil.example/cb",
+				why:         "the same family through hier-part's path-absolute production",
+			},
+			{
+				name:        "relative",
+				redirectURI: "/relative/cb",
+				why:         "the code arrives back at this authorization server rather than at any client",
+			},
+			{
+				name:        "carrying a fragment",
+				redirectURI: "https://legit.example/cb#frag",
+				why:         "the host is legitimate and the callback still breaks: the code arrives at /cb%23frag rather than at /cb",
+			},
+		} {
+			for _, mode := range []struct{ name, value string }{
+				{"query", "query"},
+				{"fragment", "fragment"},
+				{"form_post", "form_post"},
+				{"unset, which defaults to query", ""},
+			} {
+				t.Run(tc.name+", response_mode "+mode.name, func(t *testing.T) {
+					w := httptest.NewRecorder()
+					r := httptest.NewRequest("GET", "/auth/issue", nil)
+					code := &models.Code{
+						Code:        "test_code",
+						RedirectURI: tc.redirectURI,
+						State:       "test_state",
+					}
+
+					// A form_post template that renders cleanly, so that a build with the guard
+					// removed produces a form action to assert against rather than dying on a
+					// missing template and passing for the wrong reason.
+					templateFS := &mocks_test.TestFS{
+						FileContents: map[string]string{
+							"form_post.html": `<form method="post" action="{{.redirectURI}}"></form>`,
+						},
+					}
+
+					err := issueAuthCode(w, r, templateFS, code, mode.value)
+
+					assert.Error(t, err, tc.why)
+					assert.Empty(t, w.Header().Get("Location"), "no Location may be written for %q", tc.redirectURI)
+					assert.Empty(t, w.Body.String(), "no form action may be written for %q", tc.redirectURI)
+				})
+			}
+		}
+	})
+
+	// RFC 6749 section 3.1.2: "The endpoint URI MAY include an "application/x-www-form-urlencoded"
+	// formatted query component, which MUST be retained when adding additional query parameters."
+	//
+	// Every other case in this test uses a query-less redirect URI, so nothing watched the retention
+	// path, and the query mode is the only one that rewrites the URI rather than appending to it: it
+	// parses, reads Query(), adds code and state, and re-encodes. A change to that sequence which
+	// dropped or reordered the registered query would break a real client and no test would notice.
+	// Encode sorts by key, which is why the expectation below is written out in full rather than
+	// assembled (#122).
+	t.Run("A registered query survives the addition of code and state", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{
+			Code:        "test_code",
+			RedirectURI: "http://127.0.0.1/cb?a=1",
+			State:       "test_state",
+		}
+
+		err := issueAuthCode(w, r, nil, code, "query")
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusFound, w.Code)
+		assert.Equal(t, "http://127.0.0.1/cb?a=1&code=test_code&state=test_state", w.Header().Get("Location"))
 	})
 }
 
