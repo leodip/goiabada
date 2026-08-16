@@ -1,17 +1,115 @@
 package middleware
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"testing/fstest"
 
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/handlerhelpers"
+	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
+
+// testTemplateFS is the smallest tree RenderTemplate needs: a layout that includes the
+// three blocks the real one includes, and the error page the browser rejection renders.
+//
+// The real templates live in the authserver module, which depends on core, so core's tests
+// cannot reach them. What stands in here is only their shape. What is genuinely under test
+// is the middleware's half (the layout and template it names, the bind keys it fills) plus
+// the half RenderTemplate itself owns and a stub renderer would fake: the Content-Type it
+// sets and the status it takes from _httpStatus.
+var testTemplateFS = fstest.MapFS{
+	"layouts/no_menu_layout.html": &fstest.MapFile{Data: []byte(
+		`<!DOCTYPE html><html><head><title>{{template "title" .}}</title>{{template "head" .}}</head>` +
+			`<body>{{template "body" .}}</body></html>`)},
+	"auth_error.html": &fstest.MapFile{Data: []byte(
+		`{{define "title"}}{{.appName}}{{end}}{{define "head"}}{{end}}` +
+			`{{define "body"}}<h1>{{.title}}</h1><p id="errorMsg">{{.error}}</p>{{end}}`)},
+}
+
+// auditEvent is one call the middleware made to its audit logger.
+type auditEvent struct {
+	name    string
+	details map[string]interface{}
+}
+
+// stubAuditLogger records what the limiter audited. Hand-written rather than generated,
+// which is the convention stubAuthHelper already sets in this file for a one-method
+// interface. The mutex is not decoration: the reservation cases in later stages drive the
+// middleware from several goroutines at once.
+type stubAuditLogger struct {
+	mu     sync.Mutex
+	events []auditEvent
+}
+
+func (s *stubAuditLogger) Log(name string, details map[string]interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = append(s.events, auditEvent{name: name, details: details})
+}
+
+func (s *stubAuditLogger) count(name string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, e := range s.events {
+		if e.name == name {
+			n++
+		}
+	}
+	return n
+}
+
+// newTestMiddleware builds the middleware with a real HttpHelper over testTemplateFS and a
+// throwaway audit logger, for the cases that do not look at what was audited.
+func newTestMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddleware {
+	m, _ := newAuditedTestMiddleware(authHelper, enabled)
+	return m
+}
+
+func newAuditedTestMiddleware(authHelper AuthHelper, enabled bool) (*RateLimiterMiddleware, *stubAuditLogger) {
+	audit := &stubAuditLogger{}
+	return NewRateLimiterMiddleware(authHelper, handlerhelpers.NewHttpHelper(testTemplateFS), audit, enabled), audit
+}
+
+// limiterRequest builds the request a limited route actually receives. Settings are on the
+// context because MiddlewareSettings is a global router.Use registered ahead of every
+// per-route limiter, and the browser rejection renders a template, which reads settings off
+// the context. A request built without them panics on the first 429, so this is the shape
+// the reject path has to work in rather than test scaffolding.
+func limiterRequest(method, target string, body io.Reader) *http.Request {
+	req := httptest.NewRequest(method, target, body)
+	return req.WithContext(context.WithValue(req.Context(),
+		constants.ContextKeySettings, &models.Settings{AppName: "Goiabada"}))
+}
+
+// rateLimitHeaderNames are the four headers decision 13 blanks. They told any caller the
+// exact budget, how much was left and whether the limiter was on at all, without tripping
+// anything (#219).
+var rateLimitHeaderNames = []string{
+	"X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Increment", "X-RateLimit-Reset",
+}
+
+func assertNoRateLimitHeaders(t *testing.T, rr *httptest.ResponseRecorder, when string) {
+	t.Helper()
+	for _, h := range rateLimitHeaderNames {
+		if got := rr.Header().Get(h); got != "" {
+			t.Errorf("%s: header %s = %q, want it absent", when, h, got)
+		}
+	}
+}
 
 // stubAuthHelper stands in for the real AuthHelper, which needs a session store
 // and a cookie to answer. It reads the user id from the request's query string so
@@ -124,7 +222,7 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 
 	run := func(m *RateLimiterMiddleware, email, ip string) (int, bool) {
 		form := url.Values{"email": {email}}
-		req := httptest.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
+		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
@@ -140,7 +238,7 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 	freshIP := func(i int) string { return fmt.Sprintf("203.0.113.%d:5000", i+1) }
 
 	t.Run("the per-email budget is exactly 15, from varied IPs", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		for i := 0; i < emailBudget; i++ {
 			if code, reached := run(m, "victim@example.com", freshIP(i)); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
@@ -154,7 +252,7 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("ten case and whitespace variants of one address share the per-email bucket", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		spellings := spellingsOf("victim", "example.com")
 		// Refused by accountRateLimitKey lowercasing and trimming, not by the limiter
 		// merely working: without it each spelling is its own bucket and all 16 pass.
@@ -171,7 +269,7 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("a second address still has its own bucket", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		spellings := spellingsOf("victim", "example.com")
 		for i := 0; i < emailBudget+1; i++ {
 			run(m, spellings[i%len(spellings)], freshIP(i))
@@ -186,7 +284,7 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("the per-IP budget is exactly 30, from varied emails", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		for i := 0; i < ipBudget; i++ {
 			// Distinct emails so no account bucket trips.
 			email := fmt.Sprintf("user%d@example.com", i)
@@ -202,7 +300,7 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("200 addresses inside one /64 share the per-IP bucket", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		// A fresh IPv6 address per request, all inside 2001:db8:1:2::/64, which is what a
 		// single SLAAC host owns. Refused by clientIPRateLimitKey masking to the /64:
 		// without it all 200 reach the handler (measured, #219).
@@ -224,7 +322,7 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("a second /64 has its own bucket", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		for i := 0; i < ipBudget+1; i++ {
 			run(m, fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1))
 		}
@@ -238,7 +336,7 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, false)
+		m := newTestMiddleware(nil, false)
 		for i := 0; i < 60; i++ {
 			if code, reached := run(m, "x@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
@@ -259,7 +357,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 
 	run := func(m *RateLimiterMiddleware, email, ip string) (int, bool) {
 		form := url.Values{"email": {email}}
-		req := httptest.NewRequest(http.MethodPost, "/forgot-password", strings.NewReader(form.Encode()))
+		req := limiterRequest(http.MethodPost, "/forgot-password", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
@@ -275,7 +373,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	freshIP := func(i int) string { return fmt.Sprintf("203.0.113.%d:5000", i+1) }
 
 	t.Run("the per-email budget is exactly 5, from varied IPs", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		for i := 0; i < emailBudget; i++ {
 			if code, reached := run(m, "victim@example.com", freshIP(i)); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
@@ -289,7 +387,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("ten case and whitespace variants of one address share the per-email bucket", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		spellings := spellingsOf("victim", "example.com")
 		// Refused by accountRateLimitKey lowercasing and trimming: without it each
 		// spelling buys a fresh mail-bombing budget for the same mailbox.
@@ -306,7 +404,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("a second address still has its own bucket", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		spellings := spellingsOf("victim", "example.com")
 		for i := 0; i < emailBudget+1; i++ {
 			run(m, spellings[i%len(spellings)], freshIP(i))
@@ -318,7 +416,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("the per-IP budget is exactly 20, from varied emails", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		for i := 0; i < ipBudget; i++ {
 			email := fmt.Sprintf("user%d@example.com", i) // distinct emails so no email bucket trips
 			if code, reached := run(m, email, "198.51.100.9:5000"); code != http.StatusTeapot || !reached {
@@ -333,7 +431,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("addresses inside one /64 share the per-IP bucket", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		addr := func(i int) string { return fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1) }
 		for i := 0; i < ipBudget; i++ {
 			email := fmt.Sprintf("user%d@example.com", i)
@@ -355,7 +453,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	})
 
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, false)
+		m := newTestMiddleware(nil, false)
 		for i := 0; i < 40; i++ {
 			if code, reached := run(m, "x@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
@@ -386,7 +484,7 @@ func TestLimitResetPwd_PerIP(t *testing.T) {
 	const budget = 30
 
 	run := func(m *RateLimiterMiddleware, target, ip string) (int, bool) {
-		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req := limiterRequest(http.MethodGet, target, nil)
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
 		reached := false
@@ -398,7 +496,7 @@ func TestLimitResetPwd_PerIP(t *testing.T) {
 	}
 
 	t.Run("the budget is exactly 30 per IP", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		for i := 0; i < budget; i++ {
 			if code, reached := run(m, "/reset-password", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
@@ -412,7 +510,7 @@ func TestLimitResetPwd_PerIP(t *testing.T) {
 	})
 
 	t.Run("a second client IP has an independent bucket", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		for i := 0; i < budget+1; i++ {
 			run(m, "/reset-password", "203.0.113.7:5000")
 		}
@@ -425,7 +523,7 @@ func TestLimitResetPwd_PerIP(t *testing.T) {
 	})
 
 	t.Run("the address in the query no longer keys anything", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		// A distinct address per request used to buy a fresh bucket each time. From one host
 		// they now share one, which is what makes the rekey observable.
 		blocked := false
@@ -442,7 +540,7 @@ func TestLimitResetPwd_PerIP(t *testing.T) {
 	})
 
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, false)
+		m := newTestMiddleware(nil, false)
 		for i := 0; i < budget*2; i++ {
 			if code, reached := run(m, "/reset-password", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
@@ -472,7 +570,7 @@ func TestLimitActivate_PerIP(t *testing.T) {
 	const budget = 20
 
 	run := func(m *RateLimiterMiddleware, target, ip string) (int, bool) {
-		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req := limiterRequest(http.MethodGet, target, nil)
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
 		reached := false
@@ -484,7 +582,7 @@ func TestLimitActivate_PerIP(t *testing.T) {
 	}
 
 	t.Run("the budget is exactly 20 per IP", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		for i := 0; i < budget; i++ {
 			if code, reached := run(m, "/account/activate", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
@@ -498,7 +596,7 @@ func TestLimitActivate_PerIP(t *testing.T) {
 	})
 
 	t.Run("a second client IP has an independent bucket", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		for i := 0; i < budget+1; i++ {
 			run(m, "/account/activate", "203.0.113.7:5000")
 		}
@@ -511,7 +609,7 @@ func TestLimitActivate_PerIP(t *testing.T) {
 	})
 
 	t.Run("the address in the query no longer keys anything", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, true)
+		m := newTestMiddleware(nil, true)
 		// A distinct address per request used to buy a fresh bucket each time. From one host
 		// they now share one, which is what makes the rekey observable.
 		blocked := false
@@ -528,7 +626,7 @@ func TestLimitActivate_PerIP(t *testing.T) {
 	})
 
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(nil, false)
+		m := newTestMiddleware(nil, false)
 		for i := 0; i < budget*2; i++ {
 			if code, reached := run(m, "/account/activate", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
@@ -547,7 +645,7 @@ func TestLimitActivate_PerIP(t *testing.T) {
 // "the handler ran" apart from "nothing was written", and from 429.
 func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	run := func(m *RateLimiterMiddleware, userId int) (int, bool) {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/auth/otp?userId=%d", userId), nil)
+		req := limiterRequest(http.MethodPost, fmt.Sprintf("/auth/otp?userId=%d", userId), nil)
 		rr := httptest.NewRecorder()
 		reached := false
 		m.LimitOtp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -558,7 +656,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	}
 
 	t.Run("unreadable auth context reaches the handler", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(stubAuthHelper{err: customerrors.ErrNoAuthContext}, true)
+		m := newTestMiddleware(stubAuthHelper{err: customerrors.ErrNoAuthContext}, true)
 		// Well past the 10/min budget: the pass-through is deliberately not
 		// bounded by this middleware, since there is no user to key a bucket on.
 		for i := 0; i < 20; i++ {
@@ -571,7 +669,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	})
 
 	t.Run("a readable auth context still spends the budget", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(stubAuthHelper{}, true)
+		m := newTestMiddleware(stubAuthHelper{}, true)
 		for i := 0; i < 10; i++ {
 			if code, reached := run(m, 42); code != http.StatusTeapot || !reached {
 				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
@@ -585,7 +683,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	})
 
 	t.Run("each user id has its own budget", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(stubAuthHelper{}, true)
+		m := newTestMiddleware(stubAuthHelper{}, true)
 		blocked := false
 		for i := 0; i < 11; i++ {
 			if code, _ := run(m, 42); code == http.StatusTooManyRequests {
@@ -604,10 +702,469 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	})
 
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
-		m := NewRateLimiterMiddleware(stubAuthHelper{}, false)
+		m := newTestMiddleware(stubAuthHelper{}, false)
 		for i := 0; i < 60; i++ {
 			if code, reached := run(m, 42); code != http.StatusTeapot || !reached {
 				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
+// -----------------------------------------------------------------------------
+// Seam 1, stage 2: what a rejection looks like, and that it leaves a trace.
+//
+// Every case below drives a real limiter past its budget and reads the response
+// the caller would actually receive. Nothing asserts on a spy, because the defect
+// these exist to prevent is a rejection wired up everywhere except where it is
+// written: httprate's own default answers "Too Many Requests\n" as text/plain on
+// every route regardless of how much configuration surrounds it (#219).
+// -----------------------------------------------------------------------------
+
+// tripBrowser drives LimitPwd from one host until it is refused and returns the
+// refusal. The per-email budget of 15 is the tier that trips, since it is tighter
+// than the per-IP 30.
+func tripBrowser(t *testing.T, m *RateLimiterMiddleware) *httptest.ResponseRecorder {
+	t.Helper()
+	var last *httptest.ResponseRecorder
+	for i := 0; i < 17; i++ {
+		form := url.Values{"email": {"victim@example.com"}}
+		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = "203.0.113.7:5000"
+		last = httptest.NewRecorder()
+		m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(last, req)
+		if last.Code == http.StatusTooManyRequests {
+			return last
+		}
+	}
+	t.Fatalf("LimitPwd never refused within 17 requests; last code %d", last.Code)
+	return nil
+}
+
+// tripOAuth drives LimitDCR from one host until it is refused, at a budget of 10.
+func tripOAuth(t *testing.T, m *RateLimiterMiddleware) *httptest.ResponseRecorder {
+	t.Helper()
+	var last *httptest.ResponseRecorder
+	for i := 0; i < 12; i++ {
+		req := limiterRequest(http.MethodPost, "/connect/register", nil)
+		req.RemoteAddr = "203.0.113.8:5000"
+		last = httptest.NewRecorder()
+		m.LimitDCR(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(last, req)
+		if last.Code == http.StatusTooManyRequests {
+			return last
+		}
+	}
+	t.Fatalf("LimitDCR never refused within 12 requests; last code %d", last.Code)
+	return nil
+}
+
+// TestRejection_BrowserClass verifies a browser route's 429 is the error page that
+// route's other refusals render, not plain text (decision 11), and that it carries
+// Retry-After and none of the four X-RateLimit-* headers (decision 13).
+func TestRejection_BrowserClass(t *testing.T) {
+	m := newTestMiddleware(nil, true)
+	rr := tripBrowser(t, m)
+
+	if got := rr.Header().Get("Content-Type"); got != "text/html; charset=UTF-8" {
+		t.Errorf("Content-Type = %q, want %q; a plain-text body is what httprate's default writes",
+			got, "text/html; charset=UTF-8")
+	}
+	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", got)
+	}
+	// RFC 6585 section 4 names Retry-After as what a 429 MAY carry, and it is the one
+	// header decision 13 keeps. httprate sets it from the window length, 60 seconds here.
+	if got := rr.Header().Get("Retry-After"); got != "60" {
+		t.Errorf("Retry-After = %q, want 60", got)
+	}
+	assertNoRateLimitHeaders(t, rr, "browser rejection")
+
+	// The catalog message, not the key: TestMain loads the bundle, so a raw key in the
+	// body would mean the string is missing from active.en.toml.
+	want := i18n.T(context.Background(), "auth_error.rate_limited.message")
+	if strings.HasPrefix(want, "auth_error.") {
+		t.Fatalf("auth_error.rate_limited.message is missing from the English catalog")
+	}
+	if !strings.Contains(rr.Body.String(), want) {
+		t.Errorf("body does not carry the rate-limited message.\nbody: %s", rr.Body.String())
+	}
+	if title := i18n.T(context.Background(), "auth_error.rate_limited.title"); !strings.Contains(rr.Body.String(), title) {
+		t.Errorf("body does not carry the rate-limited title %q", title)
+	}
+}
+
+// TestRejection_OAuthClass verifies the token and registration endpoints answer with
+// the JSON error object their callers already parse, under the media type both RFCs
+// require: RFC 6749 section 5.2 puts the token error parameters in "the
+// "application/json" media type", and RFC 7591 section 3.2.2 requires "content type
+// application/json". Go writes no header for a hand-encoded body, so a JSON body
+// labelled text/plain is the failure this case exists to catch.
+func TestRejection_OAuthClass(t *testing.T) {
+	m := newTestMiddleware(nil, true)
+	rr := tripOAuth(t, m)
+
+	if got := rr.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", got)
+	}
+	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", got)
+	}
+	if got := rr.Header().Get("Pragma"); got != "no-cache" {
+		t.Errorf("Pragma = %q, want no-cache", got)
+	}
+	if got := rr.Header().Get("Retry-After"); got != "60" {
+		t.Errorf("Retry-After = %q, want 60", got)
+	}
+	assertNoRateLimitHeaders(t, rr, "oauth rejection")
+
+	var body map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not JSON: %v\nbody: %s", err, rr.Body.String())
+	}
+	// RFC 6749 section 5.2 makes error REQUIRED and closes the list it comes from, so
+	// the exact string matters: slow_down would tell a conformant client to keep polling.
+	if body["error"] != "invalid_request" {
+		t.Errorf(`error = %q, want "invalid_request"`, body["error"])
+	}
+	if body["error_description"] == "" {
+		t.Error("error_description is empty")
+	}
+}
+
+// TestRejection_HeadersAbsentOnAllowedRequests is the other half of decision 13. The
+// headers rode every response including successful ones, so a caller could read the
+// budget and the remaining count without ever tripping anything.
+func TestRejection_HeadersAbsentOnAllowedRequests(t *testing.T) {
+	m := newTestMiddleware(nil, true)
+
+	form := url.Values{"email": {"someone@example.com"}}
+	req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.RemoteAddr = "203.0.113.30:5000"
+	rr := httptest.NewRecorder()
+	m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusTeapot {
+		t.Fatalf("first request got code %d, want %d", rr.Code, http.StatusTeapot)
+	}
+	assertNoRateLimitHeaders(t, rr, "allowed request")
+	if got := rr.Header().Get("Retry-After"); got != "" {
+		t.Errorf("Retry-After = %q on an allowed request, want it absent", got)
+	}
+}
+
+// TestRejection_AuditedOncePerKeyPerWindow verifies the gate that makes decision 12
+// safe. An event per 429 would turn the limiter into the unbounded audit-write
+// amplifier it exists to stop, since every write is a settings read plus an insert on
+// an unauthenticated path (#212).
+func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
+	post := func(m *RateLimiterMiddleware, email, ip string) int {
+		form := url.Values{"email": {email}}
+		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		return rr.Code
+	}
+	// A distinct IPv4 per request, so only the per-email tier can trip and the counts
+	// below belong to one limiter rather than two.
+	freshIP := func(i int) string { return fmt.Sprintf("203.0.113.%d:5000", i+1) }
+
+	t.Run("many rejections on one key produce one event", func(t *testing.T) {
+		m, audit := newAuditedTestMiddleware(nil, true)
+		refused := 0
+		for i := 0; i < 60; i++ {
+			if post(m, "victim@example.com", freshIP(i)) == http.StatusTooManyRequests {
+				refused++
+			}
+		}
+		if refused < 40 {
+			t.Fatalf("only %d of 60 requests were refused; the case needs a burst of rejections", refused)
+		}
+		if got := audit.count(constants.AuditRateLimitExceeded); got != 1 {
+			t.Errorf("got %d rate_limit_exceeded events for %d rejections on one key, want exactly 1",
+				got, refused)
+		}
+	})
+
+	t.Run("the event carries the limiter and the account", func(t *testing.T) {
+		m, audit := newAuditedTestMiddleware(nil, true)
+		for i := 0; i < 20; i++ {
+			post(m, "Victim@Example.com", freshIP(i))
+		}
+		audit.mu.Lock()
+		defer audit.mu.Unlock()
+		if len(audit.events) != 1 {
+			t.Fatalf("got %d events, want 1", len(audit.events))
+		}
+		e := audit.events[0]
+		if e.name != constants.AuditRateLimitExceeded {
+			t.Errorf("event name = %q, want %q", e.name, constants.AuditRateLimitExceeded)
+		}
+		if e.details["limiter"] != "pwd_email" {
+			t.Errorf("details[limiter] = %v, want pwd_email", e.details["limiter"])
+		}
+		// The normalized address, which is the identifier AuditAuthFailedPwd already
+		// records under the same name, and the one the log line no longer carries.
+		if e.details["email"] != "victim@example.com" {
+			t.Errorf("details[email] = %v, want victim@example.com", e.details["email"])
+		}
+	})
+
+	t.Run("two keys produce two events", func(t *testing.T) {
+		m, audit := newAuditedTestMiddleware(nil, true)
+		for i := 0; i < 20; i++ {
+			post(m, "one@example.com", freshIP(i))
+		}
+		for i := 20; i < 40; i++ {
+			post(m, "two@example.com", freshIP(i))
+		}
+		// A gate keyed globally rather than per key would report the first account and
+		// go silent for the second, which is the failure that makes the bound useless.
+		if got := audit.count(constants.AuditRateLimitExceeded); got != 2 {
+			t.Errorf("got %d events for two rejected accounts, want 2", got)
+		}
+	})
+
+	t.Run("no event when nothing is refused", func(t *testing.T) {
+		m, audit := newAuditedTestMiddleware(nil, true)
+		for i := 0; i < 10; i++ {
+			post(m, fmt.Sprintf("user%d@example.com", i), freshIP(i))
+		}
+		if got := audit.count(constants.AuditRateLimitExceeded); got != 0 {
+			t.Errorf("got %d events with nothing refused, want 0", got)
+		}
+	})
+}
+
+// TestRejection_WarnsWithoutNamingTheUser pins decision 14. Nothing else observes the
+// log line, so deleting it or restoring the address it used to interpolate would leave
+// the stage green.
+//
+// The repository already settled the policy this asserts: MiddlewareRequestLogger in
+// this same package logs by allowlist "because a denylist fails open", and email is
+// deliberately not on that list. The address is carried by the audit event instead.
+func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
+	t.Run("an account tier names the limiter and nothing else", func(t *testing.T) {
+		buf := captureSlog(t)
+		m := newTestMiddleware(nil, true)
+		tripBrowser(t, m)
+
+		out := buf.String()
+		if strings.Contains(out, "victim@example.com") {
+			t.Errorf("the warning line carries the address:\n%s", out)
+		}
+		if !strings.Contains(out, `level=WARN`) {
+			t.Errorf("the trip was not logged at WARN; an auth server whose error log fills "+
+				"with expected events has no error log left:\n%s", out)
+		}
+		if !strings.Contains(out, `limiter=pwd_email`) {
+			t.Errorf("the warning line does not name the limiter that tripped:\n%s", out)
+		}
+	})
+
+	t.Run("an IP tier keeps its bucket, which names no user", func(t *testing.T) {
+		buf := captureSlog(t)
+		m := newTestMiddleware(nil, true)
+		tripOAuth(t, m)
+
+		out := buf.String()
+		if !strings.Contains(out, "limiter=dcr") || !strings.Contains(out, "ip=203.0.113.8") {
+			t.Errorf("the warning line should carry the limiter and the client block:\n%s", out)
+		}
+	})
+}
+
+// TestLimitDCR_PerIP is LimitDCR's first test, which is half of #195's remainder. RFC
+// 7591 section 3 permits rate limiting an unauthenticated registration request "to
+// prevent a denial-of-service attack on the client registration endpoint"; the budget
+// is exact because it is published policy.
+func TestLimitDCR_PerIP(t *testing.T) {
+	const budget = 10
+
+	run := func(m *RateLimiterMiddleware, ip string) (int, bool) {
+		req := limiterRequest(http.MethodPost, "/connect/register", nil)
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		reached := false
+		m.LimitDCR(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		return rr.Code, reached
+	}
+
+	t.Run("the budget is exactly 10 per IP", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached := run(m, "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, "203.0.113.7:5000"); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("addresses inside one /64 share the bucket, a second /64 does not", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		addr := func(i int) string { return fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1) }
+		for i := 0; i < budget; i++ {
+			if code, _ := run(m, addr(i)); code != http.StatusTeapot {
+				t.Fatalf("request %d from %s: got code %d, want %d", i+1, addr(i), code, http.StatusTeapot)
+			}
+		}
+		if code, _ := run(m, addr(budget)); code != http.StatusTooManyRequests {
+			t.Errorf("request %d from %s: got code %d, want %d",
+				budget+1, addr(budget), code, http.StatusTooManyRequests)
+		}
+		// A neighbouring /64 is a different client, which is what makes the mask
+		// observable rather than the limiter.
+		if code, reached := run(m, "[2001:db8:1:3::1]:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second /64: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget*2; i++ {
+			if code, reached := run(m, "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
+// TestLimitROPC_CompositeKeyAndGrantType is LimitROPC's first test, the other half of
+// #195's remainder. RFC 6749 section 4.3.2 makes protecting this endpoint against brute
+// force a MUST.
+//
+// It pins the composite key as it stands rather than as it should be. Folding the client
+// id and the client IP into a per-account budget is the defect #107 filed and decision 7
+// settles, and stage 4 deletes this key outright; the two cases below are what will show
+// that stage actually changed the key rather than merely the budget.
+func TestLimitROPC_CompositeKeyAndGrantType(t *testing.T) {
+	const budget = 5
+
+	run := func(m *RateLimiterMiddleware, grantType, username, clientId, ip string) (int, bool) {
+		form := url.Values{
+			"grant_type": {grantType},
+			"username":   {username},
+			"client_id":  {clientId},
+		}
+		req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		reached := false
+		m.LimitROPC(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		return rr.Code, reached
+	}
+
+	t.Run("the budget is exactly 5", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached := run(m, "password", "victim@example.com", "app", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, "password", "victim@example.com", "app", "203.0.113.7:5000"); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a second client id buys a fresh budget for the same account", func(t *testing.T) {
+		// This is #107, asserted rather than assumed: the account ceiling RFC 6749
+		// section 4.3.2 makes a MUST does not exist while the key carries the client id.
+		// Stage 4 removes it and this case is expected to be rewritten there.
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget+1; i++ {
+			run(m, "password", "victim@example.com", "app", "203.0.113.7:5000")
+		}
+		if code, reached := run(m, "password", "victim@example.com", "other-app", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second client id: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("a second network buys a fresh budget for the same account", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget+1; i++ {
+			run(m, "password", "victim@example.com", "app", "203.0.113.7:5000")
+		}
+		if code, reached := run(m, "password", "victim@example.com", "app", "198.51.100.9:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second network: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("only the password grant is limited", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// Well past the budget. The other grants carry no resource-owner password, so
+		// this limiter has nothing to bound; a limiter that counted them would throttle
+		// every token refresh in the deployment from one host.
+		for i := 0; i < budget*4; i++ {
+			if code, reached := run(m, "refresh_token", "", "app", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("refresh_token request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+	})
+
+	t.Run("the rejection is the oauth shape", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		var rr *httptest.ResponseRecorder
+		for i := 0; i < budget+1; i++ {
+			form := url.Values{"grant_type": {"password"}, "username": {"v@example.com"}, "client_id": {"app"}}
+			req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.RemoteAddr = "203.0.113.7:5000"
+			rr = httptest.NewRecorder()
+			m.LimitROPC(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusTeapot)
+			})).ServeHTTP(rr, req)
+		}
+		if rr.Code != http.StatusTooManyRequests {
+			t.Fatalf("got code %d, want %d", rr.Code, http.StatusTooManyRequests)
+		}
+		// A token endpoint answering a 429 in HTML is unparseable to every OAuth2 client.
+		if got := rr.Header().Get("Content-Type"); got != "application/json" {
+			t.Errorf("Content-Type = %q, want application/json", got)
+		}
+		var body map[string]string
+		if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+			t.Fatalf("body is not JSON: %v\nbody: %s", err, rr.Body.String())
+		}
+		if body["error"] != "invalid_request" {
+			t.Errorf(`error = %q, want "invalid_request"`, body["error"])
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget*4; i++ {
+			if code, reached := run(m, "password", "victim@example.com", "app", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
 					i+1, code, reached)
 			}
 		}
