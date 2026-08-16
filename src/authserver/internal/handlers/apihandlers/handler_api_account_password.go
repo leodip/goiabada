@@ -20,6 +20,7 @@ func HandleAPIAccountPasswordPut(
 	database data.Database,
 	passwordValidator *validators.PasswordValidator,
 	auditLogger handlers.AuditLogger,
+	credentialFailures handlers.CredentialFailureRecorder,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Token and scope are enforced by middleware; extract validated token
@@ -65,6 +66,13 @@ func HandleAPIAccountPasswordPut(
 
 		// Verify current password
 		if !hashutil.VerifyPasswordHash(user.PasswordHash, req.CurrentPassword) {
+			// The only branch that is a guess at the password, which is why it is the only one
+			// that spends the budget shared with PUT /api/v1/account/otp. A missing token, a
+			// blank subject, an undecodable body, a missing field and an unknown user are all
+			// refused above without comparing anything, so charging them would let a caller
+			// spend a budget without ever attempting the credential (#219).
+			credentialFailures.RecordCredentialFailure(r)
+
 			writeJSONError(w, "Authentication failed. Check your current password and try again.", "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}

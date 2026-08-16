@@ -328,9 +328,14 @@ func (s *Server) initRoutes() {
 			apihandlers.HandleAPIAccountEmailVerificationPost(s.database, auditLogger, rateLimiter))
 		r.Put("/phone", apihandlers.HandleAPIAccountPhonePut(s.database, phoneValidator, inputSanitizer, auditLogger))
 		r.Put("/address", apihandlers.HandleAPIAccountAddressPut(s.database, addressValidator, inputSanitizer, auditLogger))
-		r.Put("/password", apihandlers.HandleAPIAccountPasswordPut(s.database, passwordValidator, auditLogger))
+		// One limiter over both PUTs, which is what makes the failure budget shared: they
+		// verify the same password, so two buckets would hand an attacker ten guesses by
+		// alternating. The enrollment GET between them checks no credential.
+		r.With(rateLimiter.LimitAccountPassword).Put("/password",
+			apihandlers.HandleAPIAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter))
 		r.Get("/otp/enrollment", apihandlers.HandleAPIAccountOTPEnrollmentGet(s.database, otpSecretGenerator))
-		r.Put("/otp", apihandlers.HandleAPIAccountOTPPut(s.database, auditLogger))
+		r.With(rateLimiter.LimitAccountPassword).Put("/otp",
+			apihandlers.HandleAPIAccountOTPPut(s.database, auditLogger, rateLimiter))
 		r.Get("/consents", apihandlers.HandleAPIAccountConsentsGet(httpHelper, s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAPIAccountConsentDelete(httpHelper, s.database, auditLogger))
 

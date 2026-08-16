@@ -116,7 +116,7 @@ func TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -150,7 +150,7 @@ func TestHandleAPIAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
 		Return(false, errors.New("the database is unwell")).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -177,7 +177,7 @@ func TestHandleAPIAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, wrongButWellFormedCode(t)))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -247,7 +247,7 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 	auditLogger.On("Log", constants.AuditDisabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -278,7 +278,7 @@ func TestHandleAPIAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -321,7 +321,7 @@ func wrongCodeDescription(t *testing.T) string {
 	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, wrongButWellFormedCode(t)))
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	return descriptionOf(t, rr)
