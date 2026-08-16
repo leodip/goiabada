@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/httprate"
@@ -61,16 +62,16 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 
 		// Per-IP ceiling first: stops a single host from hammering many distinct
 		// accounts. The client IP is trustworthy here (resolved by MiddlewareRealIP).
-		clientIP := GetClientIPFromRequest(r)
-		if m.pwdIpLimiter.RespondOnLimit(w, r, clientIP) {
-			slog.Error("Rate limiter - limit reached (pwd, by IP)", "ip", clientIP)
+		ipKey := clientIPRateLimitKey(r)
+		if m.pwdIpLimiter.RespondOnLimit(w, r, ipKey) {
+			slog.Error("Rate limiter - limit reached (pwd, by IP)", "ip", ipKey)
 			return
 		}
 
 		// Per-account limit: bounds brute force against a single email.
-		email := r.FormValue("email")
-		if m.pwdLimiter.RespondOnLimit(w, r, email) {
-			slog.Error("Rate limiter - limit reached (pwd, by email)", "email", email)
+		emailKey := accountRateLimitKey(r.FormValue("email"))
+		if m.pwdLimiter.RespondOnLimit(w, r, emailKey) {
+			slog.Error("Rate limiter - limit reached (pwd, by email)", "email", emailKey)
 			return
 		}
 
@@ -130,9 +131,9 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 		}
 
 		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
-		clientIP := GetClientIPFromRequest(r)
-		if m.activateLimiter.RespondOnLimit(w, r, clientIP) {
-			slog.Error("Rate limiter - limit reached (activate, by IP)", "ip", clientIP)
+		ipKey := clientIPRateLimitKey(r)
+		if m.activateLimiter.RespondOnLimit(w, r, ipKey) {
+			slog.Error("Rate limiter - limit reached (activate, by IP)", "ip", ipKey)
 			return
 		}
 
@@ -160,9 +161,9 @@ func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 		}
 
 		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
-		clientIP := GetClientIPFromRequest(r)
-		if m.resetPwdLimiter.RespondOnLimit(w, r, clientIP) {
-			slog.Error("Rate limiter - limit reached (resetPwd, by IP)", "ip", clientIP)
+		ipKey := clientIPRateLimitKey(r)
+		if m.resetPwdLimiter.RespondOnLimit(w, r, ipKey) {
+			slog.Error("Rate limiter - limit reached (resetPwd, by IP)", "ip", ipKey)
 			return
 		}
 
@@ -184,16 +185,16 @@ func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
 
 		// Per-IP ceiling: stops one host from mail-bombing many addresses. The
 		// client IP is trustworthy here (resolved by MiddlewareRealIP).
-		clientIP := GetClientIPFromRequest(r)
-		if m.forgotPwdIpLimiter.RespondOnLimit(w, r, clientIP) {
-			slog.Error("Rate limiter - limit reached (forgot-password, by IP)", "ip", clientIP)
+		ipKey := clientIPRateLimitKey(r)
+		if m.forgotPwdIpLimiter.RespondOnLimit(w, r, ipKey) {
+			slog.Error("Rate limiter - limit reached (forgot-password, by IP)", "ip", ipKey)
 			return
 		}
 
 		// Per-email limit: prevents mail-bombing a specific address.
-		email := r.FormValue("email")
-		if m.forgotPwdLimiter.RespondOnLimit(w, r, email) {
-			slog.Error("Rate limiter - limit reached (forgot-password, by email)", "email", email)
+		emailKey := accountRateLimitKey(r.FormValue("email"))
+		if m.forgotPwdLimiter.RespondOnLimit(w, r, emailKey) {
+			slog.Error("Rate limiter - limit reached (forgot-password, by email)", "email", emailKey)
 			return
 		}
 
@@ -211,10 +212,10 @@ func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 		}
 
 		// Use IP address as rate limit key
-		clientIP := GetClientIPFromRequest(r)
+		ipKey := clientIPRateLimitKey(r)
 
-		if m.dcrLimiter.RespondOnLimit(w, r, clientIP) {
-			slog.Error("Rate limiter - limit reached (DCR)", "ip", clientIP)
+		if m.dcrLimiter.RespondOnLimit(w, r, ipKey) {
+			slog.Error("Rate limiter - limit reached (DCR)", "ip", ipKey)
 			return
 		}
 
@@ -238,6 +239,34 @@ func GetClientIPFromRequest(r *http.Request) string {
 		return host
 	}
 	return r.RemoteAddr
+}
+
+// clientIPRateLimitKey buckets a request by the block its client controls: the address
+// itself for IPv4, the /64 for IPv6. A host with SLAAC normally owns a whole /64, so
+// keying on the full address hands one client 2^64 buckets, which voids every per-IP
+// tier (measured: 200 of 200 requests allowed against a 30/min budget, #219).
+//
+// Separate from GetClientIPFromRequest, not folded into it, because that function also
+// feeds two audit sinks that need the address an administrator can act on rather than
+// the block it sits in.
+//
+// MiddlewareRealIP guarantees the input is a real IP: it drops X-Forwarded-For entries
+// and an X-Real-IP that net.ParseIP rejects, and net/http guarantees RemoteAddr is
+// host:port. That matters because CanonicalizeIP returns anything that is not an IP
+// unchanged, "" included, which would put every such request in one global bucket.
+func clientIPRateLimitKey(r *http.Request) string {
+	return httprate.CanonicalizeIP(GetClientIPFromRequest(r))
+}
+
+// accountRateLimitKey buckets by the account an identifier names rather than by the
+// spelling submitted. Deliberately stricter than the strictest engine: mysql and mssql
+// compare email case-insensitively and postgres and sqlite do not, so without this the
+// same account has one bucket on two engines and 2^18 on the other two (#219).
+//
+// The handlers that look the account up normalize identically, so the limiter and the
+// account it protects cannot disagree about who the request is.
+func accountRateLimitKey(identifier string) string {
+	return strings.ToLower(strings.TrimSpace(identifier))
 }
 
 // LimitROPC rate limits Resource Owner Password Credentials requests.
@@ -271,16 +300,16 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 		// 3. Distributed attacks on a single user
 		username := r.PostFormValue("username")
 		clientId := r.PostFormValue("client_id")
-		clientIP := GetClientIPFromRequest(r)
+		ipKey := clientIPRateLimitKey(r)
 
 		// Use composite key for more precise rate limiting
-		key := fmt.Sprintf("ropc_%s_%s_%s", clientId, username, clientIP)
+		key := fmt.Sprintf("ropc_%s_%s_%s", clientId, username, ipKey)
 
 		if m.ropcLimiter.RespondOnLimit(w, r, key) {
 			slog.Error("Rate limiter - limit reached (ROPC)",
 				"username", username,
 				"clientId", clientId,
-				"ip", clientIP)
+				"ip", ipKey)
 			return
 		}
 

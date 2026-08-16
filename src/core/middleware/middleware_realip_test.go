@@ -123,6 +123,61 @@ func TestResolveClientIP(t *testing.T) {
 			trustProxyHeaders: false,
 			want:              "203.0.113.9",
 		},
+		// An entry that does not parse as an IP is dropped, not carried through: the
+		// header is caller-controlled and the resolved value becomes a rate-limit
+		// bucket, an audit field and a session record (#219). Dropping an entry is not
+		// rejecting the header, so the rows below say which entries survive rather than
+		// assuming the peer always wins.
+		{
+			name:              "non-IP XFF entry alone is dropped -> peer",
+			remoteAddr:        "10.0.0.5:5000",
+			xff:               "<script>",
+			trustProxyHeaders: true,
+			trusted:           []string{lb},
+			want:              "10.0.0.5",
+		},
+		{
+			name:              "every XFF entry is non-IP -> peer",
+			remoteAddr:        "10.0.0.5:5000",
+			xff:               "<script>, ../../etc",
+			trustProxyHeaders: true,
+			trusted:           []string{lb},
+			want:              "10.0.0.5",
+		},
+		{
+			name:              "non-IP X-Real-IP is refused -> peer",
+			remoteAddr:        "10.0.0.5:5000",
+			xRealIP:           "../../etc/passwd",
+			trustProxyHeaders: true,
+			trusted:           []string{lb},
+			want:              "10.0.0.5",
+		},
+		{
+			name:              "non-IP entry dropped, surviving untrusted entry is the client",
+			remoteAddr:        "10.0.0.5:5000",
+			xff:               "<script>, 203.0.113.9",
+			trustProxyHeaders: true,
+			trusted:           []string{lb},
+			want:              "203.0.113.9",
+		},
+		{
+			name:              "non-IP entry dropped, surviving entry is trusted -> walk runs out there",
+			remoteAddr:        "10.0.0.5:5000",
+			xff:               "<script>, 10.0.0.6",
+			trustProxyHeaders: true,
+			trusted:           []string{lb},
+			want:              "10.0.0.6",
+		},
+		{
+			// Alone, so the drop is what decides the answer: with a real client to its
+			// right the walk would stop there and the row would pass either way.
+			name:              "IPv6 address with a zone is not a reachable client -> dropped",
+			remoteAddr:        "10.0.0.5:5000",
+			xff:               "fe80::1%eth0",
+			trustProxyHeaders: true,
+			trusted:           []string{lb},
+			want:              "10.0.0.5",
+		},
 	}
 
 	for _, tt := range tests {

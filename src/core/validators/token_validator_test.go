@@ -4064,6 +4064,99 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	assert.Equal(t, 400, customErr.GetHttpStatusCode())
 }
 
+// TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup pins that the username
+// reaches GetUserByEmail lowercased and trimmed, which is what the rate limiter's
+// per-account key does. If the two spellings diverge, the limiter and the account it
+// protects disagree about which account a request is and a case variant buys a fresh
+// bucket. It is also the live cross-engine fix: mysql and mssql compare email
+// case-insensitively and postgres and sqlite do not (#219).
+//
+// The mock's expectation is exact-argument, so with the normalization removed the
+// lookup is called with "  Bob@Example.com  " and no expectation matches.
+func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "  Bob@Example.com  ",
+		Password:  "password",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "bob@example.com").Return(nil, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_grant", customErr.GetCode())
+}
+
+// TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant pins the one
+// place the normalization deliberately does not reach: the missing-username check
+// stays on the raw value, so a whitespace-only username is a failed credential
+// (invalid_grant) rather than a malformed request (invalid_request). The distinction
+// is what the per-account failure counter keys on, so moving the trim above the check
+// would silently stop counting a whole class of guess (#219 decision 7).
+func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "   ",
+		Password:  "password",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "").Return(nil, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_grant", customErr.GetCode())
+}
+
 func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_oauth.NewTokenParser(t)

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/core/customerrors"
@@ -80,108 +82,284 @@ func TestGetClientIPFromRequest(t *testing.T) {
 	}
 }
 
+// spellingsOf returns ten spellings of one address that differ only in case and
+// surrounding whitespace. Every one of them names the same account: all five write
+// paths store strings.ToLower(strings.TrimSpace(...)), so these are the shapes a
+// user (or an attacker looking for a fresh bucket) can type for one account.
+func spellingsOf(local, domain string) []string {
+	base := local + "@" + domain
+	return []string{
+		base,
+		strings.ToUpper(base),
+		strings.ToUpper(local[:1]) + local[1:] + "@" + strings.ToUpper(domain[:1]) + domain[1:],
+		strings.ToUpper(local) + "@" + domain,
+		local + "@" + strings.ToUpper(domain),
+		"  " + base,
+		base + "   ",
+		" " + strings.ToUpper(base) + " ",
+		"\t" + base + "\t",
+		"\n" + strings.ToUpper(local) + "@" + domain + "\n",
+	}
+}
+
 // TestLimitPwd_PerEmailAndPerIP verifies the password limiter enforces both a
 // per-email budget (bounds brute force on one account) and a per-IP budget
-// (stops one host hammering many accounts).
+// (stops one host hammering many accounts), and that neither budget can be
+// escaped by respelling the address or by moving inside one's own /64 (#219).
+//
+// Both budgets are asserted exactly, on both sides, because they are published
+// policy in the reference documentation. That is the convention
+// TestLimitResetPwd_PerIP established.
+//
+// The handler stub writes 418 rather than 200 on purpose: a middleware that writes
+// nothing produces exactly 200 with an empty body, so 418 is what tells "the handler
+// ran" apart from "nothing was written", and from 429.
+//
+// The request carries the address in a form body rather than a query string, which is
+// what the real route sends. A query target cannot express the whitespace spellings at
+// all: httptest.NewRequest parses its target as a request line and panics on one.
 func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
-	run := func(m *RateLimiterMiddleware, email, ip string) int {
-		req := httptest.NewRequest(http.MethodPost, "/auth/pwd?email="+email, nil)
+	const emailBudget = 15
+	const ipBudget = 30
+
+	run := func(m *RateLimiterMiddleware, email, ip string) (int, bool) {
+		form := url.Values{"email": {email}}
+		req := httptest.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
+		reached := false
 		m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
 		})).ServeHTTP(rr, req)
-		return rr.Code
+		return rr.Code, reached
 	}
 
-	t.Run("per-email limit trips even from varied IPs", func(t *testing.T) {
+	// A distinct IPv4 address per request, so only the account tier can trip.
+	freshIP := func(i int) string { return fmt.Sprintf("203.0.113.%d:5000", i+1) }
+
+	t.Run("the per-email budget is exactly 15, from varied IPs", func(t *testing.T) {
 		m := NewRateLimiterMiddleware(nil, true)
-		blocked := false
-		for i := 0; i < 25; i++ {
-			ip := fmt.Sprintf("203.0.113.%d:5000", i+1) // distinct IPs so the IP bucket never trips
-			if run(m, "victim@example.com", ip) == http.StatusTooManyRequests {
-				blocked = true
-				break
+		for i := 0; i < emailBudget; i++ {
+			if code, reached := run(m, "victim@example.com", freshIP(i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
 			}
 		}
-		if !blocked {
-			t.Error("expected per-email limit to trip within 25 attempts")
+		if code, reached := run(m, "victim@example.com", freshIP(emailBudget)); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				emailBudget+1, code, reached, http.StatusTooManyRequests)
 		}
 	})
 
-	t.Run("per-IP limit trips even with varied emails", func(t *testing.T) {
+	t.Run("ten case and whitespace variants of one address share the per-email bucket", func(t *testing.T) {
 		m := NewRateLimiterMiddleware(nil, true)
-		blocked := false
-		for i := 0; i < 45; i++ {
-			email := fmt.Sprintf("user%d@example.com", i) // distinct emails so no email bucket trips
-			if run(m, email, "198.51.100.7:5000") == http.StatusTooManyRequests {
-				blocked = true
-				break
+		spellings := spellingsOf("victim", "example.com")
+		// Refused by accountRateLimitKey lowercasing and trimming, not by the limiter
+		// merely working: without it each spelling is its own bucket and all 16 pass.
+		for i := 0; i < emailBudget; i++ {
+			if code, reached := run(m, spellings[i%len(spellings)], freshIP(i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("spelling %q (request %d): got code %d, handler reached %v; want %d and true",
+					spellings[i%len(spellings)], i+1, code, reached, http.StatusTeapot)
 			}
 		}
-		if !blocked {
-			t.Error("expected per-IP limit to trip within 45 attempts")
+		if code, reached := run(m, spellings[emailBudget%len(spellings)], freshIP(emailBudget)); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				emailBudget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a second address still has its own bucket", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		spellings := spellingsOf("victim", "example.com")
+		for i := 0; i < emailBudget+1; i++ {
+			run(m, spellings[i%len(spellings)], freshIP(i))
+		}
+		// Same middleware instance, a genuinely different account: a key that stopped
+		// distinguishing accounts at all would block this, so the case above cannot pass
+		// by the normalization being over-broad.
+		if code, reached := run(m, "other@example.com", freshIP(emailBudget+1)); code != http.StatusTeapot || !reached {
+			t.Errorf("second address: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("the per-IP budget is exactly 30, from varied emails", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		for i := 0; i < ipBudget; i++ {
+			// Distinct emails so no account bucket trips.
+			email := fmt.Sprintf("user%d@example.com", i)
+			if code, reached := run(m, email, "198.51.100.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, "last@example.com", "198.51.100.7:5000"); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				ipBudget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("200 addresses inside one /64 share the per-IP bucket", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		// A fresh IPv6 address per request, all inside 2001:db8:1:2::/64, which is what a
+		// single SLAAC host owns. Refused by clientIPRateLimitKey masking to the /64:
+		// without it all 200 reach the handler (measured, #219).
+		addr := func(i int) string { return fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1) }
+		for i := 0; i < ipBudget; i++ {
+			email := fmt.Sprintf("user%d@example.com", i)
+			if code, reached := run(m, email, addr(i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d from %s: got code %d, handler reached %v; want %d and true",
+					i+1, addr(i), code, reached, http.StatusTeapot)
+			}
+		}
+		for i := ipBudget; i < 200; i++ {
+			email := fmt.Sprintf("user%d@example.com", i)
+			if code, reached := run(m, email, addr(i)); code != http.StatusTooManyRequests || reached {
+				t.Fatalf("request %d from %s: got code %d, handler reached %v; want %d and false",
+					i+1, addr(i), code, reached, http.StatusTooManyRequests)
+			}
+		}
+	})
+
+	t.Run("a second /64 has its own bucket", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		for i := 0; i < ipBudget+1; i++ {
+			run(m, fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1))
+		}
+		// A neighbouring /64 is a different client. This is what makes the mask
+		// observable rather than the limiter: a key that collapsed every IPv6 address
+		// into one bucket would block this too.
+		if code, reached := run(m, "elsewhere@example.com", "[2001:db8:1:3::1]:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second /64: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
 		}
 	})
 
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
 		m := NewRateLimiterMiddleware(nil, false)
 		for i := 0; i < 60; i++ {
-			if run(m, "x@example.com", "203.0.113.1:5000") != http.StatusOK {
-				t.Fatal("disabled limiter should never block")
+			if code, reached := run(m, "x@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
 			}
 		}
 	})
 }
 
-// TestLimitForgotPwd_PerEmailAndPerIP verifies the forgot-password limiter
-// bounds both a single address (mail-bombing) and a single source IP.
+// TestLimitForgotPwd_PerEmailAndPerIP verifies the forgot-password limiter bounds
+// both a single address (mail-bombing) and a single source IP, and that neither
+// budget can be escaped by respelling the address or by moving inside one's own
+// /64 (#219). Same conventions as TestLimitPwd_PerEmailAndPerIP: exact budgets, a
+// 418 stub, and a form body rather than a query target.
 func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
-	run := func(m *RateLimiterMiddleware, email, ip string) int {
-		req := httptest.NewRequest(http.MethodPost, "/forgot-password?email="+email, nil)
+	const emailBudget = 5
+	const ipBudget = 20
+
+	run := func(m *RateLimiterMiddleware, email, ip string) (int, bool) {
+		form := url.Values{"email": {email}}
+		req := httptest.NewRequest(http.MethodPost, "/forgot-password", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
+		reached := false
 		m.LimitForgotPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
 		})).ServeHTTP(rr, req)
-		return rr.Code
+		return rr.Code, reached
 	}
 
-	t.Run("per-email limit trips even from varied IPs", func(t *testing.T) {
+	// A distinct IPv4 address per request, so only the account tier can trip.
+	freshIP := func(i int) string { return fmt.Sprintf("203.0.113.%d:5000", i+1) }
+
+	t.Run("the per-email budget is exactly 5, from varied IPs", func(t *testing.T) {
 		m := NewRateLimiterMiddleware(nil, true)
-		blocked := false
-		for i := 0; i < 12; i++ {
-			ip := fmt.Sprintf("203.0.113.%d:5000", i+1) // distinct IPs so the IP bucket never trips
-			if run(m, "victim@example.com", ip) == http.StatusTooManyRequests {
-				blocked = true
-				break
+		for i := 0; i < emailBudget; i++ {
+			if code, reached := run(m, "victim@example.com", freshIP(i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
 			}
 		}
-		if !blocked {
-			t.Error("expected per-email limit to trip within 12 attempts")
+		if code, reached := run(m, "victim@example.com", freshIP(emailBudget)); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				emailBudget+1, code, reached, http.StatusTooManyRequests)
 		}
 	})
 
-	t.Run("per-IP limit trips even with varied emails", func(t *testing.T) {
+	t.Run("ten case and whitespace variants of one address share the per-email bucket", func(t *testing.T) {
 		m := NewRateLimiterMiddleware(nil, true)
-		blocked := false
-		for i := 0; i < 30; i++ {
-			email := fmt.Sprintf("user%d@example.com", i) // distinct emails so no email bucket trips
-			if run(m, email, "198.51.100.9:5000") == http.StatusTooManyRequests {
-				blocked = true
-				break
+		spellings := spellingsOf("victim", "example.com")
+		// Refused by accountRateLimitKey lowercasing and trimming: without it each
+		// spelling buys a fresh mail-bombing budget for the same mailbox.
+		for i := 0; i < emailBudget; i++ {
+			if code, reached := run(m, spellings[i%len(spellings)], freshIP(i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("spelling %q (request %d): got code %d, handler reached %v; want %d and true",
+					spellings[i%len(spellings)], i+1, code, reached, http.StatusTeapot)
 			}
 		}
-		if !blocked {
-			t.Error("expected per-IP limit to trip within 30 attempts")
+		if code, reached := run(m, spellings[emailBudget%len(spellings)], freshIP(emailBudget)); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				emailBudget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a second address still has its own bucket", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		spellings := spellingsOf("victim", "example.com")
+		for i := 0; i < emailBudget+1; i++ {
+			run(m, spellings[i%len(spellings)], freshIP(i))
+		}
+		if code, reached := run(m, "other@example.com", freshIP(emailBudget+1)); code != http.StatusTeapot || !reached {
+			t.Errorf("second address: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("the per-IP budget is exactly 20, from varied emails", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		for i := 0; i < ipBudget; i++ {
+			email := fmt.Sprintf("user%d@example.com", i) // distinct emails so no email bucket trips
+			if code, reached := run(m, email, "198.51.100.9:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, "last@example.com", "198.51.100.9:5000"); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				ipBudget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("addresses inside one /64 share the per-IP bucket", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		addr := func(i int) string { return fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1) }
+		for i := 0; i < ipBudget; i++ {
+			email := fmt.Sprintf("user%d@example.com", i)
+			if code, reached := run(m, email, addr(i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d from %s: got code %d, handler reached %v; want %d and true",
+					i+1, addr(i), code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, "last@example.com", addr(ipBudget)); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d from %s: got code %d, handler reached %v; want %d and false",
+				ipBudget+1, addr(ipBudget), code, reached, http.StatusTooManyRequests)
+		}
+		// A neighbouring /64 is a different client, which is what makes the mask
+		// observable rather than the limiter.
+		if code, reached := run(m, "elsewhere@example.com", "[2001:db8:1:3::1]:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second /64: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
 		}
 	})
 
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
 		m := NewRateLimiterMiddleware(nil, false)
 		for i := 0; i < 40; i++ {
-			if run(m, "x@example.com", "203.0.113.1:5000") != http.StatusOK {
-				t.Fatal("disabled limiter should never block")
+			if code, reached := run(m, "x@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
 			}
 		}
 	})

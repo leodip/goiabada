@@ -67,7 +67,10 @@ func resolveClientIP(remoteAddr, xff, xRealIP string, trustProxyHeaders bool, tr
 
 	entries := splitXFF(xff)
 	if len(entries) == 0 {
-		if ip := hostOnly(xRealIP); ip != "" {
+		// Same check splitXFF applies: a header that does not carry an IP is not
+		// evidence of anything, and adopting it would put a bucket, an audit entry
+		// and a session record under a caller-chosen string (#219).
+		if ip := hostOnly(xRealIP); net.ParseIP(ip) != nil {
 			return ip
 		}
 		return peer
@@ -116,6 +119,15 @@ func parseCIDRs(entries []string) []*net.IPNet {
 }
 
 // splitXFF splits an X-Forwarded-For header into normalized, non-empty IPs.
+//
+// Entries that net.ParseIP rejects are dropped rather than carried through: the header
+// is caller-controlled, so without this a value like "<script>" becomes a rate-limit
+// bucket, an audit field and a session record. Dropping an entry does not reject the
+// whole header, so a chain whose garbage is followed by a real client still resolves to
+// that client (#219).
+//
+// This drops an address carrying an IPv6 zone (fe80::1%eth0), which net.ParseIP rejects:
+// a link-local address with a zone is not a client this server can be reached from.
 func splitXFF(xff string) []string {
 	if strings.TrimSpace(xff) == "" {
 		return nil
@@ -123,7 +135,7 @@ func splitXFF(xff string) []string {
 	parts := strings.Split(xff, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
-		if ip := hostOnly(p); ip != "" {
+		if ip := hostOnly(p); net.ParseIP(ip) != nil {
 			out = append(out, ip)
 		}
 	}

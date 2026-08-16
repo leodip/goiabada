@@ -882,8 +882,19 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			}
 		}
 
-		// Validate resource owner credentials
-		user, err := val.database.GetUserByEmail(nil, input.Username)
+		// Validate resource owner credentials.
+		//
+		// Normalized to exactly what the rate limiter's account key does, and to what every
+		// write path stores, for the reasons at /auth/pwd: the limiter and the account it
+		// protects must agree about which account a request is, and mysql and mssql compare
+		// email case-insensitively while postgres and sqlite do not (#219).
+		//
+		// Deliberately not applied to the missing-username check above, which stays on the
+		// raw value: normalizing first would turn a whitespace-only username from
+		// invalid_grant into invalid_request, and only invalid_grant is a guess against an
+		// account.
+		username := strings.ToLower(strings.TrimSpace(input.Username))
+		user, err := val.database.GetUserByEmail(nil, username)
 		if err != nil {
 			return nil, err
 		}
