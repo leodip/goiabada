@@ -1632,6 +1632,62 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 	}
 }
 
+// redirectWillBeEmitted is the one definition of "would an error response to this client actually
+// leave the server", and it now has two readers: the emitter, which withholds the redirect and
+// renders the interstitial, and the handler, which asks the same question earlier to decide whether
+// anything has to be authenticated first. Two call sites that must agree is exactly the shape a
+// later edit gets out of step, so the provenance and emittability table lives here, once, and the
+// handler-level tests stay thin on purpose.
+//
+// Every negative varies exactly one thing from the accepted row, so none of them can pass with all
+// the gates removed (#108, #122, #213).
+func TestRedirectWillBeEmitted(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		client      *models.Client
+		redirectURI string
+		want        bool
+		why         string
+	}{
+		{
+			name:        "administrator-registered client with an absolute redirect URI",
+			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI: "https://legit.example/cb",
+			want:        true,
+			why:         "a human vetted this redirect URI at registration, so RFC 9700 4.11.2's trust question is answered",
+		},
+		{
+			name:        "self-registered client",
+			client:      &models.Client{ClientIdentifier: "dcr-client", CreatedViaDCR: true},
+			redirectURI: "https://legit.example/cb",
+			want:        false,
+			why:         "the provenance gate: the client chose its own redirect URI, which is the source RFC 9700 4.11.2 names (#108)",
+		},
+		{
+			name:        "unresolved client",
+			client:      nil,
+			redirectURI: "https://legit.example/cb",
+			want:        false,
+			why: "the provenance gate again. nil means the handler could not find out where the redirect URI " +
+				"came from, and that is the untrusted case rather than an exempt one (#108)",
+		},
+		{
+			name:        "administrator-registered client with an unemittable redirect URI",
+			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI: "//evil.example/cb",
+			want:        false,
+			why: "the emittability gate: provenance passes and the string still cannot name the host it " +
+				"appears to, which is the row an old client can hold and the gate above cannot cover (#122)",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := redirectWillBeEmitted(tc.client, tc.redirectURI, "TestRedirectWillBeEmitted")
+
+			assert.Equal(t, tc.want, got, tc.why)
+		})
+	}
+}
+
 func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	t.Run("Valid implicit flow request with token response type", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
