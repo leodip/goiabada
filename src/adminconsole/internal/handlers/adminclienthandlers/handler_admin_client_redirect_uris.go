@@ -139,7 +139,12 @@ func HandleAdminClientRedirectURIsPost(
 		}
 		_, err = apiClient.UpdateClientRedirectURIs(jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			// Not JsonError directly: the API refuses a redirect URI with a 400 whose
+			// description names the offending value, and that sentence is the only thing
+			// telling the administrator which of their URIs was rejected and why. Handed
+			// to JsonError as a plain error it becomes a generic 500 and the sentence goes
+			// to the log instead of the screen (#122).
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

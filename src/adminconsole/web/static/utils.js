@@ -20,6 +20,21 @@ function tFormat(key, params) {
   return s;
 }
 
+// escapeHtml renders a string as text in a place that expects markup. Callers pass
+// literal markup to showModalDialog on purpose, so the escaping belongs at the one call
+// site that forwards a server-supplied string rather than inside showModalDialog itself.
+//
+// The ampersand has to be replaced first, or the entities produced by the later
+// replacements get their own ampersands escaped.
+function escapeHtml(str) {
+  return String(str)
+    .split("&").join("&amp;")
+    .split("<").join("&lt;")
+    .split(">").join("&gt;")
+    .split('"').join("&quot;")
+    .split("'").join("&#39;");
+}
+
 function showModalDialog(id, title, message, btn1callback, btn2callback) {
   document.getElementById(id + "_modalDialogTitle").innerText = title;
   document.getElementById(id + "_modalDialogMessage").innerHTML = message;
@@ -134,7 +149,10 @@ function sendAjaxRequest(props) {
           response.text().then((text) => {
             try {
               const err = JSON.parse(text);
-              showModalDialog(props.modalId, t("js.error.server_error_title"), err.error_description);
+              // error_description can echo back what the user typed: handlers now
+              // forward the API's 400 description verbatim so a validation failure is
+              // readable, and showModalDialog assigns this to innerHTML (#122).
+              showModalDialog(props.modalId, t("js.error.server_error_title"), escapeHtml(err.error_description));
               setLoading(false);
             } catch (err) {
               showModalDialog(
