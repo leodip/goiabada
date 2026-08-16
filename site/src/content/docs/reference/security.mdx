@@ -30,7 +30,7 @@ Goiabada includes several built-in security features:
 - **PKCE support** - [Configurable PKCE enforcement](/concepts/pkce/) at global and per-client levels, protecting against code interception attacks. PKCE is required by default (OAuth 2.1 recommendation).
 - **Two-factor authentication** - Optional or mandatory 2FA using TOTP
 - **One-time use of 2FA codes** - Each TOTP code can only be used once by the authenticator currently enrolled, enforced atomically, so two simultaneous submissions of the same code yield at most one success. Once a code has been accepted it is refused everywhere afterwards, at the login prompt, during enrollment and through the account API, with the same generic error a wrong code gets. Removing an authenticator clears that history, so enrolling again starts fresh. An `otp_code_replay_detected` [audit event](/concepts/audit-log/) is recorded whenever a replayed code is refused
-- **Rate limiting** - Configurable rate limiting on sensitive endpoints (login, OTP verification, password reset, self-registration)
+- **Rate limiting** - Configurable rate limiting on sensitive endpoints (login, OTP verification, password reset, self-registration, email verification)
 - **Session management** - Configurable session timeouts with idle and absolute expiration
 - **Durable session termination** - Ending a session revokes the refresh tokens and authorization codes that session authorized, including offline refresh tokens that outlive the browser session. A `terminated_user_session` [audit event](/concepts/audit-log/) records what each termination revoked. See [ending a session](/concepts/user-sessions/#ending-a-session)
 

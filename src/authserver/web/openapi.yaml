@@ -2070,6 +2070,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/account/phone:
     put:
@@ -2368,6 +2370,21 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     NotFound:
       description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: |
+        Rate limit reached. Returned only when rate limiting is enabled
+        (GOIABADA_AUTHSERVER_RATELIMITER_ENABLED). error_code is
+        TOO_MANY_REQUESTS and a Retry-After header carries the window length
+        in seconds.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
       content:
         application/json:
           schema:
@@ -3727,7 +3744,7 @@ components:
       properties:
         verificationCode:
           type: string
-          description: 6-character code (3 letters + 3 numbers)
+          description: 8-character code (4 letters + 4 numbers), case-insensitive
 
     AccountEmailVerificationSendResponse:
       type: object

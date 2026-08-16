@@ -217,6 +217,7 @@ When enabled, Goiabada applies rate limits to security-sensitive endpoints:
 | `POST /auth/pwd` (password login) | 100 / 60min | failed sign-ins | email (lowercased) |
 | `POST /auth/pwd` (password login) | 30 / min | every request | IP address (IPv6 grouped by /64) |
 | `POST /auth/otp` (OTP verification) | 5 / 15min | failed codes | user ID |
+| `POST /api/v1/account/email/verification` | 5 / 15min | failed codes | access token subject |
 | `POST /forgot-password` | 5 / 5min | every request | email (lowercased) |
 | `POST /forgot-password` | 20 / 5min | every request | IP address (IPv6 grouped by /64) |
 | `GET` and `POST /reset-password` | 30 / 5min | every request | IP address (IPv6 grouped by /64) |

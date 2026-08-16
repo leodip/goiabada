@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/go-chi/httprate"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -40,13 +41,15 @@ type AuditLogger interface {
 
 // rejectClass is the shape a rejected caller can parse. A browser gets the error page it
 // would get from any other refusal; an OAuth2 or RFC 7591 client gets the JSON error
-// object it is already parsing at that endpoint. Answering every route in plain text, as
-// httprate's default does, breaks both machine callers (#219).
+// object it is already parsing at that endpoint; a caller of the account or admin API gets
+// that API's own error envelope. Answering every route in plain text, as httprate's default
+// does, breaks both machine callers (#219).
 type rejectClass int
 
 const (
 	rejectBrowser rejectClass = iota
 	rejectOAuth
+	rejectAPI
 )
 
 // tier is one rate-limit bucket plus everything a rejection has to say about it.
@@ -263,10 +266,12 @@ type RateLimiterMiddleware struct {
 	enabled     bool
 	// pwdAccount is shared with the ROPC grant: both are a password guessed against one
 	// account, so one budget covers them.
-	pwdAccount  *accountFailureGate
-	pwdIp       *tier
-	otp         *failureTier
-	activate    *tier
+	pwdAccount *accountFailureGate
+	pwdIp      *tier
+	otp        *failureTier
+	// emailVerification bounds guessing at the account's own email verification code.
+	emailVerification *failureTier
+	activate          *tier
 	register    *tier
 	resetPwd    *tier
 	forgotPwd   *tier
@@ -303,6 +308,14 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 		// pointing the wrong entry in an authenticator app at the form burns codes, and a
 		// resubmitted code is refused as a replay and so counts as a failure too (#219).
 		otp: newFailureTier("otp", "", 5, 15*time.Minute),
+		// per-subject email verification failures. The code is four letters plus four
+		// digits, 26^4 x 10^4, so 5 failures per 15 minutes puts a hit on the far side of a
+		// human lifetime. It needs a bound at all because the chain in front of it is short:
+		// PUT /api/v1/account/email sets any address not already registered and clears the
+		// verified flag, so guessing the code from there buys email_verified: true on an
+		// address the attacker does not control. Failures only, so a user reading the code
+		// out of their inbox spends nothing (#219).
+		emailVerification: newFailureTier("email_verification", "", 5, 15*time.Minute),
 		// per-IP: 10 activation operations per 5 minutes, at the two requests an activation
 		// now costs (the link's GET, the clean GET). The same operation rate as
 		// resetPwd over a chain one request shorter (#112)
@@ -444,6 +457,20 @@ func (m *RateLimiterMiddleware) reject(w http.ResponseWriter, r *http.Request, c
 		return
 	}
 
+	if class == rejectAPI {
+		// The same envelope every other refusal on these routes writes, so a caller
+		// already switching on error_code needs no new shape. The envelope type lives in
+		// core/api; the helper that writes it is unexported in the authserver module, so
+		// this builds it directly rather than reaching for a function core cannot see.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_ = json.NewEncoder(w).Encode(api.ErrorResponse{
+			ErrorCode:        "TOO_MANY_REQUESTS",
+			ErrorDescription: "Too many requests. Please wait and try again later.",
+		})
+		return
+	}
+
 	bind := map[string]interface{}{
 		"title":       i18n.T(r.Context(), "auth_error.rate_limited.title"),
 		"error":       i18n.T(r.Context(), "auth_error.rate_limited.message"),
@@ -550,6 +577,69 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// LimitEmailVerification rate limits the account's own email verification check, on the
+// subject of the access token presented.
+//
+// The endpoint had no bound at all and no failure counter, while comparing a code an
+// attacker can request against an address they chose: PUT /api/v1/account/email accepts any
+// address not already registered and clears email_verified, so what a guessed code buys is
+// a verified claim on somebody else's address (#219).
+//
+// The subject rather than the client IP because the budget has to follow the account being
+// attacked rather than the host attacking it, and reaching this route at all requires a
+// valid access token for that account. A request with no readable token passes through to
+// the handler, which answers ACCESS_TOKEN_REQUIRED before touching the code, so the skipped
+// limit costs nothing: LimitOtp's rule from #114, unchanged.
+func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		key, ok := tokenSubjectRateLimitKey(r)
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if !m.emailVerification.Reserve(key) {
+			m.refuse(w, r, &m.emailVerification.tier, key, rejectAPI,
+				map[string]interface{}{"loggedInUser": key})
+			return
+		}
+
+		reservation := &credentialReservation{}
+		r = withCredentialReservation(r, reservation)
+		defer func() {
+			m.emailVerification.Release(r, key, reservation.failed.Load())
+		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// tokenSubjectRateLimitKey buckets by the account a bearer token names. It reads the token
+// the API authentication middleware validated and left on the context, which is the same
+// value the handler resolves its user from, so the limiter and the handler cannot disagree
+// about whose budget is being spent.
+//
+// The token is stored as a value rather than a pointer, so the type assertion has to match
+// (see the authserver middleware's own GetValidatedToken). false means no bucket can be
+// derived, which is a request that has no business reaching a credential check anyway.
+func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
+	token, ok := r.Context().Value(constants.ContextKeyValidatedToken).(oauth.JwtToken)
+	if !ok {
+		return "", false
+	}
+	subject := strings.TrimSpace(token.GetStringClaim("sub"))
+	if subject == "" {
+		return "", false
+	}
+	return subject, true
 }
 
 // LimitActivate rate limits the account activation endpoint, on the client IP.

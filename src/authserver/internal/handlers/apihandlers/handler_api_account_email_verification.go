@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"log/slog"
@@ -18,7 +19,6 @@ import (
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/stringutil"
 )
 
 // HandleAPIAccountEmailVerificationSendPost - POST /api/v1/account/email/verification/send
@@ -80,7 +80,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 		}
 
 		// Generate code and store encrypted
-		verificationCode := strings.ToUpper(stringutil.GenerateRandomLetterString(3)) + stringutil.GenerateRandomNumberString(3)
+		verificationCode := generateEmailVerificationCode()
 		encrypted, err := encryption.EncryptData(verificationCode)
 		if err != nil {
 			slog.Error("Failed to encrypt verification code", "error", err)
@@ -141,6 +141,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 func HandleAPIAccountEmailVerificationPost(
 	database data.Database,
 	auditLogger handlers.AuditLogger,
+	credentialFailures handlers.CredentialFailureRecorder,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth and scope are enforced by middleware; extract validated token
@@ -193,8 +194,27 @@ func HandleAPIAccountEmailVerificationPost(
 			storedCode = ""
 		}
 
-		if !strings.EqualFold(storedCode, code) || !user.EmailVerificationCodeIssuedAt.Valid ||
+		// Constant-time, and unlike its siblings this comparison is reached on every guess:
+		// the reset-password code, client secrets and HOTP all compare with
+		// subtle.ConstantTimeCompare already. Uppercasing the submission keeps the
+		// case-insensitive input the single-case alphabet relies on, and drops only exotic
+		// Unicode foldings that no generated code can contain.
+		//
+		// The emptiness check is not redundant. Decryption failure above leaves storedCode
+		// empty, and two empty strings compare equal under both this and the EqualFold that
+		// preceded it, so without it the request is refused only by the IssuedAt check
+		// behind the comparison (#219).
+		codeMatches := len(storedCode) > 0 && len(code) > 0 &&
+			subtle.ConstantTimeCompare([]byte(storedCode), []byte(strings.ToUpper(code))) == 1
+
+		if !codeMatches || !user.EmailVerificationCodeIssuedAt.Valid ||
 			user.EmailVerificationCodeIssuedAt.Time.Add(5*time.Minute).Before(time.Now().UTC()) {
+
+			// The only branch that is a guess against the code. A missing token, a blank
+			// subject, disabled SMTP and an unknown user are refused before anything is
+			// compared, so charging them would let a caller spend a budget without ever
+			// attempting the credential.
+			credentialFailures.RecordCredentialFailure(r)
 
 			auditLogger.Log(constants.AuditFailedEmailVerificationCode, map[string]interface{}{
 				"userId":       user.Id,
