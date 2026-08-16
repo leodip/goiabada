@@ -87,6 +87,25 @@ type AuthContext struct {
 	// preserving the RP's stated preference across the multi-step auth flow.
 	// Sanitized before storage (BCP 47 shape filter, capped at 10 tags / 256 bytes).
 	UILocales []string
+	// DeferredErrorCode and DeferredErrorDescription park an authorization error that the
+	// server refused to deliver until somebody had authenticated. RFC 9700 4.11.2 requires
+	// that the user be authenticated before the server redirects them, so a validation
+	// failure reaching a logged-out browser is carried across the login ceremony and
+	// delivered to the client afterwards, instead of redirecting an anonymous visitor to a
+	// host the client chose (#213).
+	//
+	// DeferredErrorCode != "" is the sentinel, and it is sound rather than merely convenient:
+	// the five deferrable validations have 23 error returns between them and not one carries
+	// an empty code, while the empty-code constructor customerrors.NewErrorDetail("", ...) is
+	// used only by ValidateClientAndRedirectURI, which answers a rendered page and never a
+	// redirect. An edit that introduces an empty-coded error on a deferrable path silently
+	// turns a parked error into no error at all, so it must mint a code instead.
+	//
+	// Absent from a context written by an older binary they unmarshal as "", which reads as
+	// "no parked error" and is the safe direction, exactly as Level1AuthCompleted and
+	// CeremonyId document for their own fields.
+	DeferredErrorCode        string
+	DeferredErrorDescription string
 }
 
 func (ac *AuthContext) SetScope(scope string) {

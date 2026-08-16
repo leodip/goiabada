@@ -197,50 +197,14 @@ func HandleAuthorizeGet(
 		}
 
 		redirToClientWithError := func(validationError *customerrors.ErrorDetail) {
-			// The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie
-			// on w, and redirToClientWithError commits the response in every response mode, so
-			// clearing afterwards leaves the header on a response already written and the
-			// browser keeps an auth context it can replay (#141).
-			err := authHelper.ClearAuthContext(w, r)
-			if err != nil {
-				// The clear failed, so Save wrote no cookie and the browser still holds the
-				// auth context. The client is owed an error response regardless: its redirect
-				// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
-				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
-				slog.Error("failed to clear the auth context, answering the client with server_error",
-					"error", err)
-				// Read from the request rather than from authContext: this closure runs before the
-				// second SaveAuthContext below, and two of its call sites run before the context
-				// has been populated with the validated values at all.
-				err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
-					client:       client,
-					code:         "server_error",
-					description:  "Internal server error",
-					responseMode: r.FormValue("response_mode"),
-					redirectURI:  r.FormValue("redirect_uri"),
-					state:        r.FormValue("state"),
-					responseType: r.FormValue("response_type"),
-				})
-				if err != nil {
-					// Nowhere left to send the client, so the 500 is the last resort here.
-					httpHelper.InternalServerError(w, r, err)
-				}
-				return
-			}
-
-			err = redirToClientWithError(w, r, httpHelper, templateFS, redirectErrorInput{
-				client:       client,
-				code:         validationError.GetCode(),
-				description:  validationError.GetDescription(),
-				responseMode: r.FormValue("response_mode"),
-				redirectURI:  r.FormValue("redirect_uri"),
-				state:        r.FormValue("state"),
-				responseType: r.FormValue("response_type"),
-			})
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
+			// Read from the request rather than from authContext: this closure runs before the
+			// second SaveAuthContext below, and two of its call sites run before the context
+			// has been populated with the validated values at all. answerClientWithError then
+			// clears the context before answering, and derives its own server_error fallback
+			// from this same request-sourced input (#141).
+			answerClientWithError(w, r, httpHelper, authHelper, templateFS,
+				redirectErrorFromRequest(r, client,
+					validationError.GetCode(), validationError.GetDescription()))
 		}
 
 		err = authorizeValidator.ValidateUnsupportedRequestParameters(&validators.ValidateUnsupportedRequestParametersInput{
@@ -436,37 +400,17 @@ func HandleAuthorizeGet(
 // - Returns an error to the client if silent auth is not possible
 // - Issues a code silently if all conditions are met
 func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database data.Database, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *oauth.AuthContext, client *models.Client, sessionIdentifier string) {
-	// Helper to clear the auth context and then redirect with error
+	// Helper to clear the auth context and then redirect with error. The clear-then-answer
+	// sequence and its server_error fallback live in answerClientWithError, which derives that
+	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
+	// exactly as it did when the sequence was written out here (#141).
+	//
+	// On the silent path the fallback is worth naming: a silent-renewal iframe reads server_error
+	// as "retry later" rather than "start an interactive login", which on a genuine server fault
+	// is the accurate instruction of the two.
 	redirectWithError := func(errorCode string, errorDescription string) {
-		// The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie on
-		// w, and redirToClientWithError commits the response in every response mode, so
-		// clearing afterwards leaves the header on a response already written and the browser
-		// keeps an auth context it can replay (#141).
-		err := authHelper.ClearAuthContext(w, r)
-		if err != nil {
-			// The clear failed, so Save wrote no cookie and the browser still holds the auth
-			// context. The client is owed an error response regardless: its redirect URI was
-			// validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749
-			// 4.1.2.1 mints server_error for exactly this condition (#141). A silent-renewal
-			// iframe reads that as "retry later" rather than "start an interactive login",
-			// which on a genuine server fault is the accurate instruction of the two.
-			slog.Error("failed to clear the auth context, answering the client with server_error",
-				"error", err)
-			err = redirToClientWithError(w, r, httpHelper, templateFS,
-				redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
-			if err != nil {
-				// Nowhere left to send the client, so the 500 is the last resort here.
-				httpHelper.InternalServerError(w, r, err)
-			}
-			return
-		}
-
-		err = redirToClientWithError(w, r, httpHelper, templateFS,
+		answerClientWithError(w, r, httpHelper, authHelper, templateFS,
 			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
 	}
 
 	// 1. Check session exists
@@ -680,6 +624,66 @@ func redirectErrorFromAuthContext(authContext *oauth.AuthContext, client *models
 	}
 }
 
+// redirectErrorFromRequest builds the input for an error redirect whose response parameters come
+// from the HTTP request rather than from the stored ceremony. It is the twin of
+// redirectErrorFromAuthContext, and it exists because HandleAuthorizeGet answers errors that arise
+// before the context holds the validated values: two of its sites run before the second
+// SaveAuthContext, so the request is the only source that has them.
+func redirectErrorFromRequest(r *http.Request, client *models.Client,
+	code string, description string) redirectErrorInput {
+
+	return redirectErrorInput{
+		client:       client,
+		code:         code,
+		description:  description,
+		responseMode: r.FormValue("response_mode"),
+		redirectURI:  r.FormValue("redirect_uri"),
+		state:        r.FormValue("state"),
+		responseType: r.FormValue("response_type"),
+	}
+}
+
+// answerClientWithError clears the auth context and then answers the client with an error, which
+// is the sequence every error response from an authorization ceremony owes.
+//
+// The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie on w, and
+// redirToClientWithError commits the response in every response mode, so clearing afterwards
+// leaves the header on a response already written and the browser keeps an auth context it can
+// replay (#141).
+//
+// On a failed clear the client is owed an error response regardless: its redirect URI was
+// validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749 4.1.2.1 mints
+// server_error for exactly this condition (#141). The fallback is the caller's own input with its
+// code and description swapped, so each call site keeps the parameter source it built the input
+// from and neither has to restate it.
+func answerClientWithError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper,
+	authHelper AuthHelper, templateFS fs.FS, input redirectErrorInput) {
+
+	err := authHelper.ClearAuthContext(w, r)
+	if err != nil {
+		// The clear failed, so Save wrote no cookie and the browser still holds the auth context.
+		slog.Error("failed to clear the auth context, answering the client with server_error",
+			"error", err)
+
+		fallback := input
+		fallback.code = "server_error"
+		fallback.description = "Internal server error"
+
+		err = redirToClientWithError(w, r, httpHelper, templateFS, fallback)
+		if err != nil {
+			// Nowhere left to send the client, so the 500 is the last resort here.
+			httpHelper.InternalServerError(w, r, err)
+		}
+		return
+	}
+
+	err = redirToClientWithError(w, r, httpHelper, templateFS, input)
+	if err != nil {
+		httpHelper.InternalServerError(w, r, err)
+		return
+	}
+}
+
 // clientProvenance loads the client behind a ceremony for the sole benefit of the trust decision in
 // redirToClientWithError, at the handlers that reach an error redirect without having loaded one.
 //
@@ -697,53 +701,70 @@ func clientProvenance(database data.Database, clientIdentifier string) *models.C
 	return client
 }
 
+// redirectWillBeEmitted answers whether an error response to this client would actually leave the
+// server as a redirect, or whether it would be withheld and replaced by the refusal interstitial.
+// It is the two gates below, asked as one question, so the callers that need the answer BEFORE
+// building a response and the emitter that enforces it at the last moment cannot drift apart.
+//
+// site names the caller for the log line inside checkRedirectURIEmittable, which records where a
+// refusal happened and deliberately never records the URI itself (#159).
+//
+// Gate 3. RFC 9700 4.11.2: an attacker who registers a client anonymously can use this server's own
+// error redirect to deliver a victim to a host they control, either by getting the user to
+// decline (attack 2) or by sending a deliberately invalid request (attack 1). The RFC leaves
+// "trusted" to the server and names the source of the redirect URI among its inputs, so a
+// client that registered itself is the untrusted case and an administrator-registered one,
+// whose redirect URI a human vetted, is not. An unresolved client is untrusted too: the
+// question is where the redirect URI came from, and "we could not find out" is not an answer
+// that justifies using it.
+//
+// A silent request is NOT exempt, and an earlier version of this guard had it the other way
+// round. RFC 9700 4.11.2 lists three attacks, and the third is the exemption written out:
+// "Intentionally send a valid silent authentication request (prompt=none) with client_id and
+// redirect_uri controlled by the attacker. In this case, the authorization server will
+// automatically redirect the user agent to the phishing site." It needs neither a session nor
+// any victim interaction, which makes it the cheapest of the three rather than a corner. The
+// exception clause in the same section, "with the exception of the silent authentication use
+// case", sits inside the requirement to prompt for credentials, not inside the "MUST take
+// precautions to prevent these threats" that governs the list attack 3 is in.
+//
+// OIDC Core 3.1.2.1 is not violated by rendering the interstitial instead: it forbids displaying
+// "any authentication or consent user interface pages", and that page asks for neither. What it
+// costs is real and was accepted knowingly: a self-registered client's silent renewal stops
+// receiving a readable consent_required and has to fall back to an interactive authorization
+// (#108, decision 15).
+//
+// Gate 4, the last resort, and a separate statement from the gate above rather than a third
+// clause on it: that one weighs where the redirect URI came from, this one weighs whether the
+// string can name the host it appears to. An administrator-registered client passes the
+// provenance test and can still hold a row stored before these rules existed, which is the case
+// the gate above cannot cover and this one does. Unreachable once the authorization endpoint has
+// refused the URI, and kept so that a test enforces it (#122).
+func redirectWillBeEmitted(client *models.Client, redirectURI string, site string) bool {
+	if client == nil || client.CreatedViaDCR {
+		return false
+	}
+
+	if err := checkRedirectURIEmittable(site, redirectURI); err != nil {
+		return false
+	}
+
+	return true
+}
+
 func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 	httpHelper HttpHelper, templateFS fs.FS, input redirectErrorInput) error {
 
-	// RFC 9700 4.11.2: an attacker who registers a client anonymously can use this server's own
-	// error redirect to deliver a victim to a host they control, either by getting the user to
-	// decline (attack 2) or by sending a deliberately invalid request (attack 1). The RFC leaves
-	// "trusted" to the server and names the source of the redirect URI among its inputs, so a
-	// client that registered itself is the untrusted case and an administrator-registered one,
-	// whose redirect URI a human vetted, is not. An unresolved client is untrusted too: the
-	// question is where the redirect URI came from, and "we could not find out" is not an answer
-	// that justifies using it.
+	// Gates 3 and 4, both of them, asked through the one predicate so this emitter and the callers
+	// that ask the same question before building a response cannot answer it differently. The
+	// reasoning for each gate travels with redirectWillBeEmitted (#108, #122).
 	//
-	// It sits above the response-mode dispatch so it covers query, fragment and form_post alike,
-	// and it can only ever withhold a redirect. Nothing below it is reached, no state is written
-	// and no route is added, so there is nothing here for an attacker to drive (#108).
-	//
-	// A silent request is NOT exempt, and an earlier version of this guard had it the other way
-	// round. RFC 9700 4.11.2 lists three attacks, and the third is the exemption written out:
-	// "Intentionally send a valid silent authentication request (prompt=none) with client_id and
-	// redirect_uri controlled by the attacker. In this case, the authorization server will
-	// automatically redirect the user agent to the phishing site." It needs neither a session nor
-	// any victim interaction, which makes it the cheapest of the three rather than a corner. The
-	// exception clause in the same section, "with the exception of the silent authentication use
-	// case", sits inside the requirement to prompt for credentials, not inside the "MUST take
-	// precautions to prevent these threats" that governs the list attack 3 is in.
-	//
-	// OIDC Core 3.1.2.1 is not violated by rendering here: it forbids displaying "any
-	// authentication or consent user interface pages", and this page asks for neither. What it
-	// costs is real and was accepted knowingly: a self-registered client's silent renewal stops
-	// receiving a readable consent_required and has to fall back to an interactive authorization
-	// (#108, decision 15).
-	if input.client == nil || input.client.CreatedViaDCR {
-		return renderRedirectBlocked(httpHelper, w, r, input)
-	}
-
-	// Gate 4, the last resort, and a separate statement from the guard above rather than a third
-	// clause on it: that one weighs where the redirect URI came from, this one weighs whether the
-	// string can name the host it appears to. An administrator-registered client passes the
-	// provenance test and can still hold a row stored before these rules existed, which is the case
-	// the guard above cannot cover and this one does.
-	//
-	// It sits above the response-mode dispatch for the same reason, so query, fragment and form_post
-	// are all covered, and it ends in the same place: the interstitial names the destination and the
-	// authorization stops, rather than this server forwarding a browser to a host of somebody else's
-	// choosing on a request it just refused. Unreachable once the authorization endpoint has refused
-	// the URI, and kept so that a test enforces it (#122).
-	if err := checkRedirectURIEmittable("redirToClientWithError", input.redirectURI); err != nil {
+	// The call sits above the response-mode dispatch so it covers query, fragment and form_post
+	// alike, and it can only ever withhold a redirect: nothing below it is reached, no state is
+	// written and no route is added, so there is nothing here for an attacker to drive. The
+	// interstitial names the destination and the authorization stops, rather than this server
+	// forwarding a browser to a host of somebody else's choosing on a request it just refused.
+	if !redirectWillBeEmitted(input.client, input.redirectURI, "redirToClientWithError") {
 		return renderRedirectBlocked(httpHelper, w, r, input)
 	}
 
