@@ -147,7 +147,13 @@ func HandleAuthPwdPost(
 			return
 		}
 
-		email := r.FormValue("email")
+		// Normalized to exactly what the rate limiter's account key does, and to what every
+		// write path stores. Two things depend on the spelling matching: the limiter and the
+		// account it protects must agree about which account a request is, or a case variant
+		// buys a fresh bucket; and mysql and mssql compare email case-insensitively while
+		// postgres and sqlite do not, so without this a stored bob@x.com typed as Bob@x.com
+		// signs in on two engines and is refused on the other two (#219).
+		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		password := r.FormValue("password")
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
@@ -189,7 +195,8 @@ func HandleAuthPwdPost(
 			}
 		}
 
-		if len(strings.TrimSpace(email)) == 0 {
+		// Already trimmed above. password is not: a space can be part of one.
+		if len(email) == 0 {
 			renderError(i18n.NewLocalizedError(i18n.ErrCodeLoginEmailRequired, nil))
 			return
 		}

@@ -548,6 +548,113 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
+	// The rate limiter keys its per-account tier on strings.ToLower(strings.TrimSpace(email)),
+	// so the lookup has to agree or the middleware and the handler disagree about which
+	// account a request is and a case variant buys a fresh bucket. It is also a live
+	// user-facing fix: mysql and mssql compare email case-insensitively and postgres and
+	// sqlite do not, so a stored bob@x.com typed as Bob@x.com used to sign in on two engines
+	// and be refused on the other two (#219).
+	//
+	// The mock's expectation is exact-argument, which is what makes this observable: with
+	// the normalization removed the lookup is called with "  Bob@Example.com  " and no
+	// expectation matches. The audit entry and the re-rendered form are asserted on the same
+	// spelling, which is decision 4's two visible consequences.
+	t.Run("The address reaches the lookup, the audit entry and the form normalized", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("email", "  Bob@Example.com  ")
+		form.Add("password", "testpassword")
+		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		settings := &models.Settings{
+			SMTPEnabled: true,
+		}
+		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		database.On("GetUserByEmail", mock.Anything, "bob@example.com").Return(nil, nil)
+
+		auditLogger.On("Log", constants.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+			return details["email"] == "bob@example.com"
+		})).Return()
+
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["error"] == "Authentication failed." && data["email"] == "bob@example.com"
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	// A whitespace-only address is still the missing-email error, not a lookup on the
+	// empty string: the trim now happens before the check rather than inside it.
+	t.Run("A whitespace-only address is refused as missing", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("email", "   ")
+		form.Add("password", "testpassword")
+		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		settings := &models.Settings{SMTPEnabled: true}
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
+
+		// No GetUserByEmail expectation: the mock fails the test if the lookup is reached.
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["error"] == "Email is required."
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+	})
+
 	t.Run("Successful authentication", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
