@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -759,14 +758,36 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 		effectiveResponseMode = "fragment"
 	}
 
+	// The error response's parameters, in the order they reach the client, built once for all three
+	// response modes because all three answer with the same three fields.
+	//
+	// state is appended on its value being non-empty and nothing else. There is no TrimSpace, and
+	// no separate "was the parameter present" flag either, because at this endpoint the two
+	// questions have one answer: RFC 6749 section 3.1 says "Parameters sent without a value MUST be
+	// treated as if they were omitted from the request", so "?state=" and "?state" are requests
+	// that carried no state. Appendix A.5 then defines the response element as "state = 1*VSCHAR",
+	// which admits no empty value in the response either. Space is %x20 and so is VSCHAR, which is
+	// why a whitespace-only state is a real state and is echoed byte for byte: trimming it away was
+	// this server substituting its own judgement for "the exact value received from the client"
+	// (RFC 6749 4.1.2.1). Undoing this and reinstating a trim would put that back (#146).
+	//
+	// The end_session_endpoint deliberately does NOT work this way: see buildPostLogoutRedirect,
+	// where a supplied-but-empty state does come back as "state=". RP-Initiated Logout 1.0 carries
+	// no valueless-parameter rule, so the two endpoints differ because their specifications do.
+	params := []responseParam{
+		{"error", input.code},
+		{"error_description", input.description},
+	}
+	if input.state != "" {
+		params = append(params, responseParam{"state", input.state})
+	}
+
 	if effectiveResponseMode == "fragment" {
-		values := url.Values{}
-		values.Add("error", input.code)
-		values.Add("error_description", input.description)
-		if len(strings.TrimSpace(input.state)) > 0 {
-			values.Add("state", input.state)
-		}
-		http.Redirect(w, r, input.redirectURI+"#"+values.Encode(), http.StatusFound)
+		// A fragment is built by appending rather than through writeResponseParams: the redirect
+		// URI cannot carry a fragment of its own (RFC 6749 3.1.2 forbids it and
+		// checkRedirectURIEmittable refuses one above), so there is no registered field list here
+		// to preserve or replace. Its query, if it registered one, is left exactly as it stands.
+		http.Redirect(w, r, input.redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
 		return nil
 	}
 
@@ -775,7 +796,18 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 		m["redirectURI"] = input.redirectURI
 		m["error"] = input.code
 		m["error_description"] = input.description
-		if len(strings.TrimSpace(input.state)) > 0 {
+		// The same rule as the params slice above, stated again because this branch answers through
+		// a bind map rather than through a field list, and all three branches should say what they
+		// emit in the same terms.
+		//
+		// It is honestly unobservable, and that is worth knowing before anyone "fixes" a test that
+		// seems to be missing: to a template, a map key that is absent and a map key holding "" are
+		// the same thing, so {{.state}} and {{if .state}} both answer identically for the two. It
+		// is kept because the alternative is the one branch of three that makes no statement about
+		// when state is part of the response, and because a template rendered with missingkey=error
+		// or reading the map through index would then see a difference. What form_post really does
+		// with an empty state is decided in form_post.html (#146).
+		if input.state != "" {
 			m["state"] = input.state
 		}
 
@@ -797,6 +829,20 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 		if err != nil {
 			return errors.Wrap(err, "unable to execute template")
 		}
+		// OAuth 2.0 Form Post Response Mode section 2: "Because the Authorization Response is
+		// intended to be used only once, the Authorization Server MUST instruct the User Agent (and
+		// any intermediaries) not to store or reuse the content of the response." The page holds
+		// the client's state, and on the success path its twin holds an authorization code, so a
+		// cached or reused copy is a replayable response sitting in an intermediary. This pair is
+		// what the rest of this codebase already writes for a no-store response (#146).
+		//
+		// Set here rather than before Execute deliberately: a render that fails must leave the
+		// response completely untouched, so that the caller's last-resort InternalServerError owns
+		// every header as well as the status. Moving these two above the Execute would leave a 500
+		// carrying the headers of a form_post page that was never sent (#141).
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+
 		_, err = w.Write(rendered.Bytes())
 		if err != nil {
 			// The connection itself failed. Nothing can be recovered from here, including the
@@ -807,18 +853,18 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 	}
 
 	// default to query
-	redirUrl, err := url.ParseRequestURI(input.redirectURI)
+	//
+	// writeResponseParams, not Query() then Encode(). Seeding url.Values from the registered URI's
+	// own query and calling Add on top is what emitted two state parameters to a client that had
+	// registered "?state=fixed", leaving its CSRF check to be made against a value it never
+	// generated, which is the defect this change exists to remove. Re-encoding also silently
+	// rewrote the registered query in five separate ways, against RFC 6749 3.1.2's "MUST be
+	// retained". Both are the shared helper's to prevent, and its comment carries the detail (#146).
+	location, err := writeResponseParams(input.redirectURI, params)
 	if err != nil {
-		return errors.Wrap(err, "unable to parse redirect URI")
+		return errors.Wrap(err, "unable to build the error redirect")
 	}
-	values := redirUrl.Query()
-	values.Add("error", input.code)
-	values.Add("error_description", input.description)
-	if len(strings.TrimSpace(input.state)) > 0 {
-		values.Add("state", input.state)
-	}
-	redirUrl.RawQuery = values.Encode()
 
-	http.Redirect(w, r, redirUrl.String(), http.StatusFound)
+	http.Redirect(w, r, location, http.StatusFound)
 	return nil
 }
