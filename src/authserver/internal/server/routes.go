@@ -67,6 +67,11 @@ func (s *Server) initRoutes() {
 		auditLogger,
 		authServerConfig.RateLimiterEnabled,
 	)
+	emitRateLimiterConfigWarnings(
+		authServerConfig.RateLimiterEnabled,
+		authServerConfig.TrustProxyHeaders,
+		authServerConfig.TrustedProxies,
+	)
 
 	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	s.router.Get("/", handlers.HandleIndexGet(httpHelper))
