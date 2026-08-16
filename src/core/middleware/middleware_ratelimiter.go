@@ -267,6 +267,7 @@ type RateLimiterMiddleware struct {
 	pwdIp       *tier
 	otp         *failureTier
 	activate    *tier
+	register    *tier
 	resetPwd    *tier
 	forgotPwd   *tier
 	forgotPwdIp *tier
@@ -306,6 +307,23 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 		// now costs (the link's GET, the clean GET). The same operation rate as
 		// resetPwd over a chain one request shorter (#112)
 		activate: newTier("activate", "ip", 20, 5*time.Minute),
+		// per-IP: self-registration, at the same budget as the activation step that follows
+		// it, so a registration and its activation trip at the same rate. It bounds three
+		// things at once, all of which are only harmful across distinct addresses: the
+		// account-existence oracle the form answers, the mail it sends to any address given
+		// to it, and the pre_registrations rows it writes.
+		//
+		// No per-email tier, and the issue asks for one. A second submission for the same
+		// address finds the user or the pre-registration row and renders "already
+		// registered" before the password hash, the row write or the mail send, so one
+		// address yields at most one mail however often it is submitted. A per-email tier
+		// would bound a path that already stops itself.
+		//
+		// This slows the oracle to 240 addresses an hour per client block rather than
+		// closing it. Closing it means answering identically for a taken and a free
+		// address, which is a change to what self-registration tells a legitimate user
+		// (#219).
+		register: newTier("register", "ip", 20, 5*time.Minute),
 		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
 		// costs (the link's GET, the clean GET, the clean POST). Half of what
 		// forgotPwdIp allows, which is the only other endpoint with an IP tier (#112)
@@ -556,6 +574,34 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
 		ipKey := clientIPRateLimitKey(r)
 		if m.tripped(w, r, m.activate, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// LimitRegister rate limits self-registration, on the client IP.
+//
+// The endpoint had no limiter at all, while being unauthenticated and enabled by default. The key
+// is the client block rather than the submitted address because every harm here is spread across
+// distinct addresses: probing which of them already have an account, sending mail to whichever do
+// not, and writing a pre_registrations row for each. A per-address key would bucket the attacker's
+// own choice of victim and bound nothing (#219).
+//
+// The POST alone is limited. The GET renders a static form and reaches no probe, no mail and no
+// row, so limiting it would only refuse the page to a household behind one address.
+func (m *RateLimiterMiddleware) LimitRegister(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
+		ipKey := clientIPRateLimitKey(r)
+		if m.tripped(w, r, m.register, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
 			return
 		}
 
