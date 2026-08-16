@@ -38,10 +38,10 @@ tools:
   go: "1.26.6"
   tailwind: "4.3.3"
   golangci-lint: "2.12.2"
-  mockery: "3.7.2"
+  mockery: "3.7.3"
   staticcheck: "0.7.0"
-  unparam: "0.0.0-20251027182757-5beb8c8f8f15"
-  govulncheck: "1.6.0"
+  unparam: "0.0.0-20260813220802-35700344e60f"
+  govulncheck: "1.7.0"
 
 # -----------------------------------------------------------------------------
 # CDN Dependencies
@@ -50,5 +50,5 @@ tools:
 # daisyui:            UI component library for Tailwind
 # humanize-duration:  Human-readable duration formatting (admin console)
 cdn:
-  daisyui: "5.7.0"
+  daisyui: "5.7.17"
   humanize-duration: "3.34.0"
