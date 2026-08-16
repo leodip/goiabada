@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/core/customerrors"
 )
 
 // HandleAPIError - for simple operations without forms (delete, etc.)
@@ -32,4 +33,32 @@ func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r 
 	} else {
 		httpHelper.InternalServerError(w, r, err)
 	}
+}
+
+// HandleAPIErrorJson - the AJAX counterpart of HandleAPIErrorWithCallback, for handlers
+// that answer with JSON rather than a rendered form.
+//
+// Routes on HTTP status the same way: 400 Bad Request from the auth server API is a
+// user-correctable validation failure, so its status and English description are forwarded
+// to the browser. Anything else, including an error that is not an *apiclient.APIError,
+// falls through to JsonError's other branch: HTTP 500, the detail in the server log, and a
+// request id on screen.
+//
+// This exists because JsonError preserves a status and a description only for
+// *customerrors.ErrorDetail. An *apiclient.APIError handed to it directly takes the generic
+// branch, so an administrator who typed a value the API refused is told "An unexpected
+// server error has occurred", and the sentence naming the offending value goes to the log
+// instead of to the screen (#122).
+//
+// Whatever renders the forwarded description must escape it: it can carry the caller's own
+// input echoed back by the API. sendAjaxRequest in adminconsole's utils.js does, and that
+// escaping is load-bearing rather than defensive, because showModalDialog assigns the
+// description to innerHTML.
+func HandleAPIErrorJson(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
+	if apiErr, ok := err.(*apiclient.APIError); ok && apiErr.StatusCode == http.StatusBadRequest {
+		httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
+			apiErr.Code, apiErr.Message, apiErr.StatusCode))
+		return
+	}
+	httpHelper.JsonError(w, r, err)
 }
