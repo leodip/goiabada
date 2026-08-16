@@ -20,7 +20,9 @@
         {{if .error_description}}
             <input type="hidden" name="error_description" value="{{.error_description}}" />
         {{end}}
-        <input type="hidden" name="state" value="{{.state}}" />
+        {{if .state}}
+            <input type="hidden" name="state" value="{{.state}}" />
+        {{end}}
     </form>
 
 </body>

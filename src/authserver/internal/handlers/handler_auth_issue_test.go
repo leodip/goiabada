@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	"github.com/leodip/goiabada/authserver/web"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	mocks_test "github.com/leodip/goiabada/core/mocks"
@@ -1715,7 +1716,15 @@ func TestIssueImplicitTokens(t *testing.T) {
 		assert.NotContains(t, location, "state=")
 	})
 
-	t.Run("State with whitespace only", func(t *testing.T) {
+	// This subtest asserted the opposite until #146: the emitter guarded on
+	// len(strings.TrimSpace(state)) > 0, so a whitespace-only state was dropped entirely and an RP
+	// that sent one got a response with no state to check at all.
+	//
+	// Space is %x20 and RFC 6749 Appendix A defines VSCHAR as %x20-7E, so "   " is a legal state
+	// and section 4.2.2 requires "the exact value received from the client". The emptiness rule is
+	// unchanged and covered by "No state parameter" above: section 3.1 makes a valueless parameter
+	// an omitted one, so nothing is echoed for it.
+	t.Run("State with whitespace only is echoed exactly", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 
@@ -1728,8 +1737,50 @@ func TestIssueImplicitTokens(t *testing.T) {
 		err := issueImplicitTokens(w, r, "https://example.com/callback", "   ", tokenResponse)
 
 		assert.NoError(t, err)
-		location := w.Header().Get("Location")
-		assert.NotContains(t, location, "state=")
+		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=+++",
+			w.Header().Get("Location"))
+	})
+
+	// RFC 6749 4.2.2 requires "the exact value received from the client", so every byte a client
+	// can legally put in a state has to survive the trip. These are the characters a construction
+	// built out of concatenation gets wrong: "+" decodes back as a space, "/" and "=" are what
+	// base64 state values are full of, "#" truncates, and "&" splits one field into two.
+	t.Run("A state is echoed byte for byte", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+
+		tokenResponse := &oauth.ImplicitGrantResponse{
+			AccessToken: "access-token-123",
+			TokenType:   "Bearer",
+			ExpiresIn:   3600,
+		}
+
+		err := issueImplicitTokens(w, r, "https://example.com/callback", "a b+c/d=e#f&g=h", tokenResponse)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+			w.Header().Get("Location"))
+	})
+
+	// This flow delivers in the fragment only, so a registered query is not the field list being
+	// written and is left exactly as registered, including a "state" of its own. That is the same
+	// answer the error emitter's fragment branch gives, and it is deliberately different from the
+	// query branch, which replaces a registered state because it is writing into the query (#146).
+	t.Run("A registered query is left alone, state included", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+
+		tokenResponse := &oauth.ImplicitGrantResponse{
+			AccessToken: "access-token-123",
+			TokenType:   "Bearer",
+			ExpiresIn:   3600,
+		}
+
+		err := issueImplicitTokens(w, r, "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", tokenResponse)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=client-csrf-token",
+			w.Header().Get("Location"))
 	})
 
 	t.Run("No scope in response", func(t *testing.T) {
@@ -2187,11 +2238,14 @@ func TestIssueAuthCode(t *testing.T) {
 	// formatted query component, which MUST be retained when adding additional query parameters."
 	//
 	// Every other case in this test uses a query-less redirect URI, so nothing watched the retention
-	// path, and the query mode is the only one that rewrites the URI rather than appending to it: it
-	// parses, reads Query(), adds code and state, and re-encodes. A change to that sequence which
-	// dropped or reordered the registered query would break a real client and no test would notice.
-	// Encode sorts by key, which is why the expectation below is written out in full rather than
-	// assembled (#122).
+	// path, and the query mode is the only one that rewrites the URI rather than appending to it. A
+	// change that dropped or reordered the registered query would break a real client and no test
+	// would notice (#122).
+	//
+	// The expected string is unchanged since #146 moved this branch onto writeResponseParams, and
+	// that is a coincidence of this input rather than a property: "a=1" happens to sort before both
+	// added fields, so Encode's alphabetical order and the new declaration order agree here. The
+	// cases in TestIssueAuthCode_RegisteredQuery are the ones that tell the two apart.
 	t.Run("A registered query survives the addition of code and state", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
@@ -2206,6 +2260,428 @@ func TestIssueAuthCode(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
 		assert.Equal(t, "http://127.0.0.1/cb?a=1&code=test_code&state=test_state", w.Header().Get("Location"))
+	})
+}
+
+// The defect the issue is named for, on the emitter it does not mention. issueAuthCode ran the same
+// sequence as the error branch, seeding url.Values from the registered redirect URI's own query and
+// Add'ing on top of it, and its state Add was not even conditional: a client that had registered
+// "?state=fixed" got back "state=fixed&state=<its own>", and url.Values.Get answers with the first.
+// This is the redirect that carries the authorization code, so it is the response an RP's RFC 9700
+// 2.1 CSRF check exists to guard, and it fired on every successful authorization rather than only
+// on a refusal (#146).
+//
+// The registered-query shapes themselves are seam 1's exhaustive table, in
+// authorization_response_test.go. What these cases add is that this emitter reaches it: a version of
+// issueAuthCode that went back to Query() and Encode() would pass every case in that table and fail
+// every one of these.
+func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
+	t.Run("query mode replaces a registered state and keeps the rest", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{
+			Code:        "test_code",
+			RedirectURI: "https://example.com/callback?state=fixed&lang=en",
+			State:       "client-csrf-token",
+		}
+
+		err := issueAuthCode(w, r, nil, code, "query")
+
+		assert.NoError(t, err)
+		// Whole-string, not url.Values: parsing is the step that hid the duplicate, since Get
+		// answers with the first of the two and reports nothing wrong.
+		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code&state=client-csrf-token",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("query mode replaces a registered code as well", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{
+			Code:        "test_code",
+			RedirectURI: "https://example.com/callback?code=stale",
+			State:       "abc123",
+		}
+
+		err := issueAuthCode(w, r, nil, code, "query")
+
+		assert.NoError(t, err)
+		// Not a hypothetical variant of the state case: an RP whose callback is reached from more
+		// than one place could register a "code" of its own, and two of them would leave which
+		// authorization code gets redeemed to the parser. RFC 6749 section 3.1 forbids the shape
+		// outright: "Request and response parameters MUST NOT be included more than once."
+		assert.Equal(t, "https://example.com/callback?code=test_code&state=abc123",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("query mode preserves a registered query that does not round-trip", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{
+			Code:        "test_code",
+			RedirectURI: "https://example.com/callback?lang=en;mode=dark",
+			State:       "abc123",
+		}
+
+		err := issueAuthCode(w, r, nil, code, "query")
+
+		assert.NoError(t, err)
+		// The retention half of the fix, which has nothing to do with state. url.Query discards
+		// ParseQuery's error, so this field used to be deleted outright and the client was sent to
+		// a URI it had not registered.
+		assert.Equal(t, "https://example.com/callback?lang=en;mode=dark&code=test_code&state=abc123",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("fragment mode leaves the registered query alone", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{
+			Code:        "test_code",
+			RedirectURI: "https://example.com/callback?state=fixed&lang=en",
+			State:       "client-csrf-token",
+		}
+
+		err := issueAuthCode(w, r, nil, code, "fragment")
+
+		assert.NoError(t, err)
+		// The two branches construct differently and that difference is observable here: the
+		// registered "state=fixed" in the query is NOT replaced, because the response parameters
+		// are going into the fragment and the query is not the field list being written.
+		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#code=test_code&state=client-csrf-token",
+			w.Header().Get("Location"))
+	})
+}
+
+// Emptiness is the whole of the rule, in both directions, and it is the same rule the error emitter
+// follows. RFC 6749 section 3.1: "Parameters sent without a value MUST be treated as if they were
+// omitted from the request", so "?state=" and "?state" are requests that carried no state and get
+// none back; Appendix A.5's "state = 1*VSCHAR" says the same of the response. But space is %x20 and
+// so is VSCHAR, so a whitespace-only state is a value the client chose and section 4.1.2 requires
+// "the exact value received from the client".
+//
+// The whitespace subtests asserted nothing at all before #146, because the branch guarded on
+// len(strings.TrimSpace(code.State)) > 0 and dropped the value.
+func TestIssueAuthCode_StateEmission(t *testing.T) {
+	t.Run("an empty state is omitted in query mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
+
+		err := issueAuthCode(w, r, nil, code, "query")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback?code=test_code", w.Header().Get("Location"))
+	})
+
+	t.Run("an empty state is omitted in fragment mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
+
+		err := issueAuthCode(w, r, nil, code, "fragment")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback#code=test_code", w.Header().Get("Location"))
+	})
+
+	t.Run("a whitespace-only state is echoed exactly in query mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
+
+		err := issueAuthCode(w, r, nil, code, "query")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback?code=test_code&state=+++", w.Header().Get("Location"))
+	})
+
+	t.Run("a whitespace-only state is echoed exactly in fragment mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
+
+		err := issueAuthCode(w, r, nil, code, "fragment")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback#code=test_code&state=+++", w.Header().Get("Location"))
+	})
+}
+
+// RFC 6749 4.1.2 requires "the exact value received from the client", so every byte a client can
+// legally put in a state has to survive the trip. The characters below are the ones a construction
+// built out of string concatenation gets wrong: "+" decodes back as a space, "/" and "=" are what
+// base64 state values are full of, "#" truncates a query, and "&" splits one field into two (#109
+// for the logout endpoint, #146 here).
+func TestIssueAuthCode_ByteExactState(t *testing.T) {
+	const state = "a b+c/d=e#f&g=h"
+
+	t.Run("query mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
+
+		err := issueAuthCode(w, r, nil, code, "query")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback?code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("fragment mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
+
+		err := issueAuthCode(w, r, nil, code, "fragment")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "https://example.com/callback#code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+			w.Header().Get("Location"))
+	})
+
+	t.Run("form_post mode", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
+
+		// form_post carries the value in a form field rather than a URI, so what has to survive is
+		// the raw string reaching the template, HTML-escaped by html/template and nothing else.
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<input name="state" value="{{.state}}">`,
+			},
+		}
+
+		err := issueAuthCode(w, r, templateFS, code, "form_post")
+
+		assert.NoError(t, err)
+		// html/template escapes "+" as &#43; and "&" as &amp; in an attribute; both decode back to
+		// the byte the client sent, which is what "exact value" asks for in this transport.
+		assert.Equal(t, `<input name="state" value="a b&#43;c/d=e#f&amp;g=h">`, w.Body.String())
+	})
+}
+
+// The form_post response mode's own requirement, which neither renderer met. OAuth 2.0 Form Post
+// Response Mode section 2: "Because the Authorization Response is intended to be used only once,
+// the Authorization Server MUST instruct the User Agent (and any intermediaries) not to store or
+// reuse the content of the response." This is the page that carries an authorization code, and it
+// was returned as a plain cacheable 200 with no cache header anywhere on the /auth routes to supply
+// one (#146 decision 12).
+func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
+	t.Run("both headers are set on a rendered page", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
+
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form method="post" action="{{.redirectURI}}"></form>`,
+			},
+		}
+
+		err := issueAuthCode(w, r, templateFS, code, "form_post")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+		assert.Equal(t, "no-cache", w.Header().Get("Pragma"))
+	})
+
+	t.Run("neither header is set when the render failed", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
+
+		// The companion to the buffering case below. A failed render must leave the response
+		// completely untouched, headers included, so the caller's last-resort 500 answers with its
+		// own headers rather than with those of a form_post page that was never sent (#141).
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form>{{index . "missing" 0}}</form>`,
+			},
+		}
+
+		err := issueAuthCode(w, r, templateFS, code, "form_post")
+
+		assert.Error(t, err)
+		assert.Empty(t, w.Header().Get("Cache-Control"))
+		assert.Empty(t, w.Header().Get("Pragma"))
+	})
+}
+
+// Decision 10, the defect class #141 fixed at the error emitter's twin and deliberately left here.
+// html/template's Execute writes as it walks, so a template that parses and then fails part way
+// through used to leave a partial body and an implicit 200 already on the wire. The caller answers
+// a non-nil error from here with httpHelper.InternalServerError, and a WriteHeader after the
+// response is committed changes nothing, so the client was told 200 for a page that was never
+// finished: here, a form carrying an authorization code with no submit to deliver it.
+//
+// form_post.html is operator supplied whenever GOIABADA_AUTHSERVER_TEMPLATEDIR is set, which is
+// what makes a mid-render failure reachable in a real deployment rather than only under a stub.
+func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/auth/issue", nil)
+	code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
+
+	// Parses cleanly and fails at the index call, after the prefix has been walked. Rendering
+	// straight to w writes that prefix before the failure; rendering to a buffer writes nothing.
+	templateFS := &mocks_test.TestFS{
+		FileContents: map[string]string{
+			"form_post.html": `<form action="{{.redirectURI}}"><input value="{{.code}}">{{index . "missing" 0}}</form>`,
+		},
+	}
+
+	err := issueAuthCode(w, r, templateFS, code, "form_post")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to execute template")
+	assert.Empty(t, w.Body.String(), "a failed render must leave the response body untouched")
+	assert.NotContains(t, w.Body.String(), "test_code", "the authorization code must not reach a half-written page")
+}
+
+// Both emitters decide whether to put a "state" key in the form_post bind map at all, and stage 2
+// of this change recorded that no test could see that decision, because to a template a key that is
+// absent and a key holding "" are the same value. That is true of {{.state}} and {{if .state}}, and
+// it is what the two guards' own comments said, but it is not true of a template that enumerates the
+// map: range yields the key when it is present and skips it when it is not, and len counts it.
+// Confirmed in probe/bind_map_presence.out. So the case can be written after all, and here it is for
+// both emitters (#146).
+//
+// Why it is worth pinning rather than deleting the guards: what reaches the template is this
+// server's statement about whether the response has a state, and an operator-supplied template is
+// free to read it any way it likes, including the two ways above. A guard removed as "dead" would
+// send state="" to every such template for a request that carried no state at all.
+func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
+	// Renders the bind map's key set rather than any one value, which is the whole point: it is the
+	// presence of the key that neither {{.state}} nor {{if .state}} can report.
+	const keysTemplate = `{{range $k, $v := .}}[{{$k}}]{{end}}`
+
+	t.Run("issueAuthCode", func(t *testing.T) {
+		for _, tc := range []struct {
+			name  string
+			state string
+			want  string
+		}{
+			{name: "a state the client sent", state: "abc123", want: `[code][redirectURI][state]`},
+			{name: "a whitespace-only state", state: "   ", want: `[code][redirectURI][state]`},
+			{name: "no state at all", state: "", want: `[code][redirectURI]`},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				r := httptest.NewRequest("GET", "/auth/issue", nil)
+				code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
+
+				templateFS := &mocks_test.TestFS{FileContents: map[string]string{"form_post.html": keysTemplate}}
+
+				err := issueAuthCode(w, r, templateFS, code, "form_post")
+
+				assert.NoError(t, err)
+				assert.Equal(t, tc.want, w.Body.String())
+			})
+		}
+	})
+
+	t.Run("redirToClientWithError", func(t *testing.T) {
+		for _, tc := range []struct {
+			name  string
+			state string
+			want  string
+		}{
+			{name: "a state the client sent", state: "abc123", want: `[error][error_description][redirectURI][state]`},
+			{name: "a whitespace-only state", state: "   ", want: `[error][error_description][redirectURI][state]`},
+			{name: "no state at all", state: "", want: `[error][error_description][redirectURI]`},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				r := httptest.NewRequest("GET", "/auth/authorize", nil)
+
+				templateFS := &mocks_test.TestFS{FileContents: map[string]string{"form_post.html": keysTemplate}}
+
+				err := redirToClientWithError(w, r, nil, templateFS,
+					testRedirectError("access_denied", "Access denied", "form_post",
+						"https://example.com/callback", tc.state, "code"))
+
+				assert.NoError(t, err)
+				assert.Equal(t, tc.want, w.Body.String())
+			})
+		}
+	})
+}
+
+// The template half of decision 7, and the reason it is a stage of its own rather than a line in
+// either emitter. Both Go branches decide whether to put a "state" key in the bind map, and neither
+// decision was observable: form_post.html emitted the input unconditionally, so an absent state
+// reached the RP as state="" whatever the Go code had decided (probe/form_post_state.out). The
+// guard is now {{if .state}}, matching the code, error and error_description guards already in the
+// file.
+//
+// These cases render the REAL web.TemplateFS() rather than a stub, which is the point: every other
+// form_post case in this package supplies its own template, and a stub is exactly what let the dead
+// guard go unnoticed for as long as it did. Both emitters are here together because the property
+// belongs to the shared template rather than to either of them (#146).
+func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
+	t.Run("issueAuthCode", func(t *testing.T) {
+		for _, tc := range []struct {
+			name        string
+			state       string
+			wantState   bool
+			wantValueOf string
+		}{
+			{name: "a state the client sent", state: "client-csrf-token", wantState: true, wantValueOf: "client-csrf-token"},
+			{name: "a whitespace-only state", state: "   ", wantState: true, wantValueOf: "   "},
+			{name: "no state at all", state: "", wantState: false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				r := httptest.NewRequest("GET", "/auth/issue", nil)
+				code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
+
+				err := issueAuthCode(w, r, web.TemplateFS(), code, "form_post")
+
+				assert.NoError(t, err)
+				body := w.Body.String()
+				// The code input is asserted in every row so that a template failing to render at
+				// all cannot pass the absent-state row for the wrong reason.
+				assert.Contains(t, body, `<input type="hidden" name="code" value="test_code" />`)
+				if tc.wantState {
+					assert.Contains(t, body, `<input type="hidden" name="state" value="`+tc.wantValueOf+`" />`)
+				} else {
+					assert.NotContains(t, body, `name="state"`,
+						"a request that carried no state must produce no state field, not an empty one")
+				}
+			})
+		}
+	})
+
+	t.Run("redirToClientWithError", func(t *testing.T) {
+		for _, tc := range []struct {
+			name      string
+			state     string
+			wantState bool
+		}{
+			{name: "a state the client sent", state: "client-csrf-token", wantState: true},
+			{name: "a whitespace-only state", state: "   ", wantState: true},
+			{name: "no state at all", state: "", wantState: false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				r := httptest.NewRequest("GET", "/auth/authorize", nil)
+
+				err := redirToClientWithError(w, r, nil, web.TemplateFS(),
+					testRedirectError("access_denied", "Access denied", "form_post",
+						"https://example.com/callback", tc.state, "code"))
+
+				assert.NoError(t, err)
+				body := w.Body.String()
+				assert.Contains(t, body, `<input type="hidden" name="error" value="access_denied" />`)
+				if tc.wantState {
+					assert.Contains(t, body, `<input type="hidden" name="state" value="`+tc.state+`" />`)
+				} else {
+					assert.NotContains(t, body, `name="state"`,
+						"a request that carried no state must produce no state field, not an empty one")
+				}
+			})
+		}
 	})
 }
 

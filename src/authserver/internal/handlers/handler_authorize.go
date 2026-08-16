@@ -798,15 +798,15 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 		m["error_description"] = input.description
 		// The same rule as the params slice above, stated again because this branch answers through
 		// a bind map rather than through a field list, and all three branches should say what they
-		// emit in the same terms.
+		// emit in the same terms. What the client actually receives is then decided by
+		// form_post.html, whose {{if .state}} omits the input entirely.
 		//
-		// It is honestly unobservable, and that is worth knowing before anyone "fixes" a test that
-		// seems to be missing: to a template, a map key that is absent and a map key holding "" are
-		// the same thing, so {{.state}} and {{if .state}} both answer identically for the two. It
-		// is kept because the alternative is the one branch of three that makes no statement about
-		// when state is part of the response, and because a template rendered with missingkey=error
-		// or reading the map through index would then see a difference. What form_post really does
-		// with an empty state is decided in form_post.html (#146).
+		// This guard was written as unobservable and is not. {{.state}} and {{if .state}} do answer
+		// identically for an absent key and a key holding "", which is as far as the first reading
+		// went, but a template that enumerates the map tells them apart: range yields the key only
+		// when it is present, and len counts it. form_post.html is operator supplied whenever
+		// GOIABADA_AUTHSERVER_TEMPLATEDIR is set, so that is a real reader rather than a contrived
+		// one, and TestFormPostBindMapOmitsAnAbsentState pins both emitters on it (#146).
 		if input.state != "" {
 			m["state"] = input.state
 		}

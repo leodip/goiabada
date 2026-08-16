@@ -1528,13 +1528,16 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 	})
 }
 
-// There is deliberately no case here pinning the form_post branch's "state" bind key to being
-// absent for an empty state, because no case can: to any template, a map key that is absent and a
-// map key holding "" are the same thing. Both {{.state}} and {{if .state}} answer identically for
-// the two, so a mutation that makes the guard unconditional survives every assertion that can be
-// written against the rendered page. The guard is kept anyway, for the reason stated where it sits.
-// What form_post actually does with an empty state is decided by form_post.html, and that is where
-// the coverage lives (#146).
+// The form_post branch's "state" bind key is pinned in handler_auth_issue_test.go, by
+// TestFormPostBindMapOmitsAnAbsentState, together with its twin on the success path: the property
+// belongs to both emitters and to the shared template, so the cases live together rather than half
+// here.
+//
+// It is there rather than here because it was first written off as impossible. The reasoning was
+// that to a template a map key that is absent and a key holding "" are the same thing, which holds
+// for {{.state}} and {{if .state}} and is false in general: a template that ranges over the map
+// yields the key only when it is present. The mutation that makes the guard unconditional survives
+// every assertion against a rendered page and is caught by the key-set assertion (#146).
 
 // Gate 4's third site (#122). An error redirect is the open-redirect vector on this endpoint: the
 // request has already been refused, and forwarding the browser anyway is this server sending a user
