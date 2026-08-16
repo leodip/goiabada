@@ -156,6 +156,7 @@ func HandleAuthOtpPost(
 	authHelper AuthHelper,
 	database data.Database,
 	auditLogger AuditLogger,
+	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -282,6 +283,9 @@ func HandleAuthOtpPost(
 			}
 			step, matched := otp.MatchStep(otpCode, otpSecret, time.Now().UTC())
 			if !matched {
+				// Every wrong code is a guess at three of a million, so this is the
+				// counter the whole OTP budget exists to move (#219).
+				credentialFailures.RecordCredentialFailure(r)
 				auditLogger.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
@@ -300,6 +304,9 @@ func HandleAuthOtpPost(
 				return
 			}
 			if !consumed {
+				// A replayed step is refused exactly as a wrong code is, so it counts as
+				// one: a code already spent proves nothing about who is submitting it.
+				credentialFailures.RecordCredentialFailure(r)
 				auditLogger.Log(constants.AuditOTPCodeReplayDetected, map[string]interface{}{
 					"userId": user.Id,
 					"step":   step,
@@ -314,6 +321,7 @@ func HandleAuthOtpPost(
 			// is enrolling to TOTP now
 			step, matched := otp.MatchStep(otpCode, secretKey, time.Now().UTC())
 			if !matched {
+				credentialFailures.RecordCredentialFailure(r)
 				auditLogger.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
@@ -333,6 +341,7 @@ func HandleAuthOtpPost(
 				return
 			}
 			if !consumed {
+				credentialFailures.RecordCredentialFailure(r)
 				auditLogger.Log(constants.AuditOTPCodeReplayDetected, map[string]interface{}{
 					"userId": user.Id,
 					"step":   step,

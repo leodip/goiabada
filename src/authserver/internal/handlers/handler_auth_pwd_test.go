@@ -244,7 +244,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		req, _ := http.NewRequest("POST", "/auth/pwd", nil)
 		rr := httptest.NewRecorder()
@@ -268,7 +268,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -359,7 +359,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+				handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 				form := url.Values{}
 				form.Add("email", "test@example.com")
@@ -405,7 +405,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -455,7 +455,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -502,7 +502,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -565,7 +565,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -619,7 +619,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -661,7 +661,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		password := "testpassword"
 		passwordHash, err := hashutil.HashPassword(password)
@@ -743,7 +743,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		password := "testpassword"
 		passwordHash, err := hashutil.HashPassword(password)
@@ -800,5 +800,93 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
+	})
+}
+
+// TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly is seam 2 for the password
+// form: the handler driven through a real RateLimiterMiddleware, so what is asserted is the
+// limiter's own observable behaviour rather than a spy reporting that a method was called.
+//
+// Through the middleware rather than directly, and this is the point of the case. Since
+// stage 3 the reservation the handler converts is placed by the limiter and lives in the
+// request context, so a handler invoked on a bare request has nothing to convert and
+// RecordCredentialFailure is a no-op. A case written that way passes while proving nothing.
+//
+// The budgets themselves are pinned at seam 1 in core/middleware. What is new here is the
+// wiring: that a wrong password reaches the counter at all, and that a right one does not.
+func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
+	const tightBudget = 10 // failures per 15 minutes per (account, client block)
+	const email = "victim@example.com"
+
+	password := "correct horse battery staple"
+	passwordHash, err := hashutil.HashPassword(password)
+	assert.NoError(t, err)
+
+	// newHandler wires one handler and its limiter together, the way routes.go does. The
+	// auth context comes back so a case driving repeated sign-ins can reset the state the
+	// handler advances, which in production is a fresh ceremony each time.
+	newHandler := func(t *testing.T) (http.Handler, *mocks_data.Database, *oauth.AuthContext) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+		database.On("GetUserByEmail", mock.Anything, email).
+			Return(&models.User{Id: 1, Enabled: true, Email: email, PasswordHash: passwordHash}, nil)
+		auditLogger.On("Log", mock.Anything, mock.Anything).Return().Maybe()
+		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
+			"/auth_pwd.html", mock.Anything).Return(nil).Maybe()
+
+		rateLimiter := newTestRateLimiter(authHelper)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, rateLimiter)
+		return rateLimiter.LimitPwd(handler), database, authContext
+	}
+
+	// post submits one attempt from a fixed host and reports the status.
+	post := func(handler http.Handler, submitted string) int {
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("email", email)
+		form.Add("password", submitted)
+		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = "203.0.113.7:5000"
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+			&models.Settings{SMTPEnabled: true}))
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		return rr.Code
+	}
+
+	t.Run("wrong passwords fill the budget and the next attempt is refused", func(t *testing.T) {
+		handler, database, _ := newHandler(t)
+		for i := 0; i < tightBudget; i++ {
+			assert.Equal(t, http.StatusOK, post(handler, "wrong"), "attempt %d should reach the handler", i+1)
+		}
+		assert.Equal(t, http.StatusTooManyRequests, post(handler, "wrong"),
+			"attempt %d should be refused by the limiter", tightBudget+1)
+		// The refused request never reached the handler, so it never looked an account
+		// up: 10 lookups for 11 attempts.
+		database.AssertNumberOfCalls(t, "GetUserByEmail", tightBudget)
+	})
+
+	t.Run("a correct password spends nothing", func(t *testing.T) {
+		handler, _, authContext := newHandler(t)
+		// Well past the budget. A tier that counted every request would refuse the 11th,
+		// which is an account locked out of its own login by using it.
+		for i := 0; i < tightBudget*2; i++ {
+			authContext.AuthState = oauth.AuthStateLevel1Password
+			assert.Equal(t, http.StatusFound, post(handler, password),
+				"sign-in %d should succeed", i+1)
+		}
 	})
 }

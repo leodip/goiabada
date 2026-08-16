@@ -115,6 +115,18 @@ type AuditLogger interface {
 	Log(auditEvent string, details map[string]interface{})
 }
 
+// CredentialFailureRecorder marks the credential check this request performed as failed, so
+// the rate limiter charges the reservation it is holding instead of dropping it.
+//
+// A handler names no bucket and no key: the limiter chose those before the handler ran, and
+// a handler that derived them again would be free to disagree with the limiter about which
+// account the request is, which is exactly how the per-account tiers came to be worth
+// nothing (#219). *core_middleware.RateLimiterMiddleware satisfies it, and the call is a
+// no-op on a request that carries no reservation.
+type CredentialFailureRecorder interface {
+	RecordCredentialFailure(r *http.Request)
+}
+
 type PermissionChecker interface {
 	UserHasScopePermission(userId int64, scope string) (bool, error)
 	FilterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User) (string, error)
