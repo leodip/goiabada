@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/inputsanitizer"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -760,6 +761,27 @@ func HandleAPIClientRedirectURIsPut(
 			}
 			if _, err := url.ParseRequestURI(uri); err != nil {
 				writeJSONError(w, fmt.Sprintf("Invalid redirect URI: %s", uri), "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+			// url.ParseRequestURI above accepts "//evil.example/cb", "/relative/cb",
+			// "http://host/cb#frag" and "https:///evil.example/cb", every one of which is
+			// later emitted verbatim into a Location header. RFC 6749 section 3.1.2 is what
+			// refuses them, through the same predicate dynamic registration and the
+			// authorization endpoint use. Ordered after the parse and before the duplicate
+			// check, mirroring the dynamic registration gate.
+			//
+			// Only the absolute-URI rule crosses over from dynamic registration, not that
+			// endpoint's scheme denylist or excluded-character set. The absolute-URI rule is
+			// a protocol requirement and binds an administrator exactly as it binds an
+			// anonymous registrant; the other two exist because that caller is anonymous,
+			// and an administrator has legitimate reasons to register a custom scheme (#122).
+			//
+			// Accepted cost: this PUT replaces the whole set, so a deployment still holding a
+			// legacy non-absolute row cannot save this page until the administrator removes
+			// that URI from the list. The message names the offending value, and taking that
+			// remediation also deletes the row.
+			if !urlutil.IsAbsoluteRedirectURI(uri) {
+				writeJSONError(w, fmt.Sprintf("Redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): %s", uri), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if _, exists := seen[uri]; exists {

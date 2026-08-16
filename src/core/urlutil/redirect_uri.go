@@ -55,21 +55,57 @@ func IsLoopbackHost(host string) bool {
 	return false
 }
 
-// IsAbsoluteRedirectURI reports whether raw has the form RFC 6749 section 3.1.2 requires of a
-// redirect URI: an absolute-URI per RFC 3986 section 4.3,
+// IsAbsoluteRedirectURI reports whether raw is usable as a redirect URI: an absolute-URI per
+// RFC 3986 section 4.3, as RFC 6749 section 3.1.2 requires,
 //
 //	absolute-URI = scheme ":" hier-part [ "?" query ]
 //
-// which is to say a scheme is present and no fragment follows. That production carries no
-// fragment, and RFC 6749 states the prohibition explicitly as well.
+// which is to say a scheme is present and no fragment follows (that production carries no
+// fragment, and RFC 6749 states the prohibition explicitly as well), AND, for the http and
+// https schemes only, an authority naming a host.
+//
+// # Why the host rule is here and not only in the grammar
+//
+// The absolute-URI production alone is not enough to make a redirect URI safe, because it
+// admits values that Go parses with no host and a user agent re-reads as an authority. Both
+// of these satisfy the production, so a grammar check returns true for them:
+//
+//	http:/evil.example/cb      hier-part admits path-absolute, so this is a valid absolute-URI
+//	https:///evil.example/cb   an empty authority followed by a path
+//
+// Go reports Host == "" for both and emits them verbatim into a Location header. A browser
+// resolving that Location reports host = evil.example and delivers the authorization code
+// there. The three-slash and backslash forms reach the attacker whatever scheme the
+// deployment itself runs on; the one-slash and opaque forms do so when the value's scheme
+// differs from the page's. So the question this predicate has to answer is not "is this an
+// absolute-URI" but "will a user agent navigate to the host this string names", and the
+// empty-host test is what closes the gap between the two (#122).
+//
+// # The scoping to http and https is load-bearing. Do not widen it
+//
+// RFC 8252 section 7.1 gives this as its complete example of a native-app redirect URI:
+//
+//	com.example.app:/oauth2redirect/example-provider
+//
+// One slash, no authority, and Go parses it with Host == "". A rule phrased as "an empty host
+// is refused" would refuse the document's own example and break every native and MCP client on
+// every deployment. Private-use schemes are hostless by design and are resolved by the
+// operating system rather than navigated to, so they carry none of the risk above. Refuse an
+// empty host for http and https, and for nothing else.
+//
+// The scheme comparison is against lowercase because url.Parse lowercases the scheme during
+// parsing; "HTTP:///evil.example/cb" therefore arrives here as "http" and is refused. That is
+// relied upon deliberately rather than overlooked, and a user agent lowercases the scheme too,
+// so a rule that did not fold case would be evaded by pressing shift.
 //
 // # What this does not do
 //
-// This is a form check, not a full RFC 3986 grammar validator, and the difference is worth
-// knowing before relying on it as a compliance gate. It verifies three things: that net/url
-// can parse raw, that a scheme is present, that no fragment is present, and that every
-// percent-escape is well formed. It does NOT validate the character classes of hier-part or
-// query, so values that violate the grammar in other ways are still reported as true:
+// This is a form check plus that one host rule, not a full RFC 3986 grammar validator, and the
+// difference is worth knowing before relying on it as a compliance gate. It verifies that
+// net/url can parse raw, that a scheme is present, that no fragment is present, that every
+// percent-escape is well formed, and that an http or https URI names a host. It does NOT
+// validate the character classes of hier-part or query, so values that violate the grammar in
+// other ways are still reported as true:
 //
 //	x:[      a gen-delim that pchar excludes outside an authority
 //	x:你好    non-ASCII, which RFC 3986 requires to be percent-encoded
@@ -99,13 +135,25 @@ func IsLoopbackHost(host string) bool {
 // accepts "http://127.0.0.1/cb#frag". Do not "unify" the two parsers.
 //
 // A percent-encoded %23 is an ordinary character in a path, not a fragment delimiter, and
-// stays accepted. This gate is not the one that closes the absolute-URI hole; #122 is (#105).
+// stays accepted.
+//
+// Every caller that can move a browser applies this, and it is applied to the value about to
+// be used rather than only at registration: the authorization endpoint tests the requested URI
+// before matching it against the client's registered set, which is what covers rows stored
+// before these rules existed, and the admin API and dynamic registration both apply it at
+// intake (#122, #105).
 func IsAbsoluteRedirectURI(raw string) bool {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return false
 	}
 	if !u.IsAbs() || strings.Contains(raw, "#") {
+		return false
+	}
+	// See "Why the host rule is here" above. Scoped to http and https because RFC 8252
+	// section 7.1's own example, "com.example.app:/oauth2redirect/example-provider", is
+	// hostless and must stay accepted.
+	if (u.Scheme == "http" || u.Scheme == "https") && u.Host == "" {
 		return false
 	}
 	// url.Parse does not validate percent-escapes in an opaque URI, so "x:%zz" and "x:%2"

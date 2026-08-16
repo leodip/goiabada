@@ -200,6 +200,51 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 		msg := bodyEmpty["error_description"].(string)
 		assert.Equal(t, "Redirect URI cannot be empty", msg)
 	}
+
+	// Not an absolute URI (#122). url.ParseRequestURI accepts every value below, so this
+	// gate is the only thing that refuses them, and before it they were stored and later
+	// emitted verbatim into a Location header.
+	//
+	// This endpoint is the exhaustive tier for that gate by necessity rather than by
+	// preference: handler_api_clients_test.go does not exist, and the validation loop is
+	// inline in the handler rather than a pure function, so there is no unit seam to own it.
+	//
+	// The message is asserted unconditionally, unlike the cases above, which wrap the
+	// assertion in a nil check that passes when the field is absent entirely.
+	notAbsolute := []struct {
+		uri    string
+		reason string
+	}{
+		{"//evil.example/cb", "scheme-relative: the reported shape, resolved against the server's own scheme"},
+		{"/relative/cb", "path-absolute with no scheme"},
+		{"https:///evil.example/cb", "a valid absolute-URI with no host: only the host rule refuses it"},
+		{"https://legit.example/cb#frag", "a fragment breaks the callback even on a legitimate host"},
+	}
+	for _, tc := range notAbsolute {
+		t.Run(tc.uri, func(t *testing.T) {
+			req := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{tc.uri}}
+			resp := makeAPIRequest(t, "PUT", baseURL, accessToken, req)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, tc.reason)
+			var body map[string]interface{}
+			_ = json.NewDecoder(resp.Body).Decode(&body)
+			msg, ok := body["error_description"].(string)
+			assert.True(t, ok, "the response must carry an error_description")
+			assert.Equal(t, "Redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): "+tc.uri, msg)
+		})
+	}
+
+	// The gate must not have swallowed the legitimate shapes. A private-use scheme URI is
+	// hostless by design (RFC 8252 section 7.1) and an administrator has legitimate reason
+	// to register one, so this is the row that catches the host rule being widened past
+	// http and https.
+	reqOK := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{
+		"https://legit.example/cb?a=1",
+		"com.example.app:/oauth2redirect/example-provider",
+	}}
+	respOK := makeAPIRequest(t, "PUT", baseURL, accessToken, reqOK)
+	defer func() { _ = respOK.Body.Close() }()
+	assert.Equal(t, http.StatusOK, respOK.StatusCode, "valid redirect URIs must still be accepted")
 }
 
 func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *testing.T) {

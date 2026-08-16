@@ -140,6 +140,16 @@ After the user grants or denies permission, the authorization server redirects t
 
 It's necessary to pre-configure this URI in the client, and only exact matches are accepted (no wildcards). The single exception is the port of an http loopback address, described below.
 
+### What a redirect URI must look like
+
+Three rules apply to every redirect URI, however it was registered: through the admin console, through the API, or through [dynamic client registration](#dynamic-client-registration).
+
+- **It must be absolute**, with a scheme, per [RFC 6749 section 3.1.2](https://datatracker.ietf.org/doc/html/rfc6749#section-3.1.2). Values like `//example.com/callback` and `/callback` are rejected.
+- **An `http` or `https` URI must name a host.** `https:///example.com/callback` and `http:/example.com/callback` are rejected, even though both are technically absolute URIs. They have no host, so a browser resolves them against the page it is already on and the authorization code can be delivered somewhere other than the host the URI appears to name. Custom schemes are exempt, because a private-use URI such as `com.example.app:/oauth2redirect` is hostless by design and is handed to the operating system rather than navigated to.
+- **A fragment is not permitted**, per the same section. `http://127.0.0.1/callback#done` is rejected. A percent-encoded `%23` is not a fragment and is fine.
+
+These rules are enforced when a client asks to be redirected, not only when the URI is registered. **A redirect URI that breaks them is refused even if it is already stored on the client**, so a URI registered before these rules existed stops working and the user sees an error page rather than being redirected. If a client that used to work now fails with a redirect URI error, this is the first thing to check: open the client's redirect URIs page and look for a value with no scheme, no host, or a `#`.
+
 ### Loopback redirect URIs for native apps
 
 A native or desktop app receives its callback on a temporary HTTP server bound to a port the operating system assigns at startup. The app cannot know that port when the client is registered, so [RFC 8252](https://datatracker.ietf.org/doc/html/rfc8252#section-7.3) requires the authorization server to accept any port on a loopback redirect URI.
@@ -152,7 +162,7 @@ http://127.0.0.1/callback
 
 Any port is then accepted at authorization time, so `http://127.0.0.1:54321/callback` matches. The loopback hosts are `127.0.0.1`, `::1` (written as `http://[::1]/callback`) and `localhost`.
 
-**The port is the only component that may differ.** Scheme, host, path, query and fragment are still compared byte for byte, including character case and percent-encoding. The code is delivered to the port the client actually requested, and that same URI must be presented at the token endpoint.
+**The port is the only component that may differ.** Scheme, host, path and query are still compared byte for byte, including character case and percent-encoding. The code is delivered to the port the client actually requested, and that same URI must be presented at the token endpoint.
 
 Three limits apply:
 
@@ -241,18 +251,16 @@ A self-registered client's **identifier cannot be changed**, in the same way the
 
 ### Redirect URI rules
 
-Dynamic registration validates redirect URIs more strictly than the admin console does, because the caller is anonymous. What is accepted depends on whether the client is public, which is determined by `token_endpoint_auth_method`:
+The [universal rules](#what-a-redirect-uri-must-look-like) apply here as they do everywhere else. On top of them, dynamic registration restricts the scheme and host, because the caller is anonymous, and what is accepted depends on whether the client is public, which is determined by `token_endpoint_auth_method`:
 
 | Client type | Allowed | Not allowed |
 |---|---|---|
 | Public (`token_endpoint_auth_method: none`) | `http` on `127.0.0.1`, `::1` or `localhost`, with any port; custom schemes such as `myapp://callback` | `https`; `http` on any other host |
 | Confidential (any other auth method) | `https` on any host; `http` on the three loopback hosts | custom schemes; `http` on any other host |
 
-Four rules apply to both client types:
+Two further rules apply to both client types, and these two are specific to dynamic registration:
 
 - **The host is matched exactly**, after case folding. A host that merely starts with a loopback name, such as `localhost.attacker.com`, is not a loopback host and is rejected.
-- **The URI must be absolute**, with a scheme, per [RFC 6749 section 3.1.2](https://datatracker.ietf.org/doc/html/rfc6749#section-3.1.2). Values like `//example.com/callback` and `/callback` are rejected.
-- **A fragment is not permitted**, per the same section. `http://127.0.0.1/callback#done` is rejected. A percent-encoded `%23` is not a fragment and is fine.
 - **Characters that cannot appear in a URI are rejected**, namely `<`, `>`, `"`, `{`, `}`, `|`, `\`, `^`, backtick and space. Percent-encode them if you genuinely need them.
 
 Some schemes are refused outright, either because a browser cannot deliver an authorization response to them or because they can execute script: `javascript`, `data`, `vbscript`, `file`, `blob`, `about`, `chrome`, `chrome-extension`, `moz-extension`, `view-source`, `filesystem`, `resource`, `ftp`, `ftps`, `ws`, `wss`, `gopher` and `telnet`.

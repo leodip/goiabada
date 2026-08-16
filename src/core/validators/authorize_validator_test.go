@@ -186,6 +186,23 @@ func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
 			requested:    "http://127.0.0.1:54321/cb",
 			responseType: "code",
 		},
+		{
+			// RFC 6749 section 3.1.2: the endpoint URI "MAY include an
+			// 'application/x-www-form-urlencoded' formatted query component". The
+			// absolute-URI gate must not read a query as anything else.
+			name:       "a query component is permitted",
+			registered: "http://127.0.0.1/cb?a=1",
+			requested:  "http://127.0.0.1/cb?a=1",
+		},
+		{
+			// KEEP THIS. It is the row that catches the absolute-URI gate overshooting
+			// into rejecting a percent-encoded %23, which is an ordinary path character
+			// and not a fragment delimiter. Its value is invisible once the predicate is
+			// right, which is exactly why it is easy to delete as redundant.
+			name:       "a percent-encoded %23 is not a fragment",
+			registered: "http://127.0.0.1/cb%23frag",
+			requested:  "http://127.0.0.1/cb%23frag",
+		},
 	}
 
 	for _, tc := range tests {
@@ -216,16 +233,25 @@ func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
+	// Two distinct rejections are asserted here, which is why every row carries the exact
+	// message it expects rather than the table asserting one string: "not registered" and
+	// "not an absolute URI" are different diagnoses, and telling an administrator a URI is
+	// not registered when it plainly is sends them looking in the wrong place (#122).
+	const notRegistered = "Invalid redirect_uri parameter. The client does not have this redirect URI registered."
+	const notAbsolute = "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host."
+
 	tests := []struct {
 		name         string
 		registered   string
 		requested    string
 		responseType string
+		wantMessage  string
 	}{
 		{
-			name:       "unregistered URI",
-			registered: "http://example.com",
-			requested:  "http://invalid.com",
+			name:        "unregistered URI",
+			registered:  "http://example.com",
+			requested:   "http://invalid.com",
+			wantMessage: notRegistered,
 		},
 		{
 			// Must differ only in port. Pairing it with an unrelated requested URI would
@@ -234,18 +260,21 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			registered:   "https://example.com/cb",
 			requested:    "https://example.com:8443/cb",
 			responseType: "code",
+			wantMessage:  notRegistered,
 		},
 		{
 			name:         "implicit, token",
 			registered:   "http://127.0.0.1/cb",
 			requested:    "http://127.0.0.1:54321/cb",
 			responseType: "token",
+			wantMessage:  notRegistered,
 		},
 		{
 			name:         "implicit, id_token",
 			registered:   "http://127.0.0.1/cb",
 			requested:    "http://127.0.0.1:54321/cb",
 			responseType: "id_token",
+			wantMessage:  notRegistered,
 		},
 		{
 			// Rejected by ValidateRequest later, so this asserts that *this* function does
@@ -254,6 +283,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			registered:   "http://127.0.0.1/cb",
 			requested:    "http://127.0.0.1:54321/cb",
 			responseType: "code token",
+			wantMessage:  notRegistered,
 		},
 		{
 			// "code foo" and "code code" are accepted as valid by ValidateRequest, which
@@ -263,12 +293,71 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			registered:   "http://127.0.0.1/cb",
 			requested:    "http://127.0.0.1:54321/cb",
 			responseType: "code foo",
+			wantMessage:  notRegistered,
 		},
 		{
 			name:         "duplicate code token",
 			registered:   "http://127.0.0.1/cb",
 			requested:    "http://127.0.0.1:54321/cb",
 			responseType: "code code",
+			wantMessage:  notRegistered,
+		},
+
+		// The absolute-URI gate (#122). EVERY ROW BELOW REGISTERS THE VALUE IT REQUESTS,
+		// and that is the whole difficulty of this seam: pairing a legitimate registered
+		// URI with a hostile requested one produces a case the not-registered branch
+		// refuses anyway, so it would pass with the gate deleted and prove nothing. These
+		// rows are refusable only by the gate.
+		//
+		// The exhaustive table for the predicate lives in core/urlutil. These are the thin
+		// proof that this validator consults it, one row per rule the gate enforces.
+		{
+			name:        "scheme-relative, the reported shape",
+			registered:  "//evil.example/cb",
+			requested:   "//evil.example/cb",
+			wantMessage: notAbsolute,
+		},
+		{
+			name:        "path-absolute with no scheme",
+			registered:  "/relative/cb",
+			requested:   "/relative/cb",
+			wantMessage: notAbsolute,
+		},
+		{
+			// Carries a scheme, so it catches an implementation that only tests for one.
+			name:        "fragment",
+			registered:  "http://127.0.0.1/cb#frag",
+			requested:   "http://127.0.0.1/cb#frag",
+			wantMessage: notAbsolute,
+		},
+		{
+			// Varies from the accepted "http://127.0.0.1/cb" by the fragment delimiter
+			// alone. url.URL.Fragment is "" for both, so this is the row that fails an
+			// implementation testing the parsed fragment instead of the raw string.
+			name:        "bare trailing fragment delimiter",
+			registered:  "http://127.0.0.1/cb#",
+			requested:   "http://127.0.0.1/cb#",
+			wantMessage: notAbsolute,
+		},
+		{
+			// Decision 8's sharpest member. This IS a valid RFC 3986 absolute-URI, so the
+			// grammar rule accepts it and only the empty-host rule refuses it: Go parses
+			// it with no host and a browser resolves the emitted Location to
+			// evil.example, on a production https deployment. This row is what proves the
+			// validator inherits the host rule and not merely the grammar one.
+			name:        "https with an empty authority",
+			registered:  "https:///evil.example/cb",
+			requested:   "https:///evil.example/cb",
+			wantMessage: notAbsolute,
+		},
+		{
+			// The single-slash shape, and also the configuration this change knowingly
+			// breaks: on an https deployment a browser resolves it to the named host, so
+			// it delivers codes today over cleartext.
+			name:        "http path-absolute with an empty authority",
+			registered:  "http:/evil.example/cb",
+			requested:   "http:/evil.example/cb",
+			wantMessage: notAbsolute,
 		},
 	}
 
@@ -282,10 +371,18 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 				AuthorizationCodeEnabled: true,
 			}
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(client, nil)
+			// Maybe, not a mandatory expectation. mocks_data.NewDatabase registers
+			// AssertExpectations on cleanup, and the absolute-URI gate short-circuits
+			// before this load, so a mandatory expectation would fail every gate row for
+			// the wrong reason.
+			//
+			// This does not weaken those rows. With the gate deleted the load does happen,
+			// the registered value matches the requested one exactly, no error comes back,
+			// and require.Error below fails. Verified by mutation.
 			mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
 				client := args.Get(1).(*models.Client)
 				client.RedirectURIs = []models.RedirectURI{{URI: tc.registered}}
-			}).Return(nil)
+			}).Return(nil).Maybe()
 
 			input := ValidateClientAndRedirectURIInput{
 				ClientId:     "valid-client",
@@ -299,7 +396,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			require.Error(t, err)
 			customErr, ok := err.(*customerrors.ErrorDetail)
 			require.True(t, ok)
-			assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", customErr.GetDescription())
+			assert.Equal(t, tc.wantMessage, customErr.GetDescription())
 		})
 	}
 }
