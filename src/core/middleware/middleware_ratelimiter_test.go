@@ -1093,6 +1093,132 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	})
 }
 
+// verificationRequest builds the request LimitEmailVerification actually receives. The
+// account API's authentication middleware runs ahead of every per-route limiter and leaves
+// the validated token on the context as a value rather than a pointer, so this is the shape
+// the key helper has to read. A blank subject omits the token entirely, standing for a
+// request no bucket can be derived from.
+func verificationRequest(subject string) *http.Request {
+	req := limiterRequest(http.MethodPost, "/api/v1/account/email/verification", nil)
+	if subject == "" {
+		return req
+	}
+	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken,
+		oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+}
+
+// runVerification drives one request through LimitEmailVerification and reports the status,
+// whether the handler ran, and the response. failed is what the handler found when it
+// compared the code, which is the only thing that spends this budget.
+func runVerification(m *RateLimiterMiddleware, subject string, failed bool) (int, bool, *httptest.ResponseRecorder) {
+	rr := httptest.NewRecorder()
+	reached := false
+	m.LimitEmailVerification(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		if failed {
+			m.RecordCredentialFailure(r)
+		}
+		w.WriteHeader(http.StatusTeapot)
+	})).ServeHTTP(rr, verificationRequest(subject))
+	return rr.Code, reached, rr
+}
+
+// TestLimitEmailVerification_PerSubject is seam 1 for the email verification check, which
+// had no limiter and no failure counter at all while comparing a code an attacker can have
+// sent to an address they chose (#219).
+//
+// The budget is asserted exactly, on both sides, because it is published policy in the
+// reference documentation.
+func TestLimitEmailVerification_PerSubject(t *testing.T) {
+	const budget = 5
+	const subject = "11111111-1111-1111-1111-111111111111"
+
+	t.Run("the budget is exactly 5 failures", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached, _ := runVerification(m, subject, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := runVerification(m, subject, true); code != http.StatusTooManyRequests || reached {
+			t.Errorf("failure %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a correct code spends nothing, and hands its slot back", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// Well past the budget, every one of them verified. A tier that counted every
+		// request would refuse the sixth, which is a user locked out of verifying their
+		// own address by having verified it.
+		for i := 0; i < budget*4; i++ {
+			if code, reached, _ := runVerification(m, subject, false); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		// And the full budget is still there, which a leaked reservation would have shrunk.
+		for i := 0; i < budget; i++ {
+			if code, _, _ := runVerification(m, subject, true); code != http.StatusTeapot {
+				t.Fatalf("failure %d after the successful run: got code %d, want %d",
+					i+1, code, http.StatusTeapot)
+			}
+		}
+		if code, _, _ := runVerification(m, subject, true); code != http.StatusTooManyRequests {
+			t.Errorf("failure %d: got code %d, want %d", budget+1, code, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("each subject has its own budget", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget+1; i++ {
+			runVerification(m, subject, true)
+		}
+		if code, _, _ := runVerification(m, subject, true); code != http.StatusTooManyRequests {
+			t.Fatalf("the exhausted subject got code %d, want %d", code, http.StatusTooManyRequests)
+		}
+		// Same middleware instance, a different account: a global key would refuse this.
+		if code, reached, _ := runVerification(m, "22222222-2222-2222-2222-222222222222", true); code != http.StatusTeapot || !reached {
+			t.Errorf("second subject: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("a request carrying no token reaches the handler", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// Well past the budget: with no subject there is no bucket, and the handler
+		// answers ACCESS_TOKEN_REQUIRED before it compares anything, so the skipped limit
+		// costs nothing. Returning here instead would write no response at all.
+		for i := 0; i < budget*4; i++ {
+			if code, reached, _ := runVerification(m, "", true); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+	})
+
+	t.Run("a token whose subject is blank reaches the handler", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget*4; i++ {
+			if code, reached, _ := runVerification(m, "   ", true); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget*6; i++ {
+			if code, reached, _ := runVerification(m, subject, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
 // -----------------------------------------------------------------------------
 // Seam 1, stage 2: what a rejection looks like, and that it leaves a trace.
 //
@@ -1212,6 +1338,59 @@ func TestRejection_OAuthClass(t *testing.T) {
 		t.Errorf(`error = %q, want "invalid_request"`, body["error"])
 	}
 	if body["error_description"] == "" {
+		t.Error("error_description is empty")
+	}
+}
+
+// tripAPI drives failed verification checks at LimitEmailVerification until it is refused,
+// at a budget of 5 failures. Every request has to record a failure: the tier counts nothing
+// else, so a loop of plain requests would never refuse and the case would hang on its own
+// success.
+func tripAPI(t *testing.T, m *RateLimiterMiddleware) *httptest.ResponseRecorder {
+	t.Helper()
+	var last *httptest.ResponseRecorder
+	for i := 0; i < 8; i++ {
+		_, _, rr := runVerification(m, "11111111-1111-1111-1111-111111111111", true)
+		last = rr
+		if last.Code == http.StatusTooManyRequests {
+			return last
+		}
+	}
+	t.Fatalf("LimitEmailVerification never refused within 8 failures; last code %d", last.Code)
+	return nil
+}
+
+// TestRejection_APIClass verifies the account and admin API routes answer with the flat
+// error envelope every other refusal on those routes writes, so a caller already switching
+// on error_code needs no new shape (decision 11), and that the 429 carries Retry-After and
+// none of the four X-RateLimit-* headers (decision 13).
+func TestRejection_APIClass(t *testing.T) {
+	m := newTestMiddleware(nil, true)
+	rr := tripAPI(t, m)
+
+	if got := rr.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json; a plain-text body is what httprate's default writes", got)
+	}
+	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", got)
+	}
+	// The tier's window, 15 minutes.
+	if got := rr.Header().Get("Retry-After"); got != "900" {
+		t.Errorf("Retry-After = %q, want 900", got)
+	}
+	assertNoRateLimitHeaders(t, rr, "api rejection")
+
+	var body struct {
+		ErrorCode        string `json:"error_code"`
+		ErrorDescription string `json:"error_description"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not JSON: %v\nbody: %s", err, rr.Body.String())
+	}
+	if body.ErrorCode != "TOO_MANY_REQUESTS" {
+		t.Errorf(`error_code = %q, want "TOO_MANY_REQUESTS"`, body.ErrorCode)
+	}
+	if body.ErrorDescription == "" {
 		t.Error("error_description is empty")
 	}
 }

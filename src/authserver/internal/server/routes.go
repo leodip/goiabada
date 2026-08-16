@@ -322,7 +322,10 @@ func (s *Server) initRoutes() {
 		r.Put("/profile", apihandlers.HandleAPIAccountProfilePut(s.database, profileValidator, inputSanitizer, auditLogger))
 		r.Put("/email", apihandlers.HandleAPIAccountEmailPut(s.database, emailValidator, inputSanitizer, auditLogger))
 		r.Post("/email/verification/send", apihandlers.HandleAPIAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger))
-		r.Post("/email/verification", apihandlers.HandleAPIAccountEmailVerificationPost(s.database, auditLogger))
+		// The verification check is limited, the send beside it is not: sending checks no
+		// credential and already carries its own 60 second resend cooldown.
+		r.With(rateLimiter.LimitEmailVerification).Post("/email/verification",
+			apihandlers.HandleAPIAccountEmailVerificationPost(s.database, auditLogger, rateLimiter))
 		r.Put("/phone", apihandlers.HandleAPIAccountPhonePut(s.database, phoneValidator, inputSanitizer, auditLogger))
 		r.Put("/address", apihandlers.HandleAPIAccountAddressPut(s.database, addressValidator, inputSanitizer, auditLogger))
 		r.Put("/password", apihandlers.HandleAPIAccountPasswordPut(s.database, passwordValidator, auditLogger))

@@ -179,6 +179,7 @@ Common `error_code` categories:
 - `INVALID_REQUEST_BODY` - Malformed JSON in request
 - `VALIDATION_ERROR` - Input validation failed
 - `NOT_FOUND` - Resource not found
+- `TOO_MANY_REQUESTS` - Rate limit reached; the response carries a `Retry-After` header
 - `INTERNAL_SERVER_ERROR` - Server-side error
 
 <Aside type="caution">
@@ -321,7 +322,7 @@ No request body required. Returns:
 
 ```json
 {
-  "verificationCode": "ABC123",
+  "verificationCode": "ABCD1234",
   "verificationCodeExpiresAt": "2026-01-23T21:19:43Z",
   "userId": 123,
   "email": "newemail@example.com"
@@ -332,7 +333,7 @@ No request body required. Returns:
 This call always generates a new code, and it sets <code>emailVerified</code> to <code>false</code>.
 </Aside>
 
-The verification code is 6 characters (3 letters + 3 numbers) and expires after 5 minutes.
+The verification code is 8 characters (4 letters + 4 numbers) and expires after 5 minutes.
 
 #### Update user phone
 
@@ -1338,11 +1339,11 @@ POST /api/v1/account/email/verification
 
 ```json
 {
-  "verificationCode": "ABC123"
+  "verificationCode": "ABCD1234"
 }
 ```
 
-The verification code is 6 characters (3 letters + 3 numbers) and expires after 5 minutes.
+The verification code is 8 characters (4 letters + 4 numbers) and expires after 5 minutes.
 
 ---
 
