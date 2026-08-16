@@ -119,7 +119,9 @@ func (s *Server) initRoutes() {
 
 	s.router.Route("/account", func(r chi.Router) {
 		r.Get("/register", accounthandlers.HandleAccountRegisterGet(httpHelper))
-		r.Post("/register", accounthandlers.HandleAccountRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger))
+		// The POST alone is limited: the GET renders a static form, while the POST probes
+		// whether an address already has an account, sends mail to it and writes a row.
+		r.With(rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleAccountRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger))
 		r.With(rateLimiter.LimitActivate).Get("/activate", accounthandlers.HandleAccountActivateGet(httpHelper, s.sessionStore, s.database, userCreator, auditLogger))
 	})
 

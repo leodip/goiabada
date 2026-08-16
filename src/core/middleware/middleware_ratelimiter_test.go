@@ -866,6 +866,121 @@ func TestLimitActivate_PerIP(t *testing.T) {
 	})
 }
 
+// TestLimitRegister_PerIP verifies self-registration is bounded per client block, at the same
+// budget as the activation step that follows it, and that a distinct address per request buys
+// nothing (#219).
+//
+// That last case is the one the limiter exists for. The endpoint answers whether an address
+// already has an account, sends mail to whichever do not, and writes a pre_registrations row for
+// each, and all three are only harmful across distinct addresses. A limiter keyed on the submitted
+// address would bucket the attacker's own choice of victim and bound none of it, which is why
+// decision 8 has no per-email tier.
+//
+// The budget is exact because it is published policy: 20 requests per 5 minutes, matching
+// activate so registration and its activation trip at the same rate.
+//
+// The handler stub writes 418 rather than 200 on purpose: a middleware that writes nothing
+// produces exactly 200 with an empty body, so 418 is what tells "the handler ran" apart from
+// "nothing was written", and from 429.
+func TestLimitRegister_PerIP(t *testing.T) {
+	const budget = 20
+
+	run := func(m *RateLimiterMiddleware, email, ip string) (int, bool, *httptest.ResponseRecorder) {
+		form := url.Values{"email": {email}, "password": {"whatever"}}
+		req := limiterRequest(http.MethodPost, "/account/register", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		reached := false
+		m.LimitRegister(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		return rr.Code, reached, rr
+	}
+
+	t.Run("the budget is exactly 20 per IP", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached, _ := run(m, "newuser@example.com", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := run(m, "newuser@example.com", "203.0.113.7:5000"); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a distinct address per request shares one host's bucket", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// The enumeration bound itself: 21 addresses probed from one host, and the 21st is
+		// refused. A per-address key would allow all of them.
+		for i := 0; i < budget; i++ {
+			email := fmt.Sprintf("candidate%d@example.com", i)
+			if code, reached, _ := run(m, email, "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d for %s: got code %d, handler reached %v; want %d and true",
+					i+1, email, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, _, _ := run(m, "candidate20@example.com", "203.0.113.7:5000"); code != http.StatusTooManyRequests {
+			t.Errorf("request %d with a fresh address: got code %d, want %d",
+				budget+1, code, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("addresses inside one /64 share the bucket, a second /64 does not", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		addr := func(i int) string { return fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1) }
+		for i := 0; i < budget; i++ {
+			if code, _, _ := run(m, "newuser@example.com", addr(i)); code != http.StatusTeapot {
+				t.Fatalf("request %d from %s: got code %d, want %d", i+1, addr(i), code, http.StatusTeapot)
+			}
+		}
+		if code, _, _ := run(m, "newuser@example.com", addr(budget)); code != http.StatusTooManyRequests {
+			t.Errorf("request %d from %s: got code %d, want %d",
+				budget+1, addr(budget), code, http.StatusTooManyRequests)
+		}
+		// A neighbouring /64 is a different client, which is what makes the mask observable
+		// rather than the limiter.
+		if code, reached, _ := run(m, "newuser@example.com", "[2001:db8:1:3::1]:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second /64: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("the refusal is the browser shape, with Retry-After and no rate-limit headers", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		var rr *httptest.ResponseRecorder
+		for i := 0; i < budget+1; i++ {
+			_, _, rr = run(m, "newuser@example.com", "203.0.113.7:5000")
+		}
+		if rr.Code != http.StatusTooManyRequests {
+			t.Fatalf("got code %d, want %d", rr.Code, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "300" {
+			t.Errorf("Retry-After = %q, want 300, the tier's 5 minute window", got)
+		}
+		// A registration form is a browser route, so the refusal is the error page rather
+		// than httprate's plain text.
+		if got := rr.Header().Get("Content-Type"); got != "text/html; charset=UTF-8" {
+			t.Errorf("Content-Type = %q, want text/html; charset=UTF-8", got)
+		}
+		assertNoRateLimitHeaders(t, rr, "registration rejection")
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget*2; i++ {
+			if code, reached, _ := run(m, "newuser@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
 // TestLimitOtp_PerUserAndMissingAuthContext verifies the OTP limiter keys its
 // budget on the user id, that only a wrong code spends it, and that a request whose auth
 // context cannot be read reaches the handler instead of being answered with a blank 200
