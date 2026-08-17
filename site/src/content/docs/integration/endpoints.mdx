@@ -66,7 +66,7 @@ The authorize endpoint is used to request authorization codes via the browser. T
     <tr>
       <td style="white-space: nowrap;"><code>response_mode</code></td>
       <td>No</td>
-      <td>Supported values: <code>query</code> (default for code flow), <code>fragment</code> (default and required for implicit flow), or <code>form_post</code>.</td>
+      <td>Supported values: <code>query</code> (default for code flow), <code>fragment</code> (default and required for implicit flow), or <code>form_post</code>. Any other value is answered with <code>400 Bad Request</code> on a page, with nothing returned to the client: understanding the mode is what tells the server how to encode a response, so an error cannot be sent in one it does not support.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>state</code></td>

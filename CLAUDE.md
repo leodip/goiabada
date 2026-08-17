@@ -145,6 +145,11 @@ Otherwise the error code and description are parked on `AuthContext.DeferredErro
 `/auth/level1completed` once the password is verified. That ceremony ends there and creates no
 session.
 
+One failure is answered before any of that and never redirects at all: a `response_mode` outside
+`query`, `fragment`, `form_post` renders the refusal page at 400 with no error parameters, per OIDC
+Core 3.1.2.6, since the server cannot encode a response in a mode it does not implement. The set has
+one definition, `validators.IsSupportedResponseMode`, shared by the handler and `ValidateRequest`.
+
 ### Key Logic in Level1Completed
 `handler_auth_level1.go:HandleAuthLevel1CompletedGet`:
 - If a deferred error is parked → answer the client and stop (see above)

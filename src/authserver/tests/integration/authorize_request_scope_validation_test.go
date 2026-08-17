@@ -311,6 +311,17 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 	}
 }
 
+// This assertion was rewritten rather than kept, and it is the only one in #213 that was. It read
+// 302 with error=invalid_request in the query, and OIDC Core 1.0 section 3.1.2.6 ends with an
+// explicit exception to the rule that produces such a redirect: "If the Response Mode value is not
+// supported, the Authorization Server returns an HTTP response code of 400 (Bad Request) without
+// Error Response parameters, since understanding the Response Mode is necessary to know how to
+// return those parameters." The old assertion pinned behaviour the specification contradicts
+// (#213 decision 11).
+//
+// Deliberately driven by a browser that already holds a session, because that is what shows this is
+// not the deferral reaching another case: authentication changes nothing here. The redirect is
+// withdrawn from this failure altogether, for every request, not postponed.
 func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
@@ -348,17 +359,135 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Empty(t, resp.Header.Get("Location"),
+		"the response carries no error parameters, so it carries no redirect either")
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	errorCode := redirectLocation.Query().Get("error")
-	errorDescription := redirectLocation.Query().Get("error_description")
 
-	assert.Equal(t, "invalid_request", errorCode)
-	assert.Equal(t, "Invalid response_mode parameter. Supported values are: query, fragment, form_post.", errorDescription)
+	// The same sentence the error_description used to carry, so an integrator who reads it in a
+	// redirect from an older build recognises it on the page.
+	errorMsg := doc.Find("p#errorMsg").Text()
+	assert.Equal(t, "Invalid response_mode parameter. Supported values are: query, fragment, form_post.", errorMsg)
+}
+
+// The half of the same rule that #213 itself introduced: without this branch a logged-out visitor
+// would have been shown a password form and then redirected, so the change would have put a
+// credential prompt in front of a redirect that should never be emitted at all.
+//
+// Asserting the absence of a Location header is the point. A 400 that also redirects would satisfy
+// the status assertion above while still handing the browser to a client-chosen host, and a redirect
+// to /auth/level1 would mean the error was parked instead of answered.
+func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogIn(t *testing.T) {
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+	}
+
+	err := database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	redirectUri := &models.RedirectURI{
+		ClientId: client.Id,
+		URI:      gofakeit.URL(),
+	}
+
+	err = database.CreateRedirectURI(nil, redirectUri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectUri.URI +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&response_mode=invalid"
+
+	// Cookieless: no session, and no prompt parameter, which is the combination every other
+	// validation failure defers.
+	httpClient := createHttpClient(t)
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Empty(t, resp.Header.Get("Location"),
+		"neither the client nor the login page: this failure is answered where it is found")
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	errorMsg := doc.Find("p#errorMsg").Text()
+	assert.Equal(t, "Invalid response_mode parameter. Supported values are: query, fragment, form_post.", errorMsg)
+}
+
+// The message is new text on a page that renders in the visitor's locale, so it is pinned the way
+// the seven client and redirect_uri messages are: one condition requested with ui_locales, asserting
+// the Portuguese sentence. Without it, a handler that hardcoded the English string would pass every
+// other assertion in this file (#213).
+//
+// The title is not re-asserted here. It is the same key the client and redirect_uri page uses and
+// TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale already owns it.
+func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLocale(t *testing.T) {
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+	}
+
+	err := database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	redirectUri := &models.RedirectURI{
+		ClientId: client.Id,
+		URI:      gofakeit.URL(),
+	}
+
+	err = database.CreateRedirectURI(nil, redirectUri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectUri.URI +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&response_mode=invalid" +
+		"&ui_locales=pt-BR"
+
+	httpClient := createHttpClient(t)
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	errorMsg := doc.Find("p#errorMsg").Text()
+	assert.Equal(t, "Parâmetro response_mode inválido. Os valores aceitos são: query, fragment, form_post.", errorMsg,
+		"the message did not render in pt-BR; the handler is not localizing it")
 }
 
 func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {

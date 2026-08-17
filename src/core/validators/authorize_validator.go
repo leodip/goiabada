@@ -247,6 +247,21 @@ func (val *AuthorizeValidator) ValidateUnsupportedRequestParameters(input *Valid
 	return nil
 }
 
+// supportedResponseModes are the values this server can encode an authorization response in.
+//
+// One definition, because two callers now depend on the same set: ValidateRequest below, and the
+// authorize handler, which answers an unsupported value with a local 400 before this validator
+// runs. A copy in the handler would let a mode added here be refused there (#213).
+var supportedResponseModes = []string{"query", "fragment", "form_post"}
+
+// IsSupportedResponseMode reports whether responseMode names a mechanism this server can return
+// an authorization response through. An empty value is supported: response_mode is OPTIONAL and
+// absence selects the default for the response type, per OAuth 2.0 Multiple Response Type
+// Encoding Practices section 2.1.
+func IsSupportedResponseMode(responseMode string) bool {
+	return responseMode == "" || slices.Contains(supportedResponseModes, responseMode)
+}
+
 func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) error {
 
 	// Check for empty/missing response_type first
@@ -352,13 +367,18 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 		// If PKCE is not required and not provided, that's fine - skip validation
 	}
 
-	// Response mode validation
-	if len(input.ResponseMode) > 0 {
-		if !slices.Contains([]string{"query", "fragment", "form_post"}, input.ResponseMode) {
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-				"Invalid response_mode parameter. Supported values are: query, fragment, form_post.",
-				http.StatusBadRequest)
-		}
+	// Response mode validation.
+	//
+	// The authorize handler answers an unsupported response_mode itself, with a local 400 and no
+	// error parameters, so this branch is not reached from there any more: OIDC Core 3.1.2.6 says
+	// an error cannot be encoded in a mode the server does not understand, which makes it the one
+	// failure that must not become a redirect (#213 decision 11). It stays because the rule
+	// belongs to the validator rather than to one caller, and a second caller of ValidateRequest
+	// would not inherit the handler's branch.
+	if !IsSupportedResponseMode(input.ResponseMode) {
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			"Invalid response_mode parameter. Supported values are: query, fragment, form_post.",
+			http.StatusBadRequest)
 	}
 
 	// Per RFC 6749 4.2.2 and OIDC Core 3.2.2.5: implicit grant tokens MUST be in fragment
