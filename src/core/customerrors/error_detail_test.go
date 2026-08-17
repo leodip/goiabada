@@ -125,3 +125,35 @@ func TestNewErrorDetailWithHttpStatusCode_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+// TestErrorDetail_WithDescription pins the clone. The method exists so a boundary can rewrite a
+// description without rebuilding the detail through four getters, and the whole value of that is
+// that every other key survives: a round-trip through the four-argument constructor reads correct
+// today and drops silently whatever is added later (#213).
+func TestErrorDetail_WithDescription(t *testing.T) {
+	original := NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+		"invalid_client", "Client authentication failed.", 401, `Basic realm="goiabada"`)
+
+	rewritten := original.WithDescription("Client authentication failed (conformed).")
+
+	if rewritten.GetDescription() != "Client authentication failed (conformed)." {
+		t.Errorf("Expected the new description, got %s", rewritten.GetDescription())
+	}
+
+	// Every other key travels.
+	if rewritten.GetCode() != "invalid_client" {
+		t.Errorf("Expected code invalid_client, got %s", rewritten.GetCode())
+	}
+	if rewritten.GetHttpStatusCode() != 401 {
+		t.Errorf("Expected HTTP status code 401, got %d", rewritten.GetHttpStatusCode())
+	}
+	if rewritten.GetWWWAuthenticate() != `Basic realm="goiabada"` {
+		t.Errorf("Expected the WWW-Authenticate value to survive, got %s", rewritten.GetWWWAuthenticate())
+	}
+
+	// And the receiver is untouched, which is what makes it safe to call on the package-level
+	// comparison targets such as ErrUserDisabled.
+	if original.GetDescription() != "Client authentication failed." {
+		t.Errorf("Expected the receiver to keep its description, got %s", original.GetDescription())
+	}
+}

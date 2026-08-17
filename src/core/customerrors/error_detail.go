@@ -87,6 +87,25 @@ func (e *ErrorDetail) Error() string {
 	return sb.String()
 }
 
+// WithDescription returns a copy of e carrying description in place of its own, leaving the
+// receiver untouched.
+//
+// It clones the details map rather than round-tripping through GetCode, GetHttpStatusCode,
+// GetWWWAuthenticate and the four-argument constructor. The round-trip reads correct today and
+// silently drops any detail key added later, and IsError compares len(details) as well as every
+// entry, so a dropped key would quietly change an equality that ErrUserDisabled and ErrClientDisabled
+// are compared by (#213).
+func (e *ErrorDetail) WithDescription(description string) *ErrorDetail {
+	details := make(map[string]string, len(e.details))
+	for k, v := range e.details {
+		details[k] = v
+	}
+	details["description"] = description
+	return &ErrorDetail{
+		details: details,
+	}
+}
+
 func (e *ErrorDetail) GetCode() string {
 	return e.details["code"]
 }

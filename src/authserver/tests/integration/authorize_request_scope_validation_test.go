@@ -814,3 +814,54 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 	assert.Equal(t, "invalid_scope", errorCode)
 	assert.Contains(t, errorDescription, fmt.Sprintf("Scope '%s:%s' is invalid. The resource identified by '%s' does not have a permission with identifier '%s'", resource.ResourceIdentifier, nonExistentPermission, resource.ResourceIdentifier, nonExistentPermission))
 }
+
+// TestAuthorize_ValidateScopes_EmojiScope_FormPostDescriptionIsConformed proves the authorization
+// endpoint's error_description carries no byte RFC 6749 forbids, on the response mode where a filter
+// applied to the wrong branch would show.
+//
+// RFC 6749 Appendix A.8 gives error-description = 1*NQSCHAR (%x20-21 / %x23-5B / %x5D-7E), and the
+// same production governs 4.1.2.1, 4.2.2.1 and 5.2 alike. form_post is chosen because the query and
+// fragment modes share one parameter slice while this branch builds a bind map of its own, so a
+// conform applied one level too low would pass on two modes and fail here. The scope keeps ASCII on
+// both sides of the offending rune, which is what proves the filter replaces rather than drops and
+// still names the scope that was refused (#213).
+//
+// Thin on purpose: the character set is owned by TestConformErrorDescription in
+// src/core/customerrors, and what is left here is that the filter is on this wire path.
+//
+// It drives an authenticated browser where its neighbours in this file are cookieless. That changes
+// nothing today, since the validations run above the session lookup, and it keeps the case correct
+// once #213 moves them: written cookieless, this row would be one more test for the ordering change
+// to retrofit, and it would be retrofitted by the very change it exists to be independent of.
+func TestAuthorize_ValidateScopes_EmojiScope_FormPostDescriptionIsConformed(t *testing.T) {
+	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&response_mode=form_post" +
+		"&scope=" + url.QueryEscape("emoji💣scope")
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	errorValue := doc.Find("input[name='error']").AttrOr("value", "")
+	assert.Equal(t, "invalid_scope", errorValue)
+
+	errorDescription := doc.Find("input[name='error_description']").AttrOr("value", "")
+	assert.Equal(t,
+		"Invalid scope format: 'emoji?scope'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.",
+		errorDescription)
+}

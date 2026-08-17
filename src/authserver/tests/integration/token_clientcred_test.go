@@ -635,3 +635,47 @@ func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 	assert.True(t, jwtToken.HasScope(writeScope),
 		"HasScope must match %q in claim %q", writeScope, claims["scope"])
 }
+
+// TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed proves the token endpoint's
+// error_description carries no byte RFC 6749 forbids, even when the description interpolates the
+// caller's own text.
+//
+// RFC 6749 Appendix A.8 gives error-description = 1*NQSCHAR (%x20-21 / %x23-5B / %x5D-7E), and
+// section 5.2 is one of the sections that production governs. The scope below is deliberately not a
+// bare emoji: the ASCII either side of the offending rune must survive, which is what proves the
+// filter replaces rather than drops and so still tells the integrator which scope was refused
+// (#213).
+//
+// Thin on purpose. The character set itself is owned by TestConformErrorDescription in
+// src/core/customerrors; what is left for this tier is only that the filter is on the path.
+func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	httpClient := createHttpClient(t)
+
+	formData := url.Values{
+		"grant_type": {"client_credentials"},
+		"scope":      {"emoji💣scope"},
+	}
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, clientSecret)
+
+	assert.Equal(t, "invalid_scope", data["error"])
+	assert.Equal(t,
+		"Invalid scope format: 'emoji?scope'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.",
+		data["error_description"])
+}
