@@ -575,6 +575,31 @@ func TestValidateRequest_InvalidResponseMode(t *testing.T) {
 	assert.Equal(t, "Invalid response_mode parameter. Supported values are: query, fragment, form_post.", customErr.GetDescription())
 }
 
+// IsSupportedResponseMode is the single definition of the set, and it has two callers that must
+// agree: ValidateRequest above, and the authorize handler, which answers an unsupported value with
+// a local 400 instead of a redirect (#213 decision 11). The table lives here, with the set, so
+// neither caller re-tests the rule.
+func TestIsSupportedResponseMode(t *testing.T) {
+	// Absence is supported rather than merely tolerated: response_mode is OPTIONAL, and a request
+	// that omits it takes the default for its response type. A predicate that answered false here
+	// would make the handler refuse almost every authorization request this server receives.
+	assert.True(t, IsSupportedResponseMode(""), "an absent response_mode selects the default")
+
+	for _, mode := range []string{"query", "fragment", "form_post"} {
+		assert.True(t, IsSupportedResponseMode(mode), "%q is implemented and must be accepted", mode)
+	}
+
+	// jwt, query.jwt and friends are JARM (RFC 9101 family) modes this server does not implement,
+	// and they are what a real client is most likely to ask for by mistake. The rest cover the
+	// shapes a typo takes: wrong case, whitespace, a value that merely contains a supported one.
+	for _, mode := range []string{
+		"invalid_mode", "jwt", "query.jwt", "fragment.jwt", "form_post.jwt",
+		"QUERY", "Fragment", "form-post", "formpost", " query", "query ", "query fragment", "web_message",
+	} {
+		assert.False(t, IsSupportedResponseMode(mode), "%q is not implemented and must be refused", mode)
+	}
+}
+
 func TestValidateRequest_ValidInput(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)

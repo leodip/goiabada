@@ -146,10 +146,15 @@ func HandleAuthorizeGet(
 			return
 		}
 
-		renderErrorUi := func(message string) {
+		// The refusal page, which is how this handler answers anything it must not send to the
+		// client. The status is a parameter because the two conditions that reach it differ on it:
+		// a bad client_id or redirect_uri has always answered 200, and an unsupported
+		// response_mode is answered 400 because OIDC Core 3.1.2.6 names that code (#213).
+		renderErrorUi := func(message string, httpStatus int) {
 			bind := map[string]interface{}{
-				"title": i18n.T(r.Context(), "auth_error.unable_to_authorize.title"),
-				"error": message,
+				"title":       i18n.T(r.Context(), "auth_error.unable_to_authorize.title"),
+				"error":       message,
+				"_httpStatus": httpStatus,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
@@ -175,12 +180,40 @@ func HandleAuthorizeGet(
 			// (#213 decision 9).
 			localizedErr, ok := err.(*i18n.LocalizedError)
 			if ok {
-				renderErrorUi(localizedErr.Localize(r.Context()))
+				renderErrorUi(localizedErr.Localize(r.Context()), http.StatusOK)
 				return
 			} else {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
+		}
+
+		// An unsupported response_mode is answered here, above every validation that answers by
+		// redirect, because it is the one failure that cannot be answered by redirect at all.
+		//
+		// OpenID Connect Core 1.0 section 3.1.2.6 closes with an explicit exception to the rule
+		// that returns errors to the redirect URI: "If the Response Mode value is not supported,
+		// the Authorization Server returns an HTTP response code of 400 (Bad Request) without
+		// Error Response parameters, since understanding the Response Mode is necessary to know
+		// how to return those parameters." So the check precedes all five, not just the one that
+		// would have caught it: whichever error a request carries, this server cannot encode it in
+		// a mechanism it does not implement, and falling through to the query default would answer
+		// in a mode the client did not ask for and may not read.
+		//
+		// Applied to every authorization request rather than only to an OIDC Authentication
+		// Request. The sentence's reasoning does not turn on the scope, and OAuth 2.0 Multiple
+		// Response Type Encoding Practices section 2.1, which defines response_mode, states no
+		// behaviour for an unsupported value, so extending it contradicts nothing (#213
+		// decision 11).
+		//
+		// ValidateRequest's other response_mode rule is deliberately left where it is: an implicit
+		// request asking for query or form_post is asking for a mode this server understands and
+		// simply may not use for tokens, so that error can be, and is, delivered as a redirect the
+		// client can parse.
+		if !validators.IsSupportedResponseMode(authContext.ResponseMode) {
+			renderErrorUi(i18n.T(r.Context(), "auth_error.unsupported_response_mode.message"),
+				http.StatusBadRequest)
+			return
 		}
 
 		// The client is loaded here rather than after the unsupported-parameter check below,

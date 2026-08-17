@@ -35,20 +35,22 @@ This page focuses on the authorization code flow (`response_type=code`), which i
 
 ## Stage 1: Request validation
 
-These checks run first. The client and `redirect_uri` checks are also *answered* first, on a page; the rest are answered by a redirect to the client, and a redirect is never sent to a browser that has not authenticated (see [Deferred error redirects](#deferred-error-redirects) below).
+These checks run first. Three of them are also *answered* first, on a page: the client, the `redirect_uri` and the response mode. The rest are answered by a redirect to the client, and a redirect is never sent to a browser that has not authenticated (see [Deferred error redirects](#deferred-error-redirects) below).
 
 | What's checked | On failure |
 |----------------|------------|
 | `client_id` exists and is enabled | Error page (not a redirect) |
 | `redirect_uri` is registered for this client | Error page (not a redirect) |
+| Response mode is one Goiabada supports (`query`, `fragment`, or `form_post`) | Error page at `400 Bad Request` (not a redirect) |
 | `response_type` is present and valid | `invalid_request` or `unsupported_response_type` |
 | Scopes are valid (OIDC scopes or existing `resource:permission` pairs) | `invalid_scope` |
 | PKCE is correct (required by default; configurable per client or globally) | `invalid_request` |
-| Response mode is valid (`query`, `fragment`, or `form_post`) | `invalid_request` |
 | `prompt` values are valid and not conflicting | `invalid_request` |
 
+An unsupported `response_mode` is the one failure that never reaches the client, for any request, signed in or not. Understanding the requested mode is what tells the server how to encode a response, so there is no way to send an error to a client that asked for a mode Goiabada does not implement: the answer is a page at `400 Bad Request` with no `error`, `error_description` or `state`, per [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html) section 3.1.2.6. Asking for `query` or `form_post` on an implicit request is a different thing and still reaches the client, because those are modes Goiabada does understand and merely may not use for tokens.
+
 <Aside type="caution">
-If the client or redirect URI is invalid, the error is shown on a page. Goiabada will **never** redirect to an unregistered URI. All other validation errors reach the client at its `redirect_uri`, but not necessarily straight away.
+If the client or redirect URI is invalid, the error is shown on a page. Goiabada will **never** redirect to an unregistered URI. All other validation errors reach the client at its `redirect_uri`, apart from the unsupported response mode above, but not necessarily straight away.
 
 That has one exception: a client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) never receives an error redirect, silent requests included. Goiabada shows the user a page naming the address the client asked to send them to, and the request stops there. See [Declining](#declining).
 </Aside>
@@ -57,7 +59,7 @@ That has one exception: a client that [registered itself](/concepts/clients/#dyn
 
 An error redirect is a redirect, and Goiabada does not redirect a browser to an address a client chose until the person driving that browser has signed in. This closes the case where a link carrying one bad parameter, sent to somebody who is not logged in, makes the authorization server itself forward them to a host of the client's choosing.
 
-So a validation failure from the table above is answered one of two ways:
+So a validation failure from the table above, other than the three that are answered on a page, is answered one of two ways:
 
 | Situation | What happens |
 |-----------|--------------|

@@ -253,6 +253,112 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.AssertExpectations(t)
 	})
 
+	// OIDC Core 3.1.2.6: "If the Response Mode value is not supported, the Authorization Server
+	// returns an HTTP response code of 400 (Bad Request) without Error Response parameters." So
+	// this one failure is answered on a page rather than becoming a redirect, immediate or deferred
+	// (#213 decision 11).
+	//
+	// The mocks carry most of the assertion. All of them are strict, and none of the calls the rest
+	// of the handler makes has an expectation here: the client load, the session lookup and all five
+	// redirecting validations would each fail this test if the branch let the request through to
+	// them. That is what pins the branch's position rather than merely its existence.
+	t.Run("Unsupported response_mode is answered 400 on a page, above everything that redirects", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		// jwt is JARM, which this server does not implement, and it is what a client asking for an
+		// unsupported mode most plausibly asks for.
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&response_mode=jwt", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		// _httpStatus is what RenderTemplate turns into the response code, so it is asserted here
+		// rather than on the recorder: the helper is a mock and writes nothing. The integration
+		// case asserts the 400 that actually reaches the wire.
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["title"] == i18n.T(req.Context(), "auth_error.unable_to_authorize.title") &&
+				data["error"] == i18n.T(req.Context(), "auth_error.unsupported_response_mode.message") &&
+				data["_httpStatus"] == http.StatusBadRequest
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		// Neither the client nor the login page: an error that cannot be encoded in the requested
+		// mode must not be deferred either, which is the half of this that #213 introduced.
+		assert.Empty(t, rr.Result().Header.Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
+	// A mode this server does implement is not touched by the branch above, even when the request
+	// may not use it: an implicit request asking for query is asking for something encodable, so its
+	// error is delivered as a redirect the client can read, through the ordinary deferral.
+	t.Run("A supported response_mode the request may not use still reaches the client", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&response_mode=query", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(
+			customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"Implicit flow requires response_mode=fragment or no response_mode (fragment is the default for implicit flow).",
+				http.StatusBadRequest))
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Result().Header.Get("Location")
+		assert.Contains(t, location, "https://example.com?error=invalid_request")
+		assert.Contains(t, location, "Implicit+flow+requires+response_mode%3Dfragment")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
 	// This is the only place an auth context is created, so it is the only place a ceremony id
 	// can be minted. Every bound form renders it and every bound POST checks it, so a context
 	// saved without one would render forms whose every submission is refused (#79).

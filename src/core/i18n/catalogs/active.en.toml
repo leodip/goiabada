@@ -96,6 +96,9 @@
 "auth_error.rate_limited.title" = "Too many attempts"
 "auth_error.rate_limited.message" = "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
 "auth_error.unable_to_authorize.title" = "Unable to authorize"
+# Wording kept byte for byte from the error_description this condition used to redirect, so an
+# integrator meets the same sentence now that it is answered on a page instead (#213).
+"auth_error.unsupported_response_mode.message" = "Invalid response_mode parameter. Supported values are: query, fragment, form_post."
 
 # --- Withheld redirect for a self-registered client (auth_redirect_blocked.html)
 # Neutral about why the request stopped on purpose: this page is reached both by someone who
