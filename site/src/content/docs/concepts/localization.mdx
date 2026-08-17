@@ -23,7 +23,7 @@ For each request, the UI language is resolved in this order:
 3. The **`Accept-Language`** request header.
 4. **English** fallback.
 
-A `ui_locales` value on the authorize request is preserved across the whole login flow (password → OTP → consent).
+A `ui_locales` value on the authorize request is preserved across the whole login flow (password → OTP → consent). It also applies to the page `/auth/authorize` renders when it refuses a request outright — a `client_id` it cannot resolve, or a `redirect_uri` it will not send anyone to — since that page is shown instead of a redirect and never reaches the client.
 
 <Aside type="note">
 Emails are rendered in the **recipient's** saved language, not the language of whoever triggered the email.

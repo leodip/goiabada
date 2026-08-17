@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/leodip/goiabada/core/urlutil"
@@ -119,9 +120,18 @@ func (val *AuthorizeValidator) ValidateScopes(scope string) error {
 	return nil
 }
 
+// ValidateClientAndRedirectURI answers RFC 6749 4.1.2.1: a missing or invalid client_id, or a
+// missing, non-absolute or unregistered redirect_uri, "MUST NOT automatically redirect the
+// user-agent to the invalid redirection URI". Every rejection here therefore reaches a rendered
+// page and never an error_description, which is why these seven are *i18n.LocalizedError and
+// render in the visitor's locale, while the validations that run after this one return
+// customerrors.ErrorDetail and stay English (#213).
+//
+// The declared return type stays error rather than *i18n.LocalizedError: a database failure is
+// returned unwrapped from here, and the handler tells the two apart by type assertion.
 func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClientAndRedirectURIInput) error {
 	if len(input.ClientId) == 0 {
-		return customerrors.NewErrorDetail("", "The client_id parameter is missing.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientIdMissing, nil)
 	}
 
 	client, err := val.database.GetClientByClientIdentifier(nil, input.ClientId)
@@ -129,10 +139,10 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 		return err
 	}
 	if client == nil {
-		return customerrors.NewErrorDetail("", "Invalid client_id parameter. The client does not exist.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
 	}
 	if !client.Enabled {
-		return customerrors.NewErrorDetail("", "Invalid client_id parameter. The client is disabled.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientDisabled, nil)
 	}
 
 	// Parse response_type to determine which flow is being requested
@@ -147,7 +157,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 	} else {
 		// Authorization code flow requires AuthorizationCodeEnabled
 		if !client.AuthorizationCodeEnabled {
-			return customerrors.NewErrorDetail("", "Invalid client_id parameter. The client does not support the authorization code flow.")
+			return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeAuthCodeNotEnabled, nil)
 		}
 	}
 
@@ -167,7 +177,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 	allowLoopbackPortFlexibility := len(responseTypes) == 1 && responseTypes[0] == "code"
 
 	if len(input.RedirectURI) == 0 {
-		return customerrors.NewErrorDetail("", "The redirect_uri parameter is missing.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURIMissing, nil)
 	}
 
 	// RFC 6749 section 3.1.2: "The redirection endpoint URI MUST be an absolute URI as
@@ -192,7 +202,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 		// out: the operator reads the offending value off the client's page.
 		slog.Warn("AuthServer: rejected an authorization request whose redirect_uri is not an absolute URI, or is an http/https URI naming no host",
 			"clientIdentifier", client.ClientIdentifier)
-		return customerrors.NewErrorDetail("", "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotAbsolute, nil)
 	}
 
 	err = val.database.ClientLoadRedirectURIs(nil, client)
@@ -214,7 +224,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 		}
 	}
 	if !clientHasRedirectURI {
-		return customerrors.NewErrorDetail("", "Invalid redirect_uri parameter. The client does not have this redirect URI registered.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotRegistered, nil)
 	}
 	return nil
 }

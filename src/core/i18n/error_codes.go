@@ -22,8 +22,10 @@ const (
 
 	// Email validator — used wherever an email address is validated outside
 	// the OAuth protocol path (account self-service, admin user CRUD, SMTP
-	// settings, registration). Protocol token/authorize errors stay in
-	// customerrors.ErrorDetail and are not represented here.
+	// settings, registration). Errors that become an RFC 6749
+	// error_description stay in customerrors.ErrorDetail and are not
+	// represented here; see the authorize group at the end of this block for
+	// where that line falls on the authorization endpoint.
 	ErrCodeEmailRequired             = "validator.email.required"
 	ErrCodeEmailInvalidFormat        = "validator.email.invalid_format"
 	ErrCodeEmailTooLong              = "validator.email.too_long" // Args: {"max": int}
@@ -108,4 +110,19 @@ const (
 	ErrCodeProfileDobInFuture       = "validator.profile.dob_in_future"
 	ErrCodeProfileZoneInfoInvalid   = "validator.profile.zone_info_invalid"
 	ErrCodeProfileLocaleInvalid     = "validator.profile.locale_invalid"
+
+	// Authorize endpoint, client and redirect_uri validation. These seven are
+	// the only authorize-endpoint errors represented here, and the reason is
+	// where they come out rather than what they say: RFC 6749 4.1.2.1 forbids
+	// redirecting to an invalid redirection URI, so each of these renders a
+	// page and none of them ever becomes an error_description. The five
+	// validations that run after them do become one, are addressed to the
+	// client developer, and stay English (#213).
+	ErrCodeAuthorizeClientIdMissing          = "validator.authorize.client_id_missing"
+	ErrCodeAuthorizeClientNotFound           = "validator.authorize.client_not_found"
+	ErrCodeAuthorizeClientDisabled           = "validator.authorize.client_disabled"
+	ErrCodeAuthorizeAuthCodeNotEnabled       = "validator.authorize.auth_code_not_enabled"
+	ErrCodeAuthorizeRedirectURIMissing       = "validator.authorize.redirect_uri_missing"
+	ErrCodeAuthorizeRedirectURINotAbsolute   = "validator.authorize.redirect_uri_not_absolute"
+	ErrCodeAuthorizeRedirectURINotRegistered = "validator.authorize.redirect_uri_not_registered"
 )

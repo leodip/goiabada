@@ -148,7 +148,7 @@ func HandleAuthorizeGet(
 
 		renderErrorUi := func(message string) {
 			bind := map[string]interface{}{
-				"title": "Unable to authorize",
+				"title": i18n.T(r.Context(), "auth_error.unable_to_authorize.title"),
 				"error": message,
 			}
 
@@ -166,9 +166,16 @@ func HandleAuthorizeGet(
 		})
 
 		if err != nil {
-			valError, ok := err.(*customerrors.ErrorDetail)
+			// Localized, unlike every other error this handler answers, because this one is
+			// rendered rather than redirected: RFC 6749 4.1.2.1 forbids sending a bad client_id
+			// or redirect_uri anywhere, so the page is the whole answer and OIDC Core requires
+			// an OP to honour ui_locales for the user interface. The localizer on r was already
+			// refined from ui_locales above. Anything that is not a LocalizedError is a database
+			// failure from inside the validator, which answered 500 before this change too
+			// (#213 decision 9).
+			localizedErr, ok := err.(*i18n.LocalizedError)
 			if ok {
-				renderErrorUi(valError.GetDescription())
+				renderErrorUi(localizedErr.Localize(r.Context()))
 				return
 			} else {
 				httpHelper.InternalServerError(w, r, err)
@@ -297,6 +304,16 @@ func HandleAuthorizeGet(
 		// being the only closure with the disabled-account path folded into it, because that path
 		// must never defer: a disabled user sent to the login page cannot complete it, so the
 		// access_denied its client is owed would never be delivered at all.
+		//
+		// These five descriptions stay English and are deliberately NOT localized, unlike the
+		// seven above that render the refusal page. They become an error_description, which RFC
+		// 6749 4.1.2.1 confines to "%x20-21 / %x23-5B / %x5D-7E" and describes as "used to assist
+		// the client developer in understanding the error that occurred": the audience is the
+		// integrator reading a redirect, not the visitor, and the character set excludes pt-BR
+		// anyway. Translating one would not ship non-ASCII, because
+		// customerrors.ConformErrorDescription enforces that set at both the parking site below
+		// and the emitter, so an accented sentence would reach the client as a row of question
+		// marks instead. That is the failure a translation here buys (#213 decision 9).
 		answerValidationError := func(validationError *customerrors.ErrorDetail) {
 			if answerClientNow {
 				answerClientImmediately(validationError)

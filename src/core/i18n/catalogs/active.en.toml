@@ -95,6 +95,7 @@
 "auth_error.ceremony_mismatch.message" = "This page belongs to a sign-in request that is no longer the one in progress. Another one was started in this browser, so this form can no longer be submitted. Go back to the application you were signing in to and start again."
 "auth_error.rate_limited.title" = "Too many attempts"
 "auth_error.rate_limited.message" = "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
+"auth_error.unable_to_authorize.title" = "Unable to authorize"
 
 # --- Withheld redirect for a self-registered client (auth_redirect_blocked.html)
 # Neutral about why the request stopped on purpose: this page is reached both by someone who
@@ -1500,6 +1501,22 @@
 "validator.profile.dob_in_future" = "The date of birth can't be in the future."
 "validator.profile.zone_info_invalid" = "The zone info is invalid."
 "validator.profile.locale_invalid" = "The locale is invalid."
+
+# --- Authorize endpoint, client and redirect_uri (LocalizedError-backed) -----
+#
+# These seven render the refusal page at /auth/authorize and never become an
+# error_description, which is why they are localized while the authorize
+# validations that run after them are not. Their usual reader is the integrator
+# who registered the client, so each keeps the specific diagnosis: which of the
+# seven conditions failed is the whole value of the message.
+
+"validator.authorize.client_id_missing" = "The client_id parameter is missing."
+"validator.authorize.client_not_found" = "Invalid client_id parameter. The client does not exist."
+"validator.authorize.client_disabled" = "Invalid client_id parameter. The client is disabled."
+"validator.authorize.auth_code_not_enabled" = "Invalid client_id parameter. The client does not support the authorization code flow."
+"validator.authorize.redirect_uri_missing" = "The redirect_uri parameter is missing."
+"validator.authorize.redirect_uri_not_absolute" = "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host."
+"validator.authorize.redirect_uri_not_registered" = "Invalid redirect_uri parameter. The client does not have this redirect URI registered."
 
 # --- Email subjects ----------------------------------------------------------
 #

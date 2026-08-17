@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -105,8 +106,9 @@ func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
 	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "The client_id parameter is missing.", customErr.GetDescription())
+	locErr := err.(*i18n.LocalizedError)
+	assert.Equal(t, i18n.ErrCodeAuthorizeClientIdMissing, locErr.Code)
+	assert.Equal(t, "The client_id parameter is missing.", locErr.EnglishFallback())
 }
 
 func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
@@ -119,8 +121,9 @@ func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
 	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", customErr.GetDescription())
+	locErr := err.(*i18n.LocalizedError)
+	assert.Equal(t, i18n.ErrCodeAuthorizeClientNotFound, locErr.Code)
+	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", locErr.EnglishFallback())
 }
 
 func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
@@ -133,8 +136,9 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", customErr.GetDescription())
+	locErr := err.(*i18n.LocalizedError)
+	assert.Equal(t, i18n.ErrCodeAuthorizeClientDisabled, locErr.Code)
+	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", locErr.EnglishFallback())
 }
 
 func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *testing.T) {
@@ -147,8 +151,9 @@ func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *test
 	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "Invalid client_id parameter. The client does not support the authorization code flow.", customErr.GetDescription())
+	locErr := err.(*i18n.LocalizedError)
+	assert.Equal(t, i18n.ErrCodeAuthorizeAuthCodeNotEnabled, locErr.Code)
+	assert.Equal(t, "Invalid client_id parameter. The client does not support the authorization code flow.", locErr.EnglishFallback())
 }
 
 func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
@@ -161,8 +166,9 @@ func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
 	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "The redirect_uri parameter is missing.", customErr.GetDescription())
+	locErr := err.(*i18n.LocalizedError)
+	assert.Equal(t, i18n.ErrCodeAuthorizeRedirectURIMissing, locErr.Code)
+	assert.Equal(t, "The redirect_uri parameter is missing.", locErr.EnglishFallback())
 }
 
 func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
@@ -394,9 +400,20 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			// require, not assert: on a regression err is nil, and the type assertion
 			// below would panic and take the remaining rows down with it.
 			require.Error(t, err)
-			customErr, ok := err.(*customerrors.ErrorDetail)
+			locErr, ok := err.(*i18n.LocalizedError)
 			require.True(t, ok)
-			assert.Equal(t, tc.wantMessage, customErr.GetDescription())
+
+			// The code and the sentence are asserted together because only the catalog
+			// entry ties them, and the handler keys off the code while the page shows the
+			// sentence. A row whose code says "not registered" and whose text says "not
+			// absolute" is the #122 diagnosis-swap this table exists to refuse, and after
+			// #213 that swap can happen in the catalog rather than in the validator.
+			wantCode := i18n.ErrCodeAuthorizeRedirectURINotRegistered
+			if tc.wantMessage == notAbsolute {
+				wantCode = i18n.ErrCodeAuthorizeRedirectURINotAbsolute
+			}
+			assert.Equal(t, wantCode, locErr.Code)
+			assert.Equal(t, tc.wantMessage, locErr.EnglishFallback())
 		})
 	}
 }
@@ -613,8 +630,9 @@ func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
 	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", customErr.GetDescription())
+	locErr := err.(*i18n.LocalizedError)
+	assert.Equal(t, i18n.ErrCodeAuthorizeClientNotFound, locErr.Code)
+	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", locErr.EnglishFallback())
 }
 
 func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
@@ -636,8 +654,9 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", customErr.GetDescription())
+	locErr := err.(*i18n.LocalizedError)
+	assert.Equal(t, i18n.ErrCodeAuthorizeRedirectURINotRegistered, locErr.Code)
+	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", locErr.EnglishFallback())
 }
 
 func TestValidateRequest_EmptyResponseMode(t *testing.T) {
@@ -1239,8 +1258,9 @@ func TestValidateClientAndRedirectURI_AuthCodeFlow_RequiresAuthCodeEnabled(t *te
 	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr := err.(*customerrors.ErrorDetail)
-	assert.Contains(t, customErr.GetDescription(), "does not support the authorization code flow")
+	locErr := err.(*i18n.LocalizedError)
+	assert.Equal(t, i18n.ErrCodeAuthorizeAuthCodeNotEnabled, locErr.Code)
+	assert.Contains(t, locErr.EnglishFallback(), "does not support the authorization code flow")
 	mockDB.AssertExpectations(t)
 }
 
