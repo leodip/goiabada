@@ -304,9 +304,23 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.AssertExpectations(t)
 	})
 
-	// A mode this server does implement is not touched by the branch above, even when the request
-	// may not use it: an implicit request asking for query is asking for something encodable, so its
-	// error is delivered as a redirect the client can read, through the ordinary deferral.
+	// A mode this server does implement is not answered by the branch above: query is encodable, so
+	// an implicit request asking for it falls through to the ordinary validation and its refusal
+	// reaches the client as a redirect.
+	//
+	// This pins inherited behaviour rather than endorsed behaviour, and the distinction is worth
+	// stating because the refusal goes out in the query component. RFC 6749 section 4.2.2.1, the
+	// implicit grant's own error response, says the authorization server "informs the client by
+	// adding the following parameters to the fragment component of the redirection URI using the
+	// 'application/x-www-form-urlencoded' format", and OAuth 2.0 Multiple Response Type Encoding
+	// Practices section 3 says of id_token that "the default Response Mode for this Response Type
+	// is the fragment encoding and the query encoding MUST NOT be used". So emitting this refusal
+	// in query is a deviation.
+	//
+	// It predates #213 and #213 does not widen it: redirToClientWithError already defaults an
+	// implicit error carrying no response_mode to fragment, so only an explicitly supplied query
+	// reaches this branch. Correcting it changes what an implicit client receives and where it has
+	// to look for it, which belongs to its own change rather than to this gate.
 	t.Run("A supported response_mode the request may not use still reaches the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
