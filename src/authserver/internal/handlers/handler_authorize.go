@@ -768,6 +768,21 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 		return renderRedirectBlocked(httpHelper, w, r, input)
 	}
 
+	// The description becomes an error_description on the wire from here down, so it is conformed to
+	// RFC 6749 Appendix A.8's NQSCHAR once, here, and every branch below reads the conformed value.
+	// Descriptions interpolate request text, so an emoji or a Cyrillic word in a rejected scope
+	// otherwise puts a byte the RFC forbids into a protocol parameter (#213).
+	//
+	// This function rather than answerClientWithError, which wraps it: the three response modes below
+	// build the parameter in two different places, the params slice that query and fragment share and
+	// the form_post bind map, and a wrapper cannot cover a caller that reaches this emitter without
+	// going through it.
+	//
+	// Below the redirect guard, deliberately. renderRedirectBlocked above puts the description on an
+	// HTML page, which is a user interface and not a protocol parameter, so the interstitial keeps the
+	// text as the validator wrote it and only what actually leaves as a redirect is filtered.
+	description := customerrors.ConformErrorDescription(input.description)
+
 	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment
 	// Determine if this is an implicit flow by checking response_type
 	rtInfo := oauth.ParseResponseType(input.responseType)
@@ -797,7 +812,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 	// no valueless-parameter rule, so the two endpoints differ because their specifications do.
 	params := []responseParam{
 		{"error", input.code},
-		{"error_description", input.description},
+		{"error_description", description},
 	}
 	if input.state != "" {
 		params = append(params, responseParam{"state", input.state})
@@ -816,7 +831,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 		m := make(map[string]interface{})
 		m["redirectURI"] = input.redirectURI
 		m["error"] = input.code
-		m["error_description"] = input.description
+		m["error_description"] = description
 		// The same rule as the params slice above, stated again because this branch answers through
 		// a bind map rather than through a field list, and all three branches should say what they
 		// emit in the same terms. What the client actually receives is then decided by

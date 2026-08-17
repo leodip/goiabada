@@ -16,6 +16,31 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
+// jsonErrorConformed answers an RFC 6749 5.2 error response with its description conformed to
+// Appendix A.8's character set, which is the same production that governs the authorization
+// endpoint's error redirect. It is the token endpoint's boundary: every exit in this file goes
+// through it, so a description that interpolates request text cannot carry a byte the RFC forbids
+// into the JSON body (#213).
+//
+// It wraps httpHelper.JsonError rather than changing it. That writer has 186 call sites, of which 9
+// are this file and 2 are /userinfo; the remaining 175 are the admin console's AJAX API, which RFC
+// 6749 5.2 does not govern and which this server deliberately answers in the administrator's
+// language. Filtering there would be #213 quietly forbidding a Portuguese sentence on an admin
+// screen.
+//
+// Anything that is not an *ErrorDetail passes through untouched, because JsonError's other branch
+// writes a server-generated ASCII sentence and a request id that no request text reaches.
+func jsonErrorConformed(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
+	errorDetail, ok := err.(*customerrors.ErrorDetail)
+	if !ok {
+		httpHelper.JsonError(w, r, err)
+		return
+	}
+
+	httpHelper.JsonError(w, r,
+		errorDetail.WithDescription(customerrors.ConformErrorDescription(errorDetail.GetDescription())))
+}
+
 func HandleTokenPost(
 	httpHelper HttpHelper,
 	userSessionManager UserSessionManager,
@@ -28,14 +53,14 @@ func HandleTokenPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			jsonErrorConformed(httpHelper, w, r, err)
 			return
 		}
 
 		// Extract client credentials - supports both client_secret_basic and client_secret_post
 		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(r)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			jsonErrorConformed(httpHelper, w, r, err)
 			return
 		}
 
@@ -75,7 +100,7 @@ func HandleTokenPost(
 		// refresh preserves the original token's scope, ROPC defaults to "openid"), so naming any
 		// one of those would be wrong for the other two.
 		if rawScope != "" && normalizedScope == "" && grantTypeConsumesScope(grantType) {
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				"The 'scope' parameter was provided but contains no scopes. Either omit it entirely or supply one or more scopes separated by spaces.",
 				http.StatusBadRequest))
 			return
@@ -110,7 +135,7 @@ func HandleTokenPost(
 					httpHelper.InternalServerError(w, r, revokeErr)
 					return
 				}
-				httpHelper.JsonError(w, r, reused.Detail)
+				jsonErrorConformed(httpHelper, w, r, reused.Detail)
 				return
 			}
 			// Check if user is disabled and log audit event
@@ -195,7 +220,7 @@ func HandleTokenPost(
 				})
 			}
 
-			httpHelper.JsonError(w, r, err)
+			jsonErrorConformed(httpHelper, w, r, err)
 			return
 		}
 
@@ -235,7 +260,7 @@ func HandleTokenPost(
 				// sequential-reuse path in the validator above (#77).
 				slog.Debug("authorization_code: code could not be claimed, rejecting redemption",
 					"codeId", validateResult.CodeEntity.Id)
-				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"Code is invalid.", http.StatusBadRequest))
 				return
 			}
@@ -335,7 +360,7 @@ func HandleTokenPost(
 						"refreshTokenId", refreshToken.Id)
 				}
 
-				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"This refresh token has been revoked.", http.StatusBadRequest))
 				return
 			}
@@ -378,7 +403,7 @@ func HandleTokenPost(
 			if !claimed {
 				slog.Debug("refresh_token: token was no longer live at claim time, rejecting",
 					"refreshTokenId", refreshToken.Id)
-				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"This refresh token has been revoked.", http.StatusBadRequest))
 				return
 			}
@@ -484,7 +509,7 @@ func HandleTokenPost(
 			return
 
 		default:
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("unsupported_grant_type",
+			jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode("unsupported_grant_type",
 				"Unsupported grant_type.", http.StatusBadRequest))
 			return
 		}
