@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
@@ -231,11 +232,18 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		validationError := customerrors.NewErrorDetail("", "Invalid client or redirect URI")
+		// A LocalizedError, which is what this validator returns for all seven of its
+		// conditions since #213: the refusal page is rendered rather than redirected, so it
+		// is the one authorize surface that answers in the visitor's locale. Both bind
+		// entries are computed the same way the handler computes them rather than written
+		// as literals, so a catalog reword moves the page and the test together while a
+		// handler that stopped localizing still fails.
+		validationError := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(validationError)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["title"] == "Unable to authorize" && data["error"] == validationError.GetDescription()
+			return data["title"] == i18n.T(req.Context(), "auth_error.unable_to_authorize.title") &&
+				data["error"] == validationError.Localize(req.Context())
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -276,7 +284,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				return true
 			})).Return(nil).Once()
 
-			validationError := customerrors.NewErrorDetail("", "Invalid client or redirect URI")
+			validationError := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(validationError).Once()
 			httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).Return(nil).Once()
 

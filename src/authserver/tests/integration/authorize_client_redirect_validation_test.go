@@ -3,6 +3,7 @@ package integrationtests
 import (
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
@@ -242,4 +243,48 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *test
 
 	errorMsg := doc.Find("p#errorMsg").Text()
 	assert.Equal(t, "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host.", errorMsg)
+}
+
+// The seven assertions above are the regression guard for the English catalog: since #213 the
+// refusal page reads its title and its message out of the catalog rather than out of Go literals,
+// and those seven prove the sentences survived the move byte for byte.
+//
+// This is the other half, and it is deliberately one condition rather than seven. Catalog parity
+// across locales is proved once by TestCatalog_ParityEnPtBR, and falling back to English on an
+// unknown locale is proved once by TestT_UnknownLocaleFallsBackToEnglish, both in src/core/i18n.
+// What neither can prove is that the request's ui_locales reaches THIS page, which is the whole
+// defect: the page was wired to render whatever it was handed and was handed an English literal.
+// Seven Portuguese assertions would be the parity test again, in a slower tier, and would couple
+// this file to seven translations.
+//
+// Both the title and the message are asserted. They fail independently: the title regresses if the
+// Go literal comes back, and the message regresses if the handler renders EnglishFallback() instead
+// of Localize(), which no English assertion in this file can see.
+func TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=does_not_exist&ui_locales=pt-BR"
+
+	httpClient := createHttpClient(t)
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	title := strings.TrimSpace(doc.Find("h1").First().Text())
+	assert.Equal(t, "Não foi possível autorizar", title,
+		"the refusal page title did not render in pt-BR; ui_locales did not reach it")
+	assert.NotEqual(t, "Unable to authorize", title,
+		"the refusal page title is still the English literal")
+
+	errorMsg := doc.Find("p#errorMsg").Text()
+	assert.Equal(t, "Parâmetro client_id inválido. O cliente não existe.", errorMsg,
+		"the refusal page message did not render in pt-BR; the handler is rendering the English fallback rather than the request locale")
 }
