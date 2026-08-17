@@ -4,14 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/handlerhelpers"
+	"github.com/stretchr/testify/require"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -44,7 +48,15 @@ func TestHandleTokenPost(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("JsonError", rr, req, mock.AnythingOfType("*errors.errorString")).Return()
+		// The ParseForm error is not an *ErrorDetail, and it used to be handed to the writer
+		// exactly as it arrived. It is rebuilt at the boundary instead, because the description
+		// the writer would then build interpolates a request id the caller chooses (#213).
+		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			detail, ok := err.(*customerrors.ErrorDetail)
+			return ok && detail.GetCode() == "server_error" &&
+				detail.GetHttpStatusCode() == http.StatusInternalServerError &&
+				detail.GetDescription() == customerrors.ConformErrorDescription(detail.GetDescription())
+		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
@@ -1871,4 +1883,99 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		}
 		auditLogger.AssertNotCalled(t, "Log", constants.AuditROPCAuthFailed, mock.Anything)
 	})
+}
+
+// requestWithAdoptedRequestId drives chi's own RequestID middleware over an inbound header, so the
+// request id under test reaches the context the way a real request's does rather than by being
+// written there directly. chi adopts the header verbatim when it is present, which is the whole
+// mechanism these two tests are about.
+func requestWithAdoptedRequestId(t *testing.T, headerValue string) *http.Request {
+	t.Helper()
+
+	var adopted *http.Request
+	chimiddleware.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		adopted = r
+	})).ServeHTTP(httptest.NewRecorder(), func() *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/auth/token", nil)
+		if headerValue != "" {
+			r.Header.Set(chimiddleware.RequestIDHeader, headerValue)
+		}
+		return r
+	}())
+
+	require.NotNil(t, adopted)
+	require.Equal(t, headerValue, chimiddleware.GetReqID(adopted.Context()),
+		"chi must adopt the inbound header verbatim, otherwise these tests prove nothing")
+	return adopted
+}
+
+// assertConformsToNQSCHAR fails on any byte RFC 6749 Appendix A.8 excludes from an
+// error_description: error-description = 1*NQSCHAR, NQSCHAR = %x20-21 / %x23-5B / %x5D-7E.
+func assertConformsToNQSCHAR(t *testing.T, description string) {
+	t.Helper()
+
+	for i := 0; i < len(description); i++ {
+		b := description[i]
+		conforming := (b >= 0x20 && b <= 0x21) || (b >= 0x23 && b <= 0x5B) || (b >= 0x5D && b <= 0x7E)
+		assert.True(t, conforming,
+			"byte %d of %q is 0x%02x, which RFC 6749 Appendix A.8 excludes from error-description",
+			i, description, b)
+	}
+}
+
+// TestJsonErrorConformed_GenericErrorCarriesNoForbiddenByte covers the token endpoint's error
+// responses that are not an *ErrorDetail, which is the shape r.ParseForm() and an unexpected
+// validator failure both take.
+//
+// The shared writer answers those by interpolating chi's request id into a fixed sentence, and chi
+// takes that id verbatim from the caller's own X-Request-Id header. So the caller, who need not
+// authenticate to reach this endpoint at all, chooses part of a protocol parameter that RFC 6749
+// Appendix A.8 confines to NQSCHAR. Every byte in the header below survives Go's own header parsing
+// and reaches the handler: U+1F4A3 and the Cyrillic pair are above 0x7E, the double quote is 0x22
+// and the backslash is 0x5C, and all four are outside that set (#213).
+func TestJsonErrorConformed_GenericErrorCarriesNoForbiddenByte(t *testing.T) {
+	r := requestWithAdoptedRequestId(t, "caller\U0001F4A3id\"x\\yаб")
+	rec := httptest.NewRecorder()
+
+	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), rec, r, errors.New("malformed form body"))
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+	assert.Equal(t, "no-cache", rec.Header().Get("Pragma"))
+
+	var body map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+
+	assert.Equal(t, "server_error", body["error"])
+	assertConformsToNQSCHAR(t, body["error_description"])
+
+	// One '?' per offending rune, not one per byte, and the ASCII around them is untouched: the
+	// request id still correlates the response with the server log.
+	assert.Equal(t,
+		"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: caller?id?x?y??",
+		body["error_description"])
+}
+
+// TestJsonErrorConformed_GenericDescriptionMatchesSharedWriter pins the one sentence this file
+// repeats from HttpHelper.JsonError. The repetition is deliberate, because #213 leaves that writer
+// alone for its 177 admin-console and /userinfo call sites, and this is what stops the copy drifting
+// away from the original: with a request id that needs no conforming, the boundary must emit exactly
+// what the shared writer emits.
+func TestJsonErrorConformed_GenericDescriptionMatchesSharedWriter(t *testing.T) {
+	const conformingRequestId = "goiabada/abc123-000042"
+
+	r := requestWithAdoptedRequestId(t, conformingRequestId)
+	err := errors.New("something the token endpoint did not expect")
+
+	fromSharedWriter := httptest.NewRecorder()
+	handlerhelpers.NewHttpHelper(nil).JsonError(fromSharedWriter, r, err)
+
+	fromBoundary := httptest.NewRecorder()
+	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), fromBoundary, r, err)
+
+	assert.Equal(t, fromSharedWriter.Body.String(), fromBoundary.Body.String(),
+		"the boundary's generic answer must be byte-identical to the shared writer's; "+
+			"if this fails, HttpHelper.JsonError's sentence moved and genericServerErrorDescription did not")
+	assert.Equal(t, fromSharedWriter.Code, fromBoundary.Code)
 }

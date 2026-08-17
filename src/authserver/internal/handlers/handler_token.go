@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/base64"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
@@ -28,18 +30,36 @@ import (
 // language. Filtering there would be #213 quietly forbidding a Portuguese sentence on an admin
 // screen.
 //
-// Anything that is not an *ErrorDetail passes through untouched, because JsonError's other branch
-// writes a server-generated ASCII sentence and a request id that no request text reaches.
+// Both of the writer's branches are conformed, because both interpolate text the caller chooses.
+// The *ErrorDetail branch interpolates request text into a validator's description. The other
+// branch reads chi's request id, and chi takes that id verbatim from the caller's own header
+// (`requestID := r.Header.Get(RequestIDHeader)`, go-chi/chi/v5 middleware.RequestID), so a request
+// carrying `X-Request-Id: a"b` puts 0x22 into error_description with no validator involved at all.
+// A non-*ErrorDetail is therefore rebuilt here as the generic server error the shared writer would
+// have produced, conformed, which is also why the log line that writer emits on that branch is
+// emitted here instead: the branch it now takes does not log.
 func jsonErrorConformed(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
 	errorDetail, ok := err.(*customerrors.ErrorDetail)
 	if !ok {
-		httpHelper.JsonError(w, r, err)
-		return
+		requestId := middleware.GetReqID(r.Context())
+		slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
+		errorDetail = customerrors.NewErrorDetailWithHttpStatusCode("server_error",
+			fmt.Sprintf(genericServerErrorDescription, requestId), http.StatusInternalServerError)
 	}
 
+	// One call, on the final description, so neither branch can reach the wire unfiltered and a
+	// future third branch has to come through here to be written at all.
 	httpHelper.JsonError(w, r,
 		errorDetail.WithDescription(customerrors.ConformErrorDescription(errorDetail.GetDescription())))
 }
+
+// genericServerErrorDescription repeats HttpHelper.JsonError's own sentence for an error that is
+// not an *ErrorDetail. That writer builds the sentence after the last point this boundary can
+// reach, and #213 deliberately leaves it alone because its other 177 call sites are the admin
+// console's AJAX API and /userinfo, which RFC 6749 5.2 does not govern. Repeating it is the price
+// of not filtering there; TestJsonErrorConformed_GenericDescriptionMatchesSharedWriter fails if the
+// two ever drift apart.
+const genericServerErrorDescription = "An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v"
 
 func HandleTokenPost(
 	httpHelper HttpHelper,
