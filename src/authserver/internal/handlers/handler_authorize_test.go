@@ -31,6 +31,23 @@ import (
 	mocks_validators "github.com/leodip/goiabada/core/validators/mocks"
 )
 
+// stubAuthenticatedBrowser gives HandleAuthorizeGet a browser that has already authenticated.
+//
+// Since #213 the authorization endpoint parks a validation error and sends a logged-out visitor to
+// /auth/level1 instead of redirecting them to the client, because RFC 9700 4.11.2 requires that the
+// server authenticate the user before it redirects them. Every subtest that asserts the SHAPE of an
+// error redirect (its code, description, response mode, state echo, and the clear-then-answer
+// ordering around it) is asserting what a client receives, which is orthogonal to who is at the
+// browser. Each of those keeps its assertions exactly as written and is handed a session here,
+// rather than being retargeted at the login page and losing the coverage it exists for
+// (#213 decision 6).
+func stubAuthenticatedBrowser(database *mocks_data.Database, userSessionManager *mocks_user.UserSessionManager) {
+	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
+		Return(&models.UserSession{Id: 1, UserId: 1}, nil)
+	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+		Return(true)
+}
+
 func TestHandleAuthorizeGet(t *testing.T) {
 	t.Run("Valid request with existing session", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
@@ -291,6 +308,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=invalid&scope=openid", nil)
 		assert.NoError(t, err)
@@ -348,6 +366,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
 		assert.NoError(t, err)
@@ -415,6 +434,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
 		assert.NoError(t, err)
@@ -481,6 +501,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			},
 		}
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
 		assert.NoError(t, err)
@@ -543,6 +564,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			},
 		}
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
 		assert.NoError(t, err)
@@ -860,6 +882,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		form := url.Values{}
 		form.Set("client_id", "test-client")
@@ -1842,6 +1865,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid", nil)
 		assert.NoError(t, err)
@@ -1975,6 +1999,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser := mocks_oauth.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=bad-jwt-token", nil)
 		assert.NoError(t, err)
@@ -2036,6 +2061,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser := mocks_oauth.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-wrong-issuer", nil)
 		assert.NoError(t, err)
@@ -2104,6 +2130,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser := mocks_oauth.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-no-sub", nil)
 		assert.NoError(t, err)
@@ -2944,6 +2971,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=abc123&request=foo", nil)
 		assert.NoError(t, err)
@@ -2992,6 +3020,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=xyz&request_uri=https://example.com/x", nil)
 		assert.NoError(t, err)
@@ -3039,6 +3068,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&request=", nil)
 		assert.NoError(t, err)
@@ -3071,4 +3101,393 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		authorizeValidator.AssertExpectations(t)
 	})
+}
+
+// Seam 1, the routing table. For a request that fails one of the five validations that run before
+// this handler knows who is at the browser, does it answer the client, send the visitor to log in
+// first, or refuse with the interstitial?
+//
+// This is the whole of #213: RFC 9700 4.11.2 says "The authorization server MUST always
+// authenticate the user first and, with the exception of the silent authentication use case,
+// prompt the user for credentials when needed, before redirecting the user", and before this change
+// a cookieless browser carrying one bad scope was answered with a 302 to a host the client chose.
+//
+// Every row is driven end to end through HandleAuthorizeGet and asserted on the recorder, so
+// answerClientNow is never read directly: the three outcomes are all externally visible, and a test
+// that reached inside would pass with the routing wired to nothing.
+//
+// The rows are probe/routing_table.out, and its clause-coverage section is why some of them are
+// here. Silence is pinned by a logged-out request against an administrator client, and prompt=login
+// by a request that HAS a valid session: "none" with a session passes with the silence clause
+// deleted (the session clause carries it), and "login" without one passes with the login clause
+// deleted (the no-session default carries it). Those four rows are kept anyway, because they are
+// the negative twins of the case-sensitivity rows and dropping them would leave "NONE" and "Login"
+// asserting nothing in particular.
+//
+// One row of the probe's nineteen is absent, deliberately: an unresolved client cannot reach the
+// predicate through this handler, because the load directly above it answers 500 on a nil client.
+// The nil-client case is the untrusted case and it is pinned at seam 4, in TestRedirectWillBeEmitted.
+func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T) {
+
+	const (
+		answerClient = "answer the client with the error now"
+		deferToLogin = "park the error and go to /auth/level1"
+		blockedPage  = "render the refusal interstitial, no login"
+	)
+
+	const emittableURI = "https://legit.example/cb"
+	const unemittableURI = "//evil.example/cb"
+
+	for _, tc := range []struct {
+		name        string
+		rawPrompt   string
+		hasSession  bool
+		createdVia  bool // CreatedViaDCR
+		redirectURI string
+		want        string
+		why         string
+	}{
+		{
+			name: "no prompt, no session", rawPrompt: "", hasSession: false,
+			redirectURI: emittableURI, want: deferToLogin,
+			why: "the issue itself: a cookieless visitor is no longer redirected to a host the client chose",
+		},
+		{
+			name: "no prompt, valid session", rawPrompt: "", hasSession: true,
+			redirectURI: emittableURI, want: answerClient,
+			why: "somebody is authenticated already, so RFC 9700's precondition is met and nothing changes",
+		},
+		{
+			name: "prompt=none, no session", rawPrompt: "none", hasSession: false,
+			redirectURI: emittableURI, want: answerClient,
+			why: "the silence clause, pinned: OIDC Core 3.1.2.3 forbids interacting with the End-User, " +
+				"and this is the row that fails if it is deleted",
+		},
+		{
+			name: "prompt=none, valid session", rawPrompt: "none", hasSession: true,
+			redirectURI: emittableURI, want: answerClient,
+			why: "silence does not depend on the session. Carried by the session clause, so it does NOT " +
+				"pin silence: it is here as the twin of the row above",
+		},
+		{
+			name: "prompt=none login, no session", rawPrompt: "none login", hasSession: false,
+			redirectURI: emittableURI, want: answerClient,
+			why: "an invalid prompt that still CONTAINS none stays silent. This is why the clause reads the " +
+				"raw parameter: ValidatePrompt rejects this value, so authContext.Prompt is never assigned",
+		},
+		{
+			name: "prompt=none consent, no session", rawPrompt: "none consent", hasSession: false,
+			redirectURI: emittableURI, want: answerClient,
+			why: "the second conflicting combination, same reason",
+		},
+		{
+			name: "prompt=NONE, no session", rawPrompt: "NONE", hasSession: false,
+			redirectURI: emittableURI, want: deferToLogin,
+			why: "OIDC prompt values are case-sensitive, so NONE carries no recognised token and is interactive",
+		},
+		{
+			name: "prompt=login, valid session", rawPrompt: "login", hasSession: true,
+			redirectURI: emittableURI, want: deferToLogin,
+			why: "the login clause, pinned: the client asked not to be answered on the strength of an " +
+				"existing session, and this is the row that fails if it is deleted (decision 4)",
+		},
+		{
+			name: "prompt=login, no session", rawPrompt: "login", hasSession: false,
+			redirectURI: emittableURI, want: deferToLogin,
+			why: "same outcome by the other clause. Carried by the no-session default, so it does NOT pin login",
+		},
+		{
+			name: "prompt=login consent, valid session", rawPrompt: "login consent", hasSession: true,
+			redirectURI: emittableURI, want: deferToLogin,
+			why: "login among several valid values still defers",
+		},
+		{
+			name: "prompt=login foo, valid session", rawPrompt: "login foo", hasSession: true,
+			redirectURI: emittableURI, want: deferToLogin,
+			why: "an invalid prompt that asked for a login still gets one, for the same raw-parameter reason " +
+				"as the none rows above",
+		},
+		{
+			name: "prompt=Login, valid session", rawPrompt: "Login", hasSession: true,
+			redirectURI: emittableURI, want: answerClient,
+			why: "case sensitivity again, the negative twin of prompt=login with a session",
+		},
+		{
+			name: "prompt=consent, no session", rawPrompt: "consent", hasSession: false,
+			redirectURI: emittableURI, want: deferToLogin,
+			why: "consent is neither silence nor a forced login, so the ordinary rule applies",
+		},
+		{
+			name: "prompt=select_account, valid session", rawPrompt: "select_account", hasSession: true,
+			redirectURI: emittableURI, want: answerClient,
+			why: "an unimplemented value, and a session holder is answered now",
+		},
+		{
+			name: "no prompt, no session, self-registered client", rawPrompt: "", hasSession: false,
+			createdVia: true, redirectURI: emittableURI, want: blockedPage,
+			why: "#108's provenance guard fires without a login: no redirect leaves the server, so there is " +
+				"nothing to authenticate before (decision 8)",
+		},
+		{
+			name: "no prompt, valid session, self-registered client", rawPrompt: "", hasSession: true,
+			createdVia: true, redirectURI: emittableURI, want: blockedPage,
+			why: "unchanged from before this change",
+		},
+		{
+			name: "prompt=none, no session, self-registered client", rawPrompt: "none", hasSession: false,
+			createdVia: true, redirectURI: emittableURI, want: blockedPage,
+			why: "37bbff5d: a silent request is not exempt from the trust guard, and it still is not",
+		},
+		{
+			name: "no prompt, no session, unemittable redirect URI", rawPrompt: "", hasSession: false,
+			redirectURI: unemittableURI, want: blockedPage,
+			why: "#122's guard, on an administrator-registered client. Same reasoning as the DCR rows: the " +
+				"visitor reaches the identical terminal page with or without entering a password",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			permissionChecker := mocks_user.NewPermissionChecker(t)
+			tokenParser := mocks_oauth.NewTokenParser(t)
+
+			handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil,
+				authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(tc.redirectURI) +
+				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
+			if tc.rawPrompt != "" {
+				target += "&prompt=" + url.QueryEscape(tc.rawPrompt)
+			}
+
+			req := httptest.NewRequest("GET", target, nil)
+			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+				&models.Settings{}))
+			rr := httptest.NewRecorder()
+
+			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+
+			authorizeValidator.On("ValidateClientAndRedirectURI",
+				mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+				&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: tc.createdVia}, nil)
+			authorizeValidator.On("ValidateUnsupportedRequestParameters",
+				mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+			authorizeValidator.On("ValidateRequest",
+				mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+			authorizeValidator.On("ValidateScopes", "openid bogus").Return(
+				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+					"Invalid scope format: 'bogus'.", http.StatusBadRequest))
+
+			// Maybe, because whether the session is looked up at all is the point of half these
+			// rows: the two pure clauses are evaluated first, so a request that is silent, or whose
+			// redirect would be withheld anyway, never queries.
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
+				Return(&models.UserSession{Id: 1, UserId: 1}, nil).Maybe()
+			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+				Return(tc.hasSession).Maybe()
+
+			if tc.want != deferToLogin {
+				authHelper.On("ClearAuthContext", rr, req).Return(nil)
+			}
+			if tc.want == blockedPage {
+				httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
+					"/auth_redirect_blocked.html", mock.Anything).Return(nil)
+			}
+
+			handler.ServeHTTP(rr, req)
+
+			location := rr.Header().Get("Location")
+
+			switch tc.want {
+			case answerClient:
+				assert.Equal(t, http.StatusFound, rr.Code, tc.why)
+				assert.True(t, strings.HasPrefix(location, tc.redirectURI),
+					"the client must be answered at its own redirect URI, got %q: %s", location, tc.why)
+				assert.Contains(t, location, "error=invalid_scope", tc.why)
+			case deferToLogin:
+				assert.Equal(t, http.StatusFound, rr.Code, tc.why)
+				assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", location, tc.why)
+			case blockedPage:
+				assert.Empty(t, location, "a withheld redirect must never become a Location: %s", tc.why)
+			}
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+			authorizeValidator.AssertExpectations(t)
+		})
+	}
+}
+
+// The session row is loaded lazily, so a fault reading it cannot preempt an outcome that never
+// needed it, and it fails closed for the one outcome that does.
+//
+// §4 wrote hasValidUserSession as a plain local assigned above the predicate. That would query the
+// session on every request reaching it, including a prompt=none request that queries again inside
+// handlePromptNone and a prompt=login request that never looked at one before this change, and it
+// would let a database fault answer 500 where the server used to answer correctly without a session
+// at all. The three rows below are the difference, and each fails if the assignment is made eager.
+func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		rawPrompt string
+		want      string // "client", "level1" or "500"
+		why       string
+	}{
+		{
+			name: "prompt=none", rawPrompt: "none", want: "client",
+			why: "the silence clause decides on its own, so the broken lookup is never reached and the " +
+				"client is answered exactly as it is today",
+		},
+		{
+			name: "prompt=login", rawPrompt: "login", want: "level1",
+			why: "the login clause decides on its own. The visitor goes to log in, which is where a " +
+				"prompt=login request was going anyway, rather than to a 500",
+		},
+		{
+			name: "no prompt", rawPrompt: "", want: "500",
+			why: "the one outcome that genuinely needs the session. An unreadable session is not an absent " +
+				"one: reading it as absent would send a signed-in user back through the login page on a " +
+				"transient database fault, so it fails closed",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			permissionChecker := mocks_user.NewPermissionChecker(t)
+			tokenParser := mocks_oauth.NewTokenParser(t)
+
+			handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil,
+				authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+			target := "/authorize?client_id=test-client&redirect_uri=https%3A%2F%2Flegit.example%2Fcb" +
+				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
+			if tc.rawPrompt != "" {
+				target += "&prompt=" + tc.rawPrompt
+			}
+
+			req := httptest.NewRequest("GET", target, nil)
+			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+				&models.Settings{}))
+			rr := httptest.NewRecorder()
+
+			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+			authorizeValidator.On("ValidateClientAndRedirectURI",
+				mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+			// Maybe on all three, because the predicate is computed above the validations: the
+			// row that answers 500 does so before any of them runs, which is the correct order
+			// (there is no answer to give a client until the server knows who is at the browser)
+			// and is why they are not asserted as reached.
+			authorizeValidator.On("ValidateUnsupportedRequestParameters",
+				mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil).Maybe()
+			authorizeValidator.On("ValidateRequest",
+				mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil).Maybe()
+			authorizeValidator.On("ValidateScopes", "openid bogus").Return(
+				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+					"Invalid scope format: 'bogus'.", http.StatusBadRequest)).Maybe()
+
+			lookupErr := errors.New("the session store is unreachable")
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
+				Return(nil, lookupErr).Maybe()
+
+			switch tc.want {
+			case "client":
+				authHelper.On("ClearAuthContext", rr, req).Return(nil)
+			case "500":
+				httpHelper.On("InternalServerError", rr, req, lookupErr).Return()
+			}
+
+			handler.ServeHTTP(rr, req)
+
+			switch tc.want {
+			case "client":
+				assert.Equal(t, http.StatusFound, rr.Code, tc.why)
+				assert.Contains(t, rr.Header().Get("Location"), "error=invalid_scope", tc.why)
+			case "level1":
+				assert.Equal(t, http.StatusFound, rr.Code, tc.why)
+				assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1",
+					rr.Header().Get("Location"), tc.why)
+			case "500":
+				assert.Empty(t, rr.Header().Get("Location"),
+					"a failed session lookup must not answer anybody: %s", tc.why)
+			}
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+		})
+	}
+}
+
+// Decision 10's third boundary, which this stage adds. The description is conformed to RFC 6749
+// Appendix A.8's character set on the way INTO the auth context, not only on the way out of the
+// emitter, because a bound applied at emission does nothing for a string already written to a
+// cookie: descriptions interpolate request text and ChunkedCookieStore caps a session at 50 chunks,
+// so an unbounded parked description answers 500 instead of deferring.
+//
+// The filter is idempotent, which is what lets it run at both places and still leave the deferred
+// and immediate paths byte-identical. That end-to-end equality belongs to seam 3; what is pinned
+// here is only that the parked value went through the filter at all.
+func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	userSessionManager := mocks_user.NewUserSessionManager(t)
+	database := mocks_data.NewDatabase(t)
+	authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	permissionChecker := mocks_user.NewPermissionChecker(t)
+	tokenParser := mocks_oauth.NewTokenParser(t)
+
+	handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil,
+		authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+	req := httptest.NewRequest("GET",
+		"/authorize?client_id=test-client&redirect_uri=https%3A%2F%2Flegit.example%2Fcb"+
+			"&response_type=code&scope="+url.QueryEscape("openid 💣"), nil)
+	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+		&models.Settings{}))
+	rr := httptest.NewRecorder()
+
+	// The first save carries no parked error; the second is the deferral.
+	authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		return ac.DeferredErrorCode == ""
+	})).Return(nil).Once()
+
+	var parked string
+	authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		return ac.DeferredErrorCode == "invalid_scope"
+	})).Run(func(args mock.Arguments) {
+		parked = args.Get(2).(*oauth.AuthContext).DeferredErrorDescription
+	}).Return(nil).Once()
+
+	authorizeValidator.On("ValidateClientAndRedirectURI",
+		mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+		&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+	authorizeValidator.On("ValidateUnsupportedRequestParameters",
+		mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+	authorizeValidator.On("ValidateRequest",
+		mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+	authorizeValidator.On("ValidateScopes", "openid 💣").Return(
+		customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			"Invalid scope format: '💣'.", http.StatusBadRequest))
+	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).Return(nil, nil)
+	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(false)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+	assert.Equal(t, "Invalid scope format: '?'.", parked,
+		"the emoji is one ? and not four, and the cookie never carries a byte RFC 6749 forbids")
+
+	authHelper.AssertExpectations(t)
 }

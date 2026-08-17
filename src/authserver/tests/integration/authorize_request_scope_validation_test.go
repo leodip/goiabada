@@ -39,7 +39,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -85,7 +85,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI + "&response_type=invalid"
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -133,7 +133,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI + "&response_type=code"
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -181,7 +181,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI + "&response_type=code" + "&code_challenge_method=invalid"
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -229,7 +229,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI + "&response_type=code" + "&code_challenge_method=S256"
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -289,7 +289,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 			"&redirect_uri=" + redirectUri.URI + "&response_type=code" + "&code_challenge_method=S256" +
 			"&code_challenge=" + testCase.codeChallenge
 
-		httpClient := createHttpClient(t)
+		httpClient := createAuthenticatedHttpClient(t)
 
 		resp, err := httpClient.Get(destUrl)
 		if err != nil {
@@ -340,7 +340,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 		"&code_challenge=" + gofakeit.LetterN(43) +
 		"&response_mode=invalid"
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -391,7 +391,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 		"&response_mode=query" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -443,7 +443,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 		"&response_mode=fragment" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -496,7 +496,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 		"&response_mode=form_post" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -550,7 +550,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + gofakeit.LetterN(43)
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -606,7 +606,7 @@ func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 
 	destUrl := baseUrl + "?" + params.Encode()
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -673,7 +673,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 				"&code_challenge=" + gofakeit.LetterN(43) +
 				"&scope=" + url.QueryEscape(tc.scope)
 
-			httpClient := createHttpClient(t)
+			httpClient := createAuthenticatedHttpClient(t)
 
 			resp, err := httpClient.Get(destUrl)
 			if err != nil {
@@ -729,7 +729,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 		"&code_challenge=" + gofakeit.LetterN(43) +
 		"&scope=" + url.QueryEscape(scope)
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -793,7 +793,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 		"&code_challenge=" + gofakeit.LetterN(43) +
 		"&scope=" + url.QueryEscape(scope)
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {

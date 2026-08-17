@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -196,15 +197,133 @@ func HandleAuthorizeGet(
 			return
 		}
 
-		redirToClientWithError := func(validationError *customerrors.ErrorDetail) {
-			// Read from the request rather than from authContext: this closure runs before the
-			// second SaveAuthContext below, and two of its call sites run before the context
-			// has been populated with the validated values at all. answerClientWithError then
-			// clears the context before answering, and derives its own server_error fallback
-			// from this same request-sourced input (#141).
+		sessionIdentifier := ""
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
+		}
+
+		// The session row behind this browser, loaded at most once and only if somebody asks. The
+		// predicate below asks, and so does the ordinary path at the bottom of the handler, and
+		// between them there must be exactly one query: this handler used to reach the lookup only
+		// after prompt=none and prompt=login had already returned, so an eager load here would add
+		// a query to every prompt=login request and a second one to every prompt=none request,
+		// which does its own lookup inside handlePromptNone.
+		//
+		// A lookup that fails records the error and answers false. False is not "no session" here,
+		// it is "no answer", so every caller checks sessionLoadErr and answers 500 rather than
+		// acting on it: treating an unreadable session as an absent one would turn a database
+		// fault into a login prompt for somebody who is already signed in (#213).
+		var (
+			userSession     *models.UserSession
+			sessionLookedUp bool
+			sessionIsValid  bool
+			sessionLoadErr  error
+		)
+		hasValidUserSession := func() bool {
+			if sessionLookedUp {
+				return sessionIsValid
+			}
+			sessionLookedUp = true
+
+			userSession, sessionLoadErr = database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+			if sessionLoadErr != nil {
+				return false
+			}
+
+			sessionIsValid = userSessionManager.HasValidUserSession(r.Context(), userSession,
+				authContext.ParseRequestedMaxAge())
+			return sessionIsValid
+		}
+
+		// Silence and forced re-authentication are read from the RAW parameter rather than from
+		// authContext.Prompt, because a prompt the validator rejects is never assigned there, and
+		// OIDC Core 3.1.2.3 forbids interacting with a request that "contains the prompt parameter
+		// with the value none" whether or not the rest of the value parsed. So "none login", which
+		// ValidatePrompt refuses below, is still a silent request and must not be shown a login
+		// page. Case-sensitively, and on whitespace-separated tokens, because OIDC prompt values
+		// are case-sensitive: "NONE" and "Login" carry no recognised token and are interactive
+		// (#213 decision 5).
+		rawPrompt := strings.Fields(r.FormValue("prompt"))
+		requestsSilence := slices.Contains(rawPrompt, "none")
+		requestsLogin := slices.Contains(rawPrompt, "login")
+
+		// Whether the five validations below answer the client straight away or park their error
+		// and send the visitor to log in first.
+		//
+		// RFC 9700 4.11.2: "The authorization server MUST always authenticate the user first and,
+		// with the exception of the silent authentication use case, prompt the user for credentials
+		// when needed, before redirecting the user." Without this, one link sent to a logged-out
+		// browser makes this server redirect it to a host the client chose, which is attack 1 in
+		// that section verbatim.
+		//
+		// The rule the three clauses come from: authentication is required before a REDIRECT, and
+		// only before a redirect. Where the answer is a page it is rendered at once.
+		//
+		//   - requestsSilence: OIDC Core 3.1.2.3 says the server "MUST NOT interact with the
+		//     End-User" when prompt=none, which is the exception RFC 9700 names.
+		//   - !redirectWillBeEmitted: no redirect leaves this server, so the requirement that
+		//     governs redirects has nothing to say and the visitor reaches the same refusal page
+		//     with or without a login (#108's and #122's guards, decision 8).
+		//   - !requestsLogin && hasValidUserSession(): a session holder has authenticated already,
+		//     unless the client asked not to be answered on the strength of one (decision 4).
+		//
+		// The two pure clauses are evaluated first so the impure one is reached only when it
+		// decides something: || short-circuits and redirectWillBeEmitted has no side effects, so
+		// the value is identical to the order §4 wrote and only the queries differ.
+		answerClientNow := requestsSilence ||
+			!redirectWillBeEmitted(client, authContext.RedirectURI, "authorize") ||
+			(!requestsLogin && hasValidUserSession())
+
+		if sessionLoadErr != nil {
+			httpHelper.InternalServerError(w, r, sessionLoadErr)
+			return
+		}
+
+		// answerClientImmediately answers the client with an error now, whoever is at the browser.
+		//
+		// Read from the request rather than from authContext: this closure runs before the
+		// second SaveAuthContext below, and two of its call sites run before the context
+		// has been populated with the validated values at all. answerClientWithError then
+		// clears the context before answering, and derives its own server_error fallback
+		// from this same request-sourced input (#141).
+		answerClientImmediately := func(validationError *customerrors.ErrorDetail) {
 			answerClientWithError(w, r, httpHelper, authHelper, templateFS,
 				redirectErrorFromRequest(r, client,
 					validationError.GetCode(), validationError.GetDescription()))
+		}
+
+		// answerValidationError answers one of the five validations that run before this handler
+		// knows who is at the browser. It is separate from answerClientImmediately, rather than
+		// being the only closure with the disabled-account path folded into it, because that path
+		// must never defer: a disabled user sent to the login page cannot complete it, so the
+		// access_denied its client is owed would never be delivered at all.
+		answerValidationError := func(validationError *customerrors.ErrorDetail) {
+			if answerClientNow {
+				answerClientImmediately(validationError)
+				return
+			}
+
+			// Park the error and go and authenticate. It is carried on the auth context, which
+			// securecookie encrypts and HMACs, so it is not a value the visitor can choose, and
+			// it is delivered at /auth/level1completed once level 1 credentials are verified.
+			//
+			// The description is conformed HERE and not only at the emitter. RFC 6749 Appendix
+			// A.8's character set is enforced in redirToClientWithError as well, and that filter
+			// is idempotent so the two paths stay byte-identical, but a bound applied at emission
+			// does nothing for a string already written into a cookie: descriptions interpolate
+			// request text, and ChunkedCookieStore caps a session at 50 chunks, so an unbounded
+			// one parked here would answer 500 instead of deferring (#213 decision 10).
+			authContext.DeferredErrorCode = validationError.GetCode()
+			authContext.DeferredErrorDescription =
+				customerrors.ConformErrorDescription(validationError.GetDescription())
+			authContext.AuthState = oauth.AuthStateRequiresLevel1
+
+			err := authHelper.SaveAuthContext(w, r, &authContext)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
 		}
 
 		err = authorizeValidator.ValidateUnsupportedRequestParameters(&validators.ValidateUnsupportedRequestParametersInput{
@@ -214,7 +333,7 @@ func HandleAuthorizeGet(
 		if err != nil {
 			valError, ok := err.(*customerrors.ErrorDetail)
 			if ok {
-				redirToClientWithError(valError)
+				answerValidationError(valError)
 				return
 			}
 			httpHelper.InternalServerError(w, r, err)
@@ -241,7 +360,7 @@ func HandleAuthorizeGet(
 		if err != nil {
 			valError, ok := err.(*customerrors.ErrorDetail)
 			if ok {
-				redirToClientWithError(valError)
+				answerValidationError(valError)
 				return
 			} else {
 				httpHelper.InternalServerError(w, r, err)
@@ -254,7 +373,7 @@ func HandleAuthorizeGet(
 		if err != nil {
 			valError, ok := err.(*customerrors.ErrorDetail)
 			if ok {
-				redirToClientWithError(valError)
+				answerValidationError(valError)
 				return
 			} else {
 				httpHelper.InternalServerError(w, r, err)
@@ -267,7 +386,7 @@ func HandleAuthorizeGet(
 		if err != nil {
 			valError, ok := err.(*customerrors.ErrorDetail)
 			if ok {
-				redirToClientWithError(valError)
+				answerValidationError(valError)
 				return
 			} else {
 				httpHelper.InternalServerError(w, r, err)
@@ -283,7 +402,7 @@ func HandleAuthorizeGet(
 			// id_token_hint validation errors are redirected to client
 			valError, ok := err.(*customerrors.ErrorDetail)
 			if ok {
-				redirToClientWithError(valError)
+				answerValidationError(valError)
 				return
 			}
 			httpHelper.InternalServerError(w, r, err)
@@ -296,11 +415,6 @@ func HandleAuthorizeGet(
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
-		}
-
-		sessionIdentifier := ""
-		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
 		// Handle prompt=none: silent authentication without any UI
@@ -321,20 +435,26 @@ func HandleAuthorizeGet(
 			return
 		}
 
-		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		// The same lookup the predicate at the top of the handler may already have performed, and
+		// the closure returns its cached answer when it did. It has not when a clause above the
+		// session clause carried the predicate on its own, which is why this is a call and not a
+		// read of a variable.
+		sessionIsValidForSSO := hasValidUserSession()
+		if sessionLoadErr != nil {
+			httpHelper.InternalServerError(w, r, sessionLoadErr)
 			return
 		}
 
+		// The user behind the session is loaded here, and not inside the closure, because the
+		// predicate needs only the session's own timestamps and this is the first point anything
+		// reads userSession.User. UserSessionLoadUser answers nil for a nil session.
 		err = database.UserSessionLoadUser(nil, userSession)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
-		if hasValidUserSession {
+		if sessionIsValidForSSO {
 
 			// Check id_token_hint sub matching for SSO session reuse (OIDC Core 3.1.2.1)
 			// If hint identifies a different user, force re-authentication instead of SSO
@@ -360,7 +480,10 @@ func HandleAuthorizeGet(
 					"userId": userSession.UserId,
 				})
 
-				redirToClientWithError(customerrors.NewErrorDetailWithHttpStatusCode("access_denied", "The user account is disabled.", http.StatusBadRequest))
+				// Answered at once, never deferred: this path has a valid session, so somebody is
+				// already authenticated, and a disabled user sent to the login page could not
+				// complete it anyway (#213).
+				answerClientImmediately(customerrors.NewErrorDetailWithHttpStatusCode("access_denied", "The user account is disabled.", http.StatusBadRequest))
 				return
 			}
 

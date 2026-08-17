@@ -220,6 +220,8 @@ Common error codes:
 - `consent_required` - User consent is required (typically with `prompt=none`)
 - `interaction_required` - User interaction is required, such as ACR step-up (typically with `prompt=none`)
 
+These arrive once the user has signed in. Goiabada does not redirect an unauthenticated browser to a client's `redirect_uri`, so a request that fails validation before anyone has logged in sends the user to the login page first and delivers the error afterwards, unchanged. A browser that already holds a session, and any `prompt=none` request, is answered immediately. See [Deferred error redirects](/concepts/authorization-lifecycle/#deferred-error-redirects).
+
 A client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) receives none of these. Goiabada withholds its error redirects and shows the user a page instead, so an authorization that fails never returns to the client at all.
 
 ### Token errors

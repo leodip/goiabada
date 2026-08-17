@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -57,6 +58,7 @@ func HandleAuthLevel1CompletedGet(
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
 	database data.Database,
+	templateFS fs.FS,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -76,6 +78,31 @@ func HandleAuthLevel1CompletedGet(
 		if !slices.Contains(requiredStates, authContext.AuthState) {
 			errorMsg := fmt.Sprintf("authContext.AuthState '%s' does not match any required state", authContext.AuthState)
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(errorMsg)))
+			return
+		}
+
+		// An authorization error the endpoint refused to deliver to a logged-out browser is
+		// delivered here, and this is the whole point of the deferral: RFC 9700 4.11.2 requires
+		// that the server "MUST always authenticate the user first ... before redirecting the
+		// user", and this is the first junction reached once level 1 credentials are verified.
+		// Level 2 is about the ACR a client asked for in a token, and no token is issued on this
+		// path, so waiting for it would drag a visitor through OTP for a request the server
+		// already knows is invalid (#213 decision 2).
+		//
+		// After the state gate above, so a ceremony in an unexpected state still answers 500 as it
+		// does today, and before this handler's own session lookup, because the ceremony ends
+		// here: nothing is persisted, and since the user session row is created at /auth/completed
+		// a visitor who logged in only to receive an error is left without an SSO session.
+		//
+		// Either state the gate admits is accepted. A parked error can only arrive on
+		// AuthStateLevel1PasswordCompleted today, because the AuthStateLevel1ExistingSession
+		// shortcut is reached only with a valid session and that request was answered at once, but
+		// the delivery does not depend on which one it is.
+		if authContext.DeferredErrorCode != "" {
+			answerClientWithError(w, r, httpHelper, authHelper, templateFS,
+				redirectErrorFromAuthContext(authContext,
+					clientProvenance(database, authContext.ClientId),
+					authContext.DeferredErrorCode, authContext.DeferredErrorDescription))
 			return
 		}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/core/config"
@@ -11,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	mocks_user "github.com/leodip/goiabada/core/user/mocks"
@@ -108,7 +110,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -133,7 +135,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -161,7 +163,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -217,7 +219,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -273,7 +275,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 		rr := httptest.NewRecorder()
@@ -327,7 +329,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 		rr := httptest.NewRecorder()
@@ -463,7 +465,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				userSessionManager := mocks_user.NewUserSessionManager(t)
 				database := mocks_data.NewDatabase(t)
 
-				handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
+				handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
 
 				req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 				rr := httptest.NewRecorder()
@@ -583,7 +585,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				userSessionManager := mocks_user.NewUserSessionManager(t)
 				database := mocks_data.NewDatabase(t)
 
-				handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
+				handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
 
 				req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 				rr := httptest.NewRecorder()
@@ -639,5 +641,211 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				database.AssertExpectations(t)
 			})
 		}
+	})
+}
+
+// Seam 2, delivery. An authorization error that /auth/authorize refused to hand a logged-out
+// browser is carried across the login ceremony on the auth context and delivered here, once level 1
+// credentials have been verified. That is what makes the deferral in #213 an answer to RFC 9700
+// 4.11.2 rather than a way of dropping errors on the floor: the client still receives the error
+// response OIDC Core 3.1.2.2 with 3.1.2.6 says it MUST receive, just later.
+func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
+
+	newParkedContext := func(state string) *oauth.AuthContext {
+		return &oauth.AuthContext{
+			AuthState:                state,
+			ClientId:                 "test-client",
+			RedirectURI:              "https://legit.example/cb",
+			ResponseType:             "code",
+			State:                    "abc123",
+			DeferredErrorCode:        "invalid_scope",
+			DeferredErrorDescription: "Invalid scope format: 'bogus'.",
+		}
+	}
+
+	// Both states the gate above admits. A parked error can only arrive on
+	// AuthStateLevel1PasswordCompleted today, because the existing-session shortcut is reached
+	// only with a valid session and that request was answered at /auth/authorize, but the delivery
+	// does not turn on which one it is and a later change to the shortcut must not silently strand
+	// a parked error.
+	for _, state := range []string{
+		oauth.AuthStateLevel1PasswordCompleted,
+		oauth.AuthStateLevel1ExistingSession,
+	} {
+		t.Run("answers the client on "+state, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+
+			handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
+
+			req := httptest.NewRequest("GET", "/auth/level1completed", nil)
+			rr := httptest.NewRecorder()
+
+			authHelper.On("GetAuthContext", mock.Anything).Return(newParkedContext(state), nil)
+
+			// The clear goes first, and it has to reach the browser: ClearAuthContext persists the
+			// deletion through a Set-Cookie on w, and the answer commits the response, so a clear
+			// afterwards would leave the browser holding a context it could replay (#141).
+			const clearedContextCookie = "cleared-auth-context"
+			authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+				args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
+			}).Return(nil)
+
+			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusFound, rr.Code)
+			location := rr.Header().Get("Location")
+			assert.Contains(t, location, "https://legit.example/cb?")
+			assert.Contains(t, location, "error=invalid_scope")
+			assert.Contains(t, location, "state=abc123")
+			assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
+				"the auth context must be cleared before the client response is committed")
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+		})
+	}
+
+	t.Run("a failing clear still answers the client, with server_error", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
+
+		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
+		rr := httptest.NewRecorder()
+
+		authHelper.On("GetAuthContext", mock.Anything).Return(
+			newParkedContext(oauth.AuthStateLevel1PasswordCompleted), nil)
+		authHelper.On("ClearAuthContext", rr, req).Return(assert.AnError)
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+
+		handler.ServeHTTP(rr, req)
+
+		// The client's redirect URI was validated upstream, so it is owed an error response even
+		// when this server cannot tidy up after itself, and RFC 6749 4.1.2.1 mints server_error for
+		// exactly this condition (#141). This delivery point gets that behaviour by going through
+		// answerClientWithError rather than by re-implementing it from memory, which is the whole
+		// reason that helper was extracted.
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "error=server_error")
+		assert.NotContains(t, location, "invalid_scope")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("an unusable form_post template answers 500", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+
+		// Deliberately malformed, an unclosed action, so template.ParseFS fails. form_post is the
+		// only response mode whose arm can fail after the redirect URI has been validated, and it
+		// is also what proves templateFS is genuinely wired through to this handler: with nil
+		// passed here instead, this case would 500 for the wrong reason and the parameter could be
+		// removed without a test noticing.
+		templateFS := &mocks.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS)
+
+		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
+		rr := httptest.NewRecorder()
+
+		authContext := newParkedContext(oauth.AuthStateLevel1PasswordCompleted)
+		authContext.ResponseMode = "form_post"
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "unable to parse template")
+		})).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("a self-registered client gets the refusal page, not the redirect", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
+
+		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
+		rr := httptest.NewRecorder()
+
+		authHelper.On("GetAuthContext", mock.Anything).Return(
+			newParkedContext(oauth.AuthStateLevel1PasswordCompleted), nil)
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+			&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: true}, nil)
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
+			"/auth_redirect_blocked.html", mock.Anything).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		// Unreachable in practice, because /auth/authorize renders the interstitial for this client
+		// without deferring anything (decision 8). It is asserted because the delivery point loads
+		// the client's provenance for itself, so the guard has to hold here too or a future change
+		// to that routing would turn this into an open redirect (#108).
+		assert.Empty(t, rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+	})
+
+	t.Run("no parked error leaves today's step-up decision alone", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
+
+		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, "sess-1"))
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState: oauth.AuthStateLevel1PasswordCompleted,
+			ClientId:  "test-client",
+			UserId:    1,
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "sess-1").Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything).Return(nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+			&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: enums.AcrLevel1}, nil)
+		userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(false)
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateAuthenticationCompleted
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		// The sentinel is DeferredErrorCode != "", so a context written by an older binary, where
+		// the field is absent and unmarshals to "", reads as "no parked error" and this handler
+		// behaves exactly as it did before #213.
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/completed", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
 	})
 }

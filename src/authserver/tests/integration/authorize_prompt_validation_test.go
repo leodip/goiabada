@@ -192,7 +192,7 @@ func TestPromptLogin_WithSession_ForcesReAuth(t *testing.T) {
 
 func TestPrompt_InvalidValue(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	requestState := gofakeit.LetterN(8)
 	requestCodeChallenge := gofakeit.LetterN(43)
@@ -311,7 +311,7 @@ func TestPrompt_ConflictNoneLoginConsent(t *testing.T) {
 
 func TestPrompt_CaseSensitivityUppercase(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	requestState := gofakeit.LetterN(8)
 	requestCodeChallenge := gofakeit.LetterN(43)
@@ -340,7 +340,7 @@ func TestPrompt_CaseSensitivityUppercase(t *testing.T) {
 
 func TestPrompt_CaseSensitivityMixed(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	requestState := gofakeit.LetterN(8)
 	requestCodeChallenge := gofakeit.LetterN(43)
@@ -369,7 +369,7 @@ func TestPrompt_CaseSensitivityMixed(t *testing.T) {
 
 func TestPrompt_SelectAccountNotImplemented(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	requestState := gofakeit.LetterN(8)
 	requestCodeChallenge := gofakeit.LetterN(43)

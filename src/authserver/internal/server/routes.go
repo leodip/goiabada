@@ -106,7 +106,7 @@ func (s *Server) initRoutes() {
 		r.Get("/authorize", authorizeHandler)
 		r.Post("/authorize", authorizeHandler)
 		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, authHelper))
-		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, s.database))
+		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, authHelper, s.database))
 		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker))
 		r.Get("/issue", handlers.HandleIssueGet(httpHelper, authHelper, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger))
