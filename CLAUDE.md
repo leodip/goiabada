@@ -128,15 +128,26 @@ Defined in `src/core/oauth/auth_context.go`. States transition in this order:
 | `/auth/authorize` | `handler_authorize.go` | Entry point. Validates request, checks existing session, routes to level1 |
 | `/auth/level1` | `handler_auth_level1.go` | Selects level1 auth method (currently only password) |
 | `/auth/pwd` | `handler_auth_pwd.go` | Password login form. Validates credentials, creates session |
-| `/auth/level1completed` | `handler_auth_level1.go` | Decides if level2 needed based on ACR and session state |
+| `/auth/level1completed` | `handler_auth_level1.go` | Delivers a deferred authorization error if one is parked (see below), else decides if level2 needed based on ACR and session state |
 | `/auth/level2` | `handler_auth_level2.go` | Selects level2 auth method. If `level2_optional` + no OTP → skip to completed |
 | `/auth/otp` | `handler_auth_otp.go` | OTP verification (or enrollment if user doesn't have OTP yet) |
 | `/auth/completed` | `handler_auth_completed.go` | Final auth check, scope filtering, consent check, session bump/create |
 | `/auth/consent` | `handler_consent.go` | User consent screen (if required) |
 | `/auth/issue` | `handler_auth_issue.go` | Issues authorization code, redirects to client |
 
+### Deferred error redirects (#213)
+`/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
+request, per RFC 9700 4.11.2. A validation failure is answered at once when the request is silent
+(`prompt=none`, read from the raw parameter), when the browser holds a valid session and did not ask
+for `prompt=login`, or when no redirect would be emitted anyway (`redirectWillBeEmitted` false).
+Otherwise the error code and description are parked on `AuthContext.DeferredErrorCode` /
+`DeferredErrorDescription`, the visitor goes to `/auth/level1`, and the redirect is emitted from
+`/auth/level1completed` once the password is verified. That ceremony ends there and creates no
+session.
+
 ### Key Logic in Level1Completed
 `handler_auth_level1.go:HandleAuthLevel1CompletedGet`:
+- If a deferred error is parked → answer the client and stop (see above)
 - If session ACR is `level1` and target is `level2_*` → redirect to level2
 - If session ACR is `level2_optional` and target is `level2_mandatory` → redirect to level2
 - If `Level2AuthConfigHasChanged` flag set on session → re-auth level2 (user changed OTP settings)

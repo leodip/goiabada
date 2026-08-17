@@ -325,6 +325,26 @@ func postConsent(t *testing.T, client *http.Client, destUrl string, consentPage 
 	return resp
 }
 
+// createAuthenticatedHttpClient returns a browser holding a valid level 1 session, for the tests
+// that assert what an authorization ERROR looks like when it reaches the client.
+//
+// Since #213 the authorization endpoint no longer redirects a logged-out browser to a client's
+// redirect URI on a request that failed validation: RFC 9700 4.11.2 requires that "the
+// authorization server MUST always authenticate the user first ... before redirecting the user", so
+// a cookieless request is sent to /auth/level1 and the error is delivered after the login. The
+// tests below exist to check the error response itself, its code, description, response mode and
+// state echo, which is orthogonal to who is at the browser, so each is given a session and keeps
+// its assertions exactly as written (decision 6). The deferral has its own cases; it is not what
+// these are for.
+//
+// The client and user the session was created for are discarded on purpose. A session cookie
+// belongs to the browser and not to the client that minted it, so this authenticates a request for
+// whichever client the caller creates for itself.
+func createAuthenticatedHttpClient(t *testing.T) *http.Client {
+	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+	return httpClient
+}
+
 func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *models.RedirectURI, *models.User) {
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),

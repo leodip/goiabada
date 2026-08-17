@@ -377,7 +377,7 @@ func TestImplicitFlow_Disabled_GlobalSetting(t *testing.T) {
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -484,7 +484,7 @@ func TestImplicitFlow_ClientOverride_Disabled(t *testing.T) {
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -523,7 +523,7 @@ func TestImplicitFlow_MissingNonce_IdToken(t *testing.T) {
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -564,7 +564,7 @@ func TestImplicitFlow_MissingOpenIdScope_IdToken(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -620,7 +620,7 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -752,7 +752,7 @@ func TestImplicitFlow_ErrorInFragment(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=test-nonce"
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {

@@ -15,6 +15,7 @@ Every authorization request passes through these stages:
 /auth/authorize
   │
   ├─ 1. Validate request (client, redirect_uri, scopes, PKCE, prompt, ...)
+  │     └─ on failure: answer the client, or log in first and answer afterwards
   │
   ├─ 2. Route based on prompt and session state
   │     ├─ prompt=none  ──► Silent checks ──► Issue response or error
@@ -34,7 +35,7 @@ This page focuses on the authorization code flow (`response_type=code`), which i
 
 ## Stage 1: Request validation
 
-These checks run first, before any session or authentication logic.
+These checks run first. The client and `redirect_uri` checks are also *answered* first, on a page; the rest are answered by a redirect to the client, and a redirect is never sent to a browser that has not authenticated (see [Deferred error redirects](#deferred-error-redirects) below).
 
 | What's checked | On failure |
 |----------------|------------|
@@ -47,10 +48,31 @@ These checks run first, before any session or authentication logic.
 | `prompt` values are valid and not conflicting | `invalid_request` |
 
 <Aside type="caution">
-If the client or redirect URI is invalid, the error is shown on a page. Goiabada will **never** redirect to an unregistered URI. All other validation errors are redirected to the client's `redirect_uri`.
+If the client or redirect URI is invalid, the error is shown on a page. Goiabada will **never** redirect to an unregistered URI. All other validation errors reach the client at its `redirect_uri`, but not necessarily straight away.
 
-That last sentence has one exception: a client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) never receives an error redirect, silent requests included. Goiabada shows the user a page naming the address the client asked to send them to, and the request stops there. See [Declining](#declining).
+That has one exception: a client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) never receives an error redirect, silent requests included. Goiabada shows the user a page naming the address the client asked to send them to, and the request stops there. See [Declining](#declining).
 </Aside>
+
+### Deferred error redirects
+
+An error redirect is a redirect, and Goiabada does not redirect a browser to an address a client chose until the person driving that browser has signed in. This closes the case where a link carrying one bad parameter, sent to somebody who is not logged in, makes the authorization server itself forward them to a host of the client's choosing.
+
+So a validation failure from the table above is answered one of two ways:
+
+| Situation | What happens |
+|-----------|--------------|
+| The browser already holds a valid session | The error redirect is sent immediately, exactly as before |
+| `prompt=none` | The error redirect is sent immediately: a silent request must never show UI |
+| The redirect would be withheld anyway (a self-registered client, or a `redirect_uri` that cannot name a host) | The refusal page is shown immediately, with no login |
+| Anything else, including `prompt=login` | The error is held, the user is sent to the login page, and the error redirect is delivered once they have entered their password |
+
+The client receives the same error code, description, response mode and `state` either way. The only difference is when.
+
+Two consequences worth knowing. A developer debugging a malformed authorization request has to log in before seeing the error come back. And a user who signs in only to receive an error is not left with a session: the deferred error ends the ceremony before a session is created, so the next authorization request asks for a password again.
+
+`prompt=login` defers even when a session exists, because the client asked not to be answered on the strength of one. It costs nothing in practice: such a request was going to show the login page regardless.
+
+This is [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) section 4.11.2, which requires the authorization server to "always authenticate the user first and, with the exception of the silent authentication use case, prompt the user for credentials when needed, before redirecting the user".
 
 Key details:
 - **Scopes**: `openid`, `profile`, `email`, `address`, `phone`, `groups`, `attributes`, and `offline_access` are always allowed. Custom scopes must be in `resource:permission` format. Scope *validation* (does it exist?) happens here; scope *authorization* (is this user allowed?) happens later in [post-authentication checks](#stage-4-post-authentication-checks).

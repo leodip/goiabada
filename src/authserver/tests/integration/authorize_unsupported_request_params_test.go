@@ -51,7 +51,7 @@ func TestAuthorize_RequestParameter_RejectedAsUnsupported(t *testing.T) {
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestAuthorize_RequestParameter_EmptyValue_RejectedAsUnsupported(t *testing.
 	// Encoded form drops the value but keeps the key, so request= still has the key present.
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode() + "&request="
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -114,7 +114,7 @@ func TestAuthorize_RequestUriParameter_RejectedAsUnsupported(t *testing.T) {
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -153,7 +153,7 @@ func TestAuthorize_RequestParameter_PostBody_RejectedAsUnsupported(t *testing.T)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://www.certification.openid.net")
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -216,7 +216,7 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 
 		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
 
-		httpClient := createHttpClient(t)
+		httpClient := createAuthenticatedHttpClient(t)
 		resp, err := httpClient.Get(destUrl)
 		if err != nil {
 			t.Fatal(err)
@@ -248,7 +248,7 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 
 		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
 
-		httpClient := createHttpClient(t)
+		httpClient := createAuthenticatedHttpClient(t)
 		resp, err := httpClient.Get(destUrl)
 		if err != nil {
 			t.Fatal(err)
@@ -282,7 +282,7 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 
 		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
 
-		httpClient := createHttpClient(t)
+		httpClient := createAuthenticatedHttpClient(t)
 		resp, err := httpClient.Get(destUrl)
 		if err != nil {
 			t.Fatal(err)
@@ -323,7 +323,7 @@ func TestAuthorize_RequestUriParameter_RejectedAcrossResponseModes(t *testing.T)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
 
-	httpClient := createHttpClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
