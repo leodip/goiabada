@@ -306,6 +306,57 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
+	// The confirmation alone in the query, matching the password in the body. This is the
+	// only input that reaches the confirmation read: the case above returns at the password
+	// check, so it says nothing about how the second field is read. Body-only the
+	// confirmation is absent and the handler asks for it; merged, the two would agree and
+	// the account would be created. passwordValidator and userCreator are given no
+	// expectations, so reaching either fails the test on an unexpected call (#202).
+	t.Run("Password confirmation in the query alone", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		emailValidator := mocks_validators.NewEmailValidator(t)
+		passwordValidator := mocks_validators.NewPasswordValidator(t)
+		emailSender := mocks_communication.NewEmailSender(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
+
+		form := url.Values{}
+		form.Add("email", "valid@example.com")
+		form.Add("password", "Str0ngP4ss!")
+		target := "/register?" + url.Values{
+			"passwordConfirmation": {"Str0ngP4ss!"},
+		}.Encode()
+		req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		settings := &models.Settings{
+			SelfRegistrationEnabled: true,
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
+		database.On("GetUserByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		database.On("GetPreRegistrationByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["error"] == "Password confirmation is required."
+		}))
+		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
+		userCreator.AssertExpectations(t)
+		emailSender.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
 	t.Run("Password confirmation is required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)

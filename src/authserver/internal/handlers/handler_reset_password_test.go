@@ -226,6 +226,45 @@ func postWithMarkerContinuationInQuery(t *testing.T, store sessions.Store,
 	return req
 }
 
+// postResetWithConfirmationInQuery moves the confirmation alone into the request target and
+// leaves the password in the body. The credentials-in-the-query case cannot reach this read:
+// a submission whose password is in the query is refused as absent before the two are ever
+// compared, so nothing about its answer depends on how the confirmation was read. With the
+// password present the handler gets that far, and body-only the confirmation is empty and
+// cannot match (#202).
+func postResetWithConfirmationInQuery(password, passwordConfirmation, continuationId string) *http.Request {
+	form := url.Values{}
+	form.Set("password", password)
+	if continuationId != "" {
+		form.Set(continuationIdField, continuationId)
+	}
+
+	query := url.Values{}
+	query.Set("passwordConfirmation", passwordConfirmation)
+
+	req := httptest.NewRequest("POST", ResetPasswordPath+"?"+query.Encode(),
+		strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req
+}
+
+// postResetWithContinuationInQuery moves the continuation id alone into the request target and
+// leaves it out of the body, for the rerender rather than the gate: the form the handler draws
+// after a rejection echoes the id back, and it has to echo nothing here. The id is what the
+// next submission is checked against, so echoing one a URL supplied would let a link decide
+// the continuation the user's next post carries (#202, decision 3).
+func postResetWithContinuationInQuery(password, passwordConfirmation, continuationId string) *http.Request {
+	form := url.Values{}
+	form.Set("password", password)
+	form.Set("passwordConfirmation", passwordConfirmation)
+
+	query := url.Values{continuationIdField: {continuationId}}
+	req := httptest.NewRequest("POST", ResetPasswordPath+"?"+query.Encode(),
+		strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req
+}
+
 // withRawMarker attaches cookies holding an arbitrary marker value, for the states
 // SaveLinkMarker cannot produce: an already-expired marker, and a corrupt one.
 func withRawMarker(t *testing.T, store sessions.Store, req *http.Request, value interface{}) *http.Request {
@@ -693,28 +732,38 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 	// None of these reach the database or the session, which NewDatabase(t) and the absent
 	// marker between them enforce: a handler that read the marker first would have to be
 	// given one.
+	const continuationId = "the-continuation-the-form-carried"
+
 	testCases := []struct {
 		name                 string
 		password             string
 		passwordConfirmation string
-		// inQuery puts both credential fields in the request target instead of the body,
-		// which must be answered exactly as an empty submission is (#202).
-		inQuery bool
-		arrange func(passwordValidator *mocks_validators.PasswordValidator)
+		// build assembles the submission. nil is postResetRequest, the ordinary body-only
+		// post; each variant moves one field into the request target, which has to be
+		// answered exactly as though that field had been left out (#202).
+		build func(password, passwordConfirmation, continuationId string) *http.Request
+		// wantEchoedContinuationId is the hidden value the rerendered form has to carry
+		// back, which is whatever the body submitted. Empty only where the body submitted
+		// none.
+		wantEchoedContinuationId string
+		arrange                  func(passwordValidator *mocks_validators.PasswordValidator)
 	}{
 		{
 			name:     "empty password",
 			password: "", passwordConfirmation: "",
-			arrange: func(passwordValidator *mocks_validators.PasswordValidator) {},
+			wantEchoedContinuationId: continuationId,
+			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
 		},
 		{
 			name:     "confirmation mismatch",
 			password: "Str0ngP4ss!", passwordConfirmation: "Different1!",
-			arrange: func(passwordValidator *mocks_validators.PasswordValidator) {},
+			wantEchoedContinuationId: continuationId,
+			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
 		},
 		{
 			name:     "the validator refuses the password",
 			password: "weak", passwordConfirmation: "weak",
+			wantEchoedContinuationId: continuationId,
 			arrange: func(passwordValidator *mocks_validators.PasswordValidator) {
 				passwordValidator.On("ValidatePassword", mock.Anything, "weak").
 					Return(errors.New("too weak")).Once()
@@ -726,8 +775,34 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			// expectation, so reaching it fails the test on an unexpected call: nothing
 			// downstream of the read ran, and no password was set (#202).
 			name:     "the credentials are in the query alone",
-			password: "Str0ngP4ss!", passwordConfirmation: "Str0ngP4ss!", inQuery: true,
-			arrange: func(passwordValidator *mocks_validators.PasswordValidator) {},
+			password: "Str0ngP4ss!", passwordConfirmation: "Str0ngP4ss!",
+			build:                    postResetWithCredentialsInQuery,
+			wantEchoedContinuationId: continuationId,
+			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
+		},
+		{
+			// The confirmation alone in the query, matching the password in the body,
+			// which is the only input that reaches the confirmation read at all: the
+			// case above returns at the password check, so it says nothing about how
+			// this second field is read. Body-only the confirmation is empty and the
+			// mismatch answer follows. Merged, the two would agree and the validator
+			// would run, which no expectation permits (#202).
+			name:     "the confirmation is in the query alone",
+			password: "Str0ngP4ss!", passwordConfirmation: "Str0ngP4ss!",
+			build:                    postResetWithConfirmationInQuery,
+			wantEchoedContinuationId: continuationId,
+			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
+		},
+		{
+			// The continuation id alone in the query, none in the body, pinning the
+			// rerender rather than the gate the marker cases cover. The form has to come
+			// back carrying nothing, because the id it carries is what the next
+			// submission is checked against (#202, decision 3).
+			name:     "the continuation id is in the query alone",
+			password: "", passwordConfirmation: "",
+			build:                    postResetWithContinuationInQuery,
+			wantEchoedContinuationId: "",
+			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
 		},
 	}
 
@@ -739,14 +814,12 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
-			const continuationId = "the-continuation-the-form-carried"
-
 			tc.arrange(passwordValidator)
-			expectRenderedFormError(httpHelper, continuationId)
+			expectRenderedFormError(httpHelper, tc.wantEchoedContinuationId)
 
-			build := postResetRequest
-			if tc.inQuery {
-				build = postResetWithCredentialsInQuery
+			build := tc.build
+			if build == nil {
+				build = postResetRequest
 			}
 
 			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
