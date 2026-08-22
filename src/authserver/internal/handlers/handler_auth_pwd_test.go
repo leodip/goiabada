@@ -496,6 +496,62 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		authHelper.AssertExpectations(t)
 	})
 
+	// Identical to "Missing password" except the password rides in the target's query rather
+	// than the body, and it must behave the same way. r.FormValue would merge the query behind
+	// the body and authenticate on it, putting the password in the browser's history, in the
+	// Referer of anything the page loads, and in every proxy log in front of the deployment
+	// (#202).
+	//
+	// mocks_data.NewDatabase(t) is given GetClientByClientIdentifier and nothing else, so a
+	// GetUserByEmail or VerifyPasswordHash call fails the test on an unexpected call. That
+	// absence is the assertion that no credential check ran.
+	t.Run("Password in the query alone", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("email", "test@example.com")
+		target := "/auth/pwd?" + url.Values{"password": {"testpassword"}}.Encode()
+		req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		settings := &models.Settings{
+			SMTPEnabled: true,
+		}
+		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["error"] == "Password is required." &&
+				data["ceremonyId"] == testCeremonyId
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
 	t.Run("User not found", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)

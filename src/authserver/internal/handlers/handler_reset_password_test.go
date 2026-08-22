@@ -165,6 +165,67 @@ func withMarker(t *testing.T, store sessions.Store, req *http.Request, flow Link
 	return req
 }
 
+// postResetWithCredentialsInQuery is postResetRequest with the two credential fields moved
+// into the request target. The continuation id stays in the body, so the submission is a
+// legitimate one in every respect but where the password came from, and the handler's answer
+// is the whole assertion: r.FormValue merges the query behind the body, so it would set a
+// password taken from a URL, where it reaches history, Referer and every proxy log in front
+// of the deployment (#202).
+func postResetWithCredentialsInQuery(password, passwordConfirmation, continuationId string) *http.Request {
+	form := url.Values{}
+	if continuationId != "" {
+		form.Set(continuationIdField, continuationId)
+	}
+
+	query := url.Values{}
+	query.Set("password", password)
+	query.Set("passwordConfirmation", passwordConfirmation)
+
+	req := httptest.NewRequest("POST", ResetPasswordPath+"?"+query.Encode(),
+		strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req
+}
+
+// postWithMarkerContinuationInQuery is postWithMarker with the continuation id moved into the
+// request target and left out of the body. The id is the marker's own live one, read back
+// through GetLinkMarker exactly as postWithMarker does so the test cannot invent one the
+// handler would never have rendered: the gate must still refuse it, because a marker supplied
+// by a URL is not a submission and reading one from a URL reintroduces the shape #201 removed
+// from the reset link, one indirection later (#202, decision 3).
+func postWithMarkerContinuationInQuery(t *testing.T, store sessions.Store,
+	password, passwordConfirmation string, flow LinkMarkerFlow, id int64, codeHash string) *http.Request {
+	t.Helper()
+
+	rr := httptest.NewRecorder()
+	rejection, err := SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+
+	carrying := cleanGetRequest()
+	for _, c := range rr.Result().Cookies() {
+		carrying.AddCookie(c)
+	}
+	marker, rejection, err := GetLinkMarker(store, carrying, flow)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+	require.NotEmpty(t, marker.ContinuationId)
+
+	form := url.Values{}
+	form.Set("password", password)
+	form.Set("passwordConfirmation", passwordConfirmation)
+
+	query := url.Values{continuationIdField: {marker.ContinuationId}}
+	req := httptest.NewRequest("POST", ResetPasswordPath+"?"+query.Encode(),
+		strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	for _, c := range rr.Result().Cookies() {
+		req.AddCookie(c)
+	}
+	return req
+}
+
 // withRawMarker attaches cookies holding an arbitrary marker value, for the states
 // SaveLinkMarker cannot produce: an already-expired marker, and a corrupt one.
 func withRawMarker(t *testing.T, store sessions.Store, req *http.Request, value interface{}) *http.Request {
@@ -636,7 +697,10 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 		name                 string
 		password             string
 		passwordConfirmation string
-		arrange              func(passwordValidator *mocks_validators.PasswordValidator)
+		// inQuery puts both credential fields in the request target instead of the body,
+		// which must be answered exactly as an empty submission is (#202).
+		inQuery bool
+		arrange func(passwordValidator *mocks_validators.PasswordValidator)
 	}{
 		{
 			name:     "empty password",
@@ -656,6 +720,15 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 					Return(errors.New("too weak")).Once()
 			},
 		},
+		{
+			// A password strong enough to pass the validator, submitted in the query
+			// alone. It must be refused as absent, and the validator is given no
+			// expectation, so reaching it fails the test on an unexpected call: nothing
+			// downstream of the read ran, and no password was set (#202).
+			name:     "the credentials are in the query alone",
+			password: "Str0ngP4ss!", passwordConfirmation: "Str0ngP4ss!", inQuery: true,
+			arrange: func(passwordValidator *mocks_validators.PasswordValidator) {},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -671,9 +744,14 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			tc.arrange(passwordValidator)
 			expectRenderedFormError(httpHelper, continuationId)
 
+			build := postResetRequest
+			if tc.inQuery {
+				build = postResetWithCredentialsInQuery
+			}
+
 			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 			handler.ServeHTTP(httptest.NewRecorder(),
-				postResetRequest(tc.password, tc.passwordConfirmation, continuationId))
+				build(tc.password, tc.passwordConfirmation, continuationId))
 
 			httpHelper.AssertExpectations(t)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
@@ -756,6 +834,21 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return withMarker(t, store, postResetRequest(newPassword, newPassword, ""),
+					LinkMarkerFlowResetPassword, 1, codeHash)
+			},
+		},
+		// The live id, correct in every respect but its source: in the request target
+		// rather than the body, with the body carrying none. r.FormValue would merge the
+		// query behind the body and pass the gate on it, so a link's continuation could be
+		// driven from a URL again (#202, decision 3).
+		{
+			name:       "the form names the live continuation in the query alone",
+			wantReason: auditReasonContinuationMismatch,
+			wantUserId: 1,
+			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+					Return(&models.User{Id: 1}, nil).Once()
+				return postWithMarkerContinuationInQuery(t, store, newPassword, newPassword,
 					LinkMarkerFlowResetPassword, 1, codeHash)
 			},
 		},

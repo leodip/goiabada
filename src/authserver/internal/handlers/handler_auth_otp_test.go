@@ -627,6 +627,83 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
+	// A live passcode, correct for the user's own secret, put in the target's query alone. It
+	// must be answered as though no code were submitted at all. r.FormValue would merge the
+	// query behind the body and verify it, which is worse than a leak: TryConsumeUserOTPStep
+	// would burn the step, so the passcode the user is about to type into the real form would
+	// then be refused as a replay. The mock is given no TryConsumeUserOTPStep expectation, so
+	// reaching it fails the test on an unexpected call (#202).
+	t.Run("OTP code in the query alone", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger, noCredentialFailures{})
+
+		key, err := totp.Generate(totp.GenerateOpts{
+			Issuer:      "TestApp",
+			AccountName: "test@test.com",
+		})
+		assert.Nil(t, err)
+
+		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
+		assert.Nil(t, err)
+
+		// The ceremony id is in the body, so the gate above passes and the credential read is
+		// what answers. The passcode is in the query and nowhere else.
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		target := "/auth/otp?" + url.Values{"otp": {otpCode}}.Encode()
+		req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
+
+		user := &models.User{
+			Id:                 1,
+			Enabled:            true,
+			OTPEnabled:         true,
+			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
+		}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		// The code-required re-render, carrying the ceremony id so the user can retry: the
+		// same answer an empty submission gets. No audit entry either, because no credential
+		// was checked, which is why auditLogger is given no expectation.
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
+			mock.MatchedBy(func(bind map[string]interface{}) bool {
+				return bind["ceremonyId"] == testCeremonyId &&
+					bind["error"] == "OTP code is required."
+			})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		// Nothing was authenticated and nothing was redirected to.
+		assert.Empty(t, rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
 	t.Run("Invalid OTP code for enabled OTP", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)

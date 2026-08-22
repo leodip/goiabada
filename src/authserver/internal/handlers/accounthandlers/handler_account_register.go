@@ -63,8 +63,15 @@ func HandleAccountRegisterPost(
 		}
 
 		email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
-		password := r.FormValue("password")
-		passwordConfirmation := r.FormValue("passwordConfirmation")
+		// r.PostFormValue rather than r.FormValue: r.Form merges the URL query behind the
+		// body, so /account/register?password=... would register an account with a password
+		// taken from a request target, where it reaches the browser's history, the Referer of
+		// anything the page loads, and the access log of every proxy in front of the
+		// deployment. Only the submitted body is a submission (#202). The email read above
+		// keeps the merged accessor: it is not a credential, and the rate limiter derives its
+		// per-account key from the same accessor, so the two must not diverge (#219).
+		password := r.PostFormValue("password")
+		passwordConfirmation := r.PostFormValue("passwordConfirmation")
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{

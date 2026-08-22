@@ -266,7 +266,12 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		otpCode := r.FormValue("otp")
+		// r.PostFormValue rather than r.FormValue, matching the ceremony id read above so both
+		// reads in this function agree about what a submission is: r.Form merges the URL query
+		// behind the body, so /auth/otp?otp=... would let a passcode arrive in the request
+		// target, where it reaches the browser's history, the Referer of anything the page
+		// loads, and the access log of every proxy in front of the deployment (#202).
+		otpCode := r.PostFormValue("otp")
 		if len(otpCode) == 0 {
 			renderError(i18n.NewLocalizedError(i18n.ErrCodeOtpCodeRequired, nil).Localize(r.Context()))
 			return

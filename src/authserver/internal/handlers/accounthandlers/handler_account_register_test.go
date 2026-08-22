@@ -252,6 +252,60 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		}))
 	})
 
+	// The same answer "Password not given" gets, for a submission that does carry a password
+	// and a matching confirmation, in the request target rather than the body. r.FormValue
+	// merges the query behind the body, so it would register the account on a password taken
+	// from a URL, where it reaches the browser's history, the Referer of anything the page
+	// loads, and the access log of every proxy in front of the deployment. passwordValidator
+	// and userCreator are given no expectations, so reaching either fails the test on an
+	// unexpected call (#202).
+	t.Run("Password in the query alone", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		emailValidator := mocks_validators.NewEmailValidator(t)
+		passwordValidator := mocks_validators.NewPasswordValidator(t)
+		emailSender := mocks_communication.NewEmailSender(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
+
+		// The email stays in the body, so the handler reaches the credential read the same
+		// way the neighbouring case does.
+		form := url.Values{}
+		form.Add("email", "valid@example.com")
+		target := "/register?" + url.Values{
+			"password":             {"Str0ngP4ss!"},
+			"passwordConfirmation": {"Str0ngP4ss!"},
+		}.Encode()
+		req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		settings := &models.Settings{
+			SelfRegistrationEnabled: true,
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
+		database.On("GetUserByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		database.On("GetPreRegistrationByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["error"] == "Password is required."
+		}))
+		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
+		userCreator.AssertExpectations(t)
+		emailSender.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
 	t.Run("Password confirmation is required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
