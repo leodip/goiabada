@@ -123,7 +123,13 @@ func HandleAccountEmailVerificationPost(
 			return
 		}
 
-		verificationCode := strings.TrimSpace(r.FormValue("verificationCode"))
+		// r.PostFormValue rather than r.FormValue: this code is the whole gate on an email change, so
+		// r.Form merging the URL query behind the request body meant
+		// /account/email-verification?verificationCode=... verified the address, leaving the code in
+		// the browser's history, in the Referer of anything the page loads, and in the access log of
+		// every proxy in front of the deployment. This route is POST-only with a separate GET handler
+		// rendering the form, so the query was never a submission (#202).
+		verificationCode := strings.TrimSpace(r.PostFormValue("verificationCode"))
 		req := &api.VerifyAccountEmailRequest{VerificationCode: verificationCode}
 
 		if _, err := apiClient.VerifyAccountEmail(jwtInfo.TokenResponse.AccessToken, req); err != nil {

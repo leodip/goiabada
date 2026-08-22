@@ -30,7 +30,17 @@ func HandleAuthCallbackPost(
 		}
 
 		stateFromSess := sess.Values[constants.SessionKeyState].(string)
-		state := r.FormValue("state")
+
+		// r.PostFormValue rather than r.FormValue here and for code, error and error_description
+		// below. auth_helper.go asks the authorization endpoint for response_mode=form_post
+		// precisely so all four arrive in a request body, on success and on failure alike, and this
+		// route is registered POST-only, so chi answers a GET with 405 before this handler runs.
+		// r.Form would have merged the URL query behind that body, which meant
+		// POST /auth/callback?code=... was accepted and undid the exact leak form_post was chosen
+		// to prevent: an authorization code in the request target reaches the browser's history,
+		// the Referer of anything the page loads, and the access log of every proxy in front of the
+		// deployment. This path is also CSRF-exempt, so a cross-origin POST does reach it (#202).
+		state := r.PostFormValue("state")
 		if stateFromSess != state {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("state from session is different from state posted")))
 			return
@@ -49,10 +59,10 @@ func HandleAuthCallbackPost(
 
 		redirectURI := sess.Values[constants.SessionKeyRedirectURI].(string)
 
-		code := r.FormValue("code")
+		code := r.PostFormValue("code")
 		if len(strings.TrimSpace(code)) == 0 {
-			error := r.FormValue("error")
-			errorDescription := r.FormValue("error_description")
+			error := r.PostFormValue("error")
+			errorDescription := r.PostFormValue("error_description")
 			if len(error) > 0 {
 				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(error+" - "+errorDescription)))
 			} else {

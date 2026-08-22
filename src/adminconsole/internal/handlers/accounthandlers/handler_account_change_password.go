@@ -59,9 +59,15 @@ func HandleAccountChangePasswordPost(
 			return
 		}
 
-		currentPassword := r.FormValue("currentPassword")
-		newPassword := r.FormValue("newPassword")
-		newPasswordConfirmation := r.FormValue("newPasswordConfirmation")
+		// r.PostFormValue rather than r.FormValue for all three: r.Form merges the URL query behind
+		// the request body, so /account/change-password?currentPassword=...&newPassword=... would
+		// have changed the password, and a password in a request target reaches the browser's
+		// history, the Referer of anything the page loads, and the access log of every proxy in
+		// front of the deployment. This route is POST-only with a separate GET handler rendering the
+		// form, so the query was never a submission (#202).
+		currentPassword := r.PostFormValue("currentPassword")
+		newPassword := r.PostFormValue("newPassword")
+		newPasswordConfirmation := r.PostFormValue("newPasswordConfirmation")
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{

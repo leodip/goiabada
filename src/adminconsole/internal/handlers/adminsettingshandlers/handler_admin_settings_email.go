@@ -96,12 +96,19 @@ func HandleAdminSettingsEmailPost(
 			return
 		}
 
+		// SMTPPassword reads with r.PostFormValue rather than r.FormValue: r.Form merges the URL
+		// query behind the request body, so /admin/settings/email?password=... would have set the
+		// SMTP password, leaving it in the browser's history, in the Referer of anything the page
+		// loads, and in the access log of every proxy in front of the deployment. This route is
+		// POST-only with a separate GET handler rendering the form, so the query was never a
+		// submission. The other fields here are configuration rather than credentials and keep the
+		// accessor they had (#202).
 		settingsInfo := SettingsEmailPost{
 			SMTPEnabled:    r.FormValue("smtpEnabled") == "on",
 			SMTPHost:       r.FormValue("hostOrIP"),
 			SMTPPort:       r.FormValue("port"),
 			SMTPUsername:   r.FormValue("username"),
-			SMTPPassword:   r.FormValue("password"),
+			SMTPPassword:   r.PostFormValue("password"),
 			SMTPEncryption: r.FormValue("smtpEncryption"),
 			SMTPFromName:   r.FormValue("fromName"),
 			SMTPFromEmail:  r.FormValue("fromEmail"),
