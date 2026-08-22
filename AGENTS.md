@@ -246,6 +246,7 @@ Three test types:
 2. **Audit logging**: All security events logged via `auditLogger` (see `constants/constants.go` for event names)
 3. **Rate limiting**: Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, account password and OTP changes, email verification, forgot/reset password, self-registration, activation, DCR). Credential checks count failures only, so a successful attempt spends nothing
 4. **Permissions model**: Resources contain Permissions; Users/Groups/Clients can have Permissions
+5. **Credential form fields**: A handler reads a credential-bearing field (`password`, `passwordConfirmation`, `currentPassword`, `newPassword`, `newPasswordConfirmation`, `otp`, `secretKey`, `base64Image`, `verificationCode`, `clientSecret`) and a form-binding marker (`ceremonyId`, `continuationId`) with `r.PostFormValue`, never `r.FormValue`. `r.FormValue` merges the URL query behind the request body, so the value would be accepted from the request target, where it reaches the browser's history, the `Referer` of anything the page loads, and the access log of every proxy, gateway and CDN in front of the deployment. Every such form is POST-only with a separate GET handler that renders it, so the query is never a submission. Enforced per module by `credential_read_lint_test.go` in each `internal/handlers` package; `handler_authorize.go` is exempt for `state` and `code`, which OIDC Core 3.1.2.1 requires the authorization endpoint to accept over GET as well as POST (#202)
 
 ## API Routes
 

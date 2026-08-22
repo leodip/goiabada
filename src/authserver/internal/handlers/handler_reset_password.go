@@ -382,7 +382,7 @@ func HandleResetPasswordPost(
 				// confirmation must not cost the user their continuation, and echoing is
 				// safe: the value authorizes nothing until it is checked against the
 				// marker on the next submission.
-				"continuationId": r.FormValue(continuationIdField),
+				"continuationId": r.PostFormValue(continuationIdField),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
@@ -391,8 +391,14 @@ func HandleResetPasswordPost(
 			}
 		}
 
-		password := r.FormValue("password")
-		passwordConfirmation := r.FormValue("passwordConfirmation")
+		// r.PostFormValue rather than r.FormValue throughout this handler, including the
+		// continuation id it reads twice: r.Form merges the URL query behind the body, so
+		// /reset-password?password=... would set a password from a request target, where it
+		// reaches the browser's history, the Referer of anything the page loads, and the
+		// access log of every proxy in front of the deployment. The form posts to action="",
+		// so only the submitted body is ever a submission (#202).
+		password := r.PostFormValue("password")
+		passwordConfirmation := r.PostFormValue("passwordConfirmation")
 
 		// i18n surface: A — browser-flow form rerender.
 		if len(password) == 0 {
@@ -434,7 +440,7 @@ func HandleResetPasswordPost(
 		//
 		// The userId audited is the marker's, which resolved: it names the account this
 		// submission would have written into, which is the useful half of the entry.
-		if !continuationMatches(marker.ContinuationId, r.FormValue(continuationIdField)) {
+		if !continuationMatches(marker.ContinuationId, r.PostFormValue(continuationIdField)) {
 			rejectResetPassword(httpHelper, auditLogger, w, r, user.Id,
 				auditReasonContinuationMismatch, http.StatusBadRequest)
 			return

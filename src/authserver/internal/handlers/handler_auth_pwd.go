@@ -155,7 +155,13 @@ func HandleAuthPwdPost(
 		// postgres and sqlite do not, so without this a stored bob@x.com typed as Bob@x.com
 		// signs in on two engines and is refused on the other two (#219).
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
-		password := r.FormValue("password")
+
+		// r.PostFormValue rather than r.FormValue, matching the ceremony id read above so both
+		// reads in this function agree about what a submission is: r.Form merges the URL query
+		// behind the body, so /auth/pwd?password=... would authenticate, and a credential in a
+		// request target reaches the browser's history, the Referer of anything the page loads,
+		// and the access log of every proxy in front of the deployment (#202).
+		password := r.PostFormValue("password")
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
