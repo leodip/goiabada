@@ -87,7 +87,13 @@ func HandleAdminUserNewPost(
 		setPasswordType := r.FormValue("setPasswordType")
 		password := ""
 		if (settings.SMTPEnabled && setPasswordType == "now") || !settings.SMTPEnabled {
-			password = r.FormValue("password")
+			// r.PostFormValue rather than r.FormValue: r.Form merges the URL query behind the
+			// request body, so /admin/users/new?password=... would have set the new account's
+			// password, leaving it in the browser's history, in the Referer of anything the page
+			// loads, and in the access log of every proxy in front of the deployment. This route is
+			// POST-only with a separate GET handler rendering the form, so the query was never a
+			// submission (#202).
+			password = r.PostFormValue("password")
 		}
 
 		user, err := apiClient.CreateUserAdmin(jwtInfo.TokenResponse.AccessToken, &api.CreateUserAdminRequest{

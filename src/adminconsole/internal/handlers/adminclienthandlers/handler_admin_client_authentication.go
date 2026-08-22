@@ -146,6 +146,12 @@ func HandleAdminClientAuthenticationPost(
 			return
 		}
 
+		// ClientSecret reads with r.PostFormValue rather than r.FormValue: r.Form merges the URL
+		// query behind the request body, so
+		// /admin/clients/{clientId}/authentication?clientSecret=... would have set a client
+		// credential, leaving it in the browser's history, in the Referer of anything the page loads,
+		// and in the access log of every proxy in front of the deployment. This route is POST-only
+		// with a separate GET handler rendering the form, so the query was never a submission (#202).
 		adminClientAuthentication := struct {
 			ClientId            int64
 			ClientIdentifier    string
@@ -156,7 +162,7 @@ func HandleAdminClientAuthenticationPost(
 			ClientId:            client.Id,
 			ClientIdentifier:    client.ClientIdentifier,
 			IsPublic:            isPublic,
-			ClientSecret:        r.FormValue("clientSecret"),
+			ClientSecret:        r.PostFormValue("clientSecret"),
 			IsSystemLevelClient: isSystemLevelClient,
 		}
 

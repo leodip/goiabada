@@ -111,9 +111,15 @@ func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 	}
 
 	// A walk that covers nothing passes while guarding nothing, which is how this kind of
-	// instrument dies quietly. handlers holds every credential read; middleware holds the
-	// rate limiter, whose own .FormValue("email") reads are deliberately absent from the list
-	// above and must stay visible to anyone widening it.
+	// instrument dies quietly. These are the two trees in this module whose code is handed an
+	// *http.Request: handlers holds every credential read there is, and middleware is where a
+	// form read would be just as invisible and just as unguarded by anything else.
+	//
+	// The rate limiter is not one of them. It lives in src/core/middleware, outside the walk of
+	// this file and of its admin console twin, and its own .FormValue("email") account keys are
+	// deliberately absent from the list above: an email address is not a credential, and the
+	// limiter and the handler it protects must keep reading the account name the same way or a
+	// case variant buys a fresh bucket (#219).
 	for _, tree := range []string{"handlers", "middleware"} {
 		if perTree[tree] == 0 {
 			t.Errorf("walked no non-test Go files under internal/%s; the guard is not checking "+

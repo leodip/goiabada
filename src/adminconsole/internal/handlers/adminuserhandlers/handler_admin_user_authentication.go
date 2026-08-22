@@ -142,8 +142,15 @@ func HandleAdminUserAuthenticationPost(
 
 		hasDisabledOTP := false
 
-		// Handle password update
-		newPassword := r.FormValue("newPassword")
+		// Handle password update.
+		//
+		// r.PostFormValue rather than r.FormValue: r.Form merges the URL query behind the request
+		// body, so /admin/users/{userId}/authentication?newPassword=... would have set another
+		// account's password, leaving it in the browser's history, in the Referer of anything the
+		// page loads, and in the access log of every proxy in front of the deployment. This route is
+		// POST-only with a separate GET handler rendering the form, so the query was never a
+		// submission (#202).
+		newPassword := r.PostFormValue("newPassword")
 		if len(newPassword) > 0 {
 			passwordReq := &api.UpdateUserPasswordRequest{
 				NewPassword: newPassword,

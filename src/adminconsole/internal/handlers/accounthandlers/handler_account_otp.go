@@ -77,7 +77,14 @@ func HandleAccountOtpPost(
 			return
 		}
 
-		password := r.FormValue("password")
+		// r.PostFormValue rather than r.FormValue, here and for the otp, secretKey and base64Image
+		// reads in the enrolment branch below: r.Form merges the URL query behind the request body,
+		// so /account/otp?password=... would have carried the password, and the enrolment fields are
+		// the TOTP shared secret itself plus the QR image encoding it. A credential in a request
+		// target reaches the browser's history, the Referer of anything the page loads, and the
+		// access log of every proxy in front of the deployment. This route is POST-only with a
+		// separate GET handler rendering the form, so the query was never a submission (#202).
+		password := r.PostFormValue("password")
 
 		renderError := func(message string, base64Image string, secretKey string) {
 			bind := map[string]interface{}{
@@ -123,9 +130,9 @@ func HandleAccountOtpPost(
 			}
 		} else {
 			// enabling
-			otpCode := r.FormValue("otp")
-			secretKey := r.FormValue("secretKey")
-			base64Image := r.FormValue("base64Image")
+			otpCode := r.PostFormValue("otp")
+			secretKey := r.PostFormValue("secretKey")
+			base64Image := r.PostFormValue("base64Image")
 
 			if len(otpCode) == 0 {
 				renderError("OTP code is required.", base64Image, secretKey)
