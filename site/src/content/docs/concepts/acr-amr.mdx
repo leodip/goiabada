@@ -80,8 +80,8 @@ below it is raised back to it, so `acr_values=urn:goiabada:level1` against a cli
 authentication than the client is configured for, never a weaker one.
 
 <Aside type="tip">
-If you request multiple ACR values separated by spaces, Goiabada uses the first one in the list, and
-then raises it to the client's default ACR level if it is below it.
+If you request multiple ACR values separated by spaces, Goiabada uses the first one it recognises,
+ignoring any it does not, and then raises that to the client's default ACR level if it is below it.
 </Aside>
 
 <Aside type="caution">

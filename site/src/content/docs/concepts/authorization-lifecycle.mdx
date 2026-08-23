@@ -139,7 +139,7 @@ The user enters their email and password. If credentials are valid, the flow mov
 Goiabada determines the **target ACR level** and compares it against the session's current ACR. Only a session belonging to the user who just authenticated counts here. If the browser still holds a session for a different user, that session contributes no ACR and the target alone decides, exactly as it would for a user with no session at all.
 
 **How the target ACR is determined:**
-1. If `acr_values` is in the authorization request, take the first value, then raise it to the client's default ACR level if it is below it
+1. If `acr_values` is in the authorization request, take the first value it recognises, then raise it to the client's default ACR level if it is below it
 2. Otherwise, use the client's default ACR level
 
 **Decision logic:**
@@ -250,7 +250,7 @@ A session is valid only if **all three** pass. The `max_age` parameter acts like
 
 | Situation | Target ACR used |
 |-----------|----------------|
-| `acr_values` provided in request | The higher of the first value from the `acr_values` parameter and the client's default ACR level |
+| `acr_values` provided in request | The higher of the first recognised value from the `acr_values` parameter and the client's default ACR level |
 | `acr_values` not provided | Client's default ACR level |
 
 The client's default ACR level is a floor. The `acr_values` parameter lets an application request a stronger authentication level for a specific operation, and a value below the client's default is raised back to it.
