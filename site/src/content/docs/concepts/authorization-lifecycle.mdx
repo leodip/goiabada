@@ -138,9 +138,7 @@ The user enters their email and password. If credentials are valid, the flow mov
 
 Goiabada determines the **target ACR level** and compares it against the session's current ACR. Only a session belonging to the user who just authenticated counts here. If the browser still holds a session for a different user, that session contributes no ACR and the target alone decides, exactly as it would for a user with no session at all.
 
-**How the target ACR is determined:**
-1. If `acr_values` names at least one recognised value, take the first value it recognises, then raise it to the client's default ACR level if it is below it
-2. Otherwise, meaning the parameter is absent or names no value Goiabada recognises, use the client's default ACR level
+**How the target ACR is determined:** the target is whichever is higher, the first `acr_values` entry Goiabada recognises or the client's default ACR level.
 
 **Decision logic:**
 
@@ -250,17 +248,15 @@ A session is valid only if **all three** pass. The `max_age` parameter acts like
 
 | Situation | Target ACR used |
 |-----------|----------------|
-| `acr_values` names at least one recognised value | The higher of the first recognised value from the `acr_values` parameter and the client's default ACR level |
-| `acr_values` not provided, or none of its values recognised | Client's default ACR level |
-
-The client's default ACR level is a floor. The `acr_values` parameter lets an application request a stronger authentication level for a specific operation, and a value below the client's default is raised back to it.
+| `acr_values` names at least one recognised value | The higher of the first recognised value and the client's default ACR level |
+| `acr_values` not provided, or none recognised | Client's default ACR level |
 
 ## Quick reference
 
 | Question | Determined by |
 |----------|---------------|
 | Does the user need to log in? | Session validity (idle timeout, max lifetime, `max_age`), `prompt=login` |
-| Does the user need OTP? | Target ACR level, which is the higher of `acr_values` and the client default, plus the user's OTP enrollment status and OTP configuration changes |
+| Does the user need OTP? | Target ACR level (`acr_values`, client default), user's OTP enrollment status, OTP configuration changes |
 | Does the user see a consent screen? | Client's consent setting, `offline_access` scope, `prompt=consent`, existing consent coverage |
 | Can the request succeed silently? | `prompt=none` (all of the above must pass without interaction) |
 | What scopes end up in the token? | Requested scopes filtered by user's permissions, then by user consent if applicable |
