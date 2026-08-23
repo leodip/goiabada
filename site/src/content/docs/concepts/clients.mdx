@@ -254,9 +254,7 @@ A self-registered client's **identifier cannot be changed**, in the same way the
 </Aside>
 
 <Aside type="caution">
-**For operators upgrading:** the migration turns consent on for every existing self-registered client, so a client relying on silent renewal with `prompt=none` stops renewing until each of its users has been through the consent screen once. To put a specific client back the way it was, open it in the admin console and untick **Consent required**.
-
-**One case the migration cannot find.** It marks existing self-registered clients by their `dcr_` identifier prefix, which is all there was to go on before this release. If an administrator renamed a self-registered client before upgrading, it no longer carries that prefix, so it is not marked, not badged, and consent stays off for it. Look for it in the client list and tick **Consent required** by hand. Renaming a self-registered client is refused from this release on, so the gap cannot grow after you upgrade.
+**A self-registered client can be missing its badge.** Goiabada recognises one by the `dcr_` prefix on its identifier, so a client that was renamed back when identifiers could still be changed does not carry it. Such a client is not marked, not badged, and consent is off for it. Look for it in the client list and tick **Consent required** by hand.
 </Aside>
 
 ### Redirect URI rules

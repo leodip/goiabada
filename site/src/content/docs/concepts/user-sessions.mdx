@@ -105,13 +105,13 @@ Each handover writes a `cross_user_session_replaced` entry to the [audit log](/c
 When the **same** user signs in again, none of this applies. Their existing session is reused for as long as it is still valid, and re-authenticating simply refreshes it. If it has already idled out, reached its maximum lifetime, or fallen outside a requested `max_age`, they get a new session like anyone else, and nothing is revoked.
 </Aside>
 
-### Grants issued before this behaviour existed
+### Grants tied to somebody else's session
 
-Earlier versions of Goiabada did not make this comparison, so a handover on a shared browser could leave a sign-in tied to the previous person's session. If you are upgrading, a few grants of that kind may already be out there.
+Your deployment may be holding a few grants where the comparison above never ran: a sign-in on a shared browser that stayed tied to the previous person's session.
 
 Goiabada turns them away as they are presented. An authorization code, and any refresh token descended from one, is checked against the session it names, and one naming a session that belongs to somebody else is refused. Access tokens get the same treatment at Goiabada's own endpoints, but only when they carry a session reference: an offline grant's access token carries none, and a resource server of your own validating the signature by itself never consults Goiabada's sessions at all. An ID token presented as an [`id_token_hint`](/integration/endpoints/) to log out is checked the same way, so one of these cannot end the previous person's session without asking.
 
-That check needs the previous session to still be there, and sessions do not last: they are deleted once they idle out or reach their maximum lifetime, two hours and twenty-four hours by default. After that there is nothing left to compare against. An offline refresh token can outlive that by a long way, since its maximum lifetime defaults to a year, so one issued before the upgrade can keep working after the evidence has gone.
+That check needs the previous session to still be there, and sessions do not last: they are deleted once they idle out or reach their maximum lifetime, two hours and twenty-four hours by default. After that there is nothing left to compare against. An offline refresh token can outlive that by a long way, since its maximum lifetime defaults to a year, so one of these can outlast the session it would be checked against.
 
 It is worth being precise about what such a grant carries, because it is narrower than it sounds. Its tokens name the right person, so it is not access to the previous user's account, and the `amr` and `auth_time` claims describe the sign-in that really happened. What is wrong is `acr`: it could be raised to the level the previous user's session had reached, higher than anything its holder actually presented, and it goes on claiming that through every refresh.
 
