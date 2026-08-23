@@ -211,7 +211,9 @@ if (Array.isArray(idToken.amr) && idToken.amr.includes('otp')) {
 
 ## OTP configuration changes
 
-When a user enables or disables OTP on their account, Goiabada sets a flag (`Level2AuthConfigHasChanged`) on their active sessions. The next time any of these sessions attempts to access a `level2` client, the user will be prompted to re-authenticate at level 2.
+When a user enables or disables OTP, Goiabada advances a counter on that user's record. Every session carries the value of that counter as it stood when the session last satisfied the level 2 question, so once the counter moves, all of the user's sessions are behind it at once, not just the one the change was made from.
+
+The next time any of those sessions reaches a `level2` client, the user is prompted to re-authenticate at level 2. The session catches up only once that prompt has been answered, so a login abandoned at the OTP screen still owes the prompt on the next attempt. A `prompt=none` request against a session that is behind is refused with `interaction_required`.
 
 This ensures that:
 - If a user enables OTP, they must prove they can use it

@@ -273,6 +273,12 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("ResetUserOTPStep", otpDisableTx, userId).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "reset") }).Once()
+	// The counter joins the same transaction here for free, because both disable sites share
+	// disableUserOTP. That is what closes the hole #242 found at this endpoint specifically: it
+	// flagged no session at all, so a target user whose authenticator an administrator removed
+	// kept every live session asserting amr ["pwd","otp"] for it.
+	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, userId).Return(int64(1), nil).
+		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 	database.On("CommitTransaction", otpDisableTx).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
 	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
@@ -294,8 +300,9 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	HandleAPIUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "update", "reset", "commit"}, calls,
-		"both writes belong inside one transaction, otp_enabled first per decision 10, commit last")
+	assert.Equal(t, []string{"begin", "update", "reset", "increment", "commit"}, calls,
+		"all three writes belong inside one transaction, otp_enabled first per #111 decision 10, "+
+			"the counter advance last before the commit per #242 decision 2")
 	assert.False(t, user.OTPEnabled)
 }
 

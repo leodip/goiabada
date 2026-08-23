@@ -266,7 +266,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AuthTime: newAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
-			enums.AcrLevel1.String(), int64(3)).
+			enums.AcrLevel1.String(), int64(3), (*int64)(nil)).
 			Run(func(mock.Arguments) { sequence = append(sequence, "session-created") }).
 			Return(newSession, nil)
 
@@ -416,7 +416,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AuthTime: newAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
-			enums.AcrLevel1.String(), int64(3)).Return(newSession, nil)
+			enums.AcrLevel1.String(), int64(3), (*int64)(nil)).Return(newSession, nil)
 
 		user := &models.User{Id: 2, Enabled: true}
 		database.On("GetUserById", mock.Anything, int64(2)).Return(user, nil)
@@ -515,7 +515,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AuthTime: newAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd",
-			enums.AcrLevel1.String(), int64(3)).Return(newSession, nil)
+			enums.AcrLevel1.String(), int64(3), (*int64)(nil)).Return(newSession, nil)
 
 		user := &models.User{Id: 1, Enabled: true}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
@@ -728,7 +728,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		startError := errors.New("the replacement session could not be created")
 		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
-			enums.AcrLevel1.String(), int64(3)).Return(nil, startError)
+			enums.AcrLevel1.String(), int64(3), (*int64)(nil)).Return(nil, startError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == startError.Error()
@@ -1013,7 +1013,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: enums.AcrLevel1.String(),
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7)).Return(newUserSession, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil)).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
@@ -1034,6 +1034,363 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// =====================================================================================
+	// The OTP configuration generation is promoted onto the session this ceremony bound to,
+	// once, here (#242 decision 3). The four subtests below are the four answers the two
+	// gates can give between them.
+	//
+	// Everything upstream of here writes nothing: /auth/level2 captures onto the auth
+	// context and /auth/level1completed only compares. This is the one place an obligation
+	// is discharged, which is why an abandoned ceremony costs the visitor nothing.
+	// =====================================================================================
+
+	t.Run("Reuse arm promotes the captured generation onto the bound session", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		// 4 rather than 0, so the assertion below cannot also pass against a hard-coded zero.
+		captured := int64(4)
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              1,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd otp",
+			OtpConfigGeneration: &captured,
+		}
+
+		sessionIdentifier := "test-session"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
+		userSession := &models.UserSession{
+			Id:                  9,
+			UserId:              1,
+			AcrLevel:            enums.AcrLevel2Optional.String(),
+			AuthTime:            sessionAuthTime,
+			OtpConfigGeneration: 3,
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel2Optional,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
+			"pwd otp", enums.AcrLevel2Optional.String()).Return(userSession, nil)
+
+		// The bound session's id, not the user's, and the captured value, not the user's
+		// current counter, which this handler never reads.
+		database.On("PromoteUserSessionOtpConfigGeneration", mock.Anything, int64(9), int64(4)).Return(nil)
+
+		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+
+		user := &models.User{Id: 1, Enabled: true}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.EqualValues(t, 4, userSession.OtpConfigGeneration,
+			"the in-memory session must carry what was written, since the ACR below is taken against it")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// The ACR gate. The password handler captures too, so a prompt=login ceremony at a level 1
+	// client arrives here with a capture in hand having never addressed level 2. Promoting it
+	// would discharge an obligation the ceremony never answered, and the user would keep their
+	// second factor bypassed for the rest of the session's life.
+	t.Run("Reuse arm does not promote when the target is level 1", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		captured := int64(4)
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              1,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd",
+			OtpConfigGeneration: &captured,
+		}
+
+		sessionIdentifier := "test-session"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
+		userSession := &models.UserSession{
+			Id:                  9,
+			UserId:              1,
+			AcrLevel:            enums.AcrLevel1.String(),
+			AuthTime:            sessionAuthTime,
+			OtpConfigGeneration: 3,
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
+			"pwd", enums.AcrLevel1.String()).Return(userSession, nil)
+
+		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+
+		user := &models.User{Id: 1, Enabled: true}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration",
+			mock.Anything, mock.Anything, mock.Anything)
+		assert.EqualValues(t, 3, userSession.OtpConfigGeneration,
+			"the session must still owe its level 2 re-prompt")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// No capture means the ceremony never reached /auth/level2, which can only happen when the
+	// snapshot already matched, so there is nothing to promote. It is also what an auth context
+	// written by an older binary unmarshals to, and leaving the session as it stands is the
+	// fail-closed answer there.
+	t.Run("Reuse arm does not promote when the ceremony captured nothing", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:   oauth.AuthStateAuthenticationCompleted,
+			ClientId:    "test-client",
+			UserId:      1,
+			Scope:       "openid profile",
+			AuthMethods: "pwd otp",
+		}
+
+		sessionIdentifier := "test-session"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
+		userSession := &models.UserSession{
+			Id:                  9,
+			UserId:              1,
+			AcrLevel:            enums.AcrLevel2Optional.String(),
+			AuthTime:            sessionAuthTime,
+			OtpConfigGeneration: 3,
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel2Optional,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
+			"pwd otp", enums.AcrLevel2Optional.String()).Return(userSession, nil)
+
+		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+
+		user := &models.User{Id: 1, Enabled: true}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration",
+			mock.Anything, mock.Anything, mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	// The create arm hands the captured value to StartNewUserSession, which writes it on
+	// insert. 4 rather than 0 so the expectation cannot pass against a hard-coded zero, and
+	// distinct from the auth state generation beside it so the two cannot be crossed.
+	t.Run("Create arm forwards the captured generation to the new session", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		captured := int64(4)
+		pwdAuthTime := time.Now().UTC()
+		authContext := &oauth.AuthContext{
+			AuthState:           oauth.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              1,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd otp",
+			AuthStateGeneration: 7,
+			OtpConfigGeneration: &captured,
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
+		}
+
+		sessionIdentifier := "new-test-session"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel2Optional,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+
+		newUserSession := &models.UserSession{
+			Id:                  1,
+			UserId:              1,
+			AcrLevel:            enums.AcrLevel2Optional.String(),
+			AuthTime:            time.Now().UTC(),
+			OtpConfigGeneration: 4,
+		}
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd otp",
+			enums.AcrLevel2Optional.String(), int64(7), &captured).Return(newUserSession, nil)
+
+		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
+
+		user := &models.User{Id: 1, Enabled: true}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		// The create arm never calls the promote: StartNewUserSession writes the column on
+		// insert, and a second write would be a no-op at best and a race at worst.
+		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration",
+			mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1915,7 +2272,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: enums.AcrLevel1.String(),
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7)).Return(newUserSession, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil)).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
@@ -2003,7 +2360,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: enums.AcrLevel1.String(),
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7)).Return(newUserSession, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil)).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 

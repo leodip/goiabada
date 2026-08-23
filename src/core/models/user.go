@@ -72,10 +72,22 @@ type User struct {
 	// and then writes the user back, so leaving the column in the ordinary update set
 	// would let it write the pre-claim value over its own claim. It moves only through
 	// TryConsumeUserOTPStep and ResetUserOTPStep.
-	LastOTPStep int64           `db:"last_otp_step" fieldtag:"dont-update"`
-	Groups      []Group         `db:"-"`
-	Permissions []Permission    `db:"-"`
-	Attributes  []UserAttribute `db:"-"`
+	LastOTPStep int64 `db:"last_otp_step" fieldtag:"dont-update"`
+	// OtpConfigGeneration is the authoritative per-user counter of authenticator
+	// changes: it advances by one every time OTP is enabled or disabled, and never
+	// otherwise. A session whose own snapshot differs from it owes a level 2 re-prompt.
+	// Being per user rather than per session is what makes "every session of this user"
+	// one statement, which the boolean it replaced could never do (#242).
+	//
+	// Tagged dont-update for the same reason AuthStateGeneration and LastOTPStep are:
+	// the OTP handlers load the whole user, change it and write it back, so leaving the
+	// column in the ordinary update set would let a stale model regress the counter and
+	// silently discharge every session's obligation. It advances only through
+	// IncrementUserOtpConfigGeneration.
+	OtpConfigGeneration int64           `db:"otp_config_generation" fieldtag:"dont-update"`
+	Groups              []Group         `db:"-"`
+	Permissions         []Permission    `db:"-"`
+	Attributes          []UserAttribute `db:"-"`
 }
 
 // SetOTPSecret encrypts the TOTP seed at rest (AES-256-GCM, via the process

@@ -281,6 +281,14 @@ func HandleAuthPwdPost(
 		// issues carries this older value and is rejected at redemption, which is the
 		// intended direction (#106 decision 11 rule 1).
 		authContext.AuthStateGeneration = user.AuthStateGeneration
+		// Capture the user's OTP configuration generation too. This is the value the create
+		// arm at /auth/completed stamps onto a brand new session, and it is always present
+		// there because that arm refuses to mint a session without Level1AuthCompleted,
+		// which is set only here. /auth/level2 overwrites it on every arm with a value read
+		// no earlier, so a ceremony that answers the level 2 question promotes what that
+		// answer was given against (#242 decision 3).
+		otpConfigGeneration := user.OtpConfigGeneration
+		authContext.OtpConfigGeneration = &otpConfigGeneration
 		authContext.AddAuthMethod(enums.AuthMethodPassword.String())
 		// Mark that real authentication occurred — used by handler_auth_completed
 		// to decide whether to refresh the session's AuthTime.

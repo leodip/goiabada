@@ -323,7 +323,11 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("Level2 auth config has changed", func(t *testing.T) {
+	// The user's authenticator changed since this session last answered the level 2 question,
+	// so the session's snapshot is behind the user's counter and a step-up is owed. Nothing is
+	// written: NewDatabase(t) fails on an unregistered call, and the explicit AssertNotCalled
+	// below says so in its own words, because that deletion is the whole of part 1.1 (#242).
+	t.Run("OTP config generation has moved since the session answered", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -345,11 +349,14 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
 		req = req.WithContext(ctx)
 
+		// UserSessionLoadUser is stubbed, so User is set here directly: the session answered
+		// against generation 0 and the user has since moved to 1.
 		userSession := &models.UserSession{
-			Id:                         1,
-			UserId:                     1,
-			AcrLevel:                   enums.AcrLevel2Optional.String(),
-			Level2AuthConfigHasChanged: true,
+			Id:                  1,
+			UserId:              1,
+			AcrLevel:            enums.AcrLevel2Optional.String(),
+			OtpConfigGeneration: 0,
+			User:                models.User{Id: 1, OtpConfigGeneration: 1},
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
@@ -363,8 +370,6 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		database.On("UpdateUserSession", mock.Anything, userSession).Return(nil)
-
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateRequiresLevel2
 		})).Return(nil)
@@ -374,6 +379,14 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level2", rr.Header().Get("Location"))
 
+		// Part 1.1. The handler used to clear a boolean here and commit it, so a visitor who
+		// closed the browser at the OTP form had already spent the re-prompt and the next
+		// ceremony let them through on a password alone. Deciding to ask must write nothing:
+		// the obligation is discharged at /auth/completed, once a ceremony has answered it.
+		database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything)
+		assert.EqualValues(t, 0, userSession.OtpConfigGeneration,
+			"the session's snapshot must not move in memory either")
+
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
@@ -382,11 +395,11 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 	t.Run("ACR level transitions", func(t *testing.T) {
 		tests := []struct {
-			name                    string
-			sessionAcrLevel         enums.AcrLevel
-			targetAcrLevel          enums.AcrLevel
-			level2AuthConfigChanged bool
-			expectedRedirect        string
+			name             string
+			sessionAcrLevel  enums.AcrLevel
+			targetAcrLevel   enums.AcrLevel
+			otpConfigChanged bool
+			expectedRedirect string
 		}{
 			{
 				name:             "AcrLevel1 to AcrLevel1",
@@ -419,11 +432,11 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				expectedRedirect: "/auth/completed",
 			},
 			{
-				name:                    "AcrLevel2Optional to AcrLevel2Optional (config changed)",
-				sessionAcrLevel:         enums.AcrLevel2Optional,
-				targetAcrLevel:          enums.AcrLevel2Optional,
-				level2AuthConfigChanged: true,
-				expectedRedirect:        "/auth/level2",
+				name:             "AcrLevel2Optional to AcrLevel2Optional (otp config generation moved)",
+				sessionAcrLevel:  enums.AcrLevel2Optional,
+				targetAcrLevel:   enums.AcrLevel2Optional,
+				otpConfigChanged: true,
+				expectedRedirect: "/auth/level2",
 			},
 			{
 				name:             "AcrLevel2Optional to AcrLevel2Mandatory",
@@ -450,11 +463,11 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				expectedRedirect: "/auth/completed",
 			},
 			{
-				name:                    "AcrLevel2Mandatory to AcrLevel2Mandatory (config changed)",
-				sessionAcrLevel:         enums.AcrLevel2Mandatory,
-				targetAcrLevel:          enums.AcrLevel2Mandatory,
-				level2AuthConfigChanged: true,
-				expectedRedirect:        "/auth/level2",
+				name:             "AcrLevel2Mandatory to AcrLevel2Mandatory (otp config generation moved)",
+				sessionAcrLevel:  enums.AcrLevel2Mandatory,
+				targetAcrLevel:   enums.AcrLevel2Mandatory,
+				otpConfigChanged: true,
+				expectedRedirect: "/auth/level2",
 			},
 		}
 
@@ -481,11 +494,19 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
 				req = req.WithContext(ctx)
 
+				// UserSessionLoadUser is stubbed, so User is set here directly. A moved counter
+				// is the session's snapshot sitting behind the user's, which is what the handler
+				// compares (#242).
+				userGeneration := int64(0)
+				if tt.otpConfigChanged {
+					userGeneration = 1
+				}
 				userSession := &models.UserSession{
-					Id:                         1,
-					UserId:                     1,
-					AcrLevel:                   tt.sessionAcrLevel.String(),
-					Level2AuthConfigHasChanged: tt.level2AuthConfigChanged,
+					Id:                  1,
+					UserId:              1,
+					AcrLevel:            tt.sessionAcrLevel.String(),
+					OtpConfigGeneration: 0,
+					User:                models.User{Id: 1, OtpConfigGeneration: userGeneration},
 				}
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
 				database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
@@ -498,12 +519,6 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 				userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
-
-				if tt.level2AuthConfigChanged {
-					database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(us *models.UserSession) bool {
-						return !us.Level2AuthConfigHasChanged
-					})).Return(nil)
-				}
 
 				expectedAuthState := oauth.AuthStateAuthenticationCompleted
 				if tt.expectedRedirect == "/auth/level2" {
@@ -519,6 +534,10 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				assert.Equal(t, http.StatusFound, rr.Code)
 				assert.Equal(t, config.GetAuthServer().BaseURL+tt.expectedRedirect, rr.Header().Get("Location"))
 
+				// Every row, not only the moved ones: this handler writes nothing at all now,
+				// which is what stops an abandoned ceremony spending its re-prompt (#242).
+				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything)
+
 				httpHelper.AssertExpectations(t)
 				authHelper.AssertExpectations(t)
 				userSessionManager.AssertExpectations(t)
@@ -533,12 +552,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	// no ACR, so the target alone decides step-up, and nothing writes to the other user's row (#133).
 	t.Run("Foreign session does not decide step-up", func(t *testing.T) {
 		tests := []struct {
-			name                    string
-			sessionAcrLevel         enums.AcrLevel
-			targetAcrLevel          enums.AcrLevel
-			level2AuthConfigChanged bool
-			expectedRedirect        string
-			description             string
+			name             string
+			sessionAcrLevel  enums.AcrLevel
+			targetAcrLevel   enums.AcrLevel
+			otpConfigChanged bool
+			expectedRedirect string
+			description      string
 		}{
 			{
 				name:             "foreign session at the target still prompts for level2",
@@ -569,12 +588,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				description:      "control: the target arm already handled this, so a failure here means it broke",
 			},
 			{
-				name:                    "the other user's config-changed flag is left alone",
-				sessionAcrLevel:         enums.AcrLevel2Optional,
-				targetAcrLevel:          enums.AcrLevel2Optional,
-				level2AuthConfigChanged: true,
-				expectedRedirect:        "/auth/level2",
-				description:             "no UpdateUserSession is registered below, so any write to the other user's row fails this row",
+				name:             "the other user's snapshot is left alone",
+				sessionAcrLevel:  enums.AcrLevel2Optional,
+				targetAcrLevel:   enums.AcrLevel2Optional,
+				otpConfigChanged: true,
+				expectedRedirect: "/auth/level2",
+				description:      "nothing may write to the other user's row, and nothing writes to any row now",
 			},
 		}
 
@@ -601,11 +620,19 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
 				req = req.WithContext(ctx)
 
+				// UserSessionLoadUser is stubbed, so User is set here directly. A moved counter
+				// is the session's snapshot sitting behind the user's, which is what the handler
+				// compares (#242).
+				userGeneration := int64(0)
+				if tt.otpConfigChanged {
+					userGeneration = 1
+				}
 				userSession := &models.UserSession{
-					Id:                         1,
-					UserId:                     1,
-					AcrLevel:                   tt.sessionAcrLevel.String(),
-					Level2AuthConfigHasChanged: tt.level2AuthConfigChanged,
+					Id:                  1,
+					UserId:              1,
+					AcrLevel:            tt.sessionAcrLevel.String(),
+					OtpConfigGeneration: 0,
+					User:                models.User{Id: 1, OtpConfigGeneration: userGeneration},
 				}
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
 				database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
@@ -632,8 +659,9 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 				assert.Equal(t, http.StatusFound, rr.Code)
 				assert.Equal(t, config.GetAuthServer().BaseURL+tt.expectedRedirect, rr.Header().Get("Location"), tt.description)
-				assert.True(t, userSession.Level2AuthConfigHasChanged == tt.level2AuthConfigChanged,
+				assert.EqualValues(t, 0, userSession.OtpConfigGeneration,
 					"the other user's session must not be modified in memory either")
+				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything)
 
 				httpHelper.AssertExpectations(t)
 				authHelper.AssertExpectations(t)

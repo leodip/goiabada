@@ -130,6 +130,10 @@ func (d *PostgresDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId i
 	return d.CommonDB.IncrementUserAuthStateGeneration(tx, userId)
 }
 
+func (d *PostgresDatabase) IncrementUserOtpConfigGeneration(tx *sql.Tx, userId int64) (int64, error) {
+	return d.CommonDB.IncrementUserOtpConfigGeneration(tx, userId)
+}
+
 func (d *PostgresDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error {
 	return d.CommonDB.SetUserPasswordHash(tx, userId, passwordHash)
 }

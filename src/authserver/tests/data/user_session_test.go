@@ -47,7 +47,6 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession.DeviceName = "Updated Device"
 	userSession.DeviceType = "tablet"
 	userSession.DeviceOS = "iOS"
-	userSession.Level2AuthConfigHasChanged = true
 	userSession.UserId = user.Id // This shouldn't change, but we'll update it to ensure it's not accidentally modified
 
 	time.Sleep(timestampTick)
@@ -318,18 +317,17 @@ func TestDeleteUserSession(t *testing.T) {
 
 func createTestUserSession(t *testing.T, userId int64) *models.UserSession {
 	userSession := &models.UserSession{
-		SessionIdentifier:          gofakeit.UUID(),
-		Started:                    time.Now().UTC().Truncate(time.Microsecond),
-		LastAccessed:               time.Now().UTC().Truncate(time.Microsecond),
-		AuthMethods:                "pwd",
-		AcrLevel:                   enums.AcrLevel1.String(),
-		AuthTime:                   time.Now().UTC().Truncate(time.Microsecond),
-		IpAddress:                  gofakeit.IPv4Address(),
-		DeviceName:                 gofakeit.Name(),
-		DeviceType:                 "desktop",
-		DeviceOS:                   "Windows",
-		Level2AuthConfigHasChanged: false,
-		UserId:                     userId,
+		SessionIdentifier: gofakeit.UUID(),
+		Started:           time.Now().UTC().Truncate(time.Microsecond),
+		LastAccessed:      time.Now().UTC().Truncate(time.Microsecond),
+		AuthMethods:       "pwd",
+		AcrLevel:          enums.AcrLevel1.String(),
+		AuthTime:          time.Now().UTC().Truncate(time.Microsecond),
+		IpAddress:         gofakeit.IPv4Address(),
+		DeviceName:        gofakeit.Name(),
+		DeviceType:        "desktop",
+		DeviceOS:          "Windows",
+		UserId:            userId,
 	}
 	err := database.CreateUserSession(nil, userSession)
 	if err != nil {
@@ -405,9 +403,6 @@ func assertUserSessionEqual(t *testing.T, expected, actual *models.UserSession) 
 	if actual.DeviceOS != expected.DeviceOS {
 		t.Errorf("Expected DeviceOS %s, got %s", expected.DeviceOS, actual.DeviceOS)
 	}
-	if actual.Level2AuthConfigHasChanged != expected.Level2AuthConfigHasChanged {
-		t.Errorf("Expected Level2AuthConfigHasChanged %v, got %v", expected.Level2AuthConfigHasChanged, actual.Level2AuthConfigHasChanged)
-	}
 	if actual.UserId != expected.UserId {
 		t.Errorf("Expected UserId %d, got %d", expected.UserId, actual.UserId)
 	}
@@ -462,18 +457,17 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create an active session (accessed 10 minutes ago)
 	activeSession := &models.UserSession{
-		SessionIdentifier:          gofakeit.UUID(),
-		Started:                    now.Add(-10 * time.Minute),
-		LastAccessed:               now.Add(-10 * time.Minute),
-		AuthMethods:                "pwd",
-		AcrLevel:                   enums.AcrLevel1.String(),
-		AuthTime:                   now.Add(-10 * time.Minute),
-		IpAddress:                  gofakeit.IPv4Address(),
-		DeviceName:                 gofakeit.Name(),
-		DeviceType:                 "desktop",
-		DeviceOS:                   "Windows",
-		Level2AuthConfigHasChanged: false,
-		UserId:                     user.Id,
+		SessionIdentifier: gofakeit.UUID(),
+		Started:           now.Add(-10 * time.Minute),
+		LastAccessed:      now.Add(-10 * time.Minute),
+		AuthMethods:       "pwd",
+		AcrLevel:          enums.AcrLevel1.String(),
+		AuthTime:          now.Add(-10 * time.Minute),
+		IpAddress:         gofakeit.IPv4Address(),
+		DeviceName:        gofakeit.Name(),
+		DeviceType:        "desktop",
+		DeviceOS:          "Windows",
+		UserId:            user.Id,
 	}
 	err = database.CreateUserSession(nil, activeSession)
 	if err != nil {
@@ -494,18 +488,17 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create an idle session (accessed 2 hours ago)
 	idleSession := &models.UserSession{
-		SessionIdentifier:          gofakeit.UUID(),
-		Started:                    now.Add(-3 * time.Hour),
-		LastAccessed:               now.Add(-2 * time.Hour),
-		AuthMethods:                "pwd",
-		AcrLevel:                   enums.AcrLevel1.String(),
-		AuthTime:                   now.Add(-3 * time.Hour),
-		IpAddress:                  gofakeit.IPv4Address(),
-		DeviceName:                 gofakeit.Name(),
-		DeviceType:                 "desktop",
-		DeviceOS:                   "Windows",
-		Level2AuthConfigHasChanged: false,
-		UserId:                     user.Id,
+		SessionIdentifier: gofakeit.UUID(),
+		Started:           now.Add(-3 * time.Hour),
+		LastAccessed:      now.Add(-2 * time.Hour),
+		AuthMethods:       "pwd",
+		AcrLevel:          enums.AcrLevel1.String(),
+		AuthTime:          now.Add(-3 * time.Hour),
+		IpAddress:         gofakeit.IPv4Address(),
+		DeviceName:        gofakeit.Name(),
+		DeviceType:        "desktop",
+		DeviceOS:          "Windows",
+		UserId:            user.Id,
 	}
 	err = database.CreateUserSession(nil, idleSession)
 	if err != nil {
@@ -526,18 +519,17 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create a very idle session (accessed 4 hours ago)
 	veryIdleSession := &models.UserSession{
-		SessionIdentifier:          gofakeit.UUID(),
-		Started:                    now.Add(-5 * time.Hour),
-		LastAccessed:               now.Add(-4 * time.Hour),
-		AuthMethods:                "pwd",
-		AcrLevel:                   enums.AcrLevel1.String(),
-		AuthTime:                   now.Add(-5 * time.Hour),
-		IpAddress:                  gofakeit.IPv4Address(),
-		DeviceName:                 gofakeit.Name(),
-		DeviceType:                 "desktop",
-		DeviceOS:                   "Windows",
-		Level2AuthConfigHasChanged: false,
-		UserId:                     user.Id,
+		SessionIdentifier: gofakeit.UUID(),
+		Started:           now.Add(-5 * time.Hour),
+		LastAccessed:      now.Add(-4 * time.Hour),
+		AuthMethods:       "pwd",
+		AcrLevel:          enums.AcrLevel1.String(),
+		AuthTime:          now.Add(-5 * time.Hour),
+		IpAddress:         gofakeit.IPv4Address(),
+		DeviceName:        gofakeit.Name(),
+		DeviceType:        "desktop",
+		DeviceOS:          "Windows",
+		UserId:            user.Id,
 	}
 	err = database.CreateUserSession(nil, veryIdleSession)
 	if err != nil {
@@ -663,18 +655,17 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create a recent session (started 1 hour ago)
 	recentSession := &models.UserSession{
-		SessionIdentifier:          gofakeit.UUID(),
-		Started:                    now.Add(-1 * time.Hour),
-		LastAccessed:               now,
-		AuthMethods:                "pwd",
-		AcrLevel:                   enums.AcrLevel1.String(),
-		AuthTime:                   now.Add(-1 * time.Hour),
-		IpAddress:                  gofakeit.IPv4Address(),
-		DeviceName:                 gofakeit.Name(),
-		DeviceType:                 "desktop",
-		DeviceOS:                   "Windows",
-		Level2AuthConfigHasChanged: false,
-		UserId:                     user.Id,
+		SessionIdentifier: gofakeit.UUID(),
+		Started:           now.Add(-1 * time.Hour),
+		LastAccessed:      now,
+		AuthMethods:       "pwd",
+		AcrLevel:          enums.AcrLevel1.String(),
+		AuthTime:          now.Add(-1 * time.Hour),
+		IpAddress:         gofakeit.IPv4Address(),
+		DeviceName:        gofakeit.Name(),
+		DeviceType:        "desktop",
+		DeviceOS:          "Windows",
+		UserId:            user.Id,
 	}
 	err = database.CreateUserSession(nil, recentSession)
 	if err != nil {
@@ -695,18 +686,17 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create an old session (started 2 days ago)
 	oldSession := &models.UserSession{
-		SessionIdentifier:          gofakeit.UUID(),
-		Started:                    now.Add(-48 * time.Hour),
-		LastAccessed:               now,
-		AuthMethods:                "pwd",
-		AcrLevel:                   enums.AcrLevel1.String(),
-		AuthTime:                   now.Add(-48 * time.Hour),
-		IpAddress:                  gofakeit.IPv4Address(),
-		DeviceName:                 gofakeit.Name(),
-		DeviceType:                 "desktop",
-		DeviceOS:                   "Windows",
-		Level2AuthConfigHasChanged: false,
-		UserId:                     user.Id,
+		SessionIdentifier: gofakeit.UUID(),
+		Started:           now.Add(-48 * time.Hour),
+		LastAccessed:      now,
+		AuthMethods:       "pwd",
+		AcrLevel:          enums.AcrLevel1.String(),
+		AuthTime:          now.Add(-48 * time.Hour),
+		IpAddress:         gofakeit.IPv4Address(),
+		DeviceName:        gofakeit.Name(),
+		DeviceType:        "desktop",
+		DeviceOS:          "Windows",
+		UserId:            user.Id,
 	}
 	err = database.CreateUserSession(nil, oldSession)
 	if err != nil {
@@ -727,18 +717,17 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create a very old session (started 5 days ago)
 	veryOldSession := &models.UserSession{
-		SessionIdentifier:          gofakeit.UUID(),
-		Started:                    now.Add(-120 * time.Hour),
-		LastAccessed:               now,
-		AuthMethods:                "pwd",
-		AcrLevel:                   enums.AcrLevel1.String(),
-		AuthTime:                   now.Add(-120 * time.Hour),
-		IpAddress:                  gofakeit.IPv4Address(),
-		DeviceName:                 gofakeit.Name(),
-		DeviceType:                 "desktop",
-		DeviceOS:                   "Windows",
-		Level2AuthConfigHasChanged: false,
-		UserId:                     user.Id,
+		SessionIdentifier: gofakeit.UUID(),
+		Started:           now.Add(-120 * time.Hour),
+		LastAccessed:      now,
+		AuthMethods:       "pwd",
+		AcrLevel:          enums.AcrLevel1.String(),
+		AuthTime:          now.Add(-120 * time.Hour),
+		IpAddress:         gofakeit.IPv4Address(),
+		DeviceName:        gofakeit.Name(),
+		DeviceType:        "desktop",
+		DeviceOS:          "Windows",
+		UserId:            user.Id,
 	}
 	err = database.CreateUserSession(nil, veryOldSession)
 	if err != nil {
@@ -834,6 +823,9 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	userSession := createTestUserSession(t, user.Id)
 
 	userSession.AuthStateGeneration = 7
+	// 5 rather than 7, so a mapping that crossed the two columns would be caught here rather
+	// than passing silently.
+	userSession.OtpConfigGeneration = 5
 	userSession.Id = 0
 	userSession.SessionIdentifier = gofakeit.UUID()
 	if err := database.CreateUserSession(nil, userSession); err != nil {
@@ -848,9 +840,18 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Fatalf("CreateUserSession must persist auth_state_generation, got %d want 7",
 			created.AuthStateGeneration)
 	}
+	if created.OtpConfigGeneration != 5 {
+		t.Fatalf("CreateUserSession must persist otp_config_generation, got %d want 5",
+			created.OtpConfigGeneration)
+	}
 
 	created.AuthStateGeneration = 0
-	created.Level2AuthConfigHasChanged = true
+	// otp_config_generation is tagged dont-update for the same reason, and the hazard is the
+	// one this issue exists to close: BumpUserSession writes the whole row on every request,
+	// so in the ordinary update set a stale model would regress the snapshot and hand every
+	// session of the user a re-prompt it does not owe, or discharge one it does (#242).
+	created.OtpConfigGeneration = 0
+	created.DeviceName = "the rest of the update still applies"
 	if err := database.UpdateUserSession(nil, created); err != nil {
 		t.Fatalf("Failed to update user session: %v", err)
 	}
@@ -863,8 +864,12 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Errorf("UpdateUserSession regressed auth_state_generation to %d, want 7 (is the dont-update tag missing?)",
 			after.AuthStateGeneration)
 	}
-	if !after.Level2AuthConfigHasChanged {
-		t.Error("the rest of the update must still apply, Level2AuthConfigHasChanged = false")
+	if after.OtpConfigGeneration != 5 {
+		t.Errorf("UpdateUserSession regressed otp_config_generation to %d, want 5 (is the dont-update tag missing?)",
+			after.OtpConfigGeneration)
+	}
+	if after.DeviceName != "the rest of the update still applies" {
+		t.Errorf("the rest of the update must still apply, DeviceName is %q", after.DeviceName)
 	}
 }
 

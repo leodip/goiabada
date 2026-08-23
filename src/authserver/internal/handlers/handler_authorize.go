@@ -677,8 +677,15 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 		}
 	}
 
-	// 6. Check if Level2AuthConfigHasChanged flag is set (user changed OTP settings)
-	if userSession.Level2AuthConfigHasChanged {
+	// 6. The user's authenticator has changed since this session last answered the level 2
+	// question. userSession.User is already loaded on this path, for Enabled and OTPEnabled
+	// above, so the comparison costs no query.
+	//
+	// A reader only: it refuses and promotes nothing, because no interaction happened. That
+	// is what makes an identical second prompt=none request get the identical answer, where
+	// the boolean this replaced would have been a one-shot signal had either reader cleared
+	// it here (#242 decision 1).
+	if userSession.OtpConfigGeneration != userSession.User.OtpConfigGeneration {
 		// Only matters if target requires level2
 		if targetAcrLevel == enums.AcrLevel2Optional || targetAcrLevel == enums.AcrLevel2Mandatory {
 			redirectWithError(constants.ErrorInteractionRequired, "Authentication configuration has changed")

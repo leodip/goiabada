@@ -669,11 +669,11 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	}
 	userSession1 := userSessions[0]
 
-	userSession1.Level2AuthConfigHasChanged = true
-	err = database.UpdateUserSession(nil, &userSession1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// The user's authenticator changed out of band, so the counter moves and this session's
+	// snapshot is left behind it. Standing in for the enable and disable handlers, which do this
+	// inside their own transactions; these cases are about what the ceremony does with a session
+	// that owes a re-prompt, not about how it came to owe one (#242).
+	advanceOtpConfigGeneration(t, user.Id)
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -755,7 +755,16 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
-	assert.Equal(t, false, userSession2.Level2AuthConfigHasChanged)
+	// The obligation is discharged, and here rather than earlier. /auth/level1completed only
+	// compared, /auth/level2 only captured onto the auth context, and /auth/completed is what
+	// wrote. A ceremony abandoned before that point would have left the snapshot behind and this
+	// same request would prompt for OTP again (#242 decision 3).
+	userAfter, err := database.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, userAfter.OtpConfigGeneration, userSession2.OtpConfigGeneration,
+		"the session must have caught up with the user's counter after answering the OTP prompt")
 }
 
 func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_OtpDisabled(t *testing.T) {
@@ -1260,11 +1269,11 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	}
 	userSession1 := userSessions[0]
 
-	userSession1.Level2AuthConfigHasChanged = true
-	err = database.UpdateUserSession(nil, &userSession1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// The user's authenticator changed out of band, so the counter moves and this session's
+	// snapshot is left behind it. Standing in for the enable and disable handlers, which do this
+	// inside their own transactions; these cases are about what the ceremony does with a session
+	// that owes a re-prompt, not about how it came to owe one (#242).
+	advanceOtpConfigGeneration(t, user.Id)
 
 	time.Sleep(200 * time.Millisecond)
 

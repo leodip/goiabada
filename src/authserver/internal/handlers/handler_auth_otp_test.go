@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -44,6 +45,12 @@ func encryptOTPForTest(t *testing.T, secret string) []byte {
 	}
 	return enc
 }
+
+// otpEnrolTx is an opaque non-nil transaction, the counterpart of apihandlers' otpDisableTx. The
+// enrollment cases register every write against this exact handle, so a write that slipped back to
+// the pool would arrive carrying a nil tx and fail as an unexpected call. That is the assertion;
+// nothing about *sql.Tx itself is exercised (#242 decision 2).
+var otpEnrolTx = &sql.Tx{}
 
 func TestHandleAuthOtpGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
@@ -1002,14 +1009,27 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, false).
 			Return(true, nil)
 
-		database.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+		// The enable write and the counter advance commit together, so there is no state in
+		// which the authenticator is on and no session knows (#242 decision 2). Registered
+		// against this exact handle, so a write that slipped back to the pool would arrive
+		// carrying a nil tx and fail as an unexpected call.
+		var calls []string
+		database.On("BeginTransaction").Return(otpEnrolTx, nil).
+			Run(func(mock.Arguments) { calls = append(calls, "begin") }).Once()
+		database.On("UpdateUser", otpEnrolTx, mock.MatchedBy(func(u *models.User) bool {
 			// The secret must be stored encrypted, with the plaintext column cleared.
 			if u.Id != 1 || !u.OTPEnabled || u.OTPSecret != "" || len(u.OTPSecretEncrypted) == 0 {
 				return false
 			}
 			decrypted, err := u.GetOTPSecret()
 			return err == nil && decrypted == otpSecret
-		})).Return(nil)
+		})).Return(nil).
+			Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
+		database.On("IncrementUserOtpConfigGeneration", otpEnrolTx, int64(1)).Return(int64(6), nil).
+			Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
+		database.On("CommitTransaction", otpEnrolTx).Return(nil).
+			Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
+		database.On("RollbackTransaction", otpEnrolTx).Return(nil).Once()
 
 		auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return()
 		auditLogger.On("Log", constants.AuditAuthSuccessOtp, mock.Anything).Return()
@@ -1018,6 +1038,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateAuthenticationCompleted &&
 				ac.AuthMethods == enums.AuthMethodOTP.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
+				// The value the increment returned, not the pre-enrollment value /auth/level2
+				// captured. This ceremony answered the level 2 question by MOVING the counter,
+				// so promoting the older value at /auth/completed would leave the session it is
+				// about to create owing another prompt at once (#242).
+				ac.OtpConfigGeneration != nil && *ac.OtpConfigGeneration == 6 &&
 				// OTP is level 2 and must not claim level 1: a ceremony can reach here by
 				// reusing a session rather than by entering a password, so setting this
 				// would let it recreate a session that was just ended (#129 decision 15).
@@ -1028,6 +1053,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/completed", rr.Header().Get("Location"))
+
+		assert.Equal(t, []string{"begin", "update", "increment", "commit"}, calls,
+			"the enable write and the counter advance belong inside one transaction, commit last")
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1091,11 +1119,93 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Return(true, nil)
 
 		updateError := errors.New("failed to update user")
-		database.On("UpdateUser", mock.Anything, mock.Anything).Return(updateError)
+		database.On("BeginTransaction").Return(otpEnrolTx, nil).Once()
+		database.On("UpdateUser", otpEnrolTx, mock.Anything).Return(updateError).Once()
+		database.On("RollbackTransaction", otpEnrolTx).Return(nil).Once()
 
 		httpHelper.On("InternalServerError", rr, req, updateError).Return()
 
 		handler.ServeHTTP(rr, req)
+
+		// Neither is registered, so reaching either would already fail. Saying so explicitly is
+		// the point: a failed enable rolls back whole, and the counter must not move for an
+		// authenticator that was never established.
+		database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+	})
+
+	// The other half of the transaction: the enable write lands and the counter advance fails.
+	// Committing here would leave the authenticator on with every session's snapshot still
+	// matching, so they would all keep asserting acr level2_optional with amr ["pwd"] for a user
+	// who now has an authenticator. That is precisely the state the re-prompt exists to prevent,
+	// and the caller cannot recover from it: a retry is refused with OTP_ALREADY_ENABLED
+	// (#242 decision 2).
+	t.Run("Counter advance failure rolls the enrollment back", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger, noCredentialFailures{})
+
+		key, err := totp.Generate(totp.GenerateOpts{
+			Issuer:      "TestApp",
+			AccountName: "test@test.com",
+		})
+		assert.Nil(t, err)
+
+		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
+		assert.Nil(t, err)
+
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("otp", otpCode)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		session.Values[constants.SessionKeyOTPSecret] = key.Secret()
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
+
+		user := &models.User{Id: 1, Enabled: true, OTPEnabled: false}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{ClientIdentifier: "test-client"}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, false).
+			Return(true, nil)
+
+		incrementError := errors.New("the database is unwell")
+		database.On("BeginTransaction").Return(otpEnrolTx, nil).Once()
+		database.On("UpdateUser", otpEnrolTx, mock.Anything).Return(nil).Once()
+		database.On("IncrementUserOtpConfigGeneration", otpEnrolTx, int64(1)).
+			Return(int64(0), incrementError).Once()
+		database.On("RollbackTransaction", otpEnrolTx).Return(nil).Once()
+
+		httpHelper.On("InternalServerError", rr, req, incrementError).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+		// Nothing is audited as an enrollment that did not happen, and the ceremony does not
+		// advance: no auth method is added and no context is saved.
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)

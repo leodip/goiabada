@@ -211,7 +211,12 @@ func HandleAPIAccountOTPPut(
 			}
 			user.OTPEnabled = true
 
-			if err := database.UpdateUser(nil, user); err != nil {
+			// The user write and the OTP configuration generation's advance commit together,
+			// so there is no state in which the authenticator is on and no session knows
+			// (#242 decision 2). The returned generation is discarded here: only the browser
+			// ceremony, which captured the pre-enrollment value earlier in the same ceremony,
+			// has a use for it.
+			if _, err := handlers.EnableUserOTPTx(database, user); err != nil {
 				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 				return
 			}
@@ -236,15 +241,16 @@ func HandleAPIAccountOTPPut(
 			})
 		}
 
-		// Flag session Level2AuthConfigHasChanged = true for this sid if present
-		sid := jwtToken.GetStringClaim("sid")
-		if strings.TrimSpace(sid) != "" {
-			userSession, err := database.GetUserSessionBySessionIdentifier(nil, sid)
-			if err == nil && userSession != nil {
-				userSession.Level2AuthConfigHasChanged = true
-				_ = database.UpdateUserSession(nil, userSession)
-			}
-		}
+		// Nothing to flag on the caller's own session. Both branches above advanced
+		// users.otp_config_generation inside the transaction that changed the authenticator,
+		// which covers EVERY session of this user in one statement.
+		//
+		// What stood here read the caller's own sid claim, looked that one session up, set a
+		// boolean on it and discarded both the read error and the write error. It therefore
+		// reached at most one session, and none at all for a token with no sid claim, so a
+		// user who enabled OTP through this endpoint left their other live sessions asserting
+		// acr: urn:goiabada:level2_optional with amr: ["pwd"] for an authenticator they now
+		// had (#242, parts 1.2 and 1.3).
 
 		// Get updated user and respond
 		updated, err := database.GetUserById(nil, user.Id)
@@ -304,6 +310,19 @@ func disableUserOTP(database data.Database, user *models.User) error {
 		return err
 	}
 	if err := database.ResetUserOTPStep(tx, user.Id); err != nil {
+		return err
+	}
+	// The counter that tells every one of this user's sessions they owe a second factor
+	// again, advanced inside the same transaction as the removal itself. Being per user is
+	// what makes "every session" one statement: the boolean this replaced was per session
+	// and written only for the caller's own sid, so a user disabling their authenticator
+	// from one device left every other session asserting amr ["pwd","otp"] for an
+	// authenticator that no longer existed (#242 decisions 1 and 2).
+	//
+	// Its error is returned rather than discarded, and that is the other half of decision 2:
+	// a removal that commits without the counter moving is precisely the state the re-prompt
+	// exists to prevent.
+	if _, err := database.IncrementUserOtpConfigGeneration(tx, user.Id); err != nil {
 		return err
 	}
 	return database.CommitTransaction(tx)

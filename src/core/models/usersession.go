@@ -6,25 +6,37 @@ import (
 )
 
 type UserSession struct {
-	Id                         int64        `db:"id" fieldtag:"pk"`
-	CreatedAt                  sql.NullTime `db:"created_at" fieldtag:"dont-update"`
-	UpdatedAt                  sql.NullTime `db:"updated_at"`
-	SessionIdentifier          string       `db:"session_identifier"`
-	Started                    time.Time    `db:"started"`
-	LastAccessed               time.Time    `db:"last_accessed"`
-	AuthMethods                string       `db:"auth_methods"`
-	AcrLevel                   string       `db:"acr_level"`
-	AuthTime                   time.Time    `db:"auth_time"`
-	IpAddress                  string       `db:"ip_address"`
-	DeviceName                 string       `db:"device_name"`
-	DeviceType                 string       `db:"device_type"`
-	DeviceOS                   string       `db:"device_os"`
-	Level2AuthConfigHasChanged bool         `db:"level2_auth_config_has_changed"`
+	Id                int64        `db:"id" fieldtag:"pk"`
+	CreatedAt         sql.NullTime `db:"created_at" fieldtag:"dont-update"`
+	UpdatedAt         sql.NullTime `db:"updated_at"`
+	SessionIdentifier string       `db:"session_identifier"`
+	Started           time.Time    `db:"started"`
+	LastAccessed      time.Time    `db:"last_accessed"`
+	AuthMethods       string       `db:"auth_methods"`
+	AcrLevel          string       `db:"acr_level"`
+	AuthTime          time.Time    `db:"auth_time"`
+	IpAddress         string       `db:"ip_address"`
+	DeviceName        string       `db:"device_name"`
+	DeviceType        string       `db:"device_type"`
+	DeviceOS          string       `db:"device_os"`
 	// AuthStateGeneration records the user's generation when this session was
 	// created. Tagged dont-update so an ordinary full-row UpdateUserSession cannot
 	// regress it: it is written on insert and afterwards only by
 	// PromoteUserSessionGeneration (#106).
-	AuthStateGeneration int64               `db:"auth_state_generation" fieldtag:"dont-update"`
+	AuthStateGeneration int64 `db:"auth_state_generation" fieldtag:"dont-update"`
+	// OtpConfigGeneration is the user's otp_config_generation as it stood when this
+	// session last satisfied the level 2 question, so this session owes a level 2
+	// re-prompt whenever the two differ. It replaced a boolean the readers cleared as
+	// they read it, which is why the comparison here is the whole point: reading is not
+	// writing, so a ceremony abandoned at the OTP prompt no longer spends the re-prompt
+	// it was owed (#242).
+	//
+	// Tagged dont-update for the reason AuthStateGeneration is: every credential handler
+	// loads the whole row and writes it back, and BumpUserSession rewrites it on every
+	// request, so leaving it in the ordinary update set would let a stale model regress
+	// it. It is written on insert and afterwards only by
+	// PromoteUserSessionOtpConfigGeneration.
+	OtpConfigGeneration int64               `db:"otp_config_generation" fieldtag:"dont-update"`
 	UserId              int64               `db:"user_id"`
 	User                User                `db:"-"`
 	Clients             []UserSessionClient `db:"-"`

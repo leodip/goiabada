@@ -9216,6 +9216,72 @@ func (_c *Database_IncrementUserAuthStateGeneration_Call) RunAndReturn(run func(
 	return _c
 }
 
+// IncrementUserOtpConfigGeneration provides a mock function for the type Database
+func (_mock *Database) IncrementUserOtpConfigGeneration(tx *sql.Tx, userId int64) (int64, error) {
+	ret := _mock.Called(tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IncrementUserOtpConfigGeneration")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (int64, error)); ok {
+		return returnFunc(tx, userId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) int64); ok {
+		r0 = returnFunc(tx, userId)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, userId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_IncrementUserOtpConfigGeneration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IncrementUserOtpConfigGeneration'
+type Database_IncrementUserOtpConfigGeneration_Call struct {
+	*mock.Call
+}
+
+// IncrementUserOtpConfigGeneration is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) IncrementUserOtpConfigGeneration(tx any, userId any) *Database_IncrementUserOtpConfigGeneration_Call {
+	return &Database_IncrementUserOtpConfigGeneration_Call{Call: _e.mock.On("IncrementUserOtpConfigGeneration", tx, userId)}
+}
+
+func (_c *Database_IncrementUserOtpConfigGeneration_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_IncrementUserOtpConfigGeneration_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_IncrementUserOtpConfigGeneration_Call) Return(n int64, err error) *Database_IncrementUserOtpConfigGeneration_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_IncrementUserOtpConfigGeneration_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) (int64, error)) *Database_IncrementUserOtpConfigGeneration_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsEmpty provides a mock function for the type Database
 func (_mock *Database) IsEmpty() (bool, error) {
 	ret := _mock.Called()
@@ -9624,6 +9690,69 @@ func (_c *Database_PromoteUserSessionGeneration_Call) Return(err error) *Databas
 }
 
 func (_c *Database_PromoteUserSessionGeneration_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionGeneration_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PromoteUserSessionOtpConfigGeneration provides a mock function for the type Database
+func (_mock *Database) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+	ret := _mock.Called(tx, userSessionId, generation)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PromoteUserSessionOtpConfigGeneration")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, int64) error); ok {
+		r0 = returnFunc(tx, userSessionId, generation)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_PromoteUserSessionOtpConfigGeneration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PromoteUserSessionOtpConfigGeneration'
+type Database_PromoteUserSessionOtpConfigGeneration_Call struct {
+	*mock.Call
+}
+
+// PromoteUserSessionOtpConfigGeneration is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userSessionId int64
+//   - generation int64
+func (_e *Database_Expecter) PromoteUserSessionOtpConfigGeneration(tx any, userSessionId any, generation any) *Database_PromoteUserSessionOtpConfigGeneration_Call {
+	return &Database_PromoteUserSessionOtpConfigGeneration_Call{Call: _e.mock.On("PromoteUserSessionOtpConfigGeneration", tx, userSessionId, generation)}
+}
+
+func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) Run(run func(tx *sql.Tx, userSessionId int64, generation int64)) *Database_PromoteUserSessionOtpConfigGeneration_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) Return(err error) *Database_PromoteUserSessionOtpConfigGeneration_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionOtpConfigGeneration_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -364,11 +364,22 @@ func HandleAuthOtpPost(
 				return
 			}
 			user.OTPEnabled = true
-			err = database.UpdateUser(nil, user)
+			// The user write and the OTP configuration generation's advance commit together,
+			// so there is no state in which the authenticator is on and no session knows
+			// (#242 decision 2).
+			enrolledGeneration, err := EnableUserOTPTx(database, user)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
+
+			// Overwrite what /auth/level2 captured with the value the increment returned.
+			// This ceremony asked the level 2 question against generation N and has just
+			// answered it by MOVING the counter to N+1, so promoting N at /auth/completed
+			// would leave the session it is about to bind owing another second-factor prompt
+			// immediately. The value comes from the read-back rather than from N+1 computed
+			// here, so a concurrent change cannot be laundered into it (#242).
+			authContext.OtpConfigGeneration = &enrolledGeneration
 
 			auditLogger.Log(constants.AuditEnabledOTP, map[string]interface{}{
 				"userId": user.Id,

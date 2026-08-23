@@ -54,11 +54,22 @@ func (u *UserSessionManager) HasValidUserSession(ctx context.Context, userSessio
 // authenticated under rather than the user's current value. A ceremony that began before
 // a credential change therefore produces a session on the superseded generation, which
 // is rejected rather than silently carried forward (#106 decision 11).
+//
+// otpConfigGeneration is the same shape: the user's OTP configuration generation as this
+// ceremony observed it when it answered the level 2 question. Nil means the ceremony
+// observed nothing, which writes 0, and for a brand new session that means it owes a
+// level 2 re-prompt whenever the user's counter is already above 0. That is the
+// fail-closed direction and the only one a nil can safely take (#242).
 func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	userId int64, clientId int64, authMethods string, acrLevel string,
-	authStateGeneration int64) (*models.UserSession, error) {
+	authStateGeneration int64, otpConfigGeneration *int64) (*models.UserSession, error) {
 
 	utcNow := time.Now().UTC()
+
+	observedOtpConfigGeneration := int64(0)
+	if otpConfigGeneration != nil {
+		observedOtpConfigGeneration = *otpConfigGeneration
+	}
 
 	ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
 	if len(ipWithoutPort) == 0 {
@@ -79,6 +90,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		DeviceOS:          useragent.GetDeviceOS(r),
 
 		AuthStateGeneration: authStateGeneration,
+		OtpConfigGeneration: observedOtpConfigGeneration,
 	}
 
 	userSession.Clients = append(userSession.Clients, models.UserSessionClient{
