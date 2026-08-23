@@ -442,6 +442,55 @@ func TestUpdateKeyPairState_EnlistsInCallersTransaction(t *testing.T) {
 	}
 }
 
+// TestUpdateKeyPairState_StorageFailureIsAnError separates a storage fault from a lost
+// compare-and-set. Both leave the row where it found it, and both come back with moved
+// false, so the error return is the only thing that tells them apart.
+//
+// It matters because of what the caller does with the distinction. SigningKeyRotator maps
+// a false return to ErrRotationInProgress, which the API answers with 409 and the admin
+// console renders as "Another key rotation is in progress": an administrator reading that
+// understands the rotation they asked for already happened, and does not retry. A storage
+// failure reported through that same path is a rotation that never occurred, described to
+// the operator as one that did (#251).
+//
+// A transaction that has already been rolled back is the deterministic way to make the
+// statement fail on every engine: database/sql answers sql.ErrTxDone from tx.Exec itself,
+// before any driver is reached, so this is real-implementation behaviour rather than a
+// per-dialect quirk or an injected fake.
+func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
+	current := enums.KeyStateCurrent.String()
+	previous := enums.KeyStatePrevious.String()
+
+	keyPair := createKeyPairInState(t, current)
+	clearKeyPairState(t, previous)
+
+	tx, err := database.BeginTransaction()
+	if err != nil {
+		t.Fatalf("Failed to begin transaction: %v", err)
+	}
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("Failed to roll back transaction: %v", err)
+	}
+
+	moved, err := database.UpdateKeyPairState(tx, keyPair.Id, current, previous)
+	if err == nil {
+		t.Fatal("Expected an error when the statement could not execute, got nil")
+	}
+	if moved {
+		t.Error("Expected no transition to be reported when the statement failed")
+	}
+
+	// And the row is genuinely untouched, so the error is not reporting a failure
+	// after a transition that happened anyway.
+	retrieved, err := database.GetKeyPairById(nil, keyPair.Id)
+	if err != nil {
+		t.Fatalf("Failed to retrieve key pair: %v", err)
+	}
+	if retrieved.State != current {
+		t.Errorf("Expected State to stay %s, got %s", current, retrieved.State)
+	}
+}
+
 // TestUpdateKeyPairState_Concurrent is the property seam 2 owns: two transactions
 // racing the same transition produce exactly one winner, the loser reporting false
 // rather than an error. This is probe/probe_251_test.go.txt's Q3 lifted onto the
