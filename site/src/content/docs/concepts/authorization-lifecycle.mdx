@@ -140,7 +140,7 @@ Goiabada determines the **target ACR level** and compares it against the session
 
 **How the target ACR is determined:**
 1. If `acr_values` is in the authorization request, take the first value it recognises, then raise it to the client's default ACR level if it is below it
-2. Otherwise, use the client's default ACR level
+2. Otherwise, meaning the parameter is absent or names no value Goiabada recognises, use the client's default ACR level
 
 **Decision logic:**
 
@@ -250,8 +250,8 @@ A session is valid only if **all three** pass. The `max_age` parameter acts like
 
 | Situation | Target ACR used |
 |-----------|----------------|
-| `acr_values` provided in request | The higher of the first recognised value from the `acr_values` parameter and the client's default ACR level |
-| `acr_values` not provided | Client's default ACR level |
+| `acr_values` names at least one recognised value | The higher of the first recognised value from the `acr_values` parameter and the client's default ACR level |
+| `acr_values` not provided, or none of its values recognised | Client's default ACR level |
 
 The client's default ACR level is a floor. The `acr_values` parameter lets an application request a stronger authentication level for a specific operation, and a value below the client's default is raised back to it.
 
