@@ -68,6 +68,42 @@ func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 	return nil
 }
 
+// UpdateKeyPairState moves one key from fromState to toState, and reports whether this call
+// is the one that made the transition. The state predicate is what makes it a compare-and-set:
+// without it two concurrent rotations both write the snapshot they read, and the loser deletes
+// the previous key the winner had just demoted, retiring every token that key signed (#251).
+func (d *CommonDatabase) UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromState string,
+	toState string) (bool, error) {
+
+	if keyPairId == 0 {
+		return false, errors.WithStack(errors.New("can't update the state of a keyPair with id 0"))
+	}
+
+	ub := sqlbuilder.NewUpdateBuilder()
+	ub.Update("key_pairs")
+	ub.Set(
+		ub.Assign("state", toState),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", keyPairId),
+		ub.Equal("state", fromState),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to update keyPair state")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "unable to get rows affected when updating keyPair state")
+	}
+
+	return rowsAffected == 1, nil
+}
+
 func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	keyPairStruct *sqlbuilder.Struct) (*models.KeyPair, error) {
 
@@ -141,6 +177,12 @@ func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error)
 	return keyPairs, nil
 }
 
+// GetCurrentSigningKey returns an error when no key is in the current state, departing from
+// the (nil, nil) this package returns for a lookup that may legitimately miss. Every caller
+// dereferences the result to read key material, so a nil pair is a panic rather than a
+// diagnosable failure, and a deployment with no current key cannot validate the bearer token
+// needed to repair itself. Returning the error here is what makes all of those sites correct
+// at once, including ones added later (#251).
 func (d *CommonDatabase) GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, error) {
 	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
@@ -151,6 +193,10 @@ func (d *CommonDatabase) GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, erro
 	keyPair, err := d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
 	if err != nil {
 		return nil, err
+	}
+
+	if keyPair == nil {
+		return nil, errors.WithStack(errors.New("no current signing key found"))
 	}
 
 	return keyPair, nil

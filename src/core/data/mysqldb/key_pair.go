@@ -14,6 +14,11 @@ func (d *MySQLDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error
 	return d.CommonDB.UpdateKeyPair(tx, keyPair)
 }
 
+func (d *MySQLDatabase) UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromState string,
+	toState string) (bool, error) {
+	return d.CommonDB.UpdateKeyPairState(tx, keyPairId, fromState, toState)
+}
+
 func (d *MySQLDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*models.KeyPair, error) {
 	return d.CommonDB.GetKeyPairById(tx, keyPairId)
 }

@@ -166,8 +166,24 @@ type Database interface {
 
 	CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error
 	UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error
+	// UpdateKeyPairState moves one key from an expected state to a new one, and reports
+	// whether this call is the one that made the transition. Compare-and-set for the same
+	// reason MarkCodeAsUsed is: a read-then-unconditional-write lets two concurrent
+	// rotations both act on the snapshot they read, and the loser then destroys the key
+	// the winner had just demoted for the grace period rotation exists to provide (#251).
+	//
+	// A false return means no row transitioned, so the caller lost a race or the row is
+	// gone. It is not an error.
+	UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)
 	GetKeyPairById(tx *sql.Tx, keyPairId int64) (*models.KeyPair, error)
 	GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error)
+	// GetCurrentSigningKey returns an error when no key is in the current state, rather
+	// than the (nil, nil) this codebase returns for a lookup that may legitimately miss.
+	// The current signing key is a singleton the server cannot run without: every caller
+	// dereferences the result to read key material, so (nil, nil) is a nil-pointer panic
+	// at each of them and one more at every call site added later. Narrowing the contract
+	// here is what makes all of them correct at once, as IncrementUserAuthStateGeneration
+	// rejects a nil transaction rather than tolerating it (#251).
 	GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, error)
 	DeleteKeyPair(tx *sql.Tx, keyPairId int64) error
 

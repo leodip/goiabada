@@ -11145,6 +11145,84 @@ func (_c *Database_UpdateKeyPair_Call) RunAndReturn(run func(tx *sql.Tx, keyPair
 	return _c
 }
 
+// UpdateKeyPairState provides a mock function for the type Database
+func (_mock *Database) UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error) {
+	ret := _mock.Called(tx, keyPairId, fromState, toState)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateKeyPairState")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, string, string) (bool, error)); ok {
+		return returnFunc(tx, keyPairId, fromState, toState)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, string, string) bool); ok {
+		r0 = returnFunc(tx, keyPairId, fromState, toState)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64, string, string) error); ok {
+		r1 = returnFunc(tx, keyPairId, fromState, toState)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_UpdateKeyPairState_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateKeyPairState'
+type Database_UpdateKeyPairState_Call struct {
+	*mock.Call
+}
+
+// UpdateKeyPairState is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - keyPairId int64
+//   - fromState string
+//   - toState string
+func (_e *Database_Expecter) UpdateKeyPairState(tx any, keyPairId any, fromState any, toState any) *Database_UpdateKeyPairState_Call {
+	return &Database_UpdateKeyPairState_Call{Call: _e.mock.On("UpdateKeyPairState", tx, keyPairId, fromState, toState)}
+}
+
+func (_c *Database_UpdateKeyPairState_Call) Run(run func(tx *sql.Tx, keyPairId int64, fromState string, toState string)) *Database_UpdateKeyPairState_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_UpdateKeyPairState_Call) Return(b bool, err error) *Database_UpdateKeyPairState_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_UpdateKeyPairState_Call) RunAndReturn(run func(tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)) *Database_UpdateKeyPairState_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdatePermission provides a mock function for the type Database
 func (_mock *Database) UpdatePermission(tx *sql.Tx, permission *models.Permission) error {
 	ret := _mock.Called(tx, permission)
