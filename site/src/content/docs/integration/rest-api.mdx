@@ -179,6 +179,7 @@ Common `error_code` categories:
 - `INVALID_REQUEST_BODY` - Malformed JSON in request
 - `VALIDATION_ERROR` - Input validation failed
 - `NOT_FOUND` - Resource not found
+- `FORBIDDEN` - The token is valid but the resource belongs to another user
 - `TOO_MANY_REQUESTS` - Rate limit reached; the response carries a `Retry-After` header
 - `INTERNAL_SERVER_ERROR` - Server-side error
 
@@ -274,6 +275,8 @@ POST /api/v1/admin/users/create
 | <span style="white-space: nowrap;">`familyName`</span> | string | No | Last name |
 | <span style="white-space: nowrap;">`setPasswordType`</span> | string | No | `"now"` to set password immediately, `"email"` to send setup email |
 | <span style="white-space: nowrap;">`password`</span> | string | Conditional | Required if `setPasswordType` is `"now"` |
+
+Answers `409` with error code `EMAIL_ALREADY_EXISTS` when the address is already registered. Retrying the same address will not succeed.
 
 #### Update user profile
 
