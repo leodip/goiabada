@@ -82,6 +82,9 @@ authentication than the client is configured for, never a weaker one.
 <Aside type="tip">
 If you request multiple ACR values separated by spaces, Goiabada uses the first one it recognises,
 ignoring any it does not, and then raises that to the client's default ACR level if it is below it.
+If it recognises none of the values you send, the client's default ACR level applies, exactly as if
+the parameter had been left out. The three values it recognises are `urn:goiabada:level1`,
+`urn:goiabada:level2_optional` and `urn:goiabada:level2_mandatory`, matched in full.
 </Aside>
 
 <Aside type="caution">
@@ -237,7 +240,7 @@ Both conditions are evaluated. A user may need to re-authenticate if:
 - Their session's ACR is too low (step-up authentication), OR
 - Their session is too old (even if ACR is sufficient)
 
-**Example:** A user has an active `level2_mandatory` session that started 2 hours ago. A request comes in with `acr_values=level1` and `max_age=3600` (1 hour):
+**Example:** A user has an active `level2_mandatory` session that started 2 hours ago. A request comes in with `acr_values=urn:goiabada:level1` and `max_age=3600` (1 hour):
 - ACR check: Session at `level2_mandatory` is sufficient for `level1` request
 - max_age check: Session started 2 hours ago, exceeds 1 hour limit
 - Result: User must re-authenticate (due to max_age), even though ACR was sufficient
