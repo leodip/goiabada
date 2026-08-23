@@ -38,9 +38,9 @@ RUN curl -sfL --retry 3 --retry-delay 5 https://github.com/mikefarah/yq/releases
 RUN rm -rf /var/lib/apt/lists/*
 
 # Install Go
-RUN wget https://go.dev/dl/go1.26.6.linux-amd64.tar.gz -O /tmp/go1.26.6.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.26.6.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.26.6.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.27.0.linux-amd64.tar.gz -O /tmp/go1.27.0.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.27.0.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.27.0.linux-amd64.tar.gz
 ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install Go development tools to system-wide location
@@ -52,13 +52,13 @@ RUN GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/air-ve
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/tools/gopls@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/go-delve/delve/cmd/dlv@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/tools/cmd/goimports@latest && \
-    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v honnef.co/go/tools/cmd/staticcheck@v0.7.0 && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v honnef.co/go/tools/cmd/staticcheck@v0.8.1 && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest && \
-    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v mvdan.cc/unparam@v0.0.0-20260813220802-35700344e60f && \
-    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2 && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v mvdan.cc/unparam@v0.0.0-20260820064413-a201bf8e0538 && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1 && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/vuln/cmd/govulncheck@v1.7.0 && \
-    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.7.3
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.7.4
 
 # Add Go tools bin directory to PATH (tools are accessible but don't affect project GOPATH)
 ENV PATH="/usr/local/go-tools/bin:${PATH}"
