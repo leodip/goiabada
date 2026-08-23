@@ -101,7 +101,6 @@ func HandleAPIClientSessionsGet(
 				DeviceName:                 us.DeviceName,
 				DeviceType:                 us.DeviceType,
 				DeviceOS:                   us.DeviceOS,
-				Level2AuthConfigHasChanged: us.Level2AuthConfigHasChanged,
 				UserId:                     us.UserId,
 				IsValid:                    isValid,
 			}

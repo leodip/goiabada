@@ -720,46 +720,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
-    put:
-      tags: [User Sessions]
-      summary: Update session
-      description: Update session properties
-      operationId: updateUserSession
-      parameters:
-        - name: sessionIdentifier
-          in: path
-          required: true
-          description: Session identifier
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateUserSessionRequest'
-      responses:
-        '200':
-          description: Session updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GetUserSessionResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [User Sessions]
       summary: Delete session
       description: |
         Terminate a user session.
 
-        Note: While GET/PUT use sessionIdentifier (string), DELETE uses the numeric session ID.
+        Note: While GET uses sessionIdentifier (string), DELETE uses the numeric session ID.
         The path parameter accepts either format.
       operationId: deleteUserSession
       parameters:
@@ -3225,8 +3192,6 @@ components:
           type: string
         deviceOS:
           type: string
-        level2AuthConfigHasChanged:
-          type: boolean
         userId:
           type: integer
           format: int64
@@ -3266,13 +3231,6 @@ components:
       properties:
         session:
           $ref: '#/components/schemas/UserSessionResponse'
-
-    UpdateUserSessionRequest:
-      type: object
-      properties:
-        level2AuthConfigHasChanged:
-          type: boolean
-          nullable: true
 
     # =========================================================================
     # Consent Schemas

@@ -363,7 +363,6 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 		DeviceName:                 "Test Device",
 		DeviceType:                 "computer",
 		DeviceOS:                   "linux",
-		Level2AuthConfigHasChanged: false,
 		UserId:                     testUser.Id,
 	}
 	err = database.CreateUserSession(nil, testSession)
@@ -393,7 +392,6 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	assert.Equal(t, testSession.IpAddress, getSessionResponse.Session.IpAddress)
 	assert.Equal(t, testSession.DeviceName, getSessionResponse.Session.DeviceName)
 	assert.Equal(t, testSession.UserId, getSessionResponse.Session.UserId)
-	assert.Equal(t, testSession.Level2AuthConfigHasChanged, getSessionResponse.Session.Level2AuthConfigHasChanged)
 }
 
 func TestAPIUserSessionGet_NotFound(t *testing.T) {
@@ -409,145 +407,19 @@ func TestAPIUserSessionGet_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-// TestAPIUserSessionPut tests the PUT /api/v1/admin/user-sessions/{sessionIdentifier} endpoint
-func TestAPIUserSessionPut_Success(t *testing.T) {
+// The PUT on this path was retired with the level2AuthConfigHasChanged mechanism it
+// existed to drive: its request body carried that field and nothing else, so the endpoint
+// had no other function (#242). GET and DELETE stay, so the path still exists and chi
+// answers a PUT to it with 405 rather than 404.
+func TestAPIUserSessionPut_MethodNotAllowed(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Create test user
-	testUser := &models.User{
-		Subject:       uuid.New(),
-		Enabled:       true,
-		Email:         "testuser@session-update.test",
-		GivenName:     "Test",
-		FamilyName:    "User",
-		EmailVerified: true,
-	}
-	err := database.CreateUser(nil, testUser)
-	assert.NoError(t, err)
-	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
-	}()
-
-	// Setup: Create test session
-	testSession := &models.UserSession{
-		SessionIdentifier:          uuid.New().String(),
-		Started:                    time.Now().UTC(),
-		LastAccessed:               time.Now().UTC(),
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC(),
-		IpAddress:                  "192.168.1.1",
-		DeviceName:                 "Test Device",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		Level2AuthConfigHasChanged: false,
-		UserId:                     testUser.Id,
-	}
-	err = database.CreateUserSession(nil, testSession)
-	assert.NoError(t, err)
-	defer func() {
-		_ = database.DeleteUserSession(nil, testSession.Id)
-	}()
-
-	// Test: Update session
-	level2Changed := true
-	updateReq := api.UpdateUserSessionRequest{
-		Level2AuthConfigHasChanged: &level2Changed,
-	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + testSession.SessionIdentifier
-	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	// Test: PUT the session path, which no longer registers that method
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + uuid.New().String()
+	resp := makeAPIRequest(t, "PUT", url, accessToken, map[string]interface{}{"level2AuthConfigHasChanged": true})
 	defer func() { _ = resp.Body.Close() }()
 
-	// Assert: Response should be successful
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
-
-	// Parse response
-	var getSessionResponse api.GetUserSessionResponse
-	err = json.NewDecoder(resp.Body).Decode(&getSessionResponse)
-	assert.NoError(t, err)
-
-	// Assert: Session should be updated
-	assert.Equal(t, testSession.SessionIdentifier, getSessionResponse.Session.SessionIdentifier)
-	assert.True(t, getSessionResponse.Session.Level2AuthConfigHasChanged)
-
-	// Verify session was actually updated in database
-	updatedSession, err := database.GetUserSessionBySessionIdentifier(nil, testSession.SessionIdentifier)
-	assert.NoError(t, err)
-	assert.True(t, updatedSession.Level2AuthConfigHasChanged)
-}
-
-func TestAPIUserSessionPut_NotFound(t *testing.T) {
-	// Setup: Create admin client and get access token
-	accessToken, _ := createAdminClientWithToken(t)
-
-	// Test: Update non-existent session
-	level2Changed := true
-	updateReq := api.UpdateUserSessionRequest{
-		Level2AuthConfigHasChanged: &level2Changed,
-	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/nonexistent-session"
-	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer func() { _ = resp.Body.Close() }()
-
-	// Assert: Should return not found
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-}
-
-func TestAPIUserSessionPut_NilUpdate(t *testing.T) {
-	// Setup: Create admin client and get access token
-	accessToken, _ := createAdminClientWithToken(t)
-
-	// Setup: Create test user
-	testUser := &models.User{
-		Subject:       uuid.New(),
-		Enabled:       true,
-		Email:         "testuser@session-nil-update.test",
-		GivenName:     "Test",
-		FamilyName:    "User",
-		EmailVerified: true,
-	}
-	err := database.CreateUser(nil, testUser)
-	assert.NoError(t, err)
-	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
-	}()
-
-	// Setup: Create test session
-	testSession := &models.UserSession{
-		SessionIdentifier:          uuid.New().String(),
-		Started:                    time.Now().UTC(),
-		LastAccessed:               time.Now().UTC(),
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC(),
-		IpAddress:                  "192.168.1.1",
-		DeviceName:                 "Test Device",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		Level2AuthConfigHasChanged: false,
-		UserId:                     testUser.Id,
-	}
-	err = database.CreateUserSession(nil, testSession)
-	assert.NoError(t, err)
-	defer func() {
-		_ = database.DeleteUserSession(nil, testSession.Id)
-	}()
-
-	// Test: Update session with nil (should be no-op)
-	updateReq := api.UpdateUserSessionRequest{
-		Level2AuthConfigHasChanged: nil,
-	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + testSession.SessionIdentifier
-	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer func() { _ = resp.Body.Close() }()
-
-	// Assert: Response should be successful
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// Verify session was not changed in database
-	updatedSession, err := database.GetUserSessionBySessionIdentifier(nil, testSession.SessionIdentifier)
-	assert.NoError(t, err)
-	assert.False(t, updatedSession.Level2AuthConfigHasChanged) // Should remain unchanged
+	// Assert: The method is gone, not the path
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
 }

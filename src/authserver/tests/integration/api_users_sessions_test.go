@@ -500,7 +500,6 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 		DeviceName:                 "Valid Session Device",
 		DeviceType:                 "computer",
 		DeviceOS:                   "linux",
-		Level2AuthConfigHasChanged: false,
 		UserId:                     testUser.Id,
 	}
 	err = database.CreateUserSession(nil, validSession)
@@ -521,7 +520,6 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 		DeviceName:                 "Expired Session Device",
 		DeviceType:                 "computer",
 		DeviceOS:                   "linux",
-		Level2AuthConfigHasChanged: false,
 		UserId:                     testUser.Id,
 	}
 	err = database.CreateUserSession(nil, expiredSession)
@@ -562,7 +560,6 @@ func createTestUserSession(t *testing.T, userId int64, sessionIdentifier string)
 		DeviceName:                 "Test Device",
 		DeviceType:                 "computer",
 		DeviceOS:                   "linux",
-		Level2AuthConfigHasChanged: false,
 		UserId:                     userId,
 	}
 	err := database.CreateUserSession(nil, session)

@@ -30,7 +30,6 @@ type ApiClient interface {
 	DeleteUserSessionById(accessToken string, sessionId int64) error
 	GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.EnhancedUserSessionResponse, error)
 	GetUserSession(accessToken string, sessionIdentifier string) (*models.UserSession, error)
-	UpdateUserSession(accessToken string, sessionIdentifier string, request *api.UpdateUserSessionRequest) (*models.UserSession, error)
 	GetAccountSessions(accessToken string) ([]api.EnhancedUserSessionResponse, error)
 	DeleteAccountSession(accessToken string, sessionId int64) error
 	GetUserConsents(accessToken string, userId int64) ([]models.UserConsent, error)

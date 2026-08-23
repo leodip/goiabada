@@ -90,7 +90,6 @@ func HandleAdminUserAuthenticationPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
 	apiClient apiclient.ApiClient,
-	sessionStore sessions.Store,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -140,8 +139,6 @@ func HandleAdminUserAuthenticationPost(
 			}
 		}
 
-		hasDisabledOTP := false
-
 		// Handle password update.
 		//
 		// r.PostFormValue rather than r.FormValue: r.Form merges the URL query behind the request
@@ -179,26 +176,6 @@ func HandleAdminUserAuthenticationPost(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				hasDisabledOTP = true
-			}
-		}
-
-		// Handle session update when OTP is disabled
-		if hasDisabledOTP {
-			sess, err := sessionStore.Get(r, constants.AdminConsoleSessionName)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-
-			if sess.Values[constants.SessionKeySessionIdentifier] != nil {
-				sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
-				level2Changed := true
-				sessionReq := &api.UpdateUserSessionRequest{
-					Level2AuthConfigHasChanged: &level2Changed,
-				}
-				_, _ = apiClient.UpdateUserSession(accessToken, sessionIdentifier, sessionReq)
-				// Continue even if session update fails - it's not critical
 			}
 		}
 
