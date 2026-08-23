@@ -254,7 +254,7 @@ A self-registered client's **identifier cannot be changed**, in the same way the
 </Aside>
 
 <Aside type="caution">
-**A self-registered client can be missing its badge.** Goiabada recognises one by the `dcr_` prefix on its identifier, so a client that was renamed back when identifiers could still be changed does not carry it. Such a client is not marked, not badged, and consent is off for it. Look for it in the client list and tick **Consent required** by hand.
+**A self-registered client can be missing its badge.** A client that registers itself through `/connect/register` is marked as such when it is created, and the badge, the consent default and the refusal behaviour above all read that mark. The `dcr_` prefix on those identifiers is a naming convention rather than a test, since an administrator can name a client `dcr_anything`; it was only what identified the clients that registered themselves before the mark existed. One of those that had been renamed away from the prefix, back when identifiers could still be changed, carries no mark: it is not badged, and consent is off for it. Look for it in the client list and tick **Consent required** by hand.
 </Aside>
 
 ### Redirect URI rules
