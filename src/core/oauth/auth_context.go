@@ -86,6 +86,28 @@ type AuthContext struct {
 	// re-prompt. That is the fail-closed direction, exactly as Level1AuthCompleted,
 	// CeremonyId and DeferredErrorCode each document for their own fields.
 	OtpConfigGeneration *int64
+	// OTPSecret and OTPImage hold the TOTP seed and the QR code rendered from it while this
+	// ceremony's user is enrolling an authenticator: written by the /auth/otp render that
+	// generated them, read by HandleAuthOtpPost to verify the code the user types.
+	//
+	// They live on the ceremony rather than in two slots on the browser session, and that is
+	// what fixes the enrolment reload. The session had ONE pair of slots for the whole
+	// browser, written on every GET of /auth/otp, so reloading the page replaced the seed
+	// behind a QR code the user had already scanned and every code from it was then refused.
+	// Generating only when OTPSecret is empty makes that GET idempotent (#242 part 3).
+	//
+	// The binding to the ceremony is structural rather than compared, which is the second
+	// half of it: a second /auth/authorize mints a new auth context and takes the old seed
+	// with it, so there is no shared slot for one ceremony's seed to be read out of by
+	// another and no ceremony id to check it against. ClearAuthContext at /auth/issue removes
+	// the pair, so the seed does not outlive the ceremony in the cookie either.
+	//
+	// Absent from a context written by an older binary they unmarshal as "", which reads as
+	// "this ceremony has generated nothing" and makes the next render generate. A user mid
+	// enrolment across a deploy is shown a new QR code and scans it again, which is the safe
+	// direction: no code from the seed they can no longer prove they were shown is accepted.
+	OTPSecret string
+	OTPImage  string
 	// CeremonyId names this authorization ceremony, so a form this ceremony rendered can say
 	// which ceremony rendered it and be refused once the browser's single auth context slot
 	// holds another one.

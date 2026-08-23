@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -22,7 +21,6 @@ import (
 
 func HandleAuthOtpGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
 	authHelper AuthHelper,
 	database data.Database,
 	otpSecretGenerator OtpSecretGenerator,
@@ -45,12 +43,6 @@ func HandleAuthOtpGet(
 		requiredState := oauth.AuthStateLevel2OTP
 		if authContext.AuthState != requiredState {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
-			return
-		}
-
-		sess, err := httpSession.Get(r, constants.AuthServerSessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
@@ -79,10 +71,15 @@ func HandleAuthOtpGet(
 
 		if user.OTPEnabled {
 
-			delete(sess.Values, constants.SessionKeyOTPImage)
-			delete(sess.Values, constants.SessionKeyOTPSecret)
+			// An enrolment seed this ceremony generated before the user enrolled somewhere
+			// else is dead now, and HandleAuthOtpPost picks the template for its error
+			// rerender by whether a seed is present, so leaving it here would redraw the
+			// enrolment page for a user who is already enrolled. Same clearing this arm did
+			// when the pair lived in two slots on the browser session (#242).
+			authContext.OTPSecret = ""
+			authContext.OTPImage = ""
 
-			err = httpSession.Save(r, w, sess)
+			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -111,9 +108,23 @@ func HandleAuthOtpGet(
 		} else {
 			// must enroll first
 
-			// generate secret
-			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-			base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+			// Generate only when this ceremony has no seed yet, so a reload of /auth/otp
+			// renders the secret and QR code the user has already scanned. Generating on
+			// every GET is the defect: it replaced the seed behind a scanned QR code, so
+			// every code from it was then checked against a secret the user was never
+			// shown (#242 part 3).
+			if authContext.OTPSecret == "" {
+				settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+				base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+				authContext.OTPSecret = secretKey
+				authContext.OTPImage = base64Image
+			}
+
+			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -122,23 +133,14 @@ func HandleAuthOtpGet(
 			bind := map[string]interface{}{
 				"error":                   nil,
 				"ceremonyId":              authContext.CeremonyId,
-				"base64Image":             base64Image,
-				"secretKey":               secretKey,
+				"base64Image":             authContext.OTPImage,
+				"secretKey":               authContext.OTPSecret,
 				"layoutShowClientSection": displayInfo.ShowSection,
 				"layoutClientName":        displayInfo.ClientName,
 				"layoutHasClientLogo":     displayInfo.HasLogo,
 				"layoutClientLogoUrl":     displayInfo.LogoURL,
 				"layoutClientDescription": displayInfo.Description,
 				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
-			}
-
-			// save image and secret in the session state
-			sess.Values[constants.SessionKeyOTPSecret] = secretKey
-			sess.Values[constants.SessionKeyOTPImage] = base64Image
-			err = httpSession.Save(r, w, sess)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp_enrollment.html", bind)
@@ -152,7 +154,6 @@ func HandleAuthOtpGet(
 
 func HandleAuthOtpPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
 	authHelper AuthHelper,
 	database data.Database,
 	auditLogger AuditLogger,
@@ -192,19 +193,11 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.AuthServerSessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		base64Image, secretKey := "", ""
-		if val, ok := sess.Values[constants.SessionKeyOTPImage]; ok {
-			base64Image = val.(string)
-		}
-		if val, ok := sess.Values[constants.SessionKeyOTPSecret]; ok {
-			secretKey = val.(string)
-		}
+		// The enrolment seed comes off the ceremony rather than out of a slot shared by the
+		// whole browser, so a submission can only ever be checked against the secret the
+		// same ceremony rendered. Empty for a user who is already enrolled, which is what
+		// sends the error rerender below to the verification template (#242 decision 4).
+		base64Image, secretKey := authContext.OTPImage, authContext.OTPSecret
 
 		user, err := database.GetUserById(nil, authContext.UserId)
 		if err != nil {

@@ -204,8 +204,8 @@ func apiRequest(method string, target string, body string) *http.Request {
 }
 
 // otpCeremonyCookie mints the session cookie a user part way through the OTP step carries:
-// an auth context at the level 2 state, and the enrollment secret HandleAuthOtpGet left
-// behind. Written through the server's own session store, so what the handler reads back is
+// an auth context at the level 2 state carrying the enrollment secret HandleAuthOtpGet left
+// on it. Written through the server's own session store, so what the handler reads back is
 // what gorilla wrote rather than a shape this test invented.
 func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	t.Helper()
@@ -219,12 +219,12 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 		CeremonyId: routesTestCeremonyId,
 		UserId:     1,
 		ClientId:   routesTestClientId,
+		OTPSecret:  routesTestOTPSecret,
+		OTPImage:   "base64-image",
 	})
 	assert.NoError(t, err)
 
 	sess.Values[constants.SessionKeyAuthContext] = string(authContext)
-	sess.Values[constants.SessionKeyOTPSecret] = routesTestOTPSecret
-	sess.Values[constants.SessionKeyOTPImage] = "base64-image"
 
 	recorder := httptest.NewRecorder()
 	assert.NoError(t, s.sessionStore.Save(r, recorder, sess))
