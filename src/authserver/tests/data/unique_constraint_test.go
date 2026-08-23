@@ -7,6 +7,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,12 +15,13 @@ import (
 
 // Unique constraints.
 //
-// The schema declares eleven of them, and like the cascade rules they are written
+// The schema declares twelve of them, and like the cascade rules they are written
 // out separately for each of the four engines, in one case as a named index and in
 // another inline on the column. Nothing asserted that any of them actually bites,
 // so a constraint missing from one dialect would have gone unnoticed. These are the
 // invariants the auth flows lean on: two clients cannot share a client_identifier,
-// two refresh tokens cannot share a jti, a code hash cannot be reused.
+// two refresh tokens cannot share a jti, a code hash cannot be reused, and only one
+// signing key can be in any given state.
 //
 // Only the fact of an error is asserted, never its text, which differs per engine
 // (mysql "Duplicate entry", postgres "duplicate key value violates unique
@@ -100,6 +102,23 @@ func TestUnique_CodeHash(t *testing.T) {
 	duplicate.Code = "other_" + gofakeit.LetterN(6)
 	err := database.CreateCode(nil, &duplicate)
 	assert.Error(t, err, "two codes must not share a code_hash")
+}
+
+func TestUnique_KeyPairState(t *testing.T) {
+	// 'next' rather than 'current', because 'next' is the only duplicate the rotation
+	// defect could actually produce: two concurrent rotations both inserting a new next
+	// key. The constraint covers all three states identically (#251).
+	next := enums.KeyStateNext.String()
+	existing := createKeyPairInState(t, next)
+
+	duplicate := &models.KeyPair{
+		State:         existing.State,
+		KeyIdentifier: gofakeit.UUID(),
+		Type:          "RSA",
+		Algorithm:     "RS256",
+	}
+	err := database.CreateKeyPair(nil, duplicate)
+	assert.Error(t, err, "two key pairs must not share a state")
 }
 
 func TestUnique_RefreshTokenJti(t *testing.T) {

@@ -1429,6 +1429,13 @@ CREATE INDEX idx_state ON public.key_pairs USING btree (state);
 
 
 --
+-- Name: idx_key_pairs_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_key_pairs_state ON public.key_pairs USING btree (state);
+
+
+--
 -- Name: idx_subject; Type: INDEX; Schema: public; Owner: -
 --
 

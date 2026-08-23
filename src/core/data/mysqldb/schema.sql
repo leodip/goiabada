@@ -63,6 +63,7 @@ CREATE TABLE `key_pairs` (
   `public_key_asn1_der` longblob,
   `public_key_jwk` longblob,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_key_pairs_state` (`state`),
   KEY `idx_state` (`state`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
