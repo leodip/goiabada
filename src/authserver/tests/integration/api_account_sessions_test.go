@@ -81,34 +81,34 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
 	valid := &models.UserSession{
-		SessionIdentifier:          uuid.New().String(),
-		Started:                    time.Now().UTC().Add(-30 * time.Minute),
-		LastAccessed:               time.Now().UTC().Add(-5 * time.Minute),
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC().Add(-30 * time.Minute),
-		IpAddress:                  "192.168.1.100",
-		DeviceName:                 "Valid Account Session",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		UserId:                     user.Id,
+		SessionIdentifier: uuid.New().String(),
+		Started:           time.Now().UTC().Add(-30 * time.Minute),
+		LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
+		AuthMethods:       "pwd",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthTime:          time.Now().UTC().Add(-30 * time.Minute),
+		IpAddress:         "192.168.1.100",
+		DeviceName:        "Valid Account Session",
+		DeviceType:        "computer",
+		DeviceOS:          "linux",
+		UserId:            user.Id,
 	}
 	err := database.CreateUserSession(nil, valid)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteUserSession(nil, valid.Id) }()
 
 	expired := &models.UserSession{
-		SessionIdentifier:          uuid.New().String(),
-		Started:                    time.Now().UTC().Add(-25 * time.Hour),
-		LastAccessed:               time.Now().UTC().Add(-24 * time.Hour),
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC().Add(-25 * time.Hour),
-		IpAddress:                  "192.168.1.100",
-		DeviceName:                 "Expired Account Session",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		UserId:                     user.Id,
+		SessionIdentifier: uuid.New().String(),
+		Started:           time.Now().UTC().Add(-25 * time.Hour),
+		LastAccessed:      time.Now().UTC().Add(-24 * time.Hour),
+		AuthMethods:       "pwd",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthTime:          time.Now().UTC().Add(-25 * time.Hour),
+		IpAddress:         "192.168.1.100",
+		DeviceName:        "Expired Account Session",
+		DeviceType:        "computer",
+		DeviceOS:          "linux",
+		UserId:            user.Id,
 	}
 	err = database.CreateUserSession(nil, expired)
 	assert.NoError(t, err)

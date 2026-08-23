@@ -353,17 +353,17 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 
 	// Setup: Create test session
 	testSession := &models.UserSession{
-		SessionIdentifier:          uuid.New().String(),
-		Started:                    time.Now().UTC(),
-		LastAccessed:               time.Now().UTC(),
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC(),
-		IpAddress:                  "192.168.1.1",
-		DeviceName:                 "Test Device",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		UserId:                     testUser.Id,
+		SessionIdentifier: uuid.New().String(),
+		Started:           time.Now().UTC(),
+		LastAccessed:      time.Now().UTC(),
+		AuthMethods:       "pwd",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthTime:          time.Now().UTC(),
+		IpAddress:         "192.168.1.1",
+		DeviceName:        "Test Device",
+		DeviceType:        "computer",
+		DeviceOS:          "linux",
+		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(nil, testSession)
 	assert.NoError(t, err)
