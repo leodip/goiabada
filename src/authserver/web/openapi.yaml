@@ -1923,6 +1923,15 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: |
+            Another rotation won the race and this call rotated nothing.
+            error_code is ROTATION_IN_PROGRESS. Do not retry: the rotation
+            it conflicted with already happened.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/admin/settings/keys/{id}:
     delete:

@@ -1235,6 +1235,8 @@ POST /api/v1/admin/settings/keys/rotate
 
 Rotates to a new signing key. The old key remains available for validation.
 
+Answers `409` with error code `ROTATION_IN_PROGRESS` when another rotation won the race. Do not retry: that rotation already happened, and a retry rotates a second time.
+
 ```
 DELETE /api/v1/admin/settings/keys/{id}
 ```

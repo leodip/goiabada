@@ -40,9 +40,11 @@ func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r 
 //
 // Routes on HTTP status the same way: 400 Bad Request from the auth server API is a
 // user-correctable validation failure, so its status and English description are forwarded
-// to the browser. Anything else, including an error that is not an *apiclient.APIError,
-// falls through to JsonError's other branch: HTTP 500, the detail in the server log, and a
-// request id on screen.
+// to the browser. 409 Conflict is forwarded for the same reason: it says another operation
+// won a race, which is a fact about the administrator's own request rather than a server
+// fault, and it names an action they should not repeat. Anything else, including an error
+// that is not an *apiclient.APIError, falls through to JsonError's other branch: HTTP 500,
+// the detail in the server log, and a request id on screen.
 //
 // This exists because JsonError preserves a status and a description only for
 // *customerrors.ErrorDetail. An *apiclient.APIError handed to it directly takes the generic
@@ -55,7 +57,8 @@ func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r 
 // escaping is load-bearing rather than defensive, because showModalDialog assigns the
 // description to innerHTML.
 func HandleAPIErrorJson(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
-	if apiErr, ok := err.(*apiclient.APIError); ok && apiErr.StatusCode == http.StatusBadRequest {
+	if apiErr, ok := err.(*apiclient.APIError); ok &&
+		(apiErr.StatusCode == http.StatusBadRequest || apiErr.StatusCode == http.StatusConflict) {
 		httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
 			apiErr.Code, apiErr.Message, apiErr.StatusCode))
 		return
