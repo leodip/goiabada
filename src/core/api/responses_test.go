@@ -359,19 +359,18 @@ func TestToUserSessionResponse_MapsFields(t *testing.T) {
 	authTime := time.Date(2024, 3, 1, 10, 0, 5, 0, time.UTC)
 
 	session := &models.UserSession{
-		Id:                         3,
-		SessionIdentifier:          "session-abc",
-		Started:                    started,
-		LastAccessed:               lastAccessed,
-		AuthMethods:                "pwd otp",
-		AcrLevel:                   "urn:goiabada:level2_mandatory",
-		AuthTime:                   authTime,
-		IpAddress:                  "10.0.0.1",
-		DeviceName:                 "Pixel",
-		DeviceType:                 "mobile",
-		DeviceOS:                   "Android",
-		Level2AuthConfigHasChanged: true,
-		UserId:                     42,
+		Id:                3,
+		SessionIdentifier: "session-abc",
+		Started:           started,
+		LastAccessed:      lastAccessed,
+		AuthMethods:       "pwd otp",
+		AcrLevel:          "urn:goiabada:level2_mandatory",
+		AuthTime:          authTime,
+		IpAddress:         "10.0.0.1",
+		DeviceName:        "Pixel",
+		DeviceType:        "mobile",
+		DeviceOS:          "Android",
+		UserId:            42,
 	}
 
 	resp := ToUserSessionResponse(session)
@@ -387,7 +386,6 @@ func TestToUserSessionResponse_MapsFields(t *testing.T) {
 	assert.Equal(t, "Pixel", resp.DeviceName)
 	assert.Equal(t, "mobile", resp.DeviceType)
 	assert.Equal(t, "Android", resp.DeviceOS)
-	assert.True(t, resp.Level2AuthConfigHasChanged)
 	assert.Equal(t, int64(42), resp.UserId)
 }
 
@@ -401,6 +399,32 @@ func TestToUserSessionResponse_ZeroTimesBecomeNil(t *testing.T) {
 	assert.Nil(t, resp.AuthTime)
 	assert.Nil(t, resp.CreatedAt)
 	assert.Nil(t, resp.UpdatedAt)
+}
+
+// The level2AuthConfigHasChanged field was published on both session response
+// schemas and described a per-session boolean that no longer decides anything.
+// It is gone from the wire, and the deletions that removed it are otherwise
+// invisible to a test: TestOpenAPI_DescribesEveryAPIRoute checks no response
+// body at all, so nothing else fails if the field comes back (#242).
+func TestUserSessionResponses_OmitLevel2AuthConfigHasChanged(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value interface{}
+	}{
+		{"UserSessionResponse", UserSessionResponse{Id: 1}},
+		{"EnhancedUserSessionResponse", EnhancedUserSessionResponse{Id: 1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := json.Marshal(tc.value)
+			assert.NoError(t, err)
+
+			var decoded map[string]interface{}
+			assert.NoError(t, json.Unmarshal(raw, &decoded))
+
+			_, present := decoded["level2AuthConfigHasChanged"]
+			assert.False(t, present, "level2AuthConfigHasChanged must not be published on %s", tc.name)
+		})
+	}
 }
 
 // =============================================================================

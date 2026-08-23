@@ -91,7 +91,6 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 		DeviceName:                 "Valid Account Session",
 		DeviceType:                 "computer",
 		DeviceOS:                   "linux",
-		Level2AuthConfigHasChanged: false,
 		UserId:                     user.Id,
 	}
 	err := database.CreateUserSession(nil, valid)
@@ -109,7 +108,6 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 		DeviceName:                 "Expired Account Session",
 		DeviceType:                 "computer",
 		DeviceOS:                   "linux",
-		Level2AuthConfigHasChanged: false,
 		UserId:                     user.Id,
 	}
 	err = database.CreateUserSession(nil, expired)

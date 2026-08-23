@@ -412,21 +412,20 @@ type AccountOTPEnrollmentResponse struct {
 }
 
 type UserSessionResponse struct {
-	Id                         int64      `json:"id"`
-	CreatedAt                  *time.Time `json:"createdAt"`
-	UpdatedAt                  *time.Time `json:"updatedAt"`
-	SessionIdentifier          string     `json:"sessionIdentifier"`
-	Started                    *time.Time `json:"started"`
-	LastAccessed               *time.Time `json:"lastAccessed"`
-	AuthMethods                string     `json:"authMethods"`
-	AcrLevel                   string     `json:"acrLevel"`
-	AuthTime                   *time.Time `json:"authTime"`
-	IpAddress                  string     `json:"ipAddress"`
-	DeviceName                 string     `json:"deviceName"`
-	DeviceType                 string     `json:"deviceType"`
-	DeviceOS                   string     `json:"deviceOS"`
-	Level2AuthConfigHasChanged bool       `json:"level2AuthConfigHasChanged"`
-	UserId                     int64      `json:"userId"`
+	Id                int64      `json:"id"`
+	CreatedAt         *time.Time `json:"createdAt"`
+	UpdatedAt         *time.Time `json:"updatedAt"`
+	SessionIdentifier string     `json:"sessionIdentifier"`
+	Started           *time.Time `json:"started"`
+	LastAccessed      *time.Time `json:"lastAccessed"`
+	AuthMethods       string     `json:"authMethods"`
+	AcrLevel          string     `json:"acrLevel"`
+	AuthTime          *time.Time `json:"authTime"`
+	IpAddress         string     `json:"ipAddress"`
+	DeviceName        string     `json:"deviceName"`
+	DeviceType        string     `json:"deviceType"`
+	DeviceOS          string     `json:"deviceOS"`
+	UserId            int64      `json:"userId"`
 }
 
 func ToUserSessionResponse(session *models.UserSession) *UserSessionResponse {
@@ -435,16 +434,15 @@ func ToUserSessionResponse(session *models.UserSession) *UserSessionResponse {
 	}
 
 	resp := &UserSessionResponse{
-		Id:                         session.Id,
-		SessionIdentifier:          session.SessionIdentifier,
-		AuthMethods:                session.AuthMethods,
-		AcrLevel:                   session.AcrLevel,
-		IpAddress:                  session.IpAddress,
-		DeviceName:                 session.DeviceName,
-		DeviceType:                 session.DeviceType,
-		DeviceOS:                   session.DeviceOS,
-		Level2AuthConfigHasChanged: session.Level2AuthConfigHasChanged,
-		UserId:                     session.UserId,
+		Id:                session.Id,
+		SessionIdentifier: session.SessionIdentifier,
+		AuthMethods:       session.AuthMethods,
+		AcrLevel:          session.AcrLevel,
+		IpAddress:         session.IpAddress,
+		DeviceName:        session.DeviceName,
+		DeviceType:        session.DeviceType,
+		DeviceOS:          session.DeviceOS,
+		UserId:            session.UserId,
 	}
 
 	if session.CreatedAt.Valid {
@@ -783,28 +781,27 @@ type GetPhoneCountriesResponse struct {
 }
 
 type EnhancedUserSessionResponse struct {
-	Id                         int64      `json:"id"`
-	CreatedAt                  *time.Time `json:"createdAt"`
-	UpdatedAt                  *time.Time `json:"updatedAt"`
-	SessionIdentifier          string     `json:"sessionIdentifier"`
-	Started                    *time.Time `json:"started"`
-	LastAccessed               *time.Time `json:"lastAccessed"`
-	AuthMethods                string     `json:"authMethods"`
-	AcrLevel                   string     `json:"acrLevel"`
-	AuthTime                   *time.Time `json:"authTime"`
-	IpAddress                  string     `json:"ipAddress"`
-	DeviceName                 string     `json:"deviceName"`
-	DeviceType                 string     `json:"deviceType"`
-	DeviceOS                   string     `json:"deviceOS"`
-	Level2AuthConfigHasChanged bool       `json:"level2AuthConfigHasChanged"`
-	UserId                     int64      `json:"userId"`
-	StartedAt                  string     `json:"startedAt"`
-	DurationSinceStarted       string     `json:"durationSinceStarted"`
-	LastAccessedAt             string     `json:"lastAccessedAt"`
-	DurationSinceLastAccessed  string     `json:"durationSinceLastAccessed"`
-	IsValid                    bool       `json:"isValid"`
-	IsCurrent                  bool       `json:"isCurrent"`
-	ClientIdentifiers          []string   `json:"clientIdentifiers"`
+	Id                        int64      `json:"id"`
+	CreatedAt                 *time.Time `json:"createdAt"`
+	UpdatedAt                 *time.Time `json:"updatedAt"`
+	SessionIdentifier         string     `json:"sessionIdentifier"`
+	Started                   *time.Time `json:"started"`
+	LastAccessed              *time.Time `json:"lastAccessed"`
+	AuthMethods               string     `json:"authMethods"`
+	AcrLevel                  string     `json:"acrLevel"`
+	AuthTime                  *time.Time `json:"authTime"`
+	IpAddress                 string     `json:"ipAddress"`
+	DeviceName                string     `json:"deviceName"`
+	DeviceType                string     `json:"deviceType"`
+	DeviceOS                  string     `json:"deviceOS"`
+	UserId                    int64      `json:"userId"`
+	StartedAt                 string     `json:"startedAt"`
+	DurationSinceStarted      string     `json:"durationSinceStarted"`
+	LastAccessedAt            string     `json:"lastAccessedAt"`
+	DurationSinceLastAccessed string     `json:"durationSinceLastAccessed"`
+	IsValid                   bool       `json:"isValid"`
+	IsCurrent                 bool       `json:"isCurrent"`
+	ClientIdentifiers         []string   `json:"clientIdentifiers"`
 }
 
 type GetUserSessionsResponse struct {
