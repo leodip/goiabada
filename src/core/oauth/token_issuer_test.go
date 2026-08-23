@@ -4345,6 +4345,197 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
+// TestAMR_OmittedWhenNoAuthMethodRecorded verifies that the amr claim is absent from both the
+// access token and the id_token when no authentication method was recorded, rather than present
+// and empty. OIDC Core 1.0 section 2 makes amr OPTIONAL, so absent says nothing, where "amr": []
+// asserts that the authentication used no methods at all (#240).
+//
+// The claim is observed only through the decoded signed token, and absence is asserted with the
+// comma-ok form: claims["amr"] returns nil for a missing key, and an empty array decodes to a
+// non-nil []interface{}{}, so assert.Nil would pass for either and pin nothing.
+func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	sessionIdentifier := "test-session-amr-absent"
+
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "test-client",
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "test@example.com",
+		EmailVerified: true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	expectAuthCodeCalls := func() {
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
+			Started: time.Now().UTC().Add(-10 * time.Minute),
+		}, nil).Once()
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+	}
+
+	expectImplicitCalls := func() {
+		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+	}
+
+	// An empty auth_methods is what a user_sessions row with no recorded method produces: the
+	// column is a plain string with no constraint, and handler_authorize copies it into the auth
+	// context, which stamps it onto the code.
+	t.Run("AuthCode flow - no method recorded, amr absent from both tokens", func(t *testing.T) {
+		expectAuthCodeCalls()
+
+		code := &models.Code{
+			Id:                10,
+			ClientId:          1,
+			UserId:            1,
+			Scope:             "openid",
+			Nonce:             "test-nonce-amr-absent",
+			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
+			SessionIdentifier: sessionIdentifier,
+			AcrLevel:          "urn:goiabada:level1",
+			AuthMethods:       "",
+			Client:            *client,
+			User:              *user,
+		}
+
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		assert.NoError(t, err)
+
+		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+		_, present := accessClaims["amr"]
+		assert.False(t, present, "amr must be absent from the access_token, not an empty array")
+
+		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		_, present = idClaims["amr"]
+		assert.False(t, present, "amr must be absent from the id_token, not an empty array")
+	})
+
+	// Keep this: without it the guard could be written as an unconditional delete, or as
+	// `if false`, and every absence case above would still be green.
+	t.Run("AuthCode flow - method recorded, amr still present", func(t *testing.T) {
+		expectAuthCodeCalls()
+
+		code := &models.Code{
+			Id:                11,
+			ClientId:          1,
+			UserId:            1,
+			Scope:             "openid",
+			Nonce:             "test-nonce-amr-present",
+			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
+			SessionIdentifier: sessionIdentifier,
+			AcrLevel:          "urn:goiabada:level1",
+			AuthMethods:       "pwd",
+			Client:            *client,
+			User:              *user,
+		}
+
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		assert.NoError(t, err)
+
+		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+		amrAccess, present := accessClaims["amr"]
+		assert.True(t, present, "amr must still be present in the access_token when a method was recorded")
+		assert.ElementsMatch(t, []string{"pwd"}, amrAccess)
+
+		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		amrId, present := idClaims["amr"]
+		assert.True(t, present, "amr must still be present in the id_token when a method was recorded")
+		assert.ElementsMatch(t, []string{"pwd"}, amrId)
+	})
+
+	t.Run("Implicit flow - no method recorded, amr absent from both tokens", func(t *testing.T) {
+		expectImplicitCalls()
+
+		input := &ImplicitGrantInput{
+			Client:            client,
+			User:              user,
+			Scope:             "openid",
+			AcrLevel:          "urn:goiabada:level1",
+			AuthMethods:       "",
+			SessionIdentifier: sessionIdentifier,
+			Nonce:             "test-nonce-implicit-absent",
+			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
+		}
+
+		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, true)
+		assert.NoError(t, err)
+
+		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+		_, present := accessClaims["amr"]
+		assert.False(t, present, "amr must be absent from the implicit access_token, not an empty array")
+
+		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		_, present = idClaims["amr"]
+		assert.False(t, present, "amr must be absent from the implicit id_token, not an empty array")
+	})
+
+	// Keep this, for the reason given on the auth code control case above.
+	t.Run("Implicit flow - methods recorded, amr still present", func(t *testing.T) {
+		expectImplicitCalls()
+
+		input := &ImplicitGrantInput{
+			Client:            client,
+			User:              user,
+			Scope:             "openid",
+			AcrLevel:          "urn:goiabada:level2_optional",
+			AuthMethods:       "pwd otp",
+			SessionIdentifier: sessionIdentifier,
+			Nonce:             "test-nonce-implicit-present",
+			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
+		}
+
+		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, true)
+		assert.NoError(t, err)
+
+		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+		amrAccess, present := accessClaims["amr"]
+		assert.True(t, present, "amr must still be present in the implicit access_token when methods were recorded")
+		assert.ElementsMatch(t, []string{"pwd", "otp"}, amrAccess)
+
+		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		amrId, present := idClaims["amr"]
+		assert.True(t, present, "amr must still be present in the implicit id_token when methods were recorded")
+		assert.ElementsMatch(t, []string{"pwd", "otp"}, amrId)
+	})
+
+	mockDB.AssertExpectations(t)
+}
+
 // TestAMR_EdgeCases tests edge cases for authMethodsToArray
 func TestAMR_EdgeCases(t *testing.T) {
 	t.Run("whitespace only returns empty array", func(t *testing.T) {

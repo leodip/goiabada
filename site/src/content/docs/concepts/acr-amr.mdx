@@ -208,8 +208,9 @@ if (idToken.acr === 'urn:goiabada:level2_mandatory') {
   allowSensitiveOperations();
 }
 
-// Check specific authentication methods
-if (idToken.amr.includes('otp')) {
+// Check specific authentication methods.
+// amr is optional in OpenID Connect, so check it is there before reading it.
+if (Array.isArray(idToken.amr) && idToken.amr.includes('otp')) {
   // User used OTP during authentication
   console.log('MFA was used');
 }
