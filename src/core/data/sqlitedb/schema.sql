@@ -102,7 +102,7 @@ CREATE TABLE users (
   forgot_password_code_encrypted BLOB,
   forgot_password_code_issued_at DATETIME
 , phone_number_country_uniqueid TEXT, phone_number_country_callingcode TEXT
-, auth_state_generation INTEGER NOT NULL DEFAULT 0, last_otp_step INTEGER NOT NULL DEFAULT 0, forgot_password_code_hash TEXT NOT NULL DEFAULT '');
+, auth_state_generation INTEGER NOT NULL DEFAULT 0, last_otp_step INTEGER NOT NULL DEFAULT 0, forgot_password_code_hash TEXT NOT NULL DEFAULT '', otp_config_generation INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE codes (
   `id` integer PRIMARY KEY AUTOINCREMENT,
@@ -257,8 +257,9 @@ CREATE TABLE user_sessions (
   device_name TEXT NOT NULL,
   device_type TEXT NOT NULL,
   device_os TEXT NOT NULL,
-  user_id INTEGER NOT NULL, level2_auth_config_has_changed INTEGER NOT NULL DEFAULT 0,  
+  user_id INTEGER NOT NULL,
   auth_state_generation INTEGER NOT NULL DEFAULT 0,
+  otp_config_generation INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 

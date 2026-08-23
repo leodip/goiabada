@@ -606,6 +606,76 @@ func (d *CommonDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId int
 	return generation, nil
 }
 
+// IncrementUserOtpConfigGeneration advances the user's OTP configuration generation and
+// returns the value that landed.
+//
+// Called at every site that establishes or removes an authenticator, inside the same
+// transaction as the write that changed it. That is the whole point of decision 2 in
+// #242: a separate write whose error is merely surfaced leaves exactly the state the
+// re-prompt exists to prevent, the authenticator on with the counter unmoved and every
+// existing session's snapshot still matching, and the caller cannot recover from it
+// because a retry is refused with OTP_ALREADY_ENABLED.
+//
+// Narrow rather than going through UpdateUser, which writes every non-tagged column:
+// otp_config_generation is tagged dont-update precisely so a handler that loaded the
+// user before a concurrent change cannot write the old counter back and discharge every
+// session's obligation at once (#106, #242).
+func (d *CommonDatabase) IncrementUserOtpConfigGeneration(tx *sql.Tx, userId int64) (int64, error) {
+
+	if userId == 0 {
+		return 0, errors.WithStack(errors.New("can't increment the otp config generation of user with id 0"))
+	}
+	if tx == nil {
+		return 0, errors.WithStack(errors.New("incrementing the otp config generation requires a transaction: it must commit with the write that changed the authenticator"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		"otp_config_generation = otp_config_generation + 1",
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(ub.Equal("id", userId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to increment user otp config generation")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to get rows affected when incrementing user otp config generation")
+	}
+	if rowsAffected != 1 {
+		return 0, errors.WithStack(errors.New("user not found when incrementing otp config generation"))
+	}
+
+	// Read back rather than computing the successor in Go: the increment happened in the
+	// database, so this is the value that actually landed. The browser enrollment caller
+	// promotes this value onto the session it is about to create, and computing N+1 here
+	// would promote a number a concurrent change may already have passed.
+	sb := d.Flavor.NewSelectBuilder()
+	sb.Select("otp_config_generation").From("users")
+	sb.Where(sb.Equal("id", userId))
+	query, args = sb.BuildWithFlavor(d.Flavor)
+
+	var generation int64
+	rows, err := d.QuerySql(tx, query, args...)
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to read back user otp config generation")
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		return 0, errors.WithStack(errors.New("user vanished while incrementing otp config generation"))
+	}
+	if err := rows.Scan(&generation); err != nil {
+		return 0, errors.Wrap(err, "unable to scan user otp config generation")
+	}
+
+	return generation, nil
+}
+
 // SetUserPasswordHash writes a new password hash and clears any outstanding
 // forgot-password code in the same statement, so a reset cannot leave a usable code
 // behind.

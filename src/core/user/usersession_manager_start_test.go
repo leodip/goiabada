@@ -98,7 +98,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	captured := m.expectSuccessfulPersist(123, nil)
 
 	before := time.Now().UTC()
-	result, err := m.manager.StartNewUserSession(recorder, req, 123, 7, "pwd otp", enums.AcrLevel2Mandatory.String(), 0)
+	result, err := m.manager.StartNewUserSession(recorder, req, 123, 7, "pwd otp", enums.AcrLevel2Mandatory.String(), 0, nil)
 	after := time.Now().UTC()
 
 	assert.NoError(t, err)
@@ -129,8 +129,9 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	assert.Equal(t, result.Started, result.LastAccessed)
 	assert.Equal(t, result.Started, result.AuthTime)
 
-	assert.False(t, result.Level2AuthConfigHasChanged,
-		"a brand new session must not carry the level2 re-auth flag")
+	assert.EqualValues(t, 0, result.OtpConfigGeneration,
+		"a nil capture must land the session at generation 0, which is the fail-closed value: "+
+			"it owes a level 2 re-prompt as soon as the user's counter is above 0")
 
 	// Device fields come from the User-Agent.
 	assert.Equal(t, useragent.GetDeviceName(req), result.DeviceName)
@@ -157,7 +158,7 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 	m.store.On("Get", mock.Anything, testSessionName).Return(m.session, nil).Once()
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
 
-	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
+	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
 
 	assert.NoError(t, err)
 	assert.Len(t, result.Clients, 1)
@@ -179,7 +180,7 @@ func TestStartNewUserSession_WritesIdentifierIntoTheCookieSession(t *testing.T) 
 
 	m.expectSuccessfulPersist(123, nil)
 
-	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
+	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, result.SessionIdentifier, m.session.Values[constants.SessionKeySessionIdentifier])
@@ -213,7 +214,7 @@ func TestStartNewUserSession_IpAddressExtraction(t *testing.T) {
 			m.expectSuccessfulPersist(123, nil)
 
 			result, err := m.manager.StartNewUserSession(
-				httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
+				httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantIp, result.IpAddress)
@@ -245,7 +246,7 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 	m.db.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
+		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
 
 	assert.NoError(t, err)
 }
@@ -299,7 +300,7 @@ func TestStartNewUserSession_KeepsSessionsFromOtherDevicesOrIps(t *testing.T) {
 
 			_, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-				123, 7, "pwd", enums.AcrLevel1.String(), 0)
+				123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
 
 			assert.NoError(t, err)
 		})
@@ -340,7 +341,7 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0)
+		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
 
 	assert.NoError(t, err)
 }
@@ -456,7 +457,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 
 			result, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-				123, 7, "pwd", enums.AcrLevel1.String(), 0)
+				123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
 
 			assert.Error(t, err)
 			assert.Nil(t, result, "no session may be returned alongside an error")
@@ -479,7 +480,7 @@ func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", enums.AcrLevel1.String(), 0)
+		123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to get the session")
@@ -519,11 +520,55 @@ func TestStartNewUserSession_StampsAuthStateGeneration(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", enums.AcrLevel1.String(), 7)
+		123, 7, "pwd", enums.AcrLevel1.String(), 7, nil)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
 		assert.EqualValues(t, 7, (*captured).AuthStateGeneration,
 			"the session must carry the generation the ceremony authenticated under")
+	}
+}
+
+// A brand new session carries the OTP configuration generation the ceremony observed when it
+// answered the level 2 question, not the user's current value and not zero. Promoting it here
+// rather than later is what stops the session owing a re-prompt on the very next request
+// (#242 decision 3).
+//
+// 9 rather than a small number, and different from the auth state generation above, so the
+// two parameters cannot be confused with each other or with a zero default.
+func TestStartNewUserSession_StampsOtpConfigGeneration(t *testing.T) {
+	m := newStartSessionMocks(t)
+	captured := m.expectSuccessfulPersist(123, nil)
+
+	observed := int64(9)
+	_, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		123, 7, "pwd", enums.AcrLevel1.String(), 7, &observed)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
+		assert.EqualValues(t, 9, (*captured).OtpConfigGeneration,
+			"the session must carry the OTP configuration generation the ceremony answered against")
+		assert.EqualValues(t, 7, (*captured).AuthStateGeneration,
+			"the two generations must not be crossed")
+	}
+}
+
+// A nil capture is what a ceremony written by an older binary produces, and it lands at 0.
+// That is deliberately the fail-closed direction: a user whose counter has already moved above
+// 0 owes a level 2 re-prompt on this brand new session, which costs one prompt, where the
+// alternative of reading the counter live here would silently satisfy an obligation the
+// ceremony never addressed.
+func TestStartNewUserSession_NilOtpConfigGenerationLandsAtZero(t *testing.T) {
+	m := newStartSessionMocks(t)
+	captured := m.expectSuccessfulPersist(123, nil)
+
+	_, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		123, 7, "pwd", enums.AcrLevel1.String(), 7, nil)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
+		assert.EqualValues(t, 0, (*captured).OtpConfigGeneration)
 	}
 }

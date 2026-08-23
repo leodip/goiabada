@@ -155,7 +155,7 @@ one definition, `validators.IsSupportedResponseMode`, shared by the handler and 
 - If a deferred error is parked → answer the client and stop (see above)
 - If session ACR is `level1` and target is `level2_*` → redirect to level2
 - If session ACR is `level2_optional` and target is `level2_mandatory` → redirect to level2
-- If `Level2AuthConfigHasChanged` flag set on session → re-auth level2 (user changed OTP settings)
+- If the session's `OtpConfigGeneration` differs from the user's → re-auth level2 (user changed OTP settings). This block writes nothing: the obligation is discharged at `/auth/completed`
 - Otherwise → auth completed
 
 ### Key Logic in Level2
@@ -186,7 +186,7 @@ UserSession (DB)
 ├── AuthMethods ("pwd" or "pwd otp")
 ├── AcrLevel ("urn:goiabada:level1" etc.)
 ├── AuthTime (when auth occurred)
-├── Level2AuthConfigHasChanged (flag for OTP config change)
+├── OtpConfigGeneration (snapshot of users.otp_config_generation)
 └── UserId
 ```
 
@@ -201,7 +201,7 @@ Uses `enums.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_
 
 **With valid session:**
 - Target ACR higher than session ACR → redirect to level2 (step-up)
-- `Level2AuthConfigHasChanged` + target requires level2 → re-prompt OTP
+- Session `OtpConfigGeneration` != user's + target requires level2 → re-prompt OTP
 - Otherwise → SSO succeeds, bump session
 
 **Without valid session:**
@@ -210,9 +210,19 @@ Uses `enums.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_
 ### ACR in Token (`auth_context.go:SetAcrLevel`)
 Token ACR = `max(targetACR, sessionACR)`. Never downgrades within a session.
 
-### Level2AuthConfigHasChanged Flag
-Set when user enables/disables OTP (`handler_api_account_otp.go:204`).
-Forces OTP re-verification on next level2 auth request, then reset to false.
+### OTP config generation
+`users.otp_config_generation` is a per-user counter, advanced by one at every site that establishes
+or removes an authenticator (`EnableUserOTPTx` and `disableUserOTP`), inside the same transaction as
+the write that changed it. `user_sessions.otp_config_generation` records the value that session last
+satisfied, so a session owes a level 2 re-prompt whenever the two differ. Being per user means one
+statement covers every session of that user.
+
+Both readers, `HandleAuthLevel1CompletedGet` and `handlePromptNone`, only compare and write nothing,
+so an abandoned ceremony spends no re-prompt. The snapshot is captured onto `AuthContext` at
+`handler_auth_pwd` and on every arm of `HandleAuthLevel2Get`, and promoted once, at
+`/auth/completed`: `StartNewUserSession` writes it on the create arm, and
+`PromoteUserSessionOtpConfigGeneration` on the reuse arm when the target ACR is above level 1. Both
+columns are `dont-update` (#242).
 
 ### Scenario Summary
 
@@ -228,7 +238,7 @@ Forces OTP re-verification on next level2 auth request, then reset to false.
 **SSO (valid session exists):**
 - Session ACR >= target ACR → SSO succeeds (keeps higher ACR in token)
 - Session ACR < target ACR → step-up required (prompt for OTP)
-- `Level2AuthConfigHasChanged` + target requires level2 → re-prompt OTP
+- Session `OtpConfigGeneration` != user's + target requires level2 → re-prompt OTP
 
 ## Configuration
 

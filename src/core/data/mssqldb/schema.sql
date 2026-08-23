@@ -318,8 +318,8 @@ CREATE TABLE [user_sessions] (
     [device_name] NVARCHAR(256) NOT NULL,
     [device_type] NVARCHAR(32) NOT NULL,
     [device_os] NVARCHAR(64) NOT NULL,
-    [level2_auth_config_has_changed] BIT NOT NULL,
     [auth_state_generation] BIGINT NOT NULL CONSTRAINT [df_user_sessions_auth_state_generation] DEFAULT 0,
+    [otp_config_generation] BIGINT NOT NULL CONSTRAINT [df_user_sessions_otp_config_generation] DEFAULT 0,
     [user_id] BIGINT NOT NULL,
     CONSTRAINT [PK_user_sessions] PRIMARY KEY ([id])
 );
@@ -367,6 +367,7 @@ CREATE TABLE [users] (
     [auth_state_generation] BIGINT NOT NULL CONSTRAINT [df_users_auth_state_generation] DEFAULT 0,
     [last_otp_step] BIGINT NOT NULL CONSTRAINT [df_users_last_otp_step] DEFAULT 0,
     [forgot_password_code_hash] NVARCHAR(64) NOT NULL CONSTRAINT [df_users_forgot_password_code_hash] DEFAULT '',
+    [otp_config_generation] BIGINT NOT NULL CONSTRAINT [df_users_otp_config_generation] DEFAULT 0,
     CONSTRAINT [PK_users] PRIMARY KEY ([id])
 );
 

@@ -142,7 +142,7 @@ func HandleAuthLevel1CompletedGet(
 		// would then decide B's step-up from A's ACR: an A session already at or above the target
 		// sends B straight to /auth/completed with a password only, skipping the second factor a
 		// level2 client asked for. A session belonging to anyone else is treated as no session, so
-		// the target alone decides, and A's Level2AuthConfigHasChanged flag is left alone (#133).
+		// the target alone decides, and A's OTP configuration snapshot is left alone (#133).
 		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge()) && authContext.OwnsSession(userSession)
 
 		if hasValidUserSession {
@@ -159,17 +159,23 @@ func HandleAuthLevel1CompletedGet(
 				shouldRedirectToLevel2 = true
 			}
 
-			// Handle Level2AuthConfigHasChanged: if user changed their OTP config
-			// (e.g., enrolled or removed OTP), they need to re-authenticate at level2.
-			// This applies when session is already at level2 and target requires level2.
-			if userSession.Level2AuthConfigHasChanged && targetAcrLevel.IsHigherThan(enums.AcrLevel1) {
+			// The user's authenticator has changed since this session last answered the level
+			// 2 question, so ask it again. Both numbers are already in hand: UserSessionLoadUser
+			// above populated userSession.User, so the comparison costs no query.
+			//
+			// **This block writes nothing, and that is the fix.** It used to clear a boolean
+			// here and commit it, which meant a visitor who closed the browser at the OTP form
+			// had already spent the re-prompt: the next ceremony found the flag clear and let
+			// them through with a password. A comparison cannot be consumed by reading it, so
+			// the obligation stands until /auth/completed records that a ceremony actually
+			// answered it (#242 decision 1).
+			//
+			// != rather than <, so a snapshot somehow ahead of the counter re-prompts too. That
+			// should not happen, and if it does the fail-closed answer is the one to give. It is
+			// also what makes migration 000031's -1 seed work with no special case.
+			if userSession.OtpConfigGeneration != userSession.User.OtpConfigGeneration &&
+				targetAcrLevel.IsHigherThan(enums.AcrLevel1) {
 				shouldRedirectToLevel2 = true
-				userSession.Level2AuthConfigHasChanged = false
-				err = database.UpdateUserSession(nil, userSession)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-					return
-				}
 			}
 		} else if targetAcrLevel.IsHigherThan(enums.AcrLevel1) {
 			// No valid session and target requires level2

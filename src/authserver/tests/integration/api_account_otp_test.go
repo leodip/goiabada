@@ -8,10 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -374,7 +377,78 @@ func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 	}
 }
 
-func TestAPIAccountOTPPut_Enable_SetsSessionFlag(t *testing.T) {
+// seedExtraSessionForOTPTest adds a second session for the user, standing in for another device
+// they are logged in on. Written straight to the database rather than driven through a ceremony,
+// because what these cases are about is the REACH of the counter advance rather than how a session
+// came to exist.
+//
+// Its snapshot is set to the user's current counter, so before the endpoint is called it owes no
+// re-prompt. That is what makes the assertion below meaningful: the row starts out satisfied.
+func seedExtraSessionForOTPTest(t *testing.T, userId int64) *models.UserSession {
+	t.Helper()
+
+	current, err := database.GetUserById(nil, userId)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now().UTC()
+	session := &models.UserSession{
+		SessionIdentifier:   uuid.New().String(),
+		Started:             now,
+		LastAccessed:        now,
+		AuthMethods:         "pwd otp",
+		AcrLevel:            enums.AcrLevel2Optional.String(),
+		AuthTime:            now,
+		IpAddress:           "10.0.0.1",
+		DeviceName:          "another device",
+		DeviceType:          "mobile",
+		DeviceOS:            "Android",
+		OtpConfigGeneration: current.OtpConfigGeneration,
+		UserId:              userId,
+	}
+	if err := database.CreateUserSession(nil, session); err != nil {
+		t.Fatal(err)
+	}
+	return session
+}
+
+// assertEverySessionOwesAReprompt is the assertion parts 1.2 and 1.3 come down to: after an
+// authenticator change, EVERY session of that user is behind the user's counter, not just the one
+// the caller happened to be holding.
+//
+// The old mechanism could not satisfy this. It set a boolean on the single session named by the
+// caller's own sid claim, so the tests that stood here asked only for "at least one session with
+// the flag set", which is true of a mechanism that reaches exactly one and false of nothing.
+func assertEverySessionOwesAReprompt(t *testing.T, userId int64, atLeast int) {
+	t.Helper()
+
+	user, err := database.GetUserById(nil, userId)
+	assert.NoError(t, err)
+
+	sessions, err := database.GetUserSessionsByUserId(nil, userId)
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, len(sessions), atLeast,
+		"the fixture must leave at least %d sessions for this to be about reach at all", atLeast)
+
+	for i := range sessions {
+		assert.NotEqual(t, user.OtpConfigGeneration, sessions[i].OtpConfigGeneration,
+			"session %s must owe a level 2 re-prompt: the user's counter is %d and its snapshot is %d",
+			sessions[i].SessionIdentifier, user.OtpConfigGeneration, sessions[i].OtpConfigGeneration)
+	}
+}
+
+// TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration covers part 1.2 and part 1.3 of #242 at
+// the account API's enable branch.
+//
+// Part 1.2: the advance is one statement against one users row, so every session of that user owes
+// a re-prompt afterwards. The second session seeded below is the one the old per-sid writer could
+// never have reached.
+//
+// Part 1.3: the access token this suite mints carries no sid claim, so the old writer reached NO
+// session at all here. The counter does not consult the claim, and the fact that this case passes
+// with such a token is the whole of that half.
+func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 	userId := getAccountUserId(t, accessToken)
 	setUserPasswordForOTP(t, userId, "Correct1!")
@@ -384,6 +458,10 @@ func TestAPIAccountOTPPut_Enable_SetsSessionFlag(t *testing.T) {
 	u.OTPEnabled = false
 	u.OTPSecret = ""
 	_ = database.UpdateUser(nil, u)
+
+	before, err := database.GetUserById(nil, userId)
+	assert.NoError(t, err)
+	extra := seedExtraSessionForOTPTest(t, userId)
 
 	// Prepare valid enable request
 	secret := "JBSWY3DPEHPK3PXP"
@@ -398,20 +476,26 @@ func TestAPIAccountOTPPut_Enable_SetsSessionFlag(t *testing.T) {
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
 	}
 
-	// Fetch sessions for this user and ensure at least one has the flag set
-	sessions, err := database.GetUserSessionsByUserId(nil, userId)
+	after, err := database.GetUserById(nil, userId)
 	assert.NoError(t, err)
-	found := false
-	for i := range sessions {
-		if sessions[i].Level2AuthConfigHasChanged {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "expected at least one session with Level2AuthConfigHasChanged=true")
+	assert.Equal(t, before.OtpConfigGeneration+1, after.OtpConfigGeneration,
+		"enabling an authenticator advances the counter by exactly one")
+
+	assertEverySessionOwesAReprompt(t, userId, 2)
+
+	// Named explicitly as well as covered by the sweep above, because this is the row the
+	// mechanism this replaces could not reach: it was created before the call, its snapshot
+	// was current at that moment, and nothing about the request mentions it.
+	reloaded, err := database.GetUserSessionById(nil, extra.Id)
+	assert.NoError(t, err)
+	assert.NotEqual(t, after.OtpConfigGeneration, reloaded.OtpConfigGeneration,
+		"the user's other device must owe a re-prompt too")
 }
 
-func TestAPIAccountOTPPut_Disable_SetsSessionFlag(t *testing.T) {
+// TestAPIAccountOTPPut_Disable_AdvancesOtpConfigGeneration is the same property in the disable
+// direction, where the stale assertion is the more dangerous one: a session whose amr still reads
+// ["pwd","otp"] is naming an authenticator the user has removed.
+func TestAPIAccountOTPPut_Disable_AdvancesOtpConfigGeneration(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 	userId := getAccountUserId(t, accessToken)
 	setUserPasswordForOTP(t, userId, "Correct1!")
@@ -423,6 +507,10 @@ func TestAPIAccountOTPPut_Disable_SetsSessionFlag(t *testing.T) {
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(nil, u)
 
+	before, err := database.GetUserById(nil, userId)
+	assert.NoError(t, err)
+	extra := seedExtraSessionForOTPTest(t, userId)
+
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
@@ -432,17 +520,17 @@ func TestAPIAccountOTPPut_Disable_SetsSessionFlag(t *testing.T) {
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
 	}
 
-	// Fetch sessions for this user and ensure at least one has the flag set
-	sessions, err := database.GetUserSessionsByUserId(nil, userId)
+	after, err := database.GetUserById(nil, userId)
 	assert.NoError(t, err)
-	found := false
-	for i := range sessions {
-		if sessions[i].Level2AuthConfigHasChanged {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "expected at least one session with Level2AuthConfigHasChanged=true")
+	assert.Equal(t, before.OtpConfigGeneration+1, after.OtpConfigGeneration,
+		"disabling an authenticator advances the counter by exactly one")
+
+	assertEverySessionOwesAReprompt(t, userId, 2)
+
+	reloaded, err := database.GetUserSessionById(nil, extra.Id)
+	assert.NoError(t, err)
+	assert.NotEqual(t, after.OtpConfigGeneration, reloaded.OtpConfigGeneration,
+		"the user's other device must owe a re-prompt too")
 }
 
 func TestAPIAccountOTPPut_Disable_NotEnabled(t *testing.T) {

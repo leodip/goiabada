@@ -56,6 +56,31 @@ func HandleAuthLevel2Get(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
+		// GetUserById answers (nil, nil) for a row that is not there, so a user deleted
+		// mid-ceremony reaches the dereference below. Byte-identical to the six sibling
+		// ceremony handlers that already check this (HandleAuthOtpGet, HandleAuthOtpPost,
+		// HandleConsentGet, HandleConsentPost, HandleAuthCompletedGet and
+		// handleImplicitFlow): consistency is the point rather than a side benefit, because
+		// "every handler nil-checks except this one" is the kind of gap that regresses
+		// (#242 decision 5).
+		if user == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+			return
+		}
+
+		// Capture the user's OTP configuration generation, before the switch so that every
+		// arm below carries it: the level2_optional OTP prompt, the level2_optional skip for
+		// a user with no authenticator, and level2_mandatory. **The skip has to count.** A
+		// level2_optional ceremony for a user who has removed their authenticator is
+		// legitimately answered by skipping OTP, and if that did not promote, every session
+		// of that user would stay permanently behind and handlePromptNone would answer
+		// interaction_required for the rest of each session's life.
+		//
+		// Nothing is written here. The value rides on the auth context and is promoted once,
+		// at /auth/completed, so a ceremony abandoned at the OTP form discharges nothing
+		// (#242 decision 3).
+		otpConfigGeneration := user.OtpConfigGeneration
+		authContext.OtpConfigGeneration = &otpConfigGeneration
 
 		// is OTP optional or mandatory?
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)

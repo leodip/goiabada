@@ -62,3 +62,7 @@ func (d *SQLiteDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Dura
 func (d *SQLiteDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
 	return d.CommonDB.PromoteUserSessionGeneration(tx, userSessionId, generation)
 }
+
+func (d *SQLiteDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+	return d.CommonDB.PromoteUserSessionOtpConfigGeneration(tx, userSessionId, generation)
+}

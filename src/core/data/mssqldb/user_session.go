@@ -114,3 +114,7 @@ func (d *MsSQLDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Durat
 func (d *MsSQLDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
 	return d.CommonDB.PromoteUserSessionGeneration(tx, userSessionId, generation)
 }
+
+func (d *MsSQLDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+	return d.CommonDB.PromoteUserSessionOtpConfigGeneration(tx, userSessionId, generation)
+}

@@ -746,8 +746,8 @@ CREATE TABLE public.user_sessions (
     device_name character varying(256) NOT NULL,
     device_type character varying(32) NOT NULL,
     device_os character varying(64) NOT NULL,
-    level2_auth_config_has_changed boolean NOT NULL,
     auth_state_generation bigint DEFAULT 0 NOT NULL,
+    otp_config_generation bigint DEFAULT 0 NOT NULL,
     user_id bigint NOT NULL
 );
 
@@ -816,7 +816,8 @@ CREATE TABLE public.users (
     forgot_password_code_issued_at timestamp(6) without time zone,
     auth_state_generation bigint DEFAULT 0 NOT NULL,
     last_otp_step bigint DEFAULT 0 NOT NULL,
-    forgot_password_code_hash character varying(64) DEFAULT ''::character varying NOT NULL
+    forgot_password_code_hash character varying(64) DEFAULT ''::character varying NOT NULL,
+    otp_config_generation bigint DEFAULT 0 NOT NULL
 );
 
 

@@ -64,6 +64,20 @@ type Database interface {
 	// transaction a concurrent increment can land between them and this caller would
 	// return the other caller's generation.
 	IncrementUserAuthStateGeneration(tx *sql.Tx, userId int64) (int64, error)
+	// IncrementUserOtpConfigGeneration advances the user's OTP configuration generation
+	// and returns the new value. Called at every site that establishes or removes an
+	// authenticator, inside the same transaction as the write that changed it, so there
+	// is no state in which the authenticator has changed and no session knows (#242).
+	// Separate from UpdateUser because the column is tagged dont-update, for the reason
+	// IncrementUserAuthStateGeneration gives.
+	//
+	// tx is REQUIRED and a nil transaction is rejected, as above and for the same
+	// reason. The browser enrollment caller needs the returned value: it captured the
+	// pre-enrollment generation at /auth/level2 and would otherwise promote that stale
+	// value at /auth/completed, leaving a session that just enrolled and verified owing
+	// another prompt at once. Computing the successor in Go instead is what the
+	// read-back exists to refuse.
+	IncrementUserOtpConfigGeneration(tx *sql.Tx, userId int64) (int64, error)
 	// SetUserPasswordHash writes a password hash and clears any outstanding
 	// forgot-password code in the same statement. Narrow rather than a full-row
 	// update, so a concurrent admin disable cannot be undone by it (#106).
@@ -273,6 +287,17 @@ type Database interface {
 	// a caller preserving a session and its tokens together must not have half of that
 	// silently succeed.
 	PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error
+	// PromoteUserSessionOtpConfigGeneration records that this session has satisfied the
+	// level 2 question against the given OTP configuration generation. Narrow for the
+	// reason PromoteUserSessionGeneration is: BumpUserSession writes the whole row on
+	// every request and would otherwise undo the promotion. Errors if no row matched,
+	// also for that reason.
+	//
+	// Called from exactly one place, /auth/completed, and with a value captured earlier
+	// in the ceremony rather than read live: an authenticator change landing between
+	// /auth/level2 and here must not be discharged by a ceremony that never saw it
+	// (#242, #106 decision 11).
+	PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error
 	UserSessionLoadUser(tx *sql.Tx, userSession *models.UserSession) error
 	UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserSession) error
 	UserSessionLoadClients(tx *sql.Tx, userSession *models.UserSession) error

@@ -66,6 +66,26 @@ type AuthContext struct {
 	// user mid-ceremony: doing that would launder a ceremony that began before a
 	// credential change into the generation that change established (#106 decision 11).
 	AuthStateGeneration int64
+	// OtpConfigGeneration is the user's otp_config_generation as this ceremony observed it
+	// when it answered the level 2 question, and it is what /auth/completed promotes onto
+	// the session this ceremony binds to. Captured at password verification and again on
+	// every arm of /auth/level2, and overwritten with the value the increment returned
+	// when the ceremony itself enrolls an authenticator (#242).
+	//
+	// **Living on the auth context is what makes an abandoned ceremony free.** The value
+	// dies with the context, so a visitor who closes the browser at the OTP prompt has
+	// discharged nothing and is asked again; the boolean this replaced was cleared by the
+	// handler that decided to ask, so abandoning spent the re-prompt.
+	//
+	// Captured, never read live at /auth/completed: an authenticator change landing after
+	// /auth/level2 must not be discharged by a ceremony that never saw it, which is #106
+	// decision 11's rule applied to the same shape of counter.
+	//
+	// A pointer, so a context written by an older binary unmarshals as nil, which reads as
+	// "this ceremony observed nothing, promote nothing" and leaves the session owing its
+	// re-prompt. That is the fail-closed direction, exactly as Level1AuthCompleted,
+	// CeremonyId and DeferredErrorCode each document for their own fields.
+	OtpConfigGeneration *int64
 	// CeremonyId names this authorization ceremony, so a form this ceremony rendered can say
 	// which ceremony rendered it and be refused once the browser's single auth context slot
 	// holds another one.

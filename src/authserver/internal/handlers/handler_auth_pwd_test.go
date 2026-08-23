@@ -757,6 +757,9 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			// Nonzero so the assertion below cannot pass on the zero value if the
 			// capture were dropped (#106 decision 11 rule 1).
 			AuthStateGeneration: 7,
+			// The same trick for the OTP configuration generation, and a different number so
+			// the two cannot be crossed (#242).
+			OtpConfigGeneration: 4,
 		}
 		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(user, nil)
 
@@ -779,7 +782,14 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				ac.Level1AuthCompleted &&
 				// Captured from the user whose credentials were just verified. Thin on
 				// purpose: token_issuer_auth_state_generation_test.go owns the tables.
-				ac.AuthStateGeneration == 7
+				ac.AuthStateGeneration == 7 &&
+				// The OTP configuration generation is captured here too, so a ceremony that
+				// creates a session without passing through /auth/level2 stamps the user's
+				// current counter on it rather than 0. It is defence in depth rather than a
+				// reachable bypass, since every ceremony whose target is above level 1 goes
+				// through /auth/level2 and overwrites this, and it is asserted here for that
+				// reason: this is the only place the write is observable at all (#242).
+				ac.OtpConfigGeneration != nil && *ac.OtpConfigGeneration == 4
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

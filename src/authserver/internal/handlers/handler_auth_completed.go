@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
@@ -132,6 +133,30 @@ func HandleAuthCompletedGet(
 				authContext.AuthenticatedAt = &bumpedSession.AuthTime
 			}
 
+			// The session has answered this ceremony's level 2 question, so record the OTP
+			// configuration generation it answered against and stop owing a re-prompt for it.
+			//
+			// After the bump and after the AuthTime write above, both of which write the whole
+			// row: otp_config_generation is tagged dont-update so neither carries it, and this
+			// narrow write is the only thing that moves it.
+			//
+			// Two conditions, and both are load-bearing. A missing capture means the ceremony
+			// never reached /auth/level2, which can only happen when the snapshot already
+			// matched, so there is nothing to promote. The ACR gate is needed because the
+			// password handler captures too: without it a prompt=login ceremony at a level 1
+			// client would discharge a level 2 obligation it never addressed. It is the same
+			// predicate /auth/level1completed uses to decide the step-up, so the two agree by
+			// construction (#242 decision 3).
+			if authContext.OtpConfigGeneration != nil && targetAcrLevel.IsHigherThan(enums.AcrLevel1) {
+				err = database.PromoteUserSessionOtpConfigGeneration(nil, bumpedSession.Id,
+					*authContext.OtpConfigGeneration)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+				bumpedSession.OtpConfigGeneration = *authContext.OtpConfigGeneration
+			}
+
 			auditLogger.Log(constants.AuditBumpedUserSession, map[string]interface{}{
 				"userId":   authContext.UserId,
 				"clientId": client.Id,
@@ -234,7 +259,7 @@ func HandleAuthCompletedGet(
 			// start new session
 			newSession, err := userSessionManager.StartNewUserSession(
 				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String(),
-				authContext.AuthStateGeneration)
+				authContext.AuthStateGeneration, authContext.OtpConfigGeneration)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

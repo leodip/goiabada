@@ -424,3 +424,49 @@ func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId 
 
 	return nil
 }
+
+// PromoteUserSessionOtpConfigGeneration records that this session has satisfied the level
+// 2 question against the given OTP configuration generation, so it stops owing a
+// re-prompt until the user's counter moves again.
+//
+// Narrow for the same reason PromoteUserSessionGeneration is: otp_config_generation is
+// tagged dont-update, so it is excluded from UpdateUserSession and can only be changed
+// here. BumpUserSession writes the whole row on every request, so in the ordinary update
+// set the first bump would carry whatever the caller's stale model held.
+//
+// Called from /auth/completed and nowhere else, with a value captured earlier in the
+// ceremony. Reading the counter live here instead would launder an authenticator change
+// that landed after the ceremony asked its level 2 question (#242, #106 decision 11).
+func (d *CommonDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+
+	if userSessionId == 0 {
+		return errors.WithStack(errors.New("can't promote the otp config generation of user session with id 0"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("user_sessions")
+	ub.Set(
+		ub.Assign("otp_config_generation", generation),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(ub.Equal("id", userSessionId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to promote user session otp config generation")
+	}
+
+	// A promotion that matched nothing is an error, not a no-op, as above: the caller has
+	// just completed a ceremony that answered the level 2 question, and silently failing
+	// to record that leaves the session re-prompted on every later request.
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "unable to get rows affected when promoting user session otp config generation")
+	}
+	if rowsAffected != 1 {
+		return errors.WithStack(errors.New("user session not found when promoting its otp config generation"))
+	}
+
+	return nil
+}

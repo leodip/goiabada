@@ -187,14 +187,106 @@ func TestHandleAPIAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }
 
+// TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically is the enable half of #242
+// decision 2, and the counterpart of the disable case below. Establishing the authenticator and
+// advancing the OTP configuration generation have to land as one commit.
+//
+// The alternative rejected there was a separate increment whose error is merely surfaced, and the
+// window it leaves is the exact state the re-prompt exists to prevent: otp_enabled on with the
+// counter unmoved, so every existing session's snapshot still matches and they all keep obtaining
+// tokens stamped acr: urn:goiabada:level2_optional with amr: ["pwd"] for a user who now has an
+// authenticator. The caller cannot recover from it either, since a retry is refused with
+// OTP_ALREADY_ENABLED and the only way out is to disable and enroll again.
+//
+// The call shape is what distinguishes this from a sequential pair of writes, which is why it is
+// asserted through a mock: end to end, a caller observes the same final row either way.
+func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+
+	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	database.On("TryConsumeUserOTPStep", (*sql.Tx)(nil), user.Id, mock.Anything, false).
+		Return(true, nil).Once()
+
+	var calls []string
+	database.On("BeginTransaction").Return(otpDisableTx, nil).
+		Run(func(mock.Arguments) { calls = append(calls, "begin") }).Once()
+	database.On("UpdateUser", otpDisableTx, user).Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
+	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, user.Id).Return(int64(1), nil).
+		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
+	database.On("CommitTransaction", otpDisableTx).Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
+	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
+
+	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+	auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, []string{"begin", "update", "increment", "commit"}, calls,
+		"the enable write and the counter advance belong inside one transaction, commit last")
+	assert.True(t, user.OTPEnabled)
+
+	// Part 1.3. The handler used to read the caller's own sid claim and flag that one session,
+	// so a token with no sid, which this request carries, reached no session at all. The counter
+	// above covers every session of this user, and it fires whether or not a sid is present.
+	database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything)
+}
+
+// TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack is the other half: the enable write
+// lands and the counter advance fails. Committing here is exactly the state above, so the whole
+// enrollment goes back and the caller retries cleanly. The TOTP code is spent either way, which is
+// not new: #111 claims the step before the enable write precisely so a failed enable cannot leave
+// OTP switched on, and the user types the next code.
+func TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+
+	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	database.On("TryConsumeUserOTPStep", (*sql.Tx)(nil), user.Id, mock.Anything, false).
+		Return(true, nil).Once()
+
+	database.On("BeginTransaction").Return(otpDisableTx, nil).Once()
+	database.On("UpdateUser", otpDisableTx, user).Return(nil).Once()
+	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, user.Id).
+		Return(int64(0), errors.New("the database is unwell")).Once()
+	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
+	// Neither is registered on the mock, so reaching either would already fail the test. Saying so
+	// explicitly is the point: nothing commits, and an enable that did not happen is not audited
+	// as one.
+	database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+}
+
 // otpDisableTx is an opaque non-nil transaction, the counterpart of this package's apiRevokeTx. The
 // two disable cases below register every write against this exact handle, so a write that slipped
 // back to the pool would arrive carrying a nil tx and fail as an unexpected call. That is the
 // assertion; nothing about *sql.Tx itself is exercised.
 var otpDisableTx = &sql.Tx{}
 
-// accountOTPDisableRequest carries no sid claim, so the handler skips the Level2AuthConfigHasChanged
-// session write. That path is not what these cases are about and registering it would be noise.
+// accountOTPDisableRequest carries no sid claim. That used to matter, because the handler read the
+// claim to flag one session; it no longer does, and the counter advance below fires for every
+// caller whether or not a sid is present, which is part 1.3 of #242 pinned at this tier.
 func accountOTPDisableRequest(t *testing.T, subject, password string) *http.Request {
 	t.Helper()
 	body, err := json.Marshal(map[string]interface{}{
@@ -237,6 +329,12 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("ResetUserOTPStep", otpDisableTx, user.Id).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "reset") }).Once()
+	// The counter that tells every session of this user they owe a second factor again, inside the
+	// same transaction for the reason #242 decision 2 gives: a removal that commits without the
+	// counter moving leaves every live session asserting amr ["pwd","otp"] for an authenticator
+	// that is gone.
+	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, user.Id).Return(int64(1), nil).
+		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 	database.On("CommitTransaction", otpDisableTx).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
 	// Deferred, so it runs after the commit and is a no-op there. Registered rather than asserted:
@@ -251,8 +349,9 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "update", "reset", "commit"}, calls,
-		"both writes belong inside one transaction, otp_enabled first per decision 10, commit last")
+	assert.Equal(t, []string{"begin", "update", "reset", "increment", "commit"}, calls,
+		"all three writes belong inside one transaction, otp_enabled first per #111 decision 10, "+
+			"the counter advance last before the commit per #242 decision 2")
 	assert.False(t, user.OTPEnabled)
 	assert.Empty(t, user.OTPSecretEncrypted, "the authenticator's secret goes with it")
 }

@@ -135,6 +135,10 @@ func (d *MsSQLDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId int6
 	return d.CommonDB.IncrementUserAuthStateGeneration(tx, userId)
 }
 
+func (d *MsSQLDatabase) IncrementUserOtpConfigGeneration(tx *sql.Tx, userId int64) (int64, error) {
+	return d.CommonDB.IncrementUserOtpConfigGeneration(tx, userId)
+}
+
 func (d *MsSQLDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error {
 	return d.CommonDB.SetUserPasswordHash(tx, userId, passwordHash)
 }

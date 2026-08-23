@@ -572,9 +572,21 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 	assert.Equal(t, requestState, state)
 }
 
+// The user's authenticator changed since this session answered the level 2 question, so a silent
+// request against it is refused (#242 seam 2).
+//
+// **The session is at level2_optional, not level1, and that is what makes this case about the
+// counter at all.** With a level1 session the ACR check at step 4 refuses first, because
+// level2_optional is higher than level1, and the counter comparison at step 6 is never reached: the
+// case would pass with the whole mechanism removed.
+//
+// This is also the exact shape decision 9 describes. The session authenticated at level2_optional
+// with amr ["pwd"] while the user had no authenticator, and the user then enabled OTP somewhere
+// else. Step 5 only refuses a level2_MANDATORY target for a user with no authenticator, so nothing
+// before step 6 objects, and without the counter this session would keep obtaining tokens stamped
+// acr: urn:goiabada:level2_optional with amr: ["pwd"] for a user who now has one.
 func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
-	// Create session at level1
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
 	// Enable OTP for user
 	key, err := totp.Generate(totp.GenerateOpts{
@@ -592,18 +604,14 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Set Level2AuthConfigHasChanged flag on the session
+	// Move the user's OTP configuration generation, leaving the session's snapshot behind it.
 	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 1, len(userSessions))
 
-	userSessions[0].Level2AuthConfigHasChanged = true
-	err = database.UpdateUserSession(nil, &userSessions[0])
-	if err != nil {
-		t.Fatal(err)
-	}
+	advanceOtpConfigGeneration(t, user.Id)
 
 	requestState := gofakeit.LetterN(8)
 	requestCodeChallenge := gofakeit.LetterN(43)
@@ -632,22 +640,96 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 	assert.Equal(t, requestState, state)
 }
 
+// TestPromptNone_OtpConfigChanged_RefusalWritesNothing is the case that distinguishes the counter
+// from the boolean it replaced, and it was unobservable before #242.
+//
+// This reader has never cleared anything, so the boolean would have survived a refusal here too;
+// what would not survive is a refusal followed by an INTERACTIVE ceremony's reader, which did clear
+// it. The property that matters is the same one either way and is stated positively: refusing is a
+// read, so an identical second request gets the identical answer, and the obligation stands until a
+// ceremony actually answers it at /auth/completed.
+//
+// Two requests rather than one, on the same jar and session. The second is what fails if any reader
+// ever starts consuming the signal again.
+func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
+	// level2_optional rather than level1, for the reason the case above gives: a level1 session is
+	// refused by the ACR check before the counter is ever consulted.
+	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
+
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "Goiabada",
+		AccountName: user.Email,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	user.OTPEnabled = true
+	user.OTPSecret = key.Secret()
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
+	if err := database.UpdateUser(nil, user); err != nil {
+		t.Fatal(err)
+	}
+
+	advanceOtpConfigGeneration(t, user.Id)
+
+	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, len(userSessions))
+	snapshotBefore := userSessions[0].OtpConfigGeneration
+
+	silentRequest := func() string {
+		requestState := gofakeit.LetterN(8)
+		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+			"&response_type=code" +
+			"&code_challenge_method=S256" +
+			"&code_challenge=" + gofakeit.LetterN(43) +
+			"&scope=" + url.QueryEscape("openid profile") +
+			"&state=" + requestState +
+			"&prompt=none" +
+			"&acr_values=" + enums.AcrLevel2Optional.String()
+
+		resp, err := httpClient.Get(destUrl)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, http.StatusFound, resp.StatusCode)
+		errorCode, _, state := getErrorFromUrl(t, resp)
+		assert.Equal(t, requestState, state)
+		return errorCode
+	}
+
+	assert.Equal(t, "interaction_required", silentRequest(),
+		"the first silent request must be refused: the session is behind the user's counter")
+	assert.Equal(t, "interaction_required", silentRequest(),
+		"and so must an identical second one. A refusal is a read: no interaction happened, so "+
+			"nothing may be discharged by it")
+
+	after, err := database.GetUserSessionsByUserId(nil, user.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, len(after))
+	assert.Equal(t, snapshotBefore, after[0].OtpConfigGeneration,
+		"the refusals must not have moved the session's snapshot")
+}
+
 func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 	// Create session at level1
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
-	// Set Level2AuthConfigHasChanged flag on the session
+	// Move the user's OTP configuration generation, leaving the session's snapshot behind it.
 	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 1, len(userSessions))
 
-	userSessions[0].Level2AuthConfigHasChanged = true
-	err = database.UpdateUserSession(nil, &userSessions[0])
-	if err != nil {
-		t.Fatal(err)
-	}
+	advanceOtpConfigGeneration(t, user.Id)
 
 	requestState := gofakeit.LetterN(8)
 	requestNonce := gofakeit.LetterN(8)
@@ -1624,4 +1706,30 @@ func TestPromptNone_InvalidScope(t *testing.T) {
 	errorCode, _, state := getErrorFromUrl(t, resp)
 	assert.Equal(t, "invalid_scope", errorCode)
 	assert.Equal(t, requestState, state)
+}
+
+// advanceOtpConfigGeneration moves a user's OTP configuration generation without going through an
+// enable or disable handler, which is what the production sites do inside their own transactions.
+// Standing in for them here rather than calling one: these cases are about what the READERS do with
+// a session whose snapshot is behind, and driving a real enable would also change otp_enabled and
+// consume a TOTP step, neither of which the reader under test looks at.
+//
+// It is the counter-era replacement for `userSession.Level2AuthConfigHasChanged = true` followed by
+// UpdateUserSession, which is what these cases used to do. The difference is the point: the flag was
+// per session and this is per user, so one call puts EVERY session of the user behind (#242).
+func advanceOtpConfigGeneration(t *testing.T, userId int64) {
+	t.Helper()
+
+	tx, err := database.BeginTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.RollbackTransaction(tx) }()
+
+	if _, err := database.IncrementUserOtpConfigGeneration(tx, userId); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.CommitTransaction(tx); err != nil {
+		t.Fatal(err)
+	}
 }
