@@ -78,9 +78,9 @@ Goiabada has 3 levels:
 
 By default, a client comes configured with `urn:goiabada:level2_optional`, which provides a good balance between security and user experience.
 
-You can raise the client's default ACR level on a per-authorization basis. For example, if your client has the default `urn:goiabada:level2_optional` but you have a specific resource that requires 2FA, you can specify `urn:goiabada:level2_mandatory` in the `acr_values` parameter of the authorization request.
+You can raise the client's default ACR level on a per-authorization basis, but never lower it. For example, if your client has the default `urn:goiabada:level2_optional` but you have a specific resource that requires 2FA, you can specify `urn:goiabada:level2_mandatory` in the `acr_values` parameter of the authorization request.
 
-The default is a floor, so it can be raised this way but never lowered: an authorization request asking for a level below the client's default is raised back to it. Changing this setting applies to authorization requests that start after the change, so a user who is already partway through signing in finishes at the level their request was accepted under.
+Changing this setting applies to authorization requests that start after the change, so a sign-in already in progress finishes at the level it was accepted under. See [ACR and AMR](/concepts/acr-amr/) for the full rules.
 
 ## Client display settings
 
@@ -158,7 +158,7 @@ The one exception is a field that names a response parameter. The authorization 
 
 This applies to the query component, which is where the response is written in the default `query` response mode. With `response_mode=fragment` or `response_mode=form_post` the response travels in the URL fragment or the form body instead, and the registered query is left exactly as registered, a `state=fixed` in it included.
 
-These rules are enforced when a client asks to be redirected, not only when the URI is registered. **A redirect URI that breaks them is refused even if it is already stored on the client**, so a URI registered before these rules existed stops working and the user sees an error page rather than being redirected. If a client that used to work now fails with a redirect URI error, this is the first thing to check: open the client's redirect URIs page and look for a value with no scheme, no host, or a `#`.
+These rules are enforced when a client asks to be redirected, not only when the URI is registered. **A redirect URI that breaks them is refused even if it is already stored on the client**, and the user sees an error page rather than being redirected. If a client fails with a redirect URI error, this is the first thing to check: open the client's redirect URIs page and look for a value with no scheme, no host, or a `#`.
 
 ### Loopback redirect URIs for native apps
 
@@ -254,7 +254,7 @@ A self-registered client's **identifier cannot be changed**, in the same way the
 </Aside>
 
 <Aside type="caution">
-**A self-registered client can be missing its badge.** A client that registers itself through `/connect/register` is marked as such when it is created, and the badge and the refusal behaviour above both read that mark. The `dcr_` prefix on those identifiers is a naming convention rather than a test, since an administrator can name a client `dcr_anything`; it was only what identified the clients that registered themselves before the mark existed. One of those that had been renamed away from the prefix, back when identifiers could still be changed, carries no mark: it is not badged, and it registered itself before self-registration turned consent on, so consent is off for it unless someone has ticked it since. Look for it in the client list and tick **Consent required** if it is not already ticked.
+**A self-registered client can be missing its badge.** One that registered itself before Goiabada started marking them, and was renamed back when that was still possible, carries no mark: no badge, and the refusal behaviour above does not apply to it. Nothing in the client list distinguishes it from a client an administrator created, so if your deployment is old enough to have one, check that **Consent required** is set the way you want across your clients.
 </Aside>
 
 ### Redirect URI rules
