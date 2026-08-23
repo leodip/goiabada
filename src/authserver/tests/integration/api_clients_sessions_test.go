@@ -221,17 +221,17 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Valid session
 	valid := &models.UserSession{
-		SessionIdentifier:          uuid.New().String(),
-		Started:                    time.Now().UTC().Add(-30 * time.Minute),
-		LastAccessed:               time.Now().UTC().Add(-5 * time.Minute),
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC().Add(-30 * time.Minute),
-		IpAddress:                  "192.168.1.100",
-		DeviceName:                 "Valid Session Device",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		UserId:                     testUser.Id,
+		SessionIdentifier: uuid.New().String(),
+		Started:           time.Now().UTC().Add(-30 * time.Minute),
+		LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
+		AuthMethods:       "pwd",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthTime:          time.Now().UTC().Add(-30 * time.Minute),
+		IpAddress:         "192.168.1.100",
+		DeviceName:        "Valid Session Device",
+		DeviceType:        "computer",
+		DeviceOS:          "linux",
+		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(nil, valid)
 	assert.NoError(t, err)
@@ -239,17 +239,17 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Expired session
 	expired := &models.UserSession{
-		SessionIdentifier:          uuid.New().String(),
-		Started:                    time.Now().UTC().Add(-25 * time.Hour),
-		LastAccessed:               time.Now().UTC().Add(-24 * time.Hour),
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC().Add(-25 * time.Hour),
-		IpAddress:                  "192.168.1.100",
-		DeviceName:                 "Expired Session Device",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		UserId:                     testUser.Id,
+		SessionIdentifier: uuid.New().String(),
+		Started:           time.Now().UTC().Add(-25 * time.Hour),
+		LastAccessed:      time.Now().UTC().Add(-24 * time.Hour),
+		AuthMethods:       "pwd",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthTime:          time.Now().UTC().Add(-25 * time.Hour),
+		IpAddress:         "192.168.1.100",
+		DeviceName:        "Expired Session Device",
+		DeviceType:        "computer",
+		DeviceOS:          "linux",
+		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(nil, expired)
 	assert.NoError(t, err)
@@ -314,17 +314,17 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	now := time.Now().UTC()
 	for i := 0; i < total; i++ {
 		s := &models.UserSession{
-			SessionIdentifier:          uuid.New().String(),
-			Started:                    now.Add(-time.Hour),
-			LastAccessed:               now.Add(-time.Minute * 5),
-			AuthMethods:                "pwd",
-			AcrLevel:                   "urn:goiabada:pwd",
-			AuthTime:                   now.Add(-time.Hour),
-			IpAddress:                  "192.168.1.100",
-			DeviceName:                 "Test Device",
-			DeviceType:                 "computer",
-			DeviceOS:                   "linux",
-			UserId:                     testUser.Id,
+			SessionIdentifier: uuid.New().String(),
+			Started:           now.Add(-time.Hour),
+			LastAccessed:      now.Add(-time.Minute * 5),
+			AuthMethods:       "pwd",
+			AcrLevel:          "urn:goiabada:pwd",
+			AuthTime:          now.Add(-time.Hour),
+			IpAddress:         "192.168.1.100",
+			DeviceName:        "Test Device",
+			DeviceType:        "computer",
+			DeviceOS:          "linux",
+			UserId:            testUser.Id,
 		}
 		err := database.CreateUserSession(nil, s)
 		assert.NoError(t, err)

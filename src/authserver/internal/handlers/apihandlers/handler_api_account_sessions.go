@@ -76,17 +76,17 @@ func HandleAPIAccountSessionsGet(
 			}
 
 			enh := api.EnhancedUserSessionResponse{
-				Id:                         us.Id,
-				SessionIdentifier:          us.SessionIdentifier,
-				AuthMethods:                us.AuthMethods,
-				AcrLevel:                   us.AcrLevel,
-				IpAddress:                  us.IpAddress,
-				DeviceName:                 us.DeviceName,
-				DeviceType:                 us.DeviceType,
-				DeviceOS:                   us.DeviceOS,
-				UserId:                     us.UserId,
-				IsValid:                    isValid,
-				IsCurrent:                  currentSid != "" && us.SessionIdentifier == currentSid,
+				Id:                us.Id,
+				SessionIdentifier: us.SessionIdentifier,
+				AuthMethods:       us.AuthMethods,
+				AcrLevel:          us.AcrLevel,
+				IpAddress:         us.IpAddress,
+				DeviceName:        us.DeviceName,
+				DeviceType:        us.DeviceType,
+				DeviceOS:          us.DeviceOS,
+				UserId:            us.UserId,
+				IsValid:           isValid,
+				IsCurrent:         currentSid != "" && us.SessionIdentifier == currentSid,
 			}
 
 			if us.CreatedAt.Valid {

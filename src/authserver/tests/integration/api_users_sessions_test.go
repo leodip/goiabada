@@ -490,17 +490,17 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Setup: Create a valid session (recently accessed)
 	validSession := &models.UserSession{
-		SessionIdentifier:          uuid.New().String(),
-		Started:                    time.Now().UTC().Add(-time.Minute * 30), // Started 30 minutes ago
-		LastAccessed:               time.Now().UTC().Add(-time.Minute * 5),  // Last accessed 5 minutes ago
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC().Add(-time.Minute * 30),
-		IpAddress:                  "192.168.1.100",
-		DeviceName:                 "Valid Session Device",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		UserId:                     testUser.Id,
+		SessionIdentifier: uuid.New().String(),
+		Started:           time.Now().UTC().Add(-time.Minute * 30), // Started 30 minutes ago
+		LastAccessed:      time.Now().UTC().Add(-time.Minute * 5),  // Last accessed 5 minutes ago
+		AuthMethods:       "pwd",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthTime:          time.Now().UTC().Add(-time.Minute * 30),
+		IpAddress:         "192.168.1.100",
+		DeviceName:        "Valid Session Device",
+		DeviceType:        "computer",
+		DeviceOS:          "linux",
+		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(nil, validSession)
 	assert.NoError(t, err)
@@ -510,17 +510,17 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Setup: Create an expired session (very old last access)
 	expiredSession := &models.UserSession{
-		SessionIdentifier:          uuid.New().String(),
-		Started:                    time.Now().UTC().Add(-time.Hour * 25), // Started 25 hours ago
-		LastAccessed:               time.Now().UTC().Add(-time.Hour * 24), // Last accessed 24 hours ago (expired)
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC().Add(-time.Hour * 25),
-		IpAddress:                  "192.168.1.100",
-		DeviceName:                 "Expired Session Device",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		UserId:                     testUser.Id,
+		SessionIdentifier: uuid.New().String(),
+		Started:           time.Now().UTC().Add(-time.Hour * 25), // Started 25 hours ago
+		LastAccessed:      time.Now().UTC().Add(-time.Hour * 24), // Last accessed 24 hours ago (expired)
+		AuthMethods:       "pwd",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthTime:          time.Now().UTC().Add(-time.Hour * 25),
+		IpAddress:         "192.168.1.100",
+		DeviceName:        "Expired Session Device",
+		DeviceType:        "computer",
+		DeviceOS:          "linux",
+		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(nil, expiredSession)
 	assert.NoError(t, err)
@@ -550,17 +550,17 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 // Helper function moved from utils_test.go: createTestUserSession
 func createTestUserSession(t *testing.T, userId int64, sessionIdentifier string) *models.UserSession {
 	session := &models.UserSession{
-		SessionIdentifier:          sessionIdentifier,
-		Started:                    time.Now().UTC().Add(-time.Hour),        // Started 1 hour ago
-		LastAccessed:               time.Now().UTC().Add(-time.Minute * 30), // Last accessed 30 minutes ago
-		AuthMethods:                "pwd",
-		AcrLevel:                   "urn:goiabada:pwd",
-		AuthTime:                   time.Now().UTC().Add(-time.Hour),
-		IpAddress:                  "192.168.1.100",
-		DeviceName:                 "Test Device",
-		DeviceType:                 "computer",
-		DeviceOS:                   "linux",
-		UserId:                     userId,
+		SessionIdentifier: sessionIdentifier,
+		Started:           time.Now().UTC().Add(-time.Hour),        // Started 1 hour ago
+		LastAccessed:      time.Now().UTC().Add(-time.Minute * 30), // Last accessed 30 minutes ago
+		AuthMethods:       "pwd",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthTime:          time.Now().UTC().Add(-time.Hour),
+		IpAddress:         "192.168.1.100",
+		DeviceName:        "Test Device",
+		DeviceType:        "computer",
+		DeviceOS:          "linux",
+		UserId:            userId,
 	}
 	err := database.CreateUserSession(nil, session)
 	assert.NoError(t, err)

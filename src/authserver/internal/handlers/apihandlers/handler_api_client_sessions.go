@@ -93,16 +93,16 @@ func HandleAPIClientSessionsGet(
 			}
 
 			enh := api.EnhancedUserSessionResponse{
-				Id:                         us.Id,
-				SessionIdentifier:          us.SessionIdentifier,
-				AuthMethods:                us.AuthMethods,
-				AcrLevel:                   us.AcrLevel,
-				IpAddress:                  us.IpAddress,
-				DeviceName:                 us.DeviceName,
-				DeviceType:                 us.DeviceType,
-				DeviceOS:                   us.DeviceOS,
-				UserId:                     us.UserId,
-				IsValid:                    isValid,
+				Id:                us.Id,
+				SessionIdentifier: us.SessionIdentifier,
+				AuthMethods:       us.AuthMethods,
+				AcrLevel:          us.AcrLevel,
+				IpAddress:         us.IpAddress,
+				DeviceName:        us.DeviceName,
+				DeviceType:        us.DeviceType,
+				DeviceOS:          us.DeviceOS,
+				UserId:            us.UserId,
+				IsValid:           isValid,
 			}
 
 			if us.CreatedAt.Valid {
