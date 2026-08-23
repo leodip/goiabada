@@ -11,7 +11,7 @@ import (
 )
 
 func TestCreateKeyPair(t *testing.T) {
-	keyPair := createTestKeyPair(t)
+	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
 
 	if keyPair.Id == 0 {
 		t.Error("Expected non-zero ID after creation")
@@ -32,7 +32,14 @@ func TestCreateKeyPair(t *testing.T) {
 }
 
 func TestUpdateKeyPair(t *testing.T) {
-	keyPair := createTestKeyPair(t)
+	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
+
+	// The destination state is cleared before the row is moved into it. UNIQUE (state)
+	// refuses an update into an occupied state, and the data-test database is shared and
+	// never dropped, so a 'previous' row left behind by an earlier case or an earlier run
+	// would fail this update on all four engines. Production observes the same ordering:
+	// the rotator deletes the previous key before demoting the current one (#251).
+	clearKeyPairState(t, enums.KeyStatePrevious.String())
 
 	// Update all properties
 	keyPair.State = enums.KeyStatePrevious.String()
@@ -88,7 +95,7 @@ func TestUpdateKeyPair(t *testing.T) {
 }
 
 func TestGetKeyPairById(t *testing.T) {
-	keyPair := createTestKeyPair(t)
+	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
 
 	retrievedKeyPair, err := database.GetKeyPairById(nil, keyPair.Id)
 	if err != nil {
@@ -121,8 +128,13 @@ func TestGetAllSigningKeys(t *testing.T) {
 		}
 	}
 
-	keyPair1 := createTestKeyPair(t)
-	keyPair2 := createTestKeyPair(t)
+	// Two states rather than two rows in one: UNIQUE (state) forbids the second
+	// 'current' row this case used to create. What it is actually for is unchanged, and
+	// is the reason it holds two rows at all: GetAllSigningKeys returns every signing
+	// key whatever state it is in, which is what lets the token parser fall back to a
+	// previous key and what lets /certs publish the whole set (#251).
+	keyPair1 := createKeyPairInState(t, enums.KeyStateCurrent.String())
+	keyPair2 := createKeyPairInState(t, enums.KeyStateNext.String())
 
 	keyPairs, err = database.GetAllSigningKeys(nil)
 	if err != nil {
@@ -172,12 +184,7 @@ func TestGetCurrentSigningKey(t *testing.T) {
 		t.Fatal("Expected an error when no key pair is in the current state, got nil")
 	}
 
-	keyPair := createTestKeyPair(t)
-	keyPair.State = enums.KeyStateCurrent.String()
-	err = database.UpdateKeyPair(nil, keyPair)
-	if err != nil {
-		t.Fatalf("Failed to update key pair: %v", err)
-	}
+	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
 
 	currentKeyPair, err := database.GetCurrentSigningKey(nil)
 	if err != nil {
@@ -192,7 +199,7 @@ func TestGetCurrentSigningKey(t *testing.T) {
 }
 
 func TestDeleteKeyPair(t *testing.T) {
-	keyPair := createTestKeyPair(t)
+	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
 
 	err := database.DeleteKeyPair(nil, keyPair.Id)
 	if err != nil {
@@ -211,24 +218,6 @@ func TestDeleteKeyPair(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent key pair, got: %v", err)
 	}
-}
-
-func createTestKeyPair(t *testing.T) *models.KeyPair {
-	keyPair := &models.KeyPair{
-		State:             enums.KeyStateCurrent.String(),
-		KeyIdentifier:     gofakeit.UUID(),
-		Type:              "RSA",
-		Algorithm:         "RS256",
-		PrivateKeyPEM:     []byte(gofakeit.LoremIpsumSentence(100)),
-		PublicKeyPEM:      []byte(gofakeit.LoremIpsumSentence(50)),
-		PublicKeyASN1_DER: []byte(gofakeit.LoremIpsumSentence(30)),
-		PublicKeyJWK:      []byte(gofakeit.LoremIpsumSentence(40)),
-	}
-	err := database.CreateKeyPair(nil, keyPair)
-	if err != nil {
-		t.Fatalf("Failed to create test key pair: %v", err)
-	}
-	return keyPair
 }
 
 func compareKeyPairs(t *testing.T, expected, actual *models.KeyPair) {
@@ -291,7 +280,10 @@ func clearKeyPairState(t *testing.T, state string) {
 }
 
 // createKeyPairInState creates a key pair already in state, clearing whatever held
-// that state first.
+// that state first. It is the only key-pair fixture in this package: UNIQUE (state)
+// means a fixture that always stamped 'current' could not be called twice, so the
+// state is the caller's to choose rather than something to correct afterwards with an
+// update.
 func createKeyPairInState(t *testing.T, state string) *models.KeyPair {
 	t.Helper()
 

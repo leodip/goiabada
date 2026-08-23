@@ -431,6 +431,7 @@ CREATE UNIQUE INDEX [idx_client_identifier] ON [clients] (client_identifier);
 CREATE UNIQUE INDEX [idx_code_hash] ON [codes] (code_hash);
 CREATE UNIQUE INDEX [idx_group_identifier] ON [groups] (group_identifier);
 CREATE INDEX [idx_state] ON [key_pairs] (state);
+CREATE UNIQUE INDEX [idx_key_pairs_state] ON [key_pairs] (state);
 CREATE UNIQUE INDEX [idx_permission_identifier_resource] ON [permissions] (permission_identifier, resource_id);
 CREATE INDEX [idx_pre_reg_email] ON [pre_registrations] (email);
 CREATE UNIQUE INDEX [idx_pre_reg_verification_code_hash] ON [pre_registrations] ([verification_code_hash]);
