@@ -703,7 +703,13 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New().String()
 	claims["acr"] = input.AcrLevel
-	claims["amr"] = input.AuthMethods
+	// Omit amr rather than signing an empty array. OIDC Core 1.0 section 2 makes amr OPTIONAL, so
+	// absent says nothing about how the user authenticated, where "amr": [] positively asserts that
+	// no method was used. Reinstating the unconditional assignment would sign that false claim for
+	// any grant whose session carries an empty auth_methods, which the column permits (#240).
+	if len(input.AuthMethods) > 0 {
+		claims["amr"] = input.AuthMethods
+	}
 	claims["auth_state_generation"] = input.AuthStateGeneration
 
 	// Optional sid claim, suppressed for offline grants: see GrantIsOffline.
@@ -839,7 +845,10 @@ func (t *TokenIssuer) generateIdTokenCore(settings *models.Settings, input *Toke
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New().String()
 	claims["acr"] = input.AcrLevel
-	claims["amr"] = input.AuthMethods
+	// Omitted when no method was recorded, for the reason given in generateAccessTokenCore (#240).
+	if len(input.AuthMethods) > 0 {
+		claims["amr"] = input.AuthMethods
+	}
 
 	// Optional sid claim
 	if len(input.SessionIdentifier) > 0 {
