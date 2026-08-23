@@ -106,6 +106,25 @@ type AuthContext struct {
 	// CeremonyId document for their own fields.
 	DeferredErrorCode        string
 	DeferredErrorDescription string
+	// TargetAcrLevel is the authentication level this ceremony must reach, snapshotted at
+	// /auth/authorize when the request was accepted and never recomputed afterwards.
+	//
+	// Without it the target is a live read of the client's default_acr_level at three later
+	// handlers, so an administrator changing that row mid-ceremony retroactively redefines what
+	// the ceremony was required to do. A raise landing after /auth/level1completed has already
+	// decided no step-up is needed makes /auth/completed stamp acr: urn:goiabada:level2_mandatory
+	// on a ceremony that only ever saw a password, and OIDC Core section 2 defines acr as the
+	// class "the authentication performed satisfied", so the claim is false in the direction a
+	// relying party trusts. A lowering landing before /auth/level2 takes its target outside that
+	// handler's switch and answers 500 instead.
+	//
+	// Absent from a context written by an older binary it unmarshals as "", and an unparsable
+	// value could only mean a later release dropped an ACR level. Both fall back to computing the
+	// target from the client's current row, which is what every handler did before this field
+	// existed and is never below what the request asked for, so a ceremony in flight across a
+	// deploy finishes at that answer rather than at a 500 and the window closes as the session
+	// cookies age out (#240).
+	TargetAcrLevel string
 }
 
 func (ac *AuthContext) SetScope(scope string) {
@@ -219,10 +238,45 @@ func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []enums.AcrLevel {
 	return arr
 }
 
+// SetTargetAcrLevel snapshots the level this ceremony must reach. Called once, at the point the
+// authorization request is accepted, because a target recomputed later is a target an
+// administrator can move underneath a ceremony that is already in progress. See TargetAcrLevel
+// for what that costs (#240).
+func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLevel) {
+	ac.TargetAcrLevel = ac.computeTargetAcrLevel(defaultAcrLevelFromClient).String()
+}
+
+// GetTargetAcrLevel returns the authentication level this ceremony must reach: the snapshot taken
+// when the request was accepted, or, when there is none to read, the level computed from the
+// client's current default. It stays the only way a caller obtains a target, so no handler can
+// compute one another way and be missed. See TargetAcrLevel for why the fallback is the safe
+// direction.
 func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLevel) enums.AcrLevel {
+	if ac.TargetAcrLevel != "" {
+		acr, err := enums.AcrLevelFromString(ac.TargetAcrLevel)
+		if err == nil {
+			return acr
+		}
+	}
+	return ac.computeTargetAcrLevel(defaultAcrLevelFromClient)
+}
+
+// computeTargetAcrLevel raises the level the request asked for to the client's configured level
+// and never lowers it, so the client's configuration is a floor.
+//
+// acr_values arrives on the front channel with no client authentication, so undo this and whoever
+// composes the URL chooses the authentication policy: appending &acr_values=urn:goiabada:level1
+// then turns off the second factor of a client configured to demand one, for anybody who can get
+// the end user to follow a link. A request asking for MORE than the client's level still gets it,
+// which is what makes this a floor rather than the client default always winning, and dropping
+// that half would leave step-up broken while every clamp case still passed.
+//
+// enums.AcrMax is the codebase's existing comparison, already used by SetAcrLevel one layer up for
+// the same never-downgrade rule against a session's ACR (#240).
+func (ac *AuthContext) computeTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLevel) enums.AcrLevel {
 	acrValuesFromAuthorizeRequest := ac.parseAcrValuesFromAuthorizeRequest()
 	if len(acrValuesFromAuthorizeRequest) > 0 {
-		return acrValuesFromAuthorizeRequest[0]
+		return enums.AcrMax(acrValuesFromAuthorizeRequest[0], defaultAcrLevelFromClient)
 	}
 	return defaultAcrLevelFromClient
 }

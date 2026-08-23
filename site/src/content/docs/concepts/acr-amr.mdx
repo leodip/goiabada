@@ -74,8 +74,20 @@ GET /auth/authorize?
 
 If `acr_values` is not specified, Goiabada uses the client's default ACR level.
 
+The client's default ACR level is a floor, not just a starting point. A request asking for a level
+below it is raised back to it, so `acr_values=urn:goiabada:level1` against a client configured for
+`level2_mandatory` still requires the OTP. The parameter can only ask for a stronger
+authentication than the client is configured for, never a weaker one.
+
 <Aside type="tip">
-If you request multiple ACR values separated by spaces, Goiabada will use the first one in the list.
+If you request multiple ACR values separated by spaces, Goiabada uses the first one in the list, and
+then raises it to the client's default ACR level if it is below it.
+</Aside>
+
+<Aside type="caution">
+Because the returned `acr` can be higher than the one you asked for, compare it with what your
+application requires rather than with what it requested. An exact string match against the requested
+value will not hold when the client's configured level is higher.
 </Aside>
 
 ## How authentication flows work
@@ -217,7 +229,7 @@ The `max_age` parameter and ACR levels are independent checks that both affect w
 
 | Parameter | What it checks | When user must re-authenticate |
 |-----------|----------------|-------------------------------|
-| `acr_values` | Authentication strength | Session ACR is lower than requested |
+| `acr_values` | Authentication strength | Session ACR is lower than the level required, which is the higher of the requested value and the client's default |
 | `max_age` | Time since session started | Session is older than specified seconds |
 
 Both conditions are evaluated. A user may need to re-authenticate if:

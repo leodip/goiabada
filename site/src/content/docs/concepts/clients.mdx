@@ -78,7 +78,9 @@ Goiabada has 3 levels:
 
 By default, a client comes configured with `urn:goiabada:level2_optional`, which provides a good balance between security and user experience.
 
-You can override the client's default ACR level on a per-authorization basis. For example, if your client has the default `urn:goiabada:level2_optional` but you have a specific resource that requires 2FA, you can specify `urn:goiabada:level2_mandatory` in the `acr_values` parameter of the authorization request.
+You can raise the client's default ACR level on a per-authorization basis. For example, if your client has the default `urn:goiabada:level2_optional` but you have a specific resource that requires 2FA, you can specify `urn:goiabada:level2_mandatory` in the `acr_values` parameter of the authorization request.
+
+The default is a floor, so it can be raised this way but never lowered: an authorization request asking for a level below the client's default is raised back to it. Changing this setting applies to authorization requests that start after the change, so a user who is already partway through signing in finishes at the level their request was accepted under.
 
 ## Client display settings
 

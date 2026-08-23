@@ -460,7 +460,20 @@ func HandleAuthorizeGet(
 		}
 		authContext.IdTokenHintSub = hintSub
 
-		// Save AuthContext with the validated hint sub for use in downstream handlers
+		// The authentication level this ceremony must reach is fixed HERE, at the one point the
+		// request has been accepted and before any handler acts on it, and every later handler
+		// reads the snapshot instead of the client's row. /auth/level1completed, /auth/level2 and
+		// /auth/completed each reload the client and would otherwise recompute the target from
+		// whatever default_acr_level says by the time they run, so an administrator editing that
+		// row mid-ceremony would retroactively change what the ceremony was required to do:
+		// raising it after the step-up decision has been taken stamps an acr naming a second
+		// factor that was never performed, and lowering it takes /auth/level2's target outside
+		// its switch and answers 500. This is also the last point before handlePromptNone below
+		// reads the target (#240).
+		authContext.SetTargetAcrLevel(client.DefaultAcrLevel)
+
+		// Save AuthContext with the validated hint sub and the target ACR snapshot, for use in
+		// downstream handlers
 		err = authHelper.SaveAuthContext(w, r, &authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
