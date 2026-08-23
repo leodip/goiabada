@@ -87,8 +87,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SearchUsersResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/create:
     post:
@@ -113,6 +119,17 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: |
+            The email address is already registered. error_code is
+            EMAIL_ALREADY_EXISTS. Answered both by the explicit duplicate check
+            and by the user creator, which derives the username from the email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}:
     get:
@@ -129,10 +146,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [Users]
       summary: Delete user
@@ -147,10 +168,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/profile:
     put:
@@ -179,6 +204,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/email:
     put:
@@ -207,6 +234,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/email/verification-code:
     post:
@@ -226,10 +255,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenerateUserEmailVerificationCodeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/phone:
     put:
@@ -258,6 +291,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/address:
     put:
@@ -286,6 +321,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/password:
     put:
@@ -314,6 +351,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/enabled:
     put:
@@ -336,10 +375,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UpdateUserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/otp:
     put:
@@ -368,6 +411,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/groups:
     get:
@@ -384,10 +429,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserGroupsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Users]
       summary: Set user groups
@@ -414,6 +463,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/users/{id}/permissions:
     get:
@@ -430,10 +481,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserPermissionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Permissions]
       summary: Set user permissions
@@ -460,6 +515,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
   # ADMIN API - USER ATTRIBUTES
@@ -479,10 +536,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserAttributesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/user-attributes:
     post:
@@ -507,6 +568,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/user-attributes/{id}:
     get:
@@ -529,10 +594,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserAttributeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [User Attributes]
       summary: Update user attribute
@@ -565,6 +634,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [User Attributes]
       summary: Delete user attribute
@@ -585,10 +656,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
   # ADMIN API - USER SESSIONS
@@ -608,10 +683,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserSessionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/user-sessions/{sessionIdentifier}:
     get:
@@ -633,10 +712,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [User Sessions]
       summary: Update session
@@ -662,10 +745,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [User Sessions]
       summary: Delete session
@@ -689,10 +776,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
   # ADMIN API - USER CONSENTS
@@ -712,10 +803,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserConsentsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          description: |
+            The request failed inside the server. Unlike every other failure on
+            this endpoint, the body is the server's HTML error page rather than
+            the JSON error envelope, because this handler renders the shared
+            error template.
+          content:
+            text/html:
+              schema:
+                type: string
 
   /api/v1/admin/user-consents/{id}:
     delete:
@@ -738,10 +841,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          description: |
+            The request failed inside the server. Unlike every other failure on
+            this endpoint, the body is the server's HTML error page rather than
+            the JSON error envelope, because this handler renders the shared
+            error template.
+          content:
+            text/html:
+              schema:
+                type: string
 
   # =============================================================================
   # ADMIN API - GROUPS
@@ -761,6 +876,8 @@ paths:
                 $ref: '#/components/schemas/GetGroupsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       tags: [Groups]
       summary: Create group
@@ -783,6 +900,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/groups/{id}:
     get:
@@ -799,10 +918,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetGroupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Groups]
       summary: Update group
@@ -829,6 +952,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [Groups]
       summary: Delete group
@@ -843,10 +968,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/groups/{id}/members:
     get:
@@ -865,10 +994,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetGroupMembersResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       tags: [Group Members]
       summary: Add group member
@@ -883,7 +1016,7 @@ paths:
             schema:
               $ref: '#/components/schemas/AddGroupMemberRequest'
       responses:
-        '200':
+        '201':
           description: Member added
           content:
             application/json:
@@ -895,6 +1028,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/groups/{id}/members/{userId}:
     delete:
@@ -918,10 +1053,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/groups/{id}/permissions:
     get:
@@ -938,10 +1077,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetGroupPermissionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Permissions]
       summary: Set group permissions
@@ -968,6 +1111,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
   # ADMIN API - GROUP ATTRIBUTES
@@ -987,10 +1132,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetGroupAttributesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/group-attributes:
     post:
@@ -1015,6 +1164,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/group-attributes/{id}:
     get:
@@ -1037,10 +1190,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetGroupAttributeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Group Attributes]
       summary: Update group attribute
@@ -1073,6 +1230,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [Group Attributes]
       summary: Delete group attribute
@@ -1093,10 +1252,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
   # ADMIN API - RESOURCES
@@ -1116,6 +1279,8 @@ paths:
                 $ref: '#/components/schemas/GetResourcesResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       tags: [Resources]
       summary: Create resource
@@ -1138,6 +1303,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/resources/{id}:
     get:
@@ -1154,10 +1321,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetResourceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Resources]
       summary: Update resource
@@ -1184,6 +1355,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [Resources]
       summary: Delete resource
@@ -1198,10 +1371,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/resources/{id}/permissions:
     get:
@@ -1213,15 +1390,20 @@ paths:
         - $ref: '#/components/parameters/ResourceIdParam'
       responses:
         '200':
-          description: Resource permissions
+          description: |
+            Resource permissions. An id that matches no resource is answered
+            here with an empty list rather than a 404: the handler queries the
+            permissions by resource id and never looks the resource up.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetPermissionsByResourceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Resources]
       summary: Update resource permissions
@@ -1248,6 +1430,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/permissions/{id}/users:
     get:
@@ -1272,10 +1456,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUsersByPermissionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
   # ADMIN API - CLIENTS
@@ -1295,6 +1483,8 @@ paths:
                 $ref: '#/components/schemas/GetClientsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       tags: [Clients]
       summary: Create client
@@ -1317,6 +1507,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/clients/{id}:
     get:
@@ -1333,10 +1525,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetClientResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Clients]
       summary: Update client settings
@@ -1363,6 +1559,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [Clients]
       summary: Delete client
@@ -1377,10 +1575,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/clients/{id}/authentication:
     put:
@@ -1409,6 +1611,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/clients/{id}/oauth2-flows:
     put:
@@ -1437,6 +1641,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/clients/{id}/redirect-uris:
     put:
@@ -1465,6 +1671,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/clients/{id}/web-origins:
     put:
@@ -1493,6 +1701,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/clients/{id}/tokens:
     put:
@@ -1521,6 +1731,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/clients/{id}/permissions:
     get:
@@ -1537,10 +1749,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetClientPermissionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Clients]
       summary: Set client permissions
@@ -1567,6 +1783,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/clients/{id}/logo:
     get:
@@ -1583,10 +1801,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClientLogoInfoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       tags: [Clients]
       summary: Upload client logo
@@ -1620,6 +1842,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [Clients]
       summary: Delete client logo
@@ -1634,10 +1858,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /client/logo/{clientIdentifier}:
     get:
@@ -1674,6 +1902,16 @@ paths:
           description: Not modified (ETag match)
         '404':
           description: Client or logo not found
+        '500':
+          description: |
+            The request failed inside the server. Unlike every other failure on
+            this endpoint, the body is the server's HTML error page rather than
+            the JSON error envelope, because this handler renders the shared
+            error template.
+          content:
+            text/html:
+              schema:
+                type: string
 
   # =============================================================================
   # ADMIN API - SETTINGS
@@ -1693,6 +1931,8 @@ paths:
                 $ref: '#/components/schemas/SettingsGeneralResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Settings]
       summary: Update general settings
@@ -1715,6 +1955,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/settings/email:
     get:
@@ -1731,6 +1973,8 @@ paths:
                 $ref: '#/components/schemas/SettingsEmailResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Settings]
       summary: Update email settings
@@ -1753,6 +1997,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/settings/email/send-test:
     post:
@@ -1777,6 +2023,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/settings/sessions:
     get:
@@ -1793,6 +2041,8 @@ paths:
                 $ref: '#/components/schemas/SettingsSessionsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Settings]
       summary: Update session settings
@@ -1815,6 +2065,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/settings/ui-theme:
     get:
@@ -1831,6 +2083,8 @@ paths:
                 $ref: '#/components/schemas/SettingsUIThemeResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Settings]
       summary: Update UI theme
@@ -1853,6 +2107,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/settings/tokens:
     get:
@@ -1869,6 +2125,8 @@ paths:
                 $ref: '#/components/schemas/SettingsTokensResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Settings]
       summary: Update token settings
@@ -1891,6 +2149,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/settings/keys:
     get:
@@ -1907,6 +2167,8 @@ paths:
                 $ref: '#/components/schemas/GetSettingsKeysResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/settings/keys/rotate:
     post:
@@ -1928,6 +2190,17 @@ paths:
             Another rotation won the race and this call rotated nothing.
             error_code is ROTATION_IN_PROGRESS. Do not retry: the rotation
             it conflicted with already happened.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: |
+            error_code is KEY_SET_INCOMPLETE when the deployment has no current
+            or no next key, which is an operator problem rather than a
+            transient one and a retry will not clear it, or INTERNAL_ERROR for
+            a storage or key generation failure. Nothing was rotated either
+            way: the whole transition is one transaction.
           content:
             application/json:
               schema:
@@ -1954,10 +2227,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: |
+            error_code is VALIDATION_ERROR. The id is malformed, matches no
+            key, or names a key that is not in the previous state, since only a
+            previous key can be revoked. A key that does not exist is answered
+            here rather than with a 404.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/phone-countries:
     get:
@@ -1974,6 +2257,8 @@ paths:
                 $ref: '#/components/schemas/GetPhoneCountriesResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
   # ACCOUNT API
@@ -1993,6 +2278,10 @@ paths:
                 $ref: '#/components/schemas/GetUserResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Account]
       summary: Update own profile
@@ -2015,6 +2304,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/email:
     put:
@@ -2039,6 +2332,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/email/verification/send:
     post:
@@ -2053,8 +2350,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountEmailVerificationSendResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/email/verification:
     post:
@@ -2079,8 +2382,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/phone:
     put:
@@ -2105,6 +2412,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/address:
     put:
@@ -2129,6 +2440,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/password:
     put:
@@ -2153,8 +2468,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/otp/enrollment:
     get:
@@ -2173,6 +2492,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/otp:
     put:
@@ -2197,8 +2520,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/consents:
     get:
@@ -2215,6 +2542,10 @@ paths:
                 $ref: '#/components/schemas/GetUserConsentsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/consents/{id}:
     delete:
@@ -2237,10 +2568,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/sessions:
     get:
@@ -2257,6 +2594,10 @@ paths:
                 $ref: '#/components/schemas/GetUserSessionsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/sessions/{id}:
     delete:
@@ -2279,10 +2620,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/account/logout-request:
     post:
@@ -2307,6 +2654,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   securitySchemes:
@@ -2387,6 +2736,16 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: |
+        The authenticated user does not own the resource. error_code is
+        FORBIDDEN. Returned by the account endpoints, which resolve a
+        resource by id and then check it belongs to the caller, so a valid
+        token for the wrong user reaches this rather than a 404.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     TooManyRequests:
       description: |
         Rate limit reached. Returned only when rate limiting is enabled
@@ -2398,6 +2757,16 @@ components:
           description: Seconds to wait before retrying
           schema:
             type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalServerError:
+      description: |
+        The request failed inside the server, most often a storage error.
+        error_code is INTERNAL_ERROR, INTERNAL_SERVER_ERROR or an operation
+        specific code; the description is safe to show and carries no detail
+        about the failure. Retrying is reasonable.
       content:
         application/json:
           schema:
