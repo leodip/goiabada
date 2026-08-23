@@ -60,7 +60,3 @@ In the database, each row of the `audit_logs` table stores:
 - `created_at`: timestamp the event was recorded
 - `audit_event`: event identifier
 - `details`: JSON payload as text
-
-## Upgrading from earlier versions
-
-The `GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE` environment variable was removed in v1.5.1. Console logging is now controlled through the **Audit log settings** page (or the corresponding REST API endpoint), and the value is stored in the database alongside the other settings. Existing deployments are migrated to console logging enabled and database logging enabled with 180 day retention.

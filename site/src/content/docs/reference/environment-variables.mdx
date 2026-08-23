@@ -587,7 +587,7 @@ Store `GOIABADA_AES_ENCRYPTION_KEY` in a secure location that is **separate from
 
 ### Rotating the key
 
-**Upgrading an existing installation.** The first time the auth server runs with `GOIABADA_AES_ENCRYPTION_KEY` set, if it finds secrets still encrypted with the key that was previously stored in the database, it automatically re-encrypts every stored secret and signing key to the env key and clears the old one. This runs in a single transaction at startup and retries safely if interrupted; no extra configuration is needed.
+**Secrets still encrypted with a key held in the database.** At startup, if the auth server finds secrets encrypted with a key stored in the database rather than with `GOIABADA_AES_ENCRYPTION_KEY`, it automatically re-encrypts every stored secret and signing key to the env key and clears the old one. This runs in a single transaction and retries safely if interrupted; no extra configuration is needed.
 
 **Rotating to a new key.** To change the key later, set `GOIABADA_AES_ENCRYPTION_KEY` to the new key and `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` to the old key, then restart the auth server. At startup it detects that the data is still encrypted under the previous key and re-encrypts everything to the new key (a single transaction). The operation is idempotent, so it is safe to leave `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` set across restarts, but you should remove it once the rotation is confirmed. If the data decrypts under neither key, the auth server refuses to start rather than risk corrupting it.
 
