@@ -5,8 +5,6 @@ const AuthServerSessionName string = "authserver"
 const AdminConsoleSessionName string = "adminconsole"
 
 const SessionKeySessionIdentifier string = "SessionIdentifier"
-const SessionKeyOTPImage string = "OTPImage"
-const SessionKeyOTPSecret string = "OTPSecret"
 const SessionKeyAuthContext string = "AuthContext"
 const SessionKeyJwt string = "Jwt"
 

@@ -122,7 +122,17 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 func startOtpCeremony(t *testing.T, client *models.Client, redirectUri *models.RedirectURI,
 	user *models.User, password string, extra string) (*http.Client, *http.Response, string) {
 
-	httpClient := createHttpClient(t)
+	return startOtpCeremonyOn(t, createHttpClient(t), client, redirectUri, user, password, extra)
+}
+
+// startOtpCeremonyOn is startOtpCeremony driving a cookie jar the caller already holds, which is
+// what makes a SECOND authorization request in the SAME browser expressible. The fresh-jar caller
+// above is the common case; this one exists because the enrolment seed's binding to its ceremony
+// is only observable from inside one browser, where the two ceremonies share everything the seed
+// used to be stored in (#242 decision 4).
+func startOtpCeremonyOn(t *testing.T, httpClient *http.Client, client *models.Client,
+	redirectUri *models.RedirectURI, user *models.User, password string,
+	extra string) (*http.Client, *http.Response, string) {
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
