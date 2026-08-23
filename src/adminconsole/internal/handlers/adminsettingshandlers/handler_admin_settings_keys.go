@@ -99,7 +99,12 @@ func HandleAdminSettingsKeysRotatePost(
 		}
 
 		if err := apiClient.RotateSettingsKeys(jwtInfo.TokenResponse.AccessToken); err != nil {
-			httpHelper.JsonError(w, r, err)
+			// Not JsonError directly: the API answers 409 when another rotation won the race,
+			// and JsonError's generic branch would show the administrator "An unexpected
+			// server error has occurred" with a request id, for something neither unexpected
+			// nor a server error. HandleAPIErrorJson forwards the API's description instead,
+			// so the modal reads "Another key rotation is in progress" (#251).
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
