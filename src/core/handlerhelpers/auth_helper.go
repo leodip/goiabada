@@ -145,7 +145,6 @@ func (s *AuthHelper) RedirToAuthorize(
 	}
 	values.Add("nonce", nonceHash)
 	values.Add("scope", scope)
-	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
 
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", s.authServerBaseURL, values.Encode())
 

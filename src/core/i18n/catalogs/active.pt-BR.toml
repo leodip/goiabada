@@ -574,7 +574,7 @@
 "adminconsole.admin_clients.settings.field.display_name" = "Nome de exibição"
 "adminconsole.admin_clients.settings.field.display_name_tooltip" = "Um nome amigável para o cliente, exibido aos usuários nas telas de login e consentimento quando habilitado."
 "adminconsole.admin_clients.settings.field.default_acr" = "Nível ACR padrão"
-"adminconsole.admin_clients.settings.field.default_acr_tooltip" = "A política de autenticação padrão do cliente. Em caso de dúvida, recomenda-se manter no nível ACR 2."
+"adminconsole.admin_clients.settings.field.default_acr_tooltip" = "A política de autenticação mínima do cliente. Uma requisição de autorização pode pedir um nível mais forte, mas nunca um mais fraco. Em caso de dúvida, recomenda-se manter no nível ACR 2."
 "adminconsole.admin_clients.settings.acr_level1" = "ACR nível 1 - apenas senha"
 "adminconsole.admin_clients.settings.acr_level2_optional" = "ACR nível 2 - senha + OTP (se habilitado pelo usuário)"
 "adminconsole.admin_clients.settings.acr_level2_mandatory" = "ACR nível 3 - senha + OTP obrigatório"

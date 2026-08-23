@@ -113,7 +113,16 @@ func TestPromptNone_ClientDefaultAcrSatisfied(t *testing.T) {
 	assert.Empty(t, redirectURL.Query().Get("error"), "error should not be present")
 }
 
-func TestPromptNone_AcrValuesOverridesClientDefault(t *testing.T) {
+// acr_values cannot take a silent request below the client's configured level. The setup is the
+// one that used to prove the opposite: a level1 session, a level2_optional client, and
+// acr_values=level1 asking for less than the client requires. The floor raises the target back to
+// level2_optional, which the session does not meet, so the request is refused (#240).
+//
+// Not a duplicate of TestPromptNone_ClientDefaultAcrHigher above, which reaches the same
+// interaction_required from the same client and session while sending no acr_values at all. This
+// is the only case proving the floor is applied on the silent path, where handlePromptNone reads
+// the target and decides without any UI.
+func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 	// Create session at level1
 	httpClient, _, _, _, _ := createSessionWithAcrLevel1AndPassword(t)
 
@@ -139,7 +148,8 @@ func TestPromptNone_AcrValuesOverridesClientDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Specify acr_values=level1 to override client default of level2_optional
+	// Ask for less than the client requires. Before the floor this lowered the target to level1,
+	// which the session met, and a code was issued.
 	requestState := gofakeit.LetterN(8)
 	requestNonce := gofakeit.LetterN(8)
 	requestCodeChallenge := gofakeit.LetterN(43)
@@ -161,19 +171,13 @@ func TestPromptNone_AcrValuesOverridesClientDefault(t *testing.T) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Should succeed because acr_values=level1 overrides client default
-	redirectLocation := assertRedirect(t, resp, "/auth/issue")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	location := resp.Header.Get("Location")
-	redirectURL, err := url.Parse(location)
-	if err != nil {
-		t.Fatal(err)
-	}
+	errorCode, _, state := getErrorFromUrl(t, resp)
 
-	assert.NotEmpty(t, redirectURL.Query().Get("code"), "code should be present")
-	assert.Empty(t, redirectURL.Query().Get("error"), "error should not be present")
+	assert.Equal(t, "interaction_required", errorCode,
+		"acr_values below the client's configured level must not lower the target")
+	assert.Equal(t, requestState, state)
 }
 
 // =============================================================================

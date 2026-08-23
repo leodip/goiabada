@@ -115,8 +115,12 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 // Resubmitting inside the first ceremony proves nothing either: the first success moves the
 // auth context to AuthStateAuthenticationCompleted, so the handler's requiredState check
 // rejects the second POST with a 500 before the replay guard is ever consulted.
+//
+// extra is appended verbatim to the authorization URL, already query-escaped, matching the
+// crossUserAuthorizeUrl(b, extra) idiom used elsewhere in this suite. Every existing caller passes
+// "".
 func startOtpCeremony(t *testing.T, client *models.Client, redirectUri *models.RedirectURI,
-	user *models.User, password string) (*http.Client, *http.Response, string) {
+	user *models.User, password string, extra string) (*http.Client, *http.Response, string) {
 
 	httpClient := createHttpClient(t)
 
@@ -127,7 +131,8 @@ func startOtpCeremony(t *testing.T, client *models.Client, redirectUri *models.R
 		"&code_challenge=" + gofakeit.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + gofakeit.LetterN(8) +
+		extra
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -246,7 +251,7 @@ func nextStepCode(t *testing.T, secret string, consumed string) string {
 func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 	client, redirectUri, user, password := createLevel2MandatoryUser(t, true)
 
-	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password)
+	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 
 	codeC, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	if err != nil {
@@ -259,7 +264,7 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// Second ceremony, fresh cookie jar, same code.
-	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, password)
+	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, password, "")
 
 	refused := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
 	_ = otpPage.Body.Close()
@@ -286,7 +291,7 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	client, redirectUri, user, password := createLevel2MandatoryUser(t, false)
 
-	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password)
+	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
 
 	codeC, err := totp.GenerateCode(secret, time.Now())
@@ -307,7 +312,7 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 
 	// Second ceremony, fresh cookie jar. The user is enrolled now, so this is the
 	// verification branch validating C against the secret it just stored.
-	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, password)
+	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, password, "")
 
 	refused := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
 	_ = otpPage.Body.Close()
@@ -369,7 +374,7 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	// Now the browser prompt, where the user is enrolled and codeC is checked against the
 	// secret the API just stored.
 	client, redirectUri := createLevel2MandatoryClient(t)
-	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, enrolled, "Correct1!")
+	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, enrolled, "Correct1!", "")
 
 	refused := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
 	_ = otpPage.Body.Close()
@@ -379,4 +384,31 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	_ = refused.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
+}
+
+// A request cannot ask its way out of a client's mandatory second factor. The client is configured
+// level2_mandatory, the user is enrolled, and the authorization URL carries
+// acr_values=urn:goiabada:level1 asking for a password alone. The floor raises the target back to
+// the client's level and the ceremony reaches the OTP form anyway (#240).
+//
+// This is the interactive counterpart to TestPromptNone_AcrValuesCannotLowerTheClientFloor: between
+// them they cover both consumers of the target, the silent path inside handlePromptNone and the
+// interactive one through /auth/level1completed, /auth/level2 and /auth/completed.
+//
+// It fails for its stated reason in both directions, because assertRedirect fails when the location
+// is not the path it was given: without the floor /auth/level1completed answers /auth/completed,
+// since a target lowered to level1 is not higher than level1 and no step-up is owed.
+//
+// Scope stops at the OTP form. Completing the ceremony is the replay tests' subject above, and
+// reaching the form is the whole of what the floor decides here.
+func TestOtpCeremony_AcrValuesLevel1CannotSkipMandatoryOtp(t *testing.T) {
+	client, redirectUri, user, password := createLevel2MandatoryUser(t, true)
+
+	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password,
+		"&acr_values="+url.QueryEscape(enums.AcrLevel1.String()))
+	defer func() { _ = otpPage.Body.Close() }()
+
+	assert.NotNil(t, httpClient)
+	assert.Contains(t, otpUrl, "/auth/otp",
+		"acr_values=level1 must not take the ceremony past a level2_mandatory client's OTP form")
 }
