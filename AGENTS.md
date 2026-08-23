@@ -250,6 +250,12 @@ Three test types:
 
 **Best way to run all tests**: `./run-tests.sh` inside the dev container (from `src/authserver/`).
 
+**gofmt guard**: every module's unit tier runs `TestGoSourcesAreGofmted`, which holds every Go
+file under `src/` to gofmt's formatting through `core/testutil.AssertGofmted`. The walk is
+repository-wide from each tier because `cmd/goiabada-setup` has no tier of its own. CI's Lint job
+checks the same thing per module, where an unformatted file also costs that module its vet,
+unparam and golangci-lint run.
+
 ## Important Patterns
 
 1. **Handler signature**: `HandleXxxGet/Post(dependencies...) http.HandlerFunc`
