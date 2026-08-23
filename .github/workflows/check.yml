@@ -146,12 +146,19 @@ jobs:
       # cache and rebuilds exactly once. That is also why this cannot serve a
       # stale linter: the version is in the key, not merely in the install
       # command.
+      #
+      # The Go version is part of the key for a different reason: these tools
+      # parse this repository with the go/types compiled into them, which is the
+      # one from the toolchain that built them. A copy built with the previous
+      # Go cannot read a module that declares the new one, and every package
+      # fails with "package requires newer Go version". So a Go bump has to miss
+      # this cache as surely as a linter bump does.
       - name: Cache linter binaries
         id: linter-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
-          key: linters-${{ runner.os }}-golangci${{ needs.versions.outputs.golangci }}-unparam${{ needs.versions.outputs.unparam }}
+          key: linters-${{ runner.os }}-go${{ needs.versions.outputs.go }}-golangci${{ needs.versions.outputs.golangci }}-unparam${{ needs.versions.outputs.unparam }}
 
       # Pinned from versions.yaml. A blocking gate whose definition of "clean"
       # can change on an upstream release is not a gate.
@@ -278,12 +285,18 @@ jobs:
         with:
           go-version: ${{ needs.versions.outputs.go }}
           cache-dependency-path: src/**/go.sum
+      # Keyed on the Go version as well as on the pinned govulncheck version,
+      # for the same reason as the linter cache above: the binary scans with the
+      # go/types it was built against. Leaving Go out of the key is what broke
+      # the 1.26 to 1.27 bump, where a cached 1.26 build was restored and
+      # reported every package in the repository, and the 1.27 standard library
+      # it had to read, as "package requires newer Go version".
       - name: Cache govulncheck
         id: govuln-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
-          key: govulncheck-${{ runner.os }}-${{ needs.versions.outputs.govulncheck }}
+          key: govulncheck-${{ runner.os }}-go${{ needs.versions.outputs.go }}-${{ needs.versions.outputs.govulncheck }}
 
       - name: Install govulncheck
         if: steps.govuln-cache.outputs.cache-hit != 'true'
