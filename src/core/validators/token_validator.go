@@ -104,6 +104,11 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 	clientSecretRequiredErrorMsg := "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed."
 
+	// One message for a superfluous secret, shared by all three arms that reject one, so the
+	// authorization_code arm and the two that gained the rejection alongside it cannot drift
+	// into three spellings of one fact (#245).
+	const clientSecretNotRequiredErrorMsg = "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request."
+
 	switch input.GrantType {
 	case "authorization_code":
 		if !client.AuthorizationCodeEnabled {
@@ -229,7 +234,30 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			}
 		} else if len(input.ClientSecret) > 0 {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-				"This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request.",
+				clientSecretNotRequiredErrorMsg, http.StatusBadRequest)
+		}
+
+		// The PKCE boundary for a public client (#245). A public client authenticates with
+		// nothing, so a code that carries no challenge is bound to nothing and whoever presents
+		// it gets the tokens: that is the parameter-stripping attack in RFC 9700 section 4.8.1.
+		// Refusing it here is what reaches a code minted before the rule existed, and a code
+		// minted while the client was still confidential and redeemed after it became public.
+		//
+		// Keyed on IsPublic, read now, rather than on IsPKCERequired. Keying on the requirement
+		// would refuse every outstanding grant of a CONFIDENTIAL client whose administrator
+		// merely turns PKCE on, as a side effect of hardening, and those grants are still
+		// authenticated by the secret.
+		//
+		// Empty counts as absent: the column is nullable and an empty string reaches it, so a
+		// .Valid check with no != "" beside it would let one of the two states through.
+		//
+		// invalid_grant per RFC 6749 section 5.2, which covers a grant that is invalid. The
+		// description is plain rather than generic like the refusals below: a caller already
+		// knows whether its own client is public and whether it sent a verifier, so this leaks
+		// nothing.
+		if client.IsPublic && (!codeEntity.CodeChallenge.Valid || codeEntity.CodeChallenge.String == "") {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				"This code was issued without PKCE, and public clients are required to use PKCE. Please start a new authorization request with a code_challenge.",
 				http.StatusBadRequest)
 		}
 
@@ -451,6 +479,14 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 					"Client authentication failed. Please review your client_secret.",
 					http.StatusUnauthorized)
 			}
+		} else if len(input.ClientSecret) > 0 {
+			// Symmetry with the authorization_code arm, not a defect fix (#245 decision 11).
+			// No specification requires refusing a superfluous secret and nothing was exposed
+			// by ignoring one; what this buys is that all three arms answer the same request
+			// the same way. It does break a public client that harmlessly sends a stale
+			// secret, which is why it is in the release note.
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				clientSecretNotRequiredErrorMsg, http.StatusBadRequest)
 		}
 
 		if len(input.RefreshToken) == 0 {
@@ -585,6 +621,28 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if !isROPCToken && refreshToken.Code.Revoked {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 				invalidTokenMessage, http.StatusBadRequest)
+		}
+
+		// The PKCE boundary again, on the arm where the exposure is durable (#245). A code
+		// lives 60 seconds; a refresh token descended from it lives for the grant's lifetime,
+		// so a client that becomes public keeps handing out tokens against a challenge-less
+		// grant indefinitely unless this refuses them.
+		//
+		// It costs nothing: RefreshTokenLoadCode above already put the code in hand, so this
+		// is the same struct the revoked check just read, for the same kind of code-borne rule.
+		//
+		// ROPC is excluded by isROPCToken exactly as the revoked check excludes it: code_id is
+		// NULL, there is no code, and refreshToken.Code is the zero value on that path. On the
+		// auth code path a missing code row leaves the same zero value, so CodeChallenge.Valid
+		// is false and the token is refused. Fail-closed either way.
+		//
+		// Placed after the ownership check above for the reason that check documents: an
+		// unauthenticated presenter of someone else's token learns nothing from it.
+		if !isROPCToken && client.IsPublic &&
+			(!refreshToken.Code.CodeChallenge.Valid || refreshToken.Code.CodeChallenge.String == "") {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				"This refresh token descends from an authorization code issued without PKCE, and public clients are required to use PKCE.",
+				http.StatusBadRequest)
 		}
 
 		refreshTokenType := refreshTokenInfo.GetStringClaim("typ")
@@ -880,6 +938,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
 					"Client authentication failed.", http.StatusUnauthorized)
 			}
+		} else if len(input.ClientSecret) > 0 {
+			// Symmetry with the authorization_code arm, not a defect fix (#245 decision 11).
+			// Same reasoning as the refresh_token arm above: nothing was exposed by ignoring a
+			// superfluous secret, and the value here is that one request gets one answer
+			// whichever grant type carries it.
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				clientSecretNotRequiredErrorMsg, http.StatusBadRequest)
 		}
 
 		// Validate resource owner credentials.

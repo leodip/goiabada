@@ -713,7 +713,48 @@ func encryptOTPSecretForTest(t *testing.T, plain string) []byte {
 	return enc
 }
 
-func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
+// authCodeOptions varies the client and the ceremony createAuthCode runs. Its ZERO VALUE is
+// createAuthCode's original behaviour, a confidential client running a PKCE ceremony, so the
+// existing call sites pass nothing and are unaffected (#245).
+//
+// noPKCE has a precondition the caller owns: the seeded Settings.PKCERequired is true, so a
+// challenge-less ceremony is refused at /auth/authorize unless pkceRequired is also set to
+// false. That is deliberate rather than inferred here, because the two together are exactly
+// the misconfiguration the tests are about.
+type authCodeOptions struct {
+	isPublic     bool
+	noPKCE       bool
+	pkceRequired *bool
+}
+
+// requireChallengelessCodesAreStorable skips the calling test on SQLite, where a code carrying
+// no PKCE challenge cannot be persisted at all.
+//
+// This is a defect in the server rather than a limitation of the tests, and it is pre-existing:
+// migration 000007 made codes.code_challenge and codes.code_challenge_method nullable on MySQL,
+// PostgreSQL and SQL Server, and its SQLite file is a no-op whose comment claims "SQLite VARCHAR
+// columns can store NULL regardless of NOT NULL constraint". SQLite does enforce NOT NULL, so
+// /auth/issue answers 500 with "NOT NULL constraint failed: codes.code_challenge" and the
+// PKCE-optional configuration does not work on that engine. Drafted as a follow-up rather than
+// fixed here: relaxing it needs a table rebuild, which is a migration and its own data test.
+//
+// The rows that skip here are NOT losing their coverage. The check suite runs this tier on all
+// four engines, so they execute for real on the other three, which is also the only tier that
+// could have told the two behaviours apart.
+func requireChallengelessCodesAreStorable(t *testing.T) {
+	t.Helper()
+
+	if strings.Trim(config.GetDatabase().Type, `"'`) == "sqlite" {
+		t.Skip("sqlite still has NOT NULL on codes.code_challenge; see the #245 follow-up")
+	}
+}
+
+func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...authCodeOptions) (*http.Client, *models.Code) {
+
+	var opt authCodeOptions
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
 
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
@@ -722,10 +763,16 @@ func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Clie
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		IsPublic:                 false,
+		IsPublic:                 opt.isPublic,
 		ConsentRequired:          false,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
+		PKCERequired:             opt.pkceRequired,
+	}
+	if opt.isPublic {
+		// A public client holds no secret. Leaving the encrypted one on the row would be a
+		// fixture that cannot occur in production, and the flip deletes it for that reason.
+		client.ClientSecretEncrypted = nil
 	}
 
 	err = database.CreateClient(nil, client)
@@ -768,10 +815,12 @@ func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Clie
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
-		"&response_type=code" +
-		"&code_challenge_method=S256" +
-		"&code_challenge=" + requestCodeChallenge +
-		"&scope=" + url.QueryEscape(scope) +
+		"&response_type=code"
+	if !opt.noPKCE {
+		destUrl += "&code_challenge_method=S256" +
+			"&code_challenge=" + requestCodeChallenge
+	}
+	destUrl += "&scope=" + url.QueryEscape(scope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 

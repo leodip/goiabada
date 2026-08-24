@@ -58,6 +58,35 @@ func TestIsPKCERequired_ClientNilUsesGlobalFalse(t *testing.T) {
 	}
 }
 
+func TestIsPKCERequired_PublicClientAlwaysTrue(t *testing.T) {
+	pkceRequired := false
+
+	// The public arm has to beat both of the two ways PKCE can be off: an explicit false
+	// override on the client, and a nil override under a global setting that is off. The
+	// second is the state /connect/register leaves a self-registered public client in.
+	overridden := &Client{
+		IsPublic:     true,
+		PKCERequired: &pkceRequired,
+	}
+	if got := overridden.IsPKCERequired(false); got != true {
+		t.Errorf("IsPKCERequired(false) = %v, want true (public beats an explicit false override)", got)
+	}
+	if got := overridden.IsPKCERequired(true); got != true {
+		t.Errorf("IsPKCERequired(true) = %v, want true (public beats an explicit false override)", got)
+	}
+
+	inherited := &Client{
+		IsPublic:     true,
+		PKCERequired: nil,
+	}
+	if got := inherited.IsPKCERequired(false); got != true {
+		t.Errorf("IsPKCERequired(false) = %v, want true (public beats a false global setting)", got)
+	}
+	if got := inherited.IsPKCERequired(true); got != true {
+		t.Errorf("IsPKCERequired(true) = %v, want true (public beats a false global setting)", got)
+	}
+}
+
 func TestIsSystemLevelClient(t *testing.T) {
 	tests := []struct {
 		name             string
