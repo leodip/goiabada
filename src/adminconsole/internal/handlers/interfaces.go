@@ -37,7 +37,7 @@ type AuthHelper interface {
 }
 
 type OtpSecretGenerator interface {
-	GenerateOTPSecret(email string, appName string) (string, string, error)
+	GenerateOTPSecret(email string, appName string) (string, error)
 }
 
 type ProfileValidator interface {

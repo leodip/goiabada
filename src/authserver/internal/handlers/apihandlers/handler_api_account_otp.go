@@ -52,9 +52,24 @@ func HandleAPIAccountOTPEnrollmentGet(
 			return
 		}
 
-		// Generate enrollment QR and secret
+		// Generate the enrollment key, then derive from its otpauth:// URL the two things
+		// this response publishes: the QR code the user scans and the secret they can type
+		// instead. The generator hands back the URL alone, so the image and the secret are
+		// two views of one value rather than two values that could disagree (#247).
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+		keyURL, err := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		base64Image, err := otp.RenderQRCodeImage(keyURL)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		secretKey, err := otp.SecretFromKeyURL(keyURL)
 		if err != nil {
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return

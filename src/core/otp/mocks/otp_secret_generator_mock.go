@@ -38,7 +38,7 @@ func (_m *OtpSecretGenerator) EXPECT() *OtpSecretGenerator_Expecter {
 }
 
 // GenerateOTPSecret provides a mock function for the type OtpSecretGenerator
-func (_mock *OtpSecretGenerator) GenerateOTPSecret(email string, appName string) (string, string, error) {
+func (_mock *OtpSecretGenerator) GenerateOTPSecret(email string, appName string) (string, error) {
 	ret := _mock.Called(email, appName)
 
 	if len(ret) == 0 {
@@ -46,9 +46,8 @@ func (_mock *OtpSecretGenerator) GenerateOTPSecret(email string, appName string)
 	}
 
 	var r0 string
-	var r1 string
-	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(string, string) (string, string, error)); ok {
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, string) (string, error)); ok {
 		return returnFunc(email, appName)
 	}
 	if returnFunc, ok := ret.Get(0).(func(string, string) string); ok {
@@ -56,17 +55,12 @@ func (_mock *OtpSecretGenerator) GenerateOTPSecret(email string, appName string)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, string) string); ok {
+	if returnFunc, ok := ret.Get(1).(func(string, string) error); ok {
 		r1 = returnFunc(email, appName)
 	} else {
-		r1 = ret.Get(1).(string)
+		r1 = ret.Error(1)
 	}
-	if returnFunc, ok := ret.Get(2).(func(string, string) error); ok {
-		r2 = returnFunc(email, appName)
-	} else {
-		r2 = ret.Error(2)
-	}
-	return r0, r1, r2
+	return r0, r1
 }
 
 // OtpSecretGenerator_GenerateOTPSecret_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateOTPSecret'
@@ -99,12 +93,12 @@ func (_c *OtpSecretGenerator_GenerateOTPSecret_Call) Run(run func(email string, 
 	return _c
 }
 
-func (_c *OtpSecretGenerator_GenerateOTPSecret_Call) Return(s string, s1 string, err error) *OtpSecretGenerator_GenerateOTPSecret_Call {
-	_c.Call.Return(s, s1, err)
+func (_c *OtpSecretGenerator_GenerateOTPSecret_Call) Return(s string, err error) *OtpSecretGenerator_GenerateOTPSecret_Call {
+	_c.Call.Return(s, err)
 	return _c
 }
 
-func (_c *OtpSecretGenerator_GenerateOTPSecret_Call) RunAndReturn(run func(email string, appName string) (string, string, error)) *OtpSecretGenerator_GenerateOTPSecret_Call {
+func (_c *OtpSecretGenerator_GenerateOTPSecret_Call) RunAndReturn(run func(email string, appName string) (string, error)) *OtpSecretGenerator_GenerateOTPSecret_Call {
 	_c.Call.Return(run)
 	return _c
 }

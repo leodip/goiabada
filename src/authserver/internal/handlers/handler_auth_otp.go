@@ -71,13 +71,12 @@ func HandleAuthOtpGet(
 
 		if user.OTPEnabled {
 
-			// An enrolment seed this ceremony generated before the user enrolled somewhere
+			// An enrolment key this ceremony generated before the user enrolled somewhere
 			// else is dead now, and HandleAuthOtpPost picks the template for its error
-			// rerender by whether a seed is present, so leaving it here would redraw the
+			// rerender by whether one is present, so leaving it here would redraw the
 			// enrolment page for a user who is already enrolled. Same clearing this arm did
-			// when the pair lived in two slots on the browser session (#242).
-			authContext.OTPSecret = ""
-			authContext.OTPImage = ""
+			// when the seed and its image lived in two slots on the browser session (#242).
+			authContext.OTPKeyURL = ""
 
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
@@ -108,20 +107,41 @@ func HandleAuthOtpGet(
 		} else {
 			// must enroll first
 
-			// Generate only when this ceremony has no seed yet, so a reload of /auth/otp
-			// renders the secret and QR code the user has already scanned. Generating on
-			// every GET is the defect: it replaced the seed behind a scanned QR code, so
-			// every code from it was then checked against a secret the user was never
-			// shown (#242 part 3).
-			if authContext.OTPSecret == "" {
+			// Generate only when this ceremony has no usable key yet, so a reload of
+			// /auth/otp renders the secret and QR code the user has already scanned.
+			// Generating on every GET is the defect: it replaced the seed behind a scanned
+			// QR code, so every code from it was then checked against a secret the user was
+			// never shown (#242 part 3).
+			//
+			// A stored URL that will not parse counts as none, which is the failure the one
+			// field brings with it. This handler is the only writer of it, so an unusable
+			// value can only be a defect or a context shape this binary does not understand;
+			// generating shows the user a fresh QR code to scan, where refusing would wedge
+			// the ceremony on a 500 that every reload repeats (#247).
+			secretKey, err := otp.SecretFromKeyURL(authContext.OTPKeyURL)
+			if err != nil {
 				settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-				base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+				keyURL, genErr := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+				if genErr != nil {
+					httpHelper.InternalServerError(w, r, genErr)
+					return
+				}
+				authContext.OTPKeyURL = keyURL
+
+				secretKey, err = otp.SecretFromKeyURL(keyURL)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				authContext.OTPSecret = secretKey
-				authContext.OTPImage = base64Image
+			}
+
+			// Drawn from the URL on every render rather than carried beside it, so the
+			// ceremony holds one value and the image cannot come to disagree with the secret
+			// the code is checked against (#247).
+			base64Image, err := otp.RenderQRCodeImage(authContext.OTPKeyURL)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
 			}
 
 			err = authHelper.SaveAuthContext(w, r, authContext)
@@ -133,8 +153,8 @@ func HandleAuthOtpGet(
 			bind := map[string]interface{}{
 				"error":                   nil,
 				"ceremonyId":              authContext.CeremonyId,
-				"base64Image":             authContext.OTPImage,
-				"secretKey":               authContext.OTPSecret,
+				"base64Image":             base64Image,
+				"secretKey":               secretKey,
 				"layoutShowClientSection": displayInfo.ShowSection,
 				"layoutClientName":        displayInfo.ClientName,
 				"layoutHasClientLogo":     displayInfo.HasLogo,
@@ -193,11 +213,23 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		// The enrolment seed comes off the ceremony rather than out of a slot shared by the
+		// The enrolment key comes off the ceremony rather than out of a slot shared by the
 		// whole browser, so a submission can only ever be checked against the secret the
 		// same ceremony rendered. Empty for a user who is already enrolled, which is what
 		// sends the error rerender below to the verification template (#242 decision 4).
-		base64Image, secretKey := authContext.OTPImage, authContext.OTPSecret
+		//
+		// The secret is derived here because every enrolling path needs it; the QR code is
+		// not, because only the error rerender does, and encoding a PNG on every submission
+		// to discard it is work the ceremony no longer has to do (#247).
+		keyURL := authContext.OTPKeyURL
+		var secretKey string
+		if keyURL != "" {
+			secretKey, err = otp.SecretFromKeyURL(keyURL)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+		}
 
 		user, err := database.GetUserById(nil, authContext.UserId)
 		if err != nil {
@@ -238,7 +270,12 @@ func HandleAuthOtpPost(
 			}
 
 			template := "/auth_otp.html"
-			if len(base64Image) > 0 && len(secretKey) > 0 {
+			if keyURL != "" {
+				base64Image, imgErr := otp.RenderQRCodeImage(keyURL)
+				if imgErr != nil {
+					httpHelper.InternalServerError(w, r, imgErr)
+					return
+				}
 				template = "/auth_otp_enrollment.html"
 				bind["base64Image"] = base64Image
 				bind["secretKey"] = secretKey
@@ -396,6 +433,14 @@ func HandleAuthOtpPost(
 		utcNow := time.Now().UTC()
 		authContext.AuthenticatedAt = &utcNow
 		authContext.AuthState = oauth.AuthStateAuthenticationCompleted
+		// The enrolment key has done its work: this ceremony has just proved the user holds
+		// the authenticator, and nothing downstream reads the field. Leaving it set carries a
+		// spent credential through /auth/completed, /auth/consent and /auth/issue, and leaves
+		// it in the cookie of a ceremony abandoned after enrolling until a later
+		// /auth/authorize replaces the context, whose ceiling is the cookie's own one-year
+		// maximum age. Same discipline as User.SetOTPSecret, which blanks the plaintext seed
+		// once it has encrypted it (#82, #247).
+		authContext.OTPKeyURL = ""
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

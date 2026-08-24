@@ -50,6 +50,27 @@ func encryptOTPForTest(t *testing.T, secret string) []byte {
 // nothing about *sql.Tx itself is exercised (#242 decision 2).
 var otpEnrolTx = &sql.Tx{}
 
+// otpTestKeyURL is the otpauth:// URL for a secret, the form the ceremony carries since the
+// seed and its QR code collapsed into one field. The handler parses what it holds and derives
+// both from it, so a case cannot stand a placeholder here the way it could when the two were
+// stored verbatim (#247).
+func otpTestKeyURL(secret string) string {
+	return "otpauth://totp/TestApp:test@example.com" +
+		"?algorithm=SHA1&digits=6&issuer=TestApp&period=30&secret=" + secret
+}
+
+// otpTestRenderedQR is the QR code the handler will draw for a key URL. Computed with the same
+// function the handler calls rather than pinned to a literal: what the cases below are about is
+// that the image on the page comes from the key the ceremony holds, not what a PNG encoder emits.
+func otpTestRenderedQR(t *testing.T, keyURL string) string {
+	t.Helper()
+	image, err := otp.RenderQRCodeImage(keyURL)
+	if err != nil {
+		t.Fatalf("otpTestRenderedQR: %v", err)
+	}
+	return image
+}
+
 func TestHandleAuthOtpGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
@@ -120,12 +141,11 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
-			OTPSecret:  "stale-secret",
-			OTPImage:   "stale-image",
+			OTPKeyURL:  otpTestKeyURL("STALESECRETSTALE"),
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.OTPSecret == "" && ac.OTPImage == ""
+			return ac.OTPKeyURL == ""
 		})).Return(nil)
 
 		user := &models.User{
@@ -184,8 +204,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 
-		assert.Empty(t, authContext.OTPSecret)
-		assert.Empty(t, authContext.OTPImage)
+		assert.Empty(t, authContext.OTPKeyURL)
 	})
 
 	t.Run("OTP not enabled user", func(t *testing.T) {
@@ -212,8 +231,13 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			ClientId:   "test-client",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		// A real key URL, because the handler parses what the generator returns: the page's
+		// secret and QR code are both derived from it (#247).
+		generatedKeyURL := otpTestKeyURL("JBSWY3DPEHPK3PXP")
+		wantImage := otpTestRenderedQR(t, generatedKeyURL)
+
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.OTPSecret == "secretKey" && ac.OTPImage == "base64Image"
+			return ac.OTPKeyURL == generatedKeyURL
 		})).Return(nil)
 
 		user := &models.User{
@@ -228,7 +252,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
-		otpSecretGenerator.On("GenerateOTPSecret", "test@example.com", "TestApp").Return("base64Image", "secretKey", nil)
+		otpSecretGenerator.On("GenerateOTPSecret", "test@example.com", "TestApp").Return(generatedKeyURL, nil)
 
 		httpHelper.On("RenderTemplate",
 			mock.Anything,
@@ -247,10 +271,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 				if bind["ceremonyId"] != testCeremonyId {
 					return false
 				}
-				if base64Image, ok := bind["base64Image"]; !ok || base64Image != "base64Image" {
+				if base64Image, ok := bind["base64Image"]; !ok || base64Image != wantImage {
 					return false
 				}
-				if secretKey, ok := bind["secretKey"]; !ok || secretKey != "secretKey" {
+				if secretKey, ok := bind["secretKey"]; !ok || secretKey != "JBSWY3DPEHPK3PXP" {
 					return false
 				}
 				if _, ok := bind["layoutShowClientSection"]; !ok {
@@ -282,10 +306,9 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		database.AssertExpectations(t)
 		otpSecretGenerator.AssertExpectations(t)
 
-		// The generated pair is left on the ceremony, which is what the next GET reads to
+		// The generated key is left on the ceremony, which is what the next GET reads to
 		// render the same QR code rather than a fresh one (#242 part 3).
-		assert.Equal(t, "secretKey", authContext.OTPSecret)
-		assert.Equal(t, "base64Image", authContext.OTPImage)
+		assert.Equal(t, generatedKeyURL, authContext.OTPKeyURL)
 	})
 
 	// The reload. Nothing else in this file pins it, and it is the whole of part 3: with a seed
@@ -310,17 +333,17 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
 
+		firstRenderKeyURL := otpTestKeyURL("FIRSTRENDERSECRET")
 		authContext := &oauth.AuthContext{
 			AuthState:  oauth.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
-			OTPSecret:  "first-render-secret",
-			OTPImage:   "first-render-image",
+			OTPKeyURL:  firstRenderKeyURL,
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.OTPSecret == "first-render-secret" && ac.OTPImage == "first-render-image"
+			return ac.OTPKeyURL == firstRenderKeyURL
 		})).Return(nil)
 
 		user := &models.User{
@@ -341,8 +364,8 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			"/layouts/auth_layout.html",
 			"/auth_otp_enrollment.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				return bind["secretKey"] == "first-render-secret" &&
-					bind["base64Image"] == "first-render-image"
+				return bind["secretKey"] == "FIRSTRENDERSECRET" &&
+					bind["base64Image"] == otpTestRenderedQR(t, firstRenderKeyURL)
 			}),
 		).Return(nil)
 
@@ -353,8 +376,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		database.AssertExpectations(t)
 		otpSecretGenerator.AssertExpectations(t)
 
-		assert.Equal(t, "first-render-secret", authContext.OTPSecret)
-		assert.Equal(t, "first-render-image", authContext.OTPImage)
+		assert.Equal(t, firstRenderKeyURL, authContext.OTPKeyURL)
 	})
 }
 
@@ -837,8 +859,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		authContext.OTPSecret = "test-secret"
-		authContext.OTPImage = "test-image"
+		authContext.OTPKeyURL = otpTestKeyURL("test-secret")
 
 		database.On("GetUserById", mock.Anything, int64(1)).
 			Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil)
@@ -850,7 +871,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
 			"/auth_otp_enrollment.html", mock.MatchedBy(func(bind map[string]interface{}) bool {
 				return bind["ceremonyId"] == testCeremonyId &&
-					bind["secretKey"] == "test-secret" && bind["base64Image"] == "test-image"
+					bind["secretKey"] == "test-secret" &&
+					bind["base64Image"] == otpTestRenderedQR(t, otpTestKeyURL("test-secret"))
 			})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -861,7 +883,16 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	t.Run("Invalid OTP code for disabled OTP", func(t *testing.T) {
+	// The other arm of the error rerender's template selection, and the only one left now that
+	// the seed and its image are one field: a ceremony carrying no key falls back to the
+	// verification page, because there is nothing to draw an enrolment page from. Reachable
+	// when HandleAuthOtpGet's enrolled arm cleared the key and the authenticator was then
+	// removed elsewhere before this submission arrived.
+	//
+	// It used to be reached by setting a secret and no image, which the two-field condition
+	// read as "not enrolling". No GET ever wrote that state, so what the case pinned was an
+	// inconsistency rather than a branch (#247).
+	t.Run("Invalid OTP code for disabled OTP with no key on the ceremony", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
@@ -884,8 +915,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		authContext.OTPSecret = "test-secret"
-
 		user := &models.User{
 			Id:         1,
 			Enabled:    true,
@@ -900,7 +929,13 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).Return(nil)
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
+			mock.MatchedBy(func(bind map[string]interface{}) bool {
+				// Neither is bound, because neither can be derived from nothing.
+				_, hasImage := bind["base64Image"]
+				_, hasSecret := bind["secretKey"]
+				return !hasImage && !hasSecret
+			})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -1018,7 +1053,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		otpSecret := key.Secret()
-		authContext.OTPSecret = otpSecret
+		authContext.OTPKeyURL = otpTestKeyURL(otpSecret)
 
 		user := &models.User{
 			Id:         1,
@@ -1072,6 +1107,13 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				// so promoting the older value at /auth/completed would leave the session it is
 				// about to create owing another prompt at once (#242).
 				ac.OtpConfigGeneration != nil && *ac.OtpConfigGeneration == 6 &&
+				// The enrolment key is spent: it has just proved the user holds the
+				// authenticator and nothing downstream reads it, so carrying it through
+				// /auth/completed, /auth/consent and /auth/issue, and leaving it in the
+				// cookie of a ceremony abandoned here, is a credential outliving its
+				// purpose. Asserted on the value SAVED rather than on the field afterwards,
+				// because what the cookie receives is the whole claim (#247).
+				ac.OTPKeyURL == "" &&
 				// OTP is level 2 and must not claim level 1: a ceremony can reach here by
 				// reusing a session rather than by entering a password, so setting this
 				// would let it recreate a session that was just ended (#129 decision 15).
@@ -1085,6 +1127,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		assert.Equal(t, []string{"begin", "update", "increment", "commit"}, calls,
 			"the enable write and the counter advance belong inside one transaction, commit last")
+
+		assert.Empty(t, authContext.OTPKeyURL,
+			"a successful enrolment must leave no copy of the key on the ceremony")
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1125,7 +1170,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		otpSecret := key.Secret()
-		authContext.OTPSecret = otpSecret
+		authContext.OTPKeyURL = otpTestKeyURL(otpSecret)
 
 		user := &models.User{
 			Id:         1,
@@ -1202,7 +1247,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		authContext.OTPSecret = key.Secret()
+		authContext.OTPKeyURL = otpTestKeyURL(key.Secret())
 
 		user := &models.User{Id: 1, Enabled: true, OTPEnabled: false}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
@@ -1486,8 +1531,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			// What HandleAuthOtpGet leaves on the ceremony for an enrolling user, and what
 			// puts the handler on its enrollment branch: the secret it verifies against comes
 			// from the auth context rather than from the user row.
-			authContext.OTPSecret = key.Secret()
-			authContext.OTPImage = "test-image"
+			authContext.OTPKeyURL = otpTestKeyURL(key.Secret())
 			template = "/auth_otp_enrollment.html"
 		}
 
