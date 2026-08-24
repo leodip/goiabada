@@ -1470,7 +1470,7 @@ Removes the authenticated user's profile picture.
 GET /api/v1/account/otp/enrollment
 ```
 
-Returns a QR code and secret key for TOTP setup:
+Issues the enrollment and returns the QR code and secret key to set up an authenticator with:
 
 ```json
 {
@@ -1478,6 +1478,11 @@ Returns a QR code and secret key for TOTP setup:
   "secretKey": "JBSWY3DPEHPK3PXP"
 }
 ```
+
+The server records the secret it issued, and enables only that one. While an enrollment is pending
+this call is idempotent: it returns the same secret and the same QR code, so a user who reloads your
+enrollment page keeps the code they have already scanned. A pending enrollment lasts 15 minutes,
+after which the next call issues a new one.
 
 <Aside type="caution">
 This endpoint fails if OTP is already enabled for the user.
@@ -1495,10 +1500,19 @@ PUT /api/v1/account/otp
 {
   "enabled": true,
   "password": "CurrentPassword123!",
-  "otpCode": "123456",
-  "secretKey": "JBSWY3DPEHPK3PXP"
+  "otpCode": "123456"
 }
 ```
+
+Call the enrollment endpoint first. The code is verified against the secret the server issued there,
+and that secret is what gets enrolled.
+
+<Aside type="caution">
+Do not send a `secretKey` with this request. It is refused with `400 SECRET_KEY_NOT_ACCEPTED` rather
+than ignored, because a request carrying one is asking to choose which authenticator is installed,
+which the server no longer permits. If no enrollment is pending, or the one started has expired, the
+request is refused with `400 OTP_ENROLLMENT_NOT_PENDING`.
+</Aside>
 
 **Disable OTP:**
 

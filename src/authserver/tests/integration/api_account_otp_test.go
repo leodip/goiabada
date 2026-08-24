@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
@@ -121,6 +122,75 @@ func wrongOtpCodeFor(t *testing.T, secret string) string {
 	return ""
 }
 
+// -----------------------------------------------------------------------------
+// The enrollment contract (#247)
+//
+// The server issues the enrollment and enrolls that seed and no other. Every enable case below
+// therefore starts by asking for one, which is what a caller now has to do, and the cases that
+// exercise the boundaries of the pending window install one directly.
+
+// getOTPEnrollment calls the issuing endpoint and returns what it answered. This is the only way a
+// caller can obtain a seed the PUT will accept.
+func getOTPEnrollment(t *testing.T, accessToken string) api.AccountOTPEnrollmentResponse {
+	t.Helper()
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
+	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected the enrollment to be issued, got %d. body: %s", resp.StatusCode, string(body))
+	}
+
+	var enrollment api.AccountOTPEnrollmentResponse
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&enrollment))
+	return enrollment
+}
+
+// resetOTPStateForTest returns the account user to "not enrolled, nothing pending". The cases share
+// one user, so a pending enrollment left behind by an earlier case would decide a later one.
+func resetOTPStateForTest(t *testing.T, userId int64) {
+	t.Helper()
+
+	user, err := database.GetUserById(nil, userId)
+	assert.NoError(t, err)
+	user.OTPEnabled = false
+	user.ClearOTPSecret()
+	assert.NoError(t, database.UpdateUser(nil, user))
+	assert.NoError(t, database.ClearPendingOTPEnrollment(nil, userId))
+}
+
+// installPendingEnrollmentForTest stages an enrollment as though the server had issued it at
+// issuedAt, which is fixture setup no caller can perform: the issuing endpoint always stamps now,
+// so an expired pending value cannot be reached through HTTP without waiting a quarter of an hour.
+//
+// It is the only place in this file that writes the pending columns. Every assertion below still
+// observes the endpoints, never the row.
+func installPendingEnrollmentForTest(t *testing.T, userId int64, keyURL string, issuedAt time.Time) {
+	t.Helper()
+
+	assert.NoError(t, database.ClearPendingOTPEnrollment(nil, userId))
+
+	ciphertext, err := encryption.EncryptData(keyURL)
+	assert.NoError(t, err)
+
+	installed, err := database.TryInstallPendingOTPEnrollment(nil, userId, ciphertext, issuedAt,
+		time.Now().UTC().Add(time.Hour))
+	assert.NoError(t, err)
+	assert.True(t, installed, "the fixture must have installed the pending enrollment")
+}
+
+// newOTPKeyURLForTest mints a key the same way the server does, for the cases that need to know the
+// seed before the endpoint issues one.
+func newOTPKeyURLForTest(t *testing.T, account string) (keyURL string, secret string) {
+	t.Helper()
+
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: account})
+	assert.NoError(t, err)
+	return key.URL(), key.Secret()
+}
+
 func TestAPIAccountOTPEnrollmentGet_Success(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 	userId := getAccountUserId(t, accessToken)
@@ -207,16 +277,16 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	u.OTPSecret = ""
 	_ = database.UpdateUser(nil, u)
 
-	// Use a known base32 secret and generate a valid current code
-	secret := "JBSWY3DPEHPK3PXP"
+	// The seed comes from the issuing endpoint, which is the only one the PUT will accept.
+	assert.NoError(t, database.ClearPendingOTPEnrollment(nil, userId))
+	secret := getOTPEnrollment(t, accessToken).SecretKey
 	code, err := totp.GenerateCode(secret, time.Now())
 	assert.NoError(t, err)
 
 	reqBody := api.UpdateAccountOTPRequest{
-		Enabled:   true,
-		Password:  "Correct1!",
-		OtpCode:   code,
-		SecretKey: secret,
+		Enabled:  true,
+		Password: "Correct1!",
+		OtpCode:  code,
 	}
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
@@ -244,10 +314,9 @@ func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
 	setUserPasswordForOTP(t, userId, "Correct1!")
 
 	reqBody := api.UpdateAccountOTPRequest{
-		Enabled:   true,
-		Password:  "WrongPwd!",
-		OtpCode:   "000000",
-		SecretKey: "JBSWY3DPEHPK3PXP",
+		Enabled:  true,
+		Password: "WrongPwd!",
+		OtpCode:  "000000",
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
@@ -266,20 +335,17 @@ func TestAPIAccountOTPPut_Enable_InvalidFormats(t *testing.T) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 
 	// Invalid code format (non-digits)
-	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: "aaaaa", SecretKey: "JBSWY3DPEHPK3PXP"})
+	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: "aaaaa"})
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
 	assert.Equal(t, "Invalid OTP code.", err1.ErrorDescription)
 
-	// Invalid secret format (bad chars)
-	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: "123456", SecretKey: "INVALID!!!"})
-	defer func() { _ = resp2.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
-	var err2 api.ErrorResponse
-	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "Invalid OTP secret format.", err2.ErrorDescription)
+	// There is no secret-format row any more. The caller no longer supplies a secret, so
+	// INVALID_OTP_SECRET became unreachable and was retired with the field (#247 decision 13).
+	// The shape check above still runs before the pending enrollment is looked up, which is why
+	// this case needs no enrollment of its own.
 }
 
 func TestAPIAccountOTPPut_Enable_WrongCode(t *testing.T) {
@@ -287,9 +353,10 @@ func TestAPIAccountOTPPut_Enable_WrongCode(t *testing.T) {
 	userId := getAccountUserId(t, accessToken)
 	setUserPasswordForOTP(t, userId, "Correct1!")
 
-	// Valid-looking secret and code format, but a code the matcher refuses for that secret right now
-	const secret = "JBSWY3DPEHPK3PXP"
-	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: wrongOtpCodeFor(t, secret), SecretKey: secret}
+	// A well-formed code that the matcher refuses for the seed the server just issued.
+	resetOTPStateForTest(t, userId)
+	secret := getOTPEnrollment(t, accessToken).SecretKey
+	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: wrongOtpCodeFor(t, secret)}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -343,20 +410,21 @@ func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 	userId := getAccountUserId(t, accessToken)
 	setUserPasswordForOTP(t, userId, "Correct1!")
 
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: "reset@otp.test"})
-	assert.NoError(t, err)
-	secret := key.Secret()
+	// The two enables must use the same secret, or the same code could not match twice and the
+	// case would prove nothing about the marker. A second call to the issuing endpoint would mint
+	// a different one, so the pending enrollment is staged directly here instead (#247).
+	keyURL, secret := newOTPKeyURLForTest(t, "reset@otp.test")
 
 	code, err := totp.GenerateCode(secret, time.Now())
 	assert.NoError(t, err)
 
 	enable := api.UpdateAccountOTPRequest{
-		Enabled:   true,
-		Password:  "Correct1!",
-		OtpCode:   code,
-		SecretKey: secret,
+		Enabled:  true,
+		Password: "Correct1!",
+		OtpCode:  code,
 	}
 
+	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC())
 	status, body := putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the first enable to succeed, got %d. body: %s", status, body)
@@ -368,8 +436,10 @@ func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 	}
 
 	// The same code again. It was consumed by the first enable, so this succeeds only because the
-	// disable reset the marker.
+	// disable reset the marker. The pending enrollment is restaged with the same key, since the
+	// first enable cleared it inside the transaction that established the authenticator.
 	skipIfOtpCodeOutsideWindow(t, secret, code)
+	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC())
 	status, body = putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the re-enable with the same code to succeed after the disable reset the "+
@@ -463,11 +533,12 @@ func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
 	assert.NoError(t, err)
 	extra := seedExtraSessionForOTPTest(t, userId)
 
-	// Prepare valid enable request
-	secret := "JBSWY3DPEHPK3PXP"
+	// Prepare valid enable request, against the seed the server issues for it
+	assert.NoError(t, database.ClearPendingOTPEnrollment(nil, userId))
+	secret := getOTPEnrollment(t, accessToken).SecretKey
 	code, err := totp.GenerateCode(secret, time.Now())
 	assert.NoError(t, err)
-	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: code, SecretKey: secret}
+	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: code}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -572,4 +643,172 @@ func TestAPIAccountOTPPut_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
 	assert.Contains(t, string(body2), "Insufficient scope.")
+}
+
+// -----------------------------------------------------------------------------
+// Seam G: the enrollment contract as a caller sees it (#247)
+
+// The issuing endpoint is idempotent while an enrollment is pending. This is the reload bug, and it
+// is the one a user actually hits: every call used to mint a fresh secret, so refreshing the
+// enrollment page silently replaced the seed behind a QR code they had already scanned, and every
+// code they then read off it was checked against a secret they were never shown.
+//
+// The image is asserted as well as the seed. They are two views of one stored otpauth:// URL, and a
+// second call that answered with the same seed but a newly rendered image would still be handing
+// the user a different QR code to scan.
+func TestAPIAccountOTPEnrollmentGet_IsIdempotentWhileOnePending(t *testing.T) {
+	accessToken, _ := getUserAccessTokenWithAccountScope(t)
+	userId := getAccountUserId(t, accessToken)
+	resetOTPStateForTest(t, userId)
+
+	first := getOTPEnrollment(t, accessToken)
+	second := getOTPEnrollment(t, accessToken)
+
+	assert.Equal(t, first.SecretKey, second.SecretKey,
+		"a reload must not replace the seed behind a QR code the user has already scanned")
+	assert.Equal(t, first.Base64Image, second.Base64Image,
+		"nor the QR code itself")
+	assert.NotEmpty(t, first.SecretKey)
+}
+
+// A pending enrollment older than the lifetime is replaced rather than honoured, so an abandoned
+// one does not sit on the account forever.
+func TestAPIAccountOTPEnrollmentGet_ReplacesAnExpiredEnrollment(t *testing.T) {
+	accessToken, _ := getUserAccessTokenWithAccountScope(t)
+	userId := getAccountUserId(t, accessToken)
+	resetOTPStateForTest(t, userId)
+
+	keyURL, staleSecret := newOTPKeyURLForTest(t, "expired@otp.test")
+	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC().Add(-20*time.Minute))
+
+	issued := getOTPEnrollment(t, accessToken)
+	assert.NotEqual(t, staleSecret, issued.SecretKey,
+		"an expired enrollment must not be handed out again")
+
+	// And the replacement is itself pending, so the caller can still complete it.
+	assert.Equal(t, issued.SecretKey, getOTPEnrollment(t, accessToken).SecretKey)
+}
+
+// A request still carrying secretKey is refused, loudly and by name. Decision 13 chose the break so
+// an integrator learns at once rather than wondering which secret was enrolled.
+//
+// The body is built as a raw map because api.UpdateAccountOTPRequest no longer has the field, which
+// is exactly the change this asserts the server enforces.
+func TestAPIAccountOTPPut_Enable_RefusesACallerSuppliedSecret(t *testing.T) {
+	accessToken, _ := getUserAccessTokenWithAccountScope(t)
+	userId := getAccountUserId(t, accessToken)
+	setUserPasswordForOTP(t, userId, "Correct1!")
+	resetOTPStateForTest(t, userId)
+
+	issued := getOTPEnrollment(t, accessToken)
+	code, err := totp.GenerateCode(issued.SecretKey, time.Now())
+	assert.NoError(t, err)
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, map[string]interface{}{
+		"enabled":   true,
+		"password":  "Correct1!",
+		"otpCode":   code,
+		"secretKey": issued.SecretKey,
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "SECRET_KEY_NOT_ACCEPTED", errResp.ErrorCode)
+	assert.Contains(t, errResp.ErrorDescription, "/api/v1/account/otp/enrollment")
+
+	// Refused, not partially applied: the field is rejected before anything else happens.
+	after, err := database.GetUserById(nil, userId)
+	assert.NoError(t, err)
+	assert.False(t, after.OTPEnabled)
+}
+
+// With no pending enrollment there is nothing to enroll, and the request is refused rather than
+// falling back to anything. A partially migrated or rolled back deployment therefore fails closed.
+func TestAPIAccountOTPPut_Enable_RefusedWithNoPendingEnrollment(t *testing.T) {
+	accessToken, _ := getUserAccessTokenWithAccountScope(t)
+	userId := getAccountUserId(t, accessToken)
+	setUserPasswordForOTP(t, userId, "Correct1!")
+	resetOTPStateForTest(t, userId)
+
+	// A well-formed code for a secret the server never issued, which is precisely what must not
+	// be enrollable.
+	_, strangerSecret := newOTPKeyURLForTest(t, "stranger@otp.test")
+	code, err := totp.GenerateCode(strangerSecret, time.Now())
+	assert.NoError(t, err)
+
+	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
+		Enabled: true, Password: "Correct1!", OtpCode: code,
+	})
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, body, "OTP_ENROLLMENT_NOT_PENDING")
+
+	after, err := database.GetUserById(nil, userId)
+	assert.NoError(t, err)
+	assert.False(t, after.OTPEnabled)
+}
+
+// An expired enrollment is no enrollment: the same refusal, and the seed cannot be redeemed late.
+func TestAPIAccountOTPPut_Enable_RefusedWithAnExpiredEnrollment(t *testing.T) {
+	accessToken, _ := getUserAccessTokenWithAccountScope(t)
+	userId := getAccountUserId(t, accessToken)
+	setUserPasswordForOTP(t, userId, "Correct1!")
+	resetOTPStateForTest(t, userId)
+
+	keyURL, secret := newOTPKeyURLForTest(t, "expired-put@otp.test")
+	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC().Add(-20*time.Minute))
+
+	code, err := totp.GenerateCode(secret, time.Now())
+	assert.NoError(t, err)
+
+	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
+		Enabled: true, Password: "Correct1!", OtpCode: code,
+	})
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, body, "OTP_ENROLLMENT_NOT_PENDING")
+}
+
+// The whole contract in one pass: the GET issues, the PUT enrolls that seed and no other, and the
+// pending pair is gone afterwards.
+//
+// The stored secret is read back because that is the assertion the endpoints cannot make about
+// themselves. Everything else here is endpoint-observable.
+func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testing.T) {
+	accessToken, _ := getUserAccessTokenWithAccountScope(t)
+	userId := getAccountUserId(t, accessToken)
+	setUserPasswordForOTP(t, userId, "Correct1!")
+	resetOTPStateForTest(t, userId)
+
+	issued := getOTPEnrollment(t, accessToken)
+	code, err := totp.GenerateCode(issued.SecretKey, time.Now())
+	assert.NoError(t, err)
+
+	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
+		Enabled: true, Password: "Correct1!", OtpCode: code,
+	})
+	if status != http.StatusOK {
+		t.Fatalf("expected the enrollment to succeed, got %d. body: %s", status, body)
+	}
+
+	after, err := database.GetUserById(nil, userId)
+	assert.NoError(t, err)
+	assert.True(t, after.OTPEnabled)
+
+	enrolled, err := after.GetOTPSecret()
+	assert.NoError(t, err)
+	assert.Equal(t, issued.SecretKey, enrolled,
+		"the authenticator installed must be the one the server issued")
+
+	// Cleared inside the transaction that established the authenticator, so no committed state
+	// has OTP enabled with a live pending seed behind it.
+	assert.Empty(t, after.OtpEnrollmentSecretEncrypted)
+	assert.False(t, after.OtpEnrollmentIssuedAt.Valid)
+
+	// And the issuing endpoint now refuses, because enrollment is over for this user.
+	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
+	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }

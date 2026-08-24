@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -14,9 +15,11 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/otp"
+	mocks_otp "github.com/leodip/goiabada/core/otp/mocks"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -43,20 +46,46 @@ import (
 // no sequential caller can observe; that the marker is genuinely reset stays with
 // TestAPIAccountOTPPut_Disable_ResetsConsumedStep, which asserts it end to end on four engines.
 
-// otpTestSecret is a valid base32 secret of the length the handler's isValidSecret accepts: 32 chars,
-// A-Z and 2-7 only. Nothing about the digits matters, only that totp and MatchStep agree on it.
+// otpTestSecret is a valid base32 TOTP secret, 32 chars of A-Z and 2-7. Nothing about the digits
+// matters, only that totp and MatchStep agree on it.
 const otpTestSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+
+// otpTestKeyURL is what the server actually stores for a pending enrollment: the whole otpauth://
+// URL, not the bare seed, so a repeat GET can render a byte-identical QR image from it. Written out
+// with algorithm, digits and period explicit, exactly as otp.Key.URL() serializes them, so
+// otp.SecretFromKeyURL reads otpTestSecret back off it.
+const otpTestKeyURL = "otpauth://totp/Goiabada:otp@example.com?algorithm=SHA1&digits=6&issuer=Goiabada&period=30&secret=" + otpTestSecret
+
+// pendingEnrollment is the encrypted-and-timestamped pair the server writes when it issues an
+// enrollment. issuedAt is passed in so a case can put the pair inside or outside
+// otpEnrollmentLifetime.
+func pendingEnrollment(t *testing.T, keyURL string, issuedAt time.Time) ([]byte, sql.NullTime) {
+	t.Helper()
+	ciphertext, err := encryption.EncryptData(keyURL)
+	require.NoError(t, err)
+	return ciphertext, sql.NullTime{Time: issuedAt, Valid: true}
+}
 
 // accountOTPEnableRequest builds an enable request carrying a code the handler will match, so every
 // case below reaches the claim rather than stopping at the matcher.
+//
+// It sends no secretKey, and that is the contract rather than an omission: the server enrolls the
+// seed it issued and refuses a request that names one (#247). accountOTPRawRequest below is what
+// the cases about that refusal use.
 func accountOTPEnableRequest(t *testing.T, subject, password, code string) *http.Request {
 	t.Helper()
-	body, err := json.Marshal(map[string]interface{}{
-		"enabled":   true,
-		"password":  password,
-		"otpCode":   code,
-		"secretKey": otpTestSecret,
+	return accountOTPRawRequest(t, subject, map[string]interface{}{
+		"enabled":  true,
+		"password": password,
+		"otpCode":  code,
 	})
+}
+
+// accountOTPRawRequest builds a PUT from an arbitrary body, so a case can send a field the request
+// struct no longer models.
+func accountOTPRawRequest(t *testing.T, subject string, fields map[string]interface{}) *http.Request {
+	t.Helper()
+	body, err := json.Marshal(fields)
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/account/otp", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -75,13 +104,21 @@ func currentOtpCode(t *testing.T) string {
 	return code
 }
 
+// otpTestUser is a user part way through an enrollment: the server has issued otpTestKeyURL to them
+// and recorded it, which is the only state the enable branch can now succeed from. Without the
+// pending pair every case here would stop at OTP_ENROLLMENT_NOT_PENDING before reaching the claim.
 func otpTestUser(t *testing.T, password string) *models.User {
 	t.Helper()
 	hash, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
+	ciphertext, issuedAt := pendingEnrollment(t, otpTestKeyURL, time.Now().UTC())
 	// OTPEnabled false: the OTP_ALREADY_ENABLED check above the claim is what makes this the only
 	// state the enable branch is ever reached in, which is why requireOTPEnabled is passed false.
-	return &models.User{Id: 77, Enabled: true, PasswordHash: hash, OTPEnabled: false}
+	return &models.User{
+		Id: 77, Enabled: true, PasswordHash: hash, OTPEnabled: false,
+		OtpEnrollmentSecretEncrypted: ciphertext,
+		OtpEnrollmentIssuedAt:        issuedAt,
+	}
 }
 
 // TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused is the one that matters. A refused claim must draw
@@ -448,4 +485,349 @@ func errorCodeOf(t *testing.T, rr *httptest.ResponseRecorder) string {
 func descriptionOf(t *testing.T, rr *httptest.ResponseRecorder) string {
 	t.Helper()
 	return decodeErrorBody(t, rr).ErrorDescription
+}
+
+// -----------------------------------------------------------------------------
+// The enrollment contract (#247)
+//
+// Everything below is about one property: the server enrolls the seed it issued and no other, and
+// it can only do that if the issuing step is a write and the confirming step reads it back. The
+// cases come in two halves, the GET that issues and the PUT that consumes.
+//
+// Handler unit tests are where the compare-and-set losing, the pending value expiring and a
+// caller-supplied secretKey can each be driven exactly. Seam G covers the same contract end to end
+// over HTTP, where those three states are hard to arrange and easy to arrange wrongly.
+
+// enrollmentGetRequest builds a GET carrying a validated token for the given subject, with the
+// settings the handler reads out of the request context.
+func enrollmentGetRequest(subject string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/account/otp/enrollment", nil)
+	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+		&models.Settings{AppName: "Goiabada"}))
+	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
+}
+
+func decodeEnrollment(t *testing.T, rr *httptest.ResponseRecorder) api.AccountOTPEnrollmentResponse {
+	t.Helper()
+	var resp api.AccountOTPEnrollmentResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp),
+		"expected an enrollment response, got %s", rr.Body.String())
+	return resp
+}
+
+// A live pending enrollment is answered as it stands, and nothing is minted. This is goal 7: a
+// reload of the enrollment page must not replace the seed behind a QR code the user has already
+// scanned, which is what every call did before (#242 part 3, still live on this surface).
+//
+// The generator mock is constructed and never given an expectation, so calling it fails the test.
+// That is the assertion: mockery's NewOtpSecretGenerator(t) registers a cleanup that refuses an
+// unexpected call.
+func TestHandleAPIAccountOTPEnrollmentGet_LivePendingIsReturnedUnchanged(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	generator := mocks_otp.NewOtpSecretGenerator(t)
+
+	const subject = "enrolling-subject"
+	user := otpTestUser(t, "P4ss!word")
+	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPEnrollmentGet(database, generator).ServeHTTP(rr, enrollmentGetRequest(subject))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	resp := decodeEnrollment(t, rr)
+	assert.Equal(t, otpTestSecret, resp.SecretKey,
+		"a second call must answer with the seed already issued, not a new one")
+
+	expectedImage, err := otp.RenderQRCodeImage(otpTestKeyURL)
+	require.NoError(t, err)
+	assert.Equal(t, expectedImage, resp.Base64Image,
+		"and with the same QR image, since it is rendered from the same stored URL")
+
+	database.AssertNotCalled(t, "TryInstallPendingOTPEnrollment",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// A pending enrollment older than otpEnrollmentLifetime is not honoured: it is replaced. Without
+// decision 12's expiry an abandoned seed would sit on the user row with nothing to sweep it.
+func TestHandleAPIAccountOTPEnrollmentGet_ExpiredPendingIsReplaced(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	generator := mocks_otp.NewOtpSecretGenerator(t)
+
+	const subject = "enrolling-subject"
+	user := otpTestUser(t, "P4ss!word")
+	user.OtpEnrollmentSecretEncrypted, user.OtpEnrollmentIssuedAt =
+		pendingEnrollment(t, otpTestKeyURL, time.Now().UTC().Add(-otpEnrollmentLifetime-time.Minute))
+	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
+
+	freshKeyURL, err := (&otp.OTPSecretGenerator{}).GenerateOTPSecret("otp@example.com", "Goiabada")
+	require.NoError(t, err)
+	generator.On("GenerateOTPSecret", user.Email, "Goiabada").Return(freshKeyURL, nil).Once()
+
+	// The staleBefore the handler passes must be far enough back to leave the expired value
+	// replaceable and no further, so it is captured and checked rather than waved through.
+	var staleBefore time.Time
+	database.On("TryInstallPendingOTPEnrollment", (*sql.Tx)(nil), user.Id,
+		mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			staleBefore = args.Get(4).(time.Time)
+		}).
+		Return(true, nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPEnrollmentGet(database, generator).ServeHTTP(rr, enrollmentGetRequest(subject))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	freshSecret, err := otp.SecretFromKeyURL(freshKeyURL)
+	require.NoError(t, err)
+	assert.Equal(t, freshSecret, decodeEnrollment(t, rr).SecretKey)
+	assert.NotEqual(t, otpTestSecret, decodeEnrollment(t, rr).SecretKey)
+
+	assert.WithinDuration(t, time.Now().UTC().Add(-otpEnrollmentLifetime), staleBefore, time.Minute,
+		"the expiry line the writer is given must be the lifetime behind now")
+}
+
+// Losing the compare-and-set answers with the winner's seed rather than the one this call minted.
+// Two concurrent enrollment calls must agree on one QR code: handing out the unstored one would
+// give the user a code the PUT can never accept.
+func TestHandleAPIAccountOTPEnrollmentGet_LostRaceAnswersWithTheStoredSeed(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	generator := mocks_otp.NewOtpSecretGenerator(t)
+
+	const subject = "enrolling-subject"
+	loser := otpTestUser(t, "P4ss!word")
+	loser.OtpEnrollmentSecretEncrypted, loser.OtpEnrollmentIssuedAt = nil, sql.NullTime{}
+	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(loser, nil).Once()
+
+	mintedKeyURL, err := (&otp.OTPSecretGenerator{}).GenerateOTPSecret("otp@example.com", "Goiabada")
+	require.NoError(t, err)
+	generator.On("GenerateOTPSecret", loser.Email, "Goiabada").Return(mintedKeyURL, nil).Once()
+
+	database.On("TryInstallPendingOTPEnrollment", (*sql.Tx)(nil), loser.Id,
+		mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
+
+	// The row as the winner left it.
+	winner := otpTestUser(t, "P4ss!word")
+	database.On("GetUserById", (*sql.Tx)(nil), loser.Id).Return(winner, nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPEnrollmentGet(database, generator).ServeHTTP(rr, enrollmentGetRequest(subject))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	mintedSecret, err := otp.SecretFromKeyURL(mintedKeyURL)
+	require.NoError(t, err)
+	resp := decodeEnrollment(t, rr)
+	assert.Equal(t, otpTestSecret, resp.SecretKey, "the stored seed is the one the caller must get")
+	assert.NotEqual(t, mintedSecret, resp.SecretKey, "never the seed this call failed to store")
+}
+
+// A caller that lost the race to a user who has finished enrolling gets the ordinary refusal, not a
+// 500 and not a seed. Enrollment is over for them.
+func TestHandleAPIAccountOTPEnrollmentGet_LostRaceToACompletedEnrollment(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	generator := mocks_otp.NewOtpSecretGenerator(t)
+
+	const subject = "enrolling-subject"
+	user := otpTestUser(t, "P4ss!word")
+	user.OtpEnrollmentSecretEncrypted, user.OtpEnrollmentIssuedAt = nil, sql.NullTime{}
+	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
+
+	keyURL, err := (&otp.OTPSecretGenerator{}).GenerateOTPSecret("otp@example.com", "Goiabada")
+	require.NoError(t, err)
+	generator.On("GenerateOTPSecret", user.Email, "Goiabada").Return(keyURL, nil).Once()
+	database.On("TryInstallPendingOTPEnrollment", (*sql.Tx)(nil), user.Id,
+		mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
+
+	enrolled := otpTestUser(t, "P4ss!word")
+	enrolled.OTPEnabled = true
+	enrolled.OtpEnrollmentSecretEncrypted, enrolled.OtpEnrollmentIssuedAt = nil, sql.NullTime{}
+	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(enrolled, nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPEnrollmentGet(database, generator).ServeHTTP(rr, enrollmentGetRequest(subject))
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, "OTP_ALREADY_ENABLED", errorCodeOf(t, rr))
+}
+
+// A request still carrying secretKey is refused, and refused loudly. Decision 13 chose the break:
+// nothing sets DisallowUnknownFields, so dropping the field alone would have changed which secret
+// was enrolled without telling the integrator anything.
+//
+// The table is the point. The refusal is on the field's presence, so a null and a number must
+// refuse exactly as a string does, and it runs before the password check so an upgrading caller
+// sees the reason rather than an authentication failure.
+func TestHandleAPIAccountOTPPut_SecretKeyIsRefused(t *testing.T) {
+	testCases := []struct {
+		name  string
+		value interface{}
+	}{
+		{name: "a secret", value: otpTestSecret},
+		{name: "an empty string", value: ""},
+		{name: "null", value: nil},
+		{name: "a number", value: 12345},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// No expectations on either mock: the refusal must land before the user is
+			// loaded, so any database call fails this test.
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
+				"enabled":   true,
+				"password":  "P4ss!word",
+				"otpCode":   currentOtpCode(t),
+				"secretKey": tc.value,
+			})
+
+			rr := httptest.NewRecorder()
+			HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
+			assert.Equal(t, "SECRET_KEY_NOT_ACCEPTED", errorCodeOf(t, rr))
+			assert.Contains(t, descriptionOf(t, rr), "/api/v1/account/otp/enrollment",
+				"the refusal must say where the enrollment now comes from")
+		})
+	}
+}
+
+// A disable request carrying secretKey is refused too. The rule is about the shape of the request,
+// not about the branch it would have taken.
+func TestHandleAPIAccountOTPPut_SecretKeyIsRefusedOnDisableToo(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
+		"enabled":   false,
+		"password":  "P4ss!word",
+		"secretKey": otpTestSecret,
+	})
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, "SECRET_KEY_NOT_ACCEPTED", errorCodeOf(t, rr))
+}
+
+// No live pending enrollment refuses the enable, and refuses it before any code is checked. Both
+// rows are the same refusal deliberately: an expired enrollment is no enrollment.
+//
+// This is also what makes a partially migrated or rolled back deployment fail closed. With nothing
+// to read back, enrolling stops working rather than falling back to trusting the wire again.
+func TestHandleAPIAccountOTPPut_Enable_RefusedWithoutALivePendingEnrollment(t *testing.T) {
+	testCases := []struct {
+		name    string
+		prepare func(*testing.T, *models.User)
+	}{
+		{
+			name: "none was ever issued",
+			prepare: func(t *testing.T, u *models.User) {
+				u.OtpEnrollmentSecretEncrypted, u.OtpEnrollmentIssuedAt = nil, sql.NullTime{}
+			},
+		},
+		{
+			name: "the one issued has expired",
+			prepare: func(t *testing.T, u *models.User) {
+				u.OtpEnrollmentSecretEncrypted, u.OtpEnrollmentIssuedAt = pendingEnrollment(
+					t, otpTestKeyURL, time.Now().UTC().Add(-otpEnrollmentLifetime-time.Second))
+			},
+		},
+		{
+			name: "ciphertext with no issue time, which no writer produces",
+			prepare: func(t *testing.T, u *models.User) {
+				u.OtpEnrollmentIssuedAt = sql.NullTime{}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			const subject = "the-subject"
+			const password = "P4ss!word"
+			user := otpTestUser(t, password)
+			tc.prepare(t, user)
+			database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
+
+			rr := httptest.NewRecorder()
+			HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+				ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
+			assert.Equal(t, "OTP_ENROLLMENT_NOT_PENDING", errorCodeOf(t, rr))
+
+			// Nothing was claimed and nothing was written. A refusal that still spent the
+			// user's time step would burn a code they could otherwise retry with.
+			database.AssertNotCalled(t, "TryConsumeUserOTPStep",
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			assert.False(t, user.OTPEnabled)
+		})
+	}
+}
+
+// The seed that gets stored is the one the server issued. This is the defect in one assertion: the
+// handler used to match the code against the secret the request carried and then store that same
+// value, so it enrolled whatever it was handed.
+//
+// The code submitted here is generated from otpTestSecret, which is the pending seed, so a handler
+// still reading a caller-supplied secret would find none and could not reach the claim at all.
+// What the case pins is the other half: the value that reaches the row.
+func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	database.On("TryConsumeUserOTPStep", (*sql.Tx)(nil), user.Id, mock.Anything, false).
+		Return(true, nil).Once()
+
+	tx := &sql.Tx{}
+	database.On("BeginTransaction").Return(tx, nil).Once()
+	database.On("RollbackTransaction", tx).Return(nil).Once()
+	database.On("UpdateUser", tx, user).Return(nil).Once()
+	database.On("IncrementUserOtpConfigGeneration", tx, user.Id).Return(int64(4), nil).Once()
+	// The clear rides in the enable's own transaction, so no committed state has OTP on with a
+	// live seed still installed behind it.
+	database.On("ClearPendingOTPEnrollment", tx, user.Id).Return(nil).Once()
+	database.On("CommitTransaction", tx).Return(nil).Once()
+	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+	auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.True(t, user.OTPEnabled)
+
+	stored, err := user.GetOTPSecret()
+	require.NoError(t, err)
+	assert.Equal(t, otpTestSecret, stored,
+		"the enrolled authenticator must be the one the server issued and recorded")
+}
+
+// A blank code is refused by name. OTP_CODE_AND_SECRET_REQUIRED became OTP_CODE_REQUIRED when the
+// secret left the request, and a renamed error code is a published contract change that nothing
+// else in the suite observes.
+func TestHandleAPIAccountOTPPut_Enable_BlankCodeIsRefusedByName(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, "   "))
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, "OTP_CODE_REQUIRED", errorCodeOf(t, rr))
 }

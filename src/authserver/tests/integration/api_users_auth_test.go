@@ -223,12 +223,16 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 	assert.NoError(t, err)
 
 	enable := api.UpdateAccountOTPRequest{
-		Enabled:   true,
-		Password:  "Correct1!",
-		OtpCode:   code,
-		SecretKey: secret,
+		Enabled:  true,
+		Password: "Correct1!",
+		OtpCode:  code,
 	}
 
+	// The account API enrolls the seed the server issued and no other, so both enables below have
+	// to be staged against this same key rather than named in the request. A second call to the
+	// issuing endpoint would mint a different secret, and the same code could not match twice
+	// (#247).
+	installPendingEnrollmentForTest(t, user.Id, key.URL(), time.Now().UTC())
 	status, body := putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the enable to succeed, got %d. body: %s", status, body)
@@ -244,6 +248,7 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 	// The same code the enable already consumed. It is accepted only because the admin disable
 	// reset the marker.
 	skipIfOtpCodeOutsideWindow(t, secret, code)
+	installPendingEnrollmentForTest(t, user.Id, key.URL(), time.Now().UTC())
 	status, body = putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the re-enable with the same code to succeed after the admin disable reset "+

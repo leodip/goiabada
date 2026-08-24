@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/constants"
@@ -56,8 +57,16 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 	hash, err := hashutil.HashPassword(credentialPassword)
 	require.NoError(t, err)
 	// OTPEnabled false, so the OTP route's enable branch is the one reached past the password
-	// check. Nothing here gets as far as a write.
-	user := &models.User{Id: 91, Enabled: true, PasswordHash: hash, OTPEnabled: false}
+	// check, and part way through an enrolment, so a wrong code there is refused for being wrong
+	// rather than for there being nothing to enrol. Without the pending pair every OTP attempt
+	// below would stop at OTP_ENROLLMENT_NOT_PENDING, which is not the branch this seam is about
+	// (#247). Nothing here gets as far as a write.
+	ciphertext, issuedAt := pendingEnrollment(t, otpTestKeyURL, time.Now().UTC())
+	user := &models.User{
+		Id: 91, Enabled: true, PasswordHash: hash, OTPEnabled: false,
+		OtpEnrollmentSecretEncrypted: ciphertext,
+		OtpEnrollmentIssuedAt:        issuedAt,
+	}
 
 	database.On("GetUserBySubject", (*sql.Tx)(nil), credentialSubject).Return(user, nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything).Return().Maybe()
@@ -98,11 +107,13 @@ func (e *credentialEnv) putPassword(t *testing.T, current, next string) *httptes
 // branch checks after the password, and it is deliberately outside the budget.
 func (e *credentialEnv) putOTP(t *testing.T, password, code string) *httptest.ResponseRecorder {
 	t.Helper()
+	// No secretKey. Since #247 the endpoint refuses a request carrying one before it looks at the
+	// password, so sending it here would take every attempt below out of the budget entirely and
+	// this case would be measuring nothing.
 	body, err := json.Marshal(map[string]interface{}{
-		"enabled":   true,
-		"password":  password,
-		"otpCode":   code,
-		"secretKey": otpTestSecret,
+		"enabled":  true,
+		"password": password,
+		"otpCode":  code,
 	})
 	require.NoError(t, err)
 
@@ -159,9 +170,10 @@ func TestAccountCredentialBudget_SharedAcrossPasswordAndOTP(t *testing.T) {
 
 		// Well past the budget, and every one of them refused for a reason that is not the
 		// password: a wrong OTP code at the enable branch, which decision 10 leaves unbounded
-		// because it is checked against the secret the caller supplied in the same request,
-		// and a new password the policy rejects. A tier that counted every request, or a
-		// handler that charged either of these branches, would refuse the sixth.
+		// because it is checked against a seed the server issued to this same caller at
+		// GET /api/v1/account/otp/enrollment, which their own token entitles them to fetch, and
+		// a new password the policy rejects. A tier that counted every request, or a handler
+		// that charged either of these branches, would refuse the sixth.
 		for i := 0; i < budget*2; i++ {
 			rr := env.putOTP(t, credentialPassword, wrongButWellFormedCode(t))
 			require.Equal(t, http.StatusBadRequest, rr.Code, "OTP attempt %d", i+1)

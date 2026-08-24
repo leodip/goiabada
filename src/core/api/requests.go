@@ -90,12 +90,19 @@ type UpdateUserOTPRequest struct {
 // UpdateAccountOTPRequest is used by the account (self-service) API to
 // enable or disable OTP for the currently authenticated user. The server
 // validates the current password and, when enabling, validates the OTP code
-// generated from the provided secret.
+// against the enrollment it issued at GET /api/v1/account/otp/enrollment.
+//
+// There is deliberately no SecretKey field. The server records the enrollment
+// it issued and enrolls that seed and no other, so a caller cannot choose which
+// authenticator is installed on its own account. A request that still carries
+// secretKey is refused with 400 SECRET_KEY_NOT_ACCEPTED rather than having the
+// field ignored, which is a breaking change and was chosen as one: nothing sets
+// DisallowUnknownFields, so removing the field alone would have changed which
+// secret was enrolled without telling anybody (#247).
 type UpdateAccountOTPRequest struct {
-	Enabled   bool   `json:"enabled"`
-	Password  string `json:"password"`
-	OtpCode   string `json:"otpCode,omitempty"`
-	SecretKey string `json:"secretKey,omitempty"`
+	Enabled  bool   `json:"enabled"`
+	Password string `json:"password"`
+	OtpCode  string `json:"otpCode,omitempty"`
 }
 
 type UpdateUserEmailRequest struct {

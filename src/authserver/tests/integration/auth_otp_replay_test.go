@@ -360,13 +360,17 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Enroll through the account API, which consumes codeC's step.
+	// Enroll through the account API, which consumes codeC's step. The seed has to be staged as
+	// a pending enrollment first: the API enrolls the one the server issued and no longer accepts
+	// one named in the request, and this case needs to know the secret in advance so the browser
+	// prompt below can be driven against it (#247).
+	installPendingEnrollmentForTest(t, user.Id, key.URL(), time.Now().UTC())
+
 	enableUrl := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", enableUrl, accessToken, api.UpdateAccountOTPRequest{
-		Enabled:   true,
-		Password:  "Correct1!",
-		OtpCode:   codeC,
-		SecretKey: secret,
+		Enabled:  true,
+		Password: "Correct1!",
+		OtpCode:  codeC,
 	})
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

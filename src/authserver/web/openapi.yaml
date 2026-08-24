@@ -2461,7 +2461,15 @@ paths:
     get:
       tags: [Account]
       summary: Start OTP enrollment
-      description: Get QR code and secret for TOTP setup (fails if already enabled)
+      description: |
+        Issues the TOTP enrollment for the authenticated user and returns the QR code and secret to
+        set up an authenticator with. Fails if OTP is already enabled.
+
+        The server records what it issued, and `PUT /api/v1/account/otp` enrolls that seed and no
+        other. While an enrollment is pending the call is idempotent: repeating it returns the same
+        secret and the same QR code, so reloading an enrollment page does not invalidate a code the
+        user has already scanned. A pending enrollment lasts 15 minutes, after which the next call
+        issues a new one.
       operationId: getAccountOTPEnrollment
       responses:
         '200':
@@ -2483,7 +2491,18 @@ paths:
     put:
       tags: [Account]
       summary: Enable/disable OTP
-      description: Enable or disable TOTP (requires password verification)
+      description: |
+        Enables or disables TOTP for the authenticated user. Requires password verification, and
+        when enabling, a current code from the authenticator.
+
+        Enabling completes the enrollment issued by `GET /api/v1/account/otp/enrollment`: the code
+        is verified against the seed the server issued and that seed is what gets enrolled. Call the
+        enrollment endpoint first. Returns 400 if no enrollment is pending or the one started has
+        expired (`OTP_ENROLLMENT_NOT_PENDING`).
+
+        This request must not carry a `secretKey`. One that does is refused with 400
+        (`SECRET_KEY_NOT_ACCEPTED`) rather than having the field ignored, because a caller sending
+        one believes it is choosing which authenticator is installed, and it is not.
       operationId: updateAccountOTP
       requestBody:
         required: true
@@ -4143,7 +4162,9 @@ components:
           description: QR code as base64-encoded PNG
         secretKey:
           type: string
-          description: TOTP secret key (base32)
+          description: >-
+            TOTP secret key (base32), for a user who cannot scan the QR code. The server has
+            recorded this value; do not substitute another when enabling.
 
     UpdateAccountOTPRequest:
       type: object
@@ -4158,10 +4179,9 @@ components:
           description: Current password for verification
         otpCode:
           type: string
-          description: 6-digit TOTP code (required when enabling)
-        secretKey:
-          type: string
-          description: Base32 secret (required when enabling)
+          description: >-
+            6-digit TOTP code (required when enabling), generated from the secret returned by
+            GET /api/v1/account/otp/enrollment
 
     AccountLogoutRequest:
       type: object
