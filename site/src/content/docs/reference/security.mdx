@@ -46,6 +46,7 @@ Goiabada includes several built-in security features:
 - **Secure flag** - Cookies marked as secure in production (HTTPS only)
 - **HttpOnly flag** - Cookies not accessible via JavaScript
 - **SameSite attribute** - Protection against CSRF attacks
+- **No stored copies of the rendered pages** - Every page Goiabada renders is sent with `Cache-Control: no-store` and `Pragma: no-cache`, the login form, the one-time code prompt, the page that shows a new authenticator's setup key, and the consent screen among them. That binds HTTP caches, so a proxy, a CDN or the browser's own disk cache must not keep a copy and must not answer anyone else with one. It does not bind the browser's history or its back/forward cache, which [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html#section-6) leaves free to redisplay a page it has already shown, so this is not a promise that nothing is retained on the machine
 
 ### Cross-site request forgery
 
