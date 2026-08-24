@@ -42,6 +42,10 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 
 	const pem = "-----BEGIN RSA PRIVATE KEY-----\nfakepem\n-----END RSA PRIVATE KEY-----\n"
 	const clientSec = "client-secret"
+	// The pending TOTP enrolment (#247), carried through the rotation alongside the client secret
+	// so this test covers both halves of aesProtectedColumns: a settings-level secret and a
+	// user-level one.
+	const otpEnrolment = "otpauth://totp/Goiabada:u@example.com?secret=JBSWY3DPEHPK3PXP"
 
 	if err := db.CreateKeyPair(nil, &models.KeyPair{
 		State: "current", KeyIdentifier: uuid.NewString(), Type: "RSA", Algorithm: "RS256",
@@ -55,6 +59,16 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	}
 	if err := db.CreateClient(nil, client); err != nil {
 		t.Fatalf("CreateClient: %v", err)
+	}
+	user := &models.User{
+		Subject:                      uuid.New(),
+		Username:                     uuid.NewString(),
+		Email:                        uuid.NewString() + "@example.com",
+		PasswordHash:                 "x",
+		OtpEnrollmentSecretEncrypted: encA(otpEnrolment),
+	}
+	if err := db.CreateUser(nil, user); err != nil {
+		t.Fatalf("CreateUser: %v", err)
 	}
 
 	// Same key, or no previous key: no-op.
@@ -93,6 +107,17 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	}
 	if dec, err := encryption.DecryptText(keys[0].PrivateKeyPEM, keyB); err != nil || dec != pem {
 		t.Errorf("keypair PEM after rotate not decryptable under keyB: %v", err)
+	}
+	gotUser, err := db.GetUserById(nil, user.Id)
+	if err != nil {
+		t.Fatalf("GetUserById: %v", err)
+	}
+	if dec, err := encryption.DecryptText(gotUser.OtpEnrollmentSecretEncrypted, keyB); err != nil || dec != otpEnrolment {
+		t.Errorf("pending OTP enrolment after rotate = (%q, %v), want (%q, nil)", dec, err, otpEnrolment)
+	}
+	if _, err := encryption.DecryptText(gotUser.OtpEnrollmentSecretEncrypted, keyA); err == nil {
+		t.Error("pending OTP enrolment still decrypts under the retired key: is the column missing " +
+			"from commondb.aesProtectedColumns?")
 	}
 
 	// Idempotent: data is already under keyB, so a repeat is a no-op.

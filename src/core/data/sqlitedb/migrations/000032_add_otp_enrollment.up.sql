@@ -1,0 +1,25 @@
+-- A pending TOTP enrolment on the user row (#247).
+--
+-- The account API's enrolment ceremony binds nothing today: GET /api/v1/account/otp/enrollment
+-- mints a secret and hands it to the caller, and PUT /api/v1/account/otp enrols whatever secret the
+-- caller sends back, matching the submitted code against that same caller-supplied value. So the
+-- server never learns which authenticator it issued, and a caller can enrol a seed the server never
+-- generated. These two columns are where the issued seed is recorded so the PUT can enrol that one
+-- and no other.
+--
+-- The pair is the same shape as the three pending-credential pairs already on this table, email
+-- verification, phone verification and forgot password: an encrypted blob beside an issued_at, both
+-- nullable, both dormant as NULL, both cleared on success. What it holds is the whole otpauth:// URL
+-- rather than the bare base32 secret, because a repeat GET has to return the same QR image and the
+-- image can only be rendered from the URL; the column is named for the credential it carries, as its
+-- three siblings are.
+--
+-- issued_at is what makes the pending value expire: an abandoned enrolment would otherwise leave a
+-- live seed on the row forever with nothing to sweep it. The lifetime itself lives in Go, so this
+-- migration has no opinion about it.
+--
+-- Nullable with no default, so unlike 000031 there is no default constraint for SQL Server to name
+-- or for the down migration to drop, and each down is a bare pair of DROP COLUMNs. Nothing indexes
+-- or constrains either column on any engine, which is SQLite's requirement before DROP COLUMN.
+ALTER TABLE users ADD COLUMN otp_enrollment_secret_encrypted BLOB;
+ALTER TABLE users ADD COLUMN otp_enrollment_issued_at DATETIME;

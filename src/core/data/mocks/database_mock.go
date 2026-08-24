@@ -156,6 +156,63 @@ func (_c *Database_BeginTransaction_Call) RunAndReturn(run func() (*sql.Tx, erro
 	return _c
 }
 
+// ClearPendingOTPEnrollment provides a mock function for the type Database
+func (_mock *Database) ClearPendingOTPEnrollment(tx *sql.Tx, userId int64) error {
+	ret := _mock.Called(tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClearPendingOTPEnrollment")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
+		r0 = returnFunc(tx, userId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_ClearPendingOTPEnrollment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClearPendingOTPEnrollment'
+type Database_ClearPendingOTPEnrollment_Call struct {
+	*mock.Call
+}
+
+// ClearPendingOTPEnrollment is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) ClearPendingOTPEnrollment(tx any, userId any) *Database_ClearPendingOTPEnrollment_Call {
+	return &Database_ClearPendingOTPEnrollment_Call{Call: _e.mock.On("ClearPendingOTPEnrollment", tx, userId)}
+}
+
+func (_c *Database_ClearPendingOTPEnrollment_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_ClearPendingOTPEnrollment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_ClearPendingOTPEnrollment_Call) Return(err error) *Database_ClearPendingOTPEnrollment_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_ClearPendingOTPEnrollment_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) error) *Database_ClearPendingOTPEnrollment_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ClientHasLogo provides a mock function for the type Database
 func (_mock *Database) ClientHasLogo(tx *sql.Tx, clientId int64) (bool, error) {
 	ret := _mock.Called(tx, clientId)
@@ -10736,6 +10793,90 @@ func (_c *Database_TryConsumeUserOTPStep_Call) Return(b bool, err error) *Databa
 }
 
 func (_c *Database_TryConsumeUserOTPStep_Call) RunAndReturn(run func(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)) *Database_TryConsumeUserOTPStep_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TryInstallPendingOTPEnrollment provides a mock function for the type Database
+func (_mock *Database) TryInstallPendingOTPEnrollment(tx *sql.Tx, userId int64, secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error) {
+	ret := _mock.Called(tx, userId, secretEncrypted, issuedAt, staleBefore)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryInstallPendingOTPEnrollment")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, []byte, time.Time, time.Time) (bool, error)); ok {
+		return returnFunc(tx, userId, secretEncrypted, issuedAt, staleBefore)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, []byte, time.Time, time.Time) bool); ok {
+		r0 = returnFunc(tx, userId, secretEncrypted, issuedAt, staleBefore)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64, []byte, time.Time, time.Time) error); ok {
+		r1 = returnFunc(tx, userId, secretEncrypted, issuedAt, staleBefore)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryInstallPendingOTPEnrollment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryInstallPendingOTPEnrollment'
+type Database_TryInstallPendingOTPEnrollment_Call struct {
+	*mock.Call
+}
+
+// TryInstallPendingOTPEnrollment is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+//   - secretEncrypted []byte
+//   - issuedAt time.Time
+//   - staleBefore time.Time
+func (_e *Database_Expecter) TryInstallPendingOTPEnrollment(tx any, userId any, secretEncrypted any, issuedAt any, staleBefore any) *Database_TryInstallPendingOTPEnrollment_Call {
+	return &Database_TryInstallPendingOTPEnrollment_Call{Call: _e.mock.On("TryInstallPendingOTPEnrollment", tx, userId, secretEncrypted, issuedAt, staleBefore)}
+}
+
+func (_c *Database_TryInstallPendingOTPEnrollment_Call) Run(run func(tx *sql.Tx, userId int64, secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time)) *Database_TryInstallPendingOTPEnrollment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 []byte
+		if args[2] != nil {
+			arg2 = args[2].([]byte)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		var arg4 time.Time
+		if args[4] != nil {
+			arg4 = args[4].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryInstallPendingOTPEnrollment_Call) Return(b bool, err error) *Database_TryInstallPendingOTPEnrollment_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryInstallPendingOTPEnrollment_Call) RunAndReturn(run func(tx *sql.Tx, userId int64, secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error)) *Database_TryInstallPendingOTPEnrollment_Call {
 	_c.Call.Return(run)
 	return _c
 }

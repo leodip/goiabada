@@ -219,6 +219,8 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, user.Id).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
+	database.On("ClearPendingOTPEnrollment", otpDisableTx, user.Id).Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 	database.On("CommitTransaction", otpDisableTx).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
 	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
@@ -231,8 +233,11 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "update", "increment", "commit"}, calls,
-		"the enable write and the counter advance belong inside one transaction, commit last")
+	assert.Equal(t, []string{"begin", "update", "increment", "clear", "commit"}, calls,
+		"the enable write, the counter advance and the pending-enrolment clear belong inside one "+
+			"transaction, commit last. The clear is handed otpDisableTx rather than nil: committed "+
+			"on its own it would discard the pending seed even when the enable rolls back, and the "+
+			"caller would be left with a QR code the server no longer recognises (#247)")
 	assert.True(t, user.OTPEnabled)
 
 	// Part 1.3. The handler used to read the caller's own sid claim and flag that one session,

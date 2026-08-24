@@ -159,3 +159,12 @@ func (d *MsSQLDatabase) TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int
 func (d *MsSQLDatabase) ResetUserOTPStep(tx *sql.Tx, userId int64) error {
 	return d.CommonDB.ResetUserOTPStep(tx, userId)
 }
+
+func (d *MsSQLDatabase) TryInstallPendingOTPEnrollment(tx *sql.Tx, userId int64,
+	secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error) {
+	return d.CommonDB.TryInstallPendingOTPEnrollment(tx, userId, secretEncrypted, issuedAt, staleBefore)
+}
+
+func (d *MsSQLDatabase) ClearPendingOTPEnrollment(tx *sql.Tx, userId int64) error {
+	return d.CommonDB.ClearPendingOTPEnrollment(tx, userId)
+}

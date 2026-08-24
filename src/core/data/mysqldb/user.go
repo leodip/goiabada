@@ -2,6 +2,7 @@ package mysqldb
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/leodip/goiabada/core/models"
 )
@@ -109,4 +110,13 @@ func (d *MySQLDatabase) TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int
 
 func (d *MySQLDatabase) ResetUserOTPStep(tx *sql.Tx, userId int64) error {
 	return d.CommonDB.ResetUserOTPStep(tx, userId)
+}
+
+func (d *MySQLDatabase) TryInstallPendingOTPEnrollment(tx *sql.Tx, userId int64,
+	secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error) {
+	return d.CommonDB.TryInstallPendingOTPEnrollment(tx, userId, secretEncrypted, issuedAt, staleBefore)
+}
+
+func (d *MySQLDatabase) ClearPendingOTPEnrollment(tx *sql.Tx, userId int64) error {
+	return d.CommonDB.ClearPendingOTPEnrollment(tx, userId)
 }

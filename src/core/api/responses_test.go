@@ -36,6 +36,8 @@ var sensitiveUserFields = []string{
 	"PhoneNumberVerificationCodeIssuedAt",
 	"ForgotPasswordCodeEncrypted",
 	"ForgotPasswordCodeIssuedAt",
+	"OtpEnrollmentSecretEncrypted",
+	"OtpEnrollmentIssuedAt",
 }
 
 // This catches a sensitive field being added to UserResponse even before any
@@ -63,6 +65,7 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 	emailCodeEncrypted := []byte("SENTINEL-email-verification-code")
 	phoneCodeEncrypted := []byte("SENTINEL-phone-verification-code")
 	forgotCodeEncrypted := []byte("SENTINEL-forgot-password-code")
+	otpEnrollmentEncrypted := []byte("SENTINEL-otp-enrollment-key-url")
 
 	user := &models.User{
 		Id:                                   1,
@@ -76,6 +79,8 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 		PhoneNumberVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now(), Valid: true},
 		ForgotPasswordCodeEncrypted:          forgotCodeEncrypted,
 		ForgotPasswordCodeIssuedAt:           sql.NullTime{Time: time.Now(), Valid: true},
+		OtpEnrollmentSecretEncrypted:         otpEnrollmentEncrypted,
+		OtpEnrollmentIssuedAt:                sql.NullTime{Time: time.Now(), Valid: true},
 	}
 
 	resp := ToUserResponse(user)
@@ -90,7 +95,8 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 	assert.NotContains(t, payload, "SENTINEL-otp-secret-plaintext")
 
 	// Byte-slice secrets would serialize as base64, so check that encoding too.
-	for _, secret := range [][]byte{otpSecretEncrypted, emailCodeEncrypted, phoneCodeEncrypted, forgotCodeEncrypted} {
+	for _, secret := range [][]byte{otpSecretEncrypted, emailCodeEncrypted, phoneCodeEncrypted,
+		forgotCodeEncrypted, otpEnrollmentEncrypted} {
 		assert.NotContains(t, payload, string(secret))
 		assert.NotContains(t, payload, base64.StdEncoding.EncodeToString(secret))
 	}

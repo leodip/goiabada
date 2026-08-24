@@ -111,6 +111,20 @@ type Database interface {
 	// disabled: the marker belongs to the enrolled authenticator, and it is the only
 	// remedy if a clock jump strands the marker in the future (#111).
 	ResetUserOTPStep(tx *sql.Tx, userId int64) error
+	// TryInstallPendingOTPEnrollment records a TOTP enrollment the server has just
+	// issued, only if the user has no live one and no authenticator already, and
+	// reports whether this call installed it. Compare-and-set is what makes the
+	// issuing endpoint idempotent: concurrent requests all find nothing pending,
+	// exactly one wins, and the losers answer with the winner's seed rather than
+	// handing out a second QR code that invalidates the one already scanned. An
+	// existing value counts as replaceable when it is absent or was issued before
+	// staleBefore, which keeps the lifetime itself in the handler (#247).
+	TryInstallPendingOTPEnrollment(tx *sql.Tx, userId int64, secretEncrypted []byte,
+		issuedAt time.Time, staleBefore time.Time) (bool, error)
+	// ClearPendingOTPEnrollment returns the pending enrollment pair to NULL. Called
+	// inside the transaction that establishes the authenticator, so no committed
+	// state has OTP enabled with a live pending seed still installed (#247).
+	ClearPendingOTPEnrollment(tx *sql.Tx, userId int64) error
 	UserLoadGroups(tx *sql.Tx, user *models.User) error
 	UsersLoadGroups(tx *sql.Tx, users []models.User) error
 	UserLoadPermissions(tx *sql.Tx, user *models.User) error
