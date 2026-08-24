@@ -20,6 +20,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// assertNoStore requires the two cache header fields every rendered page carries. Read off
+// http.Response.Header, which is the snapshot the client receives, rather than the recorder's
+// live map (#247).
+func assertNoStore(t *testing.T, header http.Header) {
+	t.Helper()
+
+	assert.Equal(t, "no-store", header.Get("Cache-Control"))
+	assert.Equal(t, "no-cache", header.Get("Pragma"))
+}
+
 func TestInternalServerError(t *testing.T) {
 	templateFS := &mocks.TestFS{
 		FileContents: map[string]string{
@@ -46,14 +56,23 @@ func TestInternalServerError(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	// Every header assertion here reads the snapshot taken at WriteHeader, never the recorder's
+	// live map. The two disagree in exactly the case this test used to be blind to: a header set
+	// after the status is committed is dropped from the wire but still visible in w.Header(), so
+	// the Content-Type assertion below was green for a header the 500 page never sent (#247).
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
 	assert.Contains(t, w.Body.String(), "Error:")
 
 	// Check if the response contains a request ID
 	assert.Regexp(t, `Error: [a-zA-Z0-9/-]+`, w.Body.String(), "Response should contain a request ID")
 
 	// Check if the content type is set correctly
-	assert.Equal(t, "text/html; charset=UTF-8", w.Header().Get("Content-Type"))
+	assert.Equal(t, "text/html; charset=UTF-8", res.Header.Get("Content-Type"))
+
+	assertNoStore(t, res.Header)
 
 	// Ensure the response body is not empty
 	assert.NotEmpty(t, w.Body.String())
@@ -86,11 +105,15 @@ func TestRenderTemplate(t *testing.T) {
 
 		err := httpHelper.RenderTemplate(w, req, "layouts/layout.html", "page.html", data)
 
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+
 		assert.NoError(t, err)
-		assert.Equal(t, "text/html; charset=UTF-8", w.Header().Get("Content-Type"))
+		assert.Equal(t, "text/html; charset=UTF-8", res.Header.Get("Content-Type"))
+		assertNoStore(t, res.Header)
 		assert.Contains(t, w.Body.String(), "Hello, John!")
 		assert.Contains(t, w.Body.String(), "Status:")
-		assert.Equal(t, http.StatusOK, w.Code) // Default status should be 200 OK
+		assert.Equal(t, http.StatusOK, res.StatusCode) // Default status should be 200 OK
 	})
 
 	t.Run("With _httpStatus", func(t *testing.T) {
@@ -108,11 +131,43 @@ func TestRenderTemplate(t *testing.T) {
 
 		err := httpHelper.RenderTemplate(w, req, "layouts/layout.html", "page.html", data)
 
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+
 		assert.NoError(t, err)
-		assert.Equal(t, "text/html; charset=UTF-8", w.Header().Get("Content-Type"))
+		assert.Equal(t, "text/html; charset=UTF-8", res.Header.Get("Content-Type"))
+		assertNoStore(t, res.Header)
 		assert.Contains(t, w.Body.String(), "Hello, Jane!")
 		assert.Contains(t, w.Body.String(), "Status: 201")
-		assert.Equal(t, http.StatusCreated, w.Code)
+		assert.Equal(t, http.StatusCreated, res.StatusCode)
+	})
+
+	// A failed render must leave the response completely untouched, so the caller's
+	// InternalServerError owns every header as well as the status. That is the property the
+	// placement of the Cache-Control write depends on: it sits after RenderTemplateToBuffer has
+	// returned successfully, and moving it above the error return would put a directive on a
+	// response this function never wrote a body for (#247).
+	t.Run("A failed render writes no headers at all", func(t *testing.T) {
+		emptyFS := &mocks.TestFS{FileContents: map[string]string{}}
+		failing := NewHttpHelper(emptyFS)
+
+		req := httptest.NewRequest("GET", "/", nil)
+		w := httptest.NewRecorder()
+
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{AppName: "TestApp", UITheme: "light"})
+		req = req.WithContext(ctx)
+
+		err := failing.RenderTemplate(w, req, "layouts/layout.html", "page.html", map[string]interface{}{})
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+
+		assert.Error(t, err)
+		assert.Empty(t, res.Header.Get("Content-Type"))
+		assert.Empty(t, res.Header.Get("Cache-Control"))
+		assert.Empty(t, res.Header.Get("Pragma"))
+		assert.Empty(t, w.Body.String())
 	})
 }
 

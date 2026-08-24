@@ -34,11 +34,16 @@ func (h *HttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request,
 	requestId := middleware.GetReqID(r.Context())
 	slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
 
-	w.WriteHeader(http.StatusInternalServerError)
-
-	// render the error in the UI
+	// The status travels in the bind map rather than through an early WriteHeader. Committing it
+	// first freezes the header map, so every header RenderTemplate sets afterwards is silently
+	// dropped: this page has been shipping without the Content-Type the helper writes, and would
+	// ship without the cache directives too. RenderTemplate writes the status from _httpStatus, and
+	// the http.Error fallback below still writes 500 when the render fails, so the answer is 500
+	// either way. It also makes this last-resort path obey the rule the form_post emitters state,
+	// that a failed render leaves the response untouched for whoever renders the error (#247).
 	err = h.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/error.html", map[string]interface{}{
-		"requestId": requestId,
+		"requestId":   requestId,
+		"_httpStatus": http.StatusInternalServerError,
 	})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to render the error page: %v", err.Error()), http.StatusInternalServerError)
@@ -54,6 +59,22 @@ func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layo
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	// Every page built from a template is dynamic, per-user UI, and several of them carry a
+	// credential: the password form, the OTP prompt, the enrolment page that shows the TOTP seed,
+	// and the consent screen. RFC 6749 section 5.1 makes both header fields a MUST for any response
+	// containing tokens, credentials, or other sensitive information, unqualified as to endpoint,
+	// and RFC 9111 section 4.2.2 says an origin server that wants to prevent caching has to say so
+	// explicitly: a 200 with no directives is heuristically cacheable and a cache may store it.
+	// Writing the pair here rather than in a middleware covers every render site in both modules by
+	// construction, and structurally cannot reach static assets, images, JWKS or discovery, which
+	// must stay cacheable.
+	//
+	// The position matters as much as the values. It is after RenderTemplateToBuffer has returned
+	// successfully, so a render that fails leaves the response completely untouched and the
+	// caller's InternalServerError still owns every header as well as the status (#247).
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
 
 	if data != nil && data["_httpStatus"] != nil {
 		httpStatus, ok := data["_httpStatus"].(int)
