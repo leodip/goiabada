@@ -64,10 +64,22 @@ func (c *Client) IsSystemLevelClient() bool {
 	return false
 }
 
-// IsPKCERequired returns whether PKCE is required for this client,
-// taking into account both the client-level override and global settings.
-// If the client has an explicit setting, it takes precedence over the global setting.
+// IsPKCERequired returns whether PKCE is required for this client.
+// A public client always requires PKCE, whatever the client-level override and the global
+// setting say. Otherwise the client-level override, when set, takes precedence over the
+// global setting.
+//
+// The public arm comes first because a public client presents no credential at the token
+// endpoint, so the code's binding to a verifier is the only thing tying the redemption back
+// to the ceremony that produced it. Without it an attacker who strips code_challenge from the
+// authorization request gets a code bound to nothing and can spend it against a client that
+// authenticates with nothing (RFC 9700 section 4.8.1). Removing this line reopens that, and it
+// reopens it silently: the two ways in are an explicit false override on a public client and a
+// nil column while the global setting is off, which is what /connect/register creates (#245).
 func (c *Client) IsPKCERequired(globalPKCERequired bool) bool {
+	if c.IsPublic {
+		return true
+	}
 	if c.PKCERequired != nil {
 		return *c.PKCERequired
 	}

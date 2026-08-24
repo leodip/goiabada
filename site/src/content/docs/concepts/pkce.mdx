@@ -37,6 +37,8 @@ If an attacker intercepts the authorization code, they cannot exchange it for to
 
 ## PKCE configuration in Goiabada
 
+Public clients always require PKCE and the settings below cannot turn that off; they govern confidential clients.
+
 Goiabada supports configurable PKCE enforcement at two levels:
 
 ### Global setting
@@ -44,23 +46,23 @@ Goiabada supports configurable PKCE enforcement at two levels:
 The global PKCE setting determines the default behavior for all clients. This can be configured in **Settings → General** in the admin console.
 
 - **PKCE required (default)** - All authorization code flows must use PKCE. This is the OAuth 2.1 recommendation and provides the strongest security.
-- **PKCE optional** - Clients can choose whether to use PKCE. When provided, PKCE parameters are validated strictly.
+- **PKCE optional** - Confidential clients can choose whether to use PKCE. When provided, PKCE parameters are validated strictly.
 
 ### Per-client override
 
-Individual clients can override the global setting. This is configured in the client settings under **Clients → [Client Name] → Settings**.
+Individual confidential clients can override the global setting. This is configured in the client settings under **Clients → [Client Name] → OAuth2 flows**.
 
 - **Use global setting** - Inherits the global PKCE configuration
 - **PKCE required** - This client must always use PKCE, regardless of global setting
-- **PKCE not required** - This client can skip PKCE, regardless of global setting
+- **PKCE not required** - This confidential client can skip PKCE, regardless of global setting
 
 <Aside type="tip">
-The per-client override is useful when migrating legacy applications. You can keep PKCE required globally while allowing specific legacy clients to operate without PKCE until they can be updated.
+The per-client override is useful when migrating legacy applications. You can keep PKCE required globally while allowing specific legacy confidential clients to operate without PKCE until they can be updated.
 </Aside>
 
 ## When to make PKCE optional
 
-The OAuth 2.1 specification recommends PKCE for all authorization code flows. However, there are scenarios where you might need to make it optional:
+The OAuth 2.1 specification recommends PKCE for all authorization code flows. However, there are scenarios where you might need to make it optional for a confidential client:
 
 - **Legacy client compatibility** - Older OAuth libraries that don't support PKCE
 - **Third-party integrations** - External applications that cannot be modified

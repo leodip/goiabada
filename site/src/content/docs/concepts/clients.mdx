@@ -178,7 +178,7 @@ Three limits apply:
 
 - **`http` only.** An `https` loopback URI still requires an exact match, since RFC 8252 defines loopback redirects as using `http`.
 - **`response_type=code` only.** The implicit flow gets no port flexibility, because it returns tokens directly in the redirect and interception cannot be mitigated.
-- **PKCE is required for public native clients.** Port flexibility widens the set of local ports that may receive an authorization code, and PKCE is what makes an intercepted code useless. Enable it globally under **Settings** → **General** → *PKCE required for authorization code flow*, or per client under the client's **OAuth2 flows** page. See [PKCE](/concepts/pkce/).
+- **PKCE is required for public native clients.** Port flexibility widens the set of local ports that may receive an authorization code, and PKCE is what makes an intercepted code useless. It is enforced for every public client and cannot be turned off; the global and per-client settings govern confidential clients. See [PKCE](/concepts/pkce/).
 
 If the client registers itself through [dynamic client registration](#dynamic-client-registration-rfc-7591) rather than being created in the admin console, additional restrictions apply to its redirect URIs. See [Redirect URI rules](#redirect-uri-rules).
 

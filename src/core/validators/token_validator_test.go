@@ -2573,15 +2573,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "nil_session_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		refreshTokenJwt := &oauth.JwtToken{
@@ -2638,15 +2643,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "invalid_session_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		refreshTokenJwt := &oauth.JwtToken{
@@ -2707,15 +2717,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "expired_offline_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		pastTime := time.Now().UTC().Add(-24 * time.Hour)
@@ -2769,15 +2784,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "invalid_offline_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		refreshTokenJwt := &oauth.JwtToken{
@@ -2826,15 +2846,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "invalid_typ_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		refreshTokenJwt := &oauth.JwtToken{
@@ -2885,16 +2910,21 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "invalid_scope_refresh_token",
 			Scope:        "openid profile email address", // 'address' is not in original scopes
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		refreshTokenJwt := &oauth.JwtToken{
@@ -2957,15 +2987,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "valid_offline_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 			ConsentRequired:          true,
 		}
 
@@ -3028,15 +3063,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "valid_offline_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 			ConsentRequired:          true,
 		}
 
@@ -3102,16 +3142,21 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "valid_refresh_token",
 			Scope:        "openid srv1:read", // Reduced scope (should be allowed)
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		refreshTokenJwt := &oauth.JwtToken{
@@ -3178,15 +3223,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "revoked_consent_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 			ConsentRequired:          true,
 		}
 
@@ -3256,15 +3306,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "partial_consent_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 			ConsentRequired:          true,
 		}
 
@@ -3341,15 +3396,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "revoked_permission_refresh_token",
 		}
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		refreshTokenJwt := &oauth.JwtToken{
@@ -3409,7 +3469,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *testing.T) {
 	// When PKCE was NOT used during authorization and no code_verifier is provided,
-	// the token request should succeed
+	// the token request should succeed.
+	//
+	// The fixture is CONFIDENTIAL, and it used to be public (#245). The no-PKCE success
+	// case remains valid, but only for a client that authenticates: a public client is
+	// now refused a challenge-less code, which is what the _PublicClient_Fails
+	// counterpart below asserts.
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_oauth.NewTokenParser(t)
 	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3422,16 +3487,21 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
 		ClientId:     "client1",
+		ClientSecret: "client_secret",
 		Code:         "valid_code",
 		RedirectURI:  "https://example.com/callback",
 		CodeVerifier: "", // No code_verifier provided
 	}
 
+	clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+	require.NoError(t, err)
+
 	client := &models.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		IsPublic:                 true,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
 	// Code entity has NO code_challenge stored (PKCE was not used)
@@ -3465,7 +3535,12 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 
 func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.T) {
 	// When PKCE was NOT used during authorization but code_verifier IS provided,
-	// this should fail (strict mode)
+	// this should fail (strict mode). This is the PKCE downgrade guard RFC 9700 section
+	// 2.1.1 requires.
+	//
+	// The fixture is CONFIDENTIAL, and it used to be public (#245). It has to be: a public
+	// client presenting a challenge-less code is now refused above this guard, so a public
+	// fixture would pass on the wrong refusal and stop covering the downgrade guard at all.
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_oauth.NewTokenParser(t)
 	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3478,16 +3553,21 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
 		ClientId:     "client1",
+		ClientSecret: "client_secret",
 		Code:         "valid_code",
 		RedirectURI:  "https://example.com/callback",
 		CodeVerifier: "some_code_verifier", // code_verifier provided but PKCE was not used
 	}
 
+	clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+	require.NoError(t, err)
+
 	client := &models.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		IsPublic:                 true,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
 	// Code entity has NO code_challenge stored (PKCE was not used)
@@ -3707,7 +3787,10 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 }
 
 func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *testing.T) {
-	// When code_challenge is an empty string with Valid=true, it should be treated as no PKCE
+	// When code_challenge is an empty string with Valid=true, it should be treated as no PKCE.
+	//
+	// Confidential for the same reason as the test above (#245): treating empty as no PKCE
+	// still means success for a client that authenticates, and refusal for one that does not.
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_oauth.NewTokenParser(t)
 	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3720,16 +3803,21 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
 		ClientId:     "client1",
+		ClientSecret: "client_secret",
 		Code:         "valid_code",
 		RedirectURI:  "https://example.com/callback",
 		CodeVerifier: "", // No code_verifier
 	}
 
+	clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+	require.NoError(t, err)
+
 	client := &models.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		IsPublic:                 true,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
 	// Code entity has empty string code_challenge (edge case)
@@ -3760,6 +3848,250 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, codeEntity, result.CodeEntity)
+}
+
+// =============================================================================
+// Public clients always use PKCE (#245) - the redemption half of the mandate
+// =============================================================================
+
+// publicClientChallengelessCode builds the fixture the four tests below share: a public
+// client, and a code whose stored challenge is whatever the caller passes. Everything
+// else is an ordinary, valid authorization code redemption, so the only thing any row
+// here can be refused for is the rule under test.
+func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString, isPublic bool) (
+	*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+	t.Helper()
+
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+	client := &models.Client{
+		Id:                       1,
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 isPublic,
+	}
+
+	codeEntity := &models.Code{
+		CodeHash:      "hash_of_valid_code",
+		RedirectURI:   "https://example.com/callback",
+		ClientId:      1,
+		CodeChallenge: storedChallenge,
+		Client:        models.Client{ClientIdentifier: "client1"},
+		User:          models.User{Id: 7, Enabled: true},
+		CreatedAt:     sql.NullTime{Time: time.Now().UTC(), Valid: true},
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).
+		Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+	input := &ValidateTokenRequestInput{
+		GrantType:   "authorization_code",
+		ClientId:    "client1",
+		Code:        "valid_code",
+		RedirectURI: "https://example.com/callback",
+	}
+
+	return validator, input, ctx
+}
+
+func TestValidateTokenRequest_PKCE_NoPKCEUsed_PublicClient_Fails(t *testing.T) {
+	// The defect #245 is about. A public client presents nothing at this endpoint, so a
+	// code carrying no challenge is bound to nothing and whoever holds it gets the tokens.
+	validator, input, ctx := publicClientChallengelessCode(t, sql.NullString{Valid: false}, true)
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Contains(t, customErr.GetDescription(), "public clients are required to use PKCE")
+	}
+}
+
+func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_PublicClient_Fails(t *testing.T) {
+	// Varies exactly one field from the row above: Valid is true and the string is empty.
+	// Without this row a predicate written as !CodeChallenge.Valid, with no != "" beside
+	// it, passes every other new case while still accepting a challenge-less grant.
+	validator, input, ctx := publicClientChallengelessCode(t,
+		sql.NullString{String: "", Valid: true}, true)
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Contains(t, customErr.GetDescription(), "public clients are required to use PKCE")
+	}
+}
+
+// publicClientChallengelessRefresh is the refresh-arm counterpart of the helper above: an
+// auth code flow refresh token whose code carries the challenge the caller passes. The
+// grant is otherwise entirely valid, so the accepted row proves the fixture reaches the
+// end of the arm rather than stopping somewhere harmless on the way.
+func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullString, isPublic bool) (
+	*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+	t.Helper()
+
+	const grantUserId = int64(7)
+
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+		UserSessionIdleTimeoutInSeconds: 3600,
+		UserSessionMaxLifetimeInSeconds: 86400,
+	})
+
+	client := &models.Client{
+		Id:                       1,
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 isPublic,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "refresh_token",
+		ClientId:     "client1",
+		RefreshToken: "the-refresh-token",
+	}
+
+	if !isPublic {
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
+		client.ClientSecretEncrypted = clientSecretEncrypted
+		input.ClientSecret = "client_secret"
+	}
+
+	user := models.User{Id: grantUserId, Enabled: true}
+	refreshToken := &models.RefreshToken{
+		RefreshTokenJti:   "the-jti",
+		SessionIdentifier: "sid-1",
+		CodeId:            sql.NullInt64{Int64: 5, Valid: true}, // auth code flow token
+		Code: models.Code{
+			Id:                5,
+			ClientId:          1,
+			UserId:            grantUserId,
+			Scope:             "openid",
+			SessionIdentifier: "sid-1",
+			CodeChallenge:     storedChallenge,
+			User:              user,
+		},
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
+	mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+		Return(&oauth.JwtToken{Claims: jwt.MapClaims{
+			"jti": "the-jti", "typ": "Refresh", "sub": "user_subject",
+		}}, nil)
+	mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
+	mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
+	mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+	// Only the accepted row reaches these two.
+	now := time.Now().UTC()
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
+		Return(&models.UserSession{
+			Id: 9, SessionIdentifier: "sid-1", UserId: grantUserId,
+			Started: now.Add(-10 * time.Minute), LastAccessed: now,
+		}, nil).Maybe()
+	mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil).Maybe()
+
+	return validator, input, ctx
+}
+
+func TestValidateTokenRequest_RefreshToken_NoPKCEUsed_PublicClient_Fails(t *testing.T) {
+	// The durable half of the exposure. A code lives 60 seconds; a refresh token descended
+	// from a challenge-less code keeps minting access tokens for the life of the grant.
+	validator, input, ctx := publicClientChallengelessRefresh(t, sql.NullString{Valid: false}, true)
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Contains(t, customErr.GetDescription(), "public clients are required to use PKCE")
+	}
+}
+
+func TestValidateTokenRequest_RefreshToken_EmptyStringCodeChallenge_PublicClient_Fails(t *testing.T) {
+	// The refresh arm's empty-string row, for the reason the redemption arm has one: the
+	// rule is "absent OR empty", and a .Valid-only predicate would pass every other case.
+	validator, input, ctx := publicClientChallengelessRefresh(t,
+		sql.NullString{String: "", Valid: true}, true)
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Contains(t, customErr.GetDescription(), "public clients are required to use PKCE")
+	}
+}
+
+func TestValidateTokenRequest_RefreshToken_NoPKCEUsed_ConfidentialClient_Succeeds(t *testing.T) {
+	// The positive control, and the row that pins the rule on IsPublic rather than on the
+	// PKCE requirement: the same challenge-less grant still refreshes for a client that
+	// authenticates, because the secret is what binds the redemption.
+	validator, input, ctx := publicClientChallengelessRefresh(t, sql.NullString{Valid: false}, false)
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testing.T) {
+	// Decision 11's symmetry, the refresh_token arm. The authorization_code arm has always
+	// refused a superfluous secret from a public client; this arm used to ignore it.
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+	client := &models.Client{
+		Id:                       1,
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 true,
+	}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+		GrantType:    "refresh_token",
+		ClientId:     "client1",
+		ClientSecret: "a_secret_this_client_does_not_have",
+		RefreshToken: "the-refresh-token",
+	})
+
+	assert.Nil(t, result)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_request", customErr.GetCode())
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Contains(t, customErr.GetDescription(), "remove the client_secret from your request")
+	}
+	// The strict mock is the second assertion: the refusal answers before the refresh token
+	// is ever parsed or looked up.
 }
 
 // =============================================================================
@@ -4021,6 +4353,52 @@ func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 	assert.Equal(t, "invalid_request", customErr.GetCode())
 	assert.Equal(t, "Missing required password parameter.", customErr.GetDescription())
 	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
+	// Decision 11's symmetry, the password arm. Its own branch, independent of the
+	// refresh_token arm's, so neutralising one leaves the other proving itself (#245).
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	// Username and password are both present, so nothing above the rejection can answer.
+	input := &ValidateTokenRequestInput{
+		GrantType:    "password",
+		ClientId:     "ropc-client",
+		ClientSecret: "a_secret_this_client_does_not_have",
+		Username:     "user@example.com",
+		Password:     "the-password",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_request", customErr.GetCode())
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Contains(t, customErr.GetDescription(), "remove the client_secret from your request")
+	}
+	// The strict mock is the second assertion: the refusal answers before the resource
+	// owner's credentials are ever looked up, so no rate-limited guess is spent on it.
 }
 
 func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
@@ -5000,9 +5378,17 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
 
+				// Confidential, with a secret, because the subject here is the generation
+				// boundary and nothing else. It was public only to sidestep the secret
+				// check, and a public client with a challenge-less code is now refused
+				// before the generation check is ever reached (#245).
+				clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+				require.NoError(t, err)
+
 				client := &models.Client{
 					Id: 1, ClientIdentifier: "test_client", Enabled: true,
-					AuthorizationCodeEnabled: true, IsPublic: true,
+					AuthorizationCodeEnabled: true, IsPublic: false,
+					ClientSecretEncrypted: clientSecretEncrypted,
 				}
 				code := &models.Code{
 					Id: 5, ClientId: 1, UserId: 7,
@@ -5022,10 +5408,11 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 
 				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
-					GrantType:   "authorization_code",
-					ClientId:    "test_client",
-					Code:        "the-code",
-					RedirectURI: "https://example.com/cb",
+					GrantType:    "authorization_code",
+					ClientId:     "test_client",
+					ClientSecret: "client_secret",
+					Code:         "the-code",
+					RedirectURI:  "https://example.com/cb",
 				})
 
 				if tc.wantAccepted {
@@ -5073,9 +5460,16 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 					UserSessionMaxLifetimeInSeconds: 86400,
 				})
 
+				// Confidential for the same reason as the redemption case above: the
+				// subject is the generation boundary, and a public client whose grant
+				// descends from a challenge-less code is now refused before it (#245).
+				clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+				require.NoError(t, err)
+
 				client := &models.Client{
 					Id: 1, ClientIdentifier: "test_client", Enabled: true,
-					AuthorizationCodeEnabled: true, IsPublic: true,
+					AuthorizationCodeEnabled: true, IsPublic: false,
+					ClientSecretEncrypted: clientSecretEncrypted,
 				}
 				user := models.User{Id: 7, Enabled: true, AuthStateGeneration: tc.userGeneration}
 				refreshToken := &models.RefreshToken{
@@ -5113,6 +5507,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 					GrantType:    "refresh_token",
 					ClientId:     "test_client",
+					ClientSecret: "client_secret",
 					RefreshToken: "the-refresh-token",
 				})
 
@@ -5296,9 +5691,13 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			validator, mockDB, _ := newValidator(t)
 			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
 
+			clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+			require.NoError(t, err)
+
 			client := &models.Client{
 				Id: 1, ClientIdentifier: "test_client", Enabled: true,
-				AuthorizationCodeEnabled: true, IsPublic: true,
+				AuthorizationCodeEnabled: true, IsPublic: false,
+				ClientSecretEncrypted: clientSecretEncrypted,
 			}
 			code := &models.Code{
 				Id: 5, ClientId: 1, UserId: 7,
@@ -5316,10 +5715,11 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
-				GrantType:   "authorization_code",
-				ClientId:    "test_client",
-				Code:        "the-code",
-				RedirectURI: "https://example.com/cb",
+				GrantType:    "authorization_code",
+				ClientId:     "test_client",
+				ClientSecret: "client_secret",
+				Code:         "the-code",
+				RedirectURI:  "https://example.com/cb",
 			})
 
 			assert.Nil(t, result)
@@ -5337,9 +5737,13 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			validator, mockDB, _ := newValidator(t)
 			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
 
+			clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+			require.NoError(t, err)
+
 			client := &models.Client{
 				Id: 1, ClientIdentifier: "test_client", Enabled: true,
-				AuthorizationCodeEnabled: true, IsPublic: true,
+				AuthorizationCodeEnabled: true, IsPublic: false,
+				ClientSecretEncrypted: clientSecretEncrypted,
 			}
 			code := &models.Code{
 				Id: 5, ClientId: 1, UserId: 7,
@@ -5357,10 +5761,11 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
-				GrantType:   "authorization_code",
-				ClientId:    "test_client",
-				Code:        "the-code",
-				RedirectURI: "https://example.com/cb",
+				GrantType:    "authorization_code",
+				ClientId:     "test_client",
+				ClientSecret: "client_secret",
+				Code:         "the-code",
+				RedirectURI:  "https://example.com/cb",
 			})
 
 			assert.NoError(t, err)
@@ -5511,9 +5916,13 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			validator, mockDB, _ := newValidator(t)
 			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
 
+			clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+			require.NoError(t, err)
+
 			client := &models.Client{
 				Id: 1, ClientIdentifier: "test_client", Enabled: true,
-				AuthorizationCodeEnabled: true, IsPublic: true,
+				AuthorizationCodeEnabled: true, IsPublic: false,
+				ClientSecretEncrypted: clientSecretEncrypted,
 			}
 			code := &models.Code{
 				Id: 5, ClientId: 1, UserId: 7,
@@ -5534,10 +5943,11 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
-				GrantType:   "authorization_code",
-				ClientId:    "test_client",
-				Code:        "the-code",
-				RedirectURI: "https://example.com/cb",
+				GrantType:    "authorization_code",
+				ClientId:     "test_client",
+				ClientSecret: "client_secret",
+				Code:         "the-code",
+				RedirectURI:  "https://example.com/cb",
 			})
 
 			assert.Nil(t, result)
@@ -5553,10 +5963,19 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		// Fixtures shared by the three rows below. An OFFLINE token deliberately: the typ
 		// switch's Offline branch never consults the session, so this is the case the
 		// pre-existing checks cannot reach and the marker exists for.
+		//
+		// CONFIDENTIAL, and it used to be public (#245). The subject of these rows is the
+		// code marker, and the code they build carries no challenge, so a public client
+		// would now be refused by the PKCE boundary immediately below the marker check and
+		// every row here would pass for the wrong reason.
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
+
 		build := func(revoked bool, clientIdOnCode int64) (*models.Client, *models.RefreshToken, models.User) {
 			client := &models.Client{
 				Id: 1, ClientIdentifier: "test_client", Enabled: true,
-				AuthorizationCodeEnabled: true, IsPublic: true,
+				AuthorizationCodeEnabled: true, IsPublic: false,
+				ClientSecretEncrypted: clientSecretEncrypted,
 			}
 			user := models.User{Id: 7, Enabled: true}
 			refreshToken := &models.RefreshToken{
@@ -5595,6 +6014,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
 				ClientId:     "test_client",
+				ClientSecret: "client_secret",
 				RefreshToken: "the-refresh-token",
 			})
 
@@ -5634,6 +6054,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
 				ClientId:     "test_client",
+				ClientSecret: "client_secret",
 				RefreshToken: "the-refresh-token",
 			})
 
@@ -5659,6 +6080,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
 				ClientId:     "test_client",
+				ClientSecret: "client_secret",
 				RefreshToken: "the-refresh-token",
 			})
 
@@ -5748,12 +6170,19 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
+		// Confidential, and it used to be public (#245). The subject is session ownership,
+		// and the grant's code carries no challenge, so a public client would now be refused
+		// by the PKCE boundary before the session is ever looked up.
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
+
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		refreshTokenJwt := &oauth.JwtToken{
@@ -5801,6 +6230,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
+			ClientSecret: "client_secret",
 			RefreshToken: "ownership_refresh_token",
 		}
 
@@ -5871,12 +6301,19 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
 
+		// Confidential, and it used to be public (#245). The subject is the code's session
+		// ownership, and the code carries no challenge, so a public client would now be
+		// refused by the PKCE boundary before the session is ever looked up.
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
+
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		codeEntity := &models.Code{
@@ -5911,10 +6348,11 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		}
 
 		input := &ValidateTokenRequestInput{
-			GrantType:   "authorization_code",
-			ClientId:    "client1",
-			Code:        "valid_code",
-			RedirectURI: "https://example.com/callback",
+			GrantType:    "authorization_code",
+			ClientId:     "client1",
+			ClientSecret: "client_secret",
+			Code:         "valid_code",
+			RedirectURI:  "https://example.com/callback",
 		}
 
 		return validator, input, ctx
@@ -6011,12 +6449,19 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
 
+		// Confidential, and it used to be public (#245). The subject is the offline grant's
+		// session ownership, and its code carries no challenge, so a public client would now
+		// be refused by the PKCE boundary before any of these rows could measure anything.
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
+
 		client := &models.Client{
 			Id:                       1,
 			ClientIdentifier:         "test_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			IsPublic:                 true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 		user := models.User{Id: grantUserId, Enabled: true}
 
@@ -6071,6 +6516,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "test_client",
+			ClientSecret: "client_secret",
 			RefreshToken: "the-refresh-token",
 		}
 

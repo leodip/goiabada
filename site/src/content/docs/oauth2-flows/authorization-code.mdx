@@ -179,11 +179,11 @@ Refresh tokens are always issued in the authorization code flow. Including the `
    - **Confidential** for server-side web apps
 3. Enable **Authorization Code** flow in OAuth2 flows settings
 4. Register your **Redirect URIs**
-5. Configure **PKCE requirement** (recommended: required)
+5. Configure the **PKCE requirement** for a confidential client (public clients always require PKCE)
 
 ### PKCE configuration
 
-PKCE can be configured at two levels:
+For confidential clients, PKCE can be configured at two levels:
 
 - **Global**: Settings → General → PKCE Required
 - **Per-client**: Clients → [Client] → OAuth2 Flows → PKCE

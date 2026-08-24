@@ -54,7 +54,7 @@ For full documentation, see `site/` (Astro-based docs site).
 ### Authorization Code (with PKCE)
 Primary flow for web/mobile apps. User authenticates via browser, receives code, exchanges for tokens.
 - Endpoint: `GET /auth/authorize` → `POST /auth/token` (grant_type=authorization_code)
-- PKCE: Configurable globally (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
+- PKCE: always required for a public client; otherwise configurable globally (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
 - Supports `response_type=code` with optional `code_challenge` + `code_challenge_method`
 - Implementation: `handler_authorize.go`, `handler_token.go`, `oauth/code_issuer.go`
 
