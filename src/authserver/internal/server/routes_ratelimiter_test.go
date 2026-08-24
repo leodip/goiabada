@@ -93,6 +93,10 @@ const (
 	// A well-formed base32 TOTP secret, so the code the OTP case submits is refused for
 	// being wrong rather than for the secret being unreadable.
 	routesTestOTPSecret = "JBSWY3DPEHPK3PXP"
+	// The ceremony carries the key as its otpauth:// URL and derives the secret from it,
+	// so the cookie has to hold one the handler can parse (#247).
+	routesTestOTPKeyURL = "otpauth://totp/Goiabada:routes@example.com" +
+		"?algorithm=SHA1&digits=6&issuer=Goiabada&period=30&secret=" + routesTestOTPSecret
 )
 
 // withRateLimiterEnabled turns the limiter on for the duration of the test and restores the
@@ -219,8 +223,7 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 		CeremonyId: routesTestCeremonyId,
 		UserId:     1,
 		ClientId:   routesTestClientId,
-		OTPSecret:  routesTestOTPSecret,
-		OTPImage:   "base64-image",
+		OTPKeyURL:  routesTestOTPKeyURL,
 	})
 	assert.NoError(t, err)
 
