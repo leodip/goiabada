@@ -1091,6 +1091,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 		database.On("IncrementUserOtpConfigGeneration", otpEnrolTx, int64(1)).Return(int64(6), nil).
 			Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
+		database.On("ClearPendingOTPEnrollment", otpEnrolTx, int64(1)).Return(nil).
+			Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 		database.On("CommitTransaction", otpEnrolTx).Return(nil).
 			Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
 		database.On("RollbackTransaction", otpEnrolTx).Return(nil).Once()
@@ -1125,8 +1127,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/completed", rr.Header().Get("Location"))
 
-		assert.Equal(t, []string{"begin", "update", "increment", "commit"}, calls,
-			"the enable write and the counter advance belong inside one transaction, commit last")
+		assert.Equal(t, []string{"begin", "update", "increment", "clear", "commit"}, calls,
+			"the enable write, the counter advance and the pending-enrolment clear belong inside "+
+				"one transaction, commit last. The clear is handed otpEnrolTx rather than nil: on "+
+				"a nil transaction it would commit on its own, and a rolled back enrolment would "+
+				"discard a pending seed the account API still owes the user (#247)")
 
 		assert.Empty(t, authContext.OTPKeyURL,
 			"a successful enrolment must leave no copy of the key on the ceremony")
@@ -1265,11 +1270,15 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Return(int64(0), incrementError).Once()
 		database.On("RollbackTransaction", otpEnrolTx).Return(nil).Once()
 
+		// The clear sits after the increment inside the transaction, so a failed increment must
+		// stop before it. Asserted below rather than stubbed here.
+
 		httpHelper.On("InternalServerError", rr, req, incrementError).Return()
 
 		handler.ServeHTTP(rr, req)
 
 		database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+		database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything)
 		// Nothing is audited as an enrollment that did not happen, and the ceremony does not
 		// advance: no auth method is added and no context is saved.
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)

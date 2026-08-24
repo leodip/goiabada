@@ -43,7 +43,11 @@ func TestReencryptDataToNewKey(t *testing.T) {
 		otpSeed    = "JBSWY3DPEHPK3PXP"
 		emailCode  = "email-verif-code"
 		preRegCode = "prereg-verif-code"
-		pemPlain   = "-----BEGIN RSA PRIVATE KEY-----\nMIIabc123fakepemcontent\n-----END RSA PRIVATE KEY-----\n"
+		// The pending TOTP enrolment (#247). It joins aesProtectedColumns, which is an
+		// enumeration nothing derives, so a column missing from that list survives a key change
+		// as ciphertext decryptable only under the retired key.
+		otpEnrolment = "otpauth://totp/Goiabada:u@example.com?secret=JBSWY3DPEHPK3PXP"
+		pemPlain     = "-----BEGIN RSA PRIVATE KEY-----\nMIIabc123fakepemcontent\n-----END RSA PRIVATE KEY-----\n"
 	)
 
 	// settings: legacy key present + an encrypted SMTP password.
@@ -70,6 +74,7 @@ func TestReencryptDataToNewKey(t *testing.T) {
 		PasswordHash:                   "x",
 		OTPSecretEncrypted:             encOld(otpSeed),
 		EmailVerificationCodeEncrypted: encOld(emailCode),
+		OtpEnrollmentSecretEncrypted:   encOld(otpEnrolment),
 	}
 	if err := db.CreateUser(nil, user); err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -134,6 +139,7 @@ func TestReencryptDataToNewKey(t *testing.T) {
 	}
 	mustDecryptNew("users.otp_secret", gotUser.OTPSecretEncrypted, otpSeed)
 	mustDecryptNew("users.email_verification_code", gotUser.EmailVerificationCodeEncrypted, emailCode)
+	mustDecryptNew("users.otp_enrollment_secret", gotUser.OtpEnrollmentSecretEncrypted, otpEnrolment)
 
 	gotPreReg, err := db.GetPreRegistrationById(nil, preReg.Id)
 	if err != nil {

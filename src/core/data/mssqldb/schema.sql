@@ -368,6 +368,8 @@ CREATE TABLE [users] (
     [last_otp_step] BIGINT NOT NULL CONSTRAINT [df_users_last_otp_step] DEFAULT 0,
     [forgot_password_code_hash] NVARCHAR(64) NOT NULL CONSTRAINT [df_users_forgot_password_code_hash] DEFAULT '',
     [otp_config_generation] BIGINT NOT NULL CONSTRAINT [df_users_otp_config_generation] DEFAULT 0,
+    [otp_enrollment_secret_encrypted] VARBINARY(MAX) NULL,
+    [otp_enrollment_issued_at] DATETIME2(6) NULL,
     CONSTRAINT [PK_users] PRIMARY KEY ([id])
 );
 

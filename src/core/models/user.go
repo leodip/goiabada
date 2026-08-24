@@ -84,10 +84,36 @@ type User struct {
 	// column in the ordinary update set would let a stale model regress the counter and
 	// silently discharge every session's obligation. It advances only through
 	// IncrementUserOtpConfigGeneration.
-	OtpConfigGeneration int64           `db:"otp_config_generation" fieldtag:"dont-update"`
-	Groups              []Group         `db:"-"`
-	Permissions         []Permission    `db:"-"`
-	Attributes          []UserAttribute `db:"-"`
+	OtpConfigGeneration int64 `db:"otp_config_generation" fieldtag:"dont-update"`
+	// OtpEnrollmentSecretEncrypted is the AES-GCM ciphertext of a TOTP enrolment the server
+	// has issued but the user has not yet confirmed, and OtpEnrollmentIssuedAt is when it was
+	// issued. NULL in both means no enrolment is pending, which is the state of every user who
+	// is not part way through one. They are the fourth pending-credential pair on this table,
+	// in the same shape as email verification, phone verification and forgot password, and
+	// they are cleared the moment the authenticator is established.
+	//
+	// **The ciphertext is the whole otpauth:// URL, not the base32 seed the column is named
+	// for.** The enrolment endpoint has to answer a repeat call with the same QR image, and
+	// the image can only be rendered from the URL: otp.RenderQRCodeImage parses an otpauth://
+	// URL and refuses a bare secret, and nothing rebuilds a URL from one. The seed comes off
+	// the URL with otp.SecretFromKeyURL wherever it is needed, so there is one stored value
+	// rather than two that could disagree (#247).
+	//
+	// Both are tagged dont-update for the reason AuthStateGeneration, LastOTPStep and
+	// OtpConfigGeneration are, and the hazard is the pair's whole purpose. UpdateUser writes
+	// every field not tagged pk or dont-update, and fourteen production sites load a user and
+	// later write it back, EnableUserOTPTx among them. In the ordinary update set, two
+	// concurrent enrolment requests would each see no pending value, issue different seeds and
+	// leave only the last one usable, which is exactly the reload bug these columns exist to
+	// close; and any later full-row write from a model loaded before issuance would erase or
+	// resurrect the pending seed. They move only through TryInstallPendingOTPEnrollment and
+	// ClearPendingOTPEnrollment.
+	OtpEnrollmentSecretEncrypted []byte       `db:"otp_enrollment_secret_encrypted" fieldtag:"dont-update"`
+	OtpEnrollmentIssuedAt        sql.NullTime `db:"otp_enrollment_issued_at" fieldtag:"dont-update"`
+
+	Groups      []Group         `db:"-"`
+	Permissions []Permission    `db:"-"`
+	Attributes  []UserAttribute `db:"-"`
 }
 
 // SetOTPSecret encrypts the TOTP seed at rest (AES-256-GCM, via the process

@@ -2,6 +2,7 @@ package sqlitedb
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/leodip/goiabada/core/models"
 )
@@ -109,4 +110,13 @@ func (d *SQLiteDatabase) TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step in
 
 func (d *SQLiteDatabase) ResetUserOTPStep(tx *sql.Tx, userId int64) error {
 	return d.CommonDB.ResetUserOTPStep(tx, userId)
+}
+
+func (d *SQLiteDatabase) TryInstallPendingOTPEnrollment(tx *sql.Tx, userId int64,
+	secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error) {
+	return d.CommonDB.TryInstallPendingOTPEnrollment(tx, userId, secretEncrypted, issuedAt, staleBefore)
+}
+
+func (d *SQLiteDatabase) ClearPendingOTPEnrollment(tx *sql.Tx, userId int64) error {
+	return d.CommonDB.ClearPendingOTPEnrollment(tx, userId)
 }

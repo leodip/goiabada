@@ -817,7 +817,9 @@ CREATE TABLE public.users (
     auth_state_generation bigint DEFAULT 0 NOT NULL,
     last_otp_step bigint DEFAULT 0 NOT NULL,
     forgot_password_code_hash character varying(64) DEFAULT ''::character varying NOT NULL,
-    otp_config_generation bigint DEFAULT 0 NOT NULL
+    otp_config_generation bigint DEFAULT 0 NOT NULL,
+    otp_enrollment_secret_encrypted bytea,
+    otp_enrollment_issued_at timestamp(6) without time zone
 );
 
 

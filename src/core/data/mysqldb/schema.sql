@@ -177,6 +177,8 @@ CREATE TABLE `users` (
   `last_otp_step` bigint NOT NULL DEFAULT 0,
   `forgot_password_code_hash` varchar(64) NOT NULL DEFAULT '',
   `otp_config_generation` bigint NOT NULL DEFAULT 0,
+  `otp_enrollment_secret_encrypted` longblob,
+  `otp_enrollment_issued_at` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_subject` (`subject`),
   UNIQUE KEY `idx_email` (`email`),

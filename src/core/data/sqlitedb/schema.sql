@@ -102,7 +102,7 @@ CREATE TABLE users (
   forgot_password_code_encrypted BLOB,
   forgot_password_code_issued_at DATETIME
 , phone_number_country_uniqueid TEXT, phone_number_country_callingcode TEXT
-, auth_state_generation INTEGER NOT NULL DEFAULT 0, last_otp_step INTEGER NOT NULL DEFAULT 0, forgot_password_code_hash TEXT NOT NULL DEFAULT '', otp_config_generation INTEGER NOT NULL DEFAULT 0);
+, auth_state_generation INTEGER NOT NULL DEFAULT 0, last_otp_step INTEGER NOT NULL DEFAULT 0, forgot_password_code_hash TEXT NOT NULL DEFAULT '', otp_config_generation INTEGER NOT NULL DEFAULT 0, otp_enrollment_secret_encrypted BLOB, otp_enrollment_issued_at DATETIME);
 
 CREATE TABLE codes (
   `id` integer PRIMARY KEY AUTOINCREMENT,

@@ -958,3 +958,129 @@ func (d *CommonDatabase) ResetUserOTPStep(tx *sql.Tx, userId int64) error {
 
 	return nil
 }
+
+// TryInstallPendingOTPEnrollment records a TOTP enrolment the server has just issued, but only if
+// this user has no live one already, and reports whether this call is the one that installed it.
+//
+// The predicate carries three terms, and each of them is load-bearing:
+//
+//   - the user id, which is what the write is keyed on;
+//   - otp_enabled being false, so an authenticator that already exists cannot have a pending
+//     enrolment staged behind it. Without it a caller could park a seed on an enrolled account and
+//     wait for the authenticator to be removed;
+//   - the existing pending value being absent or issued before staleBefore, which is what makes the
+//     issuing endpoint idempotent. Two concurrent enrolment requests both find no pending value,
+//     both call this, and exactly one wins; the loser re-reads the row and answers with the
+//     winner's seed, so a user who reloads the enrolment page is not handed a second QR code that
+//     silently invalidates the one they already scanned (#247, goal 7).
+//
+// staleBefore rather than a lifetime, because how long an enrolment stays valid is a product
+// decision and belongs with the handler that issues it. A zero staleBefore means nothing counts as
+// expired, so an existing pending value is never replaced, which fails closed.
+//
+// **A false return is not an error and is not proof of a race**, the same imprecision
+// TryConsumeUserOTPStep documents: it means no row transitioned, and the causes are not
+// distinguishable here. Another request installed a seed first, the authenticator was enabled under
+// this request, or the user row is gone. The caller re-reads and responds from what it finds.
+//
+// rowsAffected == 1 means this call transitioned the row on all four engines. Matching the predicate
+// implies the row changes: what it held was either NULL or an older issued_at, and AES-GCM's random
+// nonce means even an identical plaintext re-encrypts to different bytes, so MySQL's changed-rows
+// accounting agrees with matched rows. That is the trap RevokeCodesBySessionIdentifier documents,
+// and it does not bite here.
+//
+// Deliberately not part of UpdateUser: both columns are tagged dont-update, because the full-row
+// write is what would let one enrolment request erase another's issuance. See models.User.
+func (d *CommonDatabase) TryInstallPendingOTPEnrollment(tx *sql.Tx, userId int64,
+	secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error) {
+
+	if userId == 0 {
+		return false, errors.WithStack(errors.New("can't install a pending OTP enrollment for user with id 0"))
+	}
+	// Errors rather than benign falses, and neither is defensive. An empty ciphertext is the
+	// dormant value of every user with no enrollment pending, so installing one would leave the
+	// row looking untouched while reporting success. A zero issuedAt is worse: it installs a seed
+	// that every real staleBefore immediately treats as expired, so the enrollment appears to
+	// succeed and can never be read back.
+	if len(secretEncrypted) == 0 {
+		return false, errors.WithStack(errors.New("can't install an empty pending OTP enrollment"))
+	}
+	if issuedAt.IsZero() {
+		return false, errors.WithStack(errors.New("can't install a pending OTP enrollment with a zero issued at"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("otp_enrollment_secret_encrypted", secretEncrypted),
+		ub.Assign("otp_enrollment_issued_at", issuedAt),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", userId),
+		// A bound Go bool, as TrySetUserEnabled does against users.enabled and
+		// TryConsumeUserOTPStep against this same column. The four engines declare it
+		// numeric, tinyint(1), boolean and BIT, and the driver types the parameter, so
+		// nothing here is dialect specific.
+		ub.Equal("otp_enabled", false),
+		ub.Or(
+			ub.IsNull("otp_enrollment_secret_encrypted"),
+			// Both halves of the OR on the timestamp, because a row carrying ciphertext with
+			// a NULL issued_at has no expiry to compare and would otherwise be permanent. No
+			// writer produces that state, and this is what stops it being unrecoverable if
+			// one ever did.
+			ub.IsNull("otp_enrollment_issued_at"),
+			ub.LessThan("otp_enrollment_issued_at", staleBefore),
+		),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to install pending OTP enrollment")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "unable to get rows affected when installing pending OTP enrollment")
+	}
+
+	return rowsAffected == 1, nil
+}
+
+// ClearPendingOTPEnrollment returns the pending enrollment pair to its dormant NULL state. Called
+// once the authenticator it staged has been established, inside the same transaction as the write
+// that established it, so there is no committed state in which OTP is on and a live pending seed is
+// still installed.
+//
+// Unconditional and keyed on the user id alone, in ResetUserOTPStep's shape: clearing a user who has
+// nothing pending is not a failure, and nothing gates on the transition, unlike TrySetUserEnabled's
+// disable direction. So this reports only an error.
+//
+// The clears are raw SQL rather than Assign(..., nil), for the reason SetUserPasswordHash gives:
+// sqlbuilder sends an untyped Go nil as a parameter and the SQL Server driver types it nvarchar,
+// which it then refuses to convert implicitly to varbinary(max). A literal NULL has no parameter
+// type to get wrong and is portable across all four engines (#247).
+func (d *CommonDatabase) ClearPendingOTPEnrollment(tx *sql.Tx, userId int64) error {
+
+	if userId == 0 {
+		return errors.WithStack(errors.New("can't clear the pending OTP enrollment of user with id 0"))
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		"otp_enrollment_secret_encrypted = NULL",
+		"otp_enrollment_issued_at = NULL",
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(ub.Equal("id", userId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	_, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to clear pending OTP enrollment")
+	}
+
+	return nil
+}
