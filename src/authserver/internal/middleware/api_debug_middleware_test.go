@@ -750,12 +750,21 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 	assert.NoError(t, err)
 
 	sent := api.UpdateAccountOTPRequest{
-		Enabled:   true,
-		Password:  "SENTINEL-account-password",
-		OtpCode:   otpCode,
-		SecretKey: secretKey,
+		Enabled:  true,
+		Password: "SENTINEL-account-password",
+		OtpCode:  otpCode,
 	}
-	body, err := json.Marshal(sent)
+	// secretKey is put on the wire by hand rather than through the struct, which no longer
+	// carries it: PUT /api/v1/account/otp now enrolls the seed the server issued and refuses a
+	// request naming one (#247). What this middleware owes is unchanged and matters slightly
+	// more for it, since a caller that has not upgraded still sends the field and its body still
+	// reaches the debug log on the way to the 400.
+	body, err := json.Marshal(map[string]interface{}{
+		"enabled":   sent.Enabled,
+		"password":  sent.Password,
+		"otpCode":   sent.OtpCode,
+		"secretKey": secretKey,
+	})
 	assert.NoError(t, err)
 
 	router := debugAPIRouter(t, http.MethodPut, "/otp", func(w http.ResponseWriter, r *http.Request) {
@@ -764,6 +773,12 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, sent, received,
 			"the handler must receive the credentials intact after the middleware read the body to log it")
+		// And the field the struct no longer models must still have arrived on the wire, or
+		// the redaction assertions below would be asserting about a body that never carried
+		// it.
+		var raw map[string]json.RawMessage
+		assert.NoError(t, json.Unmarshal(body, &raw))
+		assert.Contains(t, raw, "secretKey")
 
 		w.Header().Set("Content-Type", "application/json")
 		_, err = w.Write([]byte(`{"otpEnabled":true}`))

@@ -152,3 +152,46 @@ func TestRender_JSBootstrapNoKeyLeak(t *testing.T) {
 		assert.NotEqualf(t, k, v, "js bootstrap key %q leaked (value == key): JSBootstrap could not resolve it", k)
 	}
 }
+
+// The enrolment form shows the QR code and the seed, and carries neither back as a hidden input.
+//
+// Both halves need HTML to see, which is why they are here rather than in the handler's own tests:
+// a mocked RenderTemplate is handed a bind map, and a bind map cannot tell you whether a value was
+// drawn for the user to scan or planted in a form for the browser to post back.
+//
+// The hidden inputs are what #247 removed. They put the TOTP shared secret and an image encoding it
+// into the submitted body of every enrolment attempt, on a page that then let the server enrol
+// whatever came back. The visible <img> and <pre> stay: those are what the user scans and types.
+func TestRender_AccountOtp_Enrollment(t *testing.T) {
+	const secretKey = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+
+	out := render(t, "/account_otp.html", map[string]interface{}{
+		"otpEnabled":  false,
+		"base64Image": "aW1hZ2UtYnl0ZXM=",
+		"secretKey":   secretKey,
+		"error":       "OTP code is required.",
+	})
+
+	assert.Contains(t, out, "data:image/png;base64,aW1hZ2UtYnl0ZXM=", "the QR code must be shown")
+	assert.Contains(t, out, secretKey, "and the seed, for a user who cannot scan it")
+	assert.Contains(t, out, `name="otp"`)
+	assert.Contains(t, out, `name="password"`)
+
+	assert.NotContains(t, out, `type="hidden"`,
+		"the enrolment form must post nothing the user did not type")
+	assert.NotContains(t, out, `name="secretKey"`)
+	assert.NotContains(t, out, `name="base64Image"`)
+}
+
+// The enabled state carries neither, whatever the bind map happens to hold: a user with an
+// authenticator is not enrolling, and the page is a disable form.
+func TestRender_AccountOtp_Enabled(t *testing.T) {
+	out := render(t, "/account_otp.html", map[string]interface{}{
+		"otpEnabled": true,
+		"error":      "Authentication failed. Check your password and try again.",
+	})
+
+	assert.NotContains(t, out, "data:image/png;base64,")
+	assert.NotContains(t, out, `name="otp"`)
+	assert.Contains(t, out, `name="password"`)
+}

@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -11,10 +12,54 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/otp"
 )
+
+// otpEnrollmentLifetime is how long an enrollment the server has issued stays usable: the window
+// in which GET /api/v1/account/otp/enrollment keeps answering with the same seed, and in which PUT
+// /api/v1/account/otp will still accept a passcode generated from it.
+//
+// Fifteen minutes, against the five that the three other pending-credential pairs on the users
+// table use. Those time a code that arrives by email or SMS and is typed straight in, about a
+// minute's work. This times installing an authenticator app, scanning a QR code and reading a
+// passcode off it, which a first-time enroller can plausibly exceed, and the refusal would land
+// after they had already scanned (#247).
+const otpEnrollmentLifetime = 15 * time.Minute
+
+// maxOTPRequestBodyBytes bounds the PUT's body, which is read whole because it is parsed twice:
+// once into the request and once as a raw object, to see whether the caller sent a secretKey at
+// all. A legitimate body here is a few hundred bytes.
+const maxOTPRequestBodyBytes = 64 * 1024
+
+// livePendingEnrollmentKeyURL returns the otpauth:// URL of the enrollment this server last issued
+// the user, or "" when there is none to honour: no ciphertext, no issue time, or an issue time
+// before staleBefore.
+//
+// The stored ciphertext is the whole key URL rather than the bare base32 seed, so a repeat call
+// answers with a byte-identical QR image and the seed comes off the URL wherever it is needed.
+//
+// staleBefore is passed in rather than computed here because the same instant has to reach
+// TryInstallPendingOTPEnrollment, whose WHERE clause draws the same line with a strict "issued
+// before". A reader and a compare-and-set writer disagreeing about the boundary would produce a
+// value this function calls dead and the database refuses to replace, which is a wedged endpoint
+// rather than a stale seed.
+//
+// A ciphertext that will not decrypt is an error rather than a "none". Reporting none would send
+// the caller down the minting path, where that same conditional UPDATE declines to replace a value
+// that is not yet stale, so the request would answer 200 with a seed that was never stored and
+// that the PUT could therefore never accept (#247).
+func livePendingEnrollmentKeyURL(user *models.User, staleBefore time.Time) (string, error) {
+	if len(user.OtpEnrollmentSecretEncrypted) == 0 || !user.OtpEnrollmentIssuedAt.Valid {
+		return "", nil
+	}
+	if user.OtpEnrollmentIssuedAt.Time.Before(staleBefore) {
+		return "", nil
+	}
+	return encryption.DecryptData(user.OtpEnrollmentSecretEncrypted)
+}
 
 // HandleAPIAccountOTPEnrollmentGet - GET /api/v1/account/otp/enrollment
 func HandleAPIAccountOTPEnrollmentGet(
@@ -52,15 +97,86 @@ func HandleAPIAccountOTPEnrollmentGet(
 			return
 		}
 
-		// Generate the enrollment key, then derive from its otpauth:// URL the two things
-		// this response publishes: the QR code the user scans and the secret they can type
-		// instead. The generator hands back the URL alone, so the image and the secret are
-		// two views of one value rather than two values that could disagree (#247).
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		keyURL, err := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+		// Answer with the enrollment this user already has pending, and mint one only when
+		// there is none. That single rule is what makes the endpoint idempotent, and
+		// idempotence is the whole of it: minting on every call replaced the seed behind a
+		// QR code the user had already scanned, so every passcode they then read off it was
+		// checked against a secret they were never shown. #242 closed exactly that at the
+		// browser ceremony and it was still live here, for the admin console and for every
+		// third-party caller (#247).
+		//
+		// Minting also became a write rather than a hand-out. Before this, the server never
+		// learned which authenticator it had issued: the PUT matched the submitted code
+		// against the secret the same request carried and then stored that value, so a
+		// caller could enroll a seed the server had never generated.
+		now := time.Now().UTC()
+		staleBefore := now.Add(-otpEnrollmentLifetime)
+
+		keyURL, err := livePendingEnrollmentKeyURL(user, staleBefore)
 		if err != nil {
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return
+		}
+
+		if keyURL == "" {
+			// The generator hands back the otpauth:// URL alone, and the QR image and the
+			// base32 secret below are both derived from it, so there is one value to store
+			// and no second copy that could disagree with it.
+			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+			keyURL, err = otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+			if err != nil {
+				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				return
+			}
+
+			secretEncrypted, err := encryption.EncryptData(keyURL)
+			if err != nil {
+				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				return
+			}
+
+			installed, err := database.TryInstallPendingOTPEnrollment(nil, user.Id, secretEncrypted, now, staleBefore)
+			if err != nil {
+				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				return
+			}
+			if !installed {
+				// Losing the compare-and-set is an ordinary outcome, not a failure: another
+				// request for this user installed an enrollment between the read above and
+				// this write, or the user finished enrolling in between. Returning the seed
+				// that was NOT stored would hand out a QR code the PUT can never accept, so
+				// the row is read back and the winner's value answered instead. Two
+				// concurrent calls then agree on one enrollment, which is the reason the
+				// install is conditional at all.
+				user, err = database.GetUserById(nil, user.Id)
+				if err != nil {
+					writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+					return
+				}
+				if user == nil {
+					writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+					return
+				}
+				if user.OTPEnabled {
+					writeJSONError(w, "OTP is already enabled", "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+					return
+				}
+
+				keyURL, err = livePendingEnrollmentKeyURL(user, staleBefore)
+				if err != nil {
+					writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+					return
+				}
+				if keyURL == "" {
+					// Neither this call nor a winner holds one, with OTP still off. Nothing
+					// the caller did produces this: the write's predicate and the read above
+					// draw the expiry line at the same instant, so it means the row moved in
+					// a way this handler cannot account for. Answering 200 with an
+					// unstored seed is the one thing that must not happen here.
+					writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+					return
+				}
+			}
 		}
 
 		base64Image, err := otp.RenderQRCodeImage(keyURL)
@@ -104,9 +220,45 @@ func HandleAPIAccountOTPPut(
 			return
 		}
 
-		// Decode request body
+		// Decode request body twice: once as a raw object, to see which field names the
+		// caller actually sent, and once into the request itself.
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxOTPRequestBodyBytes))
+		if err != nil {
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
+			return
+		}
+
+		var rawFields map[string]json.RawMessage
+		if err := json.Unmarshal(body, &rawFields); err != nil {
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
+			return
+		}
+
+		// This endpoint no longer accepts a secret from its caller, and a request still
+		// carrying one is refused rather than quietly ignored. The server now issues the
+		// enrollment at GET /api/v1/account/otp/enrollment, records it, and enrolls that
+		// value and no other, so a secretKey in this body can only mean the caller believes
+		// it is choosing which authenticator is installed. It is not, and silence would
+		// leave it believing it had (#247).
+		//
+		// The refusal is on the field's presence, not on its value: nothing here sets
+		// DisallowUnknownFields, so dropping the field from the struct alone would have been
+		// silently backward compatible, which is the outcome this exists to avoid. Testing
+		// the raw object is also what makes "secretKey": null and a non-string secretKey
+		// refuse the same way a string does.
+		//
+		// It runs ahead of the user load and the password check because it is a statement
+		// about the shape of the request rather than about who sent it, and an integrator
+		// upgrading needs to see the reason rather than a password failure.
+		if _, sent := rawFields["secretKey"]; sent {
+			writeJSONError(w,
+				"This endpoint no longer accepts a secretKey. Start an enrollment with GET /api/v1/account/otp/enrollment and submit only the code from your authenticator app.",
+				"SECRET_KEY_NOT_ACCEPTED", http.StatusBadRequest)
+			return
+		}
+
 		var req api.UpdateAccountOTPRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.Unmarshal(body, &req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
@@ -131,9 +283,14 @@ func HandleAPIAccountOTPPut(
 			// The one branch here that is a guess at the password, and so the only one that
 			// spends the budget shared with PUT /api/v1/account/password. The blank check
 			// above compares nothing, and the enable branch's wrong code and replay below are
-			// deliberately unbounded: that code is verified against the secret the caller
-			// supplied in the same request, so guessing it gains nothing. This check is what
-			// guards disabling OTP, which takes no code at all (#113, #219).
+			// deliberately unbounded: that code is checked against a seed this server issued
+			// to this same caller at GET /api/v1/account/otp/enrollment, which their own
+			// access token entitles them to fetch outright, so guessing the code gains
+			// nothing that asking for it would not. (Until #247 the reason was that the code
+			// was checked against a secret the same request carried. The conclusion survived
+			// the seed moving server-side; the premise did not, so it is restated rather than
+			// left standing as written.) This check is what guards disabling OTP, which takes
+			// no code at all (#113, #219).
 			credentialFailures.RecordCredentialFailure(r)
 
 			writeJSONError(w, "Authentication failed. Check your password and try again.", "AUTHENTICATION_FAILED", http.StatusBadRequest)
@@ -147,32 +304,11 @@ func HandleAPIAccountOTPPut(
 				writeJSONError(w, "OTP is already enabled", "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 				return
 			}
-			if strings.TrimSpace(req.SecretKey) == "" || strings.TrimSpace(req.OtpCode) == "" {
-				writeJSONError(w, "OTP code and secret are required to enable.", "OTP_CODE_AND_SECRET_REQUIRED", http.StatusBadRequest)
+			if strings.TrimSpace(req.OtpCode) == "" {
+				writeJSONError(w, "OTP code is required to enable.", "OTP_CODE_REQUIRED", http.StatusBadRequest)
 				return
 			}
 
-			// Basic validation/sanitization
-			// Normalize secret: uppercase, strip spaces
-			normalizedSecret := strings.ToUpper(strings.ReplaceAll(req.SecretKey, " ", ""))
-			// Secret must be base32-like and of reasonable length
-			// 16..64 chars covers typical 80..320 bits
-			isValidSecret := func(s string) bool {
-				if len(s) < 16 || len(s) > 64 {
-					return false
-				}
-				for i := 0; i < len(s); i++ {
-					ch := s[i]
-					if (ch < 'A' || ch > 'Z') && (ch < '2' || ch > '7') {
-						return false
-					}
-				}
-				return true
-			}
-			if !isValidSecret(normalizedSecret) {
-				writeJSONError(w, "Invalid OTP secret format.", "INVALID_OTP_SECRET", http.StatusBadRequest)
-				return
-			}
 			// OTP code must be 6 digits
 			if len(req.OtpCode) != 6 {
 				writeJSONError(w, "Invalid OTP code.", "INVALID_OTP_CODE", http.StatusBadRequest)
@@ -185,11 +321,41 @@ func HandleAPIAccountOTPPut(
 				}
 			}
 
+			// The seed this code is checked against is the one the server issued at GET
+			// /api/v1/account/otp/enrollment and recorded on the user row, never one the
+			// caller names. That is the whole of the fix: before it, the code was matched
+			// against the secret the request carried and that same value was then stored, so
+			// the server enrolled whatever it was handed and never learned what it had
+			// issued (#247).
+			//
+			// No live enrollment refuses the request rather than falling back to anything.
+			// A partially migrated or rolled back deployment therefore fails closed:
+			// enrolling stops working, which is the safe direction, instead of accepting a
+			// secret from the wire again.
+			now := time.Now().UTC()
+			keyURL, err := livePendingEnrollmentKeyURL(user, now.Add(-otpEnrollmentLifetime))
+			if err != nil {
+				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				return
+			}
+			if keyURL == "" {
+				writeJSONError(w,
+					"No OTP enrollment is pending, or the one you started has expired. Request a new one with GET /api/v1/account/otp/enrollment and try again.",
+					"OTP_ENROLLMENT_NOT_PENDING", http.StatusBadRequest)
+				return
+			}
+
+			pendingSecret, err := otp.SecretFromKeyURL(keyURL)
+			if err != nil {
+				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				return
+			}
+
 			// A replayed code must be indistinguishable from a wrong one to the caller, so
 			// both branches below write this same body (#111).
 			incorrectOtpCode := "Incorrect OTP Code. OTP codes are time-sensitive and change every 30 seconds. Make sure you're using the most recent code generated by your authenticator app."
 
-			step, matched := otp.MatchStep(req.OtpCode, normalizedSecret, time.Now().UTC())
+			step, matched := otp.MatchStep(req.OtpCode, pendingSecret, now)
 			if !matched {
 				writeJSONError(w, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
@@ -220,7 +386,7 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			if err := user.SetOTPSecret(normalizedSecret); err != nil {
+			if err := user.SetOTPSecret(pendingSecret); err != nil {
 				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 				return
 			}
