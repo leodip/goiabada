@@ -719,10 +719,14 @@ func TestAPIAccountOTPPut_Enable_RefusesACallerSuppliedSecret(t *testing.T) {
 	assert.Equal(t, "SECRET_KEY_NOT_ACCEPTED", errResp.ErrorCode)
 	assert.Contains(t, errResp.ErrorDescription, "/api/v1/account/otp/enrollment")
 
-	// Refused, not partially applied: the field is rejected before anything else happens.
-	after, err := database.GetUserById(nil, userId)
-	assert.NoError(t, err)
-	assert.False(t, after.OTPEnabled)
+	// Refused, not partially applied, observed the way a caller can observe it: the issuing
+	// endpoint still answers, and still with the same seed. That says two things at once. It
+	// says the authenticator was not established, because the GET refuses outright once OTP is
+	// on, which is what TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending
+	// asserts in its tail. And it says the pending enrollment was not consumed either, which
+	// reading users.otp_enabled could never have told us.
+	assert.Equal(t, issued.SecretKey, getOTPEnrollment(t, accessToken).SecretKey,
+		"a refused request must leave the pending enrollment exactly as it was")
 }
 
 // With no pending enrollment there is nothing to enroll, and the request is refused rather than
@@ -745,9 +749,11 @@ func TestAPIAccountOTPPut_Enable_RefusedWithNoPendingEnrollment(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Contains(t, body, "OTP_ENROLLMENT_NOT_PENDING")
 
-	after, err := database.GetUserById(nil, userId)
-	assert.NoError(t, err)
-	assert.False(t, after.OTPEnabled)
+	// Nothing was partially applied, said the way a caller can hear it: the issuing endpoint
+	// still issues. It refuses with 400 once OTP is on, so a 200 here is the observable form of
+	// "the stranger's seed did not become this account's authenticator".
+	assert.NotEmpty(t, getOTPEnrollment(t, accessToken).SecretKey,
+		"a refused enable must leave the account still able to start an enrollment")
 }
 
 // An expired enrollment is no enrollment: the same refusal, and the seed cannot be redeemed late.
@@ -773,8 +779,17 @@ func TestAPIAccountOTPPut_Enable_RefusedWithAnExpiredEnrollment(t *testing.T) {
 // The whole contract in one pass: the GET issues, the PUT enrolls that seed and no other, and the
 // pending pair is gone afterwards.
 //
-// The stored secret is read back because that is the assertion the endpoints cannot make about
-// themselves. Everything else here is endpoint-observable.
+// EVERY ASSERTION IS ENDPOINT-OBSERVABLE, which is what seam G is for. "The authenticator installed
+// is the one the server issued" is proved by using it: a fresh level 2 authorization ceremony is
+// driven to the OTP form and a code from the issued seed is accepted. Decrypting
+// users.otp_secret_encrypted and comparing would assert the same equality one layer below the
+// behaviour anyone actually depends on, and it would keep passing if the browser ceremony could not
+// verify against what was stored. The direct column reads belong to seam F, which owns them on all
+// four engines in tests/data/otp_enrollment_test.go: TestTryInstallPendingOTPEnrollment_RoundTrip
+// for the write and read back, TestEnableUserOTPTx_ClearsThePendingEnrollment for the clear.
+//
+// Loading the user is fixture setup rather than an assertion: the ceremony driver takes a
+// *models.User for its email, and no caller of this API has one.
 func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 	userId := getAccountUserId(t, accessToken)
@@ -792,21 +807,29 @@ func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testi
 		t.Fatalf("expected the enrollment to succeed, got %d. body: %s", status, body)
 	}
 
-	after, err := database.GetUserById(nil, userId)
+	// The authenticator works, and it is the issued seed that drives it. A fresh cookie jar and a
+	// level2_mandatory client put the browser at the OTP form, where the code is verified against
+	// what the enable branch stored; nothing but the right secret gets past it.
+	//
+	// nextStepCode rather than the code above: the enable branch claims its time step through
+	// TryConsumeUserOTPStep (#111), so resubmitting the spent code would be refused correctly and
+	// would read here as a broken enrollment. The helper also skips, rather than failing, when the
+	// two codes cannot be ordered.
+	user, err := database.GetUserById(nil, userId)
 	assert.NoError(t, err)
-	assert.True(t, after.OTPEnabled)
+	ceremonyClient, ceremonyRedirectUri := createLevel2MandatoryClient(t)
 
-	enrolled, err := after.GetOTPSecret()
-	assert.NoError(t, err)
-	assert.Equal(t, issued.SecretKey, enrolled,
-		"the authenticator installed must be the one the server issued")
+	httpClient, otpPage, otpUrl := startOtpCeremony(t, ceremonyClient, ceremonyRedirectUri,
+		user, "Correct1!", "")
+	accepted := authenticateWithOtp(t, httpClient, otpUrl, otpPage,
+		nextStepCode(t, issued.SecretKey, code))
+	_ = otpPage.Body.Close()
+	assertRedirect(t, accepted, "/auth/completed")
+	_ = accepted.Body.Close()
 
-	// Cleared inside the transaction that established the authenticator, so no committed state
-	// has OTP enabled with a live pending seed behind it.
-	assert.Empty(t, after.OtpEnrollmentSecretEncrypted)
-	assert.False(t, after.OtpEnrollmentIssuedAt.Valid)
-
-	// And the issuing endpoint now refuses, because enrollment is over for this user.
+	// And the issuing endpoint now refuses, because enrollment is over for this user. That is the
+	// pending pair's clear as a caller can see it: a live pending enrollment would have been
+	// answered with, and this account has none.
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()

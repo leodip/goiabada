@@ -18,7 +18,9 @@ The auth server exposes two main API groups:
 
 ### Caching
 
-Every response from both API groups is sent with `Cache-Control: no-store` and `Pragma: no-cache`, refusals included. Do not cache these responses, and if your HTTP client caches `GET` requests by default, make sure it honours those directives. Two endpoints return a credential in the response body: `GET /api/v1/admin/clients/{id}` returns the client secret decrypted, and `GET /api/v1/account/otp/enrollment` returns a new authenticator's setup key. The bearer token on the request does not make a cached copy safe.
+Every response from an endpoint in either API group is sent with `Cache-Control: no-store` and `Pragma: no-cache`, refusals from the token and scope checks included. Do not cache these responses, and if your HTTP client caches `GET` requests by default, make sure it honours those directives. Two endpoints return a credential in the response body: `GET /api/v1/admin/clients/{id}` returns the client secret decrypted, and `GET /api/v1/account/otp/enrollment` returns a new authenticator's setup key. The bearer token on the request does not make a cached copy safe.
+
+A few responses under these paths are answered by the server before it picks an endpoint, and those carry neither header: a CORS preflight, and the errors Goiabada returns when it cannot read its own settings or your session. None of them carries a credential or a response body worth keeping.
 
 ### Granular Admin API scopes
 
