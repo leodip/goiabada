@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -709,6 +710,59 @@ func TestHandleAPIAccountOTPPut_SecretKeyIsRefusedOnDisableToo(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "SECRET_KEY_NOT_ACCEPTED", errorCodeOf(t, rr))
+}
+
+// countingCredentials is unlimitedCredentials that remembers. The stub above answers silently,
+// which is right for the cases that only need the limiter not to refuse; this one is for the case
+// that has to assert the budget was never spent at all.
+type countingCredentials struct{ failures int }
+
+func (c *countingCredentials) RecordCredentialFailure(*http.Request) { c.failures++ }
+
+// TestHandleAPIAccountOTPPut_OversizedBodyIsRefused pins maxOTPRequestBodyBytes.
+//
+// This handler is the one API JSON endpoint that reads its request body WHOLE, with io.ReadAll,
+// because the body is parsed twice: once as a raw object to see whether the caller sent a
+// secretKey field at all, and once into the request struct. Every other JSON handler streams
+// through a decoder, and the three upload handlers already cap their reads. Buffering is what
+// makes the cap load-bearing, so the cap needs a test that fails without it (#247).
+//
+// THE PADDING IS VALID JSON, AND THAT IS THE WHOLE DESIGN OF THIS CASE. A malformed oversized body
+// answers 400 INVALID_REQUEST_BODY whether the cap is there or not, from the json.Unmarshal below
+// it, so it would pass with MaxBytesReader deleted and pin nothing. With well-formed JSON the two
+// outcomes separate: capped, io.ReadAll fails and the handler answers 400 having touched nothing;
+// uncapped, it parses cleanly and runs on to load the user, which the expectation-free mocks turn
+// into a failure. Verified by mutation, replacing the read with a bare io.ReadAll(r.Body).
+//
+// No secretKey either, for the same reason: that refusal also answers 400 and would mask this one.
+func TestHandleAPIAccountOTPPut_OversizedBodyIsRefused(t *testing.T) {
+	// Expectation-free: an oversized body must be refused before the user is loaded, so any
+	// database or audit call is a failure, and the limiter is asked afterwards.
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	limiter := &countingCredentials{}
+
+	req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
+		"enabled":  true,
+		"password": "P4ss!word",
+		"otpCode":  currentOtpCode(t),
+		// An unknown field, so it is ignored rather than rejected on its name: nothing here
+		// sets DisallowUnknownFields. Its only job is to put the body over the cap.
+		"padding": strings.Repeat("A", maxOTPRequestBodyBytes),
+	})
+	assert.Greater(t, req.ContentLength, int64(maxOTPRequestBodyBytes),
+		"the body must actually exceed the cap, or this case proves nothing")
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountOTPPut(database, auditLogger, limiter).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, "INVALID_REQUEST_BODY", errorCodeOf(t, rr))
+
+	// The shared credential budget is not spent by a request that never reached a password
+	// check. An oversized body would otherwise be a way to exhaust the account's own limiter.
+	assert.Zero(t, limiter.failures,
+		"refusing an oversized body must not spend the credential budget")
 }
 
 // No live pending enrollment refuses the enable, and refuses it before any code is checked. Both

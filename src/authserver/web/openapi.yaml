@@ -20,7 +20,8 @@ info:
 
     ## Caching
 
-    Every response from both API groups carries these headers, error responses included:
+    Every response from an operation in either API group carries these headers, error
+    responses and the token and scope refusals included:
     ```
     Cache-Control: no-store
     Pragma: no-cache
@@ -30,6 +31,11 @@ info:
     `getClient` returns the client secret decrypted, and `getAccountOTPEnrollment` returns
     a new authenticator's setup key. The bearer token on the request does not make a
     cached copy safe: a private cache may still store a response it authenticated.
+
+    A few responses under these paths are answered before an operation is selected and
+    carry neither header: a CORS preflight, and the errors returned when the server cannot
+    read its own settings or the caller's session. None of them carries a credential, and
+    none of them is described by this document.
 
     The headers are not declared per operation, since every operation sends them.
   version: 1.0.0

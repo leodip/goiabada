@@ -69,10 +69,21 @@ func TestMiddlewareNoStore(t *testing.T) {
 
 // TestMiddlewareNoStore_HandlerCanOverrideCacheControl pins the escape hatch the design relies on:
 // Header().Set replaces, so a handler that has a legitimate reason to be cacheable can say so and
-// win. Nothing under /api/v1 does today, and the sweep in the authserver's routes_no_store_test.go
-// is what would catch it if one started to. This case exists so that the escape hatch is a stated
-// property rather than an accident of ordering, since a future rewrite as a wrapped
-// ResponseWriter that forced the value on flush would silently take it away.
+// win. This case exists so that the escape hatch is a stated property rather than an accident of
+// ordering, since a future rewrite as a wrapped ResponseWriter that forced the value on flush
+// would silently take it away.
+//
+// WHAT WOULD CATCH A HANDLER USING IT, since an escape hatch nothing watches is just a hole. It is
+// NOT the sweep in the authserver's internal/server/routes_no_store_test.go, and an earlier version
+// of this comment said it was. That sweep calls every registered route WITHOUT credentials, so it
+// stops in a guard and never reaches a handler: setting Cache-Control: public, max-age=300 on
+// HandleAPIClientGet leaves all 105 of its cases green, and leaves this case green too.
+//
+// Only an authenticated success response can observe it, so the two API responses that carry a
+// credential each assert the pair on their own success in the authserver's integration tier:
+// tests/integration/cache_directives_test.go for GET /api/v1/account/otp/enrollment, and
+// tests/integration/api_clients_detail_secret_test.go for GET /api/v1/admin/clients/{id}, which is
+// where the decrypted client secret goes out. That same mutation fails there (#247).
 func TestMiddlewareNoStore_HandlerCanOverrideCacheControl(t *testing.T) {
 	handler := MiddlewareNoStore()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=300")
