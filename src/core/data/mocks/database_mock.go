@@ -10640,6 +10640,72 @@ func (_c *Database_SearchUsersPaginated_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// SetClientPublic provides a mock function for the type Database
+func (_mock *Database) SetClientPublic(tx *sql.Tx, clientId int64) (bool, error) {
+	ret := _mock.Called(tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetClientPublic")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (bool, error)); ok {
+		return returnFunc(tx, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) bool); ok {
+		r0 = returnFunc(tx, clientId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_SetClientPublic_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetClientPublic'
+type Database_SetClientPublic_Call struct {
+	*mock.Call
+}
+
+// SetClientPublic is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) SetClientPublic(tx any, clientId any) *Database_SetClientPublic_Call {
+	return &Database_SetClientPublic_Call{Call: _e.mock.On("SetClientPublic", tx, clientId)}
+}
+
+func (_c *Database_SetClientPublic_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_SetClientPublic_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetClientPublic_Call) Return(b bool, err error) *Database_SetClientPublic_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_SetClientPublic_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) (bool, error)) *Database_SetClientPublic_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetUserPasswordHash provides a mock function for the type Database
 func (_mock *Database) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error {
 	ret := _mock.Called(tx, userId, passwordHash)

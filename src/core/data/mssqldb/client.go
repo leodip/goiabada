@@ -63,6 +63,10 @@ func (d *MsSQLDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 	return d.CommonDB.UpdateClient(tx, client)
 }
 
+func (d *MsSQLDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, error) {
+	return d.CommonDB.SetClientPublic(tx, clientId)
+}
+
 func (d *MsSQLDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
 	return d.CommonDB.GetClientById(tx, clientId)
 }

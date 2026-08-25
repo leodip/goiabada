@@ -29,6 +29,17 @@ type Database interface {
 
 	CreateClient(tx *sql.Tx, client *models.Client) error
 	UpdateClient(tx *sql.Tx, client *models.Client) error
+	// SetClientPublic makes one client public and reports whether THIS call performed
+	// the confidential-to-public transition, which is the write that removes the
+	// client's obligation to authenticate and so the one that must revoke its
+	// outstanding grants (see #245). True means this call made the change; false means
+	// the client was already public and nothing was taken away.
+	//
+	// A transaction is required. The answer is established by the statements
+	// themselves rather than by a read the caller compares against, because a read and
+	// the write after it can straddle another writer's commit, and a classification
+	// taken from the stale side leaves the grants alive.
+	SetClientPublic(tx *sql.Tx, clientId int64) (bool, error)
 	GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error)
 	GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error)

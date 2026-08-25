@@ -674,24 +674,22 @@ func HandleAPIClientAuthenticationPut(
 		// destroyed while the grants it was protecting survive. The audit event is emitted after
 		// the commit, because a logged revocation that then rolled back would be a false record.
 		//
-		// WHICH TRANSITION THIS IS, IS DECIDED INSIDE THAT TRANSACTION, against the row as it
-		// stands rather than against the copy loaded above. The two are not the same client: a
-		// concurrent request can make this client confidential and issue it a grant between the
-		// load and the write, and a classification taken from the stale copy then reads "already
-		// public", skips the revocation, and commits a public client holding grants that were
-		// issued while a secret was required. Reading it here costs one query inside a
-		// transaction the flip already opens (#245, final review finding 1).
+		// WHICH TRANSITION THIS IS, IS DECIDED BY THE WRITE ITSELF, not by comparing against a
+		// copy of the client. The two are not the same row: a concurrent request can make this
+		// client confidential and issue it a grant between any read and the write that follows
+		// it, and a classification taken from the stale side then reads "already public", skips
+		// the revocation, and commits a public client holding grants that were issued while a
+		// secret was required. SetClientPublic answers it with the statements that perform the
+		// change, which is the only way the answer and the change cannot disagree (#245, final
+		// review finding 1, decision 17).
 		if req.IsPublic {
 			var becamePublic bool
 			result, err := handlers.RevokeClientGrantsTx(database, client.Id, func(tx *sql.Tx) (bool, error) {
-				current, err := database.GetClientById(tx, client.Id)
+				var err error
+				becamePublic, err = database.SetClientPublic(tx, client.Id)
 				if err != nil {
 					return false, err
 				}
-				if current == nil {
-					return false, errors.WithStack(errors.New("client no longer exists"))
-				}
-				becamePublic = !current.IsPublic
 				if err := database.UpdateClient(tx, client); err != nil {
 					return false, err
 				}

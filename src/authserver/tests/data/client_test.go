@@ -1279,3 +1279,164 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Errorf("Expected ResourceOwnerPasswordCredentialsEnabled to be nil after reset, got %v", *retrievedResetClient.ResourceOwnerPasswordCredentialsEnabled)
 	}
 }
+
+// TestSetClientPublic covers the contract of the write that classifies the confidential-to-public
+// flip (#245 decision 17). The boolean is not a convenience: it is what decides whether the flip
+// revokes the client's outstanding grants, so "this call made the change" and "the client was
+// already public" have to be told apart exactly.
+func TestSetClientPublic(t *testing.T) {
+	client := createTestClient(t)
+	if client.IsPublic {
+		t.Fatalf("the fixture must start confidential, or the transition below is not a transition")
+	}
+
+	tx := beginTx(t)
+	becamePublic, err := database.SetClientPublic(tx, client.Id)
+	if err != nil {
+		t.Fatalf("SetClientPublic returned error: %v", err)
+	}
+	if !becamePublic {
+		t.Errorf("making a confidential client public must report the transition")
+	}
+	if err := database.CommitTransaction(tx); err != nil {
+		t.Fatalf("CommitTransaction: %v", err)
+	}
+
+	// The column really moved. Reporting the transition without performing it would leave the
+	// flip revoking the grants of a client that is still confidential.
+	stored, err := database.GetClientById(nil, client.Id)
+	if err != nil {
+		t.Fatalf("GetClientById: %v", err)
+	}
+	if stored == nil || !stored.IsPublic {
+		t.Errorf("expected the client to be public after the transition, got %+v", stored)
+	}
+
+	// Idempotent, and false the second time. This is the boundary that stops an administrator
+	// re-saving the authentication page from signing every user of the application out: the save
+	// removes no requirement, so it must revoke nothing.
+	tx = beginTx(t)
+	becamePublic, err = database.SetClientPublic(tx, client.Id)
+	if err != nil {
+		t.Fatalf("second SetClientPublic returned error: %v", err)
+	}
+	if becamePublic {
+		t.Errorf("saving an already-public client must not report a transition")
+	}
+	if err := database.CommitTransaction(tx); err != nil {
+		t.Fatalf("CommitTransaction: %v", err)
+	}
+
+	// A client that is not there is an error rather than a quiet false. False means "nothing was
+	// taken away from a client that exists", and answering that about a row nobody can find would
+	// let the endpoint reply 200 describing a client it did not save.
+	tx = beginTx(t)
+	if _, err := database.SetClientPublic(tx, client.Id+1_000_000); err == nil {
+		t.Errorf("expected an error for a client id that does not exist")
+	}
+	_ = database.RollbackTransaction(tx)
+
+	// A zero id is a caller bug rather than a filter, exactly as it is in RevokeCodesByClientId.
+	tx = beginTx(t)
+	if _, err := database.SetClientPublic(tx, 0); err == nil {
+		t.Errorf("expected an error for a client id of 0")
+	}
+	_ = database.RollbackTransaction(tx)
+
+	// Without a transaction the two statements autocommit separately, so the row is released
+	// between acquiring it and classifying the write and the whole mechanism is gone. Refused
+	// rather than silently degraded.
+	if _, err := database.SetClientPublic(nil, client.Id); err == nil {
+		t.Errorf("expected an error when called without a transaction")
+	}
+}
+
+// TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite is the defect itself, run against
+// a real engine rather than described.
+//
+// The row starts public and a request arrives to save it public, which on its own is not a
+// transition. While that request is in flight, another administrator makes the client
+// confidential and commits, which creates a secret and lets grants be issued under it. The save
+// then completes and leaves the client public. That save DID remove the client's obligation to
+// authenticate, so it owes the revocation, and a classification taken from anything the caller
+// read before the other transaction committed reports "already public" and skips it.
+//
+// This is also the only test that distinguishes the acquisition from the classification. Without
+// the unconditional acquisition, PostgreSQL's READ COMMITTED never makes the row a target of a
+// predicate the committed version fails, so the conditional statement returns 0 without waiting
+// and this test fails there while still passing on MySQL and SQL Server, which block and
+// re-evaluate. Only the four-engine data tier can catch that, and only on one of its four engines.
+// Measured per engine in the agreement's probe/client_flip_cas_race.out.
+func TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite(t *testing.T) {
+	if dbType() == "" || dbType() == "sqlite" {
+		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so a second write " +
+			"transaction queues behind the first instead of overlapping it. The interleaving " +
+			"cannot be constructed here, in this process or in the server")
+	}
+
+	client := createTestClient(t)
+	client.IsPublic = true
+	if err := database.UpdateClient(nil, client); err != nil {
+		t.Fatalf("UpdateClient seeding a public client: %v", err)
+	}
+
+	// The other administrator: makes the client confidential, and holds it uncommitted.
+	other := beginTx(t)
+	client.IsPublic = false
+	client.ClientSecretEncrypted = []byte("the-secret-the-other-request-just-set")
+	if err := database.UpdateClient(other, client); err != nil {
+		t.Fatalf("UpdateClient making the client confidential: %v", err)
+	}
+
+	// The save under test, which believes the client is already public.
+	saver := beginTx(t)
+	type outcome struct {
+		becamePublic bool
+		err          error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		becamePublic, err := database.SetClientPublic(saver, client.Id)
+		done <- outcome{becamePublic, err}
+	}()
+
+	// It must not be able to answer yet. Whatever it said now could only come from the row as it
+	// stood before the other transaction committed, which is the stale side the classification
+	// must never be taken from.
+	select {
+	case o := <-done:
+		t.Fatalf("SetClientPublic answered %v while another transaction held the row uncommitted; "+
+			"it must wait for that writer rather than classify against the row it left behind",
+			o.becamePublic)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	if err := database.CommitTransaction(other); err != nil {
+		t.Fatalf("committing the concurrent confidential write: %v", err)
+	}
+
+	var o outcome
+	select {
+	case o = <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatalf("SetClientPublic never returned after the concurrent transaction committed")
+	}
+	if o.err != nil {
+		t.Fatalf("SetClientPublic returned error: %v", o.err)
+	}
+	if !o.becamePublic {
+		t.Errorf("the save turned a confidential client public and must report the transition, " +
+			"or the flip commits a public client still holding the grants that secret protected")
+	}
+
+	if err := database.CommitTransaction(saver); err != nil {
+		t.Fatalf("committing the save: %v", err)
+	}
+	stored, err := database.GetClientById(nil, client.Id)
+	if err != nil {
+		t.Fatalf("GetClientById: %v", err)
+	}
+	if stored == nil || !stored.IsPublic {
+		t.Errorf("expected the client to end public, got %+v", stored)
+	}
+}
