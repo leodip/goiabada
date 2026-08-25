@@ -3716,6 +3716,9 @@ components:
           type: boolean
         consentRequired:
           type: boolean
+        createdViaDcr:
+          type: boolean
+          description: Read-only. True when the client registered itself through /connect/register
         showLogo:
           type: boolean
           description: When true, the client logo is displayed on login and consent screens
@@ -3736,6 +3739,18 @@ components:
           type: boolean
         clientCredentialsEnabled:
           type: boolean
+        pkceRequired:
+          type: boolean
+          nullable: true
+          description: Null inherits the global setting, true requires PKCE, false makes it optional. Ignored for public clients, which always require PKCE
+        implicitGrantEnabled:
+          type: boolean
+          nullable: true
+          description: Null inherits the global setting, true enables the implicit flow, false disables it. Deprecated in OAuth 2.1
+        resourceOwnerPasswordCredentialsEnabled:
+          type: boolean
+          nullable: true
+          description: Null inherits the global setting, true enables grant_type=password (RFC 6749 section 4.3), false disables it. Deprecated in OAuth 2.1
         tokenExpirationInSeconds:
           type: integer
         refreshTokenOfflineIdleTimeoutInSeconds:
@@ -3743,6 +3758,8 @@ components:
         refreshTokenOfflineMaxLifetimeInSeconds:
           type: integer
         includeOpenIDConnectClaimsInAccessToken:
+          type: string
+        includeOpenIDConnectClaimsInIdToken:
           type: string
         defaultAcrLevel:
           type: string
@@ -3848,6 +3865,18 @@ components:
           type: boolean
         clientCredentialsEnabled:
           type: boolean
+        pkceRequired:
+          type: boolean
+          nullable: true
+          description: Null inherits the global setting, true requires PKCE, false makes it optional. Ignored for public clients, which always require PKCE
+        implicitGrantEnabled:
+          type: boolean
+          nullable: true
+          description: Null inherits the global setting, true enables the implicit flow, false disables it. Deprecated in OAuth 2.1
+        resourceOwnerPasswordCredentialsEnabled:
+          type: boolean
+          nullable: true
+          description: Null inherits the global setting, true enables grant_type=password (RFC 6749 section 4.3), false disables it. Deprecated in OAuth 2.1
 
     UpdateClientRedirectURIsRequest:
       type: object
@@ -3875,6 +3904,8 @@ components:
         refreshTokenOfflineMaxLifetimeInSeconds:
           type: integer
         includeOpenIDConnectClaimsInAccessToken:
+          type: string
+        includeOpenIDConnectClaimsInIdToken:
           type: string
 
     UpdateClientPermissionsRequest:
@@ -3932,6 +3963,15 @@ components:
           type: boolean
         passwordPolicy:
           type: string
+        pkceRequired:
+          type: boolean
+          description: When true, confidential clients must use PKCE. Public clients always require PKCE regardless of this setting
+        implicitFlowEnabled:
+          type: boolean
+          description: When true, the implicit flow is enabled server-wide. Deprecated in OAuth 2.1
+        resourceOwnerPasswordCredentialsEnabled:
+          type: boolean
+          description: When true, grant_type=password is enabled server-wide (RFC 6749 section 4.3). Deprecated in OAuth 2.1
 
     UpdateSettingsGeneralRequest:
       type: object
@@ -3948,6 +3988,15 @@ components:
           type: boolean
         passwordPolicy:
           type: string
+        pkceRequired:
+          type: boolean
+          description: When true, confidential clients must use PKCE. Public clients always require PKCE regardless of this setting
+        implicitFlowEnabled:
+          type: boolean
+          description: When true, allows the implicit flow (response_type=token, id_token, id_token token). Deprecated in OAuth 2.1
+        resourceOwnerPasswordCredentialsEnabled:
+          type: boolean
+          description: When true, allows grant_type=password at the token endpoint (RFC 6749 section 4.3). Deprecated in OAuth 2.1
 
     SettingsEmailResponse:
       type: object
@@ -4041,6 +4090,8 @@ components:
           type: integer
         includeOpenIDConnectClaimsInAccessToken:
           type: boolean
+        includeOpenIDConnectClaimsInIdToken:
+          type: boolean
 
     UpdateSettingsTokensRequest:
       type: object
@@ -4052,6 +4103,8 @@ components:
         refreshTokenOfflineMaxLifetimeInSeconds:
           type: integer
         includeOpenIDConnectClaimsInAccessToken:
+          type: boolean
+        includeOpenIDConnectClaimsInIdToken:
           type: boolean
 
     SettingsSigningKeyResponse:
@@ -4091,6 +4144,10 @@ components:
       type: object
       properties:
         uniqueId:
+          type: string
+        alpha2:
+          type: string
+        emoji:
           type: string
         callingCode:
           type: string
