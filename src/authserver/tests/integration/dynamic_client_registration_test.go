@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -694,4 +695,75 @@ func disableDCR(t *testing.T) {
 	settings.DynamicClientRegistrationEnabled = false
 	err = database.UpdateSettings(nil, settings)
 	assert.NoError(t, err)
+}
+
+// TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly covers the one creation path that makes a
+// client public FROM INCEPTION (#245). Migration 000033 repairs rows that already exist and cannot
+// reach one registered afterwards, so without this write a self-registered public client keeps a
+// NULL column.
+//
+// The server enforces PKCE for it either way, so nothing here is about enforcement. What a NULL
+// costs is truthfulness: the admin API hands the raw pointer back in ClientResponse and the admin
+// console hands it raw to the template, where it renders as "inherit from the global setting", so
+// under a global-off deployment both would report the opposite of what the server does.
+//
+// Read back through the ADMIN RESPONSE rather than off the row, because the response is the
+// surface that would tell the lie, and a column assertion would pass with ToClientResponse
+// dropping the field entirely.
+func TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly(t *testing.T) {
+	enableDCR(t)
+	defer disableDCR(t)
+
+	adminToken, _ := createAdminClientWithToken(t)
+
+	register := func(t *testing.T, authMethod string, redirectURI string) *api.ClientResponse {
+		t.Helper()
+
+		resp := makeDCRRequest(t, api.DynamicClientRegistrationRequest{
+			RedirectURIs:            []string{redirectURI},
+			TokenEndpointAuthMethod: authMethod,
+			GrantTypes:              []string{"authorization_code"},
+			ClientName:              "PKCE column " + authMethod,
+		})
+		defer func() { _ = resp.Body.Close() }()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var registered api.DynamicClientRegistrationResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&registered))
+
+		client, err := database.GetClientByClientIdentifier(nil, registered.ClientID)
+		require.NoError(t, err)
+		require.NotNil(t, client)
+		t.Cleanup(func() { _ = database.DeleteClient(nil, client.Id) })
+
+		detailURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" +
+			strconv.FormatInt(client.Id, 10)
+		detail := makeAPIRequest(t, "GET", detailURL, adminToken, nil)
+		defer func() { _ = detail.Body.Close() }()
+		require.Equal(t, http.StatusOK, detail.StatusCode)
+
+		var body api.GetClientResponse
+		require.NoError(t, json.NewDecoder(detail.Body).Decode(&body))
+		return &body.Client
+	}
+
+	t.Run("public", func(t *testing.T) {
+		// Loopback http, because that is the only redirect a public client may register
+		// (#105) and the MCP case this path exists for.
+		client := register(t, "none", "http://localhost:8080/callback")
+		require.True(t, client.IsPublic)
+		require.NotNil(t, client.PKCERequired,
+			"a self-registered public client must not be left inheriting the global setting")
+		assert.True(t, *client.PKCERequired)
+	})
+
+	t.Run("confidential", func(t *testing.T) {
+		// The negative control, and the reason the write is on the public path only: a
+		// confidential client inheriting the global is what the global setting is for, and
+		// pinning it here would quietly remove that.
+		client := register(t, "client_secret_post", "https://app.example.com/callback")
+		require.False(t, client.IsPublic)
+		assert.Nil(t, client.PKCERequired,
+			"a confidential client must keep inheriting the global setting")
+	})
 }

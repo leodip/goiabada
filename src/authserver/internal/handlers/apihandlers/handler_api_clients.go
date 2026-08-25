@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -555,11 +556,22 @@ func HandleAPIClientAuthenticationPut(
 			return
 		}
 
+		// Captured before the request is applied, because the revocation below keys on the
+		// TRANSITION and not on the state that was asked for. Reading client.IsPublic after the
+		// assignment would revoke on every save of an already-public client.
+		wasPublic := client.IsPublic
+
 		if req.IsPublic {
 			// Switching to public: remove secret and disable client credentials
 			client.IsPublic = true
 			client.ClientSecretEncrypted = nil
 			client.ClientCredentialsEnabled = false
+			// A public client always requires PKCE, and the server enforces that whatever this
+			// column holds. It is still written explicitly, because the admin console and this
+			// API both hand the raw pointer back to a reader, and a stale false or a nil under a
+			// global-off deployment would report the opposite of what the server does (#245).
+			pkceRequired := true
+			client.PKCERequired = &pkceRequired
 		} else {
 			// Confidential: require strong secret
 			if err := validateClientSecret(req.ClientSecret); err != nil {
@@ -578,7 +590,29 @@ func HandleAPIClientAuthenticationPut(
 			// Preserve ClientCredentialsEnabled as-is
 		}
 
-		if err := database.UpdateClient(nil, client); err != nil {
+		// The confidential-to-public transition is the one that REMOVES the requirement for the
+		// client to authenticate, so it is the one that revokes: every grant this client holds
+		// was issued on the understanding that redeeming it took a secret, and after this write
+		// nothing is presented at all. The reverse transition closes a window rather than opening
+		// one, and rotating a confidential client's secret leaves the requirement in place;
+		// revoking on either would sign real users out to protect against nothing (#245).
+		//
+		// The client write and the revocation share one transaction so the secret cannot be
+		// destroyed while the grants it was protecting survive. The audit event is emitted after
+		// the commit, because a logged revocation that then rolled back would be a false record.
+		becomingPublic := req.IsPublic && !wasPublic
+		if becomingPublic {
+			result, err := handlers.RevokeClientGrantsTx(database, client.Id, func(tx *sql.Tx) error {
+				return database.UpdateClient(tx, client)
+			})
+			if err != nil {
+				slog.Error("AuthServer API: Database error updating client authentication", "error", err, "clientId", client.Id)
+				writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
+				return
+			}
+			handlers.LogRevokedClientGrants(auditLogger, client.Id,
+				handlers.RevocationReasonClientBecamePublic, authHelper.GetLoggedInSubject(r), result)
+		} else if err := database.UpdateClient(nil, client); err != nil {
 			slog.Error("AuthServer API: Database error updating client authentication", "error", err, "clientId", client.Id)
 			writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
@@ -673,6 +707,12 @@ func HandleAPIClientOAuth2FlowsPut(
 		if client.IsPublic {
 			// Public clients cannot use client credentials flow
 			client.ClientCredentialsEnabled = false
+			// A public client always requires PKCE, so req.PKCERequired is not read for one:
+			// normalized here rather than refused with a 400, so the endpoint's two
+			// public-client rules behave the same way. It is not silent, because the response
+			// body is the updated client and a caller who sent false reads back true (#245).
+			pkceRequired := true
+			client.PKCERequired = &pkceRequired
 		}
 
 		if err := database.UpdateClient(nil, client); err != nil {
