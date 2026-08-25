@@ -75,7 +75,15 @@ func (c *Client) IsSystemLevelClient() bool {
 // authorization request gets a code bound to nothing and can spend it against a client that
 // authenticates with nothing (RFC 9700 section 4.8.1). Removing this line reopens that, and it
 // reopens it silently: the two ways in are an explicit false override on a public client and a
-// nil column while the global setting is off, which is what /connect/register creates (#245).
+// nil column while the global setting is off.
+//
+// Neither state is reachable through a supported writer any more, and the arm is kept all the
+// same. Every writer normalizes a public client to an explicit true, /connect/register included,
+// and migration 000033 repaired every public row that already held false or NULL. What is left
+// is a row no writer here produced: one inserted directly, one restored from a backup taken
+// before the migration, or one a future writer forgets to normalize. This arm is what makes the
+// server's answer independent of all of them, which is why it is the enforcement and the column
+// is only the display (#245).
 func (c *Client) IsPKCERequired(globalPKCERequired bool) bool {
 	if c.IsPublic {
 		return true

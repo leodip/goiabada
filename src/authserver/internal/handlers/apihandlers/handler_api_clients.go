@@ -40,16 +40,23 @@ import (
 //
 // So the two authentication-owned columns are re-read INSIDE the transaction and copied over
 // whatever the caller is holding, which makes the change structurally impossible rather than
-// merely unintended. normalize, when given, runs after that refresh and before the write, so a
-// caller whose own rules depend on the authentication mode applies them to the mode the row
-// really has; passing nil means the caller has no such rule.
+// merely unintended.
+//
+// REFRESHING THE MODE IS NOT ENOUGH ON ITS OWN, because two other columns are derived from it.
+// A public client must carry pkce_required true and client_credentials_enabled false, and every
+// one of these endpoints writes both columns from its own snapshot. So a save that loaded the
+// client while it was confidential, with PKCE optional and client credentials on, would preserve
+// the refreshed public mode and restore both forbidden values underneath it. The server would
+// still refuse client credentials and still require PKCE at runtime, because both rules are read
+// at the point of use, but the stored row, the admin API's response and the console would all
+// report the opposite of what the server does, which is the display lie decision 2 exists to
+// prevent. applyPublicClientInvariants therefore runs on every caller's behalf, after the
+// refresh and before the write (#245, final review round 2 finding 2).
 //
 // It does not close the lost update on the columns each endpoint DOES own: two concurrent saves
 // of the same section still last-write-wins, which is how every entity in this codebase behaves
 // and is a separate, wider question.
-func updateClientNotOwningAuthenticationMode(database data.Database, client *models.Client,
-	normalize func(client *models.Client)) error {
-
+func updateClientNotOwningAuthenticationMode(database data.Database, client *models.Client) error {
 	tx, err := database.BeginTransaction()
 	if err != nil {
 		return err
@@ -66,14 +73,37 @@ func updateClientNotOwningAuthenticationMode(database data.Database, client *mod
 	client.IsPublic = current.IsPublic
 	client.ClientSecretEncrypted = current.ClientSecretEncrypted
 
-	if normalize != nil {
-		normalize(client)
-	}
+	applyPublicClientInvariants(client)
 
 	if err := database.UpdateClient(tx, client); err != nil {
 		return err
 	}
 	return database.CommitTransaction(tx)
+}
+
+// applyPublicClientInvariants forces the two columns a public client is not allowed to
+// contradict. One definition, called by every writer that can persist them, because the defect
+// this closes was the same rule living at one write site and not the others.
+//
+// Both are storage-side corrections rather than enforcement: the server already refuses client
+// credentials for a public client and already requires its PKCE whatever these columns hold. What
+// they buy is that the row, the API response built from it and the admin console's rendering of
+// it all say what the server will actually do. A stale false or a nil pkce_required is handed
+// straight back to a reader, and under a global-off deployment nil renders as "inherit from the
+// global setting (currently: optional)", which is the display lie decision 2 exists to prevent
+// (#245).
+func applyPublicClientInvariants(client *models.Client) {
+	if !client.IsPublic {
+		return
+	}
+	// Public clients cannot use the client credentials flow.
+	client.ClientCredentialsEnabled = false
+	// A public client always requires PKCE, so a caller's own value is not read for one:
+	// normalized rather than refused with a 400, so the two public-client rules behave the same
+	// way. It is not silent, because these endpoints answer with the updated client and a caller
+	// who sent false reads back true.
+	pkceRequired := true
+	client.PKCERequired = &pkceRequired
 }
 
 // HandleAPIClientsGet - GET /api/v1/admin/clients
@@ -536,7 +566,7 @@ func HandleAPIClientUpdatePut(
 			client.DefaultAcrLevel = acrLevel
 		}
 
-		if err := updateClientNotOwningAuthenticationMode(database, client, nil); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(database, client); err != nil {
 			slog.Error("AuthServer API: Database error updating client", "error", err, "clientId", client.Id, "clientIdentifier", client.ClientIdentifier)
 			writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
@@ -612,13 +642,9 @@ func HandleAPIClientAuthenticationPut(
 			// Switching to public: remove secret and disable client credentials
 			client.IsPublic = true
 			client.ClientSecretEncrypted = nil
-			client.ClientCredentialsEnabled = false
-			// A public client always requires PKCE, and the server enforces that whatever this
-			// column holds. It is still written explicitly, because the admin console and this
-			// API both hand the raw pointer back to a reader, and a stale false or a nil under a
-			// global-off deployment would report the opposite of what the server does (#245).
-			pkceRequired := true
-			client.PKCERequired = &pkceRequired
+			// Client credentials off and PKCE required, from the one definition every writer
+			// that can persist those two columns shares (#245).
+			applyPublicClientInvariants(client)
 		} else {
 			// Confidential: require strong secret
 			if err := validateClientSecret(req.ClientSecret); err != nil {
@@ -775,26 +801,13 @@ func HandleAPIClientOAuth2FlowsPut(
 		client.ImplicitGrantEnabled = req.ImplicitGrantEnabled
 		client.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled
 
-		// Both public-client rules run inside the write's transaction, against the is_public the
-		// row really carries. They cannot run out here: this endpoint reloads the client at the
-		// top of the request, and a client that became public in between would have its two
-		// rules skipped and be saved with client credentials on and PKCE off, which is the state
-		// this whole change exists to make unreachable (#245, final review finding 1).
-		normalize := func(client *models.Client) {
-			if !client.IsPublic {
-				return
-			}
-			// Public clients cannot use client credentials flow
-			client.ClientCredentialsEnabled = false
-			// A public client always requires PKCE, so req.PKCERequired is not read for one:
-			// normalized here rather than refused with a 400, so the endpoint's two
-			// public-client rules behave the same way. It is not silent, because the response
-			// body is the updated client and a caller who sent false reads back true (#245).
-			pkceRequired := true
-			client.PKCERequired = &pkceRequired
-		}
-
-		if err := updateClientNotOwningAuthenticationMode(database, client, normalize); err != nil {
+		// The two public-client rules are applied by the writer below, inside the write's
+		// transaction and against the is_public the row really carries. They cannot run out
+		// here: this endpoint reloads the client at the top of the request, and a client that
+		// became public in between would have its two rules skipped and be saved with client
+		// credentials on and PKCE off, which is the state this whole change exists to make
+		// unreachable (#245, final review finding 1).
+		if err := updateClientNotOwningAuthenticationMode(database, client); err != nil {
 			slog.Error("AuthServer API: Database error updating client OAuth2 flows", "error", err, "clientId", client.Id)
 			writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
@@ -1180,7 +1193,7 @@ func HandleAPIClientTokensPut(
 		client.IncludeOpenIDConnectClaimsInAccessToken = strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken)
 		client.IncludeOpenIDConnectClaimsInIdToken = strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken)
 
-		if err := updateClientNotOwningAuthenticationMode(database, client, nil); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(database, client); err != nil {
 			slog.Error("AuthServer API: Database error updating client tokens", "error", err, "clientId", client.Id)
 			writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
