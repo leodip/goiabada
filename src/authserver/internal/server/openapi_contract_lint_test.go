@@ -709,3 +709,419 @@ func TestOpenAPI_EveryRefResolves(t *testing.T) {
 			refs)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// The schema half.
+// ---------------------------------------------------------------------------
+
+// TestOpenAPI_SchemaPropertiesMatchTheAPIStructs holds every component schema's property set
+// to the json: tags of the src/core/api struct of the same name, in both directions. Routes
+// and statuses were already guarded both ways by the tests above; schemas were guarded by
+// nothing, and they had drifted: 19 properties across 8 schemas were undeclared when this was
+// first measured, pkceRequired among them, so the published contract did not know PKCE
+// configuration existed at all and a generated client could neither set it nor read it back
+// (#245). Leaving a field out of the spec does not keep it off the wire; it only keeps it out
+// of the client somebody generates from the spec.
+//
+// Composition is resolved on both sides. A property inherited through allOf or reached
+// through a $ref counts as documented, and a Go field promoted from an embedded struct counts
+// as declared. A first version of the measurement that did neither reported 21 phantom
+// properties on EnhancedUserSessionResponse alone, every one of which it inherits.
+//
+// Two limits, both real, both stated here rather than left to be discovered.
+//
+// Pairing is by identical name. A schema deliberately named differently from its struct is
+// paired through schemaStructNames below rather than renamed: a published schema name is part
+// of the contract a caller has already generated against, and an internal Go name is not.
+//
+// The check covers presence, not type. A named type that marshals to a scalar cannot be typed
+// from the Go source lexically: api.UserResponse.Subject is a uuid.UUID, so a type check would
+// call the spec's correct "string" a mismatch against an "object" it inferred from the
+// selector. Carrying a type map for the handful of such types buys less than the one live
+// case costs to explain, so type agreement stays a question for the census.
+//
+// A schema that no operation reaches is not this test's subject: TestOpenAPI_EveryRefResolves
+// owns reachability, and this one owns content.
+
+// schemaStructNames pairs a component schema with the src/core/api struct it describes where
+// the two are deliberately named differently. An entry pairs rather than exempts, so the
+// schema's properties are still checked; the name difference is the only thing waved through.
+//
+// Exact, like the two maps below: both ends must exist, and an entry is refused if a struct of
+// the schema's own name also exists, because then the pairing is ambiguous rather than
+// deliberate.
+var schemaStructNames = map[string]string{
+	// The spec has said CreateUserRequest since it was written and a caller has generated
+	// against it. The Go type is CreateUserAdminRequest because there is a self-service
+	// counterpart it has to be told apart from inside the server. Both names are right where
+	// they are.
+	"CreateUserRequest": "CreateUserAdminRequest",
+}
+
+// schemasWithNoAPIStruct is one half of the exemption, in the shape knownUndocumentedRoutes
+// had: a name and the reason it is not a defect. Exact, so a schema that acquires a struct of
+// its own name fails this test until its entry comes out.
+var schemasWithNoAPIStruct = map[string]string{
+	// Four bodies their handlers build as a map[string]interface{} literal rather than from a
+	// declared type, so there is nothing to pair with. The declared shapes are confirmed
+	// against what the handlers actually write by the census, not by this test.
+	"ClientLogoInfoResponse":       "handler_api_client_logo.go builds this body as a map literal; no Go type declares it",
+	"ClientLogoUploadResponse":     "handler_api_client_logo.go builds this body as a map literal; no Go type declares it",
+	"ProfilePictureInfoResponse":   "the profile picture handlers build this body as a map literal; no Go type declares it",
+	"ProfilePictureUploadResponse": "the profile picture handlers build this body as a map literal; no Go type declares it",
+
+	// Four nested shapes written by hand for the schemas that embed them. Each is referenced
+	// once, from the schema it belongs to, and none is a response body in its own right.
+	"GroupBasic":      "a nested shape inside the schema that references it; no core/api struct declares it",
+	"PermissionBasic": "a nested shape inside the schema that references it; no core/api struct declares it",
+	"RedirectURI":     "a nested shape backed by the core/models type of that name, not a core/api one",
+	"WebOrigin":       "a nested shape backed by the core/models type of that name, not a core/api one",
+}
+
+// apiStructsWithNoSchema is the other half. A struct here is a shape the server can write or
+// read that this document does not declare, and the reason has to say why that is acceptable
+// rather than merely true.
+var apiStructsWithNoSchema = map[string]string{
+	// Outside the document's declared scope. info.description scopes this file to the Admin
+	// API (/api/v1/admin/*) and the Account API (/api/v1/account/*); /connect/register is a
+	// protocol endpoint and is neither, which is also why TestOpenAPI_DescribesEveryAPIRoute
+	// scopes itself to /api/v1.
+	"DynamicClientRegistrationRequest":  "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
+	"DynamicClientRegistrationResponse": "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
+	"DynamicClientRegistrationError":    "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
+
+	// Five real gaps on operations that are already documented, which is why layer (ii) did
+	// not close them: the routes exist in the spec, but each answers a shape the spec does not
+	// declare. They belong to the census, and when it declares them these entries have to come
+	// out or this test fails, which is the point of the map being exact.
+	"SearchUsersWithGroupAnnotationResponse":      "searchUsers answers this when annotateGroupMembership is set; the spec declares only the plain SearchUsersResponse",
+	"SearchUsersWithPermissionAnnotationResponse": "searchUsers answers this when annotatePermissionId is set; the spec declares only the plain SearchUsersResponse",
+	"UserWithGroupMembershipResponse":             "the element type of the annotated searchUsers response above, undeclared for the same reason",
+	"UserWithPermissionResponse":                  "the element type of the annotated searchUsers response above, undeclared for the same reason",
+	"AccountLogoutFormPostResponse":               "the second shape requestAccountLogout can answer; the spec declares only AccountLogoutRedirectResponse",
+}
+
+func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
+	schemas := specSchemaProperties(t)
+	structs := apiStructFields(t)
+
+	// Pair first. A schema is checked against the struct of its own name unless an alias says
+	// otherwise.
+	pairedStruct := map[string]string{} // schema name -> struct name
+	pairedSchema := map[string]string{} // struct name -> schema name
+	for schema := range schemas {
+		name := schema
+		if alias, aliased := schemaStructNames[schema]; aliased {
+			name = alias
+		}
+		if _, exists := structs[name]; !exists {
+			continue
+		}
+		pairedStruct[schema] = name
+		pairedSchema[name] = schema
+	}
+
+	// The forward direction, and the one that matters to a caller: a field the API really
+	// carries must be in the contract it generates from.
+	for _, schema := range sortedKeys(pairedStruct) {
+		structName := pairedStruct[schema]
+		for _, field := range sortedKeys(structs[structName]) {
+			if schemas[schema][field] {
+				continue
+			}
+			t.Errorf("api.%s marshals %q, which the %s schema does not declare: a client "+
+				"generated from openapi.yaml has no field for it", structName, field, schema)
+		}
+	}
+
+	// The reverse: a property the spec promises must be one the struct really marshals, or the
+	// caller is told to expect a field that never arrives.
+	for _, schema := range sortedKeys(pairedStruct) {
+		structName := pairedStruct[schema]
+		for _, prop := range sortedKeys(schemas[schema]) {
+			if structs[structName][prop] {
+				continue
+			}
+			t.Errorf("the %s schema declares %q, which api.%s does not marshal: the spec is "+
+				"promising a field that cannot arrive", schema, prop, structName)
+		}
+	}
+
+	// Names with no counterpart, both ways, against the two exemption maps.
+	for _, schema := range sortedKeys(schemas) {
+		if _, paired := pairedStruct[schema]; paired {
+			continue
+		}
+		if _, allowed := schemasWithNoAPIStruct[schema]; allowed {
+			continue
+		}
+		t.Errorf("the %s schema has no struct of that name in src/core/api, so nothing checks "+
+			"its properties. Give it a struct, pair it in schemaStructNames, or record why in "+
+			"schemasWithNoAPIStruct", schema)
+	}
+	for _, structName := range sortedKeys(structs) {
+		if _, paired := pairedSchema[structName]; paired {
+			continue
+		}
+		if _, allowed := apiStructsWithNoSchema[structName]; allowed {
+			continue
+		}
+		t.Errorf("api.%s is a shape this server reads or writes and openapi.yaml declares no "+
+			"schema for it. Document it, pair it in schemaStructNames, or record why in "+
+			"apiStructsWithNoSchema", structName)
+	}
+
+	// The maps are exact in both directions, so an entry that has stopped being a gap fails
+	// here rather than sitting on as a stale allowance. That is what retired
+	// knownUndocumentedRoutes: every one of its eleven entries eventually stopped being true.
+	for _, schema := range sortedKeys(schemasWithNoAPIStruct) {
+		if _, exists := schemas[schema]; !exists {
+			t.Errorf("schemasWithNoAPIStruct exempts %s, which openapi.yaml no longer defines; "+
+				"delete the entry", schema)
+			continue
+		}
+		if structName, paired := pairedStruct[schema]; paired {
+			t.Errorf("schemasWithNoAPIStruct exempts %s, but api.%s now pairs with it; delete "+
+				"the entry so its properties are checked", schema, structName)
+		}
+	}
+	for _, structName := range sortedKeys(apiStructsWithNoSchema) {
+		if _, exists := structs[structName]; !exists {
+			t.Errorf("apiStructsWithNoSchema exempts api.%s, which src/core/api no longer "+
+				"declares; delete the entry", structName)
+			continue
+		}
+		if schema, paired := pairedSchema[structName]; paired {
+			t.Errorf("apiStructsWithNoSchema exempts api.%s, but the %s schema now pairs with "+
+				"it; delete the entry so its properties are checked", structName, schema)
+		}
+	}
+	for _, schema := range sortedKeys(schemaStructNames) {
+		structName := schemaStructNames[schema]
+		if _, exists := schemas[schema]; !exists {
+			t.Errorf("schemaStructNames pairs %s with api.%s, but openapi.yaml defines no such "+
+				"schema", schema, structName)
+		}
+		if _, exists := structs[structName]; !exists {
+			t.Errorf("schemaStructNames pairs %s with api.%s, but src/core/api declares no such "+
+				"struct", schema, structName)
+		}
+		if _, sameName := structs[schema]; sameName {
+			t.Errorf("schemaStructNames pairs %s with api.%s, but api.%s also exists, so which "+
+				"one the schema describes is a guess", schema, structName, schema)
+		}
+	}
+
+	// The floor. A pairing that quietly stopped matching would make every loop above run over
+	// nothing and the failure would look like a pass.
+	if len(pairedStruct) < 100 {
+		t.Errorf("paired only %d schemas with a struct; the name matching is no longer working",
+			len(pairedStruct))
+	}
+}
+
+// apiStructFields reads src/core/api and returns, per struct, the JSON names it marshals.
+//
+// Every struct type declaration is read, not only those carrying json tags, so a struct that
+// has none is visible to the pairing above rather than silently absent from it. Embedding is
+// flattened transitively: an embedded struct's fields marshal as though declared on the outer
+// one, which is the Go side of the spec's allOf.
+func apiStructFields(t *testing.T) map[string]map[string]bool {
+	t.Helper()
+
+	// go test runs with the package directory as the working directory, so this is
+	// src/authserver/internal/server and the API package is three levels up.
+	dir := filepath.Join("..", "..", "..", "core", "api")
+	sources, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	if err != nil {
+		t.Fatalf("globbing %s: %v", dir, err)
+	}
+
+	own := map[string]map[string]bool{}
+	embeds := map[string][]string{}
+	for _, path := range sources {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		fset := token.NewFileSet()
+		file, pErr := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if pErr != nil {
+			t.Fatalf("parsing %s: %v", path, pErr)
+		}
+		for _, decl := range file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				ts, isType := spec.(*ast.TypeSpec)
+				if !isType {
+					continue
+				}
+				st, isStruct := ts.Type.(*ast.StructType)
+				if !isStruct {
+					continue
+				}
+				fields := map[string]bool{}
+				for _, f := range st.Fields.List {
+					if len(f.Names) == 0 {
+						// Embedded. Recorded by name and resolved below; a qualified
+						// embed from another package would not be a core/api struct and
+						// is not one this package has.
+						if id, isIdent := f.Type.(*ast.Ident); isIdent {
+							embeds[ts.Name.Name] = append(embeds[ts.Name.Name], id.Name)
+						}
+						continue
+					}
+					if name, marshalled := jsonFieldName(f); marshalled {
+						fields[name] = true
+					}
+				}
+				own[ts.Name.Name] = fields
+			}
+		}
+	}
+
+	// Cycles are impossible in a Go struct graph, so the walk needs no visited set.
+	var flatten func(string, map[string]bool)
+	flatten = func(name string, into map[string]bool) {
+		for field := range own[name] {
+			into[field] = true
+		}
+		for _, embedded := range embeds[name] {
+			flatten(embedded, into)
+		}
+	}
+	out := map[string]map[string]bool{}
+	for name := range own {
+		flat := map[string]bool{}
+		flatten(name, flat)
+		out[name] = flat
+	}
+
+	if len(out) < 100 {
+		t.Fatalf("read only %d structs out of %s; the parse is no longer matching the package",
+			len(out), dir)
+	}
+	return out
+}
+
+var jsonTagValue = regexp.MustCompile(`json:"([^"]*)"`)
+
+// jsonFieldName reports the name a field marshals under, following encoding/json's own rules:
+// the tag's name part wins, "-" means the field is skipped, and an empty name or an absent tag
+// falls back to the Go field name. An unexported field never marshals whatever its tag says.
+func jsonFieldName(f *ast.Field) (string, bool) {
+	goName := f.Names[0].Name
+	if !ast.IsExported(goName) {
+		return "", false
+	}
+	if f.Tag == nil {
+		return goName, true
+	}
+	m := jsonTagValue.FindStringSubmatch(f.Tag.Value)
+	if m == nil {
+		return goName, true
+	}
+	name, _, hasOptions := strings.Cut(m[1], ",")
+	if name == "-" && !hasOptions {
+		return "", false
+	}
+	if name == "" {
+		return goName, true
+	}
+	return name, true
+}
+
+// specSchemaProperties reads the embedded bytes, as every other test here does, and returns
+// the properties each component schema exposes with allOf and $ref resolved.
+func specSchemaProperties(t *testing.T) map[string]map[string]bool {
+	t.Helper()
+
+	var doc struct {
+		Components struct {
+			Schemas map[string]yaml.Node `yaml:"schemas"`
+		} `yaml:"components"`
+	}
+	if err := yaml.Unmarshal(web.OpenAPISpec(), &doc); err != nil {
+		t.Fatalf("parsing the embedded openapi.yaml: %v", err)
+	}
+
+	out := map[string]map[string]bool{}
+	for name := range doc.Components.Schemas {
+		out[name] = resolveSchemaProperties(t, doc.Components.Schemas, name, map[string]bool{})
+	}
+
+	if len(out) < 100 {
+		t.Fatalf("read only %d component schemas out of the embedded openapi.yaml; the parse "+
+			"is no longer matching the document's shape", len(out))
+	}
+	return out
+}
+
+// resolveSchemaProperties collects one schema's properties, descending through allOf members
+// and $ref targets so an inherited property counts as documented.
+//
+// oneOf and anyOf are refused rather than unioned. A property set has no single meaning across
+// alternatives, so answering at all would be answering wrongly; the document uses neither
+// today, and the first one somebody writes should fail here and be thought about.
+func resolveSchemaProperties(t *testing.T, schemas map[string]yaml.Node, name string, seen map[string]bool) map[string]bool {
+	t.Helper()
+
+	out := map[string]bool{}
+	if seen[name] {
+		return out
+	}
+	seen[name] = true
+	node, defined := schemas[name]
+	if !defined {
+		return out
+	}
+
+	var walk func(n *yaml.Node)
+	walk = func(n *yaml.Node) {
+		if n == nil || n.Kind != yaml.MappingNode {
+			return
+		}
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			key, val := n.Content[i].Value, n.Content[i+1]
+			switch key {
+			case "properties":
+				if val.Kind != yaml.MappingNode {
+					continue
+				}
+				for j := 0; j+1 < len(val.Content); j += 2 {
+					out[val.Content[j].Value] = true
+				}
+			case "allOf":
+				for _, member := range val.Content {
+					walk(member)
+				}
+			case "oneOf", "anyOf":
+				t.Errorf("schema %s uses %s, which this check does not model: a property set "+
+					"has no single meaning across alternatives", name, key)
+			case "$ref":
+				idx := strings.LastIndex(val.Value, "/")
+				if idx < 0 {
+					continue // TestOpenAPI_EveryRefResolves owns malformed references
+				}
+				for prop := range resolveSchemaProperties(t, schemas, val.Value[idx+1:], seen) {
+					out[prop] = true
+				}
+			}
+		}
+	}
+	walk(&node)
+	return out
+}
+
+// sortedKeys makes every failure above deterministic, so a run that fails twice fails
+// identically and a diff of two runs is about the code rather than about map ordering.
+func sortedKeys[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
