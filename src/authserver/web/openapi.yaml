@@ -6,17 +6,25 @@ info:
 
     ## Authentication
 
-    All endpoints require a valid JWT access token in the `Authorization` header:
+    Every operation under `/api/v1` requires a valid JWT access token in the
+    `Authorization` header:
     ```
     Authorization: Bearer <access_token>
     ```
-
-    Use the client credentials flow to obtain an access token with the required scope.
+    `getClientLogoImage` is the exception and is marked `security: []`: it is public.
 
     ## API Groups
 
-    - **Admin API** (`/api/v1/admin/*`): Full administrative control. Requires `authserver:manage` scope.
-    - **Account API** (`/api/v1/account/*`): Self-service account management. Requires `authserver:manage-account` scope.
+    - **Admin API** (`/api/v1/admin/*`): administrative control. Each operation accepts any
+      one of a small set of scopes rather than a single one: reads accept
+      `authserver:admin-read` alongside the domain's own scope, and writes accept the
+      domain scope (`authserver:manage-users`, `authserver:manage-clients` or
+      `authserver:manage-settings`). `authserver:manage` is accepted everywhere.
+      A token from the client credentials flow is accepted here.
+    - **Account API** (`/api/v1/account/*`): Self-service account management. Requires
+      `authserver:manage-account` scope, **and** a token issued for a user: these operations
+      resolve the acting user from `sub`, so a client credentials token is refused with 403
+      and `error_code` `USER_CONTEXT_REQUIRED`.
 
     ## Caching
 
@@ -93,7 +101,11 @@ paths:
     get:
       tags: [Users]
       summary: Search users
-      description: Search for users with pagination
+      description: |
+        Search for users with pagination.
+
+        Each returned user can be annotated against one group or one permission. The two
+        annotations are mutually exclusive: sending both is refused with 400.
       operationId: searchUsers
       parameters:
         - name: query
@@ -101,15 +113,41 @@ paths:
           description: Search term (matches email, username, name)
           schema:
             type: string
+        - name: annotateGroupMembership
+          in: query
+          description: |
+            Group id to annotate each returned user against. Selects the
+            SearchUsersWithGroupAnnotationResponse shape. A group id that matches nothing is
+            answered 404.
+          schema:
+            type: integer
+            format: int64
+        - name: annotatePermissionId
+          in: query
+          description: |
+            Permission id to annotate each returned user against. Selects the
+            SearchUsersWithPermissionAnnotationResponse shape. A permission id that matches
+            nothing is answered 404, and the authserver `userinfo` permission is refused with
+            400.
+          schema:
+            type: integer
+            format: int64
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/SizeParam'
       responses:
         '200':
-          description: Search results
+          description: |
+            Search results. The shape depends on the annotation parameter: neither gives
+            SearchUsersResponse, annotateGroupMembership gives
+            SearchUsersWithGroupAnnotationResponse, annotatePermissionId gives
+            SearchUsersWithPermissionAnnotationResponse.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SearchUsersResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/SearchUsersResponse'
+                  - $ref: '#/components/schemas/SearchUsersWithGroupAnnotationResponse'
+                  - $ref: '#/components/schemas/SearchUsersWithPermissionAnnotationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -828,10 +866,12 @@ paths:
       tags: [User Sessions]
       summary: Delete session
       description: |
-        Terminate a user session.
+        Terminate a user session. The session's authorization codes are marked revoked and the
+        refresh tokens descended from them are swept, in one transaction.
 
-        Note: While GET uses sessionIdentifier (string), DELETE uses the numeric session ID.
-        The path parameter accepts either format.
+        Note: while GET takes the sessionIdentifier, DELETE takes the numeric session id at the
+        same position. It does not accept the identifier: a value that is not an integer is
+        refused with 400 and error_code INVALID_USER_SESSION_ID.
       operationId: deleteUserSession
       parameters:
         - name: sessionIdentifier
@@ -839,7 +879,8 @@ paths:
           required: true
           description: Session ID (numeric)
           schema:
-            type: string
+            type: integer
+            format: int64
       responses:
         '200':
           description: Session deleted
@@ -1694,7 +1735,15 @@ paths:
     put:
       tags: [Clients]
       summary: Update client authentication
-      description: Update client public/confidential mode and secret
+      description: |
+        Update client public/confidential mode and secret.
+
+        Switching a confidential client to public also revokes every authorization code and
+        refresh token the client holds, in the same transaction as the write: after it the
+        client authenticates with nothing, so the grants issued on the understanding that
+        redeeming them took a secret are no longer honoured. It sets pkceRequired to true for
+        the same reason, and disables the client credentials flow. The reverse transition and a
+        secret rotation revoke nothing.
       operationId: updateClientAuthentication
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -1953,7 +2002,7 @@ paths:
     post:
       tags: [Clients]
       summary: Upload client logo
-      description: Upload or replace the client logo image. Supports JPEG, PNG, GIF, and WebP formats up to 3MB.
+      description: Upload or replace the client logo image. Supports JPEG, PNG, GIF, and WebP formats up to the configured maximum size (3MB by default).
       operationId: uploadClientLogo
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -1969,7 +2018,7 @@ paths:
                 picture:
                   type: string
                   format: binary
-                  description: Logo image file (JPEG, PNG, GIF, or WebP, max 3MB)
+                  description: Logo image file (JPEG, PNG, GIF, or WebP), up to the configured maximum size
       responses:
         '200':
           description: Logo uploaded successfully
@@ -2965,7 +3014,18 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: |
+            The request failed inside the server. This operation is the one account endpoint
+            with two 500 bodies: a failure deleting the picture is the JSON error envelope with
+            error_code DELETE_ERROR, and a failure loading the user beforehand is the server's
+            HTML error page, because that branch renders the shared error template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+            text/html:
+              schema:
+                type: string
 
 components:
   securitySchemes:
@@ -2974,10 +3034,15 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        JWT access token obtained via OAuth2 client credentials flow.
+        JWT access token.
 
-        Admin API requires scope: `authserver:manage`
-        Account API requires scope: `authserver:manage-account`
+        Admin API: any one of `authserver:admin-read`, the domain scope for the operation
+        (`authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings`)
+        or `authserver:manage`. A client credentials token is accepted.
+
+        Account API: scope `authserver:manage-account`, on a token issued for a user. A client
+        credentials token carries no `auth_time` claim and is refused with 403
+        `USER_CONTEXT_REQUIRED`.
 
   parameters:
     UserIdParam:
@@ -3209,24 +3274,32 @@ components:
 
     GroupBasic:
       type: object
+      description: |
+        The `groups` entries of UserResponse. Backed by the Go type `models.Group`, which
+        carries no JSON tags, so the wire names are its exported field names and are
+        capitalised where the rest of this API is not.
       properties:
-        id:
+        Id:
           type: integer
           format: int64
-        groupIdentifier:
+        GroupIdentifier:
           type: string
-        description:
+        Description:
           type: string
 
     PermissionBasic:
       type: object
+      description: |
+        The `permissions` entries of UserResponse. Backed by the Go type `models.Permission`,
+        which carries no JSON tags, so the wire names are its exported field names and are
+        capitalised where the rest of this API is not.
       properties:
-        id:
+        Id:
           type: integer
           format: int64
-        permissionIdentifier:
+        PermissionIdentifier:
           type: string
-        resourceId:
+        ResourceId:
           type: integer
           format: int64
 
@@ -3237,6 +3310,58 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserResponse'
+        total:
+          type: integer
+        page:
+          type: integer
+        size:
+          type: integer
+        query:
+          type: string
+
+    UserWithGroupMembershipResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserResponse'
+        - type: object
+          properties:
+            inGroup:
+              type: boolean
+              description: Whether this user belongs to the annotated group
+
+    SearchUsersWithGroupAnnotationResponse:
+      type: object
+      description: Answered by searchUsers when annotateGroupMembership is set.
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserWithGroupMembershipResponse'
+        total:
+          type: integer
+        page:
+          type: integer
+        size:
+          type: integer
+        query:
+          type: string
+
+    UserWithPermissionResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserResponse'
+        - type: object
+          properties:
+            hasPermission:
+              type: boolean
+              description: Whether this user has the annotated permission assigned
+
+    SearchUsersWithPermissionAnnotationResponse:
+      type: object
+      description: Answered by searchUsers when annotatePermissionId is set.
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserWithPermissionResponse'
         total:
           type: integer
         page:
@@ -3301,7 +3426,9 @@ components:
           description: '"now" to set password immediately, "email" to send setup email'
         password:
           type: string
-          description: Required if setPasswordType is "now"
+          description: >-
+            Required if setPasswordType is "now", and required whatever setPasswordType says on
+            a deployment with no SMTP configured, since the setup email cannot be sent.
 
     UpdateUserProfileRequest:
       type: object
@@ -3995,20 +4122,28 @@ components:
     # =========================================================================
     RedirectURI:
       type: object
+      description: |
+        The `redirectURIs` entries of ClientResponse. Backed by the Go type
+        `models.RedirectURI`, which carries no JSON tags, so the wire names are its exported
+        field names and are capitalised where the rest of this API is not.
       properties:
-        id:
+        Id:
           type: integer
           format: int64
-        uri:
+        URI:
           type: string
 
     WebOrigin:
       type: object
+      description: |
+        The `webOrigins` entries of ClientResponse. Backed by the Go type `models.WebOrigin`,
+        which carries no JSON tags, so the wire names are its exported field names and are
+        capitalised where the rest of this API is not.
       properties:
-        id:
+        Id:
           type: integer
           format: int64
-        origin:
+        Origin:
           type: string
 
     ClientResponse:
@@ -4656,7 +4791,9 @@ components:
           description: Auto-resolved if omitted
         responseMode:
           type: string
-          enum: [form_post, redirect]
+          description: >-
+            Accepted and ignored. The response is always a redirect URL; there is no form_post
+            mode at this endpoint, and no value of this field changes what is returned.
 
     AccountLogoutRedirectResponse:
       type: object
