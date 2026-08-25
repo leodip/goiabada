@@ -950,9 +950,9 @@ func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 	db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 
 	var wroteWith *sql.Tx
-	result, err := RevokeClientGrantsTx(db, revokeClientId, func(tx *sql.Tx) error {
+	result, err := RevokeClientGrantsTx(db, revokeClientId, func(tx *sql.Tx) (bool, error) {
 		wroteWith = tx
-		return nil
+		return true, nil
 	})
 	require.NoError(t, err)
 
@@ -964,6 +964,42 @@ func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 	// it will be after the commit rather than as it was.
 	assert.Less(t, callIndex(t, db, "BeginTransaction"), callIndex(t, db, "RevokeCodesByClientId"))
 	assert.Less(t, callIndex(t, db, "GetRefreshTokensByClientId"), callIndex(t, db, "CommitTransaction"))
+}
+
+// TestRevokeClientGrantsTx_AWriteThatIsNotATransitionCommitsAndRevokesNothing is the other half of
+// the wrapper's contract, and the reason the write reports a bool at all.
+//
+// The decision "is this write the one that removes the client's obligation to authenticate" can
+// only be taken against the row inside the transaction, so it is taken by the write function and
+// reported back. A write answering false still commits: a save of an already-public client is a
+// legitimate write and must not be refused, and it must not revoke, because there is no
+// transition to answer for and the grants belong to a client that was already public before the
+// request arrived.
+//
+// The strict mock is the assertion. RevokeCodesByClientId and GetRefreshTokensByClientId are
+// never registered, so reaching either fails the test.
+func TestRevokeClientGrantsTx_AWriteThatIsNotATransitionCommitsAndRevokesNothing(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+
+	db.On("BeginTransaction").Return(revokeTx, nil).Once()
+	db.On("CommitTransaction", revokeTx).Return(nil).Once()
+	db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+
+	wrote := false
+	result, err := RevokeClientGrantsTx(db, revokeClientId, func(tx *sql.Tx) (bool, error) {
+		wrote = true
+		return false, nil
+	})
+	require.NoError(t, err)
+
+	assert.True(t, wrote, "the write still runs and still commits; only the revocation is skipped")
+	assert.Equal(t, int64(0), result.RevokedCodeCount)
+	assert.Empty(t, result.RevokedRefreshTokenJtis)
+	// A list rather than nil, like the success path, so a caller that audits it anyway logs []
+	// rather than null.
+	assert.NotNil(t, result.RevokedRefreshTokenJtis)
+	assertNotAttempted(t, db, "RevokeCodesByClientId", "GetRefreshTokensByClientId",
+		"UpdateRefreshToken")
 }
 
 // TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult walks every failure point and asserts the
@@ -979,7 +1015,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 	cases := []struct {
 		name         string
 		setup        func(db *mocks_data.Database)
-		write        func(tx *sql.Tx) error
+		write        func(tx *sql.Tx) (bool, error)
 		notAttempted []string
 		extraAssert  func(t *testing.T, result ClientGrantRevocationResult)
 	}{
@@ -1000,7 +1036,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				db.On("BeginTransaction").Return(revokeTx, nil).Once()
 				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
-			write:        func(tx *sql.Tx) error { return boom },
+			write:        func(tx *sql.Tx) (bool, error) { return false, boom },
 			notAttempted: []string{"RevokeCodesByClientId", "GetRefreshTokensByClientId", "CommitTransaction"},
 		},
 		{
@@ -1068,7 +1104,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 
 			write := tc.write
 			if write == nil {
-				write = func(tx *sql.Tx) error { return nil }
+				write = func(tx *sql.Tx) (bool, error) { return true, nil }
 			}
 
 			result, err := RevokeClientGrantsTx(db, revokeClientId, write)

@@ -22,7 +22,59 @@ import (
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/leodip/goiabada/core/validators"
+	"github.com/pkg/errors"
 )
+
+// updateClientNotOwningAuthenticationMode writes a client through an endpoint that changes some
+// other part of it. Three of them exist (general settings, OAuth2 flows, token settings) and none
+// of them means to touch how the client authenticates, but UpdateClient writes every mutable
+// column, so each one silently carries is_public and client_secret_encrypted from the copy it
+// loaded at the top of the request back into the row.
+//
+// That is a lost update with a security consequence, which is why it is closed here rather than
+// left to the general concurrency of the endpoint. A save whose loaded copy said "public" and
+// whose row now says "confidential" restores public mode and deletes the newer secret, and the
+// handler doing it has no revocation of its own, so the client's outstanding grants stay
+// redeemable with nothing presented. The confidential-to-public flip is the only write allowed to
+// change this, and it revokes (#245, final review finding 1).
+//
+// So the two authentication-owned columns are re-read INSIDE the transaction and copied over
+// whatever the caller is holding, which makes the change structurally impossible rather than
+// merely unintended. normalize, when given, runs after that refresh and before the write, so a
+// caller whose own rules depend on the authentication mode applies them to the mode the row
+// really has; passing nil means the caller has no such rule.
+//
+// It does not close the lost update on the columns each endpoint DOES own: two concurrent saves
+// of the same section still last-write-wins, which is how every entity in this codebase behaves
+// and is a separate, wider question.
+func updateClientNotOwningAuthenticationMode(database data.Database, client *models.Client,
+	normalize func(client *models.Client)) error {
+
+	tx, err := database.BeginTransaction()
+	if err != nil {
+		return err
+	}
+	defer database.RollbackTransaction(tx) //nolint:errcheck
+
+	current, err := database.GetClientById(tx, client.Id)
+	if err != nil {
+		return err
+	}
+	if current == nil {
+		return errors.WithStack(errors.New("client no longer exists"))
+	}
+	client.IsPublic = current.IsPublic
+	client.ClientSecretEncrypted = current.ClientSecretEncrypted
+
+	if normalize != nil {
+		normalize(client)
+	}
+
+	if err := database.UpdateClient(tx, client); err != nil {
+		return err
+	}
+	return database.CommitTransaction(tx)
+}
 
 // HandleAPIClientsGet - GET /api/v1/admin/clients
 func HandleAPIClientsGet(
@@ -484,7 +536,7 @@ func HandleAPIClientUpdatePut(
 			client.DefaultAcrLevel = acrLevel
 		}
 
-		if err := database.UpdateClient(nil, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(database, client, nil); err != nil {
 			slog.Error("AuthServer API: Database error updating client", "error", err, "clientId", client.Id, "clientIdentifier", client.ClientIdentifier)
 			writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
@@ -556,11 +608,6 @@ func HandleAPIClientAuthenticationPut(
 			return
 		}
 
-		// Captured before the request is applied, because the revocation below keys on the
-		// TRANSITION and not on the state that was asked for. Reading client.IsPublic after the
-		// assignment would revoke on every save of an already-public client.
-		wasPublic := client.IsPublic
-
 		if req.IsPublic {
 			// Switching to public: remove secret and disable client credentials
 			client.IsPublic = true
@@ -600,18 +647,41 @@ func HandleAPIClientAuthenticationPut(
 		// The client write and the revocation share one transaction so the secret cannot be
 		// destroyed while the grants it was protecting survive. The audit event is emitted after
 		// the commit, because a logged revocation that then rolled back would be a false record.
-		becomingPublic := req.IsPublic && !wasPublic
-		if becomingPublic {
-			result, err := handlers.RevokeClientGrantsTx(database, client.Id, func(tx *sql.Tx) error {
-				return database.UpdateClient(tx, client)
+		//
+		// WHICH TRANSITION THIS IS, IS DECIDED INSIDE THAT TRANSACTION, against the row as it
+		// stands rather than against the copy loaded above. The two are not the same client: a
+		// concurrent request can make this client confidential and issue it a grant between the
+		// load and the write, and a classification taken from the stale copy then reads "already
+		// public", skips the revocation, and commits a public client holding grants that were
+		// issued while a secret was required. Reading it here costs one query inside a
+		// transaction the flip already opens (#245, final review finding 1).
+		if req.IsPublic {
+			var becamePublic bool
+			result, err := handlers.RevokeClientGrantsTx(database, client.Id, func(tx *sql.Tx) (bool, error) {
+				current, err := database.GetClientById(tx, client.Id)
+				if err != nil {
+					return false, err
+				}
+				if current == nil {
+					return false, errors.WithStack(errors.New("client no longer exists"))
+				}
+				becamePublic = !current.IsPublic
+				if err := database.UpdateClient(tx, client); err != nil {
+					return false, err
+				}
+				return becamePublic, nil
 			})
 			if err != nil {
 				slog.Error("AuthServer API: Database error updating client authentication", "error", err, "clientId", client.Id)
 				writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
 				return
 			}
-			handlers.LogRevokedClientGrants(auditLogger, client.Id,
-				handlers.RevocationReasonClientBecamePublic, authHelper.GetLoggedInSubject(r), result)
+			// Only a write that really performed the transition gets the event. A save of an
+			// already-public client revoked nothing and must not claim to.
+			if becamePublic {
+				handlers.LogRevokedClientGrants(auditLogger, client.Id,
+					handlers.RevocationReasonClientBecamePublic, authHelper.GetLoggedInSubject(r), result)
+			}
 		} else if err := database.UpdateClient(nil, client); err != nil {
 			slog.Error("AuthServer API: Database error updating client authentication", "error", err, "clientId", client.Id)
 			writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
@@ -704,7 +774,16 @@ func HandleAPIClientOAuth2FlowsPut(
 		client.PKCERequired = req.PKCERequired
 		client.ImplicitGrantEnabled = req.ImplicitGrantEnabled
 		client.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled
-		if client.IsPublic {
+
+		// Both public-client rules run inside the write's transaction, against the is_public the
+		// row really carries. They cannot run out here: this endpoint reloads the client at the
+		// top of the request, and a client that became public in between would have its two
+		// rules skipped and be saved with client credentials on and PKCE off, which is the state
+		// this whole change exists to make unreachable (#245, final review finding 1).
+		normalize := func(client *models.Client) {
+			if !client.IsPublic {
+				return
+			}
 			// Public clients cannot use client credentials flow
 			client.ClientCredentialsEnabled = false
 			// A public client always requires PKCE, so req.PKCERequired is not read for one:
@@ -715,7 +794,7 @@ func HandleAPIClientOAuth2FlowsPut(
 			client.PKCERequired = &pkceRequired
 		}
 
-		if err := database.UpdateClient(nil, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(database, client, normalize); err != nil {
 			slog.Error("AuthServer API: Database error updating client OAuth2 flows", "error", err, "clientId", client.Id)
 			writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
@@ -1101,7 +1180,7 @@ func HandleAPIClientTokensPut(
 		client.IncludeOpenIDConnectClaimsInAccessToken = strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken)
 		client.IncludeOpenIDConnectClaimsInIdToken = strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken)
 
-		if err := database.UpdateClient(nil, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(database, client, nil); err != nil {
 			slog.Error("AuthServer API: Database error updating client tokens", "error", err, "clientId", client.Id)
 			writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return

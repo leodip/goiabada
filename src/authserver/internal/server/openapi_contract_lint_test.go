@@ -79,7 +79,13 @@ type routeRegistration struct {
 	key         string // method + path with parameter names erased, the join key with the spec
 	handler     string
 	rateLimited bool
-	line        int
+	// scopeGuarded is true when a scope-checking middleware stands in front of the route, so
+	// the route can answer 403 without its handler containing the word. It is read from both
+	// places such a guard can be mounted: r.With(...) on the registration itself, which is how
+	// the Admin group does it per route, and r.Use(...) at the top of the enclosing r.Route
+	// group, which is how the Account group does it once for all of them.
+	scopeGuarded bool
+	line         int
 }
 
 // pathParam erases the name of a path parameter. routes.go and the spec disagree on several
@@ -96,6 +102,14 @@ func routeKey(method, path string) string {
 // TestOpenAPI_DeclaresEveryStatusTheHandlersEmit is the forward direction: a status a
 // handler can write must appear in the spec. This is the one that matters to a caller,
 // because the statuses it catches are the ones a generated client has no branch for.
+//
+// A status the ROUTE can write counts too, and the reason this test says so is that scanning
+// handler bodies alone missed 103 of them. Every Admin and Account operation sits behind a
+// scope guard that answers 403 before the handler runs, exactly as every one of them sits
+// behind the bearer-token check that answers 401, and the document declared the 401 on all
+// 105 and the 403 on two: the two whose handlers write it themselves. Middleware statuses are
+// not less part of the contract for being written earlier, and a generated client has no
+// branch for one either way (#245, final review finding 2).
 func TestOpenAPI_DeclaresEveryStatusTheHandlersEmit(t *testing.T) {
 	routes := parseRoutes(t)
 	statuses := parseHandlerStatuses(t)
@@ -120,6 +134,13 @@ func TestOpenAPI_DeclaresEveryStatusTheHandlersEmit(t *testing.T) {
 				"generated client has no branch for it. Handler: %s",
 				op.operationId, strings.ToUpper(r.method), r.path, code, r.handler)
 		}
+
+		// The middleware's own status, which no handler body mentions.
+		if r.scopeGuarded && !op.responses[403] {
+			t.Errorf("%s (%s %s) is behind a scope guard at routes.go:%d, so it can answer "+
+				"403 INSUFFICIENT_SCOPE before %s runs, and openapi.yaml does not declare it",
+				op.operationId, strings.ToUpper(r.method), r.path, r.line, r.handler)
+		}
 	}
 }
 
@@ -133,11 +154,15 @@ func TestOpenAPI_DeclaresEveryStatusTheHandlersEmit(t *testing.T) {
 // httpHelper.EncodeJson and never touches WriteHeader answers 200 without naming it, so
 // absence from the source would not be absence from the wire.
 //
-// Two failures are exempt, both because something other than the handler writes them, and
-// neither is merely waved through. 401 comes from the bearer-token middleware, which sits on
-// every API route. 429 comes from the rate limiter, which sits on three, and that one is
-// checked in both directions below: declared only where a limiter is in front, and required
-// wherever one is.
+// Three failures can come from somewhere other than the handler, and none is merely waved
+// through. 401 comes from the bearer-token middleware, which sits on every API route. 429
+// comes from the rate limiter, which sits on three. 403 comes from the scope guards, which
+// sit on all 105 API routes. The last two are checked in BOTH directions, here and in the
+// forward test: declared only where the middleware is in front, and required wherever it is.
+//
+// 403 is the one that has to stay two-directional rather than becoming a blanket exemption
+// like 401's, because an operation outside the API groups has no scope guard, and a 403 on
+// one of those would be promising a failure that cannot arrive.
 func TestOpenAPI_DeclaresNoStatusTheHandlersCannotEmit(t *testing.T) {
 	routes := parseRoutes(t)
 	statuses := parseHandlerStatuses(t)
@@ -155,6 +180,14 @@ func TestOpenAPI_DeclaresNoStatusTheHandlersCannotEmit(t *testing.T) {
 			}
 			if code == 401 {
 				continue // the bearer-token middleware, not the handler
+			}
+			if code == 403 {
+				if !r.scopeGuarded {
+					t.Errorf("%s (%s %s) declares 403, but routes.go:%d puts no scope guard "+
+						"in front of it and %s never writes one", op.operationId,
+						strings.ToUpper(r.method), r.path, r.line, r.handler)
+				}
+				continue
 			}
 			if code == 429 {
 				if !r.rateLimited {
@@ -282,7 +315,7 @@ func parseRoutes(t *testing.T) []routeRegistration {
 	}
 
 	var out []routeRegistration
-	collectRoutes(t, fset, file, "", &out)
+	collectRoutes(t, fset, file, "", false, &out)
 
 	// The floor. A parse that silently stopped matching chi's registration shape would make
 	// every test above vacuous, and the failure would look like a pass.
@@ -314,7 +347,9 @@ var specVerbs = func() map[string]bool {
 	return out
 }()
 
-func collectRoutes(t *testing.T, fset *token.FileSet, node ast.Node, prefix string, out *[]routeRegistration) {
+func collectRoutes(t *testing.T, fset *token.FileSet, node ast.Node, prefix string,
+	groupScopeGuarded bool, out *[]routeRegistration) {
+
 	ast.Inspect(node, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
@@ -331,7 +366,10 @@ func collectRoutes(t *testing.T, fset *token.FileSet, node ast.Node, prefix stri
 			sub, subOK := stringLiteral(call.Args[0])
 			body, bodyOK := call.Args[1].(*ast.FuncLit)
 			if subOK && bodyOK {
-				collectRoutes(t, fset, body, prefix+sub, out)
+				// A guard mounted with r.Use here covers every route in the body, and a
+				// group nested inside an already-guarded one stays guarded.
+				collectRoutes(t, fset, body, prefix+sub,
+					groupScopeGuarded || usesScopeGuard(body), out)
 				return false
 			}
 		}
@@ -347,12 +385,13 @@ func collectRoutes(t *testing.T, fset *token.FileSet, node ast.Node, prefix stri
 		}
 		full := prefix + path
 		*out = append(*out, routeRegistration{
-			method:      verb,
-			path:        full,
-			key:         routeKey(verb, full),
-			handler:     handler,
-			rateLimited: mentionsRateLimiter(sel.X),
-			line:        fset.Position(call.Pos()).Line,
+			method:       verb,
+			path:         full,
+			key:          routeKey(verb, full),
+			handler:      handler,
+			rateLimited:  mentionsRateLimiter(sel.X),
+			scopeGuarded: groupScopeGuarded || mentionsScopeGuard(sel.X),
+			line:         fset.Position(call.Pos()).Line,
 		})
 		return true
 	})
@@ -385,6 +424,56 @@ func handlerConstructor(e ast.Expr) (string, bool) {
 		return fn.Name, strings.HasPrefix(fn.Name, "Handle")
 	}
 	return "", false
+}
+
+// scopeGuards are the middlewares that can answer 403 INSUFFICIENT_SCOPE before a handler
+// runs. All three live in internal/middleware/api_auth.go, and each returns 403 rather than
+// 401 when the token is valid but does not carry what the route demands.
+//
+// Listed by name rather than detected structurally, so a fourth one is a deliberate addition
+// here rather than something that silently starts or stops being checked.
+var scopeGuards = map[string]bool{
+	"RequireBearerTokenScope":      true,
+	"RequireBearerTokenScopeAnyOf": true,
+	"RequireUserBoundToken":        true,
+}
+
+// mentionsScopeGuard looks for one of those in the .With(...) chain a verb hangs off, which is
+// how the Admin group mounts them: once per route, with the scopes that route accepts.
+func mentionsScopeGuard(e ast.Expr) bool {
+	found := false
+	ast.Inspect(e, func(n ast.Node) bool {
+		if sel, ok := n.(*ast.SelectorExpr); ok && scopeGuards[sel.Sel.Name] {
+			found = true
+		}
+		return !found
+	})
+	return found
+}
+
+// usesScopeGuard looks for one inside an r.Use(...) at the top of a route group, which is how
+// the Account group mounts them: once, covering every route in the body. Only r.Use counts,
+// because a guard named anywhere else in the body belongs to the single route that named it
+// and mentionsScopeGuard has already found it there.
+func usesScopeGuard(body *ast.FuncLit) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "Use" {
+			return true
+		}
+		for _, arg := range call.Args {
+			if mentionsScopeGuard(arg) {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
 }
 
 // mentionsRateLimiter looks for the limiter in the .With(...) chain the verb hangs off.
@@ -742,6 +831,15 @@ func TestOpenAPI_EveryRefResolves(t *testing.T) {
 //
 // A schema that no operation reaches is not this test's subject: TestOpenAPI_EveryRefResolves
 // owns reachability, and this one owns content.
+//
+// SOME SHAPES ON THE WIRE ARE NOT core/api STRUCTS, and exempting them was a hole rather than
+// a limit. Four nested schemas were waved through here on the true observation that no
+// core/api type declares them, and all four turned out to be incomplete against the
+// core/models type they really serialize: fifteen fields the API emits on every one of these
+// responses had no entry in the contract, and adding a bogus property to one left this whole
+// tier green (#245, final review finding 3). So a schema backed by a core/models type is
+// paired through schemaModelNames and checked exactly, the same way and to the same standard
+// as a core/api one. What stays exempt is only what no Go type declares at all.
 
 // schemaStructNames pairs a component schema with the src/core/api struct it describes where
 // the two are deliberately named differently. An entry pairs rather than exempts, so the
@@ -770,12 +868,32 @@ var schemasWithNoAPIStruct = map[string]string{
 	"ProfilePictureInfoResponse":   "the profile picture handlers build this body as a map literal; no Go type declares it",
 	"ProfilePictureUploadResponse": "the profile picture handlers build this body as a map literal; no Go type declares it",
 
-	// Four nested shapes written by hand for the schemas that embed them. Each is referenced
-	// once, from the schema it belongs to, and none is a response body in its own right.
-	"GroupBasic":      "a nested shape inside the schema that references it; no core/api struct declares it",
-	"PermissionBasic": "a nested shape inside the schema that references it; no core/api struct declares it",
-	"RedirectURI":     "a nested shape backed by the core/models type of that name, not a core/api one",
-	"WebOrigin":       "a nested shape backed by the core/models type of that name, not a core/api one",
+	// A standard-library shape, not a Goiabada one. Every timestamp on the model-backed
+	// schemas is a database/sql NullTime, which carries no JSON tags and no MarshalJSON, so
+	// it reaches the wire as its own two exported fields. Declaring it once and referencing
+	// it is what stops those two fields being written out six times.
+	"NullTime": "database/sql.NullTime as encoding/json writes it; no Goiabada type declares it",
+}
+
+// schemaModelNames pairs a component schema with the src/core/models type it serializes. These
+// are the shapes an API response embeds directly rather than converting: api.UserResponse
+// carries []models.Group and []models.Permission, and api.ClientResponse carries
+// []models.RedirectURI and []models.WebOrigin, so those model types ARE the wire contract at
+// those positions.
+//
+// None of them carries a json: tag, which is why their properties are capitalised where the
+// rest of this document is not. That is a fact about the wire, not a style choice, and the
+// schemas say so in their own descriptions.
+//
+// Exact, like the maps above: both ends must exist, and a schema here must not also have a
+// core/api struct of its own name, because then which one it describes is a guess.
+var schemaModelNames = map[string]string{
+	"GroupBasic":          "Group",
+	"GroupAttributeBasic": "GroupAttribute",
+	"PermissionBasic":     "Permission",
+	"ResourceBasic":       "Resource",
+	"RedirectURI":         "RedirectURI",
+	"WebOrigin":           "WebOrigin",
 }
 
 // apiStructsWithNoSchema is the other half. A struct here is a shape the server can write or
@@ -799,7 +917,8 @@ var apiStructsWithNoSchema = map[string]string{
 
 func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 	schemas := specSchemaProperties(t)
-	structs := apiStructFields(t)
+	structs := structFields(t, filepath.Join("..", "..", "..", "core", "api"), 100)
+	models := structFields(t, filepath.Join("..", "..", "..", "core", "models"), 20)
 
 	// Pair first. A schema is checked against the struct of its own name unless an alias says
 	// otherwise.
@@ -815,6 +934,51 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 		}
 		pairedStruct[schema] = name
 		pairedSchema[name] = schema
+	}
+
+	// The model-backed shapes, checked to the same standard. They are a separate map rather
+	// than a second pass over the same one because the two packages mean different things: a
+	// core/api type is a shape written for this API, and a core/models type is a database row
+	// that an API response happens to serialize whole.
+	pairedModel := map[string]string{} // schema name -> models type name
+	for schema, model := range schemaModelNames {
+		if _, exists := schemas[schema]; !exists {
+			t.Errorf("schemaModelNames pairs %s with models.%s, but openapi.yaml defines no "+
+				"such schema", schema, model)
+			continue
+		}
+		if _, exists := models[model]; !exists {
+			t.Errorf("schemaModelNames pairs %s with models.%s, but src/core/models declares "+
+				"no such type", schema, model)
+			continue
+		}
+		if _, ambiguous := structs[schema]; ambiguous {
+			t.Errorf("schemaModelNames pairs %s with models.%s, but api.%s also exists, so "+
+				"which one the schema describes is a guess", schema, model, schema)
+			continue
+		}
+		pairedModel[schema] = model
+	}
+
+	// Both directions, exactly, for each one. A field the response really carries must be in
+	// the contract, and a property the contract promises must be one the type really
+	// marshals.
+	for _, schema := range sortedKeys(pairedModel) {
+		model := pairedModel[schema]
+		for _, field := range sortedKeys(models[model]) {
+			if schemas[schema][field] {
+				continue
+			}
+			t.Errorf("models.%s marshals %q, which the %s schema does not declare: a client "+
+				"generated from openapi.yaml has no field for it", model, field, schema)
+		}
+		for _, prop := range sortedKeys(schemas[schema]) {
+			if models[model][prop] {
+				continue
+			}
+			t.Errorf("the %s schema declares %q, which models.%s does not marshal: the spec "+
+				"is promising a field that cannot arrive", schema, prop, model)
+		}
 	}
 
 	// The forward direction, and the one that matters to a caller: a field the API really
@@ -848,11 +1012,14 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 		if _, paired := pairedStruct[schema]; paired {
 			continue
 		}
+		if _, paired := pairedModel[schema]; paired {
+			continue
+		}
 		if _, allowed := schemasWithNoAPIStruct[schema]; allowed {
 			continue
 		}
-		t.Errorf("the %s schema has no struct of that name in src/core/api, so nothing checks "+
-			"its properties. Give it a struct, pair it in schemaStructNames, or record why in "+
+		t.Errorf("the %s schema has no Go type checking its properties. Give it a struct in "+
+			"src/core/api, pair it in schemaStructNames or schemaModelNames, or record why in "+
 			"schemasWithNoAPIStruct", schema)
 	}
 	for _, structName := range sortedKeys(structs) {
@@ -879,6 +1046,10 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 		if structName, paired := pairedStruct[schema]; paired {
 			t.Errorf("schemasWithNoAPIStruct exempts %s, but api.%s now pairs with it; delete "+
 				"the entry so its properties are checked", schema, structName)
+		}
+		if model, paired := pairedModel[schema]; paired {
+			t.Errorf("schemasWithNoAPIStruct exempts %s, but models.%s now pairs with it; "+
+				"delete the entry so its properties are checked", schema, model)
 		}
 	}
 	for _, structName := range sortedKeys(apiStructsWithNoSchema) {
@@ -916,18 +1087,26 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 	}
 }
 
-// apiStructFields reads src/core/api and returns, per struct, the JSON names it marshals.
+// structFields reads one Go package directory and returns, per struct, the JSON names it
+// marshals. It is called for src/core/api and for src/core/models, which are the two packages
+// whose types reach this API's wire.
 //
 // Every struct type declaration is read, not only those carrying json tags, so a struct that
-// has none is visible to the pairing above rather than silently absent from it. Embedding is
-// flattened transitively: an embedded struct's fields marshal as though declared on the outer
-// one, which is the Go side of the spec's allOf.
-func apiStructFields(t *testing.T) map[string]map[string]bool {
+// has none is visible to the pairing above rather than silently absent from it. That matters
+// more for core/models than for core/api: no type in core/models carries a json tag at all,
+// which is exactly why its fields arrive capitalised.
+//
+// Embedding is flattened transitively: an embedded struct's fields marshal as though declared
+// on the outer one, which is the Go side of the spec's allOf.
+//
+// go test runs with the package directory as the working directory, so callers pass a path
+// relative to src/authserver/internal/server, and a floor: the smallest number of struct
+// declarations the package can honestly contain. A parse that quietly stopped matching would
+// return nothing, every loop above would run over it, and the failure would look like a pass.
+// The floor is per package because the two are nothing like the same size.
+func structFields(t *testing.T, dir string, floor int) map[string]map[string]bool {
 	t.Helper()
 
-	// go test runs with the package directory as the working directory, so this is
-	// src/authserver/internal/server and the API package is three levels up.
-	dir := filepath.Join("..", "..", "..", "core", "api")
 	sources, err := filepath.Glob(filepath.Join(dir, "*.go"))
 	if err != nil {
 		t.Fatalf("globbing %s: %v", dir, err)
@@ -995,9 +1174,9 @@ func apiStructFields(t *testing.T) map[string]map[string]bool {
 		out[name] = flat
 	}
 
-	if len(out) < 100 {
-		t.Fatalf("read only %d structs out of %s; the parse is no longer matching the package",
-			len(out), dir)
+	if len(out) < floor {
+		t.Fatalf("read only %d structs out of %s, fewer than the %d this package must have; "+
+			"the parse is no longer matching it", len(out), dir, floor)
 	}
 	return out
 }

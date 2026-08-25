@@ -483,10 +483,21 @@ const RevocationReasonClientBecamePublic = "client_became_public"
 //
 //   - the client write and the revocation are in the same transaction, so a client can never end
 //     up public with its secret deleted while the grants that secret was protecting survive;
+//   - the write DECIDES, inside that transaction, whether the grants must go, and reports it in
+//     its bool return. Classifying outside cannot establish the guarantee above: a caller
+//     comparing against a client it loaded before the transaction opened is comparing against a
+//     row another request may already have changed, and a write that turns out to remove the
+//     authentication requirement would then commit with the grants left alive (#245, final review
+//     finding 1). Nothing else may decide this, which is why the signal is a return value here
+//     rather than an argument the caller computes;
 //   - any failure BEFORE the commit is rolled back atomically, via the deferred rollback;
 //   - the audit event is the CALLER's job and happens after this returns successfully, because
 //     AuditLogger.Log takes no transaction and a logged revocation that then rolled back would be
 //     a false record (#106 decision 5).
+//
+// A write reporting false commits on its own and revokes nothing, so the same discipline covers
+// the save that turns out not to be a transition. The caller can tell the two apart by what its
+// own write function observed, and must only audit a revocation when it reported true.
 //
 // On any error the returned result is the zero value rather than a partially populated one, so a
 // caller that mistakenly audits on the error path cannot emit half-truthful lists.
@@ -498,7 +509,7 @@ const RevocationReasonClientBecamePublic = "client_became_public"
 // failure is indeterminate, and the bounded consequence is a client left flipped and revoked with
 // no audit record of it, which is fail-closed on the security side and a gap on the forensic side.
 func RevokeClientGrantsTx(db data.Database, clientId int64,
-	write func(tx *sql.Tx) error) (ClientGrantRevocationResult, error) {
+	write func(tx *sql.Tx) (bool, error)) (ClientGrantRevocationResult, error) {
 
 	tx, err := db.BeginTransaction()
 	if err != nil {
@@ -506,13 +517,17 @@ func RevokeClientGrantsTx(db data.Database, clientId int64,
 	}
 	defer db.RollbackTransaction(tx) //nolint:errcheck
 
-	if err := write(tx); err != nil {
+	revoke, err := write(tx)
+	if err != nil {
 		return ClientGrantRevocationResult{}, err
 	}
 
-	result, err := RevokeClientGrants(db, tx, clientId)
-	if err != nil {
-		return ClientGrantRevocationResult{}, err
+	result := ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
+	if revoke {
+		result, err = RevokeClientGrants(db, tx, clientId)
+		if err != nil {
+			return ClientGrantRevocationResult{}, err
+		}
 	}
 
 	if err := db.CommitTransaction(tx); err != nil {
