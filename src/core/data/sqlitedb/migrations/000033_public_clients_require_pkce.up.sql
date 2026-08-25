@@ -1,0 +1,20 @@
+-- Migration 000033: a public client always requires PKCE, so bring the stored
+-- column into line with what the server now enforces (#245).
+--
+-- The rule itself lives in Client.IsPKCERequired, which answers `required` for a
+-- public client whatever this column holds. This migration exists because the
+-- column is still READ for display: the admin console hands the raw pointer to
+-- its template and the REST API returns it, so a public client left at `false`
+-- or at NULL would have the console and the API reporting the opposite of what
+-- the token endpoint does.
+--
+-- The predicate is `is_public`, NOT `pkce_required = false`. NULL has to move as
+-- well: a public client left at NULL renders as "Inherit from global setting
+-- (currently: optional)" the moment the global setting is turned off. One
+-- predicate covers `false` and NULL together, and re-running is harmless.
+--
+-- The boolean literal differs by engine and a wrong one matches nothing SILENTLY
+-- rather than failing: is_public is `numeric` here, `tinyint(1)` on MySQL and
+-- `BIT` on SQL Server, all of which take 1, and `boolean` on PostgreSQL, which
+-- takes true.
+UPDATE clients SET pkce_required = 1 WHERE is_public = 1;
