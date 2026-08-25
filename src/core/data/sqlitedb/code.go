@@ -23,6 +23,10 @@ func (d *SQLiteDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdent
 	return d.CommonDB.RevokeCodesBySessionIdentifier(tx, sessionIdentifier)
 }
 
+func (d *SQLiteDatabase) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error) {
+	return d.CommonDB.RevokeCodesByClientId(tx, clientId)
+}
+
 func (d *SQLiteDatabase) RevokeCodeIfSessionGone(tx *sql.Tx, codeId int64, sessionIdentifier string) (bool, error) {
 	return d.CommonDB.RevokeCodeIfSessionGone(tx, codeId, sessionIdentifier)
 }

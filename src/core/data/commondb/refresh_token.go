@@ -526,6 +526,64 @@ func (d *CommonDatabase) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*
 	return refreshTokens, nil
 }
 
+// GetRefreshTokensByClientId returns every refresh token belonging to a client,
+// whatever shape links it to them.
+//
+// The invariant this rests on: a refresh token reaches its client through
+// codes.client_id (authorization code flow, where refresh_tokens.code_id is set and
+// refresh_tokens.client_id is null) or through refresh_tokens.client_id (ROPC, where
+// code_id is null), and through nothing else. generateRefreshToken writes the first
+// shape and generateRefreshTokenForROPC the second, so the two are mutually exclusive
+// and the union cannot produce duplicates. If a third issuance shape is ever added,
+// the data test enumerating shapes is what should fail.
+//
+// Built as two UNION ALL branches for the reason GetRefreshTokensByUserId is: each
+// branch can use its own index where an OR across the two tables would defeat both.
+// (#245)
+func (d *CommonDatabase) GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error) {
+
+	if clientId == 0 {
+		return nil, nil
+	}
+
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+		For(d.Flavor)
+
+	// Authorization code flow: the client is on the code, not the token.
+	viaCode := refreshTokenStruct.SelectFrom("refresh_tokens")
+	viaCode.JoinWithOption(sqlbuilder.InnerJoin, "codes", "codes.id = refresh_tokens.code_id")
+	viaCode.Where(viaCode.Equal("codes.client_id", clientId))
+
+	// ROPC: the client is on the token itself and there is no code at all.
+	direct := refreshTokenStruct.SelectFrom("refresh_tokens")
+	direct.Where(direct.Equal("refresh_tokens.client_id", clientId))
+
+	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var refreshTokens []*models.RefreshToken
+	for rows.Next() {
+		var refreshToken models.RefreshToken
+		addr := refreshTokenStruct.Addr(&refreshToken)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan refreshToken")
+		}
+		refreshTokens = append(refreshTokens, &refreshToken)
+	}
+	// Without this a mid-stream failure would return a PARTIAL token set as success,
+	// and the flip would commit a revocation sweep that missed rows it never saw.
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
+	return refreshTokens, nil
+}
+
 // PromoteRefreshTokenGenerations moves the named refresh tokens to a new
 // authentication generation, skipping any that are already revoked.
 //

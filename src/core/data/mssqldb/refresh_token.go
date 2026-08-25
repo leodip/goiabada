@@ -111,6 +111,10 @@ func (d *MsSQLDatabase) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*m
 	return d.CommonDB.GetRefreshTokensByUserId(tx, userId)
 }
 
+func (d *MsSQLDatabase) GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error) {
+	return d.CommonDB.GetRefreshTokensByClientId(tx, clientId)
+}
+
 func (d *MsSQLDatabase) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
 	return d.CommonDB.PromoteRefreshTokenGenerations(tx, refreshTokenIds, generation)
 }

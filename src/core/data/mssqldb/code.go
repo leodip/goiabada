@@ -79,6 +79,10 @@ func (d *MsSQLDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdenti
 	return d.CommonDB.RevokeCodesBySessionIdentifier(tx, sessionIdentifier)
 }
 
+func (d *MsSQLDatabase) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error) {
+	return d.CommonDB.RevokeCodesByClientId(tx, clientId)
+}
+
 func (d *MsSQLDatabase) RevokeCodeIfSessionGone(tx *sql.Tx, codeId int64, sessionIdentifier string) (bool, error) {
 	return d.CommonDB.RevokeCodeIfSessionGone(tx, codeId, sessionIdentifier)
 }
