@@ -75,6 +75,8 @@ tags:
     description: Permission management (Admin API)
   - name: Clients
     description: OAuth client management (Admin API)
+  - name: Audit Logs
+    description: Audit log query (Admin API)
   - name: Settings
     description: System settings (Admin API)
   - name: Account
@@ -426,6 +428,87 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UpdateUserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/users/{id}/profile-picture:
+    get:
+      tags: [Users]
+      summary: Get user profile picture info
+      description: Check whether a user has a profile picture and get the picture URL
+      operationId: getUserProfilePictureInfo
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Profile picture info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilePictureInfoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Users]
+      summary: Upload user profile picture
+      description: Upload or replace the user's profile picture. Supports JPEG, PNG, GIF, and WebP formats up to the configured maximum size.
+      operationId: uploadUserProfilePicture
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - picture
+              properties:
+                picture:
+                  type: string
+                  format: binary
+                  description: Profile picture file (JPEG, PNG, GIF, or WebP)
+      responses:
+        '200':
+          description: Profile picture uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilePictureUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Users]
+      summary: Delete user profile picture
+      description: Remove the user's profile picture
+      operationId: deleteUserProfilePicture
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Profile picture deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -888,6 +971,41 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/groups/search:
+    get:
+      tags: [Groups]
+      summary: Search groups annotated with a permission
+      description: |
+        Get a page of groups, each annotated with whether it has the given
+        permission assigned. The annotation permission is required: without it
+        there is nothing to annotate and the request is refused.
+      operationId: searchGroupsWithPermissionAnnotation
+      parameters:
+        - name: annotatePermissionId
+          in: query
+          required: true
+          description: The permission each returned group is annotated against
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Annotated groups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchGroupsWithPermissionAnnotationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -1774,6 +1892,41 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/clients/{id}/sessions:
+    get:
+      tags: [Clients]
+      summary: List client sessions
+      description: |
+        Get a page of the user sessions associated with a client. Sessions that
+        have passed the configured idle timeout or maximum lifetime are left out,
+        so the list is the live ones.
+      operationId: getClientSessions
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - name: size
+          in: query
+          description: Results per page (default 50, capped at 100)
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: Client sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetUserSessionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/clients/{id}/logo:
     get:
       tags: [Clients]
@@ -2140,6 +2293,48 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/settings/audit-logs:
+    get:
+      tags: [Settings]
+      summary: Get audit log settings
+      description: Get audit log destinations and retention
+      operationId: getSettingsAuditLogs
+      responses:
+        '200':
+          description: Audit log settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsAuditLogsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags: [Settings]
+      summary: Update audit log settings
+      description: Update audit log destinations and retention
+      operationId: updateSettingsAuditLogs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsAuditLogsRequest'
+      responses:
+        '200':
+          description: Audit log settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsAuditLogsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/settings/keys:
     get:
       tags: [Settings]
@@ -2243,6 +2438,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetPhoneCountriesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # =============================================================================
+  # ADMIN API - AUDIT LOGS
+  # =============================================================================
+  /api/v1/admin/audit-logs:
+    get:
+      tags: [Audit Logs]
+      summary: Query audit logs
+      description: |
+        Get a page of audit log entries, most recent first, optionally narrowed to
+        a single audit event. Entries are only present when audit logging to the
+        database is enabled.
+      operationId: getAuditLogs
+      parameters:
+        - name: auditEvent
+          in: query
+          description: Return only entries for this audit event
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageParam'
+        - name: size
+          in: query
+          description: Results per page (default 20, capped at 200)
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetAuditLogsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -2661,6 +2894,76 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/account/profile-picture:
+    get:
+      tags: [Account]
+      summary: Get own profile picture info
+      description: Check whether the authenticated user has a profile picture and get the picture URL
+      operationId: getAccountProfilePictureInfo
+      responses:
+        '200':
+          description: Profile picture info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilePictureInfoResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Account]
+      summary: Upload own profile picture
+      description: Upload or replace the authenticated user's profile picture. Supports JPEG, PNG, GIF, and WebP formats up to the configured maximum size.
+      operationId: uploadAccountProfilePicture
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - picture
+              properties:
+                picture:
+                  type: string
+                  format: binary
+                  description: Profile picture file (JPEG, PNG, GIF, or WebP)
+      responses:
+        '200':
+          description: Profile picture uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilePictureUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Account]
+      summary: Delete own profile picture
+      description: Remove the authenticated user's profile picture
+      operationId: deleteAccountProfilePicture
+      responses:
+        '200':
+          description: Profile picture deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -3396,6 +3699,29 @@ components:
         group:
           $ref: '#/components/schemas/GroupResponse'
 
+    GroupWithPermissionResponse:
+      allOf:
+        - $ref: '#/components/schemas/GroupResponse'
+        - type: object
+          properties:
+            hasPermission:
+              type: boolean
+              description: Whether this group has the annotated permission assigned
+
+    SearchGroupsWithPermissionAnnotationResponse:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupWithPermissionResponse'
+        total:
+          type: integer
+        page:
+          type: integer
+        size:
+          type: integer
+
     GetGroupMembersResponse:
       type: object
       properties:
@@ -3945,6 +4271,24 @@ components:
           type: string
           description: Public URL to the uploaded logo
 
+    ProfilePictureInfoResponse:
+      type: object
+      properties:
+        hasPicture:
+          type: boolean
+        pictureUrl:
+          type: string
+          description: Public URL to serve the picture (only present when hasPicture is true)
+
+    ProfilePictureUploadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        pictureUrl:
+          type: string
+          description: Public URL to the uploaded picture
+
     # =========================================================================
     # Settings Schemas
     # =========================================================================
@@ -4139,6 +4483,57 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SettingsSigningKeyResponse'
+
+    SettingsAuditLogsResponse:
+      type: object
+      properties:
+        auditLogsInConsoleEnabled:
+          type: boolean
+        auditLogsInDatabaseEnabled:
+          type: boolean
+        auditLogRetentionDays:
+          type: integer
+          description: Days to keep entries for. 0 means keep them forever.
+
+    UpdateSettingsAuditLogsRequest:
+      type: object
+      properties:
+        auditLogsInConsoleEnabled:
+          type: boolean
+        auditLogsInDatabaseEnabled:
+          type: boolean
+        auditLogRetentionDays:
+          type: integer
+          description: Days to keep entries for. 0 means keep them forever, and the maximum is 3650.
+
+    AuditLogResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        auditEvent:
+          type: string
+        details:
+          type: string
+          description: The event payload, as a JSON string
+
+    GetAuditLogsResponse:
+      type: object
+      properties:
+        auditLogs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogResponse'
+        total:
+          type: integer
+        page:
+          type: integer
+        size:
+          type: integer
 
     PhoneCountryResponse:
       type: object

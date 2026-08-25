@@ -233,13 +233,6 @@ type UpdateGroupAttributeRequest struct {
 	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
 
-// ValidateResourcePermissionRequest checks if a permission identifier and
-// description are valid according to server rules.
-type ValidateResourcePermissionRequest struct {
-	PermissionIdentifier string `json:"permissionIdentifier"`
-	Description          string `json:"description"`
-}
-
 type CreateClientRequest struct {
 	ClientIdentifier         string `json:"clientIdentifier"`
 	Description              string `json:"description"`

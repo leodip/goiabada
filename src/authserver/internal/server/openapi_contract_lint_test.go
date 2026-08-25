@@ -93,29 +93,6 @@ func routeKey(method, path string) string {
 	return method + " " + pathParam.ReplaceAllString(path, "{}")
 }
 
-// knownUndocumentedRoutes are the API routes web/openapi.yaml does not describe at all.
-// Documenting them means writing full operations, several needing request and response
-// schemas that do not exist yet (the profile picture endpoints carry image bytes, the audit
-// log ones a query surface), which is a larger piece of work than reconciling the statuses
-// of the operations that are already there.
-//
-// The list is exact in both directions. A new API route that is not documented fails
-// TestOpenAPI_DescribesEveryAPIRoute unless it is added here deliberately, and an entry that
-// stops being a gap fails it too, so documenting one of these forces the line to go.
-var knownUndocumentedRoutes = map[string]string{
-	"get /api/v1/admin/users/{}/profile-picture":    "image bytes, no schema in the spec yet",
-	"post /api/v1/admin/users/{}/profile-picture":   "multipart upload, no schema in the spec yet",
-	"delete /api/v1/admin/users/{}/profile-picture": "paired with the two above",
-	"get /api/v1/account/profile-picture":           "image bytes, no schema in the spec yet",
-	"post /api/v1/account/profile-picture":          "multipart upload, no schema in the spec yet",
-	"delete /api/v1/account/profile-picture":        "paired with the two above",
-	"get /api/v1/admin/groups/search":               "search response schema not in the spec yet",
-	"get /api/v1/admin/clients/{}/sessions":         "session list schema not in the spec yet",
-	"get /api/v1/admin/audit-logs":                  "audit log query surface not in the spec yet",
-	"get /api/v1/admin/settings/audit-logs":         "audit log settings not in the spec yet",
-	"put /api/v1/admin/settings/audit-logs":         "audit log settings not in the spec yet",
-}
-
 // TestOpenAPI_DeclaresEveryStatusTheHandlersEmit is the forward direction: a status a
 // handler can write must appear in the spec. This is the one that matters to a caller,
 // because the statuses it catches are the ones a generated client has no branch for.
@@ -208,9 +185,16 @@ func TestOpenAPI_DeclaresNoStatusTheHandlersCannotEmit(t *testing.T) {
 	}
 }
 
-// TestOpenAPI_DescribesEveryAPIRoute keeps the two surfaces the same size. Every route under
-// /api/v1 is either in the spec or named in knownUndocumentedRoutes with a reason, and the
-// spec describes no operation that no longer exists.
+// TestOpenAPI_DescribesEveryAPIRoute keeps the two surfaces the same size, in both
+// directions: every route under /api/v1 is in the spec, and the spec describes no operation
+// that no longer exists.
+//
+// There is no allowance list any more. There used to be one, knownUndocumentedRoutes, holding
+// eleven routes with a reason each, and its note claimed several of them needed schemas that
+// did not exist. That was stale: the profile picture operations answer JSON rather than image
+// bytes, and the audit log and group search shapes were already declared in src/core/api. All
+// eleven were written out (#245), so a new API route now has one way to satisfy this test,
+// which is to be documented.
 func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 	routes := parseRoutes(t)
 	spec := parseSpec(t)
@@ -221,16 +205,10 @@ func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 		if !strings.HasPrefix(r.path, "/api/v1/") {
 			continue
 		}
-		_, documented := spec[r.key]
-		_, allowed := knownUndocumentedRoutes[r.key]
-		switch {
-		case documented && allowed:
-			t.Errorf("%s %s is documented now, so its knownUndocumentedRoutes entry %q is "+
-				"stale and must go", strings.ToUpper(r.method), r.path, r.key)
-		case !documented && !allowed:
-			t.Errorf("routes.go:%d: %s %s is not in openapi.yaml. Document it, or add it to "+
-				"knownUndocumentedRoutes with the reason it cannot be documented yet",
-				r.line, strings.ToUpper(r.method), r.path)
+		if _, documented := spec[r.key]; !documented {
+			t.Errorf("routes.go:%d: %s %s is not in openapi.yaml. Document it: the file is the "+
+				"contract a caller generates a client from, and a route missing from it is a route "+
+				"that caller cannot reach", r.line, strings.ToUpper(r.method), r.path)
 		}
 	}
 
@@ -656,5 +634,78 @@ func TestOpenAPI_ResponseRefsResolve(t *testing.T) {
 	if checked < 300 {
 		t.Errorf("checked only %d response entries; the walk is no longer reaching the "+
 			"document's operations", checked)
+	}
+}
+
+// TestOpenAPI_EveryRefResolves is the same guard widened to every $ref in the document, not
+// only the ones that are a whole response. The test above walks operations' response entries
+// and resolves those into components/responses; a $ref to a schema, sitting one level deeper
+// under content/application-json/schema, was reached by nothing. That is the ref a caller
+// actually depends on: a generator that cannot resolve an operation's response schema emits
+// no type for it, so a misspelling there costs more than a misspelled shared response, and
+// until this test it shipped in silence. Found by mutation while writing the eleven
+// operations that had never been documented (#245).
+//
+// The walk is over the parsed document rather than over the text, so it reaches a $ref
+// wherever one is legal: inside a schema, a parameter, an array's items, an allOf member.
+func TestOpenAPI_EveryRefResolves(t *testing.T) {
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal(web.OpenAPISpec(), &doc); err != nil {
+		t.Fatalf("parsing the embedded openapi.yaml: %v", err)
+	}
+
+	components, _ := doc["components"].(map[string]interface{})
+	if components == nil {
+		t.Fatal("openapi.yaml has no components section")
+	}
+
+	// defined reports whether components/<section>/<name> exists.
+	defined := func(section, name string) bool {
+		sec, ok := components[section].(map[string]interface{})
+		if !ok {
+			return false
+		}
+		_, ok = sec[name]
+		return ok
+	}
+
+	refs := 0
+	var walk func(node interface{}, where string)
+	walk = func(node interface{}, where string) {
+		switch n := node.(type) {
+		case map[string]interface{}:
+			for key, val := range n {
+				if key == "$ref" {
+					ref, isString := val.(string)
+					if !isString {
+						t.Errorf("%s: $ref is not a string", where)
+						continue
+					}
+					refs++
+					parts := strings.Split(strings.TrimPrefix(ref, "#/"), "/")
+					if !strings.HasPrefix(ref, "#/components/") || len(parts) != 3 {
+						t.Errorf("%s: $ref %q is not a local reference into components, "+
+							"which is the only shape this document uses", where, ref)
+						continue
+					}
+					if !defined(parts[1], parts[2]) {
+						t.Errorf("%s: $ref %q resolves to nothing. A generator reading this "+
+							"document emits no type for it", where, ref)
+					}
+					continue
+				}
+				walk(val, where+"/"+key)
+			}
+		case []interface{}:
+			for i, item := range n {
+				walk(item, fmt.Sprintf("%s[%d]", where, i))
+			}
+		}
+	}
+	walk(doc, "")
+
+	if refs < 300 {
+		t.Errorf("resolved only %d references; the walk is no longer reaching the document",
+			refs)
 	}
 }

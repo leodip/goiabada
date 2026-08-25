@@ -761,13 +761,6 @@ type GetUsersByPermissionResponse struct {
 	Size  int            `json:"size"`
 }
 
-// ValidateResourcePermissionResponse returns the result of server-side
-// validation for a permission identifier/description pair.
-type ValidateResourcePermissionResponse struct {
-	Valid bool   `json:"valid"`
-	Error string `json:"error,omitempty"`
-}
-
 type PhoneCountryResponse struct {
 	UniqueId    string `json:"uniqueId"`
 	Alpha2      string `json:"alpha2"`
