@@ -6540,6 +6540,74 @@ func (_c *Database_GetRefreshTokenByJti_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// GetRefreshTokensByClientId provides a mock function for the type Database
+func (_mock *Database) GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error) {
+	ret := _mock.Called(tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRefreshTokensByClientId")
+	}
+
+	var r0 []*models.RefreshToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) ([]*models.RefreshToken, error)); ok {
+		return returnFunc(tx, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) []*models.RefreshToken); ok {
+		r0 = returnFunc(tx, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.RefreshToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetRefreshTokensByClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRefreshTokensByClientId'
+type Database_GetRefreshTokensByClientId_Call struct {
+	*mock.Call
+}
+
+// GetRefreshTokensByClientId is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) GetRefreshTokensByClientId(tx any, clientId any) *Database_GetRefreshTokensByClientId_Call {
+	return &Database_GetRefreshTokensByClientId_Call{Call: _e.mock.On("GetRefreshTokensByClientId", tx, clientId)}
+}
+
+func (_c *Database_GetRefreshTokensByClientId_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_GetRefreshTokensByClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByClientId_Call) Return(refreshTokens []*models.RefreshToken, err error) *Database_GetRefreshTokensByClientId_Call {
+	_c.Call.Return(refreshTokens, err)
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByClientId_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensByClientId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRefreshTokensByCodeId provides a mock function for the type Database
 func (_mock *Database) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error) {
 	ret := _mock.Called(tx, codeId)
@@ -10167,6 +10235,72 @@ func (_c *Database_RevokeCodeIfSessionGone_Call) Return(b bool, err error) *Data
 }
 
 func (_c *Database_RevokeCodeIfSessionGone_Call) RunAndReturn(run func(tx *sql.Tx, codeId int64, sessionIdentifier string) (bool, error)) *Database_RevokeCodeIfSessionGone_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RevokeCodesByClientId provides a mock function for the type Database
+func (_mock *Database) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error) {
+	ret := _mock.Called(tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RevokeCodesByClientId")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (int64, error)); ok {
+		return returnFunc(tx, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) int64); ok {
+		r0 = returnFunc(tx, clientId)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RevokeCodesByClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeCodesByClientId'
+type Database_RevokeCodesByClientId_Call struct {
+	*mock.Call
+}
+
+// RevokeCodesByClientId is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) RevokeCodesByClientId(tx any, clientId any) *Database_RevokeCodesByClientId_Call {
+	return &Database_RevokeCodesByClientId_Call{Call: _e.mock.On("RevokeCodesByClientId", tx, clientId)}
+}
+
+func (_c *Database_RevokeCodesByClientId_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_RevokeCodesByClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RevokeCodesByClientId_Call) Return(n int64, err error) *Database_RevokeCodesByClientId_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_RevokeCodesByClientId_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) (int64, error)) *Database_RevokeCodesByClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }

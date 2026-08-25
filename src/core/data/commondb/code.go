@@ -169,6 +169,53 @@ func (d *CommonDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdent
 	return rowsAffected, nil
 }
 
+// RevokeCodesByClientId marks every not-yet-revoked code of one client revoked, and
+// reports how many rows this call transitioned. It is the durable half of flipping a
+// client from confidential to public (#245): the code is the grant record, and a
+// rotated refresh token inherits its parent's code_id, so marking the code marks every
+// descendant of that grant, including one inserted after this statement committed. The
+// refresh-token sweep that follows it is cleanup and the audit record, not the boundary.
+//
+// The `revoked = false` term is what makes the count mean "rows this call
+// transitioned" on all four engines rather than "rows matched", exactly as it does in
+// RevokeCodesBySessionIdentifier above: MySQL reports changed rows, and the updated_at
+// assignment would make an already-revoked row count as changed, so without the term a
+// second flip would report the client's whole code history as newly revoked.
+//
+// A zero client id is rejected rather than used as a filter. codes.client_id is NOT
+// NULL and no clients row carries id 0, so a zero can only be a caller bug, and a flip
+// must never be able to sweep on one.
+func (d *CommonDatabase) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error) {
+
+	if clientId == 0 {
+		return 0, errors.WithStack(errors.New("can't revoke codes with a client id of 0"))
+	}
+
+	ub := sqlbuilder.NewUpdateBuilder()
+	ub.Update("codes")
+	ub.Set(
+		ub.Assign("revoked", true),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("client_id", clientId),
+		ub.Equal("revoked", false),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to revoke codes by client id")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to get rows affected when revoking codes by client id")
+	}
+
+	return rowsAffected, nil
+}
+
 // RevokeCodeIfSessionGone marks one code revoked, but only if the session it was issued
 // through no longer has a row, and reports whether it made that transition. It is the
 // compensating half of ending a session (#129 decision 12), and it exists because the

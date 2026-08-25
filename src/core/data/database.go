@@ -147,6 +147,14 @@ type Database interface {
 	// every refresh token descended from it, present and future, because a rotated
 	// child inherits its parent's code_id (see #129).
 	RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error)
+	// RevokeCodesByClientId marks every not-yet-revoked code of one client revoked and
+	// reports how many rows it transitioned. It is the durable half of flipping a
+	// client from confidential to public: marking the code reaches every refresh token
+	// descended from it, present and future, because a rotated child inherits its
+	// parent's code_id, so a token inserted after this statement committed is born
+	// already rejected. The count is what this call transitioned and not what the
+	// client has, so a second flip reports 0 (see #245).
+	RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error)
 	// RevokeCodeIfSessionGone marks one code revoked only if the session it was issued
 	// through no longer has a row, reporting whether it made the transition. It runs
 	// immediately after a code is inserted, so a code that lands after a termination
@@ -386,6 +394,15 @@ type Database interface {
 	// substitute for it, because that query joins through codes and so excludes ROPC
 	// rows, and because it needs a live session row to supply the identifier (#106).
 	GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error)
+	// GetRefreshTokensByClientId returns every refresh token belonging to a client,
+	// through either linkage shape: codes.client_id for the authorization code flow,
+	// where refresh_tokens.client_id is null, and refresh_tokens.client_id for ROPC,
+	// where there is no code at all. GetRefreshTokensBySessionIdentifier cannot
+	// substitute for it, for the two reasons it cannot substitute for the by-user
+	// query: it joins through codes and so excludes ROPC rows, and it needs a live
+	// session row to supply the identifier. Used by the confidential-to-public flip,
+	// which must reach every grant the client holds however it was issued (#245).
+	GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error)
 	// PromoteRefreshTokenGenerations moves the named, unrevoked refresh tokens to a
 	// new authentication generation. An empty id list is a no-op (#106).
 	PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error

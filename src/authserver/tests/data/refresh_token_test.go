@@ -845,6 +845,204 @@ func TestGetRefreshTokensByUserId_NoTokens(t *testing.T) {
 	}
 }
 
+// TestGetRefreshTokensByClientId is the exhaustive owner of this query's linkage-shape
+// coverage (seam 6, #245). The confidential-to-public flip sweeps through it, so a shape
+// the query cannot reach is a grant that survives the flip.
+//
+// The shapes exist because a refresh token reaches its client two different ways: through
+// codes.client_id for the authorization code flow, where refresh_tokens.client_id is left
+// null, and directly through refresh_tokens.client_id for ROPC, where there is no code at
+// all. The query is two UNION ALL branches over those two columns, so both have to be
+// enumerated or a whole class of token escapes the sweep.
+//
+// The ROPC branch is not a formality here. The password arm's entire client
+// authentication block sits under `if !client.IsPublic`, so a public client can use ROPC
+// presenting nothing at all, and its tokens carry no code for the marker to reach.
+func TestGetRefreshTokensByClientId(t *testing.T) {
+	client := createTestClient(t)
+	otherClient := createTestClient(t)
+	user := createTestUser(t)
+
+	newToken := func(rt *models.RefreshToken) *models.RefreshToken {
+		rt.RefreshTokenJti = gofakeit.UUID()
+		rt.Scope = "openid"
+		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
+		rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
+		if err := database.CreateRefreshToken(nil, rt); err != nil {
+			t.Fatalf("Failed to create refresh token: %v", err)
+		}
+		return rt
+	}
+
+	// Shape 1: authorization code flow. The client is on the code; generateRefreshToken
+	// writes code_id and leaves the token's own client_id null.
+	code := createTestCode(t, client.Id, user.Id)
+	viaCode := newToken(&models.RefreshToken{
+		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
+		SessionIdentifier: code.SessionIdentifier,
+		RefreshTokenType:  "Refresh",
+	})
+
+	// Shape 2: ROPC. generateRefreshTokenForROPC does the reverse, writing user_id and
+	// client_id straight onto the token with no code at all.
+	ropc := newToken(&models.RefreshToken{
+		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		RefreshTokenType: "Offline",
+		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+	})
+
+	// Negatives: the same two shapes for a different client. Each varies only the
+	// client, so neither can pass with its branch's predicate removed.
+	otherCode := createTestCode(t, otherClient.Id, user.Id)
+	otherViaCode := newToken(&models.RefreshToken{
+		CodeId:            sql.NullInt64{Int64: otherCode.Id, Valid: true},
+		SessionIdentifier: otherCode.SessionIdentifier,
+		RefreshTokenType:  "Refresh",
+	})
+	otherRopc := newToken(&models.RefreshToken{
+		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: otherClient.Id, Valid: true},
+		RefreshTokenType: "Offline",
+		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+	})
+
+	got, err := database.GetRefreshTokensByClientId(nil, client.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByClientId failed: %v", err)
+	}
+
+	found := make(map[int64]bool, len(got))
+	for _, rt := range got {
+		found[rt.Id] = true
+	}
+
+	for _, want := range []struct {
+		label string
+		id    int64
+	}{
+		{"authorization code token reached through codes.client_id", viaCode.Id},
+		{"ROPC token reached through refresh_tokens.client_id", ropc.Id},
+	} {
+		if !found[want.id] {
+			t.Errorf("missing shape: %s (id %d)", want.label, want.id)
+		}
+	}
+
+	for _, unwanted := range []struct {
+		label string
+		id    int64
+	}{
+		{"another client's token via a code", otherViaCode.Id},
+		{"another client's ROPC token", otherRopc.Id},
+	} {
+		if found[unwanted.id] {
+			t.Errorf("returned a token that is not this client's: %s (id %d)", unwanted.label, unwanted.id)
+		}
+	}
+
+	// The union must not double-count. The two branches are mutually exclusive in
+	// production because the issuer writes one linkage column or the other, never both,
+	// so an auth-code token matches only the first branch.
+	if len(got) != 2 {
+		t.Errorf("expected exactly 2 tokens for this client, got %d (duplicates from the UNION ALL?)", len(got))
+	}
+}
+
+// TestGetRefreshTokensByClientId_NoTokens covers the empty result, and the zero-id guard.
+func TestGetRefreshTokensByClientId_NoTokens(t *testing.T) {
+	client := createTestClient(t)
+
+	got, err := database.GetRefreshTokensByClientId(nil, client.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByClientId failed: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for a fresh client, got %d", len(got))
+	}
+
+	got, err = database.GetRefreshTokensByClientId(nil, 0)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByClientId(0) should not error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for client id 0, got %d", len(got))
+	}
+}
+
+// TestGetRefreshTokensByClientId_TransactionAndFailurePath answers the two questions a
+// mock can never answer about a new data method: does it enlist in the caller's
+// transaction rather than reading through the pool, and does its failure path return an
+// error rather than a benign empty slice.
+//
+// Both matter for the flip, which reads this inside the same transaction as the client
+// write. A read through the pool would miss rows written earlier in that transaction, and
+// a database fault collapsed into (nil, nil) would have the flip commit a sweep that
+// revoked nothing and audit it as a success.
+func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+
+	tx := beginTx(t)
+
+	random := gofakeit.LetterN(6)
+	code := &models.Code{
+		ClientId:            client.Id,
+		UserId:              user.Id,
+		Code:                "txcode_" + random,
+		CodeHash:            "txhash_" + random,
+		CodeChallenge:       sql.NullString{String: "txchal_" + random, Valid: true},
+		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+		RedirectURI:         "https://example.com/callback",
+		Scope:               "openid",
+		IpAddress:           "127.0.0.1",
+		UserAgent:           "test",
+		ResponseMode:        "query",
+		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+		SessionIdentifier:   "txsess_" + random,
+		AcrLevel:            "1",
+		AuthMethods:         "pwd",
+	}
+	if err := database.CreateCode(tx, code); err != nil {
+		t.Fatalf("CreateCode in a transaction: %v", err)
+	}
+	refreshToken := &models.RefreshToken{
+		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
+		SessionIdentifier: code.SessionIdentifier,
+		RefreshTokenJti:   gofakeit.UUID(),
+		RefreshTokenType:  "Refresh",
+		Scope:             "openid",
+		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
+	}
+	if err := database.CreateRefreshToken(tx, refreshToken); err != nil {
+		t.Fatalf("CreateRefreshToken in a transaction: %v", err)
+	}
+
+	// Neither row is committed, so only a query enlisted in this transaction can see
+	// them. A query through the pool returns nothing here.
+	got, err := database.GetRefreshTokensByClientId(tx, client.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByClientId in a transaction returned error: %v", err)
+	}
+	if len(got) != 1 || got[0].Id != refreshToken.Id {
+		t.Fatalf("expected the transaction's own uncommitted token, got %d rows", len(got))
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+
+	// The failure path, forced by the same finished transaction.
+	got, err = database.GetRefreshTokensByClientId(tx, client.Id)
+	if err == nil {
+		t.Error("a query that cannot run must return an error, not a benign empty slice")
+	}
+	if len(got) != 0 {
+		t.Errorf("a failed call must return no rows, got %d", len(got))
+	}
+}
+
 // TestPromoteRefreshTokenGenerations checks that promotion touches only the named rows,
 // skips already-revoked ones, and treats an empty id list as a no-op.
 //

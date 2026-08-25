@@ -61,6 +61,10 @@ func (d *SQLiteDatabase) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*
 	return d.CommonDB.GetRefreshTokensByUserId(tx, userId)
 }
 
+func (d *SQLiteDatabase) GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error) {
+	return d.CommonDB.GetRefreshTokensByClientId(tx, clientId)
+}
+
 func (d *SQLiteDatabase) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
 	return d.CommonDB.PromoteRefreshTokenGenerations(tx, refreshTokenIds, generation)
 }

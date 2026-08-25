@@ -1064,6 +1064,112 @@ func TestRevokeCodesBySessionIdentifier_TransactionAndFailurePath(t *testing.T) 
 	}
 }
 
+// TestRevokeCodesByClientId covers the marker that makes the confidential-to-public flip
+// durable (#245): every code of the flipped client is marked, and nothing else is.
+//
+// Marking the code is the boundary rather than bookkeeping. A rotated refresh token
+// inherits its parent's code_id, so a token inserted after this statement committed is
+// born already rejected by the check on the refresh arm. The token sweep that follows the
+// marker in the flip is cleanup and the audit record.
+func TestRevokeCodesByClientId(t *testing.T) {
+	client := createTestClient(t)
+	otherClient := createTestClient(t)
+	user := createTestUser(t)
+
+	first := createTestCode(t, client.Id, user.Id)
+	second := createTestCode(t, client.Id, user.Id)
+	unrelated := createTestCode(t, otherClient.Id, user.Id)
+
+	// Every code of the flipped client transitions, and the count says how many. The
+	// count is what the audit event reports, so it is part of the contract.
+	count, err := database.RevokeCodesByClientId(nil, client.Id)
+	if err != nil {
+		t.Fatalf("RevokeCodesByClientId returned error: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("expected 2 codes revoked, got %d", count)
+	}
+	assertCodeRevoked(t, first.Id, true, "a code of the flipped client")
+	assertCodeRevoked(t, second.Id, true, "the second code of the flipped client")
+
+	// The negative control, and the boundary the flip depends on. Without it this test
+	// passes against a method that revokes every code in the table, which would cut off
+	// every grant of every other client at once.
+	assertCodeRevoked(t, unrelated.Id, false, "a code of a client that was not flipped")
+
+	// Idempotent, and the count reports rows actually transitioned rather than rows
+	// matched. MySQL reports changed rows, so without `revoked = false` in the predicate
+	// the updated_at assignment alone would make a second flip report the client's whole
+	// code history as newly revoked.
+	count, err = database.RevokeCodesByClientId(nil, client.Id)
+	if err != nil {
+		t.Fatalf("second RevokeCodesByClientId returned error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("re-flipping an already flipped client must report 0 rows, got %d", count)
+	}
+	assertCodeRevoked(t, first.Id, true, "a code after its client was flipped twice")
+
+	// A client with no codes is not an error, it simply matches nothing.
+	emptyClient := createTestClient(t)
+	count, err = database.RevokeCodesByClientId(nil, emptyClient.Id)
+	if err != nil {
+		t.Fatalf("RevokeCodesByClientId for a client with no codes returned error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("a client with no codes must report 0 rows, got %d", count)
+	}
+
+	// A zero client id is rejected outright rather than used as a filter. codes.client_id
+	// is NOT NULL and no clients row carries id 0, so a zero can only be a caller bug.
+	if _, err := database.RevokeCodesByClientId(nil, 0); err == nil {
+		t.Error("a zero client id must return an error")
+	}
+	assertCodeRevoked(t, unrelated.Id, false,
+		"a code of another client after the zero-id call")
+}
+
+// TestRevokeCodesByClientId_TransactionAndFailurePath answers the two questions a mock can
+// never answer about a new data method: does it enlist in the caller's transaction rather
+// than writing through the pool, and does its failure path return an error rather than a
+// benign zero.
+//
+// Both matter here because the flip performs the client write, this marker and the token
+// sweep in one transaction, and a method that collapsed a database fault into (0, nil)
+// would let the flip audit a revocation that never happened.
+func TestRevokeCodesByClientId_TransactionAndFailurePath(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+	code := createTestCode(t, client.Id, user.Id)
+
+	tx := beginTx(t)
+	count, err := database.RevokeCodesByClientId(tx, client.Id)
+	if err != nil {
+		t.Fatalf("RevokeCodesByClientId in a transaction returned error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 code revoked inside the transaction, got %d", count)
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+
+	// Had the statement gone through the pool instead of the transaction it would have
+	// survived the rollback, and a flip whose later steps failed would leave the grants
+	// marked while the client stayed confidential with its secret intact.
+	assertCodeRevoked(t, code.Id, false, "a code revoked inside a rolled-back transaction")
+
+	// The failure path, forced by the same finished transaction.
+	count, err = database.RevokeCodesByClientId(tx, client.Id)
+	if err == nil {
+		t.Error("a statement that cannot run must return an error, not a benign zero count")
+	}
+	if count != 0 {
+		t.Errorf("a failed call must report 0 rows, got %d", count)
+	}
+}
+
 // TestRevokeCodeIfSessionGone covers the compensating revoke that runs immediately after a
 // code is inserted (#129 decision 12). The liveness read at /auth/issue and that insert are
 // two statements, so a termination can commit between them and leave a code bound to a
