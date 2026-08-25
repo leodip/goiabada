@@ -68,6 +68,7 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 
 	secret := []byte("the-secret-another-request-just-set")
 	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
 	var written *models.Client
@@ -90,6 +91,12 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	// leave exactly the gap this helper exists to close.
 	assert.Less(t, callIndex(t, database, "BeginTransaction"), callIndex(t, database, "GetClientById"))
 	assert.Less(t, callIndex(t, database, "GetClientById"), callIndex(t, database, "UpdateClient"))
+
+	// And the row is taken BEFORE it is read, which is what makes the read atomic with the write
+	// that follows it. A read that runs first can be invalidated by a writer committing behind
+	// it, and on mysql and postgres it is not even made to wait for one, so the order of these
+	// two calls is the whole of the remedy rather than a detail of it (#245 decision 18).
+	assert.Less(t, callIndex(t, database, "AcquireClientRow"), callIndex(t, database, "GetClientById"))
 }
 
 // TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAgainstTheRefreshedMode
@@ -106,6 +113,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 	database := mocks_data.NewDatabase(t)
 
 	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	// The row is public; the caller below thinks it is confidential.
 	database.On("GetClientById", clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
@@ -145,6 +153,7 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 	database := mocks_data.NewDatabase(t)
 
 	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false}, nil).Once()
 	var written *models.Client
@@ -176,12 +185,31 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 	database := mocks_data.NewDatabase(t)
 
 	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", clientUpdateTx, int64(7)).Return(nil, nil).Once()
 	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
 	err := updateClientNotOwningAuthenticationMode(database, &models.Client{Id: 7})
 	require.Error(t, err)
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient", "CommitTransaction")
+}
+
+// TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite covers the
+// acquisition erroring. It must abort the save rather than fall through to a read that nothing is
+// holding, because that unprotected read is exactly what this helper was changed to stop making.
+// Falling through would put the endpoint back where it was with every other test here still
+// green.
+func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+
+	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	database.On("AcquireClientRow", clientUpdateTx, int64(7)).
+		Return(errors.New("deadlock found when trying to get lock")).Once()
+	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
+
+	err := updateClientNotOwningAuthenticationMode(database, &models.Client{Id: 7, IsPublic: true})
+	require.Error(t, err)
+	assertNotAttemptedOnClientDatabase(t, database, "GetClientById", "UpdateClient", "CommitTransaction")
 }
 
 // =============================================================================

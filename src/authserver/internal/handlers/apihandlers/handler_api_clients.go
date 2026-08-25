@@ -38,9 +38,18 @@ import (
 // redeemable with nothing presented. The confidential-to-public flip is the only write allowed to
 // change this, and it revokes (#245, final review finding 1).
 //
-// So the two authentication-owned columns are re-read INSIDE the transaction and copied over
-// whatever the caller is holding, which makes the change structurally impossible rather than
-// merely unintended.
+// So the row is ACQUIRED and then the two authentication-owned columns are re-read inside the
+// transaction and copied over whatever the caller is holding.
+//
+// THE ACQUISITION IS NOT DECORATION, and taking it out reopens the window rather than merely
+// slowing it down. A re-read is not atomic with the write that follows it: another transaction
+// can commit in the gap between them, and this write then carries the value read before that
+// commit. On mysql and postgres the re-read does not even wait for an in-flight writer, so the
+// window is that writer's whole transaction rather than the gap between two statements; SQL
+// Server's shared locks narrow it and do not close it. AcquireClientRow takes the row first, so
+// the re-read happens under this transaction's own lock and nothing can get between it and the
+// write. Measured on all four engines in the agreement's probe/shared_writer_restores_public.out
+// (#245, final review round 3, decision 18).
 //
 // REFRESHING THE MODE IS NOT ENOUGH ON ITS OWN, because two other columns are derived from it.
 // A public client must carry pkce_required true and client_credentials_enabled false, and every
@@ -62,6 +71,10 @@ func updateClientNotOwningAuthenticationMode(database data.Database, client *mod
 		return err
 	}
 	defer database.RollbackTransaction(tx) //nolint:errcheck
+
+	if err := database.AcquireClientRow(tx, client.Id); err != nil {
+		return err
+	}
 
 	current, err := database.GetClientById(tx, client.Id)
 	if err != nil {

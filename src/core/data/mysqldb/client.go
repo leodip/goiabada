@@ -18,6 +18,10 @@ func (d *MySQLDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, error
 	return d.CommonDB.SetClientPublic(tx, clientId)
 }
 
+func (d *MySQLDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
+	return d.CommonDB.AcquireClientRow(tx, clientId)
+}
+
 func (d *MySQLDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
 	return d.CommonDB.GetClientById(tx, clientId)
 }

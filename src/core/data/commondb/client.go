@@ -67,6 +67,58 @@ func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 	return nil
 }
 
+// AcquireClientRow takes the client's row and holds it for the rest of the caller's
+// transaction. It is one unconditional UPDATE that writes nothing a reader can observe: the row's
+// updated_at, which every caller of this overwrites moments later with its own write.
+//
+// WHAT IT BUYS, AND WHY A READ ALONE DOES NOT. A caller that re-reads a column to decide what to
+// preserve, and then writes the whole row back, has two statements with a gap between them.
+// Another transaction can commit inside that gap, and the write then carries the value read
+// before that commit. `WHERE id = ?` alone matches under every engine's snapshot, so this
+// statement waits out any in-flight writer and takes the row; a read after it sees what that
+// writer committed, and no later writer can get between the read and the caller's write.
+//
+// Measured rather than assumed, on all four engines, in the agreement's
+// probe/shared_writer_restores_public.out and probe/client_flip_cas_race.out: under MVCC (mysql,
+// postgres) a bare re-read returns the last committed version without waiting at all, so the
+// window is the other writer's whole transaction rather than the gap between two statements.
+// SQL Server's shared locks narrow it but do not close it. Removing this call therefore reopens
+// a window on three engines, and does so silently, because everything still passes when nothing
+// else is writing (#245).
+//
+// SQLite is the one engine where the interleaving cannot be constructed: sqlitedb/db.go calls
+// SetMaxOpenConns(1), so a second writer queues behind the open transaction rather than landing
+// inside it.
+//
+// The transaction is required rather than optional. Without one the statement autocommits and
+// drops the row before the caller's read runs, which is the whole of what this buys.
+func (d *CommonDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
+
+	if tx == nil {
+		return errors.WithStack(errors.New("acquiring a client row requires a transaction: an autocommitted statement releases the row before the caller can read it"))
+	}
+
+	if clientId == 0 {
+		return errors.WithStack(errors.New("can't acquire a client row with an id of 0"))
+	}
+
+	acquire := sqlbuilder.NewUpdateBuilder()
+	acquire.Update("clients")
+	acquire.Set(acquire.Assign("updated_at", time.Now().UTC()))
+	acquire.Where(acquire.Equal("id", clientId))
+
+	query, args := acquire.BuildWithFlavor(d.Flavor)
+	if _, err := d.ExecSql(tx, query, args...); err != nil {
+		return errors.Wrap(err, "unable to acquire client row")
+	}
+
+	// A client that is not there affects no rows and is not reported here. There is nothing to
+	// hold, and every caller reads the row immediately afterwards, which is the one place that
+	// decides whether the client still exists. Answering it twice would put the same sentence in
+	// two places and let them disagree.
+	return nil
+}
+
 // SetClientPublic makes one client public and reports whether THIS call performed the
 // confidential-to-public transition. That transition is the write that removes the client's
 // obligation to authenticate, so it is the one whose caller must revoke the grants issued while
@@ -90,12 +142,12 @@ func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 // follows it blocks, unblocks and commits public anyway. Measured on all four engines in
 // probe/client_flip_cas_race.out.
 //
-// So the first statement is an acquisition and the second is the classification. `WHERE id = ?`
-// alone matches under every engine's snapshot, so it waits out any in-flight writer and takes
-// the row; the conditional UPDATE after it then evaluates against this transaction's own
-// version, which was derived from the committed one. It writes updated_at because the flip's
-// own client write overwrites that column moments later regardless, so the acquisition adds
-// nothing a reader can observe.
+// So the first statement is an acquisition and the second is the classification. The
+// acquisition is AcquireClientRow, shared with the three endpoints that re-read these columns
+// rather than classifying them (#245 decision 18), so the mechanism has one spelling and one
+// explanation: `WHERE id = ?` alone matches under every engine's snapshot, so it waits out any
+// in-flight writer and takes the row, and the conditional UPDATE after it evaluates against this
+// transaction's own version, which was derived from the committed one.
 //
 // The transaction is required rather than optional, for the reason RevokeClientGrants states
 // about its own: without one, each statement autocommits and the acquisition drops its lock
@@ -110,17 +162,11 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 		return false, errors.WithStack(errors.New("can't make a client public with an id of 0"))
 	}
 
-	now := time.Now().UTC()
-
-	acquire := sqlbuilder.NewUpdateBuilder()
-	acquire.Update("clients")
-	acquire.Set(acquire.Assign("updated_at", now))
-	acquire.Where(acquire.Equal("id", clientId))
-
-	query, args := acquire.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSql(tx, query, args...); err != nil {
-		return false, errors.Wrap(err, "unable to acquire client row before making it public")
+	if err := d.AcquireClientRow(tx, clientId); err != nil {
+		return false, err
 	}
+
+	now := time.Now().UTC()
 
 	classify := sqlbuilder.NewUpdateBuilder()
 	classify.Update("clients")
@@ -133,7 +179,7 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 		classify.Equal("is_public", false),
 	)
 
-	query, args = classify.BuildWithFlavor(d.Flavor)
+	query, args := classify.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
 		return false, errors.Wrap(err, "unable to make client public")
