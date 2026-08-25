@@ -62,8 +62,10 @@ func TestIsPKCERequired_PublicClientAlwaysTrue(t *testing.T) {
 	pkceRequired := false
 
 	// The public arm has to beat both of the two ways PKCE can be off: an explicit false
-	// override on the client, and a nil override under a global setting that is off. The
-	// second is the state /connect/register leaves a self-registered public client in.
+	// override on the client, and a nil override under a global setting that is off. Neither is
+	// reachable through a supported writer now, since every one of them normalizes a public
+	// client to an explicit true and migration 000033 repaired the existing rows. Both are
+	// asserted because this method is what holds for a row none of those writers produced.
 	overridden := &Client{
 		IsPublic:     true,
 		PKCERequired: &pkceRequired,

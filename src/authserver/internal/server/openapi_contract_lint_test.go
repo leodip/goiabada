@@ -973,7 +973,7 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 				"generated from openapi.yaml has no field for it", model, field, schema)
 		}
 		for _, prop := range sortedKeys(schemas[schema]) {
-			if models[model][prop] {
+			if _, marshalled := models[model][prop]; marshalled {
 				continue
 			}
 			t.Errorf("the %s schema declares %q, which models.%s does not marshal: the spec "+
@@ -999,7 +999,7 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 	for _, schema := range sortedKeys(pairedStruct) {
 		structName := pairedStruct[schema]
 		for _, prop := range sortedKeys(schemas[schema]) {
-			if structs[structName][prop] {
+			if _, marshalled := structs[structName][prop]; marshalled {
 				continue
 			}
 			t.Errorf("the %s schema declares %q, which api.%s does not marshal: the spec is "+
@@ -1104,7 +1104,14 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 // declarations the package can honestly contain. A parse that quietly stopped matching would
 // return nothing, every loop above would run over it, and the failure would look like a pass.
 // The floor is per package because the two are nothing like the same size.
-func structFields(t *testing.T, dir string, floor int) map[string]map[string]bool {
+// goField is one marshalled field of a Go struct. The name it takes on the wire is the map key;
+// what is recorded here is the one further fact the contract turns on, whether encoding/json may
+// leave the field out. A field WITHOUT omitempty is written on every response, whatever its value.
+type goField struct {
+	omitempty bool
+}
+
+func structFields(t *testing.T, dir string, floor int) map[string]map[string]goField {
 	t.Helper()
 
 	sources, err := filepath.Glob(filepath.Join(dir, "*.go"))
@@ -1112,7 +1119,7 @@ func structFields(t *testing.T, dir string, floor int) map[string]map[string]boo
 		t.Fatalf("globbing %s: %v", dir, err)
 	}
 
-	own := map[string]map[string]bool{}
+	own := map[string]map[string]goField{}
 	embeds := map[string][]string{}
 	for _, path := range sources {
 		if strings.HasSuffix(path, "_test.go") {
@@ -1137,7 +1144,7 @@ func structFields(t *testing.T, dir string, floor int) map[string]map[string]boo
 				if !isStruct {
 					continue
 				}
-				fields := map[string]bool{}
+				fields := map[string]goField{}
 				for _, f := range st.Fields.List {
 					if len(f.Names) == 0 {
 						// Embedded. Recorded by name and resolved below; a qualified
@@ -1148,8 +1155,8 @@ func structFields(t *testing.T, dir string, floor int) map[string]map[string]boo
 						}
 						continue
 					}
-					if name, marshalled := jsonFieldName(f); marshalled {
-						fields[name] = true
+					if name, omitempty, marshalled := jsonFieldName(f); marshalled {
+						fields[name] = goField{omitempty: omitempty}
 					}
 				}
 				own[ts.Name.Name] = fields
@@ -1158,18 +1165,18 @@ func structFields(t *testing.T, dir string, floor int) map[string]map[string]boo
 	}
 
 	// Cycles are impossible in a Go struct graph, so the walk needs no visited set.
-	var flatten func(string, map[string]bool)
-	flatten = func(name string, into map[string]bool) {
-		for field := range own[name] {
-			into[field] = true
+	var flatten func(string, map[string]goField)
+	flatten = func(name string, into map[string]goField) {
+		for field, detail := range own[name] {
+			into[field] = detail
 		}
 		for _, embedded := range embeds[name] {
 			flatten(embedded, into)
 		}
 	}
-	out := map[string]map[string]bool{}
+	out := map[string]map[string]goField{}
 	for name := range own {
-		flat := map[string]bool{}
+		flat := map[string]goField{}
 		flatten(name, flat)
 		out[name] = flat
 	}
@@ -1186,26 +1193,31 @@ var jsonTagValue = regexp.MustCompile(`json:"([^"]*)"`)
 // jsonFieldName reports the name a field marshals under, following encoding/json's own rules:
 // the tag's name part wins, "-" means the field is skipped, and an empty name or an absent tag
 // falls back to the Go field name. An unexported field never marshals whatever its tag says.
-func jsonFieldName(f *ast.Field) (string, bool) {
+func jsonFieldName(f *ast.Field) (name string, omitempty bool, marshalled bool) {
 	goName := f.Names[0].Name
 	if !ast.IsExported(goName) {
-		return "", false
+		return "", false, false
 	}
 	if f.Tag == nil {
-		return goName, true
+		return goName, false, true
 	}
 	m := jsonTagValue.FindStringSubmatch(f.Tag.Value)
 	if m == nil {
-		return goName, true
+		return goName, false, true
 	}
-	name, _, hasOptions := strings.Cut(m[1], ",")
-	if name == "-" && !hasOptions {
-		return "", false
+	tagged, opts, hasOptions := strings.Cut(m[1], ",")
+	if tagged == "-" && !hasOptions {
+		return "", false, false
 	}
-	if name == "" {
-		return goName, true
+	for _, opt := range strings.Split(opts, ",") {
+		if opt == "omitempty" {
+			omitempty = true
+		}
 	}
-	return name, true
+	if tagged == "" {
+		return goName, omitempty, true
+	}
+	return tagged, omitempty, true
 }
 
 // specSchemaProperties reads the embedded bytes, as every other test here does, and returns
@@ -1298,5 +1310,309 @@ func sortedKeys[V any](m map[string]V) []string {
 		out = append(out, k)
 	}
 	sort.Strings(out)
+	return out
+}
+
+// TestOpenAPI_ResponseRequirednessMatchesOmitempty holds the OTHER half of a schema's contract.
+// The test above owns which properties exist; this one owns which of them a caller may be told
+// to expect.
+//
+// A property absent from a schema's `required` array is optional, and a generated client models
+// an optional field as nullable, as an Option, or as a key it has to test for before reading. So
+// leaving `required` off a response says "the server may omit any of these", and encoding/json
+// settles whether that is true: a struct field WITHOUT omitempty is written on every response
+// whatever its value, and one WITH omitempty is dropped when it is the zero value. 292 properties
+// across 73 response schemas were always emitted and declared optional when this was first
+// measured, and deleting the document's one correct entry, ErrorResponse.error_description, left
+// the whole suite green, so requiredness was not merely wrong, it was unguarded (#245, final
+// review round 2 finding 3).
+//
+// Both directions, because each catches a different lie. A missing entry under-declares, which is
+// the defect above. A surplus entry over-declares: it promises a field the server really does
+// omit, and a strict generated client then fails to decode a response that is perfectly valid.
+//
+// RESPONSES ONLY, and the scope is read off the document rather than off the name. `required` on
+// a request schema means something else entirely, "the caller must send this", which is answered
+// by the handler's validation and not by a struct tag. So a schema reached only through a
+// requestBody is not this test's subject. A schema reached both ways would have to satisfy two
+// different meanings at once, and there is none today; if one appears, this test names it rather
+// than guessing which meaning was intended.
+//
+// The five schemas no Go type declares carry their expected sets by hand in
+// untypedResponseRequired below, exactly, because a handler building a map literal has no tag for
+// this test to read.
+
+// untypedResponseRequired is the expected `required` set for each response schema that no Go type
+// declares, so those five are held to the same standard as the rest rather than skipped. Exact:
+// the schema's array must equal this set, so both a deletion and an addition fail.
+//
+// Each one is a map[string]interface{} literal in its handler, and the verdict comes from reading
+// the writes: a key assigned unconditionally is required, a key assigned inside an `if` is not.
+var untypedResponseRequired = map[string][]string{
+	// database/sql.NullTime as encoding/json writes it. No tags and no MarshalJSON, so both
+	// exported fields are always present; when Valid is false, Time is the zero instant rather
+	// than absent.
+	"NullTime": {"Time", "Valid"},
+
+	// handler_api_client_logo.go: the info handler always writes hasLogo and adds logoUrl only
+	// when hasLogo is true; the upload handler writes both keys unconditionally. The delete
+	// handler answers SuccessResponse, not this, which is why pictureUrl is unconditional here.
+	"ClientLogoInfoResponse":   {"hasLogo"},
+	"ClientLogoUploadResponse": {"success", "pictureUrl"},
+
+	// The account and admin profile picture handlers, same shape as the two above.
+	"ProfilePictureInfoResponse":   {"hasPicture"},
+	"ProfilePictureUploadResponse": {"success", "pictureUrl"},
+}
+
+func TestOpenAPI_ResponseRequirednessMatchesOmitempty(t *testing.T) {
+	doc := specDocument(t)
+	responseOnly, requestOnly, both := schemaReachability(t, doc)
+
+	if len(responseOnly) < 50 {
+		t.Fatalf("only %d schemas reachable from a response; the paths parse is no longer "+
+			"matching the document's shape", len(responseOnly))
+	}
+	for _, name := range sortedKeys(both) {
+		t.Errorf("schema %s is reached from both a response and a request body, so its "+
+			"required array would have to mean two different things at once: add it to this "+
+			"test deliberately rather than letting it be checked as a response", name)
+	}
+	_ = requestOnly // named for the reader: request schemas are not this test's subject
+
+	structs := structFields(t, filepath.Join("..", "..", "..", "core", "api"), 100)
+	models := structFields(t, filepath.Join("..", "..", "..", "core", "models"), 20)
+
+	for _, schema := range sortedKeys(responseOnly) {
+		required := resolveSchemaRequired(t, doc.Components.Schemas, schema, map[string]bool{})
+
+		// The hand-written five first, checked exactly and then done with.
+		if expected, untyped := untypedResponseRequired[schema]; untyped {
+			want := map[string]bool{}
+			for _, p := range expected {
+				want[p] = true
+			}
+			for _, p := range expected {
+				if !required[p] {
+					t.Errorf("the %s schema does not require %q, which its handler writes on "+
+						"every response: a generated client is told a field it always receives "+
+						"may be absent", schema, p)
+				}
+			}
+			for _, p := range sortedKeys(required) {
+				if !want[p] {
+					t.Errorf("the %s schema requires %q, which its handler writes only "+
+						"conditionally: a strict generated client would fail to decode a valid "+
+						"response", schema, p)
+				}
+			}
+			continue
+		}
+
+		// Everything else is paired to a Go type the same way the test above pairs it.
+		var fields map[string]goField
+		var source string
+		if model, paired := schemaModelNames[schema]; paired {
+			fields, source = models[model], "models."+model
+		} else {
+			structName := schema
+			if alias, aliased := schemaStructNames[schema]; aliased {
+				structName = alias
+			}
+			if f, exists := structs[structName]; exists {
+				fields, source = f, "api."+structName
+			}
+		}
+		if fields == nil {
+			t.Errorf("response schema %s is paired to no Go type and has no entry in "+
+				"untypedResponseRequired, so nothing establishes what it may omit", schema)
+			continue
+		}
+
+		for _, wire := range sortedKeys(fields) {
+			switch {
+			case fields[wire].omitempty && required[wire]:
+				t.Errorf("the %s schema requires %q, but %s tags it omitempty, so the server "+
+					"drops it when it is the zero value: a strict generated client would fail "+
+					"to decode a valid response", schema, wire, source)
+			case !fields[wire].omitempty && !required[wire]:
+				t.Errorf("the %s schema does not require %q, but %s emits it on every "+
+					"response: a generated client is told a field it always receives may be "+
+					"absent", schema, wire, source)
+			}
+		}
+	}
+}
+
+// specDocument parses the embedded spec once into the shape the reachability walk needs.
+func specDocument(t *testing.T) *openAPIDocument {
+	t.Helper()
+	var doc openAPIDocument
+	if err := yaml.Unmarshal(web.OpenAPISpec(), &doc); err != nil {
+		t.Fatalf("parsing the embedded openapi.yaml: %v", err)
+	}
+	return &doc
+}
+
+type openAPIDocument struct {
+	Paths      map[string]map[string]yaml.Node `yaml:"paths"`
+	Components struct {
+		Schemas   map[string]yaml.Node `yaml:"schemas"`
+		Responses map[string]yaml.Node `yaml:"responses"`
+	} `yaml:"components"`
+}
+
+// schemaReachability splits the component schemas by how an operation can reach them: through a
+// response, through a request body, or both. Each root set is closed over the schemas those
+// schemas reference, so a nested shape inherits the position of whatever refers to it.
+func schemaReachability(t *testing.T, doc *openAPIDocument) (responseOnly, requestOnly, both map[string]bool) {
+	t.Helper()
+
+	responseRoots, requestRoots := map[string]bool{}, map[string]bool{}
+	for _, methods := range doc.Paths {
+		for method, op := range methods {
+			if method == "parameters" {
+				continue // a path-level parameter list, not an operation
+			}
+			node := op
+			collectSchemaRefsUnder(&node, "responses", responseRoots)
+			collectSchemaRefsUnder(&node, "requestBody", requestRoots)
+		}
+	}
+	// A shared component response (Unauthorized, Forbidden, ...) is reached by name, so its own
+	// refs have to be followed too or ErrorResponse would look unreachable.
+	for _, node := range doc.Components.Responses {
+		n := node
+		collectSchemaRefs(&n, responseRoots)
+	}
+
+	fromResponse := closeOverSchemaRefs(doc.Components.Schemas, responseRoots)
+	fromRequest := closeOverSchemaRefs(doc.Components.Schemas, requestRoots)
+
+	responseOnly, requestOnly, both = map[string]bool{}, map[string]bool{}, map[string]bool{}
+	for name := range doc.Components.Schemas {
+		switch {
+		case fromResponse[name] && fromRequest[name]:
+			both[name] = true
+		case fromResponse[name]:
+			responseOnly[name] = true
+		case fromRequest[name]:
+			requestOnly[name] = true
+		}
+	}
+	return responseOnly, requestOnly, both
+}
+
+// collectSchemaRefsUnder gathers every component-schema $ref beneath one key of an operation.
+func collectSchemaRefsUnder(op *yaml.Node, key string, into map[string]bool) {
+	if op == nil || op.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(op.Content); i += 2 {
+		if op.Content[i].Value == key {
+			collectSchemaRefs(op.Content[i+1], into)
+		}
+	}
+}
+
+func collectSchemaRefs(n *yaml.Node, into map[string]bool) {
+	if n == nil {
+		return
+	}
+	if n.Kind == yaml.MappingNode {
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			if n.Content[i].Value == "$ref" {
+				if name, ok := componentSchemaName(n.Content[i+1].Value); ok {
+					into[name] = true
+				}
+			}
+			collectSchemaRefs(n.Content[i+1], into)
+		}
+		return
+	}
+	for _, c := range n.Content {
+		collectSchemaRefs(c, into)
+	}
+}
+
+func componentSchemaName(ref string) (string, bool) {
+	const prefix = "#/components/schemas/"
+	if strings.HasPrefix(ref, prefix) {
+		return strings.TrimPrefix(ref, prefix), true
+	}
+	return "", false
+}
+
+func closeOverSchemaRefs(schemas map[string]yaml.Node, roots map[string]bool) map[string]bool {
+	out := map[string]bool{}
+	var visit func(string)
+	visit = func(name string) {
+		if out[name] {
+			return
+		}
+		node, exists := schemas[name]
+		if !exists {
+			return // TestOpenAPI_EveryRefResolves owns dangling references
+		}
+		out[name] = true
+		refs := map[string]bool{}
+		collectSchemaRefs(&node, refs)
+		for r := range refs {
+			visit(r)
+		}
+	}
+	for r := range roots {
+		visit(r)
+	}
+	return out
+}
+
+// resolveSchemaRequired is resolveSchemaProperties for the required array: every property the
+// schema requires, following allOf and $ref so a requirement inherited from a composed schema
+// counts as declared.
+func resolveSchemaRequired(t *testing.T, schemas map[string]yaml.Node, name string, seen map[string]bool) map[string]bool {
+	t.Helper()
+
+	out := map[string]bool{}
+	if seen[name] {
+		return out
+	}
+	seen[name] = true
+	node, defined := schemas[name]
+	if !defined {
+		return out
+	}
+
+	var walk func(n *yaml.Node)
+	walk = func(n *yaml.Node) {
+		if n == nil || n.Kind != yaml.MappingNode {
+			return
+		}
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			key, val := n.Content[i].Value, n.Content[i+1]
+			switch key {
+			case "required":
+				if val.Kind != yaml.SequenceNode {
+					continue // a property-level `required: true`, not a schema's array
+				}
+				for _, item := range val.Content {
+					out[item.Value] = true
+				}
+			case "allOf":
+				for _, member := range val.Content {
+					walk(member)
+				}
+			case "$ref":
+				ref, ok := componentSchemaName(val.Value)
+				if !ok {
+					continue
+				}
+				for prop := range resolveSchemaRequired(t, schemas, ref, seen) {
+					out[prop] = true
+				}
+			}
+		}
+	}
+	walk(&node)
 	return out
 }

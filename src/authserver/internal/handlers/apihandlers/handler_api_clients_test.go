@@ -76,7 +76,7 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
 	stale := &models.Client{Id: 7, IsPublic: true, ClientSecretEncrypted: nil, Description: "edited"}
-	require.NoError(t, updateClientNotOwningAuthenticationMode(database, stale, nil))
+	require.NoError(t, updateClientNotOwningAuthenticationMode(database, stale))
 
 	require.NotNil(t, written)
 	assert.False(t, written.IsPublic, "the write must carry the row's authentication mode")
@@ -91,29 +91,81 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	assert.Less(t, callIndex(t, database, "GetClientById"), callIndex(t, database, "UpdateClient"))
 }
 
-// TestUpdateClientNotOwningAuthenticationMode_NormalizesAgainstTheRefreshedMode pins the ordering
-// the OAuth2 flows endpoint depends on. Its two public-client rules, client credentials off and
-// PKCE required, must be applied to the mode the row carries; running them against the caller's
-// stale copy would save a public client with client credentials enabled and PKCE optional, which
-// is the state #245 exists to make unreachable.
-func TestUpdateClientNotOwningAuthenticationMode_NormalizesAgainstTheRefreshedMode(t *testing.T) {
+// TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAgainstTheRefreshedMode
+// pins what every one of these endpoints depends on. The two public-client rules, client
+// credentials off and PKCE required, must be applied to the mode the ROW carries, not the mode
+// the caller loaded. This is the state #245 exists to make unreachable.
+//
+// It is the round 2 finding as well as the round 1 one. Only the OAuth2 flows endpoint used to
+// carry these rules, so a general-settings or token-settings save that loaded the client while it
+// was confidential preserved the refreshed public mode and restored client credentials on and
+// PKCE off underneath it. The caller below is exactly that stale snapshot, and it goes through
+// the same helper the other two use, with nothing endpoint-specific handed in.
+func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAgainstTheRefreshedMode(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
 	// The row is public; the caller below thinks it is confidential.
 	database.On("GetClientById", clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
-	database.On("UpdateClient", clientUpdateTx, mock.Anything).Return(nil).Once()
+	var written *models.Client
+	database.On("UpdateClient", clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { written = args.Get(1).(*models.Client) }).Return(nil).Once()
 	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
 	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
-	sawPublic := false
-	stale := &models.Client{Id: 7, IsPublic: false}
-	err := updateClientNotOwningAuthenticationMode(database, stale, func(client *models.Client) {
-		sawPublic = client.IsPublic
-	})
-	require.NoError(t, err)
-	assert.True(t, sawPublic, "normalize must run after the mode is refreshed, not before")
+	// A confidential client's legitimate settings, carried by a request that loaded it before it
+	// became public.
+	pkceOff := false
+	stale := &models.Client{
+		Id:                       7,
+		IsPublic:                 false,
+		PKCERequired:             &pkceOff,
+		ClientCredentialsEnabled: true,
+	}
+	require.NoError(t, updateClientNotOwningAuthenticationMode(database, stale))
+
+	require.NotNil(t, written)
+	assert.True(t, written.IsPublic, "the write must carry the row's authentication mode")
+	assert.False(t, written.ClientCredentialsEnabled,
+		"a public client must not be stored with client credentials enabled")
+	require.NotNil(t, written.PKCERequired,
+		"a public client must not be stored with a nil pkce_required: it renders as inherit")
+	assert.True(t, *written.PKCERequired,
+		"a public client must not be stored with pkce_required false")
+}
+
+// TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlowsAlone is the boundary
+// on the test above, and it is the one that would catch the rules being applied unconditionally.
+// The two invariants belong to public clients only: a confidential client is entitled to client
+// credentials and to PKCE optional, and a helper that forced them on every write would silently
+// take a working configuration away from the larger population.
+func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlowsAlone(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+
+	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	database.On("GetClientById", clientUpdateTx, int64(7)).
+		Return(&models.Client{Id: 7, IsPublic: false}, nil).Once()
+	var written *models.Client
+	database.On("UpdateClient", clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { written = args.Get(1).(*models.Client) }).Return(nil).Once()
+	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
+	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
+
+	pkceOff := false
+	client := &models.Client{
+		Id:                       7,
+		IsPublic:                 false,
+		PKCERequired:             &pkceOff,
+		ClientCredentialsEnabled: true,
+	}
+	require.NoError(t, updateClientNotOwningAuthenticationMode(database, client))
+
+	require.NotNil(t, written)
+	assert.True(t, written.ClientCredentialsEnabled,
+		"a confidential client keeps client credentials")
+	require.NotNil(t, written.PKCERequired)
+	assert.False(t, *written.PKCERequired, "a confidential client keeps PKCE optional")
 }
 
 // TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotAnInsert covers the
@@ -126,7 +178,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 	database.On("GetClientById", clientUpdateTx, int64(7)).Return(nil, nil).Once()
 	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
-	err := updateClientNotOwningAuthenticationMode(database, &models.Client{Id: 7}, nil)
+	err := updateClientNotOwningAuthenticationMode(database, &models.Client{Id: 7})
 	require.Error(t, err)
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient", "CommitTransaction")
 }

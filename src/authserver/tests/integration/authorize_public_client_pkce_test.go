@@ -39,8 +39,9 @@ import (
 // newPublicPKCEClient creates a public client with the given stored pkce_required, plus a
 // redirect URI and a user able to complete a level 1 ceremony for it.
 //
-// pkceRequired is a pointer because nil is one of the states under test: it is what
-// /connect/register leaves behind, and A4 is about it inheriting a global setting that is off.
+// pkceRequired is a pointer because nil is one of the states under test: A4 is about a nil
+// column inheriting a global setting that is off. No supported writer stores that state on a
+// public client, so the fixture builds it directly.
 func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*models.Client, string, *models.User, string) {
 	t.Helper()
 
@@ -132,9 +133,11 @@ func TestAuthorize_PublicClient_StoredPKCERequiredFalse_IsStillRefused(t *testin
 	assertRefusedForMissingChallenge(t, client, redirectURI, user, password)
 }
 
-// A4. The second way in, and the one a migration alone cannot close: the column is NULL and the
-// global setting is off, which is exactly what /connect/register leaves behind. A settings
-// change made long after the migration ran must not reopen this.
+// A4. The second way in: the column is NULL and the global setting is off, so the client
+// inherits "optional" from a setting an administrator can change at any time. Migration 000033
+// repaired the public rows that existed and every writer now stores an explicit true, so this
+// row is one no supported path produces. It is inserted directly here because what is under test
+// is the model rule, which has to answer required for a row whatever wrote it.
 func TestAuthorize_PublicClient_NullColumnAndGlobalPKCEOff_IsStillRefused(t *testing.T) {
 	settings, err := database.GetSettingsById(nil, 1)
 	require.NoError(t, err)

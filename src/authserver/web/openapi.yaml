@@ -3322,18 +3322,26 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
       description: |
-        The token is valid but does not authorise this request. Two different
-        checks answer here, and a caller distinguishes them by error_code.
+        The token is valid but does not authorise this request. Three checks
+        answer here, and a caller distinguishes them by error_code.
 
         INSUFFICIENT_SCOPE comes from the route's authorisation middleware,
-        before the handler runs, and is why every operation in this document
-        declares a 403: an Admin operation needs one of the scopes its route
-        names, and an Account operation needs
-        `authserver:manage-account` on a token bound to a user.
+        before the handler runs: an Admin operation needs one of the scopes
+        its route names, and an Account operation needs
+        `authserver:manage-account`.
+
+        USER_CONTEXT_REQUIRED comes from the same middleware on the Account
+        operations, which also require the token to have been issued for a
+        user: one obtained through the client credentials grant carries no
+        auth_time claim and is refused here.
 
         FORBIDDEN comes from the handler, on the account endpoints that
         resolve a resource by id and then check it belongs to the caller, so
         a valid token for the wrong user reaches this rather than a 404.
+
+        Every operation this document secures declares a 403. The public
+        client logo endpoint, which carries `security: []` and authorises
+        nothing, is the one that does not.
       content:
         application/json:
           schema:
@@ -3400,6 +3408,8 @@ components:
       properties:
         success:
           type: boolean
+      required:
+        - success
 
     # =========================================================================
     # User Schemas
@@ -3488,6 +3498,39 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserAttributeResponse'
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - enabled
+        - subject
+        - username
+        - givenName
+        - middleName
+        - familyName
+        - nickname
+        - website
+        - gender
+        - email
+        - emailVerified
+        - zoneInfoCountryName
+        - zoneInfo
+        - locale
+        - birthDate
+        - phoneNumberCountryUniqueId
+        - phoneNumberCountryCallingCode
+        - phoneNumber
+        - phoneNumberVerified
+        - addressLine1
+        - addressLine2
+        - addressLocality
+        - addressRegion
+        - addressPostalCode
+        - addressCountry
+        - otpEnabled
+        - groups
+        - permissions
+        - attributes
 
     NullTime:
       type: object
@@ -3503,6 +3546,9 @@ components:
           format: date-time
         Valid:
           type: boolean
+      required:
+        - Time
+        - Valid
 
     GroupBasic:
       type: object
@@ -3542,6 +3588,17 @@ components:
           type: boolean
         MemberCount:
           type: integer
+      required:
+        - Id
+        - CreatedAt
+        - UpdatedAt
+        - GroupIdentifier
+        - Description
+        - Attributes
+        - Permissions
+        - IncludeInIdToken
+        - IncludeInAccessToken
+        - MemberCount
 
     GroupAttributeBasic:
       type: object
@@ -3568,6 +3625,15 @@ components:
         GroupId:
           type: integer
           format: int64
+      required:
+        - Id
+        - CreatedAt
+        - UpdatedAt
+        - Key
+        - Value
+        - IncludeInIdToken
+        - IncludeInAccessToken
+        - GroupId
 
     PermissionBasic:
       type: object
@@ -3596,6 +3662,14 @@ components:
           format: int64
         Resource:
           $ref: '#/components/schemas/ResourceBasic'
+      required:
+        - Id
+        - CreatedAt
+        - UpdatedAt
+        - PermissionIdentifier
+        - Description
+        - ResourceId
+        - Resource
 
     ResourceBasic:
       type: object
@@ -3614,6 +3688,12 @@ components:
           type: string
         Description:
           type: string
+      required:
+        - Id
+        - CreatedAt
+        - UpdatedAt
+        - ResourceIdentifier
+        - Description
 
     SearchUsersResponse:
       type: object
@@ -3630,6 +3710,12 @@ components:
           type: integer
         query:
           type: string
+      required:
+        - users
+        - total
+        - page
+        - size
+        - query
 
     UserWithGroupMembershipResponse:
       allOf:
@@ -3639,6 +3725,8 @@ components:
             inGroup:
               type: boolean
               description: Whether this user belongs to the annotated group
+          required:
+            - inGroup
 
     SearchUsersWithGroupAnnotationResponse:
       type: object
@@ -3656,6 +3744,12 @@ components:
           type: integer
         query:
           type: string
+      required:
+        - users
+        - total
+        - page
+        - size
+        - query
 
     UserWithPermissionResponse:
       allOf:
@@ -3665,6 +3759,8 @@ components:
             hasPermission:
               type: boolean
               description: Whether this user has the annotated permission assigned
+          required:
+            - hasPermission
 
     SearchUsersWithPermissionAnnotationResponse:
       type: object
@@ -3682,24 +3778,36 @@ components:
           type: integer
         query:
           type: string
+      required:
+        - users
+        - total
+        - page
+        - size
+        - query
 
     GetUserResponse:
       type: object
       properties:
         user:
           $ref: '#/components/schemas/UserResponse'
+      required:
+        - user
 
     CreateUserResponse:
       type: object
       properties:
         user:
           $ref: '#/components/schemas/UserResponse'
+      required:
+        - user
 
     UpdateUserResponse:
       type: object
       properties:
         user:
           $ref: '#/components/schemas/UserResponse'
+      required:
+        - user
 
     GenerateUserEmailVerificationCodeResponse:
       type: object
@@ -3715,6 +3823,11 @@ components:
         email:
           type: string
           format: email
+      required:
+        - verificationCode
+        - verificationCodeExpiresAt
+        - userId
+        - email
 
     CreateUserRequest:
       type: object
@@ -3873,6 +3986,15 @@ components:
         userId:
           type: integer
           format: int64
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - key
+        - value
+        - includeInIdToken
+        - includeInAccessToken
+        - userId
 
     GetUserAttributesResponse:
       type: object
@@ -3881,12 +4003,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserAttributeResponse'
+      required:
+        - attributes
 
     GetUserAttributeResponse:
       type: object
       properties:
         attribute:
           $ref: '#/components/schemas/UserAttributeResponse'
+      required:
+        - attribute
 
     CreateUserAttributeRequest:
       type: object
@@ -3912,6 +4038,8 @@ components:
       properties:
         attribute:
           $ref: '#/components/schemas/UserAttributeResponse'
+      required:
+        - attribute
 
     UpdateUserAttributeRequest:
       type: object
@@ -3930,6 +4058,8 @@ components:
       properties:
         attribute:
           $ref: '#/components/schemas/UserAttributeResponse'
+      required:
+        - attribute
 
     # =========================================================================
     # Session Schemas
@@ -3977,6 +4107,21 @@ components:
         userId:
           type: integer
           format: int64
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - sessionIdentifier
+        - started
+        - lastAccessed
+        - authMethods
+        - acrLevel
+        - authTime
+        - ipAddress
+        - deviceName
+        - deviceType
+        - deviceOS
+        - userId
 
     EnhancedUserSessionResponse:
       allOf:
@@ -3999,6 +4144,14 @@ components:
               type: array
               items:
                 type: string
+          required:
+            - startedAt
+            - durationSinceStarted
+            - lastAccessedAt
+            - durationSinceLastAccessed
+            - isValid
+            - isCurrent
+            - clientIdentifiers
 
     GetUserSessionsResponse:
       type: object
@@ -4007,12 +4160,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/EnhancedUserSessionResponse'
+      required:
+        - sessions
 
     GetUserSessionResponse:
       type: object
       properties:
         session:
           $ref: '#/components/schemas/UserSessionResponse'
+      required:
+        - session
 
     # =========================================================================
     # Consent Schemas
@@ -4047,6 +4204,16 @@ components:
           type: string
         clientDescription:
           type: string
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - clientId
+        - userId
+        - scope
+        - grantedAt
+        - clientIdentifier
+        - clientDescription
 
     GetUserConsentsResponse:
       type: object
@@ -4055,6 +4222,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserConsentResponse'
+      required:
+        - consents
 
     # =========================================================================
     # Group Schemas
@@ -4083,6 +4252,15 @@ components:
           type: boolean
         memberCount:
           type: integer
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - groupIdentifier
+        - description
+        - includeInIdToken
+        - includeInAccessToken
+        - memberCount
 
     GetGroupsResponse:
       type: object
@@ -4091,12 +4269,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/GroupResponse'
+      required:
+        - groups
 
     GetGroupResponse:
       type: object
       properties:
         group:
           $ref: '#/components/schemas/GroupResponse'
+      required:
+        - group
 
     CreateGroupRequest:
       type: object
@@ -4118,6 +4300,8 @@ components:
       properties:
         group:
           $ref: '#/components/schemas/GroupResponse'
+      required:
+        - group
 
     UpdateGroupRequest:
       type: object
@@ -4137,6 +4321,8 @@ components:
       properties:
         group:
           $ref: '#/components/schemas/GroupResponse'
+      required:
+        - group
 
     GroupWithPermissionResponse:
       allOf:
@@ -4146,6 +4332,8 @@ components:
             hasPermission:
               type: boolean
               description: Whether this group has the annotated permission assigned
+          required:
+            - hasPermission
 
     SearchGroupsWithPermissionAnnotationResponse:
       type: object
@@ -4160,6 +4348,11 @@ components:
           type: integer
         size:
           type: integer
+      required:
+        - groups
+        - total
+        - page
+        - size
 
     GetGroupMembersResponse:
       type: object
@@ -4174,6 +4367,11 @@ components:
           type: integer
         size:
           type: integer
+      required:
+        - members
+        - total
+        - page
+        - size
 
     AddGroupMemberRequest:
       type: object
@@ -4193,6 +4391,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/GroupResponse'
+      required:
+        - user
+        - groups
 
     UpdateGroupPermissionsRequest:
       type: object
@@ -4231,6 +4432,15 @@ components:
         groupId:
           type: integer
           format: int64
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - key
+        - value
+        - includeInIdToken
+        - includeInAccessToken
+        - groupId
 
     GetGroupAttributesResponse:
       type: object
@@ -4239,12 +4449,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/GroupAttributeResponse'
+      required:
+        - attributes
 
     GetGroupAttributeResponse:
       type: object
       properties:
         attribute:
           $ref: '#/components/schemas/GroupAttributeResponse'
+      required:
+        - attribute
 
     CreateGroupAttributeRequest:
       type: object
@@ -4270,6 +4484,8 @@ components:
       properties:
         attribute:
           $ref: '#/components/schemas/GroupAttributeResponse'
+      required:
+        - attribute
 
     UpdateGroupAttributeRequest:
       type: object
@@ -4288,6 +4504,8 @@ components:
       properties:
         attribute:
           $ref: '#/components/schemas/GroupAttributeResponse'
+      required:
+        - attribute
 
     # =========================================================================
     # Resource & Permission Schemas
@@ -4302,6 +4520,10 @@ components:
           type: string
         description:
           type: string
+      required:
+        - id
+        - resourceIdentifier
+        - description
 
     PermissionResponse:
       type: object
@@ -4318,6 +4540,12 @@ components:
           format: int64
         resource:
           $ref: '#/components/schemas/ResourceResponse'
+      required:
+        - id
+        - permissionIdentifier
+        - description
+        - resourceId
+        - resource
 
     GetResourcesResponse:
       type: object
@@ -4326,12 +4554,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ResourceResponse'
+      required:
+        - resources
 
     GetResourceResponse:
       type: object
       properties:
         resource:
           $ref: '#/components/schemas/ResourceResponse'
+      required:
+        - resource
 
     CreateResourceRequest:
       type: object
@@ -4349,6 +4581,8 @@ components:
       properties:
         resource:
           $ref: '#/components/schemas/ResourceResponse'
+      required:
+        - resource
 
     UpdateResourceRequest:
       type: object
@@ -4364,6 +4598,8 @@ components:
       properties:
         resource:
           $ref: '#/components/schemas/ResourceResponse'
+      required:
+        - resource
 
     GetPermissionsByResourceResponse:
       type: object
@@ -4372,6 +4608,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PermissionResponse'
+      required:
+        - permissions
 
     UpdateResourcePermissionsRequest:
       type: object
@@ -4404,6 +4642,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PermissionResponse'
+      required:
+        - user
+        - permissions
 
     GetGroupPermissionsResponse:
       type: object
@@ -4414,6 +4655,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PermissionResponse'
+      required:
+        - group
+        - permissions
 
     GetUsersByPermissionResponse:
       type: object
@@ -4428,6 +4672,11 @@ components:
           type: integer
         size:
           type: integer
+      required:
+        - users
+        - total
+        - page
+        - size
 
     # =========================================================================
     # Client Schemas
@@ -4449,6 +4698,11 @@ components:
         ClientId:
           type: integer
           format: int64
+      required:
+        - Id
+        - CreatedAt
+        - URI
+        - ClientId
 
     WebOrigin:
       type: object
@@ -4467,6 +4721,11 @@ components:
         ClientId:
           type: integer
           format: int64
+      required:
+        - Id
+        - CreatedAt
+        - Origin
+        - ClientId
 
     ClientResponse:
       type: object
@@ -4554,6 +4813,36 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/WebOrigin'
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - clientIdentifier
+        - description
+        - websiteUrl
+        - displayName
+        - enabled
+        - consentRequired
+        - createdViaDcr
+        - showLogo
+        - showDisplayName
+        - showDescription
+        - showWebsiteUrl
+        - isPublic
+        - isSystemLevelClient
+        - authorizationCodeEnabled
+        - clientCredentialsEnabled
+        - pkceRequired
+        - implicitGrantEnabled
+        - resourceOwnerPasswordCredentialsEnabled
+        - tokenExpirationInSeconds
+        - refreshTokenOfflineIdleTimeoutInSeconds
+        - refreshTokenOfflineMaxLifetimeInSeconds
+        - includeOpenIDConnectClaimsInAccessToken
+        - includeOpenIDConnectClaimsInIdToken
+        - defaultAcrLevel
+        - redirectURIs
+        - webOrigins
 
     GetClientsResponse:
       type: object
@@ -4562,12 +4851,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ClientResponse'
+      required:
+        - clients
 
     GetClientResponse:
       type: object
       properties:
         client:
           $ref: '#/components/schemas/ClientResponse'
+      required:
+        - client
 
     CreateClientRequest:
       type: object
@@ -4591,12 +4884,16 @@ components:
       properties:
         client:
           $ref: '#/components/schemas/ClientResponse'
+      required:
+        - client
 
     UpdateClientResponse:
       type: object
       properties:
         client:
           $ref: '#/components/schemas/ClientResponse'
+      required:
+        - client
 
     UpdateClientSettingsRequest:
       type: object
@@ -4709,6 +5006,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PermissionResponse'
+      required:
+        - client
+        - permissions
 
     ClientLogoInfoResponse:
       type: object
@@ -4718,6 +5018,9 @@ components:
         logoUrl:
           type: string
           description: Public URL to serve the logo image (only present when hasLogo is true)
+      required:
+        # logoUrl is deliberately absent: the handler adds that key only when hasLogo is true.
+        - hasLogo
 
     ClientLogoUploadResponse:
       type: object
@@ -4727,6 +5030,9 @@ components:
         pictureUrl:
           type: string
           description: Public URL to the uploaded logo
+      required:
+        - success
+        - pictureUrl
 
     ProfilePictureInfoResponse:
       type: object
@@ -4736,6 +5042,10 @@ components:
         pictureUrl:
           type: string
           description: Public URL to serve the picture (only present when hasPicture is true)
+      required:
+        # pictureUrl is deliberately absent: the handler adds that key only when hasPicture is
+        # true.
+        - hasPicture
 
     ProfilePictureUploadResponse:
       type: object
@@ -4745,6 +5055,9 @@ components:
         pictureUrl:
           type: string
           description: Public URL to the uploaded picture
+      required:
+        - success
+        - pictureUrl
 
     # =========================================================================
     # Settings Schemas
@@ -4773,6 +5086,16 @@ components:
         resourceOwnerPasswordCredentialsEnabled:
           type: boolean
           description: When true, grant_type=password is enabled server-wide (RFC 6749 section 4.3). Deprecated in OAuth 2.1
+      required:
+        - appName
+        - issuer
+        - selfRegistrationEnabled
+        - selfRegistrationRequiresEmailVerification
+        - dynamicClientRegistrationEnabled
+        - passwordPolicy
+        - pkceRequired
+        - implicitFlowEnabled
+        - resourceOwnerPasswordCredentialsEnabled
 
     UpdateSettingsGeneralRequest:
       type: object
@@ -4818,6 +5141,15 @@ components:
           type: string
         hasSmtpPassword:
           type: boolean
+      required:
+        - smtpEnabled
+        - smtpHost
+        - smtpPort
+        - smtpUsername
+        - smtpEncryption
+        - smtpFromName
+        - smtpFromEmail
+        - hasSmtpPassword
 
     UpdateSettingsEmailRequest:
       type: object
@@ -4855,6 +5187,9 @@ components:
           type: integer
         userSessionMaxLifetimeInSeconds:
           type: integer
+      required:
+        - userSessionIdleTimeoutInSeconds
+        - userSessionMaxLifetimeInSeconds
 
     UpdateSettingsSessionsRequest:
       type: object
@@ -4873,6 +5208,9 @@ components:
           type: array
           items:
             type: string
+      required:
+        - uiTheme
+        - availableThemes
 
     UpdateSettingsUIThemeRequest:
       type: object
@@ -4893,6 +5231,12 @@ components:
           type: boolean
         includeOpenIDConnectClaimsInIdToken:
           type: boolean
+      required:
+        - tokenExpirationInSeconds
+        - refreshTokenOfflineIdleTimeoutInSeconds
+        - refreshTokenOfflineMaxLifetimeInSeconds
+        - includeOpenIDConnectClaimsInAccessToken
+        - includeOpenIDConnectClaimsInIdToken
 
     UpdateSettingsTokensRequest:
       type: object
@@ -4932,6 +5276,16 @@ components:
           type: string
         publicKeyJWK:
           type: string
+      required:
+        - id
+        - createdAt
+        - state
+        - keyIdentifier
+        - type
+        - algorithm
+        - publicKeyASN1DER
+        - publicKeyPEM
+        - publicKeyJWK
 
     GetSettingsKeysResponse:
       type: object
@@ -4940,6 +5294,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SettingsSigningKeyResponse'
+      required:
+        - keys
 
     SettingsAuditLogsResponse:
       type: object
@@ -4951,6 +5307,10 @@ components:
         auditLogRetentionDays:
           type: integer
           description: Days to keep entries for. 0 means keep them forever.
+      required:
+        - auditLogsInConsoleEnabled
+        - auditLogsInDatabaseEnabled
+        - auditLogRetentionDays
 
     UpdateSettingsAuditLogsRequest:
       type: object
@@ -4977,6 +5337,11 @@ components:
         details:
           type: string
           description: The event payload, as a JSON string
+      required:
+        - id
+        - createdAt
+        - auditEvent
+        - details
 
     GetAuditLogsResponse:
       type: object
@@ -4991,6 +5356,11 @@ components:
           type: integer
         size:
           type: integer
+      required:
+        - auditLogs
+        - total
+        - page
+        - size
 
     PhoneCountryResponse:
       type: object
@@ -5005,6 +5375,12 @@ components:
           type: string
         name:
           type: string
+      required:
+        - uniqueId
+        - alpha2
+        - emoji
+        - callingCode
+        - name
 
     GetPhoneCountriesResponse:
       type: object
@@ -5013,6 +5389,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PhoneCountryResponse'
+      required:
+        - phoneCountries
 
     # =========================================================================
     # Account API Schemas
@@ -5048,6 +5426,12 @@ components:
           type: integer
         emailVerified:
           type: boolean
+      required:
+        - emailVerificationSent
+        - emailDestination
+        - tooManyRequests
+        - waitInSeconds
+        - emailVerified
 
     UpdateAccountPhoneRequest:
       type: object
@@ -5080,6 +5464,9 @@ components:
           description: >-
             TOTP secret key (base32), for a user who cannot scan the QR code. The server has
             recorded this value; do not substitute another when enabling.
+      required:
+        - base64Image
+        - secretKey
 
     UpdateAccountOTPRequest:
       type: object
@@ -5123,3 +5510,5 @@ components:
         logoutUrl:
           type: string
           format: uri
+      required:
+        - logoutUrl
