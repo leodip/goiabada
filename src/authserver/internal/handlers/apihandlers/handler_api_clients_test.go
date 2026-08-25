@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -190,11 +191,12 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 // TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow is the finding itself.
 //
 // The handler loads the client, and by the time it writes, the row says something else: here the
-// snapshot says public and the row says confidential, which is what a concurrent save that made
-// the client confidential and issued it a grant leaves behind. Classifying from the snapshot reads
-// "already public", skips the revocation, and commits a public client still holding grants that
-// were issued while a secret was required. The transition is therefore decided inside the
-// transaction, and this asserts it by the revocation actually running.
+// snapshot says public while the write turns out to perform the transition, which is what a
+// concurrent save that made the client confidential and issued it a grant leaves behind.
+// Classifying from the snapshot reads "already public", skips the revocation, and commits a
+// public client still holding grants that were issued while a secret was required. So the answer
+// comes from SetClientPublic, the write itself, and this asserts that the handler acts on that
+// answer rather than on the copy in its hand.
 func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
@@ -204,11 +206,11 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	// The snapshot the handler works from: already public.
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
-	// The row as it stands when the write runs: confidential, because another request got there
-	// first and the grants it issued are the ones at stake.
+	// What the write reports when it runs: it really did make the client public, because another
+	// request got there first with confidential mode and the grants it issued are the ones at
+	// stake. The handler must believe this over its own snapshot.
 	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
-	database.On("GetClientById", clientUpdateTx, int64(7)).
-		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
+	database.On("SetClientPublic", clientUpdateTx, int64(7)).Return(true, nil).Once()
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("RevokeCodesByClientId", clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
 	database.On("GetRefreshTokensByClientId", clientUpdateTx, int64(7)).
@@ -235,6 +237,44 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	auditLogger.AssertExpectations(t)
 	require.NotNil(t, revokedPayload)
 	assert.Equal(t, int64(2), revokedPayload["revokedCodeCount"])
+
+	// The classification has to run BEFORE the client write, and the order is asserted rather
+	// than left to reading. UpdateClient projects every mutable column from the caller's copy,
+	// which says public, so a SetClientPublic placed after it would find the row already public
+	// and report false on every flip there has ever been. The revocation would then never run
+	// and nothing else in this file would notice.
+	assert.Less(t, callIndex(t, database, "SetClientPublic"), callIndex(t, database, "UpdateClient"))
+}
+
+// TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing covers
+// the direction the two tests above cannot: what happens when the write cannot establish which
+// transition this is. There is no safe guess. Revoking anyway would sign out the users of a
+// client nobody flipped, and saving anyway would produce the very state the classification
+// exists to catch, so the whole transaction is abandoned and the caller is told it failed.
+func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
+	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	database.On("SetClientPublic", clientUpdateTx, int64(7)).
+		Return(false, errors.New("no client with that id")).Once()
+	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleAPIClientAuthenticationPut(httpHelper, authHelper, database, auditLogger)
+	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	// Neither the client write nor the commit is registered on the strict mock, so reaching
+	// either fails on its own. Naming them says which property broke.
+	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient", "CommitTransaction",
+		"RevokeCodesByClientId", "GetRefreshTokensByClientId")
+	auditLogger.AssertNotCalled(t, "Log", constants.AuditRevokedClientGrants, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", constants.AuditUpdatedClientAuthentication, mock.Anything)
 }
 
 // TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing is the other
@@ -251,8 +291,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
 	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
-	database.On("GetClientById", clientUpdateTx, int64(7)).
-		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
+	database.On("SetClientPublic", clientUpdateTx, int64(7)).Return(false, nil).Once()
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
 	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
