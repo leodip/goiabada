@@ -40,6 +40,19 @@ type Database interface {
 	// the write after it can straddle another writer's commit, and a classification
 	// taken from the stale side leaves the grants alive.
 	SetClientPublic(tx *sql.Tx, clientId int64) (bool, error)
+	// AcquireClientRow takes the client's row inside the caller's transaction and holds it
+	// until that transaction ends, so a read taken afterwards cannot be invalidated by
+	// another writer before the caller writes it back (see #245).
+	//
+	// It exists because a re-read is not atomic with the write that follows it. A caller
+	// that reads a column to decide what to preserve, and then writes the whole row, can
+	// have another transaction commit in the gap and will write the value it read before
+	// that commit. Acquiring first makes the read happen under this transaction's own row
+	// lock, which is the only thing that makes the pair atomic.
+	//
+	// A transaction is required: without one the statement autocommits and the row is
+	// released before the read even runs.
+	AcquireClientRow(tx *sql.Tx, clientId int64) error
 	GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error)
 	GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error)

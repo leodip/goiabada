@@ -41,6 +41,63 @@ func (_m *Database) EXPECT() *Database_Expecter {
 	return &Database_Expecter{mock: &_m.Mock}
 }
 
+// AcquireClientRow provides a mock function for the type Database
+func (_mock *Database) AcquireClientRow(tx *sql.Tx, clientId int64) error {
+	ret := _mock.Called(tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AcquireClientRow")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
+		r0 = returnFunc(tx, clientId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_AcquireClientRow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AcquireClientRow'
+type Database_AcquireClientRow_Call struct {
+	*mock.Call
+}
+
+// AcquireClientRow is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) AcquireClientRow(tx any, clientId any) *Database_AcquireClientRow_Call {
+	return &Database_AcquireClientRow_Call{Call: _e.mock.On("AcquireClientRow", tx, clientId)}
+}
+
+func (_c *Database_AcquireClientRow_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_AcquireClientRow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_AcquireClientRow_Call) Return(err error) *Database_AcquireClientRow_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_AcquireClientRow_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) error) *Database_AcquireClientRow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BackfillEncryptedOTPSecrets provides a mock function for the type Database
 func (_mock *Database) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
 	ret := _mock.Called(aesKey)

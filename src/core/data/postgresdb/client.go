@@ -62,6 +62,10 @@ func (d *PostgresDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, er
 	return d.CommonDB.SetClientPublic(tx, clientId)
 }
 
+func (d *PostgresDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
+	return d.CommonDB.AcquireClientRow(tx, clientId)
+}
+
 func (d *PostgresDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
 	return d.CommonDB.GetClientById(tx, clientId)
 }

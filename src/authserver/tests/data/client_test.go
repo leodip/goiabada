@@ -1440,3 +1440,153 @@ func TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite(t *testing.T
 		t.Errorf("expected the client to end public, got %+v", stored)
 	}
 }
+
+// TestAcquireClientRow covers the contract of the statement that holds a client row for the rest
+// of a transaction (#245 decision 18). It writes nothing a reader can observe, so what there is
+// to pin is when it refuses and when it does not.
+func TestAcquireClientRow(t *testing.T) {
+	client := createTestClient(t)
+
+	tx := beginTx(t)
+	if err := database.AcquireClientRow(tx, client.Id); err != nil {
+		t.Fatalf("AcquireClientRow returned error: %v", err)
+	}
+
+	// Nothing about the client changes. The callers of this run their own write afterwards, so
+	// an acquisition that altered a column would be corrupting the row it was asked to protect.
+	held, err := database.GetClientById(tx, client.Id)
+	if err != nil {
+		t.Fatalf("GetClientById inside the transaction: %v", err)
+	}
+	if held == nil {
+		t.Fatalf("the client vanished inside the transaction that acquired it")
+	}
+	if held.ClientIdentifier != client.ClientIdentifier || held.IsPublic != client.IsPublic ||
+		held.Description != client.Description {
+		t.Errorf("acquiring the row changed it: %+v", held)
+	}
+	if err := database.CommitTransaction(tx); err != nil {
+		t.Fatalf("CommitTransaction: %v", err)
+	}
+
+	// A client that is not there is NOT an error here, which is deliberate and is the one place
+	// this differs from SetClientPublic. There is nothing to hold, and every caller reads the row
+	// immediately afterwards and answers "the client no longer exists" itself. Reporting it twice
+	// would put one sentence in two places and let them disagree.
+	tx = beginTx(t)
+	if err := database.AcquireClientRow(tx, client.Id+1_000_000); err != nil {
+		t.Errorf("acquiring a row that does not exist must not error, got %v", err)
+	}
+	_ = database.RollbackTransaction(tx)
+
+	// A zero id is a caller bug rather than a filter, exactly as it is in SetClientPublic and
+	// RevokeCodesByClientId.
+	tx = beginTx(t)
+	if err := database.AcquireClientRow(tx, 0); err == nil {
+		t.Errorf("expected an error for a client id of 0")
+	}
+	_ = database.RollbackTransaction(tx)
+
+	// Without a transaction the statement autocommits and drops the row before the caller can
+	// read it, which is the whole of what this buys. Refused rather than silently degraded.
+	if err := database.AcquireClientRow(nil, client.Id); err == nil {
+		t.Errorf("expected an error when called without a transaction")
+	}
+}
+
+// TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit is the property the three admin API
+// endpoints that do not own how a client authenticates depend on, run against a real engine
+// rather than described.
+//
+// Those endpoints re-read is_public and client_secret_encrypted inside their write transaction
+// and copy them over whatever the request is holding, because UpdateClient projects every mutable
+// column and none of them means to change how the client authenticates. A re-read alone does not
+// hold: under MVCC it returns the last committed version WITHOUT WAITING, so another
+// administrator's save can commit confidential mode and a secret while this transaction is
+// between its read and its write, and this transaction then writes the public row it read.
+// The client goes back to public, the newer secret is deleted, and no revocation runs on that
+// path, so grants issued while a secret was required stay redeemable by a client that presents
+// nothing.
+//
+// So the read has to happen under this transaction's own row lock. That is what the acquisition
+// buys, and this is the only tier that can prove it: mysql and postgres do not make the bare
+// re-read wait at all, and no unit test with a mocked database can observe an engine's snapshot
+// rules. Measured per engine in the agreement's probe/shared_writer_restores_public.out.
+func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
+	if dbType() == "" || dbType() == "sqlite" {
+		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so a second writer " +
+			"queues behind the open transaction instead of landing inside it. The interleaving " +
+			"cannot be constructed here, in this process or in the server")
+	}
+
+	client := createTestClient(t)
+	client.IsPublic = true
+	client.ClientSecretEncrypted = nil
+	if err := database.UpdateClient(nil, client); err != nil {
+		t.Fatalf("UpdateClient seeding a public client: %v", err)
+	}
+
+	// The other administrator: hardens the client to confidential and gives it a secret, and
+	// holds it uncommitted.
+	secret := []byte("the-secret-the-other-request-just-set")
+	other := beginTx(t)
+	client.IsPublic = false
+	client.ClientSecretEncrypted = secret
+	if err := database.UpdateClient(other, client); err != nil {
+		t.Fatalf("UpdateClient making the client confidential: %v", err)
+	}
+
+	// The save under test: one of the three endpoints, which loaded the client while it was
+	// still public and is about to write every column back.
+	saver := beginTx(t)
+	type outcome struct {
+		refreshed *models.Client
+		err       error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		if err := database.AcquireClientRow(saver, client.Id); err != nil {
+			done <- outcome{nil, err}
+			return
+		}
+		refreshed, err := database.GetClientById(saver, client.Id)
+		done <- outcome{refreshed, err}
+	}()
+
+	// It must not be able to read yet. Anything it could return at this point comes from the row
+	// as it stood before the other transaction committed, which is the stale side the write must
+	// never be taken from. This is the assertion a bare re-read fails on mysql and postgres.
+	select {
+	case o := <-done:
+		t.Fatalf("the read completed while another transaction held the row uncommitted "+
+			"(is_public=%v): the acquisition must wait for that writer rather than let the read "+
+			"return the row it left behind", o.refreshed != nil && o.refreshed.IsPublic)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	if err := database.CommitTransaction(other); err != nil {
+		t.Fatalf("committing the concurrent confidential write: %v", err)
+	}
+
+	var o outcome
+	select {
+	case o = <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatalf("the acquisition never returned after the concurrent transaction committed")
+	}
+	if o.err != nil {
+		t.Fatalf("acquiring and reading the client: %v", o.err)
+	}
+	if o.refreshed == nil {
+		t.Fatalf("the client vanished")
+	}
+	if o.refreshed.IsPublic {
+		t.Errorf("the read must see the committed confidential mode, or the save writes public " +
+			"mode back over it and the grants issued under the secret stay redeemable")
+	}
+	if string(o.refreshed.ClientSecretEncrypted) != string(secret) {
+		t.Errorf("the read must see the committed secret, or the save deletes it; got %q",
+			string(o.refreshed.ClientSecretEncrypted))
+	}
+	_ = database.RollbackTransaction(saver)
+}
