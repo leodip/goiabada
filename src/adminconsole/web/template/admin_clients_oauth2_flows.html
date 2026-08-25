@@ -48,7 +48,11 @@
                 updatePkceWarning(); // Also update warning visibility
             } else {
                 pkceSection.classList.add('hidden');
-                pkceWarning.classList.add('hidden'); // Hide warning when section is hidden
+                // A public client renders no warning element at all: the selection can no longer
+                // produce an optional outcome, so there is nothing to hide here (#245).
+                if (pkceWarning) {
+                    pkceWarning.classList.add('hidden'); // Hide warning when section is hidden
+                }
             }
         }
 
@@ -218,30 +222,31 @@
                     <div class="ml-1 space-y-3">
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="pkceRequired" class="radio radio-sm" value="on"
-                                {{if and .client.PKCERequired (deref .client.PKCERequired)}}checked{{end}} />
+                                {{if and .client.PKCERequired (deref .client.PKCERequired)}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
                             <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_required" }}</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="pkceRequired" class="radio radio-sm" value="off"
-                                {{if and .client.PKCERequired (not (deref .client.PKCERequired))}}checked{{end}} />
+                                {{if and .client.PKCERequired (not (deref .client.PKCERequired))}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
                             <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_optional" }}</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="pkceRequired" class="radio radio-sm" value="global"
-                                {{if not .client.PKCERequired}}checked{{end}} />
+                                {{if not .client.PKCERequired}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
                             <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_prefix" }}<a href="/admin/settings/general"
                                 class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_link" }}</a>{{if .client.GlobalPKCERequired}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_required" }}{{else}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_optional" }}{{end}}</span>
                         </label>
                     </div>
-                </div>
-
-                <div id="pkceWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
                     {{if .client.IsPublic}}
-                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_warning_public" }}</span>
-                    {{else}}
-                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_warning_confidential" }}</span>
+                        <p class="mt-2 ml-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_public_note" }}</p>
                     {{end}}
                 </div>
+
+                {{if not .client.IsPublic}}
+                <div id="pkceWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
+                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_warning_confidential" }}</span>
+                </div>
+                {{end}}
 
                 <div class="w-full mt-8 form-control">
                     <span class="label-text mb-4">
