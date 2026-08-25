@@ -1,0 +1,10 @@
+-- Migration 000033 down: intentional no-op.
+--
+-- The conversion is one-way: once a public client's pkce_required has become
+-- true, nothing records whether it was previously false or NULL, and the two
+-- are not interchangeable (NULL means "inherit the global setting"). Setting
+-- public clients back to NULL would invent a value rather than restore one, and
+-- it would restore a configuration the server no longer honours, since a public
+-- client requires PKCE regardless of this column.
+--
+-- If you must roll back the convention, restore from a pre-migration backup.
