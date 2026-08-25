@@ -233,6 +233,24 @@ const (
 	// event here lists code ids, and a count answers the only question an auditor has, whether
 	// anything was revoked.
 	AuditTerminatedUserSession = "terminated_user_session"
+	// AuditRevokedClientGrants records that a client-scoped security action cut off every grant
+	// one client holds: its not-yet-revoked authorization codes are marked revoked and its
+	// refresh tokens, through both linkage shapes, are revoked. Emitted by the
+	// confidential-to-public flip AFTER its transaction commits, on success only, and emitted
+	// even when nothing was found to revoke, so the event attests that the action happened
+	// rather than that something was there to sweep (#245 decision 4). Its `reason` field
+	// distinguishes future sites; today the only value is client_became_public.
+	//
+	// Deliberately NOT AuditRevokedUserAuthState, whose payload asserts a generation bracket and
+	// a list of terminated sessions. This action advances no generation and ends no session: it
+	// is scoped to one client, so the users of that client stay signed in everywhere else and
+	// their access tokens keep working until they expire.
+	//
+	// Its payload carries clientId, reason, revokedCodeCount and revokedRefreshTokenJtis, plus
+	// loggedInUser. Codes get a count rather than a list of ids, following
+	// terminated_user_session, because no event here lists code ids and a count answers the only
+	// question an auditor has, whether anything was revoked.
+	AuditRevokedClientGrants = "revoked_client_grants"
 	// AuditCrossUserSessionReplaced records that a different user signed in on a browser that was
 	// still carrying someone else's session cookie, so that session was ended. The browser reaches
 	// that state through prompt=login, through an id_token_hint naming another user, or simply by
@@ -330,6 +348,7 @@ var AuditEventTypes = []string{
 	AuditOTPCodeReplayDetected,
 	AuditRateLimitExceeded,
 	AuditRefreshTokenReplayDetected,
+	AuditRevokedClientGrants,
 	AuditRevokedKey,
 	AuditRevokedUserAuthState,
 	AuditROPCAuthFailed,

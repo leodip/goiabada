@@ -64,6 +64,19 @@ func HandleDynamicClientRegistrationPost(
 		// 7. Determine if public or confidential client
 		isPublic := req.TokenEndpointAuthMethod == "none"
 
+		// A public client always requires PKCE, and the server enforces that whatever this
+		// column holds. It is written explicitly all the same, and only on the public path: a
+		// nil column is handed raw to the admin API's client response and to the admin console's
+		// template, where it renders as "inherit from the global setting" and so reports the
+		// opposite of what the server does whenever that global is off. A confidential client
+		// keeps writing nothing, because inheriting the global is what the setting is for
+		// (#245).
+		var pkceRequired *bool
+		if isPublic {
+			required := true
+			pkceRequired = &required
+		}
+
 		// 8. Generate client secret for confidential clients (RFC 7591 §3.2.1)
 		var clientSecretEncrypted []byte
 		var clientSecret string
@@ -85,6 +98,7 @@ func HandleDynamicClientRegistrationPost(
 			ClientSecretEncrypted: clientSecretEncrypted,
 			Description:           req.ClientName,
 			IsPublic:              isPublic,
+			PKCERequired:          pkceRequired,
 			Enabled:               true,
 			// A self-registered client is one nobody here has vetted, and RFC 7591 section 5
 			// requires all of its metadata be treated as self-asserted. Consent is the only

@@ -649,7 +649,7 @@
 "adminconsole.admin_clients.authentication.copied_link" = "Copiado!"
 "adminconsole.admin_clients.authentication.saved_successfully" = "Autenticação do cliente salva com sucesso"
 "adminconsole.admin_clients.authentication.modal.secret_change" = "<span class='text-accent'>Você está alterando o segredo do cliente</span>, e isso pode afetar aplicativos existentes que dependem dele.<br /><br />Deseja prosseguir e salvar?"
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "<span class='text-accent'>Você está alterando o cliente de confidencial para público</span>. Isto removerá o segredo do cliente e quaisquer aplicativos que o utilizem precisarão ser atualizados.<br /><br />Deseja prosseguir e salvar?"
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "<span class='text-accent'>Você está alterando o cliente de confidencial para público</span>. Isto removerá o segredo do cliente e quaisquer aplicativos que o utilizem precisarão ser atualizados. Os refresh tokens e os códigos de autorização pendentes deste cliente serão revogados; os access tokens já emitidos continuam funcionando até expirarem, e os usuários permanecem conectados nos demais aplicativos.<br /><br />Deseja prosseguir e salvar?"
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "<span class='text-accent'>Você está alterando o cliente de público para confidencial</span>. Será necessário atualizar quaisquer aplicativos que utilizem este cliente para incluir um segredo do cliente.<br /><br />Deseja prosseguir e salvar?"
 
 "adminconsole.admin_clients.redirect_uris.page_title_prefix" = "Cliente - URIs de redirecionamento - "

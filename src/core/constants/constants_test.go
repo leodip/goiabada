@@ -62,7 +62,7 @@ func TestAuditEventTypes_NonEmpty(t *testing.T) {
 
 // TestAuditEventTypes_Count acts as a drift guard - update expected count when adding/removing audit events
 func TestAuditEventTypes_Count(t *testing.T) {
-	expectedCount := 99
+	expectedCount := 100
 	actualCount := len(AuditEventTypes)
 
 	require.Equal(t, expectedCount, actualCount,
@@ -103,6 +103,11 @@ func TestAuditEventTypes_ContainsCriticalEvents(t *testing.T) {
 		// either way, so if this one stopped being emitted the security action would leave only
 		// a lifecycle record behind and nothing attesting what it revoked.
 		AuditTerminatedUserSession,
+		// Records that flipping a client to public cut off every grant that client held (#245).
+		// Same class again: the flip's other effects are all visible on the client row, so if
+		// this event stopped being emitted the revocation would be the one part of the action
+		// leaving no trace at all.
+		AuditRevokedClientGrants,
 	}
 
 	for _, critical := range criticalEvents {
@@ -174,6 +179,7 @@ func TestAuditEventTypes_MatchesConstants(t *testing.T) {
 		AuditROPCAuthFailed,
 		AuditRateLimitExceeded,
 		AuditRefreshTokenReplayDetected,
+		AuditRevokedClientGrants,
 		AuditRevokedKey,
 		AuditRevokedUserAuthState,
 		AuditRotatedKeys,

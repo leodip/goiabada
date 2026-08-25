@@ -673,7 +673,7 @@
 "adminconsole.admin_clients.authentication.copied_link" = "Copied!"
 "adminconsole.admin_clients.authentication.saved_successfully" = "Client authentication saved successfully"
 "adminconsole.admin_clients.authentication.modal.secret_change" = "<span class='text-accent'>You are changing the client secret</span>, and this could potentially affect existing applications that depend on it.<br /><br />Do you want to proceed and save?"
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "<span class='text-accent'>You are switching from confidential to public client</span>. This will remove the client secret, and any applications using it will need to be updated.<br /><br />Do you want to proceed and save?"
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "<span class='text-accent'>You are switching from confidential to public client</span>. This will remove the client secret, and any applications using it will need to be updated. Outstanding refresh tokens and authorization codes for this client will be revoked; access tokens already issued keep working until they expire, and users stay signed in to other applications.<br /><br />Do you want to proceed and save?"
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "<span class='text-accent'>You are switching from public to confidential client</span>. This will require you to update any applications using this client to include a client secret.<br /><br />Do you want to proceed and save?"
 
 # --- Client redirect URIs --------------------------------------------------

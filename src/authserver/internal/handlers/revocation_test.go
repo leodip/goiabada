@@ -797,3 +797,289 @@ func stubRevocationSweepTx(database *mocks_data.Database, userId int64, newGener
 	database.On("CommitTransaction", revokeTx).Return(nil).Once()
 	database.On("RollbackTransaction", revokeTx).Return(nil).Once()
 }
+
+// The client whose grants are revoked (#245 stage 4). A different id from every fixture above,
+// so an expectation copied from one of those tests cannot match here by accident.
+const revokeClientId = int64(4242)
+
+// clientGrantFixture builds the four refresh tokens the client-scoped sweep reasons about:
+//
+//	1 rt-client-session  auth-code, session-bound, its own session_identifier set
+//	2 rt-client-offline  auth-code, OFFLINE, its own session_identifier EMPTY, code id set
+//	3 rt-client-ropc     ROPC, no code at all, reached only through refresh_tokens.client_id
+//	4 rt-client-gone     ALREADY revoked
+//
+// Tokens 2 and 3 are the load-bearing ones, and they are load-bearing for opposite reasons.
+// Token 2 has no sid of its own, so only the joined codes row ties it to anything. Token 3 has no
+// code at all, which is why the code marker cannot reach it and why the sweep is still owed after
+// decision 16 made the marker the boundary.
+func clientGrantFixture() []*models.RefreshToken {
+	return []*models.RefreshToken{
+		{
+			Id: 1, RefreshTokenJti: "rt-client-session",
+			SessionIdentifier: "sid-client",
+			RefreshTokenType:  "Refresh",
+			CodeId:            sql.NullInt64{Int64: 31, Valid: true},
+		},
+		{
+			Id: 2, RefreshTokenJti: "rt-client-offline",
+			SessionIdentifier: "",
+			RefreshTokenType:  "Offline",
+			CodeId:            sql.NullInt64{Int64: 32, Valid: true},
+		},
+		{
+			Id: 3, RefreshTokenJti: "rt-client-ropc",
+			SessionIdentifier: "",
+			RefreshTokenType:  "Offline",
+			CodeId:            sql.NullInt64{Valid: false},
+			ClientId:          sql.NullInt64{Int64: revokeClientId, Valid: true},
+		},
+		{
+			Id: 4, RefreshTokenJti: "rt-client-gone",
+			SessionIdentifier: "sid-client",
+			RefreshTokenType:  "Refresh",
+			CodeId:            sql.NullInt64{Int64: 34, Valid: true},
+			Revoked:           true,
+		},
+	}
+}
+
+// TestRevokeClientGrants_MarksTheCodesThenSweepsTheTokens is the happy path and the owner of
+// decision 16's write order. Every expectation is registered on a strict mock, so a call nobody
+// expected, or one that reached the pool instead of the transaction, fails the test on its own.
+func TestRevokeClientGrants_MarksTheCodesThenSweepsTheTokens(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+	tokens := clientGrantFixture()
+
+	db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(3), nil).Once()
+	db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).Return(tokens, nil).Once()
+	// The three live tokens only. rt-client-gone is not written again.
+	db.On("UpdateRefreshToken", revokeTx, tokens[0]).Return(nil).Once()
+	db.On("UpdateRefreshToken", revokeTx, tokens[1]).Return(nil).Once()
+	db.On("UpdateRefreshToken", revokeTx, tokens[2]).Return(nil).Once()
+
+	result, err := RevokeClientGrants(db, revokeTx, revokeClientId)
+	require.NoError(t, err)
+
+	// The marker's own count, reported as-is: it is what the audit event carries, and stage 3's
+	// data cases pin that it counts rows TRANSITIONED rather than rows matched.
+	assert.Equal(t, int64(3), result.RevokedCodeCount)
+
+	// Three JTIs, not four. rt-client-gone was revoked before the call, so it is neither written
+	// again nor reported, which is the invariant #77's teardown guard depends on.
+	assert.Equal(t, []string{"rt-client-session", "rt-client-offline", "rt-client-ropc"},
+		result.RevokedRefreshTokenJtis)
+	assert.NotContains(t, result.RevokedRefreshTokenJtis, "rt-client-gone")
+
+	// The ROPC token is revoked although it hangs off no code. This is the assertion that fails
+	// against an implementation that leaned on the code marker alone: decision 16 chose the
+	// marker as the boundary, and the single thing it cannot reach is exactly this row.
+	assert.True(t, tokens[2].Revoked, "the client's ROPC token has no code, so only the sweep reaches it")
+	assert.True(t, tokens[1].Revoked, "the offline token carries no sid of its own and must still be revoked")
+	assert.True(t, tokens[0].Revoked)
+
+	// Decision 16's order: the durable marker first, the sweep second. Within one transaction
+	// this is not a safety boundary and neither call reads the other's rows, so the assertion
+	// pins the design's order rather than a correctness property, and is here so reordering has
+	// to be deliberate.
+	marker := callIndex(t, db, "RevokeCodesByClientId")
+	sweep := callIndex(t, db, "GetRefreshTokensByClientId")
+	assert.Less(t, marker, sweep, "the codes are marked before the tokens are swept")
+
+	// The negative controls, and the reason this seam is worth having separately from
+	// RevokeUserAuthState. A client-scoped action must not advance anybody's generation, must not
+	// delete a session, and must not sweep by user: each would sign the client's users out of
+	// every OTHER client they hold, which is the collateral damage decision 4 exists to avoid.
+	db.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "GetRefreshTokensByUserId", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "PromoteRefreshTokenGenerations", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestRevokeClientGrants_NothingToRevoke covers a client with no grants at all. Not an error: the
+// audit event still attests that the flip happened, so the result reports zeros rather than the
+// helper refusing.
+func TestRevokeClientGrants_NothingToRevoke(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+
+	db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(0), nil).Once()
+	db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).
+		Return([]*models.RefreshToken{}, nil).Once()
+
+	result, err := RevokeClientGrants(db, revokeTx, revokeClientId)
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(0), result.RevokedCodeCount)
+	assert.Empty(t, result.RevokedRefreshTokenJtis)
+	// Non-nil, so the audit payload carries [] rather than null.
+	assert.NotNil(t, result.RevokedRefreshTokenJtis)
+	db.AssertNotCalled(t, "UpdateRefreshToken", mock.Anything, mock.Anything)
+}
+
+// TestRevokeClientGrants_RequiresATransaction pins the entry precondition. No expectations are
+// registered at all, so the strict mock fails the case on any database call whatsoever: the
+// refusal has to happen before the marker, not after it.
+func TestRevokeClientGrants_RequiresATransaction(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+
+	result, err := RevokeClientGrants(db, nil, revokeClientId)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requires a transaction")
+	assert.Empty(t, result.RevokedRefreshTokenJtis)
+	assert.Equal(t, int64(0), result.RevokedCodeCount)
+	assertNotAttempted(t, db, "RevokeCodesByClientId", "GetRefreshTokensByClientId",
+		"UpdateRefreshToken")
+}
+
+// TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction is the wrapper's happy path. What it
+// owns is that the caller's client write and both revocations reach the SAME transaction, which
+// is what stops a client ending up public with its secret deleted while the grants that secret
+// was protecting survive.
+func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+
+	db.On("BeginTransaction").Return(revokeTx, nil).Once()
+	db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(1), nil).Once()
+	db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).
+		Return([]*models.RefreshToken{}, nil).Once()
+	db.On("CommitTransaction", revokeTx).Return(nil).Once()
+	// The deferred rollback runs on the success path too, where it is a no-op against a committed
+	// transaction. A test omitting this fails on the strict mock.
+	db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+
+	var wroteWith *sql.Tx
+	result, err := RevokeClientGrantsTx(db, revokeClientId, func(tx *sql.Tx) error {
+		wroteWith = tx
+		return nil
+	})
+	require.NoError(t, err)
+
+	assert.Same(t, revokeTx, wroteWith,
+		"the caller's write must receive the transaction the revocation runs in, not nil")
+	assert.Equal(t, int64(1), result.RevokedCodeCount)
+
+	// The write happens BEFORE the revocation, so the marker and the sweep observe the client as
+	// it will be after the commit rather than as it was.
+	assert.Less(t, callIndex(t, db, "BeginTransaction"), callIndex(t, db, "RevokeCodesByClientId"))
+	assert.Less(t, callIndex(t, db, "GetRefreshTokensByClientId"), callIndex(t, db, "CommitTransaction"))
+}
+
+// TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult walks every failure point and asserts the
+// same two things at each: the error reaches the caller, and the result is the ZERO value rather
+// than a partially populated one. The second is what stops a caller emitting an audit event that
+// claims a revocation the transaction rolled back.
+//
+// Each row registers only the calls its path reaches. The strict mock does the rest in both
+// directions: an unexpected call fails the case, and so does an expectation that was never met.
+func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
+	boom := errors.New("connection refused")
+
+	cases := []struct {
+		name         string
+		setup        func(db *mocks_data.Database)
+		write        func(tx *sql.Tx) error
+		notAttempted []string
+		extraAssert  func(t *testing.T, result ClientGrantRevocationResult)
+	}{
+		{
+			name: "BeginTransaction fails",
+			setup: func(db *mocks_data.Database) {
+				db.On("BeginTransaction").Return(nil, boom).Once()
+			},
+			// Not even the rollback: there is no transaction to roll back.
+			notAttempted: []string{"RevokeCodesByClientId", "RollbackTransaction"},
+		},
+		{
+			// The client write itself failing, which is the case that must not revoke: refusing
+			// the flip and revoking the grants anyway would sign users out of a client that is
+			// still confidential.
+			name: "the client write fails",
+			setup: func(db *mocks_data.Database) {
+				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+			},
+			write:        func(tx *sql.Tx) error { return boom },
+			notAttempted: []string{"RevokeCodesByClientId", "GetRefreshTokensByClientId", "CommitTransaction"},
+		},
+		{
+			name: "the code marker fails",
+			setup: func(db *mocks_data.Database) {
+				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(0), boom).Once()
+				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+			},
+			notAttempted: []string{"GetRefreshTokensByClientId", "CommitTransaction"},
+		},
+		{
+			// KEEP THIS ROW. It is the one that names the property: the marker returned 2, the
+			// transaction rolls back, and a caller auditing that 2 would record a revocation that
+			// never happened. It is also the only row asserting the count itself, so the failure
+			// reads as a contract violation rather than a struct mismatch.
+			name: "the token query fails after the marker revoked two codes",
+			setup: func(db *mocks_data.Database) {
+				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(2), nil).Once()
+				db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).Return(nil, boom).Once()
+				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+			},
+			notAttempted: []string{"UpdateRefreshToken", "CommitTransaction"},
+			extraAssert: func(t *testing.T, result ClientGrantRevocationResult) {
+				assert.Equal(t, int64(0), result.RevokedCodeCount,
+					"the count must not survive a rolled-back transaction")
+			},
+		},
+		{
+			name: "a token write fails",
+			setup: func(db *mocks_data.Database) {
+				tokens := clientGrantFixture()
+				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(1), nil).Once()
+				db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).Return(tokens, nil).Once()
+				db.On("UpdateRefreshToken", revokeTx, tokens[0]).Return(boom).Once()
+				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+			},
+			notAttempted: []string{"CommitTransaction"},
+		},
+		{
+			name: "the commit fails",
+			setup: func(db *mocks_data.Database) {
+				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(1), nil).Once()
+				db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).
+					Return([]*models.RefreshToken{}, nil).Once()
+				db.On("CommitTransaction", revokeTx).Return(boom).Once()
+				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+			},
+			extraAssert: func(t *testing.T, result ClientGrantRevocationResult) {
+				// The honest contract, documented on the helper: a reported commit failure means
+				// the durable outcome is INDETERMINATE and may in fact have applied. What the
+				// zero result buys is that no audit event claims it did.
+				assert.Nil(t, result.RevokedRefreshTokenJtis)
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db := mocks_data.NewDatabase(t)
+			tc.setup(db)
+
+			write := tc.write
+			if write == nil {
+				write = func(tx *sql.Tx) error { return nil }
+			}
+
+			result, err := RevokeClientGrantsTx(db, revokeClientId, write)
+
+			require.ErrorIs(t, err, boom)
+			assert.Equal(t, ClientGrantRevocationResult{}, result,
+				"the error path returns the zero value, and a caller must not audit it")
+			assertNotAttempted(t, db, tc.notAttempted...)
+			if tc.extraAssert != nil {
+				tc.extraAssert(t, result)
+			}
+		})
+	}
+}

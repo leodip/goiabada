@@ -725,6 +725,18 @@ type authCodeOptions struct {
 	isPublic     bool
 	noPKCE       bool
 	pkceRequired *bool
+	// user and userPassword run the ceremony as an EXISTING user instead of a freshly created
+	// one. Both are required together, because the ceremony goes through the real password form.
+	// Their purpose is a fixture no single call can build: one user holding grants on two
+	// different clients, which is what proves a client-scoped revocation leaves the user's other
+	// clients alone (#245, D2).
+	user         *models.User
+	userPassword string
+	// userAgent runs the ceremony as a different DEVICE. Two ceremonies for one user from the
+	// default client replace each other's session, because the server treats the same user on
+	// the same device as one session, so a fixture wanting two live sessions has to say which
+	// is which. This is the same trick secondSessionFor uses.
+	userAgent string
 }
 
 // requireChallengelessCodesAreStorable skips the calling test on SQLite, where a code carrying
@@ -790,22 +802,26 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
-	passwordHashed, err := hashutil.HashPassword(password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	password := opt.userPassword
+	user := opt.user
+	if user == nil {
+		password = gofakeit.Password(true, true, true, true, false, 8)
+		passwordHashed, err := hashutil.HashPassword(password)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	user := &models.User{
-		Subject:      uuid.New(),
-		Enabled:      true,
-		Email:        gofakeit.Email(),
-		PasswordHash: passwordHashed,
-	}
+		user = &models.User{
+			Subject:      uuid.New(),
+			Enabled:      true,
+			Email:        gofakeit.Email(),
+			PasswordHash: passwordHashed,
+		}
 
-	err = database.CreateUser(nil, user)
-	if err != nil {
-		t.Fatal(err)
+		err = database.CreateUser(nil, user)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	codeVerifier := "code-verifier"
@@ -825,6 +841,9 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		"&nonce=" + requestNonce
 
 	httpClient := createHttpClient(t)
+	if opt.userAgent != "" {
+		httpClient = createHttpClientWithUserAgent(t, opt.userAgent)
+	}
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {

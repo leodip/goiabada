@@ -382,6 +382,166 @@ func TerminateUserSessionTx(db data.Database, userSession *models.UserSession) (
 	}, nil
 }
 
+// ClientGrantRevocationResult reports what revoking one client's grants actually did. It is
+// TerminationResult's two fields under a name that does not assert a session ended, and that
+// distinction is the whole reason it is a separate type (#245 decision 16): flipping a client to
+// public revokes the client's grants and deliberately leaves every session alone, so a result
+// carrying RevocationResult's terminated-sessions, preserved-session and generation fields would
+// have three fields that can never fill, and an audit payload built from it would imply an action
+// this one does not take.
+type ClientGrantRevocationResult struct {
+	// RevokedCodeCount is how many codes this call TRANSITIONED from live to revoked, not how
+	// many the client has. A second flip of the same client reports 0, which is what makes the
+	// audit event answer the only question an auditor asks of it, whether this action revoked
+	// anything.
+	RevokedCodeCount int64
+	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
+	// revokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
+	// success path, so a JSON audit payload carries [] rather than null.
+	RevokedRefreshTokenJtis []string
+}
+
+// RevokeClientGrants cuts off every grant one client holds: it writes the durable fact that the
+// client's authorization codes are revoked, then sweeps the refresh tokens those codes and the
+// client's ROPC grants issued (#245 decision 16).
+//
+// It exists for one caller, the confidential-to-public flip, and the rule that caller's comment
+// carries is the rule for any future one: revoke when the change REMOVES the requirement for the
+// client to authenticate, not when it adds or replaces one. Public to confidential closes a window
+// rather than opening one, and rotating a confidential client's secret leaves the requirement in
+// place; either would sign real users out to protect against nothing.
+//
+// The two writes, in this order:
+//
+//  1. RevokeCodesByClientId marks every not-yet-revoked code of the client revoked. This is the
+//     write that SURVIVES, and the only one that is a boundary. A sweep on its own is
+//     point-in-time: rotation claims the presented token and inserts its replacement in two
+//     separate autocommit operations, so a refresh that validated before this transaction began
+//     can insert a live child AFTER it commits. A rotated child inherits its parent's code_id, so
+//     marking the code rejects every present and future descendant at the refresh arm's
+//     revoked-code check, and that child is born already rejected because the fact predates its
+//     existence.
+//  2. The client-scoped refresh-token sweep. Still owed rather than redundant, for two reasons:
+//     GetRefreshTokensByClientId reaches the ROPC linkage shape, which has no code for step 1 to
+//     mark, and it is what gives the audit event actual JTIs rather than a count.
+//
+// It deliberately does NOT advance any user's authentication generation and does NOT delete any
+// session. Both are user-scoped: deleting the sessions of everyone who ever used this client would
+// sign each of them out of every OTHER client they hold, which is the collateral damage a
+// client-scoped action exists to avoid. Access tokens already issued keep working until they
+// expire, because nothing in session validation consults a code or a refresh token.
+//
+// No compensating "revoke a code that landed after the sweep" pass exists or is owed, and that is
+// deliberate rather than an omission. A code inserted after this commits belongs to a client that
+// is public NOW, so either it carries no challenge and the redemption rule refuses it, or it
+// carries one and is a legitimate new grant under the new rules. Fail-closed either way.
+//
+// The caller owns the transaction, which is REQUIRED here rather than optional, for the reason
+// RevokeUserAuthState states about its own: the contract is atomicity across a marker and a
+// multi-row sweep, so the transaction is a precondition of the whole operation rather than an
+// argument one nested call happens to care about.
+func RevokeClientGrants(db data.Database, tx *sql.Tx, clientId int64) (ClientGrantRevocationResult, error) {
+	result := ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
+
+	if tx == nil {
+		return result, errors.WithStack(errors.New("revoking a client's grants requires a transaction: the code marker and the sweep must not be separable"))
+	}
+
+	revokedCodeCount, err := db.RevokeCodesByClientId(tx, clientId)
+	if err != nil {
+		return ClientGrantRevocationResult{}, err
+	}
+
+	tokens, err := db.GetRefreshTokensByClientId(tx, clientId)
+	if err != nil {
+		return ClientGrantRevocationResult{}, err
+	}
+
+	revokedJtis, err := revokeRefreshTokens(db, tx, tokens)
+	if err != nil {
+		return ClientGrantRevocationResult{}, err
+	}
+
+	return ClientGrantRevocationResult{
+		RevokedCodeCount:        revokedCodeCount,
+		RevokedRefreshTokenJtis: revokedJtis,
+	}, nil
+}
+
+// RevocationReasonClientBecamePublic is the reason recorded on AuditRevokedClientGrants. A
+// constant beside the RevocationReason* group above, for the same reason those are constants: a
+// log consumer needs something to match against, and there is one place to add the next site.
+const RevocationReasonClientBecamePublic = "client_became_public"
+
+// RevokeClientGrantsTx runs a narrow client write and RevokeClientGrants inside ONE transaction
+// and commits it, returning the result for the caller to audit AFTER the commit. It is
+// RevokeUserAuthStateTx's shape applied to a client-scoped action, and it exists for the same
+// reason: the transaction discipline is written once, here, rather than open-coded at the call
+// site.
+//
+// The properties it owns, and what each one prevents:
+//
+//   - the client write and the revocation are in the same transaction, so a client can never end
+//     up public with its secret deleted while the grants that secret was protecting survive;
+//   - any failure BEFORE the commit is rolled back atomically, via the deferred rollback;
+//   - the audit event is the CALLER's job and happens after this returns successfully, because
+//     AuditLogger.Log takes no transaction and a logged revocation that then rolled back would be
+//     a false record (#106 decision 5).
+//
+// On any error the returned result is the zero value rather than a partially populated one, so a
+// caller that mistakenly audits on the error path cannot emit half-truthful lists.
+//
+// WHAT A COMMIT FAILURE DOES AND DOES NOT GUARANTEE is the contract RevokeUserAuthStateTx
+// documents at length and this shares: the deferred rollback covers failures before the commit
+// only, and `database/sql` promises nothing about a Commit that returns an error. So a 500 from a
+// caller here must not be read as "nothing happened"; the durable outcome of a reported commit
+// failure is indeterminate, and the bounded consequence is a client left flipped and revoked with
+// no audit record of it, which is fail-closed on the security side and a gap on the forensic side.
+func RevokeClientGrantsTx(db data.Database, clientId int64,
+	write func(tx *sql.Tx) error) (ClientGrantRevocationResult, error) {
+
+	tx, err := db.BeginTransaction()
+	if err != nil {
+		return ClientGrantRevocationResult{}, err
+	}
+	defer db.RollbackTransaction(tx) //nolint:errcheck
+
+	if err := write(tx); err != nil {
+		return ClientGrantRevocationResult{}, err
+	}
+
+	result, err := RevokeClientGrants(db, tx, clientId)
+	if err != nil {
+		return ClientGrantRevocationResult{}, err
+	}
+
+	if err := db.CommitTransaction(tx); err != nil {
+		return ClientGrantRevocationResult{}, err
+	}
+	return result, nil
+}
+
+// LogRevokedClientGrants emits AuditRevokedClientGrants. One function rather than a literal at the
+// call site, following LogRevokedUserAuthState and LogTerminatedUserSession: the payload cannot
+// then differ between sites, and there is a single place to assert its shape field by field.
+//
+// Call this only after RevokeClientGrantsTx returned without error.
+func LogRevokedClientGrants(auditLogger AuditLogger, clientId int64, reason string,
+	loggedInUser string, result ClientGrantRevocationResult) {
+
+	auditLogger.Log(constants.AuditRevokedClientGrants, map[string]interface{}{
+		"clientId":     clientId,
+		"reason":       reason,
+		"loggedInUser": loggedInUser,
+		// What this call TRANSITIONED, not what the client had. A second flip reports 0 and an
+		// empty list, which is the honest answer to the only question an auditor asks of this
+		// event.
+		"revokedCodeCount": result.RevokedCodeCount,
+		// Always a list rather than null: the success path initialises it.
+		"revokedRefreshTokenJtis": result.RevokedRefreshTokenJtis,
+	})
+}
+
 // LogRevokedUserAuthState emits AuditRevokedUserAuthState. One function rather than four
 // literals, so the payload cannot differ between sites and there is a single place to assert
 // its shape field by field.

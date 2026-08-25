@@ -426,13 +426,18 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitDisable(t *testing
 	assert.False(t, *refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should be false")
 }
 
+// E2. The tri-state is still real, and it is what the PKCE settings are FOR: a confidential client
+// may require PKCE, make it optional, or inherit the global. The fixture moved from public to
+// confidential rather than the test being deleted, because the behaviour it asserts did not stop
+// being true, it stopped applying to public clients (#245 decision 8). Its public-client
+// counterpart is E1 below.
 func TestAPIClientOAuth2FlowsPut_PKCERequired_TriState(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
 		ClientIdentifier:         "flows-pkce-" + strings.ToLower(gofakeit.LetterN(8)),
 		Enabled:                  true,
-		IsPublic:                 true,
+		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
 		PKCERequired:             nil, // Initially use global
 	}
@@ -484,6 +489,67 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_TriState(t *testing.T) {
 	refreshed3, err := database.GetClientById(nil, client.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, refreshed3.PKCERequired, "PKCERequired should be nil (use global)")
+}
+
+// E1. A public client has no tri-state: whatever is sent for pkceRequired, the stored value comes
+// out true (#245 decision 5).
+//
+// Normalized rather than refused with a 400, so the endpoint's two public-client rules behave the
+// same way: client credentials six lines below is normalized silently too. It is not silent to a
+// caller, though, and that is what this asserts: the response body is the updated client, so
+// somebody who sent false reads back true in the same round trip.
+//
+// Observed in the RESPONSE BODY rather than in clients.pkce_required. Reading the column is a
+// storage side channel that would pass with the endpoint returning anything at all, and what a
+// caller actually has to be able to see is what it was given back.
+func TestAPIClientOAuth2FlowsPut_PKCERequired_PublicClientIsAlwaysRequired(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	pkceOptional := false
+	client := &models.Client{
+		ClientIdentifier:         "flows-pub-pkce-" + strings.ToLower(gofakeit.LetterN(8)),
+		Enabled:                  true,
+		IsPublic:                 true,
+		AuthorizationCodeEnabled: true,
+		// Explicitly optional to begin with, so a normalization that never ran could not pass
+		// this by leaving the column alone.
+		PKCERequired: &pkceOptional,
+	}
+	err := database.CreateClient(nil, client)
+	assert.NoError(t, err)
+	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+
+	// Both ways in, per section 1: an explicit false, and a nil that would otherwise inherit a
+	// global that can be turned off later.
+	for _, tc := range []struct {
+		name string
+		sent *bool
+	}{
+		{name: "explicit false", sent: &pkceOptional},
+		{name: "nil, which would inherit the global", sent: nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reqBody := api.UpdateClientOAuth2FlowsRequest{
+				AuthorizationCodeEnabled: true,
+				PKCERequired:             tc.sent,
+			}
+			resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+			var updateResp api.UpdateClientResponse
+			err := json.NewDecoder(resp.Body).Decode(&updateResp)
+			assert.NoError(t, err)
+
+			if assert.NotNil(t, updateResp.Client.PKCERequired,
+				"a public client must read back an explicit value, never an inherit-the-global nil") {
+				assert.True(t, *updateResp.Client.PKCERequired,
+					"a public client always requires PKCE, whatever was sent")
+			}
+		})
+	}
 }
 
 func TestAPIClientOAuth2FlowsPut_ImplicitOnly_NoAuthCode(t *testing.T) {
