@@ -143,7 +143,9 @@ type AccountLogoutRequest struct {
 	PostLogoutRedirectUri string `json:"postLogoutRedirectUri"`
 	State                 string `json:"state,omitempty"`
 	ClientIdentifier      string `json:"clientIdentifier,omitempty"`
-	// ResponseMode can be "form_post" (default) or "redirect"
+	// ResponseMode is accepted and ignored. The handler reads no value from it and always
+	// answers AccountLogoutRedirectResponse; there is no form_post mode at this endpoint,
+	// and AccountLogoutFormPostResponse is never written (#245).
 	ResponseMode string `json:"responseMode,omitempty"`
 }
 

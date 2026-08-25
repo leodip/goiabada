@@ -790,15 +790,11 @@ var apiStructsWithNoSchema = map[string]string{
 	"DynamicClientRegistrationResponse": "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
 	"DynamicClientRegistrationError":    "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
 
-	// Five real gaps on operations that are already documented, which is why layer (ii) did
-	// not close them: the routes exist in the spec, but each answers a shape the spec does not
-	// declare. They belong to the census, and when it declares them these entries have to come
-	// out or this test fails, which is the point of the map being exact.
-	"SearchUsersWithGroupAnnotationResponse":      "searchUsers answers this when annotateGroupMembership is set; the spec declares only the plain SearchUsersResponse",
-	"SearchUsersWithPermissionAnnotationResponse": "searchUsers answers this when annotatePermissionId is set; the spec declares only the plain SearchUsersResponse",
-	"UserWithGroupMembershipResponse":             "the element type of the annotated searchUsers response above, undeclared for the same reason",
-	"UserWithPermissionResponse":                  "the element type of the annotated searchUsers response above, undeclared for the same reason",
-	"AccountLogoutFormPostResponse":               "the second shape requestAccountLogout can answer; the spec declares only AccountLogoutRedirectResponse",
+	// A shape no handler writes. HandleAPIAccountLogoutRequestPost ignores the request's
+	// responseMode outright and always answers AccountLogoutRedirectResponse, so there is no
+	// response for this document to declare. It is not dead code either: the admin console's
+	// apiclient still decodes it, which is a defect in the console rather than a gap here.
+	"AccountLogoutFormPostResponse": "no handler writes it; the logout endpoint always answers AccountLogoutRedirectResponse",
 }
 
 func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
