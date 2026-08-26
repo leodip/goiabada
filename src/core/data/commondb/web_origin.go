@@ -149,6 +149,44 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error
 	return webOrigins, nil
 }
 
+// WebOriginExists reports whether any client has registered origin. It answers the CORS
+// middleware's only question, which is server-wide rather than per client: a browser's
+// preflight carries no client identity, so there is nothing to scope the lookup to (#250).
+//
+// It exists to replace a full read of web_origins on every CORS-checked request. The unique
+// index on (origin, client_id) that migration 000034 adds is origin-leading precisely so this
+// count is an index lookup rather than a scan.
+//
+// The rows.Err() check is not boilerplate. This method gates cross-origin access, so a query
+// that failed part way through and reported false would fail closed with no explanation, and
+// one that reported true would fail open; either way every mock-backed test above stays green.
+func (d *CommonDatabase) WebOriginExists(tx *sql.Tx, origin string) (bool, error) {
+
+	selectBuilder := d.Flavor.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("web_origins")
+	selectBuilder.Where(selectBuilder.Equal("origin", origin))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to query database")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var count int
+	if rows.Next() {
+		if err := rows.Scan(&count); err != nil {
+			return false, errors.Wrap(err, "unable to scan web origin count")
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return false, errors.Wrap(err, "unable to read query results")
+	}
+
+	return count > 0, nil
+}
+
 func (d *CommonDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).

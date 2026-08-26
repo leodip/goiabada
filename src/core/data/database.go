@@ -256,6 +256,7 @@ type Database interface {
 	GetWebOriginById(tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error)
 	GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error)
 	GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]models.WebOrigin, error)
+	WebOriginExists(tx *sql.Tx, origin string) (bool, error)
 	DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error
 
 	CreateSettings(tx *sql.Tx, settings *models.Settings) error

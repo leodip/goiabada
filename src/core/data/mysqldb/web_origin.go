@@ -22,6 +22,10 @@ func (d *MySQLDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error)
 	return d.CommonDB.GetAllWebOrigins(tx)
 }
 
+func (d *MySQLDatabase) WebOriginExists(tx *sql.Tx, origin string) (bool, error) {
+	return d.CommonDB.WebOriginExists(tx, origin)
+}
+
 func (d *MySQLDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
 	return d.CommonDB.DeleteWebOrigin(tx, webOriginId)
 }

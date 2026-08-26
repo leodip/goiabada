@@ -1439,6 +1439,13 @@ CREATE UNIQUE INDEX idx_key_pairs_state ON public.key_pairs USING btree (state);
 
 
 --
+-- Name: idx_web_origins_origin_client; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_web_origins_origin_client ON public.web_origins USING btree (origin, client_id);
+
+
+--
 -- Name: idx_subject; Type: INDEX; Schema: public; Owner: -
 --
 
