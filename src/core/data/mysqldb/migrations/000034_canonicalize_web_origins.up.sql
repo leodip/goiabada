@@ -42,10 +42,16 @@ UPDATE `web_origins`
      OR INSTR(SUBSTRING(`origin`, 9), '?') > 0
      OR INSTR(SUBSTRING(`origin`, 9), '#') > 0);
 
+-- The colon count is a correctness guard rather than an optimisation: exactly
+-- two colons means the authority holds exactly one, and stripping a default port
+-- off a two-port authority would turn a row the delete below removes into a live
+-- origin it keeps. The sqlite file carries the full reasoning (#250).
 UPDATE `web_origins` SET `origin` = SUBSTRING(`origin`, 1, CHAR_LENGTH(`origin`) - 3)
- WHERE `origin` LIKE 'http://%:80';
+ WHERE `origin` LIKE 'http://%:80'
+   AND CHAR_LENGTH(`origin`) - CHAR_LENGTH(REPLACE(`origin`, ':', '')) = 2;
 UPDATE `web_origins` SET `origin` = SUBSTRING(`origin`, 1, CHAR_LENGTH(`origin`) - 4)
- WHERE `origin` LIKE 'https://%:443';
+ WHERE `origin` LIKE 'https://%:443'
+   AND CHAR_LENGTH(`origin`) - CHAR_LENGTH(REPLACE(`origin`, ':', '')) = 2;
 
 -- Over-long first. `origin` is varchar(256) here, so this is inert on this
 -- engine; it is carried by all four files so they stay readable side by side, and
