@@ -314,6 +314,7 @@ CREATE UNIQUE INDEX `idx_code_hash` ON `codes`(`code_hash`);
 CREATE UNIQUE INDEX `idx_group_identifier` ON `groups`(`group_identifier`);
 CREATE INDEX `idx_state` ON `key_pairs`(`state`);
 CREATE UNIQUE INDEX `idx_key_pairs_state` ON `key_pairs`(`state`);
+CREATE UNIQUE INDEX `idx_web_origins_origin_client` ON `web_origins`(`origin`, `client_id`);
 CREATE INDEX `idx_pre_reg_email` ON `pre_registrations`(`email`);
 CREATE INDEX idx_users_forgot_password_code_hash ON users(forgot_password_code_hash);
 CREATE UNIQUE INDEX idx_pre_reg_verification_code_hash ON pre_registrations(verification_code_hash);

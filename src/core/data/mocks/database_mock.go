@@ -13183,3 +13183,69 @@ func (_c *Database_UsersLoadPermissions_Call) RunAndReturn(run func(tx *sql.Tx, 
 	_c.Call.Return(run)
 	return _c
 }
+
+// WebOriginExists provides a mock function for the type Database
+func (_mock *Database) WebOriginExists(tx *sql.Tx, origin string) (bool, error) {
+	ret := _mock.Called(tx, origin)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WebOriginExists")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (bool, error)); ok {
+		return returnFunc(tx, origin)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) bool); ok {
+		r0 = returnFunc(tx, origin)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
+		r1 = returnFunc(tx, origin)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_WebOriginExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WebOriginExists'
+type Database_WebOriginExists_Call struct {
+	*mock.Call
+}
+
+// WebOriginExists is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - origin string
+func (_e *Database_Expecter) WebOriginExists(tx any, origin any) *Database_WebOriginExists_Call {
+	return &Database_WebOriginExists_Call{Call: _e.mock.On("WebOriginExists", tx, origin)}
+}
+
+func (_c *Database_WebOriginExists_Call) Run(run func(tx *sql.Tx, origin string)) *Database_WebOriginExists_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_WebOriginExists_Call) Return(b bool, err error) *Database_WebOriginExists_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_WebOriginExists_Call) RunAndReturn(run func(tx *sql.Tx, origin string) (bool, error)) *Database_WebOriginExists_Call {
+	_c.Call.Return(run)
+	return _c
+}

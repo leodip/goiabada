@@ -318,6 +318,7 @@ CREATE TABLE `web_origins` (
   `origin` varchar(256) NOT NULL,
   `client_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_web_origins_origin_client` (`origin`,`client_id`),
   KEY `fk_clients_web_origins` (`client_id`),
   CONSTRAINT `fk_clients_web_origins` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

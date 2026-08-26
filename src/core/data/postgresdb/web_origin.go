@@ -65,6 +65,10 @@ func (d *PostgresDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, err
 	return d.CommonDB.GetAllWebOrigins(tx)
 }
 
+func (d *PostgresDatabase) WebOriginExists(tx *sql.Tx, origin string) (bool, error) {
+	return d.CommonDB.WebOriginExists(tx, origin)
+}
+
 func (d *PostgresDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
 	return d.CommonDB.DeleteWebOrigin(tx, webOriginId)
 }

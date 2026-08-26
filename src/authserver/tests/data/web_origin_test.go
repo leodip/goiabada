@@ -1,7 +1,9 @@
 package datatests
 
 import (
+	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
@@ -157,6 +159,128 @@ func TestDeleteWebOrigin(t *testing.T) {
 	err = database.DeleteWebOrigin(nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent web origin, got: %v", err)
+	}
+}
+
+// WebOriginExists is what MiddlewareCors consults on every CORS-checked request
+// after #250, in place of reading the whole table. Its answer decides whether a
+// browser is allowed to read a response from /auth/token, /auth/logout or
+// /userinfo, and every test above it injects a mocked Database, so this tier is
+// the only one that can tell whether the real query works at all.
+//
+// The two cases that are not the happy path are the ones that matter, per
+// testing.md section 4. A miss must be a clean false with no error, since an
+// error mistaken for absence and absence mistaken for an error are both silent
+// here. And a query failure must be an ERROR rather than a benign false: false
+// fails closed with nothing explaining why, and the one-character variant that
+// returns true instead would fail open, with the whole unit suite green either
+// way.
+func TestWebOriginExists(t *testing.T) {
+	client := createTestClient(t)
+	webOrigin := createTestWebOrigin(t, client.Id)
+
+	exists, err := database.WebOriginExists(nil, webOrigin.Origin)
+	if err != nil {
+		t.Fatalf("WebOriginExists for a registered origin: %v", err)
+	}
+	if !exists {
+		t.Errorf("expected %s to exist", webOrigin.Origin)
+	}
+
+	// A near miss rather than an unrelated string: the same origin with one
+	// character added still has to answer false, or the lookup is matching on a
+	// prefix rather than on equality, which is what CORS compares.
+	exists, err = database.WebOriginExists(nil, webOrigin.Origin+"x")
+	if err != nil {
+		t.Errorf("expected no error for an unregistered origin, got: %v", err)
+	}
+	if exists {
+		t.Errorf("expected %sx not to exist", webOrigin.Origin)
+	}
+
+	exists, err = database.WebOriginExists(nil, "")
+	if err != nil {
+		t.Errorf("expected no error for an empty origin, got: %v", err)
+	}
+	if exists {
+		t.Error("expected an empty origin not to exist")
+	}
+}
+
+// The transaction contract, on the shape transaction_test.go pins for the
+// interface as a whole: a method that took its tx and then read through the pool
+// would answer about a different snapshot than its caller is writing in, and no
+// mock-backed test can see that.
+func TestWebOriginExists_Transaction(t *testing.T) {
+	client := createTestClient(t)
+	random := gofakeit.LetterN(6)
+	origin := "https://" + random + ".tx.example.com"
+
+	tx := beginTx(t)
+	webOrigin := &models.WebOrigin{Origin: origin, ClientId: client.Id}
+	if err := database.CreateWebOrigin(tx, webOrigin); err != nil {
+		t.Fatalf("CreateWebOrigin in a transaction: %v", err)
+	}
+
+	exists, err := webOriginExistsWithin(t, tx, origin, 15*time.Second)
+	if err != nil {
+		t.Fatalf("WebOriginExists inside the transaction: %v", err)
+	}
+	if !exists {
+		t.Error("a write made through the transaction must be visible to a read through the same transaction")
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+
+	exists, err = database.WebOriginExists(nil, origin)
+	if err != nil {
+		t.Fatalf("WebOriginExists after the rollback: %v", err)
+	}
+	if exists {
+		t.Error("a rolled-back write must leave no origin to find")
+	}
+
+	// The failure path. tx is finished, so the query cannot run. This must be an
+	// error and not a false: false is indistinguishable from "no client has
+	// registered that origin", which is the answer that quietly denies every
+	// cross-origin request for as long as the database is unhappy.
+	if _, err := database.WebOriginExists(tx, origin); err == nil {
+		t.Error("expected an error from a finished transaction, not a benign false")
+	}
+}
+
+// webOriginExistsWithin is the enlisted read, with a deadline on it.
+//
+// Without the deadline, an implementation that ignored its transaction and read
+// through the pool does not answer wrongly on sqlite, it BLOCKS behind the
+// caller's own uncommitted write. Measured rather than reasoned: the mutation
+// swapping tx for nil in WebOriginExists was caught, but as a test-binary timeout
+// panic 600 seconds later rather than as the assertion above. The deadline turns
+// that back into a failure that names what went wrong, and costs a goroutine.
+func webOriginExistsWithin(t *testing.T, tx *sql.Tx, origin string, within time.Duration) (bool, error) {
+	t.Helper()
+
+	type answer struct {
+		exists bool
+		err    error
+	}
+	// Buffered, so the query's goroutine can finish and be collected once the
+	// deferred rollback releases it, rather than leaking on a send nobody reads.
+	done := make(chan answer, 1)
+	go func() {
+		exists, err := database.WebOriginExists(tx, origin)
+		done <- answer{exists, err}
+	}()
+
+	select {
+	case a := <-done:
+		return a.exists, a.err
+	case <-time.After(within):
+		t.Fatalf("WebOriginExists did not answer within %s: a read that blocks behind the caller's "+
+			"own open transaction is a read that is not enlisted in it", within)
+		return false, nil
 	}
 }
 

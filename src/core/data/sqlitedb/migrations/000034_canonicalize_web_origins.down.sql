@@ -1,0 +1,12 @@
+-- Dropping the index is the whole of the rollback, and it is deliberately not an
+-- inverse (#250).
+--
+-- A canonicalized value is one that already worked before this change: repairing
+-- https://a.com/ to https://a.com took a row CORS could never match and made it
+-- match, so restoring the trailing slash would break it again. The original text
+-- is not recorded anywhere either. And the deleted rows never matched an Origin
+-- header at all, so there is nothing about them worth restoring.
+--
+-- What rolling back does restore is the table's willingness to hold the same
+-- origin twice for one client.
+DROP INDEX `idx_web_origins_origin_client`;
