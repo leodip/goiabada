@@ -69,7 +69,7 @@ This is what separates ending a session from a session merely expiring. An offli
 
 A sign-in that was still in progress cannot slip past this. If someone was partway through signing in to an application and was relying on the session you ended rather than typing a password, that sign-in does not quietly become a replacement session. Goiabada sends them back to the login page instead.
 
-Nor can a sign-in that had already reached the consent screen. Goiabada checks the session once more at the very last step, just before it hands the application its authorization code, so a sign-in left waiting on that screen is sent back to the login page as well rather than collecting a code on a session that is no longer there.
+Nor can a sign-in that had already reached the consent screen. Goiabada checks the session once more at the very last step, just before it hands the application its authorization code, so a sign-in left waiting on that screen is sent back to the login page as well rather than collecting a code on a session that is no longer there, or on one that timed out while the screen was open.
 
 An application renewing quietly in the background with [`prompt=none`](/concepts/prompt-parameter/) hits the same check and is told rather than shown: it gets a `login_required` error back, never a login page, so it can decide when to ask the person to sign in again. A client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) is the exception: Goiabada withholds its error redirects, so a silent request that does not return is itself the signal to send the person through an ordinary sign-in.
 

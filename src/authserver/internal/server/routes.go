@@ -109,7 +109,7 @@ func (s *Server) initRoutes() {
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, authHelper, s.database))
 		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker))
-		r.Get("/issue", handlers.HandleIssueGet(httpHelper, authHelper, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger))
+		r.Get("/issue", handlers.HandleIssueGet(httpHelper, authHelper, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger, userSessionManager, permissionChecker))
 		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, authHelper, s.database))
 		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter))
 		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, authHelper, s.database, otpSecretGenerator))

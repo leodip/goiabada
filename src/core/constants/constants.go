@@ -297,6 +297,31 @@ const (
 	// attack. A run of them against one client is worth looking at: this is the event that
 	// fires when a page tries to act on an authorization request its user never saw.
 	AuditAuthCeremonyMismatch = "auth_ceremony_mismatch"
+
+	// The three refusals at /auth/issue, one per fact the last step re-establishes before it
+	// mints anything. Each is the proof that an administrator's action reached a ceremony
+	// already in flight: the consent screen has no time bound, so a session can time out, a
+	// permission can be revoked and a callback can be deregistered while it is on screen, and
+	// without these the operator has no way to ask whether the removal stopped anything (#241).
+
+	// AuditIssuanceRefusedSessionInvalid records a ceremony refused at /auth/issue because the
+	// session it authenticated under is no longer within its idle timeout or its maximum
+	// lifetime. It attests that check alone: a session that resolves to another user, or that
+	// is gone from the database entirely, is refused by the older ownership and liveness tests
+	// beside it and writes no audit row.
+	AuditIssuanceRefusedSessionInvalid = "issuance_refused_session_invalid"
+
+	// AuditIssuanceRefusedScopeDenied records a ceremony refused at /auth/issue because
+	// re-filtering the scope against the user's live permissions left nothing to grant. A
+	// filter that merely narrows the set issues the narrowed grant and writes no row: the
+	// client is told what it got through the response's scope parameter.
+	AuditIssuanceRefusedScopeDenied = "issuance_refused_scope_denied"
+
+	// AuditIssuanceRefusedRedirectURI records a ceremony refused at /auth/issue because the
+	// redirect URI it would answer at is no longer registered on the client. It is the one of
+	// the three whose refusal reaches the client with nothing at all, not even an error: the
+	// destination is exactly what this server may no longer navigate a browser to.
+	AuditIssuanceRefusedRedirectURI = "issuance_refused_redirect_uri"
 )
 
 // AuditEventTypes is the canonical list of all audit event type strings.
@@ -344,6 +369,9 @@ var AuditEventTypes = []string{
 	AuditFailedEmailVerificationCode,
 	AuditFailedResetPasswordCode,
 	AuditGeneratedEmailVerificationCode,
+	AuditIssuanceRefusedRedirectURI,
+	AuditIssuanceRefusedScopeDenied,
+	AuditIssuanceRefusedSessionInvalid,
 	AuditLogout,
 	AuditOTPCodeReplayDetected,
 	AuditRateLimitExceeded,

@@ -26,7 +26,38 @@ import (
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	mocks_test "github.com/leodip/goiabada/core/mocks"
 	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
+	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 )
+
+// armIssueGate arms the three reads the gate at /auth/issue performs before it can dispatch: the
+// client's CURRENT registrations for the redirect URI check, the session's time validity, and the
+// live scope re-filter. Cases about something further down the handler call it so that the gate is
+// a pass rather than the subject; the cases that are about the gate arm these themselves (#241).
+//
+// Called LAST in each case, immediately before the request is served, and that placement is what
+// makes it safe. testify answers a call with the FIRST registered expectation whose arguments
+// match, so everything a case armed for itself still wins and these only catch what it did not
+// anticipate. Every one is Maybe(), because a case refused above the gate reaches none of them.
+//
+// The filter returns its input unchanged, which is the "nothing was revoked" answer and the one
+// that leaves every existing assertion about scope reading as it did before this gate existed.
+func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_user.UserSessionManager,
+	permissionChecker *mocks_user.PermissionChecker, redirectURI string) {
+
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything).
+		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Maybe()
+	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			client := args.Get(1).(*models.Client)
+			client.RedirectURIs = []models.RedirectURI{{URI: redirectURI}}
+		}).Return(nil).Maybe()
+	database.On("GetUserById", mock.Anything, mock.Anything).
+		Return(&models.User{Id: 1, Subject: uuid.New()}, nil).Maybe()
+	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+		Return(true).Maybe()
+	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything).
+		Return(func(scope string, _ *models.User) string { return scope }, nil).Maybe()
+}
 
 func TestHandleIssueGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
@@ -37,8 +68,10 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -66,8 +99,10 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -83,6 +118,8 @@ func TestHandleIssueGet(t *testing.T) {
 			return err.Error() == "authContext.AuthState is not ready_to_issue_code"
 		})).Return()
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		httpHelper.AssertExpectations(t)
@@ -97,8 +134,10 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		// The positive control for the liveness check (#129 stage 6): the ordinary ceremony,
 		// with a session identifier in the context and a session row behind it. It fails
@@ -111,6 +150,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// Mock auth context - note: ResponseType "code" means authorization code flow, not implicit
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "query",
@@ -147,6 +187,8 @@ func TestHandleIssueGet(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		// Execute the handler
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		// Assertions
@@ -182,8 +224,10 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		// An empty identifier is the shape the terminated ceremony actually arrives in:
 		// MiddlewareSessionIdentifier finds the row gone, deletes the identifier from the
@@ -197,6 +241,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "query",
@@ -210,6 +255,8 @@ func TestHandleIssueGet(t *testing.T) {
 			savedAuthContext = ac
 			return ac.AuthState == oauth.AuthStateRequiresLevel1
 		})).Return(nil)
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -234,8 +281,10 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		// The narrower half of the same predicate: the middleware saw the session alive on
 		// this very request and the termination committed immediately afterwards, so the
@@ -246,6 +295,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "query",
@@ -259,6 +309,8 @@ func TestHandleIssueGet(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateRequiresLevel1
 		})).Return(nil)
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -279,8 +331,10 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		// The same empty identifier as the row above, arriving from handlePromptNone rather
 		// than from the consent screen: it validated and bumped the session, redirected here,
@@ -293,6 +347,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "query",
@@ -313,6 +368,8 @@ func TestHandleIssueGet(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -347,8 +404,10 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -357,6 +416,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "query",
@@ -373,6 +433,8 @@ func TestHandleIssueGet(t *testing.T) {
 		// this answers 500 or redirects, and the client is owed its error response either way
 		// (#141 decision 7). It used to get nothing at all.
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -400,6 +462,8 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
 		// redirToClientWithError returns "unable to parse template" instead of committing.
@@ -409,7 +473,7 @@ func TestHandleIssueGet(t *testing.T) {
 			},
 		}
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -418,6 +482,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "form_post",
@@ -437,6 +502,8 @@ func TestHandleIssueGet(t *testing.T) {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
@@ -453,6 +520,8 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
 		templateFS := &mocks_test.TestFS{
 			FileContents: map[string]string{
@@ -460,7 +529,7 @@ func TestHandleIssueGet(t *testing.T) {
 			},
 		}
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -469,6 +538,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "form_post",
@@ -489,6 +559,8 @@ func TestHandleIssueGet(t *testing.T) {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
@@ -506,8 +578,10 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -515,6 +589,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "query",
@@ -532,6 +607,8 @@ func TestHandleIssueGet(t *testing.T) {
 			return err == dbError
 		})).Return()
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		httpHelper.AssertExpectations(t)
@@ -548,8 +625,10 @@ func TestHandleIssueGet(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -557,6 +636,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "query",
@@ -584,6 +664,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == revokeError
 		})).Return()
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -644,8 +726,10 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			permissionChecker := mocks_user.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 			logs := captureLogs(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -653,6 +737,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			authContext := &oauth.AuthContext{
 				AuthState:    oauth.AuthStateReadyToIssueCode,
+				Scope:        "openid profile",
 				ClientId:     "test-client",
 				UserId:       123,
 				ResponseMode: family.responseMode,
@@ -671,6 +756,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 				savedAuthContext = ac
 				return ac.AuthState == oauth.AuthStateRequiresLevel1
 			})).Return(nil)
+
+			armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 			handler.ServeHTTP(rr, req)
 
@@ -725,8 +812,10 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			permissionChecker := mocks_user.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 			logs := captureLogs(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -734,6 +823,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			authContext := &oauth.AuthContext{
 				AuthState:    oauth.AuthStateReadyToIssueCode,
+				Scope:        "openid profile",
 				ClientId:     "test-client",
 				UserId:       123,
 				ResponseMode: family.responseMode,
@@ -747,6 +837,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			stubLiveSession(database, foreignSessionUserId)
 			stubClientProvenanceLookup(database)
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+			armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 			handler.ServeHTTP(rr, req)
 
@@ -787,8 +879,10 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -824,6 +918,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -865,8 +961,10 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		logs := captureLogs(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -874,6 +972,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseType: "token",
@@ -891,6 +990,8 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 			savedAuthContext = ac
 			return ac.AuthState == oauth.AuthStateRequiresLevel1
 		})).Return(nil)
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -920,8 +1021,10 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		logs := captureLogs(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -929,6 +1032,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseType: "id_token token",
@@ -941,6 +1045,8 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -1198,8 +1304,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1262,6 +1370,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		// Mock clearing auth context
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -1287,8 +1397,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1343,6 +1455,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -1367,8 +1481,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1426,6 +1542,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -1452,8 +1570,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1491,6 +1611,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -1500,7 +1622,12 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		tokenIssuer.AssertExpectations(t)
 	})
 
-	t.Run("Implicit flow error - client not found", func(t *testing.T) {
+	// The client vanished between /auth/completed and /auth/issue. Before #241 this reached
+	// handleImplicitFlow, which loaded the client itself and answered a 500; now the registration
+	// gate above the dispatch meets it first, and a client with no registrations at all cannot
+	// have the stored redirect URI among them. It is a refusal rather than a fault, so it renders
+	// the withheld page and never names a client on it.
+	t.Run("Implicit flow, the client vanished - the redirect is withheld rather than emitted", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
@@ -1508,8 +1635,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1518,6 +1647,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "unknown-client",
 			UserId:       123,
 			ResponseType: "token",
@@ -1527,14 +1657,29 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "unknown-client").Return(nil, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err != nil && strings.Contains(err.Error(), "client unknown-client not found")
+		auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
+			return details["clientId"] == "unknown-client" && details["userId"] == int64(123)
 		})).Return()
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		// No clientName in the bind: renderRedirectBlocked leaves it out when the client could
+		// not be resolved, because saying anything about the application would be a claim this
+		// server cannot back at that moment.
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
+			mock.MatchedBy(func(data map[string]interface{}) bool {
+				_, named := data["clientName"]
+				return data["destination"] == "example.com" && !named && len(data) == 1
+			})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
+		assert.Empty(t, rr.Header().Get("Location"),
+			"a withheld redirect must never become a Location")
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
 		httpHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("Implicit flow error - user not found", func(t *testing.T) {
@@ -1545,8 +1690,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1555,6 +1702,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       999,
 			ResponseType: "token",
@@ -1571,6 +1719,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			return err != nil && strings.Contains(err.Error(), "user 999 not found")
 		})).Return()
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		httpHelper.AssertExpectations(t)
@@ -1585,8 +1735,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1615,6 +1767,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == tokenError
 		})).Return()
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -1865,8 +2019,10 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1875,6 +2031,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseType: "token",
@@ -1888,6 +2045,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == dbError
 		})).Return()
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -1903,8 +2062,10 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1913,6 +2074,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseType: "token",
@@ -1930,6 +2092,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			return err == dbError
 		})).Return()
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		httpHelper.AssertExpectations(t)
@@ -1944,8 +2108,10 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1983,6 +2149,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == clearError
 		})).Return()
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -2737,8 +2905,10 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -2749,6 +2919,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSubject := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
+			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
 			ResponseMode:   "query",
@@ -2793,6 +2964,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		// Execute the handler
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		// Assertions - code should be issued successfully
@@ -2815,8 +2988,10 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2828,6 +3003,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
+			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
 			ResponseMode:   "query",
@@ -2860,6 +3036,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		}).Return(nil)
 
 		// Execute the handler
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		// Assertions - should redirect to client with login_required error
@@ -2891,8 +3069,10 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2903,6 +3083,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
+			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
 			ResponseMode:   "query",
@@ -2925,6 +3106,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// handler does next. The client is still owed its error response, and server_error is
 		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
 
@@ -2952,6 +3135,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
 		// redirToClientWithError returns "unable to parse template" instead of committing.
@@ -2963,7 +3148,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			},
 		}
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2974,6 +3159,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
+			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
 			ResponseMode:   "form_post",
@@ -3001,6 +3187,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		// Nothing reached the client: the form_post arm fails before it writes, and the 500 is
@@ -3019,6 +3207,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
 		templateFS := &mocks_test.TestFS{
 			FileContents: map[string]string{
@@ -3026,7 +3216,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			},
 		}
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3037,6 +3227,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
+			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
 			ResponseMode:   "form_post",
@@ -3065,6 +3256,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
@@ -3082,8 +3275,10 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -3093,6 +3288,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// Create authContext with empty IdTokenHintSub (no hint provided)
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
+			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
 			ResponseMode:   "query",
@@ -3130,6 +3326,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		// Execute the handler
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
 		handler.ServeHTTP(rr, req)
 
 		// Assertions - code should be issued successfully
@@ -3154,8 +3352,10 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3171,6 +3371,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			stubClientProvenanceLookup(database)
 			savedAuthContext = &oauth.AuthContext{
 				AuthState:      oauth.AuthStateReadyToIssueCode,
+				Scope:          "openid profile",
 				ClientId:       "test-client",
 				UserId:         99,
 				ResponseMode:   "query",
@@ -3191,6 +3392,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			Enabled: true,
 		}
 		database.On("GetUserById", mock.Anything, int64(99)).Return(mockUserB, nil)
+
+		// The registration gate above the hint check loads the client, which
+		// stubClientProvenanceLookup already supplies, and then its registrations. Armed by hand
+		// rather than through armIssueGate so that the stub keeps supplying the client: testify
+		// answers with the first matching expectation, and a generic one registered here would
+		// shadow it and leave it unmet.
+		database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				client := args.Get(1).(*models.Client)
+				client.RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
+			}).Return(nil)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
@@ -3214,4 +3426,482 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
+}
+
+// TestHandleIssueGet_RedirectURIRecheck owns the first of the three facts /auth/issue
+// re-establishes: the destination this ceremony would be answered at is STILL registered on the
+// client. It was matched once at /auth/authorize, and the consent screen holds a ceremony for as
+// long as a person takes, so an operator who deletes a callback in between has an expectation only
+// this check meets (#241).
+//
+// Every row varies exactly one thing from the row that issues, so none of them can pass with the
+// check removed. The loopback pair is the flag: RFC 8252 port flexibility is the authorization
+// code flow's alone, so the same registered value and the same request must be accepted for
+// response_type=code and refused for an implicit one.
+func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		responseType string
+		requested    string
+		registered   []string
+		wantIssued   bool
+		wantDest     string
+		why          string
+	}{
+		{
+			name:         "still registered, exactly",
+			responseType: "code",
+			requested:    "https://example.com/callback",
+			registered:   []string{"https://other.example/cb", "https://example.com/callback"},
+			wantIssued:   true,
+			why:          "the ordinary ceremony: nothing was removed, so nothing changes",
+		},
+		{
+			name:         "deregistered while the consent screen was open",
+			responseType: "code",
+			requested:    "https://example.com/callback",
+			registered:   []string{"https://other.example/cb"},
+			wantIssued:   false,
+			wantDest:     "example.com",
+			why:          "the case the check exists for",
+		},
+		{
+			name:         "every registration removed",
+			responseType: "code",
+			requested:    "https://example.com/callback",
+			registered:   []string{},
+			wantIssued:   false,
+			wantDest:     "example.com",
+			why:          "an empty list registers nothing, so it cannot cover the stored value",
+		},
+		{
+			name:         "loopback port flexibility applies to the code flow",
+			responseType: "code",
+			requested:    "http://127.0.0.1:53421/cb",
+			registered:   []string{"http://127.0.0.1/cb"},
+			wantIssued:   true,
+			why:          "RFC 8252 section 7.3: a native app's ephemeral port is not a mismatch",
+		},
+		{
+			name:         "loopback port flexibility does not apply to an implicit response",
+			responseType: "id_token token",
+			requested:    "http://127.0.0.1:53421/cb",
+			registered:   []string{"http://127.0.0.1/cb"},
+			wantIssued:   false,
+			wantDest:     "127.0.0.1:53421",
+			why:          "the flexibility is the code flow's, and this response carries tokens in the fragment (#41)",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			templateFS := &mocks_test.TestFS{}
+			codeIssuer := mocks_oauth.NewCodeIssuer(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			permissionChecker := mocks_user.NewPermissionChecker(t)
+
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+
+			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+			rr := httptest.NewRecorder()
+
+			authContext := &oauth.AuthContext{
+				AuthState:    oauth.AuthStateReadyToIssueCode,
+				Scope:        "openid profile",
+				ClientId:     "test-client",
+				UserId:       123,
+				ResponseMode: "query",
+				ResponseType: tc.responseType,
+				RedirectURI:  tc.requested,
+				State:        "test-state",
+			}
+			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
+			database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+			database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+				Run(func(args mock.Arguments) {
+					client := args.Get(1).(*models.Client)
+					client.RedirectURIs = nil
+					for _, uri := range tc.registered {
+						client.RedirectURIs = append(client.RedirectURIs, models.RedirectURI{URI: uri})
+					}
+				}).Return(nil)
+
+			// Everything below the gate, armed as a pass so that a row reaching it gets there on
+			// its own merits. A refused row touches none of these, which is why they are Maybe().
+			database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
+				Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
+			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true).Maybe()
+			database.On("GetUserById", mock.Anything, int64(123)).
+				Return(&models.User{Id: 123, Subject: uuid.New(), Enabled: true}, nil).Maybe()
+			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything).
+				Return(func(scope string, _ *models.User) string { return scope }, nil).Maybe()
+			authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+			if tc.wantIssued {
+				codeIssuer.On("CreateAuthCode", mock.Anything).
+					Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
+				database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
+				auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
+			} else {
+				auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
+					return details["clientId"] == "test-client" && details["userId"] == int64(123)
+				})).Return()
+				httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
+					mock.MatchedBy(func(data map[string]interface{}) bool {
+						return data["destination"] == tc.wantDest
+					})).Return(nil)
+			}
+
+			handler.ServeHTTP(rr, req)
+
+			location := rr.Header().Get("Location")
+			if tc.wantIssued {
+				assert.Equal(t, http.StatusFound, rr.Code, tc.why)
+				assert.Contains(t, location, "code=test-code", tc.why)
+			} else {
+				assert.Empty(t, location,
+					"a withheld redirect must never become a Location: %s", tc.why)
+				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+				tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+					mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			}
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+			codeIssuer.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+		})
+	}
+}
+
+// TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal is the ordering case, and it
+// is the reason the registration check sits at the very top of the handler rather than beside the
+// other two.
+//
+// The id_token_hint refusal answers the client by redirect. A ceremony that fails BOTH must not be
+// answered that way, because the answer would navigate the browser to the very host the operator
+// has just deregistered, which is RFC 9700 section 4.11.2's harm arriving through this server's own
+// error response. Placed first, the handler has one property: nothing in it can send a browser to
+// an unregistered callback.
+//
+// It needs its ordering stated or it reads as a duplicate of the row above and gets tidied away.
+func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	templateFS := &mocks_test.TestFS{}
+	codeIssuer := mocks_oauth.NewCodeIssuer(t)
+	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	userSessionManager := mocks_user.NewUserSessionManager(t)
+	permissionChecker := mocks_user.NewPermissionChecker(t)
+
+	handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+
+	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+	rr := httptest.NewRecorder()
+
+	// The hint names user A; the ceremony authenticated user B. On its own that is answered with
+	// login_required AT THE CLIENT'S REDIRECT URI.
+	authContext := &oauth.AuthContext{
+		AuthState:      oauth.AuthStateReadyToIssueCode,
+		Scope:          "openid profile",
+		ClientId:       "test-client",
+		UserId:         99,
+		ResponseMode:   "query",
+		ResponseType:   "code",
+		RedirectURI:    "https://example.com/callback",
+		State:          "test-state",
+		IdTokenHintSub: uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").String(),
+	}
+	authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+	issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+	database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).Return(nil)
+
+	auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
+	authHelper.On("ClearAuthContext", rr, req).Return(nil)
+	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
+		mock.Anything).Return(nil)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Empty(t, rr.Header().Get("Location"),
+		"the id_token_hint refusal must not be delivered to a deregistered callback")
+
+	// The user is never even read: the gate refuses above the hint check, so the comparison that
+	// would have produced the redirect is never made.
+	database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything)
+
+	httpHelper.AssertExpectations(t)
+	database.AssertExpectations(t)
+	auditLogger.AssertExpectations(t)
+}
+
+// TestHandleIssueGet_ExpiredAmbientSession owns the second fact: the session backing this ceremony
+// is still within its idle timeout and its maximum lifetime, not merely present and owned.
+//
+// This is the shape #129 and #133 leave uncovered. The row resolves and it belongs to this
+// ceremony's user, so both older tests pass it; only the time bounds refuse it. Redemption does not
+// catch it either, because the authorization_code arm asks about ownership and not validity, so
+// before #241 the access token worked and the FIRST refresh answered invalid_grant.
+//
+// max_age is deliberately not re-applied, which is decision 1: it bounds the age of the
+// authentication rather than the dwell time on a consent screen, and the handler passes nil for it.
+func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		prompt string
+		silent bool
+	}{
+		{name: "restarts level 1", prompt: "", silent: false},
+		{name: "prompt=none is answered login_required instead", prompt: "none", silent: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			templateFS := &mocks_test.TestFS{}
+			codeIssuer := mocks_oauth.NewCodeIssuer(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			permissionChecker := mocks_user.NewPermissionChecker(t)
+
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+
+			logs := captureLogs(t)
+			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+			rr := httptest.NewRecorder()
+
+			authContext := &oauth.AuthContext{
+				AuthState:    oauth.AuthStateReadyToIssueCode,
+				Scope:        "openid profile",
+				ClientId:     "test-client",
+				UserId:       123,
+				ResponseMode: "query",
+				ResponseType: "code",
+				RedirectURI:  "https://example.com/callback",
+				State:        "test-state",
+				Prompt:       tc.prompt,
+			}
+			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+			database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+			database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+				Run(func(args mock.Arguments) {
+					args.Get(1).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
+				}).Return(nil)
+
+			// Present and OWNED, so #129's liveness test and #133's ownership test both pass it.
+			stubLiveSession(database, 123)
+
+			// The one thing that refuses it, and nil is what says max_age is not re-applied.
+			userSessionManager.On("HasValidUserSession", mock.Anything,
+				mock.MatchedBy(func(session *models.UserSession) bool {
+					return session != nil && session.SessionIdentifier == liveSessionIdentifier
+				}),
+				(*int)(nil)).Return(false)
+
+			auditLogger.On("Log", constants.AuditIssuanceRefusedSessionInvalid, mock.MatchedBy(func(details map[string]interface{}) bool {
+				return details["userId"] == int64(123) &&
+					details["clientId"] == "test-client" &&
+					details["sessionIdentifier"] == liveSessionIdentifier
+			})).Return()
+
+			if tc.silent {
+				authHelper.On("ClearAuthContext", rr, req).Return(nil)
+			} else {
+				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+					return ac.AuthState == oauth.AuthStateRequiresLevel1
+				})).Return(nil)
+			}
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusFound, rr.Code)
+			location := rr.Header().Get("Location")
+			assert.NotContains(t, location, "code=", "no code may be minted on an expired session")
+			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+
+			if tc.silent {
+				assert.Contains(t, location, "https://example.com/callback")
+				assert.Contains(t, location, "error=login_required")
+				assert.NotContains(t, location, "/auth/level1",
+					"prompt=none forbids UI, so it cannot be restarted into a password form")
+			} else {
+				assert.Contains(t, location, "/auth/level1")
+			}
+
+			// The operator's line has to say WHICH of the three shapes refused. #133's sentence
+			// would claim an owner mismatch that did not happen, and #129's would claim a row
+			// that did not resolve.
+			record, ok := warningSaying(t, logs, "no longer within its idle timeout or maximum lifetime")
+			if ok {
+				assert.Equal(t, liveSessionIdentifier, attrsOf(record)["sessionIdentifier"])
+			}
+			noRecordSays(t, logs, "belongs to a different user")
+			noRecordSays(t, logs, "is gone")
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+		})
+	}
+}
+
+// TestHandleIssueGet_ScopeRefilter owns the third fact: the user still holds the permissions behind
+// every resource scope about to be granted. /auth/completed filtered the scope once and that is the
+// only live permission check the ceremony performs; everything after it reads the stored value, and
+// the authorization_code arm of the token endpoint never consults the permission checker at all,
+// while a REFRESH of an older grant does (#241).
+//
+// The two write-back rows are decision 2's answer and they are not interchangeable. CreateAuthCode
+// and handleImplicitFlow both prefer ConsentedScope and fall back to Scope when it is empty, so the
+// filtered value has to land on whichever of the two the issuer will read and never on the other.
+func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		scope          string
+		consentedScope string
+		filtered       string
+		wantIssued     bool
+		wantScope      string
+		wantConsented  string
+		why            string
+	}{
+		{
+			name:           "narrows the consented scope, and writes back only to it",
+			scope:          "openid profile backend:read backend:write",
+			consentedScope: "openid backend:read backend:write",
+			filtered:       "openid backend:read",
+			wantIssued:     true,
+			wantScope:      "openid profile backend:read backend:write",
+			wantConsented:  "openid backend:read",
+			why:            "the issuer reads ConsentedScope here, so Scope must be left exactly as it stands",
+		},
+		{
+			name:          "narrows the requested scope when nothing was consented",
+			scope:         "openid backend:read backend:write",
+			filtered:      "openid backend:read",
+			wantIssued:    true,
+			wantScope:     "openid backend:read",
+			wantConsented: "",
+			why:           "with ConsentedScope empty the issuer reads Scope, so that is the field the filter owns",
+		},
+		{
+			name:           "an emptied consented scope refuses and writes back nothing",
+			scope:          "backend:read backend:write",
+			consentedScope: "backend:read",
+			filtered:       "",
+			wantIssued:     false,
+			wantScope:      "backend:read backend:write",
+			wantConsented:  "backend:read",
+			why:            "writing the empty result back would fall through to the unfiltered Scope at the issuer",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			templateFS := &mocks_test.TestFS{}
+			codeIssuer := mocks_oauth.NewCodeIssuer(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			permissionChecker := mocks_user.NewPermissionChecker(t)
+
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+
+			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+			rr := httptest.NewRecorder()
+
+			authContext := &oauth.AuthContext{
+				AuthState:      oauth.AuthStateReadyToIssueCode,
+				Scope:          tc.scope,
+				ConsentedScope: tc.consentedScope,
+				ClientId:       "test-client",
+				UserId:         123,
+				ResponseMode:   "query",
+				ResponseType:   "code",
+				RedirectURI:    "https://example.com/callback",
+				State:          "test-state",
+			}
+			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+			database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+			database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+				Run(func(args mock.Arguments) {
+					args.Get(1).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
+				}).Return(nil)
+
+			stubLiveSession(database, 123)
+			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true)
+
+			user := &models.User{Id: 123, Subject: uuid.New(), Enabled: true}
+			database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
+
+			// The field the filter is asked about is the one the issuer will read, and asserting
+			// it here is half of decision 2: reading the wrong field is as wrong as writing it.
+			wantFiltered := tc.scope
+			if tc.consentedScope != "" {
+				wantFiltered = tc.consentedScope
+			}
+			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", wantFiltered, user).
+				Return(tc.filtered, nil)
+
+			authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+			if tc.wantIssued {
+				codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
+					return input.AuthContext.Scope == tc.wantScope &&
+						input.AuthContext.ConsentedScope == tc.wantConsented
+				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
+					RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
+				database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
+				auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
+			} else {
+				auditLogger.On("Log", constants.AuditIssuanceRefusedScopeDenied, mock.MatchedBy(func(details map[string]interface{}) bool {
+					return details["userId"] == int64(123) && details["clientId"] == "test-client"
+				})).Return()
+			}
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusFound, rr.Code)
+			location := rr.Header().Get("Location")
+
+			if tc.wantIssued {
+				assert.Contains(t, location, "code=test-code", tc.why)
+			} else {
+				// /auth/completed's wording for the same condition, arriving later: one removal
+				// gets one answer wherever it lands.
+				assert.Contains(t, location, "https://example.com/callback")
+				assert.Contains(t, location, "error=access_denied", tc.why)
+				assert.Contains(t, location, "not+authorized+to+access+any+of+the+requested+scopes")
+				assert.NotContains(t, location, "code=")
+				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+			}
+
+			// Whichever way it went, the field the issuer does NOT read is untouched.
+			assert.Equal(t, tc.wantScope, authContext.Scope, tc.why)
+			assert.Equal(t, tc.wantConsented, authContext.ConsentedScope, tc.why)
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+			codeIssuer.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+		})
+	}
 }
