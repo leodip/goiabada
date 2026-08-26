@@ -188,7 +188,7 @@ Prefer the IP literals `127.0.0.1` and `::1` over `localhost`. [RFC 8252 section
 
 ## Web origins
 
-If your client application plans to make calls to the `/token`, `/logout` or `/userinfo` endpoints from JavaScript, you must register the origin of the web application to enable Cross-Origin Resource Sharing (CORS) access. Failure to do so will result in CORS blocking the HTTP requests.
+If your client application plans to make calls to the `/auth/token`, `/auth/logout` or `/userinfo` endpoints from JavaScript, you must register the origin of the web application to enable Cross-Origin Resource Sharing (CORS) access. Failure to do so will result in CORS blocking the HTTP requests.
 
 An origin is not a URL: it is a scheme, a host and an optional port, with nothing after the host, such as `https://www.example.com`. Goiabada stores the canonical form and refuses what it cannot canonicalize.
 
