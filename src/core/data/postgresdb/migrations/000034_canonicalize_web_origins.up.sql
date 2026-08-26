@@ -40,10 +40,16 @@ UPDATE web_origins
      OR strpos(substr(origin, 9), '?') > 0
      OR strpos(substr(origin, 9), '#') > 0);
 
+-- The colon count is a correctness guard rather than an optimisation: exactly
+-- two colons means the authority holds exactly one, and stripping a default port
+-- off a two-port authority would turn a row the delete below removes into a live
+-- origin it keeps. The sqlite file carries the full reasoning (#250).
 UPDATE web_origins SET origin = substr(origin, 1, char_length(origin) - 3)
- WHERE origin LIKE 'http://%:80';
+ WHERE origin LIKE 'http://%:80'
+   AND char_length(origin) - char_length(replace(origin, ':', '')) = 2;
 UPDATE web_origins SET origin = substr(origin, 1, char_length(origin) - 4)
- WHERE origin LIKE 'https://%:443';
+ WHERE origin LIKE 'https://%:443'
+   AND char_length(origin) - char_length(replace(origin, ':', '')) = 2;
 
 -- Over-long first. `origin` is character varying(256) here, so this is inert on
 -- this engine; it is carried by all four files so they stay readable side by

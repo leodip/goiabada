@@ -83,10 +83,27 @@ UPDATE web_origins
 -- 3. The default port, which a browser leaves out of the header entirely. The
 -- pattern is anchored at both ends, so http://a.com:8080 is untouched: its last
 -- three characters are '080', not ':80'.
+--
+-- THE COLON COUNT IS A CORRECTNESS GUARD, NOT AN OPTIMISATION. Step 2 has
+-- already cut everything after the authority, so the only colons left are the
+-- one in '://' and any inside the authority; exactly two means the authority
+-- holds exactly one, which is the only shape that has a port to strip.
+--
+-- Without it this step is the one place in the file that can turn a row step 4
+-- would have deleted into one it keeps. Stripping the trailing ':443' off
+-- https://a.example:80:443 leaves https://a.example:80, a live and
+-- browser-reachable origin that was never registered, and step 4 then finds a
+-- single colon and a valid port and keeps it. CanonicalOrigin refuses that input
+-- outright, because it splits the port at the LAST colon and so checks the host
+-- 'a.example:80', where a colon is not an allowed domain code point. Step 4
+-- splits at the FIRST colon instead and refuses the row on its second colon, so
+-- removing that colon here is precisely what disarms it (#250).
 UPDATE web_origins SET origin = substr(origin, 1, length(origin) - 3)
- WHERE origin LIKE 'http://%:80';
+ WHERE origin LIKE 'http://%:80'
+   AND length(origin) - length(replace(origin, ':', '')) = 2;
 UPDATE web_origins SET origin = substr(origin, 1, length(origin) - 4)
- WHERE origin LIKE 'https://%:443';
+ WHERE origin LIKE 'https://%:443'
+   AND length(origin) - length(replace(origin, ':', '')) = 2;
 
 -- 4. Delete what cannot be repaired, in two statements.
 --
