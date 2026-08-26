@@ -314,8 +314,29 @@ func HandleAuthorizeGet(
 		// wrote. Only the queries differ. It stopped being side-effect free when it gained the
 		// registration gate (#241 decision 11), and the ordering argument rests on the read being
 		// a read rather than on the predicate being pure.
+		//
+		// The answer is remembered, in the shape hasValidUserSession above already uses, because
+		// this request has a second reader: the emitter. Two live reads of a table an administrator
+		// can change mid-request are two answers that need not agree, and a no here is what makes
+		// answering the client at once safe, so it is carried to the emitter as a floor rather than
+		// recomputed there. redirectAlreadyWithheld is where it lands and why.
+		var (
+			emissionLookedUp bool
+			emissionAllowed  bool
+		)
+		redirectWouldBeEmitted := func() bool {
+			if emissionLookedUp {
+				return emissionAllowed
+			}
+			emissionLookedUp = true
+
+			emissionAllowed = redirectWillBeEmitted(database, client, authContext.RedirectURI,
+				authContext.ResponseType, "authorize")
+			return emissionAllowed
+		}
+
 		answerClientNow := requestsSilence ||
-			!redirectWillBeEmitted(database, client, authContext.RedirectURI, "authorize") ||
+			!redirectWouldBeEmitted() ||
 			(!requestsLogin && hasValidUserSession())
 
 		if sessionLoadErr != nil {
@@ -331,9 +352,16 @@ func HandleAuthorizeGet(
 		// clears the context before answering, and derives its own server_error fallback
 		// from this same request-sourced input (#141).
 		answerClientImmediately := func(validationError *customerrors.ErrorDetail) {
-			answerClientWithError(w, r, database, httpHelper, authHelper, templateFS,
-				redirectErrorFromRequest(r, client,
-					validationError.GetCode(), validationError.GetDescription()))
+			input := redirectErrorFromRequest(r, client,
+				validationError.GetCode(), validationError.GetDescription())
+
+			// Carry a refusal this request has already been given, and only a refusal. The
+			// predicate may not have run at all, on a silent request, where the first clause of
+			// answerClientNow short-circuits it; that is "nothing has refused yet" and the emitter
+			// asks for itself.
+			input.redirectAlreadyWithheld = emissionLookedUp && !emissionAllowed
+
+			answerClientWithError(w, r, database, httpHelper, authHelper, templateFS, input)
 		}
 
 		// answerValidationError answers one of the five validations that run before this handler
@@ -801,6 +829,26 @@ type redirectErrorInput struct {
 	redirectURI  string
 	state        string
 	responseType string
+
+	// redirectAlreadyWithheld records that redirectWillBeEmitted has ALREADY answered no for this
+	// request, so the emitter must not ask again and get a different answer. It is a floor, never a
+	// ceiling: false means "nothing has refused yet", not "a redirect is permitted", and the
+	// emitter still runs the live gates on top of it.
+	//
+	// The gate began reading the database (#241 decision 11), which made it non-monotonic across
+	// the two readers one authorization request has. HandleAuthorizeGet asks it before routing, to
+	// decide whether a validation failure may be answered at once or has to be parked behind a
+	// login: a refusal there makes answerClientNow true, on the reasoning that no redirect leaves
+	// this server so RFC 9700 4.11.2 has nothing to govern. The emitter then asks again. When the
+	// first answer was a transient registration-read failure, or the callback was re-added between
+	// the two reads, the second answer can be yes, and the refusal that made answering at once safe
+	// has been discarded: a logged-out browser holding one crafted link is redirected to the
+	// client's host on a request this server refused, which is attack 1 of RFC 9700 4.11.2 verbatim
+	// and the exact harm the deferral machinery exists to prevent (#213, #241).
+	//
+	// So a later read may narrow yes to no, which is a removal taking effect, and may never widen
+	// no to yes.
+	redirectAlreadyWithheld bool
 }
 
 // redirectErrorFromAuthContext builds the input for an error redirect whose response parameters
@@ -950,17 +998,43 @@ func clientProvenance(database data.Database, clientIdentifier string) *models.C
 // share rather than at each of them: a registration test copied to every site is the shape a later
 // edit gets out of step (#241 decision 11).
 //
-// The flag to RedirectURIIsRegistered is FALSE. Loopback port flexibility exists so that a native
-// app's ephemeral port can match a registered portless URI on a code request, and an error redirect
-// carries no code, so this gate is deliberately stricter than the one the stored value passed at
-// /auth/authorize. Each caller supplies the flag from what it knows, per urlutil's package contract
-// (#41), and what this caller knows is that nothing it admits will carry a code.
+// The flag to RedirectURIIsRegistered is computed from the response type, by the same token-sequence
+// test validators.ValidateClientAndRedirectURI and /auth/issue apply, so exactly one token equal to
+// "code" buys loopback port flexibility and every implicit response stays strict. An earlier version
+// of this gate passed false unconditionally, reasoning that flexibility exists for a native app's
+// ephemeral port on a code request and an error redirect carries no code. That reasoning asks the
+// wrong question. This gate weighs whether the destination is one the client still has registered,
+// and RFC 8252 section 7.3 settles what "registered" means for a loopback URI: "The authorization
+// server MUST allow any port to be specified at the time of the request for loopback IP redirect
+// URIs, to accommodate clients that obtain an available ephemeral port from the operating system at
+// the time of the request." So http://127.0.0.1:49152/cb IS covered by a registered
+// http://127.0.0.1/cb on a code request, and calling it unregistered here withholds an error the
+// client is owed: RFC 6749 section 4.1.2.1 confines the MUST NOT redirect to a request that "fails
+// due to a missing, invalid, or mismatching redirection URI", and for every other failure "the
+// authorization server informs the client by adding the following parameters to the query component
+// of the redirection URI". Passing false made a native app's consent cancellation, deferred
+// validation error and scope refusal vanish into this server's interstitial with nothing on the
+// wire, which is a hang rather than an error it can report.
+//
+// Strictness is not free here, which is why it is not the default: this gate can only refuse, so an
+// over-strict answer is a delivery failure with no security to show for it. The relaxation admits
+// nothing new either. The same flexible rule already ran over the same URI at /auth/authorize, on
+// the same ceremony, so a destination this arm now accepts is one the front door accepted, and a
+// loopback IP literal names the browser's own machine, which is not a host somebody else controls.
+// Each caller supplies the flag from what it knows, per urlutil's package contract (#41), and what
+// this caller knows is the response type the ceremony carries (#241).
 //
 // A failed load answers no, matching clientProvenance above and for the reason that function
 // states: every caller is already on its way to returning an error response, so a lookup that fails
 // must not turn a refusal that works today into a 500, and an unresolved registration is the
 // untrusted case rather than an exempt one.
-func redirectWillBeEmitted(database data.Database, client *models.Client, redirectURI string, site string) bool {
+//
+// This predicate is asked twice within one authorization request, and the second answer may not be
+// more permissive than the first: see redirectErrorInput.redirectAlreadyWithheld, which carries the
+// first refusal into the emitter.
+func redirectWillBeEmitted(database data.Database, client *models.Client, redirectURI string,
+	responseType string, site string) bool {
+
 	if client == nil || client.CreatedViaDCR {
 		return false
 	}
@@ -984,7 +1058,14 @@ func redirectWillBeEmitted(database data.Database, client *models.Client, redire
 		registered = append(registered, uri.URI)
 	}
 
-	if !urlutil.RedirectURIIsRegistered(registered, redirectURI, false) {
+	// Read off the token sequence rather than off ParseResponseType's booleans, for the reason
+	// stated at validators.ValidateClientAndRedirectURI: the parser ignores unrecognised values
+	// and collapses duplicates, so "code code" and "code foo" are true for HasCode && !HasToken
+	// && !HasIdToken and must not buy an arbitrary loopback port.
+	responseTypes := strings.Fields(responseType)
+	allowLoopbackPortFlexibility := len(responseTypes) == 1 && responseTypes[0] == "code"
+
+	if !urlutil.RedirectURIIsRegistered(registered, redirectURI, allowLoopbackPortFlexibility) {
 		slog.Warn("the redirect URI this client would be answered at is no longer registered on it, so the redirect is withheld",
 			"clientIdentifier", client.ClientIdentifier, "site", site)
 		return false
@@ -996,16 +1077,24 @@ func redirectWillBeEmitted(database data.Database, client *models.Client, redire
 func redirToClientWithError(w http.ResponseWriter, r *http.Request, database data.Database,
 	httpHelper HttpHelper, templateFS fs.FS, input redirectErrorInput) error {
 
-	// Gates 3 and 4, both of them, asked through the one predicate so this emitter and the callers
-	// that ask the same question before building a response cannot answer it differently. The
-	// reasoning for each gate travels with redirectWillBeEmitted (#108, #122).
+	// All three gates, asked through the one predicate so this emitter and the callers that ask the
+	// same question before building a response cannot answer it differently. The reasoning for each
+	// gate travels with redirectWillBeEmitted (#108, #122, #241).
+	//
+	// redirectAlreadyWithheld is read FIRST and short-circuits the live gates, so a caller that has
+	// already been told no cannot have that refusal overturned by a second read of a registration
+	// table that has changed, or recovered, since. The predicate is a database read now, so the two
+	// answers one request gets are not guaranteed to agree, and only one direction of disagreement
+	// is safe: see the field's own comment.
 	//
 	// The call sits above the response-mode dispatch so it covers query, fragment and form_post
 	// alike, and it can only ever withhold a redirect: nothing below it is reached, no state is
 	// written and no route is added, so there is nothing here for an attacker to drive. The
 	// interstitial names the destination and the authorization stops, rather than this server
 	// forwarding a browser to a host of somebody else's choosing on a request it just refused.
-	if !redirectWillBeEmitted(database, input.client, input.redirectURI, "redirToClientWithError") {
+	if input.redirectAlreadyWithheld ||
+		!redirectWillBeEmitted(database, input.client, input.redirectURI, input.responseType,
+			"redirToClientWithError") {
 		return renderRedirectBlocked(httpHelper, w, r, input)
 	}
 

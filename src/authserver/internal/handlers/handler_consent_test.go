@@ -1045,6 +1045,69 @@ func TestHandleConsentPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
+	// The filter's own failure, which is a third outcome and not either empty case. It fails CLOSED
+	// and nothing observed that until the final review: treating the error as "keep the submitted
+	// selection" left the whole authserver internal tier green, which is the mutation that survived.
+	//
+	// It matters because the empty string is this seam's REFUSAL signal, so a filter that errors and
+	// a filter that removed everything return the same value. Reading err first is the only thing
+	// keeping them apart, and a fail-open would write a consent row naming permissions the user does
+	// not hold, which is precisely the row #241 decision 3 added the filter to prevent.
+	//
+	// No expectation is registered for the consent read, either consent write, the audit or the
+	// context save, so a call reaching any of them fails the case. That absence IS the assertion.
+	t.Run("The filter failing closed records nothing", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("consent0", "openid")
+		form.Add("consent1", "backend:read")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateRequiresConsent,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
+			Scope:      "openid backend:read",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		user := &models.User{Id: 1}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid backend:read", user).
+			Return("", errors.New("permission filter sentinel"))
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err != nil && strings.Contains(err.Error(), "permission filter sentinel")
+		})).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Header().Get("Location"),
+			"a filter that could not answer must not send the ceremony on to /auth/issue")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
 	// The second empty case, and the reason there are two. "No consent given" above answers a user
 	// who ticked nothing, which is a choice they made; this answers a selection an administrator
 	// emptied, which is not. Both are access_denied and the descriptions are what tell them apart.
