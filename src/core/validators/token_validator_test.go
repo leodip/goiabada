@@ -2154,38 +2154,87 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	t.Run("Client with authorization code flow disabled", func(t *testing.T) {
+		// The negative control for a rule that MOVED rather than vanished. This subtest used
+		// to assert the validator refuses here; it now asserts it accepts, because the flow
+		// gate lives in HandleTokenPost's refresh arm below replay containment. Re-adding a
+		// gate to this arm fails this case, which is the only thing stopping a later reader
+		// from quietly suppressing containment for a stolen token again (#250).
+		//
+		// The refusal itself is owned by TestHandleTokenPost_Refresh_FlowGate in
+		// authserver/internal/handlers/handler_token_test.go, which holds the whole truth
+		// table. Kept under this name because it is the case a git log -S on the deleted
+		// gate's sentence lands on.
+		const grantUserId = int64(7)
+
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
+		settings := &models.Settings{
+			UserSessionIdleTimeoutInSeconds: 3600,
+			UserSessionMaxLifetimeInSeconds: 86400,
+		}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "client1",
 			RefreshToken: "some_refresh_token",
+			ClientSecret: "client_secret",
 		}
 
 		client := &models.Client{
+			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
+		// An authorization code flow token: CodeId valid, so the handler's gate would be the
+		// one to refuse it. Reaching the end of the arm is the assertion.
+		user := models.User{Id: grantUserId, Enabled: true}
+		refreshToken := &models.RefreshToken{
+			RefreshTokenJti:   "some_jti",
+			SessionIdentifier: "sid-1",
+			CodeId:            sql.NullInt64{Int64: 5, Valid: true},
+			Code: models.Code{
+				Id:                5,
+				ClientId:          client.Id,
+				UserId:            grantUserId,
+				Scope:             "openid",
+				SessionIdentifier: "sid-1",
+				User:              user,
+			},
+		}
+
+		now := time.Now().UTC()
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+		mockTokenParser.On("DecodeAndValidateTokenString", "some_refresh_token", (*rsa.PublicKey)(nil), true).
+			Return(&oauth.JwtToken{Claims: jwt.MapClaims{
+				"jti": "some_jti", "typ": "Refresh", "sub": "user_subject",
+			}}, nil).Once()
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, "some_jti").Return(refreshToken, nil).Once()
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil).Once()
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
+			Return(&models.UserSession{
+				Id: 9, SessionIdentifier: "sid-1", UserId: grantUserId,
+				Started: now.Add(-10 * time.Minute), LastAccessed: now,
+			}, nil).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
-		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
-		assert.True(t, ok)
-		assert.Equal(t, "unauthorized_client", customErr.GetCode())
-		assert.Equal(t, "The client associated with the provided client_id does not support authorization code flow.", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		require.NoError(t, err, "the validator must hold no flow rule on the refresh arm")
+		require.NotNil(t, result)
+		assert.False(t, result.Client.AuthorizationCodeEnabled,
+			"the fixture is only meaningful while the flow is off")
 	})
 
 	t.Run("Missing client secret for confidential client", func(t *testing.T) {

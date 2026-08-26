@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,10 +20,16 @@ import (
 func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.Client {
 	ropcEnabled := true
 	client := &models.Client{
-		ClientIdentifier:                        "ropc-client-" + gofakeit.LetterN(8),
-		Enabled:                                 true,
-		IsPublic:                                isPublic,
-		AuthorizationCodeEnabled:                true,
+		ClientIdentifier: "ropc-client-" + gofakeit.LetterN(8),
+		Enabled:          true,
+		IsPublic:         isPublic,
+		// Off deliberately, so this is an ROPC-ONLY client. With the authorization code flow
+		// also on, no test here can observe whether the token endpoint gates a refresh on the
+		// switch of the flow that issued the token: both answers look the same. That is how a
+		// refresh arm refusing every ROPC token on !AuthorizationCodeEnabled survived five
+		// releases with a green suite (#250). A test that genuinely wants both flows sets the
+		// field after this call, as the two inline clients further down this file do.
+		AuthorizationCodeEnabled:                false,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 		DefaultAcrLevel:                         enums.AcrLevel1,
 	}
@@ -736,4 +743,118 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 	assert.True(t, ok)
 	assert.Contains(t, newAccessScope, userInfoScope,
 		"the reissued access token should still carry the injected userinfo scope")
+}
+
+// TestROPC_RefreshToken_StopsWhenROPCDisabled is the breaking half of this change, end to end:
+// turning ROPC off stops refresh tokens ALREADY ISSUED, not merely new logins. Before this the
+// switch governed issuance only, so an operator who turned it off left every outstanding offline
+// grant refreshing indefinitely with nothing saying so (#250).
+//
+// Two subtests, differing only in which switch is turned off: the per-client override, and the
+// global with the client left inheriting. The second is the one an operator actually reaches for,
+// and it is the only one that fails if the gate reads the override alone.
+func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
+	testCases := []struct {
+		name string
+		// disable turns ROPC off the way this case is about, and returns a restore func.
+		disable func(t *testing.T, client *models.Client) func()
+	}{
+		{
+			name: "the client's own override is turned off",
+			disable: func(t *testing.T, client *models.Client) func() {
+				ropcDisabled := false
+				client.ResourceOwnerPasswordCredentialsEnabled = &ropcDisabled
+				assert.Nil(t, database.UpdateClient(nil, client))
+				return func() {}
+			},
+		},
+		{
+			name: "the client inherits and the global switch is turned off",
+			disable: func(t *testing.T, client *models.Client) func() {
+				client.ResourceOwnerPasswordCredentialsEnabled = nil
+				assert.Nil(t, database.UpdateClient(nil, client))
+
+				settings, err := database.GetSettingsById(nil, 1)
+				assert.Nil(t, err)
+				settings.ResourceOwnerPasswordCredentialsEnabled = false
+				assert.Nil(t, database.UpdateSettings(nil, settings))
+				return func() {
+					settings.ResourceOwnerPasswordCredentialsEnabled = true
+					_ = database.UpdateSettings(nil, settings)
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			settings, err := database.GetSettingsById(nil, 1)
+			assert.Nil(t, err)
+			originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
+			settings.ResourceOwnerPasswordCredentialsEnabled = true
+			err = database.UpdateSettings(nil, settings)
+			assert.Nil(t, err)
+			defer func() {
+				current, err := database.GetSettingsById(nil, 1)
+				if err == nil {
+					current.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
+					_ = database.UpdateSettings(nil, current)
+				}
+			}()
+
+			clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+			password := gofakeit.Password(true, true, true, true, false, 12)
+			client := createROPCClient(t, clientSecret, false)
+			user := createROPCUser(t, password)
+
+			destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+			httpClient := createHttpClient(t)
+
+			data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+				"grant_type":    {"password"},
+				"client_id":     {client.ClientIdentifier},
+				"client_secret": {clientSecret},
+				"username":      {user.Email},
+				"password":      {password},
+				"scope":         {"openid"},
+			})
+
+			// Reassigned from every response on purpose. Rotation retires a refresh token the
+			// moment it is redeemed, so presenting the password grant's token a second time
+			// would be a REPLAY: it would be contained and answered invalid_grant whatever the
+			// ROPC switch says, and this test would report a refusal while proving nothing
+			// about a live token. The successor is what must still be live when the switch
+			// goes off.
+			refreshToken, ok := data["refresh_token"].(string)
+			assert.True(t, ok, "ROPC should return a refresh token: %v", data)
+
+			// Establish that it works while ROPC is on, so the refusal below is attributable to
+			// the switch and to nothing else.
+			refreshed := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+				"grant_type":    {"refresh_token"},
+				"client_id":     {client.ClientIdentifier},
+				"client_secret": {clientSecret},
+				"refresh_token": {refreshToken},
+			})
+			assert.Nil(t, refreshed["error"], "the refresh should succeed while ROPC is on: %v", refreshed)
+			refreshToken, ok = refreshed["refresh_token"].(string)
+			assert.True(t, ok, "the rotation should return a successor refresh token: %v", refreshed)
+
+			restore := tc.disable(t, client)
+			defer restore()
+
+			stopped := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+				"grant_type":    {"refresh_token"},
+				"client_id":     {client.ClientIdentifier},
+				"client_secret": {clientSecret},
+				"refresh_token": {refreshToken},
+			})
+
+			assert.Equal(t, "unauthorized_client", stopped["error"],
+				"a live ROPC refresh token must stop the moment ROPC is turned off: %v", stopped)
+			assert.Equal(t, validators.ROPCNotAuthorizedErrorMsg, stopped["error_description"],
+				"the refusal must name the grant that was actually refused: %v", stopped)
+			assert.Nil(t, stopped["access_token"], "nothing may be minted: %v", stopped)
+		})
+	}
 }
