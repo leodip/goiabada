@@ -2061,6 +2061,169 @@ func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
 	httpHelper.AssertExpectations(t)
 }
 
+// The three gates live in redirectWillBeEmitted and TestRedirectWillBeEmitted's table owns their
+// answers. What the table cannot see is whether the emitter actually HANDS it the ceremony's
+// response type, because it calls the predicate directly. This is that seam: the same loopback
+// rows, driven through redirToClientWithError, so an edit that stopped propagating input's
+// response type into the gate is caught here rather than silently withholding a native client's
+// errors.
+//
+// RFC 8252 section 7.3 is the requirement being propagated: "The authorization server MUST allow
+// any port to be specified at the time of the request for loopback IP redirect URIs". It is scoped
+// to the code flow, so the flexibility has to travel with the response type rather than be assumed
+// (#41, #241).
+func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		responseType string
+		wantLocation string
+		why          string
+	}{
+		{
+			name:         "code request reaches the ephemeral loopback port",
+			responseType: "code",
+			wantLocation: "http://127.0.0.1:49152/cb?error=invalid_scope",
+			why: "the registration is portless and the request names a port, so the error arrives only if " +
+				"the emitter passed \"code\" down to the gate. An empty or dropped response type refuses " +
+				"the port and the native app's error vanishes with nothing on the wire (RFC 8252 7.3)",
+		},
+		{
+			name:         "implicit request does not",
+			responseType: "token",
+			wantLocation: "",
+			why: "flexibility is scoped to the code flow, so the same portless registration must NOT admit " +
+				"the ephemeral port here. This row is what stops the fix for the row above from being " +
+				"\"always pass true\"",
+		},
+		{
+			name:         "a duplicated code token does not",
+			responseType: "code code",
+			wantLocation: "",
+			why: "the gate reads the token sequence rather than ParseResponseType's booleans, and this row " +
+				"proves the emitter hands over the raw string rather than a re-derived boolean that would " +
+				"collapse the duplicate",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest("GET", "/authorize", nil)
+
+			database := mocks_data.NewDatabase(t)
+			stubRegisteredRedirectURI(database, "http://127.0.0.1/cb")
+
+			if tc.wantLocation == "" {
+				httpHelper.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html",
+					"/auth_redirect_blocked.html", mock.Anything).Return(nil)
+			}
+
+			input := testRedirectError("invalid_scope", "Invalid scope", "query",
+				"http://127.0.0.1:49152/cb", "", tc.responseType)
+
+			err := redirToClientWithError(w, r, database, httpHelper, nil, input)
+
+			require.NoError(t, err)
+			if tc.wantLocation == "" {
+				assert.Empty(t, w.Header().Get("Location"), tc.why)
+			} else {
+				assert.Contains(t, w.Header().Get("Location"), tc.wantLocation, tc.why)
+			}
+			httpHelper.AssertExpectations(t)
+		})
+	}
+}
+
+// answerClientWithError builds its fallback as a copy of the caller's own input with the code and
+// description swapped, so every OTHER field has to survive the swap. Nothing above reaches that
+// copy: the clear succeeds in the cases that assert redirect shape, and the cases where it fails
+// carry an ordinary registered callback, no earlier refusal and a code response type, so erasing
+// any of those three fields changes nothing they assert.
+//
+// These are the three fields whose erasure survived a mutation of the copy. The other three,
+// client, response mode and redirect URI, are already caught by the prompt=none clear-failure
+// cases in TestHandleAuthorizeGet_PromptNone (#241).
+func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.T) {
+	// newRequest is per-subtest because the mocks key their expectations on the exact w and r.
+	setup := func(t *testing.T) (*mocks_handlerhelpers.HttpHelper, *mocks_handlerhelpers.AuthHelper,
+		*httptest.ResponseRecorder, *http.Request) {
+
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		// The clear fails, which is the only path that builds the fallback at all.
+		authHelper.On("ClearAuthContext", w, r).Return(errors.New("the session store is unreachable"))
+
+		return httpHelper, authHelper, w, r
+	}
+
+	t.Run("an earlier refusal survives, and is not re-asked", func(t *testing.T) {
+		httpHelper, authHelper, w, r := setup(t)
+
+		httpHelper.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html",
+			"/auth_redirect_blocked.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+				return data["destination"] == "legit.example"
+			})).Return(nil)
+
+		input := testRedirectError("invalid_scope", "Invalid scope", "query", "https://legit.example/cb",
+			"abc123", "code")
+		input.redirectAlreadyWithheld = true
+
+		// No expectation on the database at all, exactly as TestRedirToClientWithError_HonoursAnEarlierRefusal
+		// does: a registration read reaching this mock fails the case. That is stronger than stubbing a
+		// recovered read and asserting it was ignored, because it proves the second read never happens.
+		answerClientWithError(w, r, mocks_data.NewDatabase(t), httpHelper, authHelper, nil, input)
+
+		assert.Empty(t, w.Header().Get("Location"),
+			"swapping the code for server_error must not launder away a refusal the request already earned: "+
+				"a failing clear is a server fault, and it cannot be what buys the client its redirect back "+
+				"(RFC 9700 4.11.2 attack 1)")
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("the response type survives, so a native client still gets server_error", func(t *testing.T) {
+		httpHelper, authHelper, w, r := setup(t)
+
+		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "http://127.0.0.1/cb")
+
+		input := testRedirectError("invalid_scope", "Invalid scope", "query",
+			"http://127.0.0.1:49152/cb", "", "code")
+
+		answerClientWithError(w, r, database, httpHelper, authHelper, nil, input)
+
+		assert.Contains(t, w.Header().Get("Location"), "http://127.0.0.1:49152/cb?error=server_error",
+			"the fallback runs the registration gate again with its own copy, so a dropped response type "+
+				"refuses the ephemeral port and the one error a native app most needs to see, the server's "+
+				"own fault, is the one it never receives (RFC 8252 7.3, RFC 6749 4.1.2.1)")
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+
+	t.Run("state survives", func(t *testing.T) {
+		httpHelper, authHelper, w, r := setup(t)
+
+		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://legit.example/cb")
+
+		input := testRedirectError("invalid_scope", "Invalid scope", "query", "https://legit.example/cb",
+			"abc123", "code")
+
+		answerClientWithError(w, r, database, httpHelper, authHelper, nil, input)
+
+		location := w.Header().Get("Location")
+		assert.Contains(t, location, "error=server_error")
+		assert.Contains(t, location, "state=abc123",
+			"RFC 6749 4.1.2.1 requires state to be echoed on the error response when the request carried "+
+				"it, and the fallback swaps only the code and the description. Without it the client cannot "+
+				"match the failure to the request it made, which is the CSRF binding the parameter exists for")
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+	})
+}
+
 func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	t.Run("Valid implicit flow request with token response type", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)

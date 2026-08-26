@@ -371,10 +371,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		// Read from the client loaded and authenticated at the top of ValidateTokenRequest,
 		// whose identifier this arm has already matched against the code's.
 		//
-		// The flexibility flag is unconditionally TRUE, unlike the emitter's gate, which passes
-		// false. A code exists only for response_type=code: ValidateRequest admits exactly
-		// code, token, id_token and id_token token, and the last three are dispatched to the
-		// implicit branch, which mints none. RFC 8252 flexibility is therefore required rather
+		// The flexibility flag is unconditionally TRUE here, and needs no response type to reach
+		// that: a code exists only for response_type=code. ValidateRequest admits exactly code,
+		// token, id_token and id_token token, and the last three are dispatched to the implicit
+		// branch, which mints none, so holding a code IS the proof of the code flow. The error
+		// emitter's gate reaches the same rule from the other side, deriving the flag from the
+		// ceremony's response type, because it runs where no code exists yet to prove it
+		// (redirectWillBeEmitted). RFC 8252 flexibility is therefore required rather
 		// than optional here, because a native app's code stores the requested URI with its
 		// ephemeral loopback port and would never exact-match the registered portless form. It
 		// can only be more permissive than the gate this same stored value already passed at
