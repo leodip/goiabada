@@ -2264,3 +2264,78 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 		})
 	}
 }
+
+// TestHandleTokenPost_RedemptionRegistrationRefusalAudit covers the handler half of #241 decision
+// 10: a code refused because its own redirect URI was deregistered has to reach the audit logger,
+// because the admin console and GET /api/v1/admin/audit-logs are the surfaces an operator can ask
+// "did pulling that callback stop anything" on. A server log line is not one of them.
+//
+// Thin on WHICH redemptions are refused, since the validator's own table owns that. What these two
+// cases pin is the discrimination, which is the whole of decision 8's name-not-payload rule: the
+// event fires on the sentinel and on nothing else that carries invalid_grant.
+func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
+	newHandler := func(t *testing.T) (*mocks_handlerhelpers.HttpHelper, *mocks_validators.TokenValidator,
+		*mocks_audit.AuditLogger, http.HandlerFunc) {
+		t.Helper()
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		return httpHelper, tokenValidator, auditLogger,
+			HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	}
+
+	const form = "grant_type=authorization_code&client_id=test_client&client_secret=s&" +
+		"code=the_code&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback"
+
+	t.Run("a deregistered redirect URI on the code is audited", func(t *testing.T) {
+		httpHelper, tokenValidator, auditLogger, handler := newHandler(t)
+
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		refusal := customerrors.ErrCodeRedirectURIDeregistered
+		tokenValidator.On("ValidateTokenRequest", req.Context(),
+			mock.AnythingOfType("*validators.ValidateTokenRequestInput")).Return(nil, refusal)
+
+		auditLogger.On("Log", constants.AuditRedemptionRefusedRedirectURI, mock.MatchedBy(
+			func(details map[string]interface{}) bool {
+				// clientIdentifier, the request's string, matching the neighbouring events.
+				// Unlike AuditTokenScopeDenied's it has been PROVED rather than asserted: this
+				// refusal is reachable only below client authentication and PKCE.
+				return details["clientIdentifier"] == "test_client"
+			})).Return()
+
+		httpHelper.On("JsonError", rr, req, mock.Anything).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("an ordinary invalid_grant refusal emits no registration event", func(t *testing.T) {
+		// The ABSENCE case, and it is the point of the whole test. The validator answers a
+		// revoked code, a superseded generation, a cross-bound session and a submitted URI that
+		// differs from the code's all with invalid_grant, so a predicate keyed on the error CODE
+		// rather than matched by value against the sentinel would name every one of them a
+		// deregistration. This row is what fails if somebody makes that simplification. Note the
+		// strict mockery double: an unexpected Log call fails the test on its own.
+		httpHelper, tokenValidator, _, handler := newHandler(t)
+
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		refusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+			"Code is invalid.", http.StatusBadRequest)
+		tokenValidator.On("ValidateTokenRequest", req.Context(),
+			mock.AnythingOfType("*validators.ValidateTokenRequestInput")).Return(nil, refusal)
+
+		httpHelper.On("JsonError", rr, req, mock.Anything).Return()
+
+		handler.ServeHTTP(rr, req)
+	})
+}

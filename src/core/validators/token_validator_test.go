@@ -26,6 +26,24 @@ import (
 	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 )
 
+// expectRedirectURIStillRegistered arms the registration read #241 added at the very end of the
+// authorization_code arm, for the fixtures either side of it whose subject is something else. The
+// URI it registers is the one the fixture's code carries, so these tests keep asserting what they
+// always asserted and the new check simply passes.
+//
+// .Maybe() rather than .Once(), because several of these fixtures are shared by subtests that
+// refuse higher up the arm and never reach the read. Nothing is weakened by that: the check is
+// owned by TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered, which asserts
+// both that it fires and, through the ABSENCE of this expectation, that it does not fire above
+// client authentication and PKCE.
+func expectRedirectURIStillRegistered(mockDB *mocks_data.Database, uri string) {
+	mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.AnythingOfType("*models.Client")).
+		Run(func(args mock.Arguments) {
+			c := args.Get(1).(*models.Client)
+			c.RedirectURIs = []models.RedirectURI{{URI: uri}}
+		}).Return(nil).Maybe()
+}
+
 func TestValidateTokenRequest(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_oauth.NewTokenParser(t)
@@ -799,6 +817,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
 		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -854,6 +873,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
 		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		expectRedirectURIStillRegistered(mockDB, "https://example.com/public-client/callback")
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3574,6 +3594,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
 	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
 	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3703,6 +3724,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
 	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
 	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3890,6 +3912,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
 	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
 	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -5455,6 +5478,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				// loaders are what the validator calls before reaching the generation check.
 				mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
 				mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+				expectRedirectURIStillRegistered(mockDB, "https://example.com/cb")
 
 				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 					GrantType:    "authorization_code",
@@ -5808,6 +5832,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
 			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+			expectRedirectURIStillRegistered(mockDB, "https://example.com/cb")
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
@@ -6385,6 +6410,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 			Return(codeEntity, nil).Once()
 		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 		switch {
 		case lookupErr != nil:
@@ -6640,5 +6666,205 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		// The shared session message, the same one a revoked code gets on this arm.
 		assert.Contains(t, customErr.GetDescription(),
 			"the associated session has expired or been terminated")
+	})
+}
+
+// TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered covers #241 decision 5's
+// registration boundary at redemption. The comparison near the top of the arm weighs the submitted
+// redirect_uri against the one stored on the code, and that stored value is a copy taken at
+// minting which nothing rematches against the client, so without this check a code delivered one
+// second before an administrator removes a callback stays redeemable for the rest of its 60 second
+// life.
+//
+// The fixture is TestValidateTokenRequest_AuthorizationCode_SessionOwnership's, with the
+// registration outcome as the variable: registered is what ClientLoadRedirectURIs writes onto the
+// client, and a non-nil loadErr makes the load itself fail, which is a distinct outcome and not a
+// third flavour of "not registered".
+func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *testing.T) {
+	const grantUserId = int64(1)
+
+	// codeChallenge empty means the code was minted without PKCE, which is every case but the
+	// last; the last needs a stored challenge so that a wrong verifier is a genuine PKCE
+	// failure rather than the strict-mode rejection of an unexpected one.
+	setup := func(t *testing.T, codeRedirectURI string, registered []string, loadErr error, codeChallenge string) (*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+		t.Helper()
+
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+		// Confidential, and the code carries no challenge, so the PKCE boundary (#245) does not
+		// pre-empt the subject. The secret also gives the ordering cases below something real to
+		// get wrong.
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
+		}
+
+		codeEntity := &models.Code{
+			CodeHash:          "hash_of_valid_code",
+			RedirectURI:       codeRedirectURI,
+			SessionIdentifier: "",
+			UserId:            grantUserId,
+			Client:            models.Client{ClientIdentifier: "client1"},
+			User:              models.User{Id: grantUserId, Enabled: true},
+			CodeChallenge:     sql.NullString{String: codeChallenge, Valid: codeChallenge != ""},
+			CreatedAt: sql.NullTime{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		}
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).
+			Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+		// registered nil means the caller does not expect the load to happen at all, which is
+		// what the two ordering cases assert: a strict mockery double fails the test if the
+		// validator calls it anyway. loadErr is the third outcome.
+		switch {
+		case loadErr != nil:
+			mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Return(loadErr).Once()
+		case registered != nil:
+			mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
+				c := args.Get(1).(*models.Client)
+				c.RedirectURIs = nil
+				for _, uri := range registered {
+					c.RedirectURIs = append(c.RedirectURIs, models.RedirectURI{URI: uri})
+				}
+			}).Return(nil).Once()
+		}
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "authorization_code",
+			ClientId:     "client1",
+			ClientSecret: "client_secret",
+			Code:         "valid_code",
+			RedirectURI:  codeRedirectURI,
+		}
+
+		return validator, input, ctx
+	}
+
+	t.Run("a code whose redirect URI is still registered is redeemable", func(t *testing.T) {
+		validator, input, ctx := setup(t, "https://example.com/callback",
+			[]string{"https://other.example.com/cb", "https://example.com/callback"}, nil, "")
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("a code whose redirect URI was deregistered is refused", func(t *testing.T) {
+		validator, input, ctx := setup(t, "https://example.com/callback",
+			[]string{"https://other.example.com/cb"}, nil, "")
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		require.True(t, ok)
+		// Matched the way HandleTokenPost matches it, by value against the sentinel, because
+		// that equality is what ties the audit row to the wire message (#241 decision 10).
+		assert.True(t, customErr.IsError(customerrors.ErrCodeRedirectURIDeregistered))
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		// Legible rather than the flat "Code is invalid." the refusals above it give. The
+		// presenter has already authenticated, and an administrator who rotated a callback
+		// needs to be able to tell this apart from a submitted value that differs from the
+		// code's, which returns "Invalid redirect_uri."
+		assert.Contains(t, customErr.GetDescription(), "no longer registered on the client")
+	})
+
+	t.Run("a client with no registrations left refuses every outstanding code", func(t *testing.T) {
+		validator, input, ctx := setup(t, "https://example.com/callback",
+			[]string{}, nil, "")
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		require.True(t, ok)
+		assert.True(t, customErr.IsError(customerrors.ErrCodeRedirectURIDeregistered))
+	})
+
+	t.Run("a loopback code still matches its registered portless URI", func(t *testing.T) {
+		// The flag's whole reason, and the case that would break if somebody made it
+		// conditional to match the emitter's false. A native app registers
+		// http://127.0.0.1/callback and requests an ephemeral port at authorization time, so
+		// the code stores the ported form and nothing exact-matches it (RFC 8252, decision 5).
+		validator, input, ctx := setup(t, "http://127.0.0.1:54321/callback",
+			[]string{"http://127.0.0.1/callback"}, nil, "")
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("a failed load is propagated, not read as a deregistration", func(t *testing.T) {
+		// The same distinction the session ownership check draws. An unreachable database says
+		// nothing about whether the URI is registered, so turning the failure into a refusal
+		// would report an outage as an administrative action.
+		loadErr := errors.New("database is down")
+		validator, input, ctx := setup(t, "https://example.com/callback",
+			nil, loadErr, "")
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, loadErr)
+		_, isErrorDetail := err.(*customerrors.ErrorDetail)
+		assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
+	})
+
+	t.Run("a wrong client secret is answered before the registration is read", func(t *testing.T) {
+		// THE ORDERING CASE, and it is asserted by ABSENCE: setup is given a nil registered
+		// list, so no ClientLoadRedirectURIs expectation exists and the strict mockery double
+		// fails the test if the validator reads the registrations anyway. That is what pins the
+		// check below client authentication (#137): an unauthenticated presenter of a stolen
+		// code must not learn from the answer whether the grant's destination still exists.
+		// Do not "simplify" this by adding the expectation.
+		validator, input, ctx := setup(t, "https://example.com/callback",
+			nil, nil, "")
+		input.ClientSecret = "wrong_secret"
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		require.True(t, ok)
+		assert.Equal(t, "invalid_client", customErr.GetCode())
+	})
+
+	t.Run("a wrong PKCE verifier is answered before the registration is read", func(t *testing.T) {
+		// The other half of the ordering case, asserted the same way and for the same reason.
+		// The code carries a challenge here, so a wrong verifier is a real PKCE failure rather
+		// than the strict-mode rejection of an unexpected one, and it must not reach the
+		// registration read. Again: no ClientLoadRedirectURIs expectation, deliberately.
+		validator, input, ctx := setup(t, "https://example.com/callback",
+			nil, nil, oauth.GeneratePKCECodeChallenge("the_right_verifier"))
+		input.CodeVerifier = "the_wrong_verifier"
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		customErr, ok := err.(*customerrors.ErrorDetail)
+		require.True(t, ok)
+		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.GetDescription())
 	})
 }
