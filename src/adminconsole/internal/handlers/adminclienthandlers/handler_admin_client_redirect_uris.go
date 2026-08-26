@@ -55,17 +55,34 @@ func HandleAdminClientRedirectURIsGet(
 			return
 		}
 
+		// The page is gated on whether the client redirects at all, not on the authorization
+		// code flow alone, so an implicit-only client can manage the one setting that makes it
+		// work (#250). Implicit is a three-state setting, per-client over a global default, and
+		// resolving it here rather than in the template keeps the template to one condition and
+		// keeps the inheritance rule in one place. The auth server's own gate on
+		// PUT /api/v1/admin/clients/{id}/redirect-uris asks the same question.
+		settingsResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
+		implicitEnabled := settingsResp.ImplicitFlowEnabled
+		if clientResp.ImplicitGrantEnabled != nil {
+			implicitEnabled = *clientResp.ImplicitGrantEnabled
+		}
+
 		adminClientRedirectURIs := struct {
-			ClientId                 int64
-			ClientIdentifier         string
-			AuthorizationCodeEnabled bool
-			RedirectURIs             map[int64]string
-			IsSystemLevelClient      bool
+			ClientId              int64
+			ClientIdentifier      string
+			CanManageRedirectURIs bool
+			RedirectURIs          map[int64]string
+			IsSystemLevelClient   bool
 		}{
-			ClientId:                 clientResp.Id,
-			ClientIdentifier:         clientResp.ClientIdentifier,
-			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
-			IsSystemLevelClient:      clientResp.IsSystemLevelClient,
+			ClientId:              clientResp.Id,
+			ClientIdentifier:      clientResp.ClientIdentifier,
+			CanManageRedirectURIs: clientResp.AuthorizationCodeEnabled || implicitEnabled,
+			IsSystemLevelClient:   clientResp.IsSystemLevelClient,
 		}
 
 		sort.Slice(clientResp.RedirectURIs, func(i, j int) bool {

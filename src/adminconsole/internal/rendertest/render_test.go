@@ -195,3 +195,41 @@ func TestRender_AccountOtp_Enabled(t *testing.T) {
 	assert.NotContains(t, out, `name="otp"`)
 	assert.Contains(t, out, `name="password"`)
 }
+
+// TestRender_AdminClientRedirectURIs is the template hop of the redirect-flow gate. The handler
+// resolves the per-client implicit override against the global setting and binds one boolean, so
+// what is left to prove here is that the page shows the form for a client that can redirect and
+// the explaining sentence for one that cannot (#250). render's own raw-key check is what proves
+// the new catalog key exists in pt-BR: a missing key leaks its own name into the HTML.
+func TestRender_AdminClientRedirectURIs(t *testing.T) {
+
+	page := func(canManage bool) string {
+		return render(t, "/admin_clients_redirect_uris.html", map[string]interface{}{
+			"client": struct {
+				ClientId              int64
+				ClientIdentifier      string
+				CanManageRedirectURIs bool
+				RedirectURIs          map[int64]string
+				IsSystemLevelClient   bool
+			}{
+				ClientId:              7,
+				ClientIdentifier:      "an-implicit-app",
+				CanManageRedirectURIs: canManage,
+				RedirectURIs:          map[int64]string{1: "https://example.com/cb"},
+			},
+			"savedSuccessfully": false,
+		})
+	}
+
+	manageable := page(true)
+	assert.Contains(t, manageable, "redirectURIsEnabledPanel")
+	assert.Contains(t, manageable, `id="btnSave"`)
+	assert.NotContains(t, manageable, "URIs de redirecionamento são usadas pelo fluxo")
+
+	blocked := page(false)
+	assert.NotContains(t, blocked, "redirectURIsEnabledPanel")
+	assert.NotContains(t, blocked, `id="btnSave"`)
+	// The sentence names both redirect-based flows, which is the whole point of the change:
+	// an implicit-only administrator used to be told to enable a flow their client never uses.
+	assert.Contains(t, blocked, "URIs de redirecionamento são usadas pelo fluxo authorization code com PKCE e pelo fluxo implicit.")
+}

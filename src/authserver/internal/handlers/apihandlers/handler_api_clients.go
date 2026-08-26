@@ -882,8 +882,21 @@ func HandleAPIClientRedirectURIsPut(
 			return
 		}
 
-		if !client.AuthorizationCodeEnabled {
-			writeJSONError(w, "Authorization code flow is disabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
+		// A redirect URI belongs to whichever redirect-based flow the client uses, and implicit
+		// is one of them. RFC 6749 section 3.1.2.2 makes registration a MUST for a confidential
+		// client using the implicit grant, and RFC 9700 section 4.1.2 notes that control of the
+		// redirect URI matters more for implicit rather than less, since the response carries the
+		// access token in the fragment. Gating on the authorization code flow alone left an
+		// administrator of an implicit-only client unable to add, rotate or urgently remove the
+		// one setting that makes it work, without first enabling a flow the client does not use
+		// (#250).
+		//
+		// These two flags are the complete enumeration of redirect-based flows here:
+		// oauth.ResponseTypeInfo.IsImplicitFlow treats any response type containing "code" as not
+		// implicit, so nothing outside the pair can produce a redirect.
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		if !client.AuthorizationCodeEnabled && !client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled) {
+			writeJSONError(w, "Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

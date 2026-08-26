@@ -679,9 +679,7 @@
 # --- Client redirect URIs --------------------------------------------------
 
 "adminconsole.admin_clients.redirect_uris.page_title_prefix" = "Client - Redirect URIs - "
-"adminconsole.admin_clients.redirect_uris.requires_auth_code_prefix" = "Configuring redirect URIs is only possible when the "
-"adminconsole.admin_clients.redirect_uris.requires_auth_code_em" = "authorization code with PKCE"
-"adminconsole.admin_clients.redirect_uris.requires_auth_code_suffix" = " flow is enabled."
+"adminconsole.admin_clients.redirect_uris.requires_redirect_flow" = "Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow. Enable one of them under OAuth2 flows to configure them here."
 "adminconsole.admin_clients.redirect_uris.intro_prefix" = "We only accept "
 "adminconsole.admin_clients.redirect_uris.intro_em" = "exact matches"
 "adminconsole.admin_clients.redirect_uris.intro_suffix" = " for redirect URIs; wildcards are not permitted. One exception: for http loopback addresses, any port is accepted on authorization code requests."
