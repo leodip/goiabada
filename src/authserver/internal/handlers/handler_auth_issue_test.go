@@ -330,6 +330,7 @@ func TestHandleIssueGet(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -403,6 +404,7 @@ func TestHandleIssueGet(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -461,6 +463,7 @@ func TestHandleIssueGet(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -519,6 +522,7 @@ func TestHandleIssueGet(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -811,6 +815,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			codeIssuer := mocks_oauth.NewCodeIssuer(t)
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
+			stubRegisteredRedirectURI(database, "https://example.com/callback")
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			userSessionManager := mocks_user.NewUserSessionManager(t)
 			permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -1020,6 +1025,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2806,7 +2812,8 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 
 				templateFS := &mocks_test.TestFS{FileContents: map[string]string{"form_post.html": keysTemplate}}
 
-				err := redirToClientWithError(w, r, nil, templateFS,
+				err := redirToClientWithError(w, r,
+					testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS,
 					testRedirectError("access_denied", "Access denied", "form_post",
 						"https://example.com/callback", tc.state, "code"))
 
@@ -2876,7 +2883,8 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/authorize", nil)
 
-				err := redirToClientWithError(w, r, nil, web.TemplateFS(),
+				err := redirToClientWithError(w, r,
+					testRegisteredDatabase(t, "https://example.com/callback"), nil, web.TemplateFS(),
 					testRedirectError("access_denied", "Access denied", "form_post",
 						"https://example.com/callback", tc.state, "code"))
 
@@ -2987,6 +2995,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3068,6 +3077,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3134,6 +3144,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3206,6 +3217,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3351,6 +3363,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3671,6 +3684,12 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			codeIssuer := mocks_oauth.NewCodeIssuer(t)
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
+			if tc.silent {
+				// Only the silent row answers the client, and only an answer to the client
+				// reaches the emitter's registration read (#241 decision 11). The other row
+				// restarts level 1, so an expectation here would go uncalled.
+				stubRegisteredRedirectURI(database, "https://example.com/callback")
+			}
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			userSessionManager := mocks_user.NewUserSessionManager(t)
 			permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3816,6 +3835,12 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			codeIssuer := mocks_oauth.NewCodeIssuer(t)
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
+			if !tc.wantIssued {
+				// The rows that issue nothing refuse to the client, and only an answer to the
+				// client reaches the emitter's registration read (#241 decision 11). The rows
+				// that issue redirect to the callback themselves and never go through it.
+				stubRegisteredRedirectURI(database, "https://example.com/callback")
+			}
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			userSessionManager := mocks_user.NewUserSessionManager(t)
 			permissionChecker := mocks_user.NewPermissionChecker(t)

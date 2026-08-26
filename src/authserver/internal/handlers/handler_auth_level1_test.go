@@ -723,6 +723,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 
 			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+			stubRegisteredRedirectURI(database, "https://legit.example/cb")
 
 			handler.ServeHTTP(rr, req)
 
@@ -756,6 +757,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(assert.AnError)
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+		stubRegisteredRedirectURI(database, "https://legit.example/cb")
 
 		handler.ServeHTTP(rr, req)
 
@@ -799,6 +801,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+		stubRegisteredRedirectURI(database, "https://legit.example/cb")
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Return()

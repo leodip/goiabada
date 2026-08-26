@@ -615,6 +615,7 @@ func TestHandleConsentPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
@@ -661,6 +662,7 @@ func TestHandleConsentPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
@@ -705,6 +707,7 @@ func TestHandleConsentPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
@@ -759,6 +762,7 @@ func TestHandleConsentPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		templateFS := &mocks_test.TestFS{
@@ -929,6 +933,7 @@ func TestHandleConsentPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
@@ -973,6 +978,7 @@ func TestHandleConsentPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
@@ -1014,6 +1020,7 @@ func TestHandleConsentPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		templateFS := &mocks_test.TestFS{
@@ -1059,6 +1066,7 @@ func TestHandleConsentPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		templateFS := &mocks_test.TestFS{
@@ -1367,6 +1375,10 @@ func TestHandleConsentPost(t *testing.T) {
 					assert.Empty(t, rr.Header().Get("Location"))
 				} else if tc.granted == nil {
 					stubClientProvenanceLookup(database)
+					// Only this branch emits, so only this branch reaches the emitter's
+					// registration read. Stubbing it above the split would leave the approving
+					// rows carrying an expectation nothing calls.
+					stubRegisteredRedirectURI(database, "https://example.com/callback")
 					authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 					handler.ServeHTTP(rr, req)

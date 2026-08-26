@@ -1503,6 +1503,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		templateFS := &mocks_test.TestFS{}
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -1603,6 +1604,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		templateFS := &mocks_test.TestFS{}
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -1687,6 +1689,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
@@ -1780,6 +1783,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
@@ -1867,6 +1871,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		templateFS := &mocks_test.TestFS{}
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -1965,6 +1970,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		templateFS := &mocks_test.TestFS{}
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2046,6 +2052,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
@@ -2130,6 +2137,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 

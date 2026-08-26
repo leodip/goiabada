@@ -262,7 +262,7 @@ func HandleConsentPost(
 					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 					slog.Error("failed to clear the auth context, answering the client with server_error",
 						"error", err)
-					err = redirToClientWithError(w, r, httpHelper, templateFS,
+					err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 						redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
 					if err != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
@@ -271,7 +271,7 @@ func HandleConsentPost(
 					return
 				}
 
-				err = redirToClientWithError(w, r, httpHelper, templateFS,
+				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, refusedClient,
 						"access_denied", "The user did not provide consent"))
 				if err != nil {
@@ -368,7 +368,7 @@ func HandleConsentPost(
 				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 				slog.Error("failed to clear the auth context, answering the client with server_error",
 					"error", err)
-				err = redirToClientWithError(w, r, httpHelper, templateFS,
+				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
 				if err != nil {
 					// Nowhere left to send the client, so the 500 is the last resort here.
@@ -377,7 +377,7 @@ func HandleConsentPost(
 				return
 			}
 
-			err = redirToClientWithError(w, r, httpHelper, templateFS,
+			err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 				redirectErrorFromAuthContext(authContext, refusedClient,
 					"access_denied", "The user did not provide consent"))
 			if err != nil {
