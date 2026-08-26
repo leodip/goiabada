@@ -269,3 +269,55 @@ func TestRedirectURIMatches(t *testing.T) {
 		})
 	}
 }
+
+func TestRedirectURIIsRegistered(t *testing.T) {
+	tests := []struct {
+		name       string
+		registered []string
+		requested  string
+		flag       bool
+		want       bool
+	}{
+		// the list, which is what this function adds over RedirectURIMatches
+		{"exact hit", []string{"https://a.example/cb"}, "https://a.example/cb", false, true},
+		{"exact hit, second entry", []string{"https://a.example/cb", "https://b.example/cb"}, "https://b.example/cb", false, true},
+		{"exact miss", []string{"https://a.example/cb"}, "https://evil.example/cb", false, false},
+		{"near miss on a trusted value", []string{"https://trusted.example/cb"}, "https://trusted.example.attacker.com/cb", false, false},
+		{"empty registered list", []string{}, "https://a.example/cb", false, false},
+		{"empty registered list, flag on", []string{}, "http://127.0.0.1:5000/cb", true, false},
+		{"empty requested against a populated list", []string{"https://a.example/cb"}, "", true, false},
+
+		// the flag, which is decision 7: the flow gate is the caller's parameter and not a
+		// rule read inside urlutil. Keep this pair. The two rows differ in the flag and in
+		// nothing else, so reading the flow inside the function breaks them and nothing else
+		// in the suite.
+		{"loopback, flag on", []string{"http://127.0.0.1/cb"}, "http://127.0.0.1:54321/cb", true, true},
+		{"loopback, flag off", []string{"http://127.0.0.1/cb"}, "http://127.0.0.1:54321/cb", false, false},
+
+		// one accept and one reject through RedirectURIMatches is all this table owns of its
+		// behaviour: the exhaustive matching table is TestRedirectURIMatches, directly above,
+		// and owning it twice means two places to update.
+		{"https loopback, flag on", []string{"https://127.0.0.1/cb"}, "https://127.0.0.1:8443/cb", true, false},
+		{"non-loopback host, flag on", []string{"https://example.com/cb"}, "https://example.com:8443/cb", true, false},
+
+		// Keep this row. It is the one a per-entry reading of the flag passes and a "the list
+		// contains a loopback entry, so relax" reading fails. It is the residual the loop
+		// shape makes possible.
+		{"flexibility does not leak across entries", []string{"https://example.com/cb", "http://127.0.0.1/cb"}, "https://example.com:8443/cb", true, false},
+		{"the loopback entry later in the list still matches", []string{"https://example.com/cb", "http://127.0.0.1/cb"}, "http://127.0.0.1:9/cb", true, true},
+
+		// url.Parse("http://127.0.0.1/%zz") fails with invalid URL escape "%zz", so the
+		// flexible arm can never match it. Keep the pair. The second row looks like a mistake
+		// beside the first and is not: a client that registered a URI url.Parse rejects must
+		// still be able to redeem that exact string, and the first row is what shows that
+		// beyond exact equality such a value matches nothing.
+		{"unparseable registered value, flag on", []string{"http://127.0.0.1/%zz"}, "http://127.0.0.1:9/%zz", true, false},
+		{"unparseable registered value, exact equality still wins", []string{"http://127.0.0.1/%zz"}, "http://127.0.0.1/%zz", true, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, RedirectURIIsRegistered(tc.registered, tc.requested, tc.flag))
+		})
+	}
+}

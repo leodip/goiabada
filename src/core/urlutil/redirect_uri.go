@@ -250,3 +250,26 @@ func RedirectURIMatches(registered, requested string) bool {
 	b, ok2 := stripPortRaw(requested)
 	return ok1 && ok2 && a == b
 }
+
+// RedirectURIIsRegistered reports whether requested is covered by registered.
+//
+// Each entry is tested for exact string equality first, and that arm runs whether or not
+// allowLoopbackPortFlexibility is set, so a registered value url.Parse rejects is still
+// matched by a byte-identical request. Only beyond exact equality does the flag admit
+// RedirectURIMatches, which is called registered first and requested second because its
+// scheme and host gates read the registered side.
+//
+// Like RedirectURIMatches this is flow agnostic. The caller supplies the flag from what it
+// knows about the request, because loopback port flexibility is scoped to the authorization
+// code flow and that gate lives with the caller rather than here (#41).
+func RedirectURIIsRegistered(registered []string, requested string, allowLoopbackPortFlexibility bool) bool {
+	for _, reg := range registered {
+		if reg == requested {
+			return true
+		}
+		if allowLoopbackPortFlexibility && RedirectURIMatches(reg, requested) {
+			return true
+		}
+	}
+	return false
+}
