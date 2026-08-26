@@ -88,11 +88,19 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	assert.False(t, gotDB[originB])
 }
 
-func TestAPIClientWebOriginsPut_AuthCodeDisabledRejected(t *testing.T) {
+// The flow gate is gone, so any client may have web origins. This test was the reverse of itself
+// until #250: the same fixture, with the authorization code flow off, asserting a 400 saying
+// "Authorization code flow is disabled for this client."
+//
+// Needing a web origin means the client's app is JavaScript running in a browser, which no flow
+// flag expresses. This fixture is the case the old gate got wrong in the least exotic way: an ROPC
+// client whose single-page app calls /auth/token from the browser, which needs an origin and
+// enables no redirect-based flow at all.
+func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
-		ClientIdentifier:         "weborig-disabled-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "weborig-noauthcode-" + strings.ToLower(gofakeit.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,
@@ -103,17 +111,82 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledRejected(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(nil, client.Id) }()
 
-	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}}
+	origin := "https://spa-" + strings.ToLower(gofakeit.LetterN(8)) + ".example.com"
+	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{origin}}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var body map[string]interface{}
-	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error_description"] != nil {
-		msg := body["error_description"].(string)
-		assert.Equal(t, "Authorization code flow is disabled for this client.", msg)
+	var updateResp api.UpdateClientResponse
+	err = json.NewDecoder(resp.Body).Decode(&updateResp)
+	assert.NoError(t, err)
+	assert.Len(t, updateResp.Client.WebOrigins, 1)
+	assert.Equal(t, origin, updateResp.Client.WebOrigins[0].Origin)
+
+	// And it really landed, rather than being echoed back from the request.
+	refreshed, err := database.GetClientById(nil, client.Id)
+	assert.NoError(t, err)
+	err = database.ClientLoadWebOrigins(nil, refreshed)
+	assert.NoError(t, err)
+	assert.Len(t, refreshed.WebOrigins, 1)
+	assert.Equal(t, origin, refreshed.WebOrigins[0].Origin)
+}
+
+// The endpoint stores the canonical origin, which is the string MiddlewareCors compares to the
+// browser's Origin header byte for byte. urlutil.CanonicalOrigin owns the table of cases; these
+// two exist to prove the handler calls it at all, and they are the two an administrator produces
+// by accident: a URL copied out of a browser bar, which carries a trailing slash and whatever case
+// was typed, and an explicit default port, which a browser never sends (#250).
+func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	client := &models.Client{
+		ClientIdentifier:         "weborig-canon-" + strings.ToLower(gofakeit.LetterN(8)),
+		Enabled:                  true,
+		ConsentRequired:          false,
+		IsPublic:                 true,
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	err := database.CreateClient(nil, client)
+	assert.NoError(t, err)
+	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+	host := "canon-" + strings.ToLower(gofakeit.LetterN(8)) + ".example.com"
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+
+	testCases := []struct {
+		name string
+		sent string
+		want string
+	}{
+		{
+			name: "a URL copied from a browser bar keeps neither its case nor its trailing slash",
+			sent: "https://" + strings.ToUpper(host) + "/",
+			want: "https://" + host,
+		},
+		{
+			name: "an explicit default port is dropped, because a browser never sends one",
+			sent: "https://" + host + ":443",
+			want: "https://" + host,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{tc.sent}}
+			resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+			refreshed, err := database.GetClientById(nil, client.Id)
+			assert.NoError(t, err)
+			err = database.ClientLoadWebOrigins(nil, refreshed)
+			assert.NoError(t, err)
+			assert.Len(t, refreshed.WebOrigins, 1)
+			assert.Equal(t, tc.want, refreshed.WebOrigins[0].Origin)
+		})
 	}
 }
 
@@ -176,33 +249,32 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 		assert.Equal(t, "Web origin cannot be empty", errResp.ErrorDescription)
 	})
 
-	// Sub-test: Invalid URL format
-	t.Run("InvalidURL", func(t *testing.T) {
-		reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"not-a-url"}}
-		resp := makeAPIRequest(t, "PUT", baseURL, accessToken, reqBody)
-		defer func() { _ = resp.Body.Close() }()
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	// Everything that is not a canonical origin is refused with one message that names the value
+	// and says what an origin looks like, rather than the three the old validator had. The
+	// scheme case is no longer separate: urlutil.CanonicalOrigin refuses "ftp://example.com" for
+	// the same reason it refuses "not-a-url", and an administrator needs the same sentence for
+	// both (#250).
+	for _, sent := range []string{"not-a-url", "ftp://example.com", "https://user@example.com", "https://[2001:db8::1]"} {
+		t.Run("Refused_"+sent, func(t *testing.T) {
+			reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{sent}}
+			resp := makeAPIRequest(t, "PUT", baseURL, accessToken, reqBody)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
-		var errResp api.ErrorResponse
-		_ = json.NewDecoder(resp.Body).Decode(&errResp)
-		assert.Contains(t, errResp.ErrorDescription, "Invalid web origin")
-	})
+			var errResp api.ErrorResponse
+			_ = json.NewDecoder(resp.Body).Decode(&errResp)
+			assert.Contains(t, errResp.ErrorDescription, "Invalid web origin: "+sent)
+			// The refusal has to say what to type instead, or the administrator is left
+			// guessing at an endpoint that used to accept the value silently.
+			assert.Contains(t, errResp.ErrorDescription, "https://www.example.com")
+		})
+	}
 
-	// Sub-test: Invalid scheme (ftp instead of http/https)
-	t.Run("InvalidScheme", func(t *testing.T) {
-		reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"ftp://example.com"}}
-		resp := makeAPIRequest(t, "PUT", baseURL, accessToken, reqBody)
-		defer func() { _ = resp.Body.Close() }()
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-
-		var errResp api.ErrorResponse
-		_ = json.NewDecoder(resp.Body).Decode(&errResp)
-		assert.Equal(t, "Web origin must use http or https scheme", errResp.ErrorDescription)
-	})
-
-	// Sub-test: Duplicate web origins (case-insensitive)
+	// Sub-test: Duplicate web origins, now colliding on the canonical form rather than on case
+	// alone. "https://example.com/" and "https://example.com" are one origin to a browser, and
+	// storing both is storing one row that can never match.
 	t.Run("DuplicateOrigins", func(t *testing.T) {
-		reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "HTTPS://EXAMPLE.COM"}}
+		reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "HTTPS://EXAMPLE.COM/"}}
 		resp := makeAPIRequest(t, "PUT", baseURL, accessToken, reqBody)
 		defer func() { _ = resp.Body.Close() }()
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

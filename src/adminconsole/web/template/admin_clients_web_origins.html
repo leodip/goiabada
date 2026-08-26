@@ -178,11 +178,6 @@
 
         <div class="w-full h-full pb-6 bg-base-100">
 
-                {{if not .client.AuthorizationCodeEnabled}}
-                <div>
-                    <p>{{ T $.ctx "adminconsole.admin_clients.web_origins.requires_auth_code_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.web_origins.requires_auth_code_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.requires_auth_code_suffix" }}</p>
-                </div>
-                {{else}}
                 <div id="webOriginsEnabledPanel">
                     <p>{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_em1" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_middle" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_em2" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_suffix" }}</p>
                     <p class="mt-1">{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_em1" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_middle" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_em2" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_suffix" }}</p>
@@ -215,8 +210,35 @@
                         </table>
                     </div>
 
+                    <div class="w-full mt-8">
+                        <h2 class="text-lg">{{ T $.ctx "adminconsole.admin_clients.web_origins.effective_title" }}</h2>
+                        <p class="mt-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.web_origins.effective_note" }}</p>
+                        <table id="effectiveWebOriginsTable" class="table mt-2">
+                            <thead>
+                                <tr>
+                                    <th class="p-1">{{ T $.ctx "adminconsole.admin_clients.web_origins.col_effective_origin" }}</th>
+                                    <th class="p-1">{{ T $.ctx "adminconsole.admin_clients.web_origins.col_effective_client" }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{if .client.EffectiveWebOrigins}}
+                                    {{range .client.EffectiveWebOrigins}}
+                                    <tr>
+                                        <td class="p-1 font-mono text-sm align-middle">{{ .Origin }}</td>
+                                        <td class="p-1 font-mono text-sm align-middle">{{ .ClientIdentifier }}</td>
+                                    </tr>
+                                    {{end}}
+                                {{else}}
+                                    <tr>
+                                        <td class="p-1 font-mono text-sm align-middle">{{ T $.ctx "adminconsole.admin_clients.web_origins.none_yet" }}</td>
+                                        <td class="p-1">&nbsp;</td>
+                                    </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+
                 </div>
-                {{end}}
 
         </div>
 
@@ -243,10 +265,8 @@
                     <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.web_origins.saved_successfully" }}</p>
                 </div>
             {{end}}
-            {{if .client.AuthorizationCodeEnabled}}
-                <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary float-right">&nbsp;</span>
-                <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
-            {{end}}
+            <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary float-right">&nbsp;</span>
+            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
 
         </div>
     </div>

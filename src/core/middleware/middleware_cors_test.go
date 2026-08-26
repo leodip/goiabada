@@ -1,12 +1,12 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -39,9 +39,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://allowed.com",
 			expectedAllow: true,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
-					{Origin: "http://allowed.com"},
-				}, nil)
+				db.On("WebOriginExists", mock.Anything, "http://allowed.com").Return(true, nil)
 			},
 		},
 		{
@@ -50,9 +48,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://allowed.com",
 			expectedAllow: true,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
-					{Origin: "http://allowed.com"},
-				}, nil)
+				db.On("WebOriginExists", mock.Anything, "http://allowed.com").Return(true, nil)
 			},
 		},
 		{
@@ -61,9 +57,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://allowed.com",
 			expectedAllow: true,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
-					{Origin: "http://allowed.com"},
-				}, nil)
+				db.On("WebOriginExists", mock.Anything, "http://allowed.com").Return(true, nil)
 			},
 		},
 		{
@@ -72,9 +66,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://disallowed.com",
 			expectedAllow: false,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
-					{Origin: "http://allowed.com"},
-				}, nil)
+				db.On("WebOriginExists", mock.Anything, "http://disallowed.com").Return(false, nil)
 			},
 		},
 		{
@@ -83,9 +75,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://disallowed.com",
 			expectedAllow: false,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
-					{Origin: "http://allowed.com"},
-				}, nil)
+				db.On("WebOriginExists", mock.Anything, "http://disallowed.com").Return(false, nil)
 			},
 		},
 		{
@@ -94,9 +84,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://disallowed.com",
 			expectedAllow: false,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
-					{Origin: "http://allowed.com"},
-				}, nil)
+				db.On("WebOriginExists", mock.Anything, "http://disallowed.com").Return(false, nil)
 			},
 		},
 		{
@@ -130,4 +118,74 @@ func TestMiddlewareCors(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The gated paths consult WebOriginExists and nothing else. GetAllWebOrigins read every row in the
+// table on every CORS-checked request, with no cache; the method here is an index lookup on the
+// UNIQUE (origin, client_id) migration 000034 adds. A strict mock is what pins which method runs:
+// the assertion below fails if the middleware goes back to scanning, and mocks_data.NewDatabase(t)
+// fails the test on any call that was not registered (#250).
+func TestMiddlewareCors_ConsultsWebOriginExistsAndNotAScan(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+	db.On("WebOriginExists", mock.Anything, "http://allowed.com").Return(true, nil).Once()
+
+	handler := MiddlewareCors(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("OPTIONS", "/userinfo", nil)
+	req.Header.Set("Origin", "http://allowed.com")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	db.AssertExpectations(t)
+	db.AssertNotCalled(t, "GetAllWebOrigins", mock.Anything)
+}
+
+// An unreadable list is not an empty one, and it is not a permissive one either. A database error
+// answering true here would let script on any origin read a token or userinfo response, so the
+// only safe answer is false. Nothing else in this file covers this path (#250).
+func TestMiddlewareCors_ADatabaseErrorFailsClosed(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+	db.On("WebOriginExists", mock.Anything, "http://allowed.com").
+		Return(false, errors.New("the database is unreachable")).Once()
+
+	handler := MiddlewareCors(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("OPTIONS", "/auth/token", nil)
+	req.Header.Set("Origin", "http://allowed.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	assert.Empty(t, rr.Result().Header.Get("Access-Control-Allow-Origin"))
+	db.AssertExpectations(t)
+}
+
+// A preflight has to say how long it may be cached. cors@v1.2.2 emits Access-Control-Max-Age only
+// when maxAge > 0, so with no value set the header never shipped and every browser fell back to
+// its own short default, re-preflighting roughly every five seconds and paying for a lookup each
+// time.
+//
+// Read through Result().Header rather than the recorder's live map: the live map shows a header
+// that was set even if the response never carried it, which is how a test of a header can be
+// green about bytes that do not exist.
+func TestMiddlewareCors_APreflightIsCacheable(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+	db.On("WebOriginExists", mock.Anything, "http://allowed.com").Return(true, nil)
+
+	handler := MiddlewareCors(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("OPTIONS", "/userinfo", nil)
+	req.Header.Set("Origin", "http://allowed.com")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, "600", rr.Result().Header.Get("Access-Control-Max-Age"))
 }

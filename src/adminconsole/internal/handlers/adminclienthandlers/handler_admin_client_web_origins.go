@@ -19,6 +19,14 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// effectiveWebOrigin is one row of the server-wide list the page renders beside the client's own.
+// ClientIdentifier is a label saying which app the origin was registered for, not a boundary:
+// every row in the list is honoured for every client.
+type effectiveWebOrigin struct {
+	Origin           string
+	ClientIdentifier string
+}
+
 func HandleAdminClientWebOriginsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
@@ -55,17 +63,53 @@ func HandleAdminClientWebOriginsGet(
 			return
 		}
 
+		// The effective list, which is the page's honest answer to "what may call these
+		// endpoints from a browser today". MiddlewareCors checks an incoming Origin against
+		// every row in the table regardless of which client it was registered against, because
+		// a CORS preflight carries no client identity, so an origin listed on the least-trusted
+		// client is permitted for every client. The page used to show only this client's rows,
+		// which implied a scoping the server does not honour, and an administrator could not
+		// answer the question without opening every client in turn (#250).
+		//
+		// This needs no new endpoint: GET /api/v1/admin/clients already loads WebOrigins for
+		// every client it returns. Assembled here rather than in the template, so the template
+		// displays a list it is handed and holds no rule.
+		allClients, err := apiClient.GetAllClients(jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
+		effectiveWebOrigins := make([]effectiveWebOrigin, 0)
+		for _, c := range allClients {
+			for _, origin := range c.WebOrigins {
+				effectiveWebOrigins = append(effectiveWebOrigins, effectiveWebOrigin{
+					Origin:           origin.Origin,
+					ClientIdentifier: c.ClientIdentifier,
+				})
+			}
+		}
+		sort.Slice(effectiveWebOrigins, func(i, j int) bool {
+			if effectiveWebOrigins[i].Origin != effectiveWebOrigins[j].Origin {
+				return effectiveWebOrigins[i].Origin < effectiveWebOrigins[j].Origin
+			}
+			return effectiveWebOrigins[i].ClientIdentifier < effectiveWebOrigins[j].ClientIdentifier
+		})
+
+		// No AuthorizationCodeEnabled in this bind. The page no longer gates on it: a web origin
+		// is needed when the client's app is JavaScript in a browser, which no flow flag
+		// expresses, and the auth server's own endpoint stopped asking too (#250).
 		adminClientWebOrigins := struct {
-			ClientId                 int64
-			ClientIdentifier         string
-			AuthorizationCodeEnabled bool
-			WebOrigins               map[int64]string
-			IsSystemLevelClient      bool
+			ClientId            int64
+			ClientIdentifier    string
+			WebOrigins          map[int64]string
+			EffectiveWebOrigins []effectiveWebOrigin
+			IsSystemLevelClient bool
 		}{
-			ClientId:                 clientResp.Id,
-			ClientIdentifier:         clientResp.ClientIdentifier,
-			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
-			IsSystemLevelClient:      clientResp.IsSystemLevelClient,
+			ClientId:            clientResp.Id,
+			ClientIdentifier:    clientResp.ClientIdentifier,
+			EffectiveWebOrigins: effectiveWebOrigins,
+			IsSystemLevelClient: clientResp.IsSystemLevelClient,
 		}
 
 		sort.Slice(clientResp.WebOrigins, func(i, j int) bool {
@@ -139,7 +183,14 @@ func HandleAdminClientWebOriginsPost(
 		}
 		_, err = apiClient.UpdateClientWebOrigins(jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			// Not JsonError directly: the API refuses a web origin with a 400 whose description
+			// names the offending value and says what an origin should look like, and that
+			// sentence is the only thing telling the administrator what to type instead. Handed
+			// to JsonError as a plain error it becomes a generic 500 and the sentence goes to
+			// the log. This is the same defect #122 fixed on the Redirect URIs page, and it
+			// bites here now that the API refuses shapes this page's own new URL().origin
+			// happily produces, such as a non-ASCII host or an IPv6 literal (#250).
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

@@ -1009,10 +1009,18 @@ func HandleAPIClientRedirectURIsPut(
 	}
 }
 
+// maxWebOriginLength is the width of the web_origins.origin column on MySQL, PostgreSQL and SQL
+// Server; sqlite stores TEXT. A standards-valid origin can be 267 characters ("https://" plus a
+// 253-character host plus ":65535"), so a longer value is refused here rather than becoming a 500
+// on three engines out of four, which is what it is today and what no sqlite tier can see. The cap
+// lives at the endpoint and not in urlutil.CanonicalOrigin because it is a fact about storage
+// rather than about what an origin is (#250).
+const maxWebOriginLength = 256
+
 // HandleAPIClientWebOriginsPut - PUT /api/v1/admin/clients/{id}/web-origins
-// Replaces the full set of web origins for the client. The server validates
-// inputs (http/https only), enforces business rules, computes add/remove, and
-// returns the updated client.
+// Replaces the full set of web origins for the client, in one transaction. Each value is
+// canonicalized to the exact string a browser sends in an Origin header, or refused, so a stored
+// origin is always one CORS can match.
 func HandleAPIClientWebOriginsPut(
 	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
@@ -1043,10 +1051,14 @@ func HandleAPIClientWebOriginsPut(
 			return
 		}
 
-		if !client.AuthorizationCodeEnabled {
-			writeJSONError(w, "Authorization code flow is disabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
+		// There is deliberately no flow gate here, and the Redirect URIs endpoint next door
+		// deliberately has one. The criterion for needing a web origin is "this client's app is
+		// JavaScript running in a browser", which no flow flag expresses: an ROPC client calling
+		// /auth/token from the browser needs one and enables no redirect-based flow at all.
+		// Gating this on the authorization code flow, as it was, refused a legitimate
+		// configuration the rest of the server permits, and a registered origin is inert until
+		// MiddlewareCors reads it, so the gate protected nothing. Restoring consistency with the
+		// page next door reintroduces this bug (#250).
 
 		var req api.UpdateClientWebOriginsRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1054,7 +1066,17 @@ func HandleAPIClientWebOriginsPut(
 			return
 		}
 
-		// Validate list and entries: non-empty, valid URL, http/https scheme, no duplicates (case-insensitive)
+		// Validate list and entries: non-empty, canonical origin, within the column, no duplicates.
+		//
+		// urlutil.CanonicalOrigin is what makes a saved value one CORS can ever match.
+		// MiddlewareCors compares the stored string to the browser's Origin header byte for
+		// byte, and the validation this replaced accepted anything url.ParseRequestURI parsed
+		// with an http or https scheme, then stored it verbatim in lower case. Six of ten
+		// realistic inputs were accepted and permanently dead, including
+		// "https://app.example.com/", which is what copying a URL out of a browser bar
+		// produces: 200, the value in the list, and CORS failing with nothing explaining why.
+		// Deduplication runs on the canonical form for the same reason, so "https://a.com" and
+		// "https://a.com/" collide in one request rather than both being stored (#250).
 		seen := make(map[string]struct{})
 		normalized := make([]string, 0, len(req.WebOrigins))
 		for _, raw := range req.WebOrigins {
@@ -1063,35 +1085,58 @@ func HandleAPIClientWebOriginsPut(
 				writeJSONError(w, "Web origin cannot be empty", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			parsed, err := url.ParseRequestURI(val)
-			if err != nil {
-				writeJSONError(w, fmt.Sprintf("Invalid web origin: %s", val), "VALIDATION_ERROR", http.StatusBadRequest)
+			origin, ok := urlutil.CanonicalOrigin(val)
+			if !ok {
+				writeJSONError(w, fmt.Sprintf("Invalid web origin: %s. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero.", val), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			if parsed.Scheme != "http" && parsed.Scheme != "https" {
-				writeJSONError(w, "Web origin must use http or https scheme", "VALIDATION_ERROR", http.StatusBadRequest)
+			if len(origin) > maxWebOriginLength {
+				writeJSONError(w, fmt.Sprintf("Web origin is too long (%d characters, the maximum is %d): %s", len(origin), maxWebOriginLength, origin), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			// Normalize to lowercase for storage and uniqueness
-			lower := strings.ToLower(val)
-			if _, exists := seen[lower]; exists {
+			if _, exists := seen[origin]; exists {
 				writeJSONError(w, "Duplicate web origins are not allowed", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			seen[lower] = struct{}{}
-			normalized = append(normalized, lower)
+			seen[origin] = struct{}{}
+			normalized = append(normalized, origin)
+		}
+
+		// The whole replacement is one transaction, on the sequence
+		// updateClientNotOwningAuthenticationMode uses a few hundred lines up. Two things go
+		// wrong without it. A failure part way through commits half a list under a 500, so an
+		// administrator removing a compromised origin and adding its replacement can end up with
+		// neither or with only the removal, and the response says the save failed either way.
+		// And two administrators saving different lists at once each read the same current list
+		// and each write their own diff of it, producing the union of the two rather than one of
+		// them. AcquireClientRow before the read is what serializes the second case (#250).
+		tx, err := database.BeginTransaction()
+		if err != nil {
+			slog.Error("AuthServer API: Database error beginning transaction for web origins update", "error", err, "clientId", client.Id)
+			writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
+		}
+		defer database.RollbackTransaction(tx) //nolint:errcheck
+
+		if err := database.AcquireClientRow(tx, client.Id); err != nil {
+			slog.Error("AuthServer API: Database error acquiring client row for web origins update", "error", err, "clientId", client.Id)
+			writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
 		}
 
 		// Load existing web origins
-		if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+		if err := database.ClientLoadWebOrigins(tx, client); err != nil {
 			slog.Error("AuthServer API: Database error loading client web origins before update", "error", err, "clientId", client.Id)
 			writeJSONError(w, "Failed to load client web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
 
+		// The stored value is already canonical, migration 000034 having repaired the rows
+		// written before this endpoint canonicalized, so it is keyed as it stands rather than
+		// lowercased again on the way past.
 		existingSet := make(map[string]int64)
 		for _, wo := range client.WebOrigins {
-			existingSet[strings.ToLower(wo.Origin)] = wo.Id
+			existingSet[wo.Origin] = wo.Id
 		}
 
 		desiredSet := seen
@@ -1099,7 +1144,7 @@ func HandleAPIClientWebOriginsPut(
 		// Add new origins
 		for _, origin := range normalized {
 			if _, ok := existingSet[origin]; !ok {
-				if err := database.CreateWebOrigin(nil, &models.WebOrigin{ClientId: client.Id, Origin: origin}); err != nil {
+				if err := database.CreateWebOrigin(tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); err != nil {
 					slog.Error("AuthServer API: Database error creating web origin", "error", err, "clientId", client.Id, "origin", origin)
 					writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
 					return
@@ -1110,12 +1155,18 @@ func HandleAPIClientWebOriginsPut(
 		// Delete removed origins
 		for origin, wid := range existingSet {
 			if _, ok := desiredSet[origin]; !ok {
-				if err := database.DeleteWebOrigin(nil, wid); err != nil {
+				if err := database.DeleteWebOrigin(tx, wid); err != nil {
 					slog.Error("AuthServer API: Database error deleting web origin", "error", err, "clientId", client.Id, "origin", origin)
 					writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
 					return
 				}
 			}
+		}
+
+		if err := database.CommitTransaction(tx); err != nil {
+			slog.Error("AuthServer API: Database error committing web origins update", "error", err, "clientId", client.Id)
+			writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
 		}
 
 		// Reload related fields for response consistency
