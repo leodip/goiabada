@@ -95,6 +95,12 @@ func TestCanonicalOrigin_Converts(t *testing.T) {
 		{"http://255.255.255.255", "http://255.255.255.255"},
 		{"http://8.8.8.8:53", "http://8.8.8.8:53"},
 
+		// the near miss of the refusal table's "ends in an IPv4 number" family: a last label
+		// that opens with 0x is a hexadecimal number only while every digit after it is one,
+		// and is an ordinary domain served verbatim the moment a single digit is not
+		{"http://example.0xzz", "http://example.0xzz"},
+		{"http://example.0x1f2g", "http://example.0x1f2g"},
+
 		// the port range's own boundaries
 		{"http://app.example.com:1", "http://app.example.com:1"},
 		{"http://app.example.com:0", "http://app.example.com:0"},

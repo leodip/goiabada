@@ -87,10 +87,16 @@ func CanonicalOrigin(raw string) (string, bool) {
 	out := scheme + "://" + host
 	// A browser omits the default port, so storing it is storing a value the header never
 	// carries.
-	if hasPort && !((scheme == "http" && port == "80") || (scheme == "https" && port == "443")) {
+	if hasPort && !isDefaultPort(scheme, port) {
 		out += ":" + port
 	}
 	return out, true
+}
+
+// isDefaultPort reports whether port is the one scheme already implies, which is the case a
+// browser leaves out of the Origin header entirely.
+func isDefaultPort(scheme, port string) bool {
+	return (scheme == "http" && port == "80") || (scheme == "https" && port == "443")
 }
 
 // isCanonicalPort reports whether port is the exact decimal a browser would serialize: no
@@ -150,7 +156,8 @@ func isCanonicalHost(host string) bool {
 		return isDottedQuad(host)
 	}
 	for i, label := range labels {
-		if label == "" && !(i > 0 && i == len(labels)-1) {
+		isTrailingDot := i > 0 && i == len(labels)-1
+		if label == "" && !isTrailingDot {
 			return false
 		}
 	}
@@ -171,12 +178,17 @@ func endsInIPv4Number(label string) bool {
 		return false
 	}
 	for i := len("0x"); i < len(label); i++ {
-		c := label[i]
-		if !(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f') {
+		if !isLowerHexDigit(label[i]) {
 			return false
 		}
 	}
 	return true
+}
+
+// isLowerHexDigit reports whether c is a hexadecimal digit as it appears in an already
+// lowercased host, so 'A' to 'F' are deliberately absent.
+func isLowerHexDigit(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
 }
 
 // isDottedQuad reports whether host is already the form a browser serializes an IPv4 address
