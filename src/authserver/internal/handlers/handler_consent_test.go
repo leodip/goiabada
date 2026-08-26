@@ -1180,6 +1180,212 @@ func TestHandleConsentPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
+	// The refusal above answers the client by redirect, so it has the same two failure modes every
+	// other refusal in this file pins: the clear can fail, and the response can fail to be
+	// produced. The "User cancels consent" and "No consent given" blocks each run that triple; the
+	// refusal #241 added landed with none of it, and three mutations against the whole authserver
+	// internal tier survived to prove it: server_error swapped for access_denied in the fallback,
+	// and each of the two 500s deleted.
+	t.Run("A selection the filter empties, failing clear - server_error to the client", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("consent0", "backend:read")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			CeremonyId:   testCeremonyId,
+			UserId:       1,
+			ClientId:     "test-client",
+			Scope:        "backend:read",
+			ResponseMode: "query",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		user := &models.User{Id: 1}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "backend:read", user).
+			Return("", nil)
+
+		// A failed clear writes no cookie, so the browser keeps the auth context whatever happens
+		// next. The client is still owed its error response, and server_error is what RFC 6749
+		// 4.1.2.1 mints for a fault that cannot travel as a 500.
+		authHelper.On("ClearAuthContext", rr, req).
+			Return(errors.New("the session store is unreachable"))
+
+		handler.ServeHTTP(rr, req)
+
+		// No InternalServerError expectation, so a bare 500 fails the mock rather than passing
+		// silently the way it would if the client were simply left unanswered.
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Result().Header.Get("Location")
+		assert.Contains(t, location, "error=server_error")
+		assert.Contains(t, location, "error_description=Internal+server+error")
+		assert.NotContains(t, location, "access_denied",
+			"the ordinary refusal's code must not stand in for one the server could not complete")
+
+		// Still no consent row read and none written: a failed clear does not turn the refusal
+		// into a grant. The mock enforces it by having no expectation for either call.
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("A selection the filter empties, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
+		// redirToClientWithError returns "unable to parse template" instead of committing.
+		// form_post is the only response mode whose arm can fail after the redirect URI has been
+		// validated, so it is how this branch is reached at all.
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("consent0", "backend:read")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			CeremonyId:   testCeremonyId,
+			UserId:       1,
+			ClientId:     "test-client",
+			Scope:        "backend:read",
+			ResponseMode: "form_post",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		user := &models.User{Id: 1}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "backend:read", user).
+			Return("", nil)
+
+		authHelper.On("ClearAuthContext", rr, req).
+			Return(errors.New("the session store is unreachable"))
+
+		// The clear failed and the server_error response the client is owed cannot be built
+		// either, so there is nowhere left to send it. Without this expectation the handler would
+		// answer nothing at all and the case would still pass.
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err != nil && strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("A selection the filter empties, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("consent0", "backend:read")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			CeremonyId:   testCeremonyId,
+			UserId:       1,
+			ClientId:     "test-client",
+			Scope:        "backend:read",
+			ResponseMode: "form_post",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		user := &models.User{Id: 1}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "backend:read", user).
+			Return("", nil)
+
+		// The other half of the same family: here the clear succeeds and it is the ordinary
+		// access_denied refusal that cannot be committed. This is the site's second and separate
+		// 500, pinned on its own so a future edit cannot delete either copy unnoticed.
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err != nil && strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
 	t.Run("No consent given", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
