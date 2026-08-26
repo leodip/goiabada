@@ -42,6 +42,27 @@ import (
 // browser. Each of those keeps its assertions exactly as written and is handed a session here,
 // rather than being retargeted at the login page and losing the coverage it exists for
 // (#213 decision 6).
+// stubRegisteredRedirectURI gives a ceremony's client the registrations the error emitter now reads
+// before it will emit anything.
+//
+// Since #241 decision 11, redirectWillBeEmitted weighs the destination against what the client has
+// registered right now, not only against where the URI came from and whether it names a host. Every
+// test below that asserts the SHAPE of an error redirect is asserting what a client receives, which
+// is orthogonal to whether an administrator has since deleted the callback, so each is handed its
+// own registration here and keeps its assertions exactly as written. It is the same move
+// stubAuthenticatedBrowser made for #213's session requirement, and for the same reason.
+//
+// The gate's own answers are TestRedirectWillBeEmitted's table, which owns every one of them.
+// Nothing here asserts the gate; this is the fixture that lets the cases about something else stay
+// about that something else.
+func stubRegisteredRedirectURI(database *mocks_data.Database, registered ...string) {
+	uris := make([]models.RedirectURI, 0, len(registered))
+	for _, uri := range registered {
+		uris = append(uris, models.RedirectURI{URI: uri})
+	}
+	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).Return(uris, nil)
+}
+
 func stubAuthenticatedBrowser(database *mocks_data.Database, userSessionManager *mocks_user.UserSessionManager) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
 		Return(&models.UserSession{Id: 1, UserId: 1}, nil)
@@ -55,6 +76,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -143,6 +165,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -326,6 +349,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -430,6 +454,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -488,6 +513,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -556,6 +582,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -613,6 +640,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -680,6 +708,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -742,6 +771,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -849,6 +879,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -932,6 +963,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1004,6 +1036,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1078,6 +1111,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1147,6 +1181,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1212,6 +1247,27 @@ func TestHandleAuthorizeGet(t *testing.T) {
 func stubClientProvenanceLookup(database *mocks_data.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything).
 		Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+}
+
+// testRegisteredDatabase gives the emitter's registration gate a client whose current
+// registrations are the URIs named, which is what every case below that asserts a Location: needs
+// since #241 decision 11: the gate reads them and withholds the redirect when the destination is
+// not among them.
+//
+// It is deliberately the ONLY expectation on the mock. A case that reaches the emitter and does not
+// reach this read is a case where one of the two older gates refused first, and those are handed a
+// bare mocks_data.NewDatabase(t) instead, so a gate reordered above the read fails loudly rather
+// than passing on a stub that answers everything.
+func testRegisteredDatabase(t *testing.T, registered ...string) *mocks_data.Database {
+	database := mocks_data.NewDatabase(t)
+
+	uris := make([]models.RedirectURI, 0, len(registered))
+	for _, uri := range registered {
+		uris = append(uris, models.RedirectURI{URI: uri})
+	}
+	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).Return(uris, nil)
+
+	return database
 }
 
 // testRedirectError builds the input the cases below vary, naming an administrator-created client.
@@ -1282,7 +1338,7 @@ func TestRedirToClientWithError_QueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, nil, testRedirectError("invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code"))
+	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1293,7 +1349,7 @@ func TestRedirToClientWithError_FragmentResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, nil, testRedirectError("unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code"))
+	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1314,7 +1370,7 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 		},
 	}
 
-	err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code"))
+	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -1345,7 +1401,7 @@ func TestRedirToClientWithError_FormPostExecutionFailureLeavesResponseUncommitte
 		},
 	}
 
-	err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("server_error", "Internal server error",
+	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("server_error", "Internal server error",
 		"form_post", "https://example.com/callback", "def456", "code"))
 
 	require.Error(t, err)
@@ -1373,7 +1429,7 @@ func TestRedirToClientWithError_FormPostWriteFailureIsReported(t *testing.T) {
 		},
 	}
 
-	err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("server_error", "Internal server error",
+	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("server_error", "Internal server error",
 		"form_post", "https://example.com/callback", "def456", "code"))
 
 	require.Error(t, err)
@@ -1384,7 +1440,7 @@ func TestRedirToClientWithError_DefaultToQueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, nil, testRedirectError("server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code"))
+	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1410,7 +1466,7 @@ func TestRedirToClientWithError_ImplicitFlow_DefaultsToFragment(t *testing.T) {
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
 			// No response_mode specified, should default to fragment for implicit flow
-			err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
+			err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
 
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusFound, w.Code)
@@ -1429,7 +1485,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token"))
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -1450,7 +1506,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 			},
 		}
 
-		err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token"))
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -1476,7 +1532,7 @@ func TestRedirToClientWithError_HybridFlow_UsesQuery(t *testing.T) {
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
 			// No response_mode specified, should default to query for hybrid flow (contains code)
-			err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
+			err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
 
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusFound, w.Code)
@@ -1501,7 +1557,7 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "", "code"))
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "", "code"))
 
 		require.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -1512,7 +1568,7 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token"))
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#error=access_denied&error_description=Access+denied&state=+++",
@@ -1536,7 +1592,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", "code"))
 
 		require.NoError(t, err)
@@ -1553,7 +1609,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		// The retention half of the fix, which has nothing to do with state. url.Query discards
 		// ParseQuery's error, so this field used to be deleted outright and the client was sent to
 		// a URI it had not registered.
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?lang=en;mode=dark"), nil, nil, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?lang=en;mode=dark", "abc123", "code"))
 
 		require.NoError(t, err)
@@ -1568,7 +1624,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		// The two branches construct differently and that difference is observable here: a
 		// registered "state=fixed" in the query is NOT replaced, because the response parameters
 		// are going into the fragment and the query is not the field list being written.
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil, testRedirectError("access_denied", "Access denied",
 			"fragment", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", "token"))
 
 		require.NoError(t, err)
@@ -1583,7 +1639,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?state=fixed&lang=en", "", "code"))
 
 		require.NoError(t, err)
@@ -1597,7 +1653,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?code=stale&lang=en"), nil, nil, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?code=stale&lang=en", "client-csrf-token", "code"))
 
 		require.NoError(t, err)
@@ -1620,7 +1676,7 @@ func TestRedirToClientWithError_ByteExactState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback", state, "code"))
 
 		require.NoError(t, err)
@@ -1632,7 +1688,7 @@ func TestRedirToClientWithError_ByteExactState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, nil, nil, testRedirectError("access_denied", "Access denied",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied",
 			"fragment", "https://example.com/callback", state, "token"))
 
 		require.NoError(t, err)
@@ -1652,7 +1708,7 @@ func TestRedirToClientWithError_ByteExactState(t *testing.T) {
 			},
 		}
 
-		err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied",
 			"form_post", "https://example.com/callback", state, "code"))
 
 		require.NoError(t, err)
@@ -1679,7 +1735,7 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 			},
 		}
 
-		err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("access_denied", "Access denied",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied",
 			"form_post", "https://example.com/callback", "abc123", "code"))
 
 		require.NoError(t, err)
@@ -1701,7 +1757,7 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 			},
 		}
 
-		err := redirToClientWithError(w, r, nil, templateFS, testRedirectError("server_error", "Internal server error",
+		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("server_error", "Internal server error",
 			"form_post", "https://example.com/callback", "abc123", "code"))
 
 		require.Error(t, err)
@@ -1773,8 +1829,7 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 					return data["destination"] == tc.destination
 				})).Return(nil)
 
-			err := redirToClientWithError(w, r, httpHelper, nil,
-				testRedirectError("access_denied", "Access denied", "query", tc.redirectURI, "abc123", "code"))
+			err := redirToClientWithError(w, r, mocks_data.NewDatabase(t), httpHelper, nil, testRedirectError("access_denied", "Access denied", "query", tc.redirectURI, "abc123", "code"))
 
 			require.NoError(t, err)
 			assert.Empty(t, w.Header().Get("Location"), "a withheld redirect must never become a Location: %s", tc.why)
@@ -1787,28 +1842,72 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 // leave the server", and it now has two readers: the emitter, which withholds the redirect and
 // renders the interstitial, and the handler, which asks the same question earlier to decide whether
 // anything has to be authenticated first. Two call sites that must agree is exactly the shape a
-// later edit gets out of step, so the provenance and emittability table lives here, once, and the
-// handler-level tests stay thin on purpose.
+// later edit gets out of step, so the provenance, emittability and registration table lives here,
+// once, and the handler-level tests stay thin on purpose. It is also why #241 decision 11 put its
+// registration check in this predicate rather than at the seven sites that answer a client from a
+// ceremony in progress: seven copies of a security gate is seven chances for one of them to be
+// forgotten.
 //
 // Every negative varies exactly one thing from the accepted row, so none of them can pass with all
-// the gates removed (#108, #122, #213).
+// the gates removed (#108, #122, #213, #241).
+//
+// The database is the row's own, and its ABSENCE is an assertion. A row whose gate refuses before
+// the registration read is handed a mocks_data.NewDatabase(t) carrying no expectation at all, so a
+// read that happens anyway fails the case instead of being absorbed by a permissive stub. That is
+// the ordering claim, and it is a claim about this function rather than about the database: the two
+// older gates cost nothing and the third costs a query, so the cheap refusals must stay above it.
 func TestRedirectWillBeEmitted(t *testing.T) {
+	// registeredDatabase answers the registration read with the URIs given. Declared here rather
+	// than reused from testRegisteredDatabase because these rows need the empty list too, and an
+	// empty variadic call reads as "no registrations" in one place and "no expectation" in the
+	// other; saying which is meant is the point of the whole table.
+	registeredDatabase := func(t *testing.T, registered ...string) *mocks_data.Database {
+		database := mocks_data.NewDatabase(t)
+
+		uris := make([]models.RedirectURI, 0, len(registered))
+		for _, uri := range registered {
+			uris = append(uris, models.RedirectURI{URI: uri})
+		}
+		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).Return(uris, nil)
+
+		return database
+	}
+
+	// The rows whose gate refuses above the read use this: a mock with no expectation, so a call
+	// that reaches it fails the case.
+	noReadExpected := func(t *testing.T) *mocks_data.Database {
+		return mocks_data.NewDatabase(t)
+	}
+
+	failingDatabase := func(t *testing.T) *mocks_data.Database {
+		database := mocks_data.NewDatabase(t)
+		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+			Return(nil, errors.New("the database is unavailable"))
+		return database
+	}
+
 	for _, tc := range []struct {
 		name        string
+		database    func(t *testing.T) *mocks_data.Database
 		client      *models.Client
 		redirectURI string
 		want        bool
 		why         string
 	}{
 		{
-			name:        "administrator-registered client with an absolute redirect URI",
+			name: "administrator-registered client with an absolute, registered redirect URI",
+			database: func(t *testing.T) *mocks_data.Database {
+				return registeredDatabase(t, "https://legit.example/cb")
+			},
 			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
 			redirectURI: "https://legit.example/cb",
 			want:        true,
-			why:         "a human vetted this redirect URI at registration, so RFC 9700 4.11.2's trust question is answered",
+			why:         "a human vetted this redirect URI at registration and the client still holds it, so all three gates are answered",
 		},
 		{
-			name:        "self-registered client",
+			name: "self-registered client",
+			// No expectation: the provenance gate refuses above the read.
+			database:    noReadExpected,
 			client:      &models.Client{ClientIdentifier: "dcr-client", CreatedViaDCR: true},
 			redirectURI: "https://legit.example/cb",
 			want:        false,
@@ -1816,23 +1915,73 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 		{
 			name:        "unresolved client",
+			database:    noReadExpected,
 			client:      nil,
 			redirectURI: "https://legit.example/cb",
 			want:        false,
 			why: "the provenance gate again. nil means the handler could not find out where the redirect URI " +
-				"came from, and that is the untrusted case rather than an exempt one (#108)",
+				"came from, and that is the untrusted case rather than an exempt one (#108). There is also no " +
+				"client id to read registrations for, so the read could not happen even if the order changed",
 		},
 		{
-			name:        "administrator-registered client with an unemittable redirect URI",
+			name: "administrator-registered client with an unemittable redirect URI",
+			// No expectation: the emittability gate refuses above the read.
+			database:    noReadExpected,
 			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
 			redirectURI: "//evil.example/cb",
 			want:        false,
 			why: "the emittability gate: provenance passes and the string still cannot name the host it " +
 				"appears to, which is the row an old client can hold and the gate above cannot cover (#122)",
 		},
+		{
+			name: "registered redirect URI deleted from the client",
+			database: func(t *testing.T) *mocks_data.Database {
+				return registeredDatabase(t, "https://other.example/cb")
+			},
+			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI: "https://legit.example/cb",
+			want:        false,
+			why: "the registration gate. Provenance and emittability both pass, exactly as they did when the " +
+				"ceremony began, and the only thing that changed is that an administrator deleted this " +
+				"callback while it ran (#241 decision 11)",
+		},
+		{
+			name: "client with no registrations at all",
+			database: func(t *testing.T) *mocks_data.Database {
+				return registeredDatabase(t)
+			},
+			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI: "https://legit.example/cb",
+			want:        false,
+			why: "an empty list covers nothing, and this is the shape a client whose last callback was " +
+				"removed actually has. RedirectURIIsRegistered answers false on it rather than treating " +
+				"\"nothing registered\" as \"no restriction\"",
+		},
+		{
+			name:        "registration read fails",
+			database:    failingDatabase,
+			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI: "https://legit.example/cb",
+			want:        false,
+			why: "an unresolved registration is the untrusted case, matching clientProvenance: the caller is " +
+				"already answering an error, so a failed lookup withholds the redirect rather than turning a " +
+				"working refusal into a 500",
+		},
+		{
+			name: "loopback port flexibility is NOT granted here",
+			database: func(t *testing.T) *mocks_data.Database {
+				return registeredDatabase(t, "http://127.0.0.1/cb")
+			},
+			client:      &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			redirectURI: "http://127.0.0.1:49152/cb",
+			want:        false,
+			why: "the flag this caller passes is false. RFC 8252 port flexibility exists so a native app's " +
+				"ephemeral port can match on a CODE request, and an error redirect carries no code, so this " +
+				"gate is deliberately stricter than the one at /auth/authorize (#41, #241)",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := redirectWillBeEmitted(tc.client, tc.redirectURI, "TestRedirectWillBeEmitted")
+			got := redirectWillBeEmitted(tc.database(t), tc.client, tc.redirectURI, "TestRedirectWillBeEmitted")
 
 			assert.Equal(t, tc.want, got, tc.why)
 		})
@@ -1845,6 +1994,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1919,6 +2069,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1987,6 +2138,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -2050,6 +2202,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -2121,6 +2274,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2183,6 +2337,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2252,6 +2407,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2320,6 +2476,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2411,6 +2568,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2502,6 +2660,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2708,6 +2867,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2809,6 +2969,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2903,6 +3064,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -2998,6 +3160,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3094,6 +3257,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3143,6 +3307,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3191,6 +3356,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3411,9 +3577,17 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest))
 
+			// Maybe, for the reason the session lookup below is Maybe: the registration read is
+			// the third gate inside redirectWillBeEmitted, so the DCR rows and the unemittable-URI
+			// row are refused above it and never query. The rows that do reach it hold their own
+			// destination registered, which is what keeps them about the routing they are named
+			// for rather than about a deleted callback (#241 decision 11).
+			database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+				Return([]models.RedirectURI{{URI: tc.redirectURI}}, nil).Maybe()
+
 			// Maybe, because whether the session is looked up at all is the point of half these
-			// rows: the two pure clauses are evaluated first, so a request that is silent, or whose
-			// redirect would be withheld anyway, never queries.
+			// rows: the clauses that read nothing are evaluated first, so a request that is
+			// silent, or whose redirect would be withheld anyway, never queries.
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
 				Return(&models.UserSession{Id: 1, UserId: 1}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
@@ -3488,6 +3662,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 			userSessionManager := mocks_user.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
+			stubRegisteredRedirectURI(database, "https://legit.example/cb")
 			authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -3570,6 +3745,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 	userSessionManager := mocks_user.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
+	stubRegisteredRedirectURI(database, "https://legit.example/cb")
 	authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	permissionChecker := mocks_user.NewPermissionChecker(t)

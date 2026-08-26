@@ -23,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -307,11 +308,14 @@ func HandleAuthorizeGet(
 		//   - !requestsLogin && hasValidUserSession(): a session holder has authenticated already,
 		//     unless the client asked not to be answered on the strength of one (decision 4).
 		//
-		// The two pure clauses are evaluated first so the impure one is reached only when it
-		// decides something: || short-circuits and redirectWillBeEmitted has no side effects, so
-		// the value is identical to the order §4 wrote and only the queries differ.
+		// The two clauses that read nothing are evaluated first so the one that does is reached
+		// only when it decides something: || short-circuits, and what redirectWillBeEmitted does
+		// is read, so skipping it changes no state and the value is identical to the order §4
+		// wrote. Only the queries differ. It stopped being side-effect free when it gained the
+		// registration gate (#241 decision 11), and the ordering argument rests on the read being
+		// a read rather than on the predicate being pure.
 		answerClientNow := requestsSilence ||
-			!redirectWillBeEmitted(client, authContext.RedirectURI, "authorize") ||
+			!redirectWillBeEmitted(database, client, authContext.RedirectURI, "authorize") ||
 			(!requestsLogin && hasValidUserSession())
 
 		if sessionLoadErr != nil {
@@ -327,7 +331,7 @@ func HandleAuthorizeGet(
 		// clears the context before answering, and derives its own server_error fallback
 		// from this same request-sourced input (#141).
 		answerClientImmediately := func(validationError *customerrors.ErrorDetail) {
-			answerClientWithError(w, r, httpHelper, authHelper, templateFS,
+			answerClientWithError(w, r, database, httpHelper, authHelper, templateFS,
 				redirectErrorFromRequest(r, client,
 					validationError.GetCode(), validationError.GetDescription()))
 		}
@@ -595,7 +599,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	// as "retry later" rather than "start an interactive login", which on a genuine server fault
 	// is the accurate instruction of the two.
 	redirectWithError := func(errorCode string, errorDescription string) {
-		answerClientWithError(w, r, httpHelper, authHelper, templateFS,
+		answerClientWithError(w, r, database, httpHelper, authHelper, templateFS,
 			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
 	}
 
@@ -849,8 +853,8 @@ func redirectErrorFromRequest(r *http.Request, client *models.Client,
 // server_error for exactly this condition (#141). The fallback is the caller's own input with its
 // code and description swapped, so each call site keeps the parameter source it built the input
 // from and neither has to restate it.
-func answerClientWithError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper,
-	authHelper AuthHelper, templateFS fs.FS, input redirectErrorInput) {
+func answerClientWithError(w http.ResponseWriter, r *http.Request, database data.Database,
+	httpHelper HttpHelper, authHelper AuthHelper, templateFS fs.FS, input redirectErrorInput) {
 
 	err := authHelper.ClearAuthContext(w, r)
 	if err != nil {
@@ -862,7 +866,7 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, httpHelper Ht
 		fallback.code = "server_error"
 		fallback.description = "Internal server error"
 
-		err = redirToClientWithError(w, r, httpHelper, templateFS, fallback)
+		err = redirToClientWithError(w, r, database, httpHelper, templateFS, fallback)
 		if err != nil {
 			// Nowhere left to send the client, so the 500 is the last resort here.
 			httpHelper.InternalServerError(w, r, err)
@@ -870,7 +874,7 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, httpHelper Ht
 		return
 	}
 
-	err = redirToClientWithError(w, r, httpHelper, templateFS, input)
+	err = redirToClientWithError(w, r, database, httpHelper, templateFS, input)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return
@@ -896,7 +900,7 @@ func clientProvenance(database data.Database, clientIdentifier string) *models.C
 
 // redirectWillBeEmitted answers whether an error response to this client would actually leave the
 // server as a redirect, or whether it would be withheld and replaced by the refusal interstitial.
-// It is the two gates below, asked as one question, so the callers that need the answer BEFORE
+// It is the three gates below, asked as one question, so the callers that need the answer BEFORE
 // building a response and the emitter that enforces it at the last moment cannot drift apart.
 //
 // site names the caller for the log line inside checkRedirectURIEmittable, which records where a
@@ -933,7 +937,30 @@ func clientProvenance(database data.Database, clientIdentifier string) *models.C
 // provenance test and can still hold a row stored before these rules existed, which is the case
 // the gate above cannot cover and this one does. Unreachable once the authorization endpoint has
 // refused the URI, and kept so that a test enforces it (#122).
-func redirectWillBeEmitted(client *models.Client, redirectURI string, site string) bool {
+//
+// The registration gate, last of the three and the only one that reads anything. The two above
+// weigh the redirect URI as it was stored when the ceremony began; this one weighs it against what
+// the client has registered right now. An authorization ceremony can sit on the consent screen for
+// as long as a person takes to read it, and an administrator who deletes a callback in that window
+// expects the deletion to reach the sign-in already running. Without this gate it reaches only what
+// /auth/issue mints: six other places answer the client from a ceremony in progress, every one of
+// them an error redirect, and every one of them navigates the browser to the URI stored at the
+// start. Delivering one to a host the operator has just disowned is RFC 9700 section 4.11.2's harm
+// whichever of the seven sites produced it, which is why the check lives in the one predicate they
+// share rather than at each of them: a registration test copied to every site is the shape a later
+// edit gets out of step (#241 decision 11).
+//
+// The flag to RedirectURIIsRegistered is FALSE. Loopback port flexibility exists so that a native
+// app's ephemeral port can match a registered portless URI on a code request, and an error redirect
+// carries no code, so this gate is deliberately stricter than the one the stored value passed at
+// /auth/authorize. Each caller supplies the flag from what it knows, per urlutil's package contract
+// (#41), and what this caller knows is that nothing it admits will carry a code.
+//
+// A failed load answers no, matching clientProvenance above and for the reason that function
+// states: every caller is already on its way to returning an error response, so a lookup that fails
+// must not turn a refusal that works today into a 500, and an unresolved registration is the
+// untrusted case rather than an exempt one.
+func redirectWillBeEmitted(database data.Database, client *models.Client, redirectURI string, site string) bool {
 	if client == nil || client.CreatedViaDCR {
 		return false
 	}
@@ -942,10 +969,31 @@ func redirectWillBeEmitted(client *models.Client, redirectURI string, site strin
 		return false
 	}
 
+	redirectURIs, err := database.GetRedirectURIsByClientId(nil, client.Id)
+	if err != nil {
+		// The client identifier is a bounded stored value and is safe to log; the URI is not,
+		// matching checkRedirectURIEmittable, which records where a refusal happened and
+		// deliberately never records the value (#159).
+		slog.Error("unable to load the client's redirect URIs while answering it with an error, withholding the redirect",
+			"clientIdentifier", client.ClientIdentifier, "site", site, "error", err)
+		return false
+	}
+
+	registered := make([]string, 0, len(redirectURIs))
+	for _, uri := range redirectURIs {
+		registered = append(registered, uri.URI)
+	}
+
+	if !urlutil.RedirectURIIsRegistered(registered, redirectURI, false) {
+		slog.Warn("the redirect URI this client would be answered at is no longer registered on it, so the redirect is withheld",
+			"clientIdentifier", client.ClientIdentifier, "site", site)
+		return false
+	}
+
 	return true
 }
 
-func redirToClientWithError(w http.ResponseWriter, r *http.Request,
+func redirToClientWithError(w http.ResponseWriter, r *http.Request, database data.Database,
 	httpHelper HttpHelper, templateFS fs.FS, input redirectErrorInput) error {
 
 	// Gates 3 and 4, both of them, asked through the one predicate so this emitter and the callers
@@ -957,7 +1005,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request,
 	// written and no route is added, so there is nothing here for an attacker to drive. The
 	// interstitial names the destination and the authorization stops, rather than this server
 	// forwarding a browser to a host of somebody else's choosing on a request it just refused.
-	if !redirectWillBeEmitted(input.client, input.redirectURI, "redirToClientWithError") {
+	if !redirectWillBeEmitted(database, input.client, input.redirectURI, "redirToClientWithError") {
 		return renderRedirectBlocked(httpHelper, w, r, input)
 	}
 

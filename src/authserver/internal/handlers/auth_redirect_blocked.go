@@ -6,8 +6,15 @@ import (
 )
 
 // This file is the refusal interstitial: the page a user is shown instead of being redirected to a
-// client that registered itself. redirToClientWithError decides when it renders; everything here is
-// what it renders and the pure function behind the one thing on it a user can act on.
+// destination this server will not send them to. redirToClientWithError decides when it renders;
+// everything here is what it renders and the pure function behind the one thing on it a user can
+// act on.
+//
+// There are three such destinations, and redirectWillBeEmitted holds all three: one a client
+// registered for itself (#108), one whose stored string cannot name the host it appears to (#122),
+// and one the client no longer has registered at all (#241). The page is the same for each,
+// because what it tells the person in front of it is the same: the authorization stopped here and
+// nothing was sent anywhere.
 //
 // RFC 9700 section 4.11.2 describes the attacks it answers, and it lists three. An attacker
 // registers a client anonymously, pointing its redirect URI at a host it controls, and then either

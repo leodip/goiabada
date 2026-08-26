@@ -339,3 +339,47 @@ func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
 	assert.NotContains(t, replayLocation, parked.redirectURI.URI,
 		"a cleared ceremony must not reach the deregistered callback on a replay either")
 }
+
+// TestRedirectURIDeletedOnConsentScreen_CancelIsNotDeliveredEither is the same deletion answered by
+// a different door, and it is the one #241 decision 11 was raised about.
+//
+// The case above lets the ceremony reach /auth/issue, where the gate refuses. This one never gets
+// there: the user clicks Cancel, and HandleConsentPost answers access_denied through
+// redirToClientWithError, the emitter six ceremony refusals share. Its gates weighed where the
+// redirect URI came from and whether the string names a host, both of which this client still
+// passes, so before the registration gate it answered
+// 302 Location: <deleted callback>?error=access_denied and navigated the browser to a host the
+// operator had just disowned. That is RFC 9700 section 4.11.2's harm, and an error response
+// carries it as surely as a code does.
+//
+// The two cases together are the property: whatever a ceremony in progress has to say to a client,
+// it says nothing at all to a callback the client no longer has.
+func TestRedirectURIDeletedOnConsentScreen_CancelIsNotDeliveredEither(t *testing.T) {
+	parked := parkOnConsentScreen(t, "openid profile email", gofakeit.LetterN(32), "code-verifier", nil)
+	defer func() { _ = parked.consentPage.Body.Close() }()
+
+	// The window opens before the submission here rather than after it, because this refusal is
+	// answered by the consent handler itself and never reaches another hop.
+	err := database.DeleteRedirectURI(nil, parked.redirectURI.Id)
+	assert.NoError(t, err)
+
+	// No consent indices is a Cancel, per postConsent.
+	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode,
+		"the refusal is rendered, not redirected")
+	assert.Empty(t, resp.Header.Get("Location"),
+		"a withheld redirect must never become a Location")
+
+	document := parseHTMLResponse(t, resp)
+	page := document.Text()
+	assert.Contains(t, page, "You have not been sent anywhere")
+	assert.NotContains(t, page, "error=access_denied",
+		"the refusal must not carry the error response it replaced")
+
+	deletedHost, err := url.Parse(parked.redirectURI.URI)
+	assert.NoError(t, err)
+	assert.Contains(t, page, deletedHost.Host,
+		"the page names the destination the request was stopped from reaching")
+}

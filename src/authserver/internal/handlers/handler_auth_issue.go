@@ -182,7 +182,7 @@ func HandleIssueGet(
 					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 					slog.Error("failed to clear the auth context, answering the client with server_error",
 						"error", err)
-					err = redirToClientWithError(w, r, httpHelper, templateFS,
+					err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 						redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
 					if err != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
@@ -191,7 +191,7 @@ func HandleIssueGet(
 					return
 				}
 
-				err = redirToClientWithError(w, r, httpHelper, templateFS,
+				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, issuingClient, constants.ErrorLoginRequired,
 						"The authenticated user does not match the id_token_hint"))
 				if err != nil {
@@ -353,7 +353,7 @@ func HandleIssueGet(
 					// condition (#141).
 					slog.Error("failed to clear the auth context, answering the client with server_error",
 						"error", err)
-					err = redirToClientWithError(w, r, httpHelper, templateFS,
+					err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 						redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
 					if err != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
@@ -361,7 +361,7 @@ func HandleIssueGet(
 					}
 					return
 				}
-				err = redirToClientWithError(w, r, httpHelper, templateFS,
+				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, issuingClient, constants.ErrorLoginRequired,
 						"User authentication is required"))
 				if err != nil {
@@ -459,7 +459,7 @@ func HandleIssueGet(
 				// this condition (#141).
 				slog.Error("failed to clear the auth context, answering the client with server_error",
 					"error", err)
-				err = redirToClientWithError(w, r, httpHelper, templateFS,
+				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
 				if err != nil {
 					// Nowhere left to send the client, so the 500 is the last resort here.
@@ -468,7 +468,7 @@ func HandleIssueGet(
 				return
 			}
 
-			err = redirToClientWithError(w, r, httpHelper, templateFS,
+			err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied",
 					"The user is not authorized to access any of the requested scopes"))
 			if err != nil {
