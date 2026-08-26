@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
@@ -360,4 +361,138 @@ func callIndex(t *testing.T, database *mocks_data.Database, method string) int {
 	}
 	t.Fatalf("%s was never called", method)
 	return -1
+}
+
+// =============================================================================
+// HandleAPIClientWebOriginsPut
+// =============================================================================
+
+// webOriginsPutRequest builds the PUT with its chi URL parameter and body.
+func webOriginsPutRequest(t *testing.T, id string, origins []string) *http.Request {
+	t.Helper()
+	body, err := json.Marshal(api.UpdateClientWebOriginsRequest{WebOrigins: origins})
+	require.NoError(t, err)
+	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/web-origins", bytes.NewReader(body))
+	return setChiURLParam(r, "id", id)
+}
+
+// The save is one transaction, and the current list is read inside it, under the row acquisition.
+//
+// Without that, two administrators saving different lists at once each read the same current list
+// and each write their own diff of it, so the row ends up holding the union of both rather than
+// either one. That is invisible to every other tier: nothing reachable over HTTP can produce the
+// gap on its own, because each request reloads. The seam where it is visible is the handler's own
+// conversation with the database, which is what a strict mock reproduces (#250 decision 15).
+//
+// The flow gate is gone as well, and this client says so: AuthorizationCodeEnabled is false, which
+// used to be refused with a 400 before the body was even read.
+func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisition(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	client := &models.Client{Id: 7, AuthorizationCodeEnabled: false}
+	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
+
+	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) {
+			args.Get(1).(*models.Client).WebOrigins = []models.WebOrigin{
+				{Id: 11, ClientId: 7, Origin: "https://old.example.com"},
+			}
+		}).Return(nil).Once()
+
+	var created string
+	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { created = args.Get(1).(*models.WebOrigin).Origin }).Return(nil).Once()
+	database.On("DeleteWebOrigin", clientUpdateTx, int64(11)).Return(nil).Once()
+	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
+	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
+	stubClientResponseLoads(database)
+
+	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
+	auditLogger.On("Log", constants.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
+
+	rr := httptest.NewRecorder()
+	handler := HandleAPIClientWebOriginsPut(httpHelper, authHelper, database, auditLogger)
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://new.example.com"}))
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "https://new.example.com", created)
+	database.AssertExpectations(t)
+
+	// The read is inside the transaction that writes, and after the acquisition. Reading it on
+	// nil, or before AcquireClientRow, is what lets the concurrent save above interleave: the
+	// tx identity above already pins the first half, and the order pins the second.
+	assert.Less(t, callIndex(t, database, "AcquireClientRow"), callIndex(t, database, "ClientLoadWebOrigins"))
+	assert.Less(t, callIndex(t, database, "ClientLoadWebOrigins"), callIndex(t, database, "CreateWebOrigin"))
+}
+
+// A failure part way through commits nothing. The old code wrote each insert and delete on nil,
+// so a database error on the second of three writes left the first one committed, answered 500,
+// and the administrator's list was neither what they sent nor what it was before. Removing a
+// compromised origin and adding its replacement in one save is exactly when that matters.
+//
+// CommitTransaction is deliberately absent from the strict mock: reaching it fails the test.
+func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).
+		Return(errors.New("the disk is full")).Once()
+	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleAPIClientWebOriginsPut(httpHelper, authHelper, database, auditLogger)
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	database.AssertExpectations(t)
+	database.AssertNotCalled(t, "CommitTransaction", clientUpdateTx)
+	// Nothing was audited either: an audit entry for a save that did not happen is a false
+	// record of an administrator's action.
+	auditLogger.AssertNotCalled(t, "Log", constants.AuditUpdatedWebOrigins, mock.Anything)
+}
+
+// A canonical origin longer than the column is refused rather than stored. web_origins.origin is
+// 256 characters on MySQL, PostgreSQL and SQL Server, so today this is a 500 on three engines out
+// of four and a silent success on sqlite, which is the only engine the local integration tier runs
+// (#250 decision 14b). The value here canonicalizes cleanly and is refused purely on length, which
+// is what separates this from the invalid-origin path.
+//
+// The strict mock carries GetClientById and nothing else: reaching BeginTransaction fails the test,
+// so the refusal is proved to happen before any write is attempted.
+func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+
+	// "https://" plus a host of repeated 63-character labels, canonical and over the cap.
+	label := strings.Repeat("a", 63)
+	host := label + "." + label + "." + label + "." + label
+	origin := "https://" + host
+	require.Greater(t, len(origin), maxWebOriginLength)
+
+	rr := httptest.NewRecorder()
+	handler := HandleAPIClientWebOriginsPut(httpHelper, authHelper, database, auditLogger)
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{origin}))
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "too long")
+	database.AssertExpectations(t)
+	database.AssertNotCalled(t, "BeginTransaction")
 }

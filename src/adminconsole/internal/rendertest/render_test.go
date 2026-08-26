@@ -233,3 +233,53 @@ func TestRender_AdminClientRedirectURIs(t *testing.T) {
 	// an implicit-only administrator used to be told to enable a flow their client never uses.
 	assert.Contains(t, blocked, "URIs de redirecionamento são usadas pelo fluxo authorization code com PKCE e pelo fluxo implicit.")
 }
+
+// The Web Origins page has no gate left and shows two lists: this client's editable rows, and the
+// effective server-wide list every client's origins land in. This case proves the template can
+// display what it is handed; that the handler assembles the server-wide list at all is proved in
+// handler_admin_client_web_origins_test.go, because a bind written by the test cannot see a fetch
+// that was deleted (#250).
+func TestRender_AdminClientWebOrigins(t *testing.T) {
+
+	type effectiveWebOrigin struct {
+		Origin           string
+		ClientIdentifier string
+	}
+
+	out := render(t, "/admin_clients_web_origins.html", map[string]interface{}{
+		"client": struct {
+			ClientId            int64
+			ClientIdentifier    string
+			WebOrigins          map[int64]string
+			EffectiveWebOrigins []effectiveWebOrigin
+			IsSystemLevelClient bool
+		}{
+			ClientId:         7,
+			ClientIdentifier: "a-javascript-app",
+			WebOrigins:       map[int64]string{1: "https://mine.example.com"},
+			EffectiveWebOrigins: []effectiveWebOrigin{
+				{Origin: "https://mine.example.com", ClientIdentifier: "a-javascript-app"},
+				{Origin: "https://theirs.example.com", ClientIdentifier: "another-app"},
+			},
+		},
+		"savedSuccessfully": false,
+	})
+
+	// The form renders unconditionally now. This client has the authorization code flow off,
+	// which the bind no longer even carries, and it still gets the form and the save button:
+	// needing a web origin is about the app being JavaScript in a browser, not about any flow.
+	assert.Contains(t, out, "webOriginsEnabledPanel")
+	assert.Contains(t, out, `id="btnSave"`)
+
+	// Another client's origin is visible here, and the sentence above the list says why an
+	// origin registered anywhere is honoured everywhere. Without both, the page still implies
+	// a per-client scoping the server does not honour.
+	assert.Contains(t, out, "https://theirs.example.com")
+	assert.Contains(t, out, "another-app")
+	assert.Contains(t, out, "Origens permitidas em todo o servidor")
+	assert.Contains(t, out, "é permitida para todos os clientes")
+
+	// The intro says the value is a bare origin rather than a URL, which is where the trailing
+	// slash that CORS can never match used to come from.
+	assert.Contains(t, out, "sem nada depois do host")
+}
