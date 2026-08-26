@@ -176,9 +176,9 @@
 
         <div class="w-full h-full pb-6 bg-base-100">
 
-                {{if not .client.AuthorizationCodeEnabled}}
+                {{if not .client.CanManageRedirectURIs}}
                 <div>
-                    <p>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.requires_auth_code_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.requires_auth_code_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.requires_auth_code_suffix" }}</p>
+                    <p>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.requires_redirect_flow" }}</p>
                 </div>
                 {{else}}
                 <div id="redirectURIsEnabledPanel">
@@ -240,7 +240,7 @@
                     <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.redirect_uris.saved_successfully" }}</p>
                 </div>
             {{end}}
-            {{if .client.AuthorizationCodeEnabled}}
+            {{if .client.CanManageRedirectURIs}}
                 <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary float-right">&nbsp;</span>
                 <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
             {{end}}

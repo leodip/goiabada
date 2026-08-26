@@ -653,9 +653,7 @@
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "<span class='text-accent'>Você está alterando o cliente de público para confidencial</span>. Será necessário atualizar quaisquer aplicativos que utilizem este cliente para incluir um segredo do cliente.<br /><br />Deseja prosseguir e salvar?"
 
 "adminconsole.admin_clients.redirect_uris.page_title_prefix" = "Cliente - URIs de redirecionamento - "
-"adminconsole.admin_clients.redirect_uris.requires_auth_code_prefix" = "É possível configurar URIs de redirecionamento apenas quando o fluxo "
-"adminconsole.admin_clients.redirect_uris.requires_auth_code_em" = "authorization code com PKCE"
-"adminconsole.admin_clients.redirect_uris.requires_auth_code_suffix" = " está habilitado."
+"adminconsole.admin_clients.redirect_uris.requires_redirect_flow" = "URIs de redirecionamento são usadas pelo fluxo authorization code com PKCE e pelo fluxo implicit. Habilite um deles em Fluxos OAuth2 para configurá-las aqui."
 "adminconsole.admin_clients.redirect_uris.intro_prefix" = "Aceitamos apenas "
 "adminconsole.admin_clients.redirect_uris.intro_em" = "correspondências exatas"
 "adminconsole.admin_clients.redirect_uris.intro_suffix" = " para URIs de redirecionamento; curingas não são permitidos. Uma exceção: para endereços de loopback http, qualquer porta é aceita em solicitações de código de autorização."

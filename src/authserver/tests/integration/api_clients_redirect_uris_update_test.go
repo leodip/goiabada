@@ -87,15 +87,23 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 	assert.False(t, gotDB[uriB])
 }
 
-func TestAPIClientRedirectURIsPut_AuthCodeDisabledRejected(t *testing.T) {
+// The gate asks whether the client redirects at all, so what is refused here is a client with
+// NEITHER redirect-based flow, not one that merely lacks the authorization code flow (#250).
+//
+// ImplicitGrantEnabled is set explicitly rather than left to inherit: nil would resolve against
+// the global setting, which other tests in this package turn on and restore, so an inheriting
+// fixture would make the refusal depend on what ran before it.
+func TestAPIClientRedirectURIsPut_NoRedirectFlowRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
+	implicitDisabled := false
 	client := &models.Client{
 		ClientIdentifier:         "redir-disabled-" + strings.ToLower(gofakeit.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: false,
+		ImplicitGrantEnabled:     &implicitDisabled,
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(nil, client)
@@ -112,8 +120,47 @@ func TestAPIClientRedirectURIsPut_AuthCodeDisabledRejected(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&body)
 	if body["error_description"] != nil {
 		msg := body["error_description"].(string)
-		assert.Equal(t, "Authorization code flow is disabled for this client.", msg)
+		assert.Equal(t, "Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client.", msg)
 	}
+}
+
+// An implicit-only client's callback is the one setting that makes it work, and RFC 6749 section
+// 3.1.2.2 makes registering it a MUST. Until this change the endpoint answered 400, so an
+// administrator could not add, rotate or urgently remove one without first enabling a flow the
+// client does not use (#250).
+func TestAPIClientRedirectURIsPut_ImplicitOnlyClientAllowed(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	implicitEnabled := true
+	client := &models.Client{
+		ClientIdentifier:         "redir-implicit-" + strings.ToLower(gofakeit.LetterN(8)),
+		Enabled:                  true,
+		ConsentRequired:          false,
+		IsPublic:                 true,
+		AuthorizationCodeEnabled: false,
+		ImplicitGrantEnabled:     &implicitEnabled,
+		ClientCredentialsEnabled: false,
+	}
+	err := database.CreateClient(nil, client)
+	assert.NoError(t, err)
+	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+	uri := "https://implicit-app.example.com/cb"
+	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{uri}}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var updateResp api.UpdateClientResponse
+	err = json.NewDecoder(resp.Body).Decode(&updateResp)
+	assert.NoError(t, err)
+
+	got := make([]string, 0, len(updateResp.Client.RedirectURIs))
+	for _, ru := range updateResp.Client.RedirectURIs {
+		got = append(got, ru.URI)
+	}
+	assert.Equal(t, []string{uri}, got)
 }
 
 func TestAPIClientRedirectURIsPut_SystemLevelClientAllowed(t *testing.T) {
