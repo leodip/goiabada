@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/core/config"
@@ -15,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/pkg/errors"
 )
 
@@ -26,6 +28,8 @@ func HandleIssueGet(
 	tokenIssuer TokenIssuer,
 	database data.Database,
 	auditLogger AuditLogger,
+	userSessionManager UserSessionManager,
+	permissionChecker PermissionChecker,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
@@ -46,12 +50,110 @@ func HandleIssueGet(
 			return
 		}
 
+		// The redirect URI this ceremony would be answered at has to STILL be registered on the
+		// client, and this is where that is asked. It was matched once, at /auth/authorize, and
+		// the consent screen has no bound on how long it holds a ceremony still, so an operator
+		// who deleted a callback while it sat there has an expectation this check is what meets
+		// (#241).
+		//
+		// The position is load-bearing rather than tidy. EVERY refusal below this line answers
+		// the client by redirect: the id_token_hint mismatch and the prompt=none arm of the
+		// binding check both call redirToClientWithError, and so does the empty-scope refusal.
+		// Delivering any of them to a callback the operator has just pulled navigates a browser
+		// to that host on a request this server refused, which is the RFC 9700 section 4.11.2
+		// harm the check exists to prevent. Placed first, this handler has one property worth
+		// stating: nothing in it can send a browser to an unregistered callback.
+		//
+		// The client loaded here is passed down to handleImplicitFlow, which used to load it
+		// again.
+		issuingClient, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		// Loopback port flexibility is the caller's gate to compute, per urlutil's package
+		// contract (#41), and this is validator.ValidateClientAndRedirectURI's own test applied
+		// to the stored response type. Read off the token sequence rather than off
+		// ParseResponseType's booleans for the reason stated there: the parser ignores
+		// unrecognised values and collapses duplicates, so "code code" and "code foo" are true
+		// for HasCode && !HasToken && !HasIdToken and must not buy an arbitrary loopback port.
+		responseTypes := strings.Fields(authContext.ResponseType)
+		allowLoopbackPortFlexibility := len(responseTypes) == 1 && responseTypes[0] == "code"
+
+		registered := []string{}
+		if issuingClient != nil {
+			err = database.ClientLoadRedirectURIs(nil, issuingClient)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			for _, redirectURI := range issuingClient.RedirectURIs {
+				registered = append(registered, redirectURI.URI)
+			}
+		}
+
+		// A nil client REFUSES rather than answering 500. A client deleted while its ceremony
+		// waited on the consent screen has no registrations at all, so the question this gate
+		// asks has been answered rather than errored, and renderRedirectBlocked already
+		// documents a nil client as the case it renders without a name.
+		if !urlutil.RedirectURIIsRegistered(registered, authContext.RedirectURI, allowLoopbackPortFlexibility) {
+			// The client identifier is a bounded stored value and is safe to log; the URI is
+			// not logged, matching the authorization endpoint's refusal, since the operator
+			// reads the offending value off the client's page.
+			slog.Warn("the redirect URI this ceremony would be answered at is no longer registered on the client, so nothing is issued and nothing is emitted",
+				"clientIdentifier", authContext.ClientId)
+
+			auditLogger.Log(constants.AuditIssuanceRefusedRedirectURI, map[string]interface{}{
+				"userId":   authContext.UserId,
+				"clientId": authContext.ClientId,
+			})
+
+			// The clear goes FIRST, the order every refusal in this handler uses: ClearAuthContext
+			// persists the deletion through a Set-Cookie on w, and the render below commits the
+			// response, so clearing afterwards leaves the header on a response already written
+			// (#141).
+			err = authHelper.ClearAuthContext(w, r)
+			if err != nil {
+				// This is the ONE refusal in the file whose fallback is not "answer the client
+				// with server_error". Answering this client is precisely what the gate exists to
+				// prevent, and an error redirect is a response to the deregistered URI just as a
+				// code would be. So the page is rendered regardless and the browser keeps a
+				// replayable auth context, which is the lesser of the two: a replay arrives back
+				// at this same gate and is refused again for as long as the registration is gone.
+				slog.Error("failed to clear the auth context while withholding a redirect to a deregistered URI, rendering the refusal anyway",
+					"error", err)
+			}
+
+			// Rendered locally, never redirected: this URI must receive nothing, an error
+			// response included. auth_redirect_blocked.html is the page redirToClientWithError
+			// already withholds a redirect through, so one condition keeps one page wherever it
+			// fires (#241 decision 4, as amended by decision 11).
+			//
+			// Built directly rather than through redirectErrorFromAuthContext, which fills in an
+			// error code, a description, a state and a response mode: this page carries none of
+			// them, and naming the two fields it does read says so.
+			err = renderRedirectBlocked(httpHelper, w, r, redirectErrorInput{
+				client:      issuingClient,
+				redirectURI: authContext.RedirectURI,
+			})
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
+			return
+		}
+
 		// id_token_hint sub enforcement (OIDC Core 3.1.2.2, Authentication Request Validation):
 		// "The Authorization Server MUST NOT reply with an ID Token or Access Token for a
 		// different user, even if they have an active session with the Authorization Server."
 		// This is the critical safety net that catches mismatched users even after successful authentication.
+		// Hoisted, because the scope re-filter below needs the same user and the hint check may
+		// already have loaded it. Nil here means "not loaded yet", never "no such user": the
+		// branch below refuses on a nil.
+		var user *models.User
+
 		if authContext.IdTokenHintSub != "" {
-			user, err := database.GetUserById(nil, authContext.UserId)
+			user, err = database.GetUserById(nil, authContext.UserId)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -59,10 +161,11 @@ func HandleIssueGet(
 			if user == nil || user.Subject.String() != authContext.IdTokenHintSub {
 				// Cannot issue tokens for a different user than the hint identifies.
 				//
-				// This handler issues codes and tokens rather than loading clients, so the only
-				// client load in the file sits inside handleImplicitFlow, far below and in a
-				// different function. An error redirect now carries the client it is answering, so
-				// provenance is resolved here, ahead of the dispatch (#108).
+				// An error redirect carries the client it is answering, so its provenance has to
+				// be resolved ahead of the dispatch (#108). The registration gate above already
+				// loaded it and refused a nil, so issuingClient is that client rather than a
+				// clientProvenance call of its own; before #241 this handler loaded no client at
+				// all above handleImplicitFlow and had to.
 				//
 				// The clear goes FIRST, the order the prompt=none refusal below and the success
 				// path both use. ClearAuthContext persists the deletion through a Set-Cookie on
@@ -71,8 +174,6 @@ func HandleIssueGet(
 				// the one refusal that leaves the context in ready_to_issue_code, the state that
 				// mints codes, so a browser keeping it can replay this endpoint with only the
 				// comparison above standing between the replay and a code (#141).
-				refusedClient := clientProvenance(database, authContext.ClientId)
-
 				err := authHelper.ClearAuthContext(w, r)
 				if err != nil {
 					// The clear failed, so Save wrote no cookie and the browser still holds the
@@ -82,7 +183,7 @@ func HandleIssueGet(
 					slog.Error("failed to clear the auth context, answering the client with server_error",
 						"error", err)
 					err = redirToClientWithError(w, r, httpHelper, templateFS,
-						redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
+						redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
 					if err != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
 						httpHelper.InternalServerError(w, r, err)
@@ -91,7 +192,7 @@ func HandleIssueGet(
 				}
 
 				err = redirToClientWithError(w, r, httpHelper, templateFS,
-					redirectErrorFromAuthContext(authContext, refusedClient, constants.ErrorLoginRequired,
+					redirectErrorFromAuthContext(authContext, issuingClient, constants.ErrorLoginRequired,
 						"The authenticated user does not match the id_token_hint"))
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -135,13 +236,15 @@ func HandleIssueGet(
 		// question here is ownership, and liveness is the half of it that a missing row
 		// already answers.
 		//
-		// Neither check is a validity check: they ask whether the row resolves and whose it
-		// is, and leave idle timeout and max age to /auth/completed, which has already
-		// applied them. Restarting level 1 rather than failing to the client is decision 6's
-		// answer for the same reason the gate at /auth/completed uses it, and the second
-		// pass mints a session of its own before arriving back here. It cannot loop: the
-		// second visit to /auth/completed terminates the foreign session and starts one
-		// owned by this ceremony.
+		// Since #241 the third question is validity, which the two above deliberately left to
+		// /auth/completed. That gate applies the idle timeout and the maximum lifetime once and
+		// the consent screen then holds the ceremony for however long a person takes, so a
+		// session that timed out on that screen still resolves and is still owned. Redemption
+		// does not catch it either: the authorization_code arm checks ownership and not
+		// validity, so the access token works and only the FIRST refresh answers invalid_grant,
+		// which is a confusing failure to debug from the relying party's side. All three
+		// questions take the same two answers below, so widening the predicate reuses them
+		// whole.
 		var ambientSession *models.UserSession
 		if sessionIdentifier != "" {
 			ambientSession, err = database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
@@ -160,7 +263,18 @@ func HandleIssueGet(
 		// session's owner against the token's subject (#133).
 		isImplicitFlow := oauth.ParseResponseType(authContext.ResponseType).IsImplicitFlow()
 
-		mayBind := authContext.OwnsSession(ambientSession)
+		// nil for the requested max age, and that is decision 1 rather than an omission. max_age
+		// bounds the age of the AUTHENTICATION, which this ceremony already satisfied at
+		// /auth/completed; re-applying it here would turn it into a deadline for reading the
+		// consent screen. UserSession.IsValid measures it from Started, so max_age=0 is violated
+		// a microsecond later and every such ceremony would restart at level 1, mint a fresh
+		// session and fail again (#241).
+		sessionIsValid := userSessionManager.HasValidUserSession(r.Context(), ambientSession, nil)
+
+		// The conjunction goes ABOVE the implicit exemption, not below it.
+		// HasValidUserSession answers false for a nil session, so folding it in afterwards would
+		// undo the exemption and refuse every implicit ceremony that arrives without a session.
+		mayBind := authContext.OwnsSession(ambientSession) && sessionIsValid
 		if isImplicitFlow && sessionIdentifier == "" {
 			// No ambient session at all, so there is nothing to cross-bind to. The code flow
 			// still refuses here, because #129 showed an empty identifier there produces an
@@ -173,11 +287,26 @@ func HandleIssueGet(
 		}
 
 		if !mayBind {
-			// A session that resolves but belongs to another user gets its own line: "the
-			// session backing this ceremony is gone" would be the wrong sentence, and an
-			// operator reading it needs to see the two user ids that failed to match
-			// (#133 decision 7).
-			sessionIsForeign := ambientSession != nil
+			// Three shapes, three lines. "The session backing this ceremony is gone" would be
+			// the wrong sentence for a session that resolves but belongs to another user, and an
+			// operator reading that one needs to see the two user ids that failed to match (#133
+			// decision 7); it is equally wrong for a session that is present, owned and merely
+			// out of time, which is what an operator's idle timeout doing its job looks like.
+			sessionIsForeign := ambientSession != nil && !authContext.OwnsSession(ambientSession)
+			sessionIsExpired := ambientSession != nil && !sessionIsForeign && !sessionIsValid
+
+			// Only the expired shape audits. The foreign and gone shapes are #133's and #129's
+			// refusals, unchanged here and writing no audit row today; this event attests the
+			// check #241 added, which is the one an administrator can cause by configuring a
+			// timeout, and stretching it over two older conditions would make it useless for
+			// answering the question it exists for.
+			if sessionIsExpired {
+				auditLogger.Log(constants.AuditIssuanceRefusedSessionInvalid, map[string]interface{}{
+					"userId":            authContext.UserId,
+					"clientId":          authContext.ClientId,
+					"sessionIdentifier": sessionIdentifier,
+				})
+			}
 
 			// prompt=none is the one ceremony that cannot be restarted: /auth/level1 sends the
 			// browser to /auth/pwd, which renders a form, and this request forbids any UI at
@@ -190,12 +319,17 @@ func HandleIssueGet(
 			// cannot tell the two apart and does not need to. No code is minted on either
 			// branch, so the fail-open decision 6 closes stays closed.
 			if authContext.HasPromptValue("none") {
-				if sessionIsForeign {
+				switch {
+				case sessionIsForeign:
 					slog.Warn("the session in this browser belongs to a different user, returning login_required instead of binding this silent ceremony to it",
 						"sessionIdentifier", sessionIdentifier,
 						"sessionUserId", ambientSession.UserId,
 						"ceremonyUserId", authContext.UserId)
-				} else {
+				case sessionIsExpired:
+					slog.Warn("the session backing this silent ceremony is no longer within its idle timeout or maximum lifetime, returning login_required instead of issuing a code",
+						"sessionIdentifier", sessionIdentifier,
+						"sessionUserId", ambientSession.UserId)
+				default:
 					slog.Warn("the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
 						"sessionIdentifier", sessionIdentifier)
 				}
@@ -206,9 +340,8 @@ func HandleIssueGet(
 				// the browser keeps a ready_to_issue_code context it can replay.
 				//
 				// Provenance is resolved before the dispatch, for the same reason as at the
-				// id_token_hint refusal above: this handler holds no client of its own (#108).
-				refusedClient := clientProvenance(database, authContext.ClientId)
-
+				// id_token_hint refusal above (#108). The registration gate at the top of the
+				// handler loaded the client and refused a nil, so issuingClient is it.
 				err := authHelper.ClearAuthContext(w, r)
 				if err != nil {
 					// Every error return in ChunkedCookieStore.Save is above its first
@@ -221,7 +354,7 @@ func HandleIssueGet(
 					slog.Error("failed to clear the auth context, answering the client with server_error",
 						"error", err)
 					err = redirToClientWithError(w, r, httpHelper, templateFS,
-						redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
+						redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
 					if err != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
 						httpHelper.InternalServerError(w, r, err)
@@ -229,7 +362,7 @@ func HandleIssueGet(
 					return
 				}
 				err = redirToClientWithError(w, r, httpHelper, templateFS,
-					redirectErrorFromAuthContext(authContext, refusedClient, constants.ErrorLoginRequired,
+					redirectErrorFromAuthContext(authContext, issuingClient, constants.ErrorLoginRequired,
 						"User authentication is required"))
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -238,12 +371,17 @@ func HandleIssueGet(
 				return
 			}
 
-			if sessionIsForeign {
+			switch {
+			case sessionIsForeign:
 				slog.Warn("the session in this browser belongs to a different user, restarting level 1 instead of binding this ceremony to it",
 					"sessionIdentifier", sessionIdentifier,
 					"sessionUserId", ambientSession.UserId,
 					"ceremonyUserId", authContext.UserId)
-			} else {
+			case sessionIsExpired:
+				slog.Warn("the session backing this ceremony is no longer within its idle timeout or maximum lifetime, restarting level 1 instead of issuing a code",
+					"sessionIdentifier", sessionIdentifier,
+					"sessionUserId", ambientSession.UserId)
+			default:
 				slog.Warn("the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
 					"sessionIdentifier", sessionIdentifier)
 			}
@@ -257,8 +395,98 @@ func HandleIssueGet(
 			return
 		}
 
+		// The scope is re-filtered against the user's LIVE permissions, immediately before
+		// anything is minted. /auth/completed filtered it once and that is the only live
+		// permission check the ceremony performs today: everything after it reads the stored
+		// value, the consent screen builds its checkboxes from it, the code issuer writes it
+		// onto the code and the implicit branch signs it. Nothing downstream catches a removal
+		// either, because the authorization_code arm of the token endpoint never consults the
+		// permission checker, while a REFRESH of an older grant does, so without this a
+		// brand-new grant is the one thing minted without a live check (#241).
+		//
+		// Placed below the binding check so a ceremony about to be restarted at level 1 pays
+		// none of it, and below the registration gate so the refusal here is safe to deliver by
+		// redirect.
+		if user == nil {
+			user, err = database.GetUserById(nil, authContext.UserId)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+		}
+		if user == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("user %v not found", authContext.UserId))))
+			return
+		}
+
+		// Whichever field the issuer will READ, and never the other one. CreateAuthCode and
+		// handleImplicitFlow both prefer ConsentedScope and fall back to Scope when it is empty,
+		// so writing an emptied ConsentedScope back would fall through to the full unfiltered
+		// request, which is why the empty result refuses instead of writing anything at all
+		// (#241 decision 2).
+		scopeField := &authContext.Scope
+		if authContext.ConsentedScope != "" {
+			scopeField = &authContext.ConsentedScope
+		}
+		effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(*scopeField, user)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		if effectiveScope == "" {
+			slog.Warn("the user holds none of the permissions behind the scopes this ceremony would grant, so nothing is issued",
+				"userId", authContext.UserId,
+				"clientIdentifier", authContext.ClientId)
+
+			auditLogger.Log(constants.AuditIssuanceRefusedScopeDenied, map[string]interface{}{
+				"userId":   authContext.UserId,
+				"clientId": authContext.ClientId,
+			})
+
+			// The wording and the error code are /auth/completed's for the same condition,
+			// arriving later: the same removal gets one answer wherever it lands.
+			//
+			// The clear goes FIRST, for the reason every refusal in this handler states: a
+			// Set-Cookie written after redirToClientWithError has committed never reaches the
+			// wire, so the browser would keep a replayable auth context (#141).
+			err = authHelper.ClearAuthContext(w, r)
+			if err != nil {
+				// The clear failed, so Save wrote no cookie and the browser still holds the
+				// auth context. The client is owed an error response regardless: its redirect
+				// URI was validated upstream and re-checked above, so OIDC Core 1.0 3.1.2.2
+				// with 3.1.2.6 applies, and RFC 6749 4.1.2.1 mints server_error for exactly
+				// this condition (#141).
+				slog.Error("failed to clear the auth context, answering the client with server_error",
+					"error", err)
+				err = redirToClientWithError(w, r, httpHelper, templateFS,
+					redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
+				if err != nil {
+					// Nowhere left to send the client, so the 500 is the last resort here.
+					httpHelper.InternalServerError(w, r, err)
+				}
+				return
+			}
+
+			err = redirToClientWithError(w, r, httpHelper, templateFS,
+				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied",
+					"The user is not authorized to access any of the requested scopes"))
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
+			return
+		}
+
+		// A narrowed set is issued rather than refused, which is RFC 6749 section 3.3's "The
+		// authorization server MAY fully or partially ignore the scope requested by the client"
+		// and what /auth/completed's own filter did with the same removal seconds earlier. The
+		// client is told what it actually got: TokenResponse.Scope carries the granted set on
+		// the code arm, and issueImplicitTokens appends a scope parameter on the implicit arm
+		// (decision 2).
+		*scopeField = effectiveScope
+
 		if isImplicitFlow {
-			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, authHelper, tokenIssuer, database, auditLogger)
+			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, issuingClient, user, authHelper, tokenIssuer, auditLogger)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 			}
@@ -317,34 +545,21 @@ func HandleIssueGet(
 
 // handleImplicitFlow handles the implicit grant flow token issuance.
 // Per RFC 6749 4.2.2 and OIDC Core 3.2.2.5, tokens are returned in fragment.
+// handleImplicitFlow takes the client and the user rather than loading them. HandleIssueGet
+// resolves both above the dispatch now, the client for the registration gate and the user for the
+// scope re-filter, and both gates refuse a nil, so re-reading them here would be two queries for
+// values already in hand (#241).
 func handleImplicitFlow(
 	w http.ResponseWriter,
 	r *http.Request,
 	authContext *oauth.AuthContext,
 	sessionIdentifier string,
+	client *models.Client,
+	user *models.User,
 	authHelper AuthHelper,
 	tokenIssuer TokenIssuer,
-	database data.Database,
 	auditLogger AuditLogger,
 ) error {
-	// Load client
-	client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
-	if err != nil {
-		return err
-	}
-	if client == nil {
-		return errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId)))
-	}
-
-	// Load user
-	user, err := database.GetUserById(nil, authContext.UserId)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return errors.WithStack(errors.New(fmt.Sprintf("user %v not found", authContext.UserId)))
-	}
-
 	// Determine what tokens to issue based on response_type
 	rtInfo := oauth.ParseResponseType(authContext.ResponseType)
 	issueAccessToken := rtInfo.HasToken
