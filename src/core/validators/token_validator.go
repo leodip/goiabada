@@ -80,6 +80,17 @@ type ValidateTokenRequestResult struct {
 // happened (#106).
 const invalidGenerationMessage = "The refresh token is invalid because it was superseded."
 
+// ROPCNotAuthorizedErrorMsg is the refusal for a client that may not use the resource owner
+// password credentials grant. Two places emit it: the password grant below, which refuses a
+// new login, and the token handler's refresh arm, which refuses to refresh a token ROPC
+// issued. They have to say the same thing, because an operator turning the switch off is
+// doing one act with two consequences, and a reader told two different stories about it will
+// think only new logins stopped. Exported and package-level because the second user lives in
+// the authserver module (#250).
+const ROPCNotAuthorizedErrorMsg = "The client is not authorized to use the resource owner password credentials grant type. " +
+	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', " +
+	"or enable it globally in 'Settings > General'."
+
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
 
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
@@ -447,12 +458,16 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			Scope:  input.Scope,
 		}, nil
 	case "refresh_token":
-		if !client.AuthorizationCodeEnabled {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
-				"The client associated with the provided client_id does not support authorization code flow.",
-				http.StatusBadRequest)
-		}
-
+		// No flow rule lives on this arm, deliberately. A refresh is governed by the switch
+		// of the flow that ISSUED the token, and which flow that was is not known here: the
+		// arm reads the presented token's linkage eighty lines below, and the client's flags
+		// say nothing about a token minted before they were last changed.
+		//
+		// The gate is in HandleTokenPost's refresh arm instead, below the replay containment
+		// block. Moving it back up here would refuse a stolen token before containment runs,
+		// so a thief replaying a token whose flow happens to be switched off would leave the
+		// rotation family live and nothing in the audit log. Whether a theft is detected must
+		// not depend on which switches are on (#250).
 		if !client.IsPublic {
 			if len(input.ClientSecret) == 0 {
 				// RFC 6749 Section 5.2: invalid_client for missing credentials
@@ -897,10 +912,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		ropcEnabled := client.IsResourceOwnerPasswordCredentialsEnabled(settings.ResourceOwnerPasswordCredentialsEnabled)
 		if !ropcEnabled {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
-				"The client is not authorized to use the resource owner password credentials grant type. "+
-					"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', "+
-					"or enable it globally in 'Settings > General'.",
-				http.StatusBadRequest)
+				ROPCNotAuthorizedErrorMsg, http.StatusBadRequest)
 		}
 
 		// Validate required parameters (RFC 6749 Section 4.3.2)

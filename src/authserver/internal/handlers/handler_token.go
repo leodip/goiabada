@@ -61,6 +61,12 @@ func jsonErrorConformed(httpHelper HttpHelper, w http.ResponseWriter, r *http.Re
 // two ever drift apart.
 const genericServerErrorDescription = "An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v"
 
+// authCodeNotAuthorizedErrorMsg refuses a refresh token that an authorization code minted, for a
+// client whose authorization code flow is now off. The wording is what the token validator's
+// refresh arm carried before the gate moved into this handler, kept verbatim so that half of the
+// endpoint's observable behaviour did not change (#250).
+const authCodeNotAuthorizedErrorMsg = "The client associated with the provided client_id does not support authorization code flow."
+
 func HandleTokenPost(
 	httpHelper HttpHelper,
 	userSessionManager UserSessionManager,
@@ -384,6 +390,40 @@ func HandleTokenPost(
 					"This refresh token has been revoked.", http.StatusBadRequest))
 				return
 			}
+
+			// A refresh is governed by the switch of the flow that ISSUED the token, not by
+			// the authorization code flag alone. Until this landed the whole arm refused on
+			// !AuthorizationCodeEnabled, so an ROPC-only client could never redeem the token
+			// ROPC handed it, and turning ROPC off stopped nothing already issued (#250).
+			//
+			// It sits BELOW containment on purpose. A stolen token replayed while its flow is
+			// switched off must still revoke its rotation family and still be audited;
+			// refusing first would leave the family live and the theft unrecorded, which is
+			// what the old placement did.
+			//
+			// It sits ABOVE MarkRefreshTokenAsRevoked on purpose too, so a token this refuses
+			// is not spent: the operator may turn the switch back on, and a live token should
+			// still be live when they do.
+			//
+			// The ROPC arm resolves the global setting rather than reading only the per-client
+			// override, because the issuing arm does. Otherwise turning the global switch off
+			// would block new logins while inheriting clients kept refreshing indefinitely,
+			// which is not what the switch says it does.
+			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+			if validateResult.CodeEntity == nil {
+				// Same ROPC marker the containment block above reads to set replayFlow, so
+				// the two cannot disagree about what an ROPC token is.
+				if !validateResult.Client.IsResourceOwnerPasswordCredentialsEnabled(settings.ResourceOwnerPasswordCredentialsEnabled) {
+					jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode(
+						"unauthorized_client", validators.ROPCNotAuthorizedErrorMsg, http.StatusBadRequest))
+					return
+				}
+			} else if !validateResult.Client.AuthorizationCodeEnabled {
+				jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode(
+					"unauthorized_client", authCodeNotAuthorizedErrorMsg, http.StatusBadRequest))
+				return
+			}
+
 			// Atomically claim the row before minting anything. Until this landed the
 			// handler read Revoked during request validation and then wrote
 			// unconditionally, so two presentations of one refresh token could both

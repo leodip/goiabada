@@ -327,10 +327,12 @@ func TestHandleTokenPost(t *testing.T) {
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req = withSettings(req, &models.Settings{})
 		rr := httptest.NewRecorder()
 
 		mockRefreshToken := &models.RefreshToken{Id: 1, Revoked: false}
 		validationResult := &validators.ValidateTokenRequestResult{
+			Client:       authCodeClient(),
 			RefreshToken: mockRefreshToken,
 			CodeEntity:   &models.Code{},
 		}
@@ -365,11 +367,13 @@ func TestHandleTokenPost(t *testing.T) {
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req = withSettings(req, &models.Settings{})
 		rr := httptest.NewRecorder()
 
 		mockRefreshToken := &models.RefreshToken{Id: 1, Revoked: false}
 		mockCode := &models.Code{Id: 1}
 		validationResult := &validators.ValidateTokenRequestResult{
+			Client:           authCodeClient(),
 			RefreshToken:     mockRefreshToken,
 			CodeEntity:       mockCode,
 			RefreshTokenInfo: &oauth.JwtToken{},
@@ -409,6 +413,7 @@ func TestHandleTokenPost(t *testing.T) {
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req = withSettings(req, &models.Settings{})
 		rr := httptest.NewRecorder()
 
 		mockSessionIdentifier := "test_session_identifier"
@@ -429,6 +434,7 @@ func TestHandleTokenPost(t *testing.T) {
 		}
 		mockCode := &models.Code{Id: mockCodeId, ClientId: mockClientId}
 		validationResult := &validators.ValidateTokenRequestResult{
+			Client:           authCodeClient(),
 			RefreshToken:     mockRefreshToken,
 			CodeEntity:       mockCode,
 			RefreshTokenInfo: &oauth.JwtToken{},
@@ -493,6 +499,7 @@ func TestHandleTokenPost(t *testing.T) {
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req = withSettings(req, &models.Settings{})
 		rr := httptest.NewRecorder()
 
 		mockClientId := int64(123)
@@ -510,6 +517,7 @@ func TestHandleTokenPost(t *testing.T) {
 		}
 		mockCode := &models.Code{Id: mockCodeId, ClientId: mockClientId}
 		validationResult := &validators.ValidateTokenRequestResult{
+			Client:           authCodeClient(),
 			RefreshToken:     mockRefreshToken,
 			CodeEntity:       mockCode,
 			RefreshTokenInfo: &oauth.JwtToken{},
@@ -1039,6 +1047,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	formData := "grant_type=refresh_token&refresh_token=raced"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = withSettings(req, &models.Settings{})
 	rr := httptest.NewRecorder()
 
 	// Revoked=false is the whole point: the validation read saw a live token, so this
@@ -1050,6 +1059,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 		FirstRefreshTokenJti: "jti-family",
 	}
 	validationResult := &validators.ValidateTokenRequestResult{
+		Client:       authCodeClient(),
 		RefreshToken: racedToken,
 		CodeEntity:   &models.Code{Id: 1},
 	}
@@ -1978,4 +1988,279 @@ func TestJsonErrorConformed_GenericDescriptionMatchesSharedWriter(t *testing.T) 
 		"the boundary's generic answer must be byte-identical to the shared writer's; "+
 			"if this fails, HttpHelper.JsonError's sentence moved and genericServerErrorDescription did not")
 	assert.Equal(t, fromSharedWriter.Code, fromBoundary.Code)
+}
+
+// withSettings puts resolved settings on a request, which the refresh arm's flow gate reads to
+// resolve a client left on "inherit". Every refresh fixture that reaches past replay containment
+// needs it, and needs a Client on its validation result beside it: a refresh token exists only
+// where the flow that issued it was switched on, so saying so is the fixture stating what it
+// always meant rather than working around the gate (#250).
+func withSettings(req *http.Request, settings *models.Settings) *http.Request {
+	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
+}
+
+// authCodeClient is the client an authorization code flow refresh fixture implies: the flow that
+// minted the token is on. Its zero-valued ROPC override leaves that grant inheriting, which is
+// irrelevant on this arm because a token carrying a CodeEntity is never judged by the ROPC switch.
+func authCodeClient() *models.Client {
+	return &models.Client{Id: 1, ClientIdentifier: "test_client", AuthorizationCodeEnabled: true}
+}
+
+// TestHandleTokenPost_Refresh_FlowGate owns the whole truth table for the rule that a refresh is
+// governed by the switch of the flow that ISSUED the token, not by the authorization code flag
+// alone. Before this landed the arm refused on !AuthorizationCodeEnabled whatever minted the
+// token, so an ROPC-only client could never redeem the token ROPC handed it (row 2) and turning
+// ROPC off stopped nothing already issued (rows 3 to 5) (#250).
+//
+// Every row presents a LIVE token, so the flow gate is what answers rather than replay
+// containment. The containment cases are the two tests below this one.
+//
+// An accepted row is proved by reaching MarkRefreshTokenAsRevoked, which is the first thing past
+// the gate. It is stubbed to lose its claim so the row stops there rather than dragging the whole
+// minting chain into a test about a gate; a lost claim answers invalid_grant, which is visibly not
+// the refusal the gate emits.
+func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
+	ropcOn, ropcOff := true, false
+
+	testCases := []struct {
+		name          string
+		client        *models.Client
+		globalROPC    bool
+		ropcToken     bool // true: no CodeEntity, so ROPC minted it
+		wantRefusal   string
+		wantRefusalIs string
+	}{
+		{
+			name:       "row 1: ROPC token, both flows on, accepted",
+			client:     &models.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
+			globalROPC: true,
+			ropcToken:  true,
+		},
+		{
+			// The defect this stage exists to close. Refused today, with a sentence about a
+			// flow the client never used.
+			name:       "row 2: ROPC token, ROPC-only client, accepted",
+			client:     &models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
+			globalROPC: true,
+			ropcToken:  true,
+		},
+		{
+			// Reverses today's behaviour, where turning ROPC off stops nothing already issued.
+			name:          "row 3: ROPC token, ROPC off on the client, refused",
+			client:        &models.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff},
+			globalROPC:    true,
+			ropcToken:     true,
+			wantRefusal:   validators.ROPCNotAuthorizedErrorMsg,
+			wantRefusalIs: "unauthorized_client",
+		},
+		{
+			name:          "row 4: ROPC token, both flows off, refused for ROPC",
+			client:        &models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff},
+			globalROPC:    true,
+			ropcToken:     true,
+			wantRefusal:   validators.ROPCNotAuthorizedErrorMsg,
+			wantRefusalIs: "unauthorized_client",
+		},
+		{
+			// Decision 3, and the only row that fails if the gate reads the per-client override
+			// alone: the client inherits, and the global switch is what turns ROPC off.
+			name:          "row 5: ROPC token, client inherits, global ROPC off, refused",
+			client:        &models.Client{Id: 1, AuthorizationCodeEnabled: true},
+			globalROPC:    false,
+			ropcToken:     true,
+			wantRefusal:   validators.ROPCNotAuthorizedErrorMsg,
+			wantRefusalIs: "unauthorized_client",
+		},
+		{
+			// Goal 3: the authorization code half keeps the refusal it has today, word for word.
+			name:          "row 6: authorization code token, that flow off, refused for auth code",
+			client:        &models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
+			globalROPC:    true,
+			ropcToken:     false,
+			wantRefusal:   authCodeNotAuthorizedErrorMsg,
+			wantRefusalIs: "unauthorized_client",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			userSessionManager := mocks_users.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			tokenValidator := mocks_validators.NewTokenValidator(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+
+			formData := "grant_type=refresh_token&refresh_token=live"
+			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			// The mocked validator is matched against THIS request's context, so the settings
+			// have to be on it before the expectation is set up.
+			req = withSettings(req, &models.Settings{ResourceOwnerPasswordCredentialsEnabled: tc.globalROPC})
+			rr := httptest.NewRecorder()
+
+			liveToken := &models.RefreshToken{
+				Id:                   7,
+				Revoked:              false,
+				RefreshTokenJti:      "jti-live",
+				FirstRefreshTokenJti: "jti-family",
+			}
+			result := &validators.ValidateTokenRequestResult{
+				Client:           tc.client,
+				RefreshToken:     liveToken,
+				RefreshTokenInfo: &oauth.JwtToken{},
+			}
+			if tc.ropcToken {
+				liveToken.ClientId = sql.NullInt64{Int64: tc.client.Id, Valid: true}
+				liveToken.UserId = sql.NullInt64{Int64: 5, Valid: true}
+			} else {
+				liveToken.CodeId = sql.NullInt64{Int64: 9, Valid: true}
+				result.CodeEntity = &models.Code{Id: 9, ClientId: tc.client.Id, UserId: 5}
+			}
+
+			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+				Return(result, nil)
+
+			if tc.wantRefusal == "" {
+				// Accepted: the request reaches the claim, and loses it, which is as far as a
+				// test about the gate needs to go.
+				database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), liveToken.Id).Return(false, nil).Once()
+				httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+					detail, ok := err.(*customerrors.ErrorDetail)
+					return ok && detail.GetCode() == "invalid_grant"
+				})).Return().Once()
+			} else {
+				httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+					detail, ok := err.(*customerrors.ErrorDetail)
+					return ok && detail.GetCode() == tc.wantRefusalIs &&
+						detail.GetDescription() == tc.wantRefusal &&
+						detail.GetHttpStatusCode() == http.StatusBadRequest
+				})).Return().Once()
+			}
+
+			handler.ServeHTTP(rr, req)
+
+			httpHelper.AssertExpectations(t)
+			tokenValidator.AssertExpectations(t)
+			database.AssertExpectations(t)
+
+			if tc.wantRefusal != "" {
+				// A refused token is not spent. The operator may turn the switch back on, and a
+				// live token should still be live when they do.
+				database.AssertNotCalled(t, "MarkRefreshTokenAsRevoked", mock.Anything, mock.Anything)
+				// The gate is not containment: nothing is cascaded and nothing is audited.
+				database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything)
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+			}
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate is why the flow gate lives in this
+// handler rather than in ValidateTokenRequest, and it is the case that was broken before this
+// stage: a stolen token replayed while its flow is switched off was refused by the validator, so
+// its rotation family stayed live and the theft went unrecorded.
+//
+// Whether a theft is detected must not depend on which switches happen to be on. Both rows
+// therefore present a REVOKED token with the issuing flow off, and require that containment ran
+// and was audited, and that the answer is the containment refusal rather than the gate's (#250).
+func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
+	ropcOff := false
+
+	testCases := []struct {
+		name     string
+		client   *models.Client
+		result   *validators.ValidateTokenRequestResult
+		wantFlow string
+	}{
+		{
+			name:   "ROPC token replayed while ROPC is off",
+			client: &models.Client{Id: 111, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff},
+			result: &validators.ValidateTokenRequestResult{
+				RefreshToken: &models.RefreshToken{
+					Id:                   1,
+					Revoked:              true,
+					RefreshTokenJti:      "jti-presented",
+					FirstRefreshTokenJti: "jti-family",
+					ClientId:             sql.NullInt64{Int64: 111, Valid: true},
+					UserId:               sql.NullInt64{Int64: 222, Valid: true},
+				},
+			},
+			wantFlow: "ropc",
+		},
+		{
+			name:   "authorization code token replayed while that flow is off",
+			client: &models.Client{Id: 111, AuthorizationCodeEnabled: false},
+			result: &validators.ValidateTokenRequestResult{
+				RefreshToken: &models.RefreshToken{
+					Id:                   1,
+					Revoked:              true,
+					RefreshTokenJti:      "jti-presented",
+					FirstRefreshTokenJti: "jti-family",
+					CodeId:               sql.NullInt64{Int64: 9, Valid: true},
+				},
+				CodeEntity: &models.Code{Id: 9, ClientId: 111, UserId: 222},
+			},
+			wantFlow: "auth_code",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			userSessionManager := mocks_users.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			tokenValidator := mocks_validators.NewTokenValidator(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+
+			formData := "grant_type=refresh_token&refresh_token=replayed"
+			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			// Global ROPC off as well, so neither arm of the gate would let this through if it
+			// were reached.
+			req = withSettings(req, &models.Settings{ResourceOwnerPasswordCredentialsEnabled: false})
+			rr := httptest.NewRecorder()
+
+			result := tc.result
+			result.Client = tc.client
+			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+				Return(result, nil)
+
+			database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), "jti-family").Return(int64(2), nil).Once()
+
+			var logged []map[string]interface{}
+			auditLogger.On("Log", constants.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
+				Run(func(args mock.Arguments) {
+					logged = append(logged, args.Get(1).(map[string]interface{}))
+				}).Return().Once()
+
+			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+				detail, ok := err.(*customerrors.ErrorDetail)
+				return ok && detail.GetCode() == "invalid_grant" &&
+					detail.GetDescription() == "This refresh token has been revoked."
+			})).Return().Once()
+
+			handler.ServeHTTP(rr, req)
+
+			httpHelper.AssertExpectations(t)
+			tokenValidator.AssertExpectations(t)
+			database.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+
+			require.Len(t, logged, 1, "containment must be audited even though the flow is switched off")
+			assert.Equal(t, tc.wantFlow, logged[0]["flow"])
+			assert.Equal(t, int64(2), logged[0]["revokedCount"])
+
+			// The flow gate must not have answered: it sits below containment, and a replay
+			// never reaches it.
+			database.AssertNotCalled(t, "MarkRefreshTokenAsRevoked", mock.Anything, mock.Anything)
+		})
+	}
 }
