@@ -4043,3 +4043,342 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 		})
 	}
 }
+
+// Every refusal #241 added can itself fail in two ways, and until now neither was observed at any
+// of them. ClearAuthContext can fail, and the response the refusal is made of can fail to be
+// produced. The refusals that predate this issue each pin both, in the triple the id_token_hint
+// block above runs: failing clear, failing clear with an unusable form_post template, and an
+// unusable form_post template on its own. The three refusals this issue added pinned neither.
+//
+// Eight mutations demonstrated it against the whole authserver internal tier, and all eight
+// survived: a return inserted after each failed-clear log, each fallback's last-resort 500 deleted,
+// and each ordinary refusal's 500 deleted. The final review reported three of the eight; the
+// remaining five are the siblings that share the house form.
+//
+// This one is a PAIR rather than a triple, and the asymmetry is the point: the deregistration
+// refusal does not answer the client at all. It renders locally, so its answer has one way to fail
+// rather than two, and there is no response mode in which it can half-commit.
+func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
+	t.Run("failing clear - the refusal is still rendered and nothing is emitted", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
+			database, auditLogger, userSessionManager, permissionChecker)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "query",
+			ResponseType: "code",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
+		database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+		database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+			Run(func(args mock.Arguments) {
+				args.Get(1).(*models.Client).RedirectURIs =
+					[]models.RedirectURI{{URI: "https://other.example/cb"}}
+			}).Return(nil)
+
+		auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
+
+		// The clear fails, and this is the one refusal in the handler that carries on regardless.
+		// Answering this client is precisely what the gate exists to prevent, so an error redirect
+		// is as unacceptable here as a code would be. The page is rendered anyway and the browser
+		// keeps a replayable auth context, which is the lesser of the two: a replay arrives back at
+		// this same gate and is refused again for as long as the registration is gone.
+		authHelper.On("ClearAuthContext", rr, req).
+			Return(errors.New("the session store is unreachable"))
+
+		// This expectation IS the assertion. A handler that returned after the failed clear never
+		// reaches the render, and the mock then fails the case for an unmet expectation.
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
+			"/auth_redirect_blocked.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+				return data["destination"] == "example.com"
+			})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		// No InternalServerError expectation either, so answering with a bare 500 fails the mock
+		// rather than passing as though the refusal had been shown.
+		assert.Empty(t, rr.Header().Get("Location"),
+			"a withheld redirect must never become a Location, least of all because the clear failed")
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("an unrenderable page - 500 when the refusal itself cannot be shown", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
+			database, auditLogger, userSessionManager, permissionChecker)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "query",
+			ResponseType: "code",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
+		database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+		database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+			Run(func(args mock.Arguments) {
+				args.Get(1).(*models.Client).RedirectURIs =
+					[]models.RedirectURI{{URI: "https://other.example/cb"}}
+			}).Return(nil)
+
+		auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		// The clear worked and it is the page that cannot be produced. There is nowhere left to
+		// report the refusal, so the 500 is the last resort, and it stays a 500: falling back to a
+		// redirect here would deliver the browser to the very host the gate just refused.
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
+			"/auth_redirect_blocked.html", mock.Anything).
+			Return(errors.New("the interstitial template is unreadable"))
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err != nil && strings.Contains(err.Error(), "the interstitial template is unreadable")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Header().Get("Location"),
+			"a failure to render the refusal must not become a redirect to the deregistered host")
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+}
+
+// The empty-scope refusal answers the client by redirect, so it has the full house triple: the
+// clear can fail, the response can fail to be produced, and both can fail together. It is the same
+// triple TestHandleIssueGet_IdTokenHintSubMatching runs for the refusal directly above it in the
+// handler, and it landed with none of the three.
+//
+// form_post is the response mode used throughout, because it is the only one whose arm can fail
+// after the redirect URI has been validated, which is how the last-resort branch is reached at all.
+func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
+	// armEmptiedScope sets up a ceremony whose consented scope the live filter empties, which is
+	// the condition all three cases share. The response mode and the clear's answer are what each
+	// case varies.
+	armEmptiedScope := func(t *testing.T, responseMode string, database *mocks_data.Database,
+		authHelper *mocks_handlerhelpers.AuthHelper, auditLogger *mocks_audit.AuditLogger,
+		userSessionManager *mocks_user.UserSessionManager,
+		permissionChecker *mocks_user.PermissionChecker,
+		req *http.Request) *oauth.AuthContext {
+
+		t.Helper()
+
+		authContext := &oauth.AuthContext{
+			AuthState:      oauth.AuthStateReadyToIssueCode,
+			Scope:          "backend:read backend:write",
+			ConsentedScope: "backend:read",
+			ClientId:       "test-client",
+			UserId:         123,
+			ResponseMode:   responseMode,
+			ResponseType:   "code",
+			RedirectURI:    "https://example.com/callback",
+			State:          "test-state",
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		// The gate's own registration read, and separately the emitter's: the refusal below is an
+		// answer to the client, so it passes through redirectWillBeEmitted too (#241 decision 11).
+		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+		database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+			Run(func(args mock.Arguments) {
+				args.Get(1).(*models.Client).RedirectURIs =
+					[]models.RedirectURI{{URI: "https://example.com/callback"}}
+			}).Return(nil)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
+
+		stubLiveSession(database, 123)
+		userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true)
+
+		user := &models.User{Id: 123, Subject: uuid.New(), Enabled: true}
+		database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "backend:read", user).
+			Return("", nil)
+
+		auditLogger.On("Log", constants.AuditIssuanceRefusedScopeDenied, mock.Anything).Return()
+
+		return authContext
+	}
+
+	t.Run("failing clear - server_error to the client", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
+			database, auditLogger, userSessionManager, permissionChecker)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+		armEmptiedScope(t, "query", database, authHelper, auditLogger, userSessionManager, permissionChecker, req)
+
+		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
+		// handler does next. The client is still owed its error response, and server_error is the
+		// code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
+		authHelper.On("ClearAuthContext", rr, req).
+			Return(errors.New("the session store is unreachable"))
+
+		handler.ServeHTTP(rr, req)
+
+		// httpHelper has no InternalServerError expectation, so a bare 500 fails the mock instead
+		// of passing as though the client had been answered.
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Result().Header.Get("Location")
+		assert.Contains(t, location, "https://example.com/callback")
+		assert.Contains(t, location, "error=server_error")
+		assert.Contains(t, location, "error_description=Internal+server+error")
+		assert.NotContains(t, location, "access_denied",
+			"the ordinary refusal's code must not stand in for one the server could not complete")
+		assert.NotContains(t, location, "code=")
+
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
+		// redirToClientWithError returns "unable to parse template" instead of committing.
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
+			database, auditLogger, userSessionManager, permissionChecker)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+		armEmptiedScope(t, "form_post", database, authHelper, auditLogger, userSessionManager, permissionChecker, req)
+
+		authHelper.On("ClearAuthContext", rr, req).
+			Return(errors.New("the session store is unreachable"))
+
+		// The clear failed and the server_error response the client is owed cannot be built
+		// either, so there is nowhere left to send it. Without this expectation the handler would
+		// answer nothing at all and the case would still pass.
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err != nil && strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		templateFS := &mocks_test.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form action="{{ .redirectURI`,
+			},
+		}
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
+			database, auditLogger, userSessionManager, permissionChecker)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+		armEmptiedScope(t, "form_post", database, authHelper, auditLogger, userSessionManager, permissionChecker, req)
+
+		// The other half of the same family: here the clear succeeds and it is the ordinary
+		// access_denied refusal that cannot be committed. This is the site's second and separate
+		// 500, pinned on its own so a future edit cannot delete either copy unnoticed.
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err != nil && strings.Contains(err.Error(), "unable to parse template")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Result().Header.Get("Location"))
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+}
