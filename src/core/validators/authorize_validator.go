@@ -189,7 +189,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 	// afterwards, so the requested value is tested on every request rather than trusted
 	// because it is registered (#122).
 	//
-	// Only the requested value is tested, and a second check inside the match loop would be
+	// Only the requested value is tested, and a second check inside the registration match would be
 	// dead code rather than defence in depth: RedirectURIMatches returns false unless the
 	// registered scheme is "http", so no absolute requested value can ever match a
 	// non-absolute registered one. Swept 63 registered/requested pairs to confirm it, 0
@@ -210,20 +210,11 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 		return err
 	}
 
-	clientHasRedirectURI := false
+	registered := make([]string, 0, len(client.RedirectURIs))
 	for _, r := range client.RedirectURIs {
-		if input.RedirectURI == r.URI {
-			clientHasRedirectURI = true
-			break
-		}
-		// Registered first, requested second: the scheme and host gates read the
-		// registered side.
-		if allowLoopbackPortFlexibility && urlutil.RedirectURIMatches(r.URI, input.RedirectURI) {
-			clientHasRedirectURI = true
-			break
-		}
+		registered = append(registered, r.URI)
 	}
-	if !clientHasRedirectURI {
+	if !urlutil.RedirectURIIsRegistered(registered, input.RedirectURI, allowLoopbackPortFlexibility) {
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotRegistered, nil)
 	}
 	return nil
