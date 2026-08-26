@@ -3930,3 +3930,116 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 		})
 	}
 }
+
+// The two storage-backed checks #241 added to this handler both fail CLOSED, and nothing observed
+// that until now. Each has a positive table above proving what it refuses when the answer arrives;
+// neither had a case making the dependency ERROR, so treating a failed registration load as "the
+// requested URI is registered", or a failed permission filter as "the requested scope stands",
+// left the whole authserver internal tier green. Those are the two mutations the final review ran,
+// and both survived.
+//
+// A fail-open here is worse than the defect the checks close. The gate would be reporting that it
+// had re-established a fact it never read, on exactly the path that mints a code, so an outage in
+// the registration table would silently restore the behaviour this issue exists to remove.
+//
+// The mocks below carry no expectation for anything downstream, so a call that reaches one fails
+// the case. That absence IS the assertion: it is what says the handler stopped rather than
+// continued with an unverified answer.
+func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		arm     func(*mocks_data.Database, *mocks_user.PermissionChecker, *models.Client)
+		wantErr string
+		why     string
+	}{
+		{
+			name: "the registration load fails",
+			arm: func(database *mocks_data.Database, _ *mocks_user.PermissionChecker, client *models.Client) {
+				database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), client).
+					Return(errors.New("registration read sentinel"))
+			},
+			wantErr: "registration read sentinel",
+			why: "an unreadable registration list is not an answer, and the gate is the first thing in " +
+				"this handler precisely so that nothing below it can emit a redirect. Continuing would " +
+				"mint a code for a callback nobody checked",
+		},
+		{
+			name: "the permission filter fails",
+			arm: func(database *mocks_data.Database, permissionChecker *mocks_user.PermissionChecker, client *models.Client) {
+				database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), client).
+					Run(func(args mock.Arguments) {
+						args.Get(1).(*models.Client).RedirectURIs =
+							[]models.RedirectURI{{URI: "https://example.com/callback"}}
+					}).Return(nil)
+				database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
+					Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
+				database.On("GetUserById", mock.Anything, int64(123)).
+					Return(&models.User{Id: 123, Subject: uuid.New(), Enabled: true}, nil)
+				permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", mock.Anything).
+					Return("", errors.New("permission filter sentinel"))
+			},
+			wantErr: "permission filter sentinel",
+			why: "the empty-string return is the REFUSAL signal on this seam, so a filter that errors " +
+				"returns the same empty string as a filter that removed everything. Reading the error " +
+				"first is what keeps those apart; ignoring it would grant the unfiltered scope",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			templateFS := &mocks_test.TestFS{}
+			codeIssuer := mocks_oauth.NewCodeIssuer(t)
+			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			permissionChecker := mocks_user.NewPermissionChecker(t)
+
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
+				database, auditLogger, userSessionManager, permissionChecker)
+
+			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+			rr := httptest.NewRecorder()
+
+			authContext := &oauth.AuthContext{
+				AuthState:    oauth.AuthStateReadyToIssueCode,
+				Scope:        "openid profile",
+				ClientId:     "test-client",
+				UserId:       123,
+				ResponseMode: "query",
+				ResponseType: "code",
+				RedirectURI:  "https://example.com/callback",
+				State:        "test-state",
+			}
+			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
+			database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+
+			// Only reached on the second row, and only because its own arming got that far.
+			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+				Return(true).Maybe()
+
+			tc.arm(database, permissionChecker, issuingClient)
+
+			httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), tc.wantErr)
+			})).Return()
+
+			handler.ServeHTTP(rr, req)
+
+			// Nothing was minted, nothing was audited as a refusal, no auth context was cleared and
+			// no response went to the client. A fail-open would have produced at least one of them.
+			assert.Empty(t, rr.Header().Get("Location"),
+				"a storage failure must not answer the client at all: %s", tc.why)
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+			codeIssuer.AssertExpectations(t)
+			tokenIssuer.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+			permissionChecker.AssertExpectations(t)
+		})
+	}
+}

@@ -249,7 +249,7 @@ A self-registered client's **identifier cannot be changed**, in the same way the
 
 **Self-registered clients require [consent](#consent-required) by default**, and the consent screen shows their self-asserted name with [a note saying it is unverified](#client-display-settings). Clients an administrator creates are unaffected and keep their existing default of consent off.
 
-**A refused authorization is not redirected back to a self-registered client.** Anyone can register a client and point it at any address, so an error response is an instruction to send someone's browser to a site nobody here has checked. When Goiabada refuses an authorization for a self-registered client, whether the user declined it or the request was invalid, it shows the user a page naming the application and the address it asked to send them to, and the request stops there. Clients an administrator created keep the ordinary redirect.
+**A refused authorization is not redirected back to a self-registered client.** Anyone can register a client and point it at any address, so an error response is an instruction to send someone's browser to a site nobody here has checked. When Goiabada refuses an authorization for a self-registered client, whether the user declined it or the request was invalid, it shows the user a page naming the application and the address it asked to send them to, and the request stops there. Clients an administrator created keep the ordinary redirect, unless the address has since been removed from the client: deleting a redirect URI takes effect on sign-ins already under way, which stop on that same page instead of receiving the error.
 
 [Silent authentication](/concepts/prompt-parameter/) with `prompt=none` is covered rather than exempt: it is the version of the same attack that needs no session and nothing from the user. Inside the hidden iframe silent renewal normally runs in, nothing is displayed to anyone.
 
@@ -258,7 +258,7 @@ A self-registered client's **identifier cannot be changed**, in the same way the
 </Aside>
 
 <Aside type="caution">
-**A self-registered client can be missing its badge.** One that registered itself before Goiabada started marking them, and was renamed back when that was still possible, carries no mark: no badge, and the refusal behaviour above does not apply to it. Nothing in the client list distinguishes it from a client an administrator created, so if your deployment is old enough to have one, check that **Consent required** is set the way you want across your clients.
+**A self-registered client can be missing its badge.** One that registered itself before Goiabada started marking them, and was renamed back when that was still possible, carries no mark: no badge, and the self-registered refusal above does not apply to it. Nothing in the client list distinguishes it from a client an administrator created, so if your deployment is old enough to have one, check that **Consent required** is set the way you want across your clients.
 </Aside>
 
 ### Redirect URI rules

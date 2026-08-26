@@ -1887,38 +1887,42 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name        string
-		database    func(t *testing.T) *mocks_data.Database
-		client      *models.Client
-		redirectURI string
-		want        bool
-		why         string
+		name         string
+		database     func(t *testing.T) *mocks_data.Database
+		client       *models.Client
+		redirectURI  string
+		responseType string
+		want         bool
+		why          string
 	}{
 		{
 			name: "administrator-registered client with an absolute, registered redirect URI",
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t, "https://legit.example/cb")
 			},
-			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
-			redirectURI: "https://legit.example/cb",
-			want:        true,
-			why:         "a human vetted this redirect URI at registration and the client still holds it, so all three gates are answered",
+			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI:  "https://legit.example/cb",
+			responseType: "code",
+			want:         true,
+			why:          "a human vetted this redirect URI at registration and the client still holds it, so all three gates are answered",
 		},
 		{
 			name: "self-registered client",
 			// No expectation: the provenance gate refuses above the read.
-			database:    noReadExpected,
-			client:      &models.Client{ClientIdentifier: "dcr-client", CreatedViaDCR: true},
-			redirectURI: "https://legit.example/cb",
-			want:        false,
-			why:         "the provenance gate: the client chose its own redirect URI, which is the source RFC 9700 4.11.2 names (#108)",
+			database:     noReadExpected,
+			client:       &models.Client{ClientIdentifier: "dcr-client", CreatedViaDCR: true},
+			redirectURI:  "https://legit.example/cb",
+			responseType: "code",
+			want:         false,
+			why:          "the provenance gate: the client chose its own redirect URI, which is the source RFC 9700 4.11.2 names (#108)",
 		},
 		{
-			name:        "unresolved client",
-			database:    noReadExpected,
-			client:      nil,
-			redirectURI: "https://legit.example/cb",
-			want:        false,
+			name:         "unresolved client",
+			database:     noReadExpected,
+			client:       nil,
+			redirectURI:  "https://legit.example/cb",
+			responseType: "code",
+			want:         false,
 			why: "the provenance gate again. nil means the handler could not find out where the redirect URI " +
 				"came from, and that is the untrusted case rather than an exempt one (#108). There is also no " +
 				"client id to read registrations for, so the read could not happen even if the order changed",
@@ -1926,10 +1930,11 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		{
 			name: "administrator-registered client with an unemittable redirect URI",
 			// No expectation: the emittability gate refuses above the read.
-			database:    noReadExpected,
-			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
-			redirectURI: "//evil.example/cb",
-			want:        false,
+			database:     noReadExpected,
+			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI:  "//evil.example/cb",
+			responseType: "code",
+			want:         false,
 			why: "the emittability gate: provenance passes and the string still cannot name the host it " +
 				"appears to, which is the row an old client can hold and the gate above cannot cover (#122)",
 		},
@@ -1938,9 +1943,10 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t, "https://other.example/cb")
 			},
-			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
-			redirectURI: "https://legit.example/cb",
-			want:        false,
+			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI:  "https://legit.example/cb",
+			responseType: "code",
+			want:         false,
 			why: "the registration gate. Provenance and emittability both pass, exactly as they did when the " +
 				"ceremony began, and the only thing that changed is that an administrator deleted this " +
 				"callback while it ran (#241 decision 11)",
@@ -1950,42 +1956,109 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t)
 			},
-			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
-			redirectURI: "https://legit.example/cb",
-			want:        false,
+			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI:  "https://legit.example/cb",
+			responseType: "code",
+			want:         false,
 			why: "an empty list covers nothing, and this is the shape a client whose last callback was " +
 				"removed actually has. RedirectURIIsRegistered answers false on it rather than treating " +
 				"\"nothing registered\" as \"no restriction\"",
 		},
 		{
-			name:        "registration read fails",
-			database:    failingDatabase,
-			client:      &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
-			redirectURI: "https://legit.example/cb",
-			want:        false,
+			name:         "registration read fails",
+			database:     failingDatabase,
+			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI:  "https://legit.example/cb",
+			responseType: "code",
+			want:         false,
 			why: "an unresolved registration is the untrusted case, matching clientProvenance: the caller is " +
 				"already answering an error, so a failed lookup withholds the redirect rather than turning a " +
 				"working refusal into a 500",
 		},
 		{
-			name: "loopback port flexibility is NOT granted here",
+			name: "loopback port flexibility IS granted on a code request",
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t, "http://127.0.0.1/cb")
 			},
-			client:      &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
-			redirectURI: "http://127.0.0.1:49152/cb",
-			want:        false,
-			why: "the flag this caller passes is false. RFC 8252 port flexibility exists so a native app's " +
-				"ephemeral port can match on a CODE request, and an error redirect carries no code, so this " +
-				"gate is deliberately stricter than the one at /auth/authorize (#41, #241)",
+			client:       &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			redirectURI:  "http://127.0.0.1:49152/cb",
+			responseType: "code",
+			want:         true,
+			why: "RFC 8252 section 7.3: \"The authorization server MUST allow any port to be specified at the " +
+				"time of the request for loopback IP redirect URIs\". So the ephemeral port IS registered, and " +
+				"RFC 6749 4.1.2.1 then requires the error to be delivered there rather than withheld. Refusing " +
+				"it made a native app's errors vanish with nothing on the wire (#41, #241)",
+		},
+		{
+			name: "loopback port flexibility is NOT granted on an implicit request",
+			database: func(t *testing.T) *mocks_data.Database {
+				return registeredDatabase(t, "http://127.0.0.1/cb")
+			},
+			client:       &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			redirectURI:  "http://127.0.0.1:49152/cb",
+			responseType: "token",
+			want:         false,
+			why: "the same token-sequence test /auth/authorize and /auth/issue apply: flexibility is scoped to " +
+				"the authorization code flow, because an implicit response carries tokens in the fragment where " +
+				"PKCE cannot mitigate interception. /auth/authorize refused this URI at the front door on the " +
+				"same rule, so the ceremony cannot legitimately be here (#41)",
+		},
+		{
+			name: "a multi-token response type buys no loopback port",
+			database: func(t *testing.T) *mocks_data.Database {
+				return registeredDatabase(t, "http://127.0.0.1/cb")
+			},
+			client:       &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			redirectURI:  "http://127.0.0.1:49152/cb",
+			responseType: "code code",
+			want:         false,
+			why: "read off the token sequence rather than off ParseResponseType, which collapses duplicates and " +
+				"ignores unrecognised values, so \"code code\" and \"code foo\" are HasCode && !HasToken && " +
+				"!HasIdToken and must not buy an arbitrary port. The same reasoning as the validator's own gate",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := redirectWillBeEmitted(tc.database(t), tc.client, tc.redirectURI, "TestRedirectWillBeEmitted")
+			got := redirectWillBeEmitted(tc.database(t), tc.client, tc.redirectURI, tc.responseType,
+				"TestRedirectWillBeEmitted")
 
 			assert.Equal(t, tc.want, got, tc.why)
 		})
 	}
+}
+
+// The predicate reads the database, so the two answers one authorization request gets from it need
+// not agree, and only one direction of disagreement is safe. This is the unsafe one: the pre-routing
+// reader was refused, which is what made answering the client at once safe under RFC 9700 4.11.2,
+// and the emitter must not then discard that refusal because its own read succeeded or saw the
+// callback re-added.
+//
+// Asserted at the emitter rather than end to end because that is where the floor is enforced and
+// where a later edit would drop it. The end-to-end shape is the sequential-read case in
+// TestHandleAuthorizeGet_RegistrationReadFailsThenSucceeds (#241).
+func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/authorize", nil)
+
+	httpHelper.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
+		mock.MatchedBy(func(data map[string]interface{}) bool {
+			// The host, not the URI: redirectDestinationLabel reduces it, as its own table pins.
+			return data["destination"] == "legit.example"
+		})).Return(nil)
+
+	input := testRedirectError("invalid_scope", "Invalid scope", "query", "https://legit.example/cb",
+		"abc123", "code")
+	input.redirectAlreadyWithheld = true
+
+	// No expectation on the database at all: the floor must short-circuit above the live gates, so
+	// a registration read reaching this mock fails the case. That is the ordering claim, and it is
+	// what stops a "helpful" edit from re-asking and taking the newer answer.
+	err := redirToClientWithError(w, r, mocks_data.NewDatabase(t), httpHelper, nil, input)
+
+	require.NoError(t, err)
+	assert.Empty(t, w.Header().Get("Location"),
+		"a refusal already given must never be overturned by a second read: that is attack 1 of RFC 9700 4.11.2")
+	httpHelper.AssertExpectations(t)
 }
 
 func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
@@ -3794,4 +3867,134 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 		"the emoji is one ? and not four, and the cookie never carries a byte RFC 6749 forbids")
 
 	authHelper.AssertExpectations(t)
+}
+
+// One authorization request asks redirectWillBeEmitted twice: HandleAuthorizeGet asks it before
+// routing, to decide whether a validation failure may be answered at once or has to be parked behind
+// a login, and the emitter asks it again at the last moment. Since the predicate started reading the
+// registration table (#241 decision 11) those two answers need not agree, and the disagreement has a
+// safe direction and an unsafe one.
+//
+// The unsafe one is a real bypass, not a theoretical one. A refusal from the first read is what
+// makes answerClientNow true, on the reasoning that no redirect leaves this server so RFC 9700
+// 4.11.2 has nothing to govern. If the second read then says yes, that reasoning has been discarded
+// while its conclusion is kept: a logged-out browser holding one crafted link is redirected to the
+// client's host on a request this server refused, which is attack 1 of that section verbatim and
+// exactly what #213's deferral machinery exists to prevent.
+//
+// Both rows drive the whole handler rather than the emitter alone, because the defect is in how the
+// two readers compose and neither one is wrong by itself.
+func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
+	const redirectURI = "https://legit.example/cb"
+
+	for _, tc := range []struct {
+		name       string
+		hasSession bool
+		firstRead  func(*mocks_data.Database)
+		secondRead func(*mocks_data.Database)
+		wantReads  int
+		why        string
+	}{
+		{
+			name:       "a refusal is never widened into a redirect",
+			hasSession: false,
+			firstRead: func(database *mocks_data.Database) {
+				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+					Return(nil, errors.New("the database is unavailable")).Once()
+			},
+			secondRead: func(database *mocks_data.Database) {
+				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+					Return([]models.RedirectURI{{URI: redirectURI}}, nil).Maybe()
+			},
+			wantReads: 1,
+			why: "the first read failed, which is what routed this logged-out browser to an immediate " +
+				"answer instead of a login. The second read recovering must not turn that into a 302: " +
+				"the refusal is a floor, carried on redirectAlreadyWithheld",
+		},
+		{
+			name:       "a permission is still narrowed into a refusal",
+			hasSession: true,
+			firstRead: func(database *mocks_data.Database) {
+				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+					Return([]models.RedirectURI{{URI: redirectURI}}, nil).Once()
+			},
+			secondRead: func(database *mocks_data.Database) {
+				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+					Return([]models.RedirectURI{}, nil).Maybe()
+			},
+			wantReads: 2,
+			why: "the other direction, and it must still work: an administrator deleting the callback " +
+				"between the two reads is the whole point of the gate, so a yes may become a no. Without " +
+				"this row the floor could be implemented as a cache and nothing would notice",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			userSessionManager := mocks_user.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			permissionChecker := mocks_user.NewPermissionChecker(t)
+			tokenParser := mocks_oauth.NewTokenParser(t)
+
+			handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil,
+				authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
+				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
+			req := httptest.NewRequest("GET", target, nil)
+			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+				&models.Settings{}))
+			rr := httptest.NewRecorder()
+
+			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+			authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+			authorizeValidator.On("ValidateClientAndRedirectURI",
+				mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+				&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: false}, nil)
+			authorizeValidator.On("ValidateUnsupportedRequestParameters",
+				mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
+			authorizeValidator.On("ValidateRequest",
+				mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+			authorizeValidator.On("ValidateScopes", "openid bogus").Return(
+				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+					"Invalid scope format: 'bogus'.", http.StatusBadRequest))
+
+			// Strictly sequential, which is the whole fixture: the first read is consumed .Once()
+			// and the second answer is left standing, rather than one stable stub answering both.
+			// A stub that answers both reads identically cannot express a disagreement, which is
+			// why the existing tables did not catch this.
+			//
+			// The second answer is the DANGEROUS one and it is deliberately left available: the
+			// row does not prove the floor by withholding the temptation, it proves it by making
+			// the wrong answer reachable and then asserting the code never went back for it.
+			tc.firstRead(database)
+			tc.secondRead(database)
+
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
+				Return(&models.UserSession{Id: 1, UserId: 1}, nil).Maybe()
+			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+				Return(tc.hasSession).Maybe()
+
+			httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
+				"/auth_redirect_blocked.html", mock.Anything).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Empty(t, rr.Header().Get("Location"),
+				"a withheld redirect must never become a Location: %s", tc.why)
+
+			// The count is the assertion that separates the two rows. One read means the emitter
+			// short-circuited on the floor instead of asking again; two means it asked and took
+			// the newer, stricter answer. Caching the first answer would make both rows read once
+			// and the second row would fail.
+			database.AssertNumberOfCalls(t, "GetRedirectURIsByClientId", tc.wantReads)
+
+			httpHelper.AssertExpectations(t)
+			authHelper.AssertExpectations(t)
+		})
+	}
 }

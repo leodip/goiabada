@@ -90,7 +90,7 @@ https://my-app.com/callback?error=login_required&error_description=User+authenti
 <Aside type="caution">
 **A self-registered client gets no error back at all.** A client that registered itself through [dynamic client registration](/concepts/clients/#dynamic-client-registration-rfc-7591) requires consent by default, so its first silent request for a user cannot be completed, and Goiabada [withholds its error redirects](/concepts/clients/#security-considerations) rather than delivering any of the errors above. The request simply does not come back.
 
-Treat a silent request that does not return as "send the user through an ordinary authorization". Do that once, without `prompt=none`, and silent renewal works from then on for the scopes they consented to. Clients an administrator registered are unaffected.
+Treat a silent request that does not return as "send the user through an ordinary authorization". Do that once, without `prompt=none`, and silent renewal works from then on for the scopes they consented to. Clients an administrator registered are unaffected, unless the `redirect_uri` has since been removed from the client: that withholds the error too.
 </Aside>
 
 ## prompt=login (force re-authentication)
