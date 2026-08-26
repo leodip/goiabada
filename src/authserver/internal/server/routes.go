@@ -115,7 +115,7 @@ func (s *Server) initRoutes() {
 		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, authHelper, s.database, otpSecretGenerator))
 		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter))
 		r.Get("/consent", handlers.HandleConsentGet(httpHelper, authHelper, s.database))
-		r.Post("/consent", handlers.HandleConsentPost(httpHelper, authHelper, s.database, s.templateFS, auditLogger))
+		r.Post("/consent", handlers.HandleConsentPost(httpHelper, authHelper, s.database, s.templateFS, auditLogger, permissionChecker))
 		// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force)
 		r.With(rateLimiter.LimitROPC).Post("/token", handlers.HandleTokenPost(httpHelper, userSessionManager, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter))
 		r.Get("/logout", handlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, authHelper, s.database, tokenParser, auditLogger))

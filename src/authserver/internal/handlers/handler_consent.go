@@ -176,6 +176,7 @@ func HandleConsentPost(
 	database data.Database,
 	templateFS fs.FS,
 	auditLogger AuditLogger,
+	permissionChecker PermissionChecker,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
@@ -301,6 +302,68 @@ func HandleConsentPost(
 					return
 				}
 
+				// The ticked selection is weighed against the permissions the user holds NOW,
+				// which need not be the ones they held when the screen was rendered. The row
+				// this branch is about to write grants nothing on its own, since every reader
+				// pairs it with a live permission check, but it suppresses the consent screen on
+				// later ceremonies: an unfiltered row means a permission granted back months
+				// later is covered by a tick the user made at a moment when they did not hold
+				// it, and the user's own consents page lists a scope the application can never
+				// use (#241).
+				//
+				// Above the consent row load rather than beside the join below, so a selection
+				// the filter empties refuses without reading or writing anything.
+				grantedScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(
+					strings.Join(grantedScopes, " "), user)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+
+				if grantedScope == "" {
+					slog.Warn("the consented selection holds no permission the user still has, so no consent is recorded",
+						"userId", user.Id,
+						"clientIdentifier", authContext.ClientId)
+
+					// A DIFFERENT refusal from the one above, deliberately. That one answers a
+					// user who ticked nothing, which is a choice they made; this one answers a
+					// selection an administrator emptied, which is not. The wording and the
+					// error code are /auth/completed's for the same condition arriving later,
+					// so the same removal gets one answer wherever it lands (#241 decision 3).
+					//
+					// The clear goes FIRST, for the reason the two refusals above state: a
+					// Set-Cookie written after redirToClientWithError has committed never
+					// reaches the wire, so the browser would keep an auth context in
+					// requires_consent that a replay of GET /auth/consent can still turn into a
+					// code (#141).
+					err = authHelper.ClearAuthContext(w, r)
+					if err != nil {
+						// The clear failed, so Save wrote no cookie and the browser still holds
+						// the auth context. The client is owed an error response regardless: its
+						// redirect URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with
+						// 3.1.2.6 applies, and RFC 6749 4.1.2.1 mints server_error for exactly
+						// this condition (#141).
+						slog.Error("failed to clear the auth context, answering the client with server_error",
+							"error", err)
+						err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+							redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
+						if err != nil {
+							// Nowhere left to send the client, so the 500 is the last resort here.
+							httpHelper.InternalServerError(w, r, err)
+						}
+						return
+					}
+
+					err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+						redirectErrorFromAuthContext(authContext, client,
+							"access_denied", "The user is not authorized to access any of the requested scopes"))
+					if err != nil {
+						httpHelper.InternalServerError(w, r, err)
+						return
+					}
+					return
+				}
+
 				consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -315,9 +378,11 @@ func HandleConsentPost(
 					}
 				}
 
-				// The join assigns the whole selection, so an existing consent is replaced rather
-				// than appended to.
-				consent.Scope = strings.Join(grantedScopes, " ")
+				// The assignment takes the whole filtered selection, so an existing consent is
+				// replaced rather than appended to. FilterOutScopesWhereUserIsNotAuthorized
+				// returns a trimmed single-spaced join in the order it was given, which is what
+				// strings.Join produced here before the filter was added.
+				consent.Scope = grantedScope
 
 				if consent.Id > 0 {
 					err = database.UpdateUserConsent(nil, consent)

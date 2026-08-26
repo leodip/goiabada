@@ -19,10 +19,23 @@ import (
 	mocks_test "github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+// stubUserHoldsEveryScope makes the live permission re-check on the consent submission a
+// pass-through, for the cases whose subject is something other than the filter.
+//
+// It returns the selection it was handed rather than a fixed string, so a case that changes what
+// it ticks keeps asserting against its own selection instead of one the stub invented. The cases
+// that never reach the approval branch are given a bare mock with no expectation at all, which is
+// what says the filter is not consulted on a cancel, a stale ceremony or a rejected body (#241).
+func stubUserHoldsEveryScope(permissionChecker *mocks_user.PermissionChecker) {
+	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything).
+		Return(func(scope string, user *models.User) string { return scope }, nil)
+}
 
 func TestBuildScopeInfoArray(t *testing.T) {
 	t.Run("Empty scope", func(t *testing.T) {
@@ -444,7 +457,9 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("POST", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -468,7 +483,9 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -562,7 +579,9 @@ func TestHandleConsentPost(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+				permissionChecker := mocks_user.NewPermissionChecker(t)
+
+				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
 				form := url.Values{}
 				if tc.btn == "btnSubmit" {
@@ -618,7 +637,9 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -665,7 +686,9 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -720,7 +743,9 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -771,7 +796,9 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -813,7 +840,11 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+
+		stubUserHoldsEveryScope(permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -871,7 +902,11 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+
+		stubUserHoldsEveryScope(permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -929,6 +964,159 @@ func TestHandleConsentPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
+	// The consent record is filtered against the permissions the user holds NOW, not the ones the
+	// screen was rendered from. The row grants nothing on its own, but it suppresses the consent
+	// screen on later ceremonies, so a scope the user no longer holds must never be written into
+	// it (#241 decision 3).
+	t.Run("A ticked scope the user no longer holds is not recorded", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("consent0", "openid")
+		form.Add("consent1", "backend:read")
+		form.Add("consent2", "backend:write")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:  oauth.AuthStateRequiresConsent,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
+			Scope:      "openid backend:read backend:write",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		user := &models.User{Id: 1}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		// The whole ticked selection is what the filter is asked about, and backend:write is what
+		// it takes away. Matched exactly rather than with mock.Anything, so a future edit that
+		// filters something other than the selection fails here rather than passing.
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized",
+			"openid backend:read backend:write", user).Return("openid backend:read", nil)
+
+		database.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(nil, nil)
+
+		var persisted *models.UserConsent
+		database.On("CreateUserConsent", mock.Anything, mock.MatchedBy(func(consent *models.UserConsent) bool {
+			persisted = consent
+			return true
+		})).Return(nil)
+
+		auditLogger.On("Log", constants.AuditSavedConsent, mock.Anything).Return()
+
+		var saved *oauth.AuthContext
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			saved = ac
+			return true
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+		if assert.NotNil(t, persisted) {
+			assert.Equal(t, "openid backend:read", persisted.Scope,
+				"a permission the user no longer holds must not reach the consent record")
+		}
+		if assert.NotNil(t, saved) {
+			assert.Equal(t, "openid backend:read", saved.ConsentedScope,
+				"the ceremony carries the filtered grant forward, not the ticked one")
+		}
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	// The second empty case, and the reason there are two. "No consent given" above answers a user
+	// who ticked nothing, which is a choice they made; this answers a selection an administrator
+	// emptied, which is not. Both are access_denied and the descriptions are what tell them apart.
+	t.Run("A selection the filter empties is refused, and says so differently", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("consent0", "backend:read")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &oauth.AuthContext{
+			AuthState:    oauth.AuthStateRequiresConsent,
+			CeremonyId:   testCeremonyId,
+			UserId:       1,
+			ClientId:     "test-client",
+			Scope:        "backend:read",
+			ResponseMode: "query",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		user := &models.User{Id: 1}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "backend:read", user).
+			Return("", nil)
+
+		// The clear has to land on the wire before the redirect commits, so the sentinel is the
+		// same one the two older refusals use (#141).
+		const clearedContextCookie = "cleared-auth-context"
+		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
+		}).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+
+		location, err := url.Parse(rr.Header().Get("Location"))
+		assert.NoError(t, err)
+		assert.Equal(t, "access_denied", location.Query().Get("error"))
+		assert.Equal(t, "The user is not authorized to access any of the requested scopes",
+			location.Query().Get("error_description"),
+			"an emptied selection is /auth/completed's condition arriving later, and takes its wording")
+
+		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
+			"the auth context must be cleared before the client response is committed")
+
+		// No consent row is read and none is written, which the mock enforces by having no
+		// expectation for either call.
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
 	t.Run("No consent given", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -936,7 +1124,9 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -967,6 +1157,13 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), "https://example.com/callback?error=access_denied")
 
+		// The description is pinned here and in "A selection the filter empties is refused", and
+		// the pair is what keeps the two access_denied refusals from collapsing into one: this is
+		// a user who chose nothing, and that one is a user whose choice was emptied for them.
+		location, err := url.Parse(rr.Header().Get("Location"))
+		assert.NoError(t, err)
+		assert.Equal(t, "The user did not provide consent", location.Query().Get("error_description"))
+
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
 			"the auth context must be cleared before the client response is committed")
 
@@ -981,7 +1178,9 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1029,7 +1228,9 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1075,7 +1276,9 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1333,7 +1536,9 @@ func TestHandleConsentPost(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+				permissionChecker := mocks_user.NewPermissionChecker(t)
+
+				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
 				scopes := scopeList(tc.scopeCount)
 
@@ -1387,6 +1592,11 @@ func TestHandleConsentPost(t *testing.T) {
 					assert.Contains(t, rr.Header().Get("Location"),
 						"https://example.com/callback?error=access_denied")
 				} else {
+					// The counterpart of the stub above: only the approving rows reach the
+					// permission re-check, so stubbing it above the split would leave the
+					// refusing rows carrying an expectation nothing calls.
+					stubUserHoldsEveryScope(permissionChecker)
+
 					grantedScopes := make([]string, 0, len(tc.granted))
 					for _, idx := range tc.granted {
 						grantedScopes = append(grantedScopes, scopes[idx])
@@ -1444,7 +1654,11 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+
+		stubUserHoldsEveryScope(permissionChecker)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")

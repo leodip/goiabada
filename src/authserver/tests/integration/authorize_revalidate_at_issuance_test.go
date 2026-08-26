@@ -18,17 +18,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// The three cases in this file are one window seen three ways. /auth/completed establishes that
+// The cases in this file are one window seen several ways. /auth/completed establishes that
 // the session is valid, that the user holds the permissions behind the requested scopes, and
 // (back at /auth/authorize) that the redirect URI is registered; the consent screen then holds
 // the ceremony for as long as a person takes to read it; and /auth/issue re-establishes all
 // three immediately before it mints anything (#241).
 //
-// Each one mutates exactly the thing its check is about, in the window between the consent
-// submission and the last hop, and asserts what the client did not get.
-// TestSessionEndedOnConsentScreen_NoCodeIsIssued in session_deletion_test.go is the sibling
+// Each one mutates exactly the thing its check is about while the ceremony is held, and asserts
+// what the client did not get. Most mutate between the consent submission and the last hop, which
+// is the window the gate at /auth/issue closes; two mutate before the submission instead, because
+// a Cancel and the consent record are both decided by HandleConsentPost and never reach another
+// hop. TestSessionEndedOnConsentScreen_NoCodeIsIssued in session_deletion_test.go is the sibling
 // these are written to match: it deletes the session row, which is the case #129 already
-// closed, and these three are what a row that survives can still be wrong about.
+// closed, and these are what a row that survives can still be wrong about.
 
 // parkedCeremony is a ceremony stopped on its consent screen, with everything a case needs to
 // mutate the world and then let it finish.
@@ -382,4 +384,84 @@ func TestRedirectURIDeletedOnConsentScreen_CancelIsNotDeliveredEither(t *testing
 	assert.NoError(t, err)
 	assert.Contains(t, page, deletedHost.Host,
 		"the page names the destination the request was stopped from reaching")
+}
+
+// TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt is the other side of the
+// window TestPermissionRevokedOnConsentScreen_TokenLosesTheScope covers, and the two are
+// deliberately not the same test twice.
+//
+// There the revocation lands AFTER the consent POST, so the user still held the permission when
+// they ticked the box and the consent record is a true account of what they agreed to. Here it
+// lands BEFORE, while the browser is parked on a screen that was rendered from the permissions
+// they had a moment ago. The tick is still submitted, because the checkbox is on a page the
+// revocation cannot reach, and the filter on the submission is the only thing between it and a
+// stored grant.
+//
+// The record grants nothing on its own, since every reader pairs it with a live permission check.
+// What it does is suppress the consent screen on later ceremonies, so a row naming a permission
+// the user did not hold would let a permission granted back months later ride in on a tick made
+// when it was gone (#241 decision 3).
+func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *testing.T) {
+	resource := createResource(t)
+	readPermission := createPermission(t, resource.Id)
+	writePermission := createPermission(t, resource.Id)
+
+	readScope := resource.ResourceIdentifier + ":" + readPermission.PermissionIdentifier
+	writeScope := resource.ResourceIdentifier + ":" + writePermission.PermissionIdentifier
+
+	clientSecret := gofakeit.LetterN(32)
+	parked := parkOnConsentScreen(t, "openid profile "+readScope+" "+writeScope,
+		clientSecret, "code-verifier", []string{readScope, writeScope})
+	defer func() { _ = parked.consentPage.Body.Close() }()
+
+	// The window: the consent screen is rendered and on it, with both boxes offered, and the
+	// administrator takes the write permission away before the user clicks Submit.
+	permissions, err := database.GetUserPermissionsByUserId(nil, parked.user.Id)
+	assert.NoError(t, err)
+	revoked := false
+	for _, permission := range permissions {
+		if permission.PermissionId == writePermission.Id {
+			err = database.DeleteUserPermission(nil, permission.Id)
+			assert.NoError(t, err)
+			revoked = true
+		}
+	}
+	assert.True(t, revoked, "the write permission must have been granted before it can be revoked")
+
+	// Every box, the revoked one included: the page was built before the revocation and the
+	// browser has no way to know.
+	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3})
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation := assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, parked.httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	assert.Equal(t, parked.state, stateVal)
+
+	data := postToTokenEndpoint(t, parked.httpClient, config.GetAuthServer().BaseURL+"/auth/token/",
+		url.Values{
+			"grant_type":    {"authorization_code"},
+			"code":          {codeVal},
+			"redirect_uri":  {parked.redirectURI.URI},
+			"code_verifier": {"code-verifier"},
+			"client_id":     {parked.client.ClientIdentifier},
+			"client_secret": {clientSecret},
+		})
+
+	assert.NotNil(t, data["access_token"], "the narrowed grant is still a grant: %v", data)
+	grantedScope, _ := data["scope"].(string)
+	assert.Contains(t, grantedScope, readScope,
+		"the permission the user still holds must survive the filter")
+	assert.NotContains(t, grantedScope, writeScope,
+		"a permission revoked before the consent submission must not reach the client")
+
+	// The half this case exists for, and the half its sibling asserts the opposite of.
+	consent, err := database.GetConsentByUserIdAndClientId(nil, parked.user.Id, parked.client.Id)
+	assert.NoError(t, err)
+	assert.NotNil(t, consent)
+	assert.Contains(t, consent.Scope, readScope)
+	assert.NotContains(t, consent.Scope, writeScope,
+		"a tick on a permission the user had already lost must not be recorded as a consent")
 }
