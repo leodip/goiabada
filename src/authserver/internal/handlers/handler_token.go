@@ -171,6 +171,27 @@ func HandleTokenPost(
 				})
 			}
 
+			// The redemption half of #241's registration boundary. The validator refuses an
+			// authorization code whose own redirect URI has been deregistered since it was
+			// minted, and this is what makes that refusal answerable from the admin console
+			// and GET /api/v1/admin/audit-logs rather than only from a server log file
+			// (decision 10). Matched by value against the sentinel for the reason the
+			// ErrUserDisabled block above is: the code is invalid_grant, which 22 unrelated
+			// failures also carry, so a bare code test would name the wrong ones.
+			//
+			// clientIdentifier, the string from the request, rather than the numeric clientId
+			// the issuance events use, for the reason AuditTokenScopeDenied gives: the
+			// validator discards the client model on failure. Unlike that event, this one is
+			// reached only below client authentication and PKCE, so the identifier here has
+			// been proved rather than merely asserted.
+			if errDetail, ok := err.(*customerrors.ErrorDetail); ok &&
+				errDetail.IsError(customerrors.ErrCodeRedirectURIDeregistered) {
+
+				auditLogger.Log(constants.AuditRedemptionRefusedRedirectURI, map[string]interface{}{
+					"clientIdentifier": input.ClientId,
+				})
+			}
+
 			// Record scope validation failures, on any grant type. Nothing recorded them before.
 			//
 			// **What this is and is not.** It is every authenticated invalid_scope failure from the

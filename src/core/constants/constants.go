@@ -322,6 +322,23 @@ const (
 	// the three whose refusal reaches the client with nothing at all, not even an error: the
 	// destination is exactly what this server may no longer navigate a browser to.
 	AuditIssuanceRefusedRedirectURI = "issuance_refused_redirect_uri"
+
+	// AuditRedemptionRefusedRedirectURI records an authorization code exchange refused at the
+	// token endpoint because the redirect URI recorded on the code is no longer registered on
+	// the client. It is the same fact as AuditIssuanceRefusedRedirectURI arriving one step
+	// later, and it exists because a code minted a second before the deregistration would
+	// otherwise stay redeemable for the rest of its 60 second life (#241 decision 5).
+	//
+	// It attests that check alone. A request whose submitted redirect_uri merely differs from
+	// the one on the code is a different refusal, answered generically much earlier in the
+	// arm, and writes no row: this event means the registration was withdrawn, not that the
+	// caller sent the wrong value.
+	//
+	// A row here is worth looking at. The check sits below client authentication and PKCE, so
+	// whoever produced it had proved possession, which makes it either an administrator
+	// rotating a callback inside the window or a grant being redeemed after its destination
+	// was deliberately pulled.
+	AuditRedemptionRefusedRedirectURI = "redemption_refused_redirect_uri"
 )
 
 // AuditEventTypes is the canonical list of all audit event type strings.
@@ -375,6 +392,7 @@ var AuditEventTypes = []string{
 	AuditLogout,
 	AuditOTPCodeReplayDetected,
 	AuditRateLimitExceeded,
+	AuditRedemptionRefusedRedirectURI,
 	AuditRefreshTokenReplayDetected,
 	AuditRevokedClientGrants,
 	AuditRevokedKey,

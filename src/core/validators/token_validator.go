@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
+	"github.com/leodip/goiabada/core/urlutil"
 )
 
 type PermissionChecker interface {
@@ -358,6 +359,46 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"Code is invalid.", http.StatusBadRequest)
 			}
+		}
+
+		// The registration boundary (#241 decision 5). The comparison near the top of this arm
+		// weighs the submitted redirect_uri against the one stored on the code, and the stored
+		// one is a copy taken at minting that nothing ever rematches against the client. So
+		// without this, a code delivered one second before an administrator removes a callback
+		// is still redeemable for the rest of its 60 second life, and the tokens it yields
+		// outlive that by their whole lifetime.
+		//
+		// Read from the client loaded and authenticated at the top of ValidateTokenRequest,
+		// whose identifier this arm has already matched against the code's.
+		//
+		// The flexibility flag is unconditionally TRUE, unlike the emitter's gate, which passes
+		// false. A code exists only for response_type=code: ValidateRequest admits exactly
+		// code, token, id_token and id_token token, and the last three are dispatched to the
+		// implicit branch, which mints none. RFC 8252 flexibility is therefore required rather
+		// than optional here, because a native app's code stores the requested URI with its
+		// ephemeral loopback port and would never exact-match the registered portless form. It
+		// can only be more permissive than the gate this same stored value already passed at
+		// /auth/authorize, so it admits nothing that was refused there.
+		//
+		// Placed at the very END of the arm, below the revoked and ownership checks, and below
+		// client authentication and PKCE for the #137 reason those two give: an unauthenticated
+		// presenter of a stolen code must not learn from the answer whether the grant's state
+		// moved. Last rather than merely late because this is the one refusal in the group that
+		// says what happened; a revoked or cross-bound code must keep the flat "Code is
+		// invalid." it has today, and it would not if this ran first.
+		//
+		// A failed load is PROPAGATED, not read as a refusal, matching the ownership lookup
+		// above: an unreachable database says nothing about whether the URI is registered.
+		err = val.database.ClientLoadRedirectURIs(nil, client)
+		if err != nil {
+			return nil, err
+		}
+		registered := make([]string, 0, len(client.RedirectURIs))
+		for _, redirectURI := range client.RedirectURIs {
+			registered = append(registered, redirectURI.URI)
+		}
+		if !urlutil.RedirectURIIsRegistered(registered, codeEntity.RedirectURI, true) {
+			return nil, customerrors.ErrCodeRedirectURIDeregistered
 		}
 
 		return &ValidateTokenRequestResult{
