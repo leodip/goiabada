@@ -1,4 +1,5 @@
-// Package urlutil holds dependency-free helpers for comparing redirect URIs.
+// Package urlutil holds dependency-free helpers for comparing redirect URIs and for
+// canonicalizing browser origins.
 //
 // It deliberately knows nothing about OAuth2 concepts: callers decide which flows a given
 // rule applies to. Loopback port flexibility is scoped to the authorization code flow, and
