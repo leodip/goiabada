@@ -90,6 +90,60 @@ AND permission_id <> (
     WHERE p.permission_identifier = 'browser-sessions' AND r.resource_identifier = 'authserver'
 );
 
+-- The permission this file creates can be one an administrator already made (#266,
+-- decision 22). The INSERT above is guarded with NOT EXISTS so that re-running the
+-- migration inserts nothing, which means that on an installation where somebody had
+-- already added a permission named exactly 'browser-sessions' to the authserver resource
+-- it ADOPTS theirs rather than creating one. The session endpoint admits any token whose
+-- scope carries authserver:browser-sessions and checks nothing about who presents it, so
+-- from this release whatever that permission meant to them also means "may create and
+-- delete admin console browser sessions".
+--
+-- Every grant of it held by anyone other than admin-console-client is therefore removed,
+-- across all three principal tables. A user or a group grant is not a lesser case than a
+-- client one: the authorize endpoint filters a requested scope against what the principal
+-- holds, so such a grant carries into an ordinary access token and leaving those two would
+-- leave the widest version of this open.
+--
+-- Destructive in the same way as the strip above and recorded the same way: a grant an
+-- administrator meant is gone with no record of it, and the down migration cannot put it
+-- back. The release notes carry the line.
+--
+-- The client statement is the mirror of the one above, keyed on the PERMISSION and
+-- excluding the client where that one is keyed on the client and excludes the permission.
+-- It says NOT EXISTS rather than `<> (SELECT id FROM clients ...)` deliberately, because
+-- the two fail in opposite directions and only one of them is right here: with the scalar
+-- form, an absent admin-console-client yields NULL, `<> NULL` is unknown and nothing is
+-- deleted. But an installation with no admin console client has no legitimate holder of
+-- this permission at all, so every grant should go. NOT EXISTS is the form that does that.
+DELETE FROM clients_permissions
+WHERE permission_id = (
+    SELECT p.id FROM permissions p
+    JOIN resources r ON r.id = p.resource_id
+    WHERE p.permission_identifier = 'browser-sessions' AND r.resource_identifier = 'authserver'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM clients c
+    WHERE c.id = clients_permissions.client_id AND c.client_identifier = 'admin-console-client'
+);
+
+-- No user and no group may hold this permission, so these two exclude nobody. The scalar
+-- subquery yields NULL where the permission does not exist, and `= NULL` is unknown, so
+-- they delete nothing rather than everything.
+DELETE FROM users_permissions
+WHERE permission_id = (
+    SELECT p.id FROM permissions p
+    JOIN resources r ON r.id = p.resource_id
+    WHERE p.permission_identifier = 'browser-sessions' AND r.resource_identifier = 'authserver'
+);
+
+DELETE FROM groups_permissions
+WHERE permission_id = (
+    SELECT p.id FROM permissions p
+    JOIN resources r ON r.id = p.resource_id
+    WHERE p.permission_identifier = 'browser-sessions' AND r.resource_identifier = 'authserver'
+);
+
 -- The boolean literal differs by engine and a wrong one matches nothing SILENTLY rather
 -- than failing: client_credentials_enabled is `numeric` here, `tinyint(1)` on MySQL and
 -- `BIT` on SQL Server, all of which take 1, and `boolean` on PostgreSQL, which takes

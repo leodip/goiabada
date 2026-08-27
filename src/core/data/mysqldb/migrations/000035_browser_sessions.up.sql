@@ -41,5 +41,36 @@ AND `permission_id` <> (
     WHERE p.`permission_identifier` = 'browser-sessions' AND r.`resource_identifier` = 'authserver'
 );
 
+-- Every grant of the browser-sessions permission held by any principal other than
+-- admin-console-client is deleted too, across all three principal tables (#266, decision
+-- 22). See the sqlite migration of the same number for why the guarded INSERT above can
+-- adopt a permission of that name an administrator already made, why a user or group grant
+-- is not a lesser case than a client one, and why the client statement says NOT EXISTS
+-- rather than excluding the client with a scalar subquery.
+DELETE FROM `clients_permissions`
+WHERE `permission_id` = (
+    SELECT p.`id` FROM `permissions` p
+    JOIN `resources` r ON r.`id` = p.`resource_id`
+    WHERE p.`permission_identifier` = 'browser-sessions' AND r.`resource_identifier` = 'authserver'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM `clients` c
+    WHERE c.`id` = `clients_permissions`.`client_id` AND c.`client_identifier` = 'admin-console-client'
+);
+
+DELETE FROM `users_permissions`
+WHERE `permission_id` = (
+    SELECT p.`id` FROM `permissions` p
+    JOIN `resources` r ON r.`id` = p.`resource_id`
+    WHERE p.`permission_identifier` = 'browser-sessions' AND r.`resource_identifier` = 'authserver'
+);
+
+DELETE FROM `groups_permissions`
+WHERE `permission_id` = (
+    SELECT p.`id` FROM `permissions` p
+    JOIN `resources` r ON r.`id` = p.`resource_id`
+    WHERE p.`permission_identifier` = 'browser-sessions' AND r.`resource_identifier` = 'authserver'
+);
+
 -- client_credentials_enabled is tinyint(1) here, so the literal is 1.
 UPDATE `clients` SET `client_credentials_enabled` = 1 WHERE `client_identifier` = 'admin-console-client';

@@ -40,6 +40,41 @@ AND permission_id <> (
     WHERE p.permission_identifier = 'browser-sessions' AND r.resource_identifier = 'authserver'
 );
 
+-- Every grant of the browser-sessions permission held by any principal other than
+-- admin-console-client is deleted too, across all three principal tables (#266, decision
+-- 22). See the sqlite migration of the same number for why the guarded INSERT above can
+-- adopt a permission of that name an administrator already made, why a user or group grant
+-- is not a lesser case than a client one, and why the client statement says NOT EXISTS
+-- rather than excluding the client with a scalar subquery.
+--
+-- The correlated reference is spelled clients_permissions.client_id without the schema:
+-- the DELETE's target enters the query's range table under the bare relation name, which
+-- is what an inner query correlates to.
+DELETE FROM public.clients_permissions
+WHERE permission_id = (
+    SELECT p.id FROM public.permissions p
+    JOIN public.resources r ON r.id = p.resource_id
+    WHERE p.permission_identifier = 'browser-sessions' AND r.resource_identifier = 'authserver'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM public.clients c
+    WHERE c.id = clients_permissions.client_id AND c.client_identifier = 'admin-console-client'
+);
+
+DELETE FROM public.users_permissions
+WHERE permission_id = (
+    SELECT p.id FROM public.permissions p
+    JOIN public.resources r ON r.id = p.resource_id
+    WHERE p.permission_identifier = 'browser-sessions' AND r.resource_identifier = 'authserver'
+);
+
+DELETE FROM public.groups_permissions
+WHERE permission_id = (
+    SELECT p.id FROM public.permissions p
+    JOIN public.resources r ON r.id = p.resource_id
+    WHERE p.permission_identifier = 'browser-sessions' AND r.resource_identifier = 'authserver'
+);
+
 -- client_credentials_enabled is a genuine `boolean` here, unlike the other three
 -- engines, so the literal is true. Writing 1 would be a type error rather than a silent
 -- no-op, but the pair is spelled out because the reverse mistake, `= true` on an integer

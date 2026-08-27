@@ -156,6 +156,99 @@ func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T
 		"the rest of the migration still runs")
 }
 
+// TestMigration000035_StripsBrowserSessionsGrantsFromEveryOtherPrincipal covers decision
+// 22, answered "B" on #267.
+//
+// The permission INSERT is guarded with NOT EXISTS so that re-running the migration adds
+// nothing, which is what the idempotence arm above pins. The other consequence of that
+// guard is the subject of this test: on an installation where an administrator had already
+// added a permission named exactly 'browser-sessions' to the built-in authserver resource,
+// the migration ADOPTS theirs rather than creating one, and from this release that
+// permission also authorizes the new session endpoint, because RequireBearerTokenScope
+// admits any token whose scope carries authserver:browser-sessions and checks nothing
+// about who presents it. Whatever the administrator meant by the name is silently widened.
+//
+// The fixture is reachable through supported journeys, which is why it is worth a test:
+// HandleAPIResourcePermissionsPut refuses only to delete or rename a BUILT-IN permission
+// and its create arm has no resource check at all, so a permission of any name can be
+// added to the authserver resource. A user or group grant is not a lesser case than a
+// client one either, because the authorize endpoint filters a requested scope against what
+// the principal holds, so such a grant reaches an ordinary access token.
+//
+// Three properties are asserted beyond the obvious one, and each is a way the statements
+// could be written wrong while still passing the first. The permission ROW must survive,
+// because the endpoint this whole migration exists for is authorized by it. The admin
+// console client's own grant must survive, because it is the one legitimate holder and
+// this same file creates it. And each principal's grant of a DIFFERENT permission must
+// survive, because the statements are keyed on this permission alone.
+//
+// Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
+//
+//	--run TestMigration000035_StripsBrowserSessionsGrantsFromEveryOtherPrincipal
+func TestMigration000035_StripsBrowserSessionsGrantsFromEveryOtherPrincipal(t *testing.T) {
+	h := newIsolatedDB(t)
+
+	require.NoError(t, h.Migrator.Migrate(34), "migrate to 000034")
+	resourceId, _ := seedInstallation000035(t, h)
+
+	// The administrator's own permission of that name, made before this release existed.
+	// The guarded INSERT adopts it rather than creating a second one.
+	browserSessionsId := seedBrowserSessionsPermission000035(t, h, resourceId)
+
+	// A second permission on the same resource that nothing in the migration names, held by
+	// the same three principals. Nothing may touch it.
+	manageId := seedPermission000035(t, h, resourceId, "manage", "Manage the authorization server")
+
+	otherClientId := seedClient000035(t, h, "some-other-client")
+	seedBrowserSessionsGrant000035(t, h, otherClientId, browserSessionsId)
+	seedBrowserSessionsGrant000035(t, h, otherClientId, manageId)
+
+	userId := seedUser000035(t, h, "mig35-holder")
+	seedUserGrant000035(t, h, userId, browserSessionsId)
+	seedUserGrant000035(t, h, userId, manageId)
+
+	groupId := seedGroup000035(t, h, "mig35-holders")
+	seedGroupGrant000035(t, h, groupId, browserSessionsId)
+	seedGroupGrant000035(t, h, groupId, manageId)
+
+	require.Equal(t, 1, countGrantOfPermission000035(t, h, "some-other-client", "browser-sessions"),
+		"fixture: another client holds the administrator's browser-sessions permission")
+	require.Equal(t, 1, countUserGrant000035(t, h, "browser-sessions"),
+		"fixture: a user holds it")
+	require.Equal(t, 1, countGroupGrant000035(t, h, "browser-sessions"),
+		"fixture: a group holds it")
+
+	require.NoError(t, h.Migrator.Migrate(35), "apply 000035")
+
+	assert.Equal(t, 0, countGrantOfPermission000035(t, h, "some-other-client", "browser-sessions"),
+		"another client's grant must go: the endpoint admits whoever carries the scope, so leaving "+
+			"it hands that client the ability to create admin console session rows at will")
+	assert.Equal(t, 0, countUserGrant000035(t, h, "browser-sessions"),
+		"a user's grant must go: the authorize endpoint filters a requested scope against what the "+
+			"user holds, so it reaches an ordinary access token")
+	assert.Equal(t, 0, countGroupGrant000035(t, h, "browser-sessions"),
+		"a group's grant must go, for the same reason a user's does")
+
+	assert.Equal(t, 1, countBrowserSessionsPermission000035(t, h),
+		"the permission ROW is adopted, not duplicated and not deleted: the endpoint this migration "+
+			"exists for is authorized by it")
+	assert.Equal(t, 1, countBrowserSessionsGrant000035(t, h),
+		"the admin console client is the one legitimate holder, and its grant is created by this "+
+			"same file, so the strip must not take it")
+	assert.Equal(t, 1, countGrantsForClient000035(t, h, "admin-console-client"),
+		"and browser-sessions is still the only permission it holds")
+
+	assert.Equal(t, 1, countGrantOfPermission000035(t, h, "some-other-client", "manage"),
+		"the statements are keyed on browser-sessions alone, so a client's other grants do not move")
+	assert.Equal(t, 1, countUserGrant000035(t, h, "manage"),
+		"nor do a user's")
+	assert.Equal(t, 1, countGroupGrant000035(t, h, "manage"),
+		"nor a group's")
+
+	assert.True(t, clientCredentialsEnabled000035(t, h),
+		"the rest of the migration still runs")
+}
+
 // assertAfter000035 is everything 000035 is responsible for, asserted in one place so the
 // apply arm and the down-then-up arm cannot drift apart.
 func assertAfter000035(t *testing.T, h *isolatedDB, when string) {
@@ -366,4 +459,103 @@ func tableExists000035(t *testing.T, h *isolatedDB, table string) bool {
 	var n int
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&n), "table catalog lookup: %s", table)
 	return n > 0
+}
+
+// seedUser000035 inserts one user. Every NOT NULL column without a default is named, so
+// the insert does not depend on per-engine defaults agreeing. Only one user is seeded, so
+// a NULL email would be safe even on SQL Server, where a unique index treats two NULLs as
+// equal; it is set anyway so the row does not depend on that staying true.
+func seedUser000035(t *testing.T, h *isolatedDB, name string) int64 {
+	t.Helper()
+
+	falseLit, trueLit := boolLiterals000031()
+	subject := "00000000-0000-4000-8000-000000000035"
+
+	_, err := h.SQL.Exec(fmt.Sprintf(`INSERT INTO users
+		(enabled, subject, username, email, email_verified, phone_number_verified,
+		 password_hash, otp_enabled)
+		VALUES (%s, '%s', '%s', '%s@test.local', %s, %s, 'x', %s)`,
+		trueLit, subject, name, name, falseLit, falseLit, falseLit))
+	require.NoError(t, err, "seed a user")
+
+	var id int64
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
+		"SELECT id FROM users WHERE subject = '%s'", subject)).Scan(&id),
+		"read back the seeded user id")
+	return id
+}
+
+// seedGroup000035 inserts one group. The table name is quoted per engine because MySQL
+// 8.0.2 made GROUPS a reserved word, so the bare name parses on three engines and fails on
+// the fourth.
+func seedGroup000035(t *testing.T, h *isolatedDB, identifier string) int64 {
+	t.Helper()
+
+	falseLit, _ := boolLiterals000031()
+
+	_, err := h.SQL.Exec(fmt.Sprintf(
+		`INSERT INTO %s (group_identifier, include_in_id_token, include_in_access_token)
+		 VALUES ('%s', %s, %s)`, groupsTable000035(), identifier, falseLit, falseLit))
+	require.NoError(t, err, "seed a group")
+
+	var id int64
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
+		"SELECT id FROM %s WHERE group_identifier = '%s'", groupsTable000035(), identifier)).Scan(&id),
+		"read back the seeded group id")
+	return id
+}
+
+func groupsTable000035() string {
+	switch dbType() {
+	case "mysql":
+		return "`groups`"
+	case "mssql":
+		return "[groups]"
+	default: // sqlite, postgres
+		return `"groups"`
+	}
+}
+
+func seedUserGrant000035(t *testing.T, h *isolatedDB, userId, permissionId int64) {
+	t.Helper()
+	_, err := h.SQL.Exec(fmt.Sprintf(
+		`INSERT INTO users_permissions (user_id, permission_id) VALUES (%d, %d)`,
+		userId, permissionId))
+	require.NoError(t, err, "seed the user permission grant")
+}
+
+func seedGroupGrant000035(t *testing.T, h *isolatedDB, groupId, permissionId int64) {
+	t.Helper()
+	_, err := h.SQL.Exec(fmt.Sprintf(
+		`INSERT INTO groups_permissions (group_id, permission_id) VALUES (%d, %d)`,
+		groupId, permissionId))
+	require.NoError(t, err, "seed the group permission grant")
+}
+
+// countUserGrant000035 and countGroupGrant000035 count grants of one permission on the
+// authserver resource across every principal of that kind, not per principal: the
+// migration's statements exclude nobody there, so the number a correct migration leaves is
+// zero whoever held it.
+func countUserGrant000035(t *testing.T, h *isolatedDB, permissionIdentifier string) int {
+	t.Helper()
+	var n int
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
+		`SELECT COUNT(*) FROM users_permissions up
+		 JOIN permissions p ON p.id = up.permission_id
+		 JOIN resources r ON r.id = p.resource_id
+		 WHERE p.permission_identifier = '%s' AND r.resource_identifier = 'authserver'`,
+		permissionIdentifier)).Scan(&n), "count the user grants of one permission")
+	return n
+}
+
+func countGroupGrant000035(t *testing.T, h *isolatedDB, permissionIdentifier string) int {
+	t.Helper()
+	var n int
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
+		`SELECT COUNT(*) FROM groups_permissions gp
+		 JOIN permissions p ON p.id = gp.permission_id
+		 JOIN resources r ON r.id = p.resource_id
+		 WHERE p.permission_identifier = '%s' AND r.resource_identifier = 'authserver'`,
+		permissionIdentifier)).Scan(&n), "count the group grants of one permission")
+	return n
 }
