@@ -405,3 +405,5 @@ CREATE TABLE browser_sessions (
 );
 CREATE UNIQUE INDEX idx_browser_sessions_owner_hash ON browser_sessions(owner, session_id_hash);
 CREATE INDEX idx_browser_sessions_expires_at ON browser_sessions(expires_at);
+
+CREATE INDEX idx_refresh_tokens_client_id ON refresh_tokens(client_id);
