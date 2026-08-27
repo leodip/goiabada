@@ -352,6 +352,46 @@ type Database interface {
 	DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error
 	DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error
 
+	// A browser session is the state the session cookie used to carry. The cookie now
+	// holds an opaque identifier and the row holds everything else (#266).
+	//
+	// Every method is keyed on (owner, sessionIdHash) rather than on the surrogate id,
+	// because the store never holds the id: it has an identifier from a cookie and the
+	// name of the application asking. That pair is the table's unique index.
+	CreateBrowserSession(tx *sql.Tx, browserSession *models.BrowserSession) error
+	// GetBrowserSessionByOwnerAndSessionIdHash returns the live session, or nil if there
+	// is none. `now` is an active-expiry predicate and not a hint: the statement matches
+	// only expires_at > now, so an expired row reads as absent whether or not the reaper
+	// has reached it. Without that term the idle timeout and the maximum lifetime would
+	// be a deletion schedule rather than a request-time rule, and a session would
+	// survive every one of its own deadlines until a sweep happened to run.
+	//
+	// nil and an error are different answers and must stay that way: nil is "there is no
+	// such session", which is a fresh session, and an error is "I could not ask", which
+	// is a refused request. Collapsing the second into the first would silently sign
+	// everyone out during any database interruption.
+	GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*models.BrowserSession, error)
+	// UpdateBrowserSessionData replaces one session's contents and moves its deadlines.
+	// Narrow rather than the house's full-row Update<Model> because it sits on a
+	// per-request path and because the caller holds no id, the reason
+	// PromoteUserSessionOtpConfigGeneration is narrow.
+	//
+	// It reports whether a row TRANSITIONED, not whether one matched: false means the
+	// session is gone or expired, which is what lets the caller tell "written" from "the
+	// row is no longer there". The expires_at > now term is in the WHERE for the reason
+	// it is in the read, so a write can never touch an expired row back to life.
+	UpdateBrowserSessionData(tx *sql.Tx, owner, sessionIdHash, data string, now, expiresAt time.Time) (bool, error)
+	// TouchBrowserSession records that a live session was used, and reports whether a row
+	// transitioned. It moves expires_at as well as last_accessed: the idle window is
+	// expressed in expires_at, so a touch that left it alone would never extend the
+	// session and the idle timeout would behave as an absolute one.
+	TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
+	DeleteBrowserSession(tx *sql.Tx, owner, sessionIdHash string) error
+	// DeleteExpiredBrowserSessions reaps on expires_at alone, across both owners. The
+	// row was already unusable before this ran, by the predicate above; this is what
+	// stops the table growing.
+	DeleteExpiredBrowserSessions(tx *sql.Tx, now time.Time) error
+
 	CreateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error
 	UpdateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error
 	GetUserConsentById(tx *sql.Tx, userConsentId int64) (*models.UserConsent, error)

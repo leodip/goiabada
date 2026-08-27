@@ -85,15 +85,19 @@ func (ds *DatabaseSeeder) Seed() error {
 	}
 
 	client1 := &models.Client{
-		ClientIdentifier:                        constants.AdminConsoleClientIdentifier,
-		Description:                             "Admin console client (system-level)",
-		DisplayName:                             "Admin console",
-		Enabled:                                 true,
-		ConsentRequired:                         false,
-		IsPublic:                                false,
-		AuthorizationCodeEnabled:                true,
-		DefaultAcrLevel:                         enums.AcrLevel2Optional,
-		ClientCredentialsEnabled:                false,
+		ClientIdentifier:         constants.AdminConsoleClientIdentifier,
+		Description:              "Admin console client (system-level)",
+		DisplayName:              "Admin console",
+		Enabled:                  true,
+		ConsentRequired:          false,
+		IsPublic:                 false,
+		AuthorizationCodeEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		// The admin console obtains a bearer token through client_credentials to reach
+		// its own browser sessions on the auth server, so this grant is on from the
+		// start. It carries the single browser-sessions permission granted below and
+		// nothing wider (#266).
+		ClientCredentialsEnabled:                true,
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 		IncludeOpenIDConnectClaimsInIdToken:     enums.ThreeStateSettingDefault.String(),
@@ -291,6 +295,30 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 		return err
 	}
 	slog.Info(fmt.Sprintf("permission '%v' created", permissionManageSettings.PermissionIdentifier))
+
+	permissionBrowserSessions := &models.Permission{
+		PermissionIdentifier: constants.BrowserSessionsPermissionIdentifier,
+		Description:          "Read and write admin console browser sessions",
+		ResourceId:           resource1.Id,
+	}
+	err = ds.DB.CreatePermission(nil, permissionBrowserSessions)
+	if err != nil {
+		return err
+	}
+	slog.Info(fmt.Sprintf("permission '%v' created", permissionBrowserSessions.PermissionIdentifier))
+
+	// Migration 000035 produces this same end state for an installation that already
+	// existed, and the two must not drift: the permission on the authserver resource,
+	// the grant to the admin console client, and client_credentials_enabled on it.
+	err = ds.DB.CreateClientPermission(nil, &models.ClientPermission{
+		ClientId:     client1.Id,
+		PermissionId: permissionBrowserSessions.Id,
+	})
+	if err != nil {
+		return err
+	}
+	slog.Info(fmt.Sprintf("client '%v' granted permission '%v'", client1.ClientIdentifier,
+		permissionBrowserSessions.PermissionIdentifier))
 
 	err = ds.DB.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,

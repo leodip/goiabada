@@ -695,6 +695,22 @@ CREATE TABLE public.audit_logs (
 
 
 --
+-- Name: browser_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.browser_sessions (
+    id bigserial NOT NULL,
+    created_at timestamp(6) without time zone,
+    updated_at timestamp(6) without time zone,
+    owner character varying(20) NOT NULL,
+    session_id_hash character varying(64) NOT NULL,
+    data text,
+    last_accessed timestamp(6) without time zone NOT NULL,
+    expires_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: user_session_clients; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1471,6 +1487,20 @@ CREATE INDEX idx_audit_logs_created_at ON public.audit_logs USING btree (created
 --
 
 CREATE INDEX idx_audit_logs_audit_event ON public.audit_logs USING btree (audit_event);
+
+
+--
+-- Name: idx_browser_sessions_owner_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_browser_sessions_owner_hash ON public.browser_sessions USING btree (owner, session_id_hash);
+
+
+--
+-- Name: idx_browser_sessions_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_browser_sessions_expires_at ON public.browser_sessions USING btree (expires_at);
 CREATE INDEX idx_codes_user_id ON codes(user_id);
 CREATE INDEX idx_codes_session_identifier ON codes(session_identifier);
 CREATE INDEX idx_refresh_tokens_code_id ON refresh_tokens(code_id);

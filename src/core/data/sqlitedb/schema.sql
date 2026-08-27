@@ -392,3 +392,16 @@ CREATE INDEX `idx_refresh_tokens_code_id` ON `refresh_tokens`(`code_id`);
 CREATE INDEX `idx_refresh_tokens_user_id` ON `refresh_tokens`(`user_id`);
 CREATE INDEX `idx_user_sessions_user_id` ON `user_sessions`(`user_id`);
 CREATE INDEX `idx_refresh_tokens_first_refresh_token_jti` ON `refresh_tokens`(`first_refresh_token_jti`);
+
+CREATE TABLE browser_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    owner TEXT NOT NULL,
+    session_id_hash TEXT NOT NULL,
+    data longtext,
+    last_accessed DATETIME NOT NULL,
+    expires_at DATETIME NOT NULL
+);
+CREATE UNIQUE INDEX idx_browser_sessions_owner_hash ON browser_sessions(owner, session_id_hash);
+CREATE INDEX idx_browser_sessions_expires_at ON browser_sessions(expires_at);
