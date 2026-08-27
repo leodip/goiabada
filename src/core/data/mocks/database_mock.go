@@ -795,6 +795,63 @@ func (_c *Database_CreateAuditLog_Call) RunAndReturn(run func(tx *sql.Tx, auditL
 	return _c
 }
 
+// CreateBrowserSession provides a mock function for the type Database
+func (_mock *Database) CreateBrowserSession(tx *sql.Tx, browserSession *models.BrowserSession) error {
+	ret := _mock.Called(tx, browserSession)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBrowserSession")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.BrowserSession) error); ok {
+		r0 = returnFunc(tx, browserSession)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateBrowserSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateBrowserSession'
+type Database_CreateBrowserSession_Call struct {
+	*mock.Call
+}
+
+// CreateBrowserSession is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - browserSession *models.BrowserSession
+func (_e *Database_Expecter) CreateBrowserSession(tx any, browserSession any) *Database_CreateBrowserSession_Call {
+	return &Database_CreateBrowserSession_Call{Call: _e.mock.On("CreateBrowserSession", tx, browserSession)}
+}
+
+func (_c *Database_CreateBrowserSession_Call) Run(run func(tx *sql.Tx, browserSession *models.BrowserSession)) *Database_CreateBrowserSession_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 *models.BrowserSession
+		if args[1] != nil {
+			arg1 = args[1].(*models.BrowserSession)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateBrowserSession_Call) Return(err error) *Database_CreateBrowserSession_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateBrowserSession_Call) RunAndReturn(run func(tx *sql.Tx, browserSession *models.BrowserSession) error) *Database_CreateBrowserSession_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateClient provides a mock function for the type Database
 func (_mock *Database) CreateClient(tx *sql.Tx, client *models.Client) error {
 	ret := _mock.Called(tx, client)
@@ -2157,6 +2214,69 @@ func (_c *Database_DeleteAllUserConsent_Call) RunAndReturn(run func(tx *sql.Tx) 
 	return _c
 }
 
+// DeleteBrowserSession provides a mock function for the type Database
+func (_mock *Database) DeleteBrowserSession(tx *sql.Tx, owner string, sessionIdHash string) error {
+	ret := _mock.Called(tx, owner, sessionIdHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteBrowserSession")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string) error); ok {
+		r0 = returnFunc(tx, owner, sessionIdHash)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteBrowserSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteBrowserSession'
+type Database_DeleteBrowserSession_Call struct {
+	*mock.Call
+}
+
+// DeleteBrowserSession is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - owner string
+//   - sessionIdHash string
+func (_e *Database_Expecter) DeleteBrowserSession(tx any, owner any, sessionIdHash any) *Database_DeleteBrowserSession_Call {
+	return &Database_DeleteBrowserSession_Call{Call: _e.mock.On("DeleteBrowserSession", tx, owner, sessionIdHash)}
+}
+
+func (_c *Database_DeleteBrowserSession_Call) Run(run func(tx *sql.Tx, owner string, sessionIdHash string)) *Database_DeleteBrowserSession_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteBrowserSession_Call) Return(err error) *Database_DeleteBrowserSession_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteBrowserSession_Call) RunAndReturn(run func(tx *sql.Tx, owner string, sessionIdHash string) error) *Database_DeleteBrowserSession_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteClient provides a mock function for the type Database
 func (_mock *Database) DeleteClient(tx *sql.Tx, clientId int64) error {
 	ret := _mock.Called(tx, clientId)
@@ -2381,6 +2501,63 @@ func (_c *Database_DeleteCode_Call) Return(err error) *Database_DeleteCode_Call 
 }
 
 func (_c *Database_DeleteCode_Call) RunAndReturn(run func(tx *sql.Tx, codeId int64) error) *Database_DeleteCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteExpiredBrowserSessions provides a mock function for the type Database
+func (_mock *Database) DeleteExpiredBrowserSessions(tx *sql.Tx, now time.Time) error {
+	ret := _mock.Called(tx, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteExpiredBrowserSessions")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(tx, now)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteExpiredBrowserSessions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteExpiredBrowserSessions'
+type Database_DeleteExpiredBrowserSessions_Call struct {
+	*mock.Call
+}
+
+// DeleteExpiredBrowserSessions is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - now time.Time
+func (_e *Database_Expecter) DeleteExpiredBrowserSessions(tx any, now any) *Database_DeleteExpiredBrowserSessions_Call {
+	return &Database_DeleteExpiredBrowserSessions_Call{Call: _e.mock.On("DeleteExpiredBrowserSessions", tx, now)}
+}
+
+func (_c *Database_DeleteExpiredBrowserSessions_Call) Run(run func(tx *sql.Tx, now time.Time)) *Database_DeleteExpiredBrowserSessions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 time.Time
+		if args[1] != nil {
+			arg1 = args[1].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteExpiredBrowserSessions_Call) Return(err error) *Database_DeleteExpiredBrowserSessions_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteExpiredBrowserSessions_Call) RunAndReturn(run func(tx *sql.Tx, now time.Time) error) *Database_DeleteExpiredBrowserSessions_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -4177,6 +4354,86 @@ func (_c *Database_GetAuditLogsPaginated_Call) Return(auditLogs []models.AuditLo
 }
 
 func (_c *Database_GetAuditLogsPaginated_Call) RunAndReturn(run func(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error)) *Database_GetAuditLogsPaginated_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetBrowserSessionByOwnerAndSessionIdHash provides a mock function for the type Database
+func (_mock *Database) GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, owner string, sessionIdHash string, now time.Time) (*models.BrowserSession, error) {
+	ret := _mock.Called(tx, owner, sessionIdHash, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBrowserSessionByOwnerAndSessionIdHash")
+	}
+
+	var r0 *models.BrowserSession
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, time.Time) (*models.BrowserSession, error)); ok {
+		return returnFunc(tx, owner, sessionIdHash, now)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, time.Time) *models.BrowserSession); ok {
+		r0 = returnFunc(tx, owner, sessionIdHash, now)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.BrowserSession)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string, string, time.Time) error); ok {
+		r1 = returnFunc(tx, owner, sessionIdHash, now)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetBrowserSessionByOwnerAndSessionIdHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBrowserSessionByOwnerAndSessionIdHash'
+type Database_GetBrowserSessionByOwnerAndSessionIdHash_Call struct {
+	*mock.Call
+}
+
+// GetBrowserSessionByOwnerAndSessionIdHash is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - owner string
+//   - sessionIdHash string
+//   - now time.Time
+func (_e *Database_Expecter) GetBrowserSessionByOwnerAndSessionIdHash(tx any, owner any, sessionIdHash any, now any) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
+	return &Database_GetBrowserSessionByOwnerAndSessionIdHash_Call{Call: _e.mock.On("GetBrowserSessionByOwnerAndSessionIdHash", tx, owner, sessionIdHash, now)}
+}
+
+func (_c *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call) Run(run func(tx *sql.Tx, owner string, sessionIdHash string, now time.Time)) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call) Return(browserSession *models.BrowserSession, err error) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
+	_c.Call.Return(browserSession, err)
+	return _c
+}
+
+func (_c *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call) RunAndReturn(run func(tx *sql.Tx, owner string, sessionIdHash string, now time.Time) (*models.BrowserSession, error)) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -10826,6 +11083,90 @@ func (_c *Database_SetUserPasswordHash_Call) RunAndReturn(run func(tx *sql.Tx, u
 	return _c
 }
 
+// TouchBrowserSession provides a mock function for the type Database
+func (_mock *Database) TouchBrowserSession(tx *sql.Tx, owner string, sessionIdHash string, now time.Time, expiresAt time.Time) (bool, error) {
+	ret := _mock.Called(tx, owner, sessionIdHash, now, expiresAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TouchBrowserSession")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, time.Time, time.Time) (bool, error)); ok {
+		return returnFunc(tx, owner, sessionIdHash, now, expiresAt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, time.Time, time.Time) bool); ok {
+		r0 = returnFunc(tx, owner, sessionIdHash, now, expiresAt)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string, string, time.Time, time.Time) error); ok {
+		r1 = returnFunc(tx, owner, sessionIdHash, now, expiresAt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TouchBrowserSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TouchBrowserSession'
+type Database_TouchBrowserSession_Call struct {
+	*mock.Call
+}
+
+// TouchBrowserSession is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - owner string
+//   - sessionIdHash string
+//   - now time.Time
+//   - expiresAt time.Time
+func (_e *Database_Expecter) TouchBrowserSession(tx any, owner any, sessionIdHash any, now any, expiresAt any) *Database_TouchBrowserSession_Call {
+	return &Database_TouchBrowserSession_Call{Call: _e.mock.On("TouchBrowserSession", tx, owner, sessionIdHash, now, expiresAt)}
+}
+
+func (_c *Database_TouchBrowserSession_Call) Run(run func(tx *sql.Tx, owner string, sessionIdHash string, now time.Time, expiresAt time.Time)) *Database_TouchBrowserSession_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		var arg4 time.Time
+		if args[4] != nil {
+			arg4 = args[4].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TouchBrowserSession_Call) Return(b bool, err error) *Database_TouchBrowserSession_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TouchBrowserSession_Call) RunAndReturn(run func(tx *sql.Tx, owner string, sessionIdHash string, now time.Time, expiresAt time.Time) (bool, error)) *Database_TouchBrowserSession_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TryClaimCleanupRun provides a mock function for the type Database
 func (_mock *Database) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
 	ret := _mock.Called(tx, now, claimableBefore)
@@ -11212,6 +11553,96 @@ func (_c *Database_TrySetUserEnabled_Call) Return(b bool, err error) *Database_T
 }
 
 func (_c *Database_TrySetUserEnabled_Call) RunAndReturn(run func(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)) *Database_TrySetUserEnabled_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateBrowserSessionData provides a mock function for the type Database
+func (_mock *Database) UpdateBrowserSessionData(tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time) (bool, error) {
+	ret := _mock.Called(tx, owner, sessionIdHash, data, now, expiresAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateBrowserSessionData")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, string, time.Time, time.Time) (bool, error)); ok {
+		return returnFunc(tx, owner, sessionIdHash, data, now, expiresAt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, string, time.Time, time.Time) bool); ok {
+		r0 = returnFunc(tx, owner, sessionIdHash, data, now, expiresAt)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string, string, string, time.Time, time.Time) error); ok {
+		r1 = returnFunc(tx, owner, sessionIdHash, data, now, expiresAt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_UpdateBrowserSessionData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateBrowserSessionData'
+type Database_UpdateBrowserSessionData_Call struct {
+	*mock.Call
+}
+
+// UpdateBrowserSessionData is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - owner string
+//   - sessionIdHash string
+//   - data string
+//   - now time.Time
+//   - expiresAt time.Time
+func (_e *Database_Expecter) UpdateBrowserSessionData(tx any, owner any, sessionIdHash any, data any, now any, expiresAt any) *Database_UpdateBrowserSessionData_Call {
+	return &Database_UpdateBrowserSessionData_Call{Call: _e.mock.On("UpdateBrowserSessionData", tx, owner, sessionIdHash, data, now, expiresAt)}
+}
+
+func (_c *Database_UpdateBrowserSessionData_Call) Run(run func(tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time)) *Database_UpdateBrowserSessionData_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 time.Time
+		if args[4] != nil {
+			arg4 = args[4].(time.Time)
+		}
+		var arg5 time.Time
+		if args[5] != nil {
+			arg5 = args[5].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_UpdateBrowserSessionData_Call) Return(b bool, err error) *Database_UpdateBrowserSessionData_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_UpdateBrowserSessionData_Call) RunAndReturn(run func(tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time) (bool, error)) *Database_UpdateBrowserSessionData_Call {
 	_c.Call.Return(run)
 	return _c
 }

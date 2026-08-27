@@ -291,6 +291,20 @@ CREATE TABLE [audit_logs] (
 CREATE INDEX [idx_audit_logs_created_at] ON [audit_logs]([created_at]);
 CREATE INDEX [idx_audit_logs_audit_event] ON [audit_logs]([audit_event]);
 
+-- Table: browser_sessions
+CREATE TABLE [browser_sessions] (
+    [id] BIGINT IDENTITY(1,1) PRIMARY KEY,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
+    [owner] NVARCHAR(20) NOT NULL,
+    [session_id_hash] NVARCHAR(64) NOT NULL,
+    [data] NVARCHAR(MAX) NULL,
+    [last_accessed] DATETIME2(6) NOT NULL,
+    [expires_at] DATETIME2(6) NOT NULL
+);
+CREATE UNIQUE INDEX [idx_browser_sessions_owner_hash] ON [browser_sessions]([owner], [session_id_hash]);
+CREATE INDEX [idx_browser_sessions_expires_at] ON [browser_sessions]([expires_at]);
+
 -- Table: user_session_clients
 CREATE TABLE [user_session_clients] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,

@@ -14,6 +14,13 @@ const (
 	ManageUsersPermissionIdentifier    = "manage-users"
 	ManageClientsPermissionIdentifier  = "manage-clients"
 	ManageSettingsPermissionIdentifier = "manage-settings"
+
+	// BrowserSessionsPermissionIdentifier is what the admin console's bearer token
+	// carries when it reaches its own browser sessions through the auth server. It is
+	// deliberately not one of the manage-* scopes above: it permits reading and writing
+	// admin console browser sessions and nothing else, so holding the admin console's
+	// client secret does not drive the whole admin API (#266).
+	BrowserSessionsPermissionIdentifier = "browser-sessions"
 )
 
 // BuiltInAuthServerPermissionIdentifiers lists the permission identifiers on the
@@ -27,6 +34,7 @@ var BuiltInAuthServerPermissionIdentifiers = []string{
 	ManageUsersPermissionIdentifier,
 	ManageClientsPermissionIdentifier,
 	ManageSettingsPermissionIdentifier,
+	BrowserSessionsPermissionIdentifier,
 }
 
 const (
