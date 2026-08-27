@@ -30,9 +30,11 @@ func NewOTPSecretGenerator() *OTPSecretGenerator {
 // callers derive the base32 secret and the QR image from it rather than being handed either, so
 // there is one value to carry and no second copy that could disagree with it.
 //
-// Returning the URL instead of a rendered PNG is what keeps an enrolment out of the browser's
-// cookie budget: the URL is about 150 bytes against roughly 2.4 KB of base64 image, which is an
-// entire cookie chunk and about 5 KB on every request for the duration of the enrolment (#247).
+// Returning the URL instead of a rendered PNG is what keeps an enrolment cheap to carry: the URL
+// is about 150 bytes against roughly 2.4 KB of base64 image. That was an entire cookie chunk and
+// about 5 KB on the wire per request while the session lived in the browser; since it became a
+// database row it is the same 2.4 KB written and read on every save for the duration of the
+// enrolment, so the saving moved rather than went away (#247, #266).
 func (g *OTPSecretGenerator) GenerateOTPSecret(email string, appName string) (string, error) {
 
 	if strings.TrimSpace(email) == "" {

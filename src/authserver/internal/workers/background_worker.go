@@ -106,7 +106,7 @@ func (w *Worker) run(ctx context.Context) {
 		return
 	}
 
-	w.runIfClaimed(ctx)
+	w.poll(ctx)
 
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
@@ -114,10 +114,44 @@ func (w *Worker) run(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			w.runIfClaimed(ctx)
+			w.poll(ctx)
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+// poll is what one tick of the worker does, and the two halves are deliberately unequal.
+//
+// The browser session reap runs on every instance every time, outside the claim. The rest
+// of the cleanup runs on at most one instance every cleanupInterval, behind the claim. Both
+// calls live here rather than inline in run so the pairing is one thing a test can exercise
+// without waiting out the startup delay (#266 decision 19).
+func (w *Worker) poll(ctx context.Context) {
+	w.reapBrowserSessions()
+	w.runIfClaimed(ctx)
+}
+
+// reapBrowserSessions deletes browser sessions whose expires_at has passed.
+//
+// It runs on the poll, outside the claim, which is the one sweep in this worker that does.
+// The reason is a rate the others do not face: /auth/authorize writes a browser session
+// before it validates anything and is not rate limited, so an unauthenticated caller can
+// produce rows as fast as it can send requests. A pre-authentication session stops being
+// usable after thirty minutes, but on the twelve hour claim it would go on EXISTING for up
+// to twelve, and a sustained hundred requests a second would leave about 4.3 million rows
+// waiting for one enormous DELETE. Every five minutes puts the physical bound below the
+// logical one, which is the relationship the thirty minute lifetime was argued on, and
+// each sweep then deletes five minutes of accumulation rather than half a day's.
+//
+// Giving up single-flight is affordable here and is not affordable for the sweeps inside
+// performTask. This delete is idempotent and keyed on an indexed column, so two instances
+// running it in the same instant do the same harmless thing; the used-code sweep beside it
+// races the token endpoint's foreign key, which is what usedCodeCleanupGrace exists for.
+// Do not move this call into performTask (#266 decision 19).
+func (w *Worker) reapBrowserSessions() {
+	if err := w.database.DeleteExpiredBrowserSessions(nil, time.Now().UTC()); err != nil {
+		slog.Error(fmt.Sprintf("error deleting expired browser sessions: %v", err))
 	}
 }
 

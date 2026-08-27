@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
@@ -101,6 +102,27 @@ func (s *AuthHelper) ClearAuthContext(w http.ResponseWriter, r *http.Request) er
 	}
 
 	return nil
+}
+
+// RegenerateSession replaces the browser session's identifier, keeping its contents.
+//
+// Callers reach rotation through here rather than through the store because sessions.Store
+// has no such method and widening it would touch the hundred places that already take the
+// interface. A store that cannot rotate is a no-op, which is what the cookie store in the
+// unit tier is; the property is observed against the real store at the integration tier,
+// where the cookie is watched changing across a privilege change (#266).
+func (s *AuthHelper) RegenerateSession(w http.ResponseWriter, r *http.Request) error {
+	regenerator, ok := s.sessionStore.(sessionstore.Regenerator)
+	if !ok {
+		return nil
+	}
+
+	sess, err := s.sessionStore.Get(r, s.sessionName)
+	if err != nil {
+		return err
+	}
+
+	return regenerator.Regenerate(w, r, sess)
 }
 
 func (s *AuthHelper) RedirToAuthorize(

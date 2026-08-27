@@ -206,12 +206,15 @@ func rejectResetPassword(httpHelper HttpHelper, auditLogger AuditLogger, w http.
 // resolveResetPasswordMarker is what both steps after the redirect run before anything else:
 // read the session marker, then re-resolve the code hash it names.
 //
-// Re-resolving is not belt and braces, it is the whole security boundary of the clean steps.
-// The session is a client-side encrypted cookie (sessionstore.NewChunkedCookieStore), so
-// clearing the marker replaces the browser's copy and cannot invalidate one an attacker
-// captured. A marker trusted on its own would therefore outlive the password write, a newly
-// issued code and every other password change, where today the write NULLs the code and a
-// replayed link simply fails. Resolving the hash is what keeps that true (#112).
+// Re-resolving is defence in depth rather than the whole boundary, and it used to be the
+// whole boundary. The session was a client-side encrypted cookie, so clearing the marker
+// replaced the browser's copy and could not invalidate one an attacker captured; the
+// session is a database row now, and clearing it reaches every copy (#266).
+//
+// It stays because it answers a question clearing does not. A marker trusted on its own
+// would outlive the password write, a newly issued code and every other password change
+// within a session nobody cleared, where today the write NULLs the code and a replayed
+// link simply fails. Resolving the hash is what keeps that true (#112, #266).
 //
 // Returns (nil, nil) when the request was refused, having already audited and responded.
 func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessions.Store,

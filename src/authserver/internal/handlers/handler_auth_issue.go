@@ -344,13 +344,20 @@ func HandleIssueGet(
 				// handler loaded the client and refused a nil, so issuingClient is it.
 				err := authHelper.ClearAuthContext(w, r)
 				if err != nil {
-					// Every error return in ChunkedCookieStore.Save is above its first
-					// http.SetCookie, so a failed clear writes zero cookies and the browser keeps
-					// the auth context whether this answers 500 or redirects. Withholding the
-					// client's response therefore buys nothing, and the client is owed one: its
-					// redirect URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6
-					// applies, and RFC 6749 4.1.2.1 mints server_error for exactly this
-					// condition (#141).
+					// A failed clear leaves the auth context either wholly there or wholly
+					// gone, never half, so withholding the client's response buys nothing
+					// whichever way it failed. That was inherited from ChunkedCookieStore,
+					// whose every error return sat above its first http.SetCookie; against a
+					// server-side store it is re-derived rather than assumed, because the save
+					// now writes in two places. The row is written before the cookie, so a
+					// failure before the row leaves the context intact, exactly as before, and
+					// a failure after it leaves the context already gone server-side while the
+					// browser's identifier still names the same cleared row. Neither outcome
+					// lets the browser replay a ready_to_issue_code context (#266).
+					//
+					// The client is owed a response either way: its redirect URI was validated
+					// upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749
+					// 4.1.2.1 mints server_error for exactly this condition (#141).
 					slog.Error("failed to clear the auth context, answering the client with server_error",
 						"error", err)
 					err = redirToClientWithError(w, r, database, httpHelper, templateFS,

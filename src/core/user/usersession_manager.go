@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/useragent"
 	"github.com/pkg/errors"
 )
@@ -148,6 +149,31 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	}
 
 	sess.Values[constants.SessionKeySessionIdentifier] = userSession.SessionIdentifier
+
+	// The browser session's identifier is replaced as the user session is bound to it, so
+	// no identifier that existed before this ceremony can name the session the ceremony
+	// produced.
+	//
+	// This is the property a cookie store gave for free and a server-side one has to add.
+	// A cookie store is structurally immune to session fixation because the cookie IS the
+	// state: an attacker's planted copy stays the attacker's own stale state. A row is
+	// not, because a planted identifier names a row the victim's sign-in then fills in,
+	// and the attacker is signed in as the victim. Rotating here is what puts that
+	// immunity back, and it covers a different user signing in on the same browser for
+	// free, being the same code path (#266).
+	//
+	// The identifier is written into the session before the rotation rather than after
+	// so that the whole sign-in reaches the browser as one Set-Cookie carrying the
+	// authenticated expiry. Nothing is persisted under the new identifier until
+	// Regenerate runs, and the row it deletes never held the identifier, so the ordering
+	// changes no outcome an attacker could use.
+	if regenerator, ok := u.sessionStore.(sessionstore.Regenerator); ok {
+		if err := regenerator.Regenerate(w, r, sess); err != nil {
+			return nil, errors.Wrap(err, "unable to rotate the browser session identifier")
+		}
+		return userSession, nil
+	}
+
 	err = u.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return nil, err
@@ -200,7 +226,7 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 		// Handle step-up authentication: update AuthMethods if new methods were used.
 		// The authMethods parameter contains all methods used in the current auth flow
 		// (e.g., "pwd otp" if the user just completed OTP after having a pwd-only session).
-		if authMethods != "" && authMethods != userSession.AuthMethods {
+		if raisesAuthMethods(userSession.AuthMethods, authMethods) {
 			userSession.AuthMethods = authMethods
 		}
 
@@ -274,6 +300,33 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 	}
 
 	return nil, errors.WithStack(errors.New("Unexpected: can't bump user session because user session is nil"))
+}
+
+// WillRaisePrivilege reports whether bumping a session with these values would raise its
+// authentication methods or its ACR level, which is the privilege change decision 6 of
+// #266 rotates the browser session identifier at.
+//
+// It exists so the decision can be taken BEFORE BumpUserSession runs. BumpUserSession
+// opens its own transaction and commits before it returns, so a rotation attempted
+// afterwards has a window in which the pre-step-up identifier names a session that is
+// already at the higher level, which is exactly the carryover rotation exists to stop.
+// Deciding first and rotating first means a failure between the two leaves a fresh
+// identifier on a session that has not been raised yet, which is the safe direction.
+//
+// It is built from the same two predicates BumpUserSession applies, so the decider and
+// the writer cannot drift apart.
+func WillRaisePrivilege(userSession *models.UserSession, authMethods, acrLevel string) bool {
+	if userSession == nil {
+		return false
+	}
+	return raisesAuthMethods(userSession.AuthMethods, authMethods) ||
+		(acrLevel != "" && shouldUpgradeAcrLevel(userSession.AcrLevel, acrLevel))
+}
+
+// raisesAuthMethods reports whether a bump would replace the session's recorded methods.
+// An empty incoming value means the ceremony recorded none, which changes nothing.
+func raisesAuthMethods(current, incoming string) bool {
+	return incoming != "" && incoming != current
 }
 
 // shouldUpgradeAcrLevel determines if the session's ACR level should be upgraded.

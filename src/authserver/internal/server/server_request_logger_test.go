@@ -77,8 +77,11 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 		database:     database,
 		sessionStore: sessions.NewCookieStore(securecookie.GenerateRandomKey(64)),
 	}
-	s.initMiddleware()
-	s.router.Get("/auth/authorize", func(w http.ResponseWriter, _ *http.Request) {
+	// The handler is registered on the branch initMiddleware returns, not on s.router,
+	// so this exercises the whole chain: the root's middleware plus the four the
+	// application branch adds (#266).
+	app := s.initMiddleware()
+	app.Get("/auth/authorize", func(w http.ResponseWriter, _ *http.Request) {
 		*handlerRan = true
 		w.WriteHeader(http.StatusOK)
 	})

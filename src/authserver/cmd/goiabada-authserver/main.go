@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -22,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/timezones"
@@ -232,29 +230,32 @@ func main() {
 	authKey, _ := hex.DecodeString(config.GetAuthServer().SessionAuthenticationKey)
 	encKey, _ := hex.DecodeString(config.GetAuthServer().SessionEncryptionKey)
 
-	// Use ChunkedCookieStore to support large sessions with custom JWT claims
-	chunkedStore := sessionstore.NewChunkedCookieStore(authKey, encKey)
-	chunkedStore.Options.Path = "/"
-	chunkedStore.Options.MaxAge = sessionstore.MaxCookieAgeSeconds // fallback; resolver below tracks live session max lifetime
-	chunkedStore.Options.HttpOnly = true
-	chunkedStore.Options.Secure = config.GetAuthServer().IsCookieSecure()
-	chunkedStore.Options.SameSite = http.SameSiteLaxMode
+	// The session lives in the database and the browser carries nothing but a signed,
+	// opaque identifier, about 220 bytes in one cookie whatever a deployment configures
+	// and whatever claims it mints. What it replaces put the whole session in the cookie
+	// and split the ciphertext across up to fifty of them, which is why this deployment's
+	// documentation had to tell operators to enlarge their proxy buffers (#266).
+	//
+	// The backend is scoped to this application's own rows at construction, so no code
+	// path here can name an admin console session however it is composed.
+	sessionStore := sessionstore.NewServerSideStore(
+		sessionstore.NewDatabaseBackend(database, constants.AuthServerSessionName),
+		constants.SessionKeySessionIdentifier,
+		config.GetAuthServer().IsCookieSecure(),
+		authKey, encKey,
+	)
 
-	// Track the live session max-lifetime setting for the browser cookie Max-Age,
-	// so the browser never holds the cookie longer than the session could be
-	// valid, and picks up setting changes without a restart. The server-side
-	// securecookie decode backstop stays fixed (see sessionstore.MaxCookieAgeSeconds).
-	chunkedStore.MaxAgeResolver = func(r *http.Request) int {
-		if s, ok := r.Context().Value(constants.ContextKeySettings).(*models.Settings); ok && s != nil {
-			return s.UserSessionMaxLifetimeInSeconds
-		}
-		return 0 // fall back to Options.MaxAge
-	}
+	// The end user's cookie keeps an expiry, so single sign-on survives a browser
+	// restart. It is set per save from the row's own expires_at, which the operator's
+	// session settings decide, so one knob governs both halves and the browser never
+	// holds a handle that outlives what it names. The admin console does the opposite
+	// for the opposite reason, and the trade is argued in full in the issue (#266).
+	sessionStore.PersistentCookie = true
 
-	slog.Info("initialized chunked cookie session store")
+	slog.Info("initialized server-side session store")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, database, chunkedStore)
+	s := server.NewServer(r, database, sessionStore)
 
 	// The process owns the signals; the server just gets told when to stop. On
 	// SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and

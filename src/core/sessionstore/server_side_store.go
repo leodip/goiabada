@@ -412,6 +412,33 @@ func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *sessions.Ses
 	return nil
 }
 
+// DeletionCookie is the cookie that removes name from the browser.
+//
+// The attributes are not decoration and getting them wrong fails silently, which is why
+// this lives on the store rather than at the caller. A browser matches a deletion to the
+// cookie it replaces by name, domain and path, so the path must be the one the cookie was
+// set with; and a __Host- prefixed cookie is refused outright unless it is Secure, so a
+// deletion missing that attribute does nothing at all to the very cookie this store sets
+// on an https deployment (#266).
+//
+// The name is physical and passed in whole, because the two callers name different
+// things: CookieName for this store's own cookie, and StaleCookieNames for what the
+// chunked cookie store left behind.
+func (s *ServerSideStore) DeletionCookie(name string) *http.Cookie {
+	return &http.Cookie{
+		Name:  name,
+		Value: "",
+		Path:  s.Options.Path,
+		// Both, and not one or the other: Max-Age is what a current browser acts on, and
+		// the expiry in the past is what one that predates it acts on.
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0).UTC(),
+		Secure:   s.Secure,
+		HttpOnly: s.Options.HttpOnly,
+		SameSite: s.Options.SameSite,
+	}
+}
+
 func (s *ServerSideStore) buildCookie(logicalName, value string, options *sessions.Options) *http.Cookie {
 	return &http.Cookie{
 		Name:     s.CookieName(logicalName),

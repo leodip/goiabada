@@ -33,10 +33,10 @@ const verificationCodeLifetime = 5 * time.Minute
 //
 // Every marker-attributable refusal on the clean hop comes here: no marker, a marker left by
 // the reset flow, an expired marker, and a marker whose code hash no longer resolves to a
-// pre-registration. That last one is what refuses a replayed marker, since the session is a
-// client-side encrypted cookie and clearing it cannot invalidate a copy somebody kept. The
-// first hop uses it for an expired code, and for a link followed while another continuation
-// is still live.
+// pre-registration. That last one is what refuses a marker whose code has since been
+// consumed, which clearing the session does not answer even now that clearing it reaches
+// every copy (#266). The first hop uses it for an expired code, and for a link followed
+// while another continuation is still live.
 //
 // It is an existing rendering rather than a new state on purpose: the page already tells the
 // reader to register again, which is the right instruction for every one of them (#112).
@@ -176,11 +176,12 @@ func isVerificationCodeExpired(preRegistration *models.PreRegistration) bool {
 
 // handleActivationCleanHop is the redirect landing: no query at all, the marker alone.
 //
-// Re-resolving the marker's code hash is the whole security boundary here, for the reason
-// resolveResetPasswordMarker gives on the reset side. The session is a client-side encrypted
-// cookie, so clearing the marker replaces the browser's copy and cannot invalidate one an
-// attacker captured; what refuses that copy is DeletePreRegistration having removed the row
-// the hash names, which happens in the same request that creates the account.
+// Re-resolving the marker's code hash is what refuses a replayed marker, for the reason
+// resolveResetPasswordMarker gives on the reset side: DeletePreRegistration removes the row
+// the hash names in the same request that creates the account, so a second attempt resolves
+// to nothing. Clearing the session now reaches every copy of the marker, since the session
+// is a database row rather than a browser cookie, so this is defence in depth rather than
+// the whole boundary it was written as (#112, #266).
 func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessions.Store,
 	database data.Database, userCreator handlers.UserCreator, auditLogger handlers.AuditLogger,
 	w http.ResponseWriter, r *http.Request) {

@@ -522,3 +522,69 @@ func TestWorker_DeleteOldAuditLogs_SkippedWhenRetentionIsUnlimited(t *testing.T)
 		mockDB.AssertNumberOfCalls(t, "DeleteOldAuditLogs", 0)
 	}
 }
+
+// TestWorker_Poll_ReapsBrowserSessionsEvenWhenTheClaimIsLost is decision 19 of #266, and
+// it is the only observable difference between reaping browser sessions on the poll and
+// reaping them inside performTask beside the other sweeps.
+//
+// Losing the claim is the ordinary case: every instance polls every five minutes and at
+// most one wins a claim every twelve hours, so on all but one poll in thousands the claim
+// is lost. If the reap moved behind it, expired browser sessions would be deleted on the
+// twelve hour schedule instead of the five minute one, which puts the physical bound on
+// the table 24 times above the thirty minute lifetime that bound was argued from. Nothing
+// else would look different: the rows still read as absent once they expire, so no
+// behaviour test anywhere would notice.
+//
+// mocks.NewDatabase(t) fails the test on any call nobody expected, so the absence of a
+// DeleteExpiredRefreshTokens expectation is the assertion that the claim really was lost.
+func TestWorker_Poll_ReapsBrowserSessionsEvenWhenTheClaimIsLost(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	worker := NewWorker(mockDB)
+
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything).Return(nil).Once()
+
+	worker.poll(context.Background())
+
+	mockDB.AssertExpectations(t)
+	mockDB.AssertNumberOfCalls(t, "DeleteExpiredBrowserSessions", 1)
+	mockDB.AssertNumberOfCalls(t, "DeleteExpiredRefreshTokens", 0)
+}
+
+// TestWorker_Poll_ReapsBrowserSessionsBeforeClaiming: a failing reap is logged and the poll
+// carries on, the same way every step inside performTask does. Housekeeping that cannot run
+// must not stop the housekeeping that can.
+func TestWorker_Poll_ReapFailureDoesNotStopTheClaim(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	worker := NewWorker(mockDB)
+
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything).
+		Return(errors.New("database is down")).Once()
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+
+	worker.poll(context.Background())
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestWorker_Poll_ReapsWithACurrentTimestamp: the cutoff is the instant of the poll, so a
+// row expires against wall-clock time rather than against anything this process remembers.
+func TestWorker_Poll_ReapsWithACurrentTimestamp(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	worker := NewWorker(mockDB)
+
+	var gotNow time.Time
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { gotNow = args.Get(1).(time.Time) }).Return(nil).Once()
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+
+	before := time.Now().UTC()
+	worker.poll(context.Background())
+	after := time.Now().UTC()
+
+	assert.False(t, gotNow.Before(before))
+	assert.False(t, gotNow.After(after))
+}

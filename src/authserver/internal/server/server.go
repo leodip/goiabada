@@ -81,7 +81,11 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 func (s *Server) Start(ctx context.Context) {
 	s.worker.Start()
 
-	s.initMiddleware()
+	// The static branch and the application branch, in that order. Both are registered
+	// on s.router; only the second carries the middleware initMiddleware returns, which
+	// is what keeps a stylesheet from costing a settings read and a session load
+	// (see initMiddleware).
+	app := s.initMiddleware()
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
@@ -89,7 +93,7 @@ func (s *Server) Start(ctx context.Context) {
 	// <link rel="icon"> tags; point it at the real asset under /static.
 	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
 
-	s.initRoutes()
+	s.initRoutes(app)
 
 	httpsHost := config.GetAuthServer().ListenHostHttps
 	httpsPort := config.GetAuthServer().ListenPortHttps
@@ -210,7 +214,30 @@ func (s *Server) shutdown(httpServers []*http.Server) {
 	slog.Info("shutdown complete")
 }
 
-func (s *Server) initMiddleware() {
+// initMiddleware mounts the chain and returns the router the application's own routes
+// belong on.
+//
+// Two branches, and the split is the point (#266). Everything mounted on s.router below
+// applies to every request this server answers, a stylesheet included: the CORS answer,
+// the request id, the security headers, the real client IP, the panic recovery, the
+// request log, the slash strip and the CSRF origin check. What the returned router adds
+// is the part a file server has no use for and cannot use: the settings read, the cookie
+// reset, the session load and the locale resolution.
+//
+// The cost that split removes is not hypothetical. An auth page references seven
+// same-origin assets, and MiddlewareSettings reads settings from the database uncached on
+// every request, so a single page view already cost seven database reads for files that
+// could not use the result. Once the session moved out of the cookie and into a row, each
+// of those would have cost a session read as well.
+//
+// It is a correctness fix too. MiddlewareCookieReset answers a cookie it cannot decode
+// with a 302 back to the request target, which is not a sensible answer to a request for
+// a stylesheet.
+//
+// chi refuses Use after a route has been registered on the same router, and With freezes
+// the parent's chain, so this is a restructure rather than a reorder: every root Use
+// happens here, before the branch, and both branches register their routes afterwards.
+func (s *Server) initMiddleware() chi.Router {
 
 	slog.Info("initializing middleware")
 
@@ -269,14 +296,7 @@ func (s *Server) initMiddleware() {
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
 	s.router.Use(custom_middleware.MiddlewareCsrf())
 
-	// Adds settings to the request context
-	s.router.Use(custom_middleware.MiddlewareSettings(s.database))
-
-	// Clear the session cookie and redirect if unable to decode it
-	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AuthServerSessionName))
-
-	// Adds the session identifier (if available) to the request context
-	s.router.Use(authserver_middleware.MiddlewareSessionIdentifier(s.sessionStore, s.database))
+	// Everything below is on the application branch, not the root.
 
 	// Global locale middleware: resolves a tentative localizer from
 	// ?ui_locales, AuthContext.UILocales (in-flight authorize flow),
@@ -286,9 +306,24 @@ func (s *Server) initMiddleware() {
 	// (RefineLocalizerWithUser), since identity is established at handler
 	// scope rather than at middleware scope.
 	i18nAuthHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName, s.baseURL, s.adminConsoleBaseURL)
-	s.router.Use(i18n.MiddlewareLocale(i18nAuthHelper))
+
+	app := s.router.With(
+		// Adds settings to the request context
+		custom_middleware.MiddlewareSettings(s.database),
+
+		// Clear the session cookie and redirect if unable to decode it, and delete
+		// whatever the chunked cookie store left in this browser
+		custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AuthServerSessionName),
+
+		// Adds the session identifier (if available) to the request context
+		authserver_middleware.MiddlewareSessionIdentifier(s.sessionStore, s.database),
+
+		i18n.MiddlewareLocale(i18nAuthHelper),
+	)
 
 	slog.Info("finished initializing middleware")
+
+	return app
 }
 
 func (s *Server) serveStaticFiles(path string, root http.FileSystem) {

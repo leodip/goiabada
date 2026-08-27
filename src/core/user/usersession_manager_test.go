@@ -781,3 +781,78 @@ func TestHasValidUserSession(t *testing.T) {
 		assert.True(t, result)
 	})
 }
+
+// =============================================================================
+// Tests for WillRaisePrivilege
+// =============================================================================
+
+// TestWillRaisePrivilege pins the predicate /auth/completed gates the browser session's
+// identifier rotation on (#266 decision 6).
+//
+// It is worth its own cases rather than being left to the step-up tests above, because a
+// wrong answer here is silent in both directions: false when it should be true drops the
+// rotation and leaves an identifier stolen at level 1 working after a step-up, and neither
+// the bump nor the token that follows looks any different for it.
+func TestWillRaisePrivilege(t *testing.T) {
+	tests := []struct {
+		name        string
+		userSession *models.UserSession
+		authMethods string
+		acrLevel    string
+		expected    bool
+	}{
+		{
+			name:        "Nil session raises nothing",
+			userSession: nil,
+			authMethods: "pwd otp",
+			acrLevel:    enums.AcrLevel2Mandatory.String(),
+			expected:    false,
+		},
+		{
+			name:        "Neither changes",
+			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: enums.AcrLevel1.String()},
+			authMethods: "pwd",
+			acrLevel:    enums.AcrLevel1.String(),
+			expected:    false,
+		},
+		{
+			name:        "Auth methods rise",
+			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: enums.AcrLevel1.String()},
+			authMethods: "pwd otp",
+			acrLevel:    enums.AcrLevel1.String(),
+			expected:    true,
+		},
+		{
+			name:        "ACR level rises",
+			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: enums.AcrLevel1.String()},
+			authMethods: "pwd",
+			acrLevel:    enums.AcrLevel2Mandatory.String(),
+			expected:    true,
+		},
+		{
+			// The session already holds the stronger level, so this ceremony is not a
+			// step-up and rotating would spend a write on nothing.
+			name:        "ACR level would be downgraded",
+			userSession: &models.UserSession{AuthMethods: "pwd otp", AcrLevel: enums.AcrLevel2Mandatory.String()},
+			authMethods: "pwd otp",
+			acrLevel:    enums.AcrLevel1.String(),
+			expected:    false,
+		},
+		{
+			// An empty incoming value means the ceremony recorded nothing, which is not a
+			// change. Reading it as one would rotate on every SSO reuse.
+			name:        "Empty inputs change nothing",
+			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: enums.AcrLevel1.String()},
+			authMethods: "",
+			acrLevel:    "",
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected,
+				WillRaisePrivilege(tt.userSession, tt.authMethods, tt.acrLevel))
+		})
+	}
+}

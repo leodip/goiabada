@@ -912,12 +912,25 @@ func withSessionIdentifier(req *http.Request, sessionIdentifier string) *http.Re
 // the browser goes straight back to a relying party (#109).
 func expectCookieWipedBeforeSave(t *testing.T, httpSession *mocks_sessionstore.Store) *sessions.Session {
 	t.Helper()
-	sess := &sessions.Session{Values: map[interface{}]interface{}{"something": "here"}}
+	// Options carries what every real store puts there when it builds a session, because
+	// the save below is what turns it into a deletion and a session without them is a
+	// shape no store produces.
+	sess := &sessions.Session{
+		Values:  map[interface{}]interface{}{"something": "here"},
+		Options: &sessions.Options{Path: "/"},
+	}
 	httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(sess, nil)
 	httpSession.On("Save", mock.Anything, mock.Anything, sess).
 		Run(func(args mock.Arguments) {
-			assert.Empty(t, args.Get(2).(*sessions.Session).Values,
+			saved := args.Get(2).(*sessions.Session)
+			assert.Empty(t, saved.Values,
 				"the OP session cookie must be cleared before it is written back")
+			// Emptying the values is not a logout against a server-side store: it would
+			// write an empty blob into a row that stays alive and stays reachable by the
+			// identifier the browser still holds. A negative MaxAge is what makes the save
+			// delete the row and expire the cookie (#266).
+			assert.Negative(t, saved.Options.MaxAge,
+				"logging out must delete the session, not rewrite it empty")
 		}).Return(nil)
 	return sess
 }
@@ -1705,7 +1718,10 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 		auditLogger.On("Log", mock.Anything, mock.Anything).Return()
 
-		mockSession := &sessions.Session{Values: make(map[interface{}]interface{})}
+		mockSession := &sessions.Session{
+			Values:  make(map[interface{}]interface{}),
+			Options: &sessions.Options{Path: "/"},
+		}
 		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(mockSession, nil)
 		httpSession.On("Save", mock.Anything, mock.Anything, mockSession).Return(errors.New("session save error"))
 
