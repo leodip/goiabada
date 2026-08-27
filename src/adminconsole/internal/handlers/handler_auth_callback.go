@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pkg/errors"
 )
 
@@ -115,7 +116,30 @@ func HandleAuthCallbackPost(
 		delete(sess.Values, constants.SessionKeyRedirectURI)
 		delete(sess.Values, constants.SessionKeyCodeVerifier)
 		delete(sess.Values, constants.SessionKeyRedirectBack)
-		err = httpSession.Save(r, w, sess)
+		// The identifier rotates here, and this is the admin console's one privilege
+		// transition: the line above turns a session that was holding nothing but handshake
+		// values into one holding an administrator's access, id and refresh tokens.
+		//
+		// A cookie store is structurally immune to session fixation, because the cookie IS
+		// the state and an attacker's planted copy stays the attacker's own stale state. A
+		// server-side store is not: a planted identifier names a row that this sign-in then
+		// fills in, so without rotation whoever planted it holds a session carrying the
+		// administrator's tokens. No identifier that existed before authentication may name
+		// the session authentication produces, and this is the site that owes that here
+		// (#266).
+		//
+		// Regenerate writes the contents under a fresh identifier, deletes the old row and
+		// only then sets the cookie, so any failure leaves the administrator without a
+		// session rather than leaving the planted identifier live.
+		//
+		// Save is the fallback because the parameter is sessions.Store, which has no
+		// rotation method: a store that cannot rotate must still be able to sign an
+		// administrator in.
+		if regenerator, ok := httpSession.(sessionstore.Regenerator); ok {
+			err = regenerator.Regenerate(w, r, sess)
+		} else {
+			err = httpSession.Save(r, w, sess)
+		}
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

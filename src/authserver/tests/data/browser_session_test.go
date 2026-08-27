@@ -269,6 +269,52 @@ func TestBrowserSession_UpdateAndTouchReportTransitions(t *testing.T) {
 	assert.False(t, touched)
 }
 
+// TestBrowserSession_TouchTwiceWithOneClockStillReportsLive pins the one engine
+// difference this table's liveness answer turns on.
+//
+// TouchBrowserSession writes last_accessed, expires_at and updated_at, all three derived
+// from the single `now` it is handed, and reports liveness from RowsAffected. SQLite,
+// PostgreSQL and SQL Server report rows MATCHED; MySQL reports rows CHANGED, so a
+// statement that matched a row and wrote it the values already there answers zero. Two
+// concurrent requests from one browser that both find last_accessed stale and both stamp
+// the same microsecond produce exactly that, and a false answer costs the browser its
+// session: the store reads it as "the row is gone" and hands back a fresh one, signing a
+// user out for a reason nobody could see.
+//
+// Passing this second touch by an identical clock is what says the answer comes from the
+// row's existence rather than from whether the write changed anything. Three of the four
+// engines pass it whatever the code does, which is why the case says so here rather than
+// leaving a green sqlite run to be read as coverage (#266).
+func TestBrowserSession_TouchTwiceWithOneClockStillReportsLive(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	bs := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
+
+	stamp := now.Add(time.Minute)
+	expires := now.Add(2 * time.Hour)
+
+	first, err := database.TouchBrowserSession(nil, bs.Owner, bs.SessionIdHash, stamp, expires)
+	require.NoError(t, err, "TouchBrowserSession")
+	assert.True(t, first, "a live row transitions")
+
+	// Byte for byte the same write, which is what two requests sharing a microsecond do.
+	second, err := database.TouchBrowserSession(nil, bs.Owner, bs.SessionIdHash, stamp, expires)
+	require.NoError(t, err, "TouchBrowserSession")
+	assert.True(t, second,
+		"a row that is plainly there reports live even when the write changed nothing")
+
+	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, now)
+	require.NoError(t, err)
+	require.NotNil(t, loaded, "and the row is still there to be read")
+	assert.WithinDuration(t, stamp, loaded.LastAccessed, time.Second)
+
+	// An expired row still answers false, so confirming existence has not turned the
+	// liveness answer into "the hash is known".
+	expired := createTestBrowserSession(t, ownerAuthServer, now.Add(-2*time.Hour), time.Hour)
+	touched, err := database.TouchBrowserSession(nil, expired.Owner, expired.SessionIdHash, now, now.Add(time.Hour))
+	require.NoError(t, err)
+	assert.False(t, touched, "an expired row is not live, however the count is read")
+}
+
 func TestBrowserSession_DeleteRemovesOnlyTheNamedSession(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	target := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)

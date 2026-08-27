@@ -299,7 +299,19 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*sessions.Session, 
 		if errors.Is(err, ErrNotFound) {
 			return session, nil
 		}
-		return nil, errors.Wrap(err, "unable to load the browser session")
+		// The session goes back beside the error, and it must not be nil. gorilla/sessions
+		// documents on Store.New that "New should never return a nil session, even in the
+		// case of an error if using the Registry infrastructure to cache the session", and
+		// Get is exactly that infrastructure: Registry.Get assigns to session.name without
+		// looking at the error, so a nil here is a nil pointer dereference inside the
+		// library on the one path that exists to make a storage fault diagnosable.
+		//
+		// Nothing fails open as a result. This error is not a securecookie.MultiError, so
+		// the cookie-reset middleware's decode branch does not fire and it passes the
+		// request along; the registry memoises the (session, error) pair, so the next
+		// middleware to ask receives the same error and answers 500 with the cause logged,
+		// which is the refusal this store owes a lookup it could not perform (#266).
+		return session, errors.Wrap(err, "unable to load the browser session")
 	}
 
 	if err := securecookie.DecodeMulti(name, string(record.Data), &session.Values, s.DataCodecs...); err != nil {
@@ -319,7 +331,11 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*sessions.Session, 
 			// holding the contents that just stopped existing.
 			return s.freshSession(name), nil
 		}
-		return nil, err
+		// A fresh session rather than the one just loaded, and non-nil for the reason
+		// above. The error is what every caller acts on; a caller that somehow did not
+		// would get an empty session rather than the live contents of a session whose
+		// liveness could not be confirmed.
+		return s.freshSession(name), err
 	}
 
 	return session, nil
@@ -475,7 +491,7 @@ func (s *ServerSideStore) DeletionCookie(name string) *http.Cookie {
 }
 
 func (s *ServerSideStore) buildCookie(logicalName, value string, options *sessions.Options) *http.Cookie {
-	return &http.Cookie{
+	cookie := &http.Cookie{
 		Name:     s.CookieName(logicalName),
 		Value:    value,
 		Path:     options.Path,
@@ -485,6 +501,15 @@ func (s *ServerSideStore) buildCookie(logicalName, value string, options *sessio
 		HttpOnly: options.HttpOnly,
 		SameSite: options.SameSite,
 	}
+	if options.MaxAge < 0 {
+		// A negative MaxAge means this cookie is being removed, and a removal carries both
+		// attributes for the reason DeletionCookie states below: Max-Age is what a current
+		// browser acts on, and the expiry in the past is what one that predates it acts on.
+		// Set here rather than at the caller so the logout path and the stale-cookie sweep
+		// cannot drift apart, which they had (#266).
+		cookie.Expires = time.Unix(0, 0).UTC()
+	}
+	return cookie
 }
 
 // isAuthenticated reports whether this session has signed in, which decides which of the

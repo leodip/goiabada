@@ -304,7 +304,12 @@ func TestServerSideStore_StorageFailurePropagates(t *testing.T) {
 	// interruption, and would erase the difference between "this session is gone" and
 	// "I could not check" (#266).
 	require.Error(t, err)
-	assert.Nil(t, session)
+	// Non-nil beside the error, which gorilla/sessions requires of Store.New and which
+	// Get's registry dereferences without checking. Asserting nil here is what let the
+	// panic in TestServerSideStore_GetSurvivesAStorageFailure below go unnoticed: it
+	// pinned the contract violation rather than the behaviour (#266).
+	require.NotNil(t, session)
+	assert.True(t, session.IsNew)
 }
 
 func TestServerSideStore_NoCookieCostsNoRead(t *testing.T) {
@@ -384,6 +389,97 @@ func TestServerSideStore_TouchFailurePropagates(t *testing.T) {
 
 // --- saving an existing session ------------------------------------------------------
 
+// TestServerSideStore_GetSurvivesAStorageFailure drives Get rather than New, and that is
+// the whole point of it: nothing in production calls New. Every caller reaches the store
+// through Get, which is gorilla's per-request registry, and Registry.Get assigns to
+// session.name on whatever New handed back without looking at the error. A store that
+// answered a storage fault with a nil session therefore panicked inside the library on the
+// one path that exists to make a database outage diagnosable, and the request came back as
+// an empty 500 with the cause nowhere, which is the opposite of what failing closed buys.
+//
+// Both failure points are driven, because they are two different returns in New (#266).
+func TestServerSideStore_GetSurvivesAStorageFailure(t *testing.T) {
+	t.Run("the load fails", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+
+		cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+		backend.loadErr = errors.New("the database is unreachable")
+
+		req := requestWith(cookie)
+		session, err := store.Get(req, storeTestName)
+
+		require.Error(t, err, "a lookup that could not be performed is a refused request")
+		require.NotNil(t, session)
+		assert.False(t, isDecodeError(err),
+			"a storage failure read as a decode error would clear the cookie instead of refusing")
+
+		// The registry memoises the pair, so the next middleware in the same request is
+		// answered identically rather than being handed a fresh empty session.
+		again, errAgain := store.Get(req, storeTestName)
+		require.Error(t, errAgain)
+		require.NotNil(t, again)
+	})
+
+	t.Run("the touch fails", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+
+		cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+		id := decodeCookieId(t, store, cookie)
+		backend.rows[id].LastAccessed = time.Now().UTC().Add(-30 * time.Second)
+		backend.touchErr = errors.New("the database is unreachable")
+
+		session, err := store.Get(requestWith(cookie), storeTestName)
+
+		require.Error(t, err)
+		require.NotNil(t, session)
+		assert.Empty(t, session.Values,
+			"a session whose liveness could not be confirmed must not hand its contents back")
+	})
+}
+
+// TestServerSideStore_RegenerateRotatesAnAdminConsoleSession is the store half of the admin
+// console's one privilege transition: a session already carrying the token set rotates onto
+// a new identifier and the old row goes. The call site that owes this lives in a module with
+// no handler harness (#237), so it is guarded there by a source lint instead.
+func TestServerSideStore_RegenerateRotatesAnAdminConsoleSession(t *testing.T) {
+	owner := matrixOwners[1] // adminconsole
+	backend := newFakeBackend()
+	store := newMatrixStore(owner, backend, false)
+
+	cookie := liveCookie(t, store, owner, map[interface{}]interface{}{"state": "the handshake"})
+	plantedId := decodeCookieId2(t, store, owner, cookie)
+
+	req := requestWith(cookie)
+	w := httptest.NewRecorder()
+	session, err := store.New(req, owner.sessionName)
+	require.NoError(t, err)
+
+	session.Values[owner.authenticatedKey] = "the administrator's tokens"
+	require.NoError(t, store.Regenerate(w, req, session))
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+	rotatedId := decodeCookieId2(t, store, owner, cookies[0])
+
+	assert.NotEqual(t, plantedId, rotatedId,
+		"an identifier that existed before sign-in must not name the session sign-in produces")
+	_, planted := backend.rows[plantedId]
+	assert.False(t, planted, "the row the old identifier named has to go, or it still works")
+	require.Contains(t, backend.rows, rotatedId)
+}
+
+// decodeCookieId2 is decodeCookieId for a matrix owner, whose codec name is not the one
+// the single-owner helpers hardcode.
+func decodeCookieId2(t *testing.T, store *ServerSideStore, owner matrixOwner, cookie *http.Cookie) string {
+	t.Helper()
+
+	var id string
+	require.NoError(t, securecookie.DecodeMulti(owner.sessionName, cookie.Value, &id, store.Codecs...))
+	return id
+}
+
 func TestServerSideStore_SaveOnALoadedSessionUpdates(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
@@ -455,6 +551,17 @@ func TestServerSideStore_NegativeMaxAgeDeletesRowAndCookie(t *testing.T) {
 	require.Len(t, cookies, 1)
 	assert.Equal(t, -1, cookies[0].MaxAge)
 	assert.Empty(t, cookies[0].Value)
+	// Both attributes, exactly as DeletionCookie carries them: Max-Age is what a current
+	// browser acts on and the past expiry is what one predating it acts on. Logging out is
+	// the path where the two disagreeing matters most, and it is the one that had only
+	// Max-Age (#266).
+	// IsZero first, and not merely "before now": an absent Expires parses back as the
+	// zero time, which is year 1 and therefore also before now, so the obvious assertion
+	// passes against a cookie carrying no expiry at all. The mutation that made this
+	// branch unreachable survived it.
+	require.False(t, cookies[0].Expires.IsZero(),
+		"a cookie being removed carries an expiry in the past as well as Max-Age")
+	assert.True(t, cookies[0].Expires.Before(time.Now()))
 }
 
 func TestServerSideStore_NegativeMaxAgeWithNoSessionTouchesNoBackend(t *testing.T) {
@@ -934,7 +1041,9 @@ func TestServerSideStore_CutoverMatrix(t *testing.T) {
 
 				session, err := loadWith(t, store, owner, cookie)
 				require.Error(t, err, "a lookup that could not be performed is not a fresh session")
-				assert.Nil(t, session)
+				require.NotNil(t, session,
+					"gorilla's registry dereferences whatever New returns, so a nil session "+
+						"here is a panic rather than the 500 this cell exists to pin")
 				assert.False(t, isDecodeError(err),
 					"a storage failure answered as a decode error would clear the cookie and "+
 						"sign everyone out for the duration of the outage")

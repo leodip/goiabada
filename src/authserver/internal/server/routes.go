@@ -384,7 +384,18 @@ func (s *Server) initRoutes(root chi.Router) {
 		// here carries session ciphertext, and RFC 6749 section 5.1's MUST covers "any
 		// response containing tokens, credentials, or other sensitive information".
 		r.Use(core_middleware.MiddlewareNoStore())
-		r.Use(middleware.APIDebugMiddleware())
+		// No APIDebugMiddleware here, and it is the only /api/v1 group without it. That
+		// middleware logs whole request and response bodies, redacting by field name, and
+		// this group's fields are called "id" and "data": neither matches its key set nor
+		// its password/secret/otp/token substring net, so turning the debug flag on would
+		// write every live admin console session handle into this server's log in the
+		// clear, beside the session ciphertext. The identifier is in the body rather than
+		// the request line precisely so that it never reaches a log, and a debug switch an
+		// operator is offered must not be the thing that undoes it. Widening the redaction
+		// set is not the alternative: "id" is a field name the rest of the admin and
+		// account API uses everywhere, and redacting it would blind the surface this
+		// middleware exists to make debuggable. What is lost is recoverable from the SQL
+		// log, which records the digest rather than the handle (#266).
 		r.Use(authHeaderToContext)
 		// One narrow permission of its own, deliberately not one of the manage-* admin
 		// API scopes: holding the admin console's client secret must not be a way to
