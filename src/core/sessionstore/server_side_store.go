@@ -36,18 +36,43 @@ const (
 	// the staleness observable to anyone (#266).
 	TouchThreshold = 10 * time.Second
 
+	// MaxSessionWireBytes bounds one whole session request or response body on the wire,
+	// the JSON envelope included. The session endpoint applies it to what it reads and
+	// the HTTP backend applies it to what it reads back, so it is the outermost of the
+	// two ceilings here and both directions carry the same one.
+	MaxSessionWireBytes = 1 << 20
+
+	// sessionEnvelopeBytes is how much of MaxSessionWireBytes the JSON around a blob is
+	// allowed to occupy, and subtracting it is what makes MaxSessionDataBytes a size that
+	// can actually cross the wire.
+	//
+	// The largest envelope is 105 bytes: a write request is
+	// {"id":<64 chars>,"data":<blob>,"authenticated":true} and a load response is
+	// {"data":<blob>,"lastAccessed":<RFC 3339 nanos>,"expiresAt":<RFC 3339 nanos>}, plus
+	// the newline json.Encoder appends. The blob is securecookie's base64, so JSON has
+	// nothing in it to escape and the encoded length is the stored length. 4 KiB is
+	// roughly forty times what is needed, which is deliberate: an allowance sized to the
+	// current field names would have to be revisited every time one is added, and the
+	// only thing it costs is 4 KiB off a ceiling nothing legitimate approaches.
+	sessionEnvelopeBytes = 4096
+
 	// MaxSessionDataBytes bounds an encoded session blob, and it is the ceiling that
 	// actually binds rather than one the store advertises and does not enforce, which is
 	// the defect #266 exists to retire. securecookie checks it on the way in and on the
 	// way out, so an oversized session fails its save with a clear error instead of being
 	// written and then refused somewhere further along.
 	//
-	// A megabyte, matching what the session endpoint accepts as a request body: the store
-	// refuses first, and with a better error, rather than letting a blob be built here and
-	// rejected at the wire. The largest real payload is an admin console session holding a
-	// full token set, about 13 KB of ciphertext, so nothing a deployment can legitimately
-	// produce comes near it.
-	MaxSessionDataBytes = 1 << 20
+	// It sits below MaxSessionWireBytes rather than equal to it, because a blob equal to
+	// the wire ceiling cannot fit through the wire once its envelope is added: the write
+	// would be refused as oversized by the endpoint and the read truncated before it
+	// decoded, both at the exact size the store had just admitted. Deriving one from the
+	// other is what keeps "the store refuses first, and with a better error" true at the
+	// boundary and not only in the middle of the range (final review, round 2, finding 3).
+	//
+	// The largest real payload is an admin console session holding a full token set,
+	// about 13 KB of ciphertext, so nothing a deployment can legitimately produce comes
+	// near either number.
+	MaxSessionDataBytes = MaxSessionWireBytes - sessionEnvelopeBytes
 
 	// MaxCookieDecodeAgeSeconds is the oldest cookie securecookie will decode at all.
 	// It is a backstop and not the session's lifetime: the row's expires_at decides

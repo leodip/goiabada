@@ -175,7 +175,10 @@ func (b *httpBackend) post(ctx context.Context, operation string, requestBody in
 }
 
 // attempt performs one request. It returns the status and body of whatever came back, and
-// an error only when nothing did, which is the distinction the retry above is built on.
+// an error otherwise. Only one of those errors is a transportError, meaning nothing came
+// back at all, and that is the distinction the retry above is built on: an operation the
+// far end never saw is safe to send again, and one whose answer merely went missing is
+// not.
 //
 // The token comes from the source on every attempt rather than being carried in from the
 // last one. That is what makes the 401 path work with no second parameter: Invalidate has
@@ -204,9 +207,23 @@ func (b *httpBackend) attempt(ctx context.Context, operation string, encoded []b
 	}
 	defer func() { _ = response.Body.Close() }()
 
+	// Not a transportError, and the distinction is the whole reason this is separate from
+	// the Do failure above. Reaching here means the far end answered, so it has already
+	// run the operation and committed it; only the body was lost on the way back. Retrying
+	// then submits an operation that has already happened, and create is the one that
+	// cannot survive that: the second attempt collides with the first attempt's own row on
+	// the (owner, session_id_hash) unique index, the endpoint answers 500, and a write that
+	// succeeded is reported to the caller as a failure that left an unreachable row behind.
+	// A rotation loses more than that, because Regenerate stops before deleting the row it
+	// was rotating away.
+	//
+	// So an answer that could not be read fails once. The retry keeps the case it exists
+	// for, an idle keep-alive connection closed by the far end, which is a Do failure with
+	// no response at all and therefore nothing the server has acted on (final review,
+	// round 2, finding 2).
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxSessionResponseBytes))
 	if err != nil {
-		return 0, nil, &transportError{errors.Wrap(err, "unable to read the browser session response")}
+		return 0, nil, errors.Wrap(err, "unable to read the browser session response")
 	}
 
 	return response.StatusCode, body, nil
@@ -225,11 +242,16 @@ func (e *transportError) Error() string { return e.err.Error() }
 
 func (e *transportError) Unwrap() error { return e.err }
 
-// maxSessionResponseBytes is the ceiling the store puts on a session blob, applied to what
-// comes back as well as to what goes out. A response is the auth server's own, so this is
-// not defence against it; it is that a store on the request path of every page should not
-// read an unbounded number of bytes into memory because something upstream went wrong.
-const maxSessionResponseBytes = MaxSessionDataBytes
+// maxSessionResponseBytes is the wire ceiling, applied to what comes back as well as to
+// what goes out. A response is the auth server's own, so this is not defence against it;
+// it is that a store on the request path of every page should not read an unbounded number
+// of bytes into memory because something upstream went wrong.
+//
+// It is the wire ceiling and not MaxSessionDataBytes, because what arrives here is a blob
+// inside a JSON envelope: capping the whole body at the blob's own ceiling would truncate
+// a maximal session's response before it decoded, which is a failure at exactly the size
+// the store admits (final review, round 2, finding 3).
+const maxSessionResponseBytes = MaxSessionWireBytes
 
 func decodeSessionResponse(operation string, status int, body []byte, out interface{}) error {
 	switch {

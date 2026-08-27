@@ -44,7 +44,13 @@ import (
 // authenticated caller is still not a reason to read an arbitrary number of bytes into
 // memory. This is this endpoint's own hygiene and not the deployment-wide request limits
 // tracked in #205.
-const maxSessionRequestBytes = 1 << 20
+//
+// It is the store's wire ceiling rather than a second copy of the same literal, because
+// the two have to be related and not merely equal: the store admits a blob one envelope
+// smaller than this, so a session it accepts is a request this reads. Written as its own
+// megabyte, the two numbers agreed everywhere except at the boundary, where the endpoint
+// refused what the store had just admitted (final review, round 2, finding 3).
+const maxSessionRequestBytes = sessionstore.MaxSessionWireBytes
 
 // adminConsoleSessions is the only place in this package that names an owner.
 //
