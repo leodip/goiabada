@@ -392,9 +392,11 @@ func HandleAuthorizeGet(
 			// The description is conformed HERE and not only at the emitter. RFC 6749 Appendix
 			// A.8's character set is enforced in redirToClientWithError as well, and that filter
 			// is idempotent so the two paths stay byte-identical, but a bound applied at emission
-			// does nothing for a string already written into a cookie: descriptions interpolate
-			// request text, and ChunkedCookieStore caps a session at 50 chunks, so an unbounded
-			// one parked here would answer 500 instead of deferring (#213 decision 10).
+			// does nothing for a string already parked in the session: descriptions interpolate
+			// request text, so an unbounded one would be carried by every request of the
+			// ceremony that parked it. The bound itself is ConformErrorDescription's own
+			// maxErrorDescriptionBytes; it used to be attributed to the 50-chunk cap of the
+			// cookie store, which no longer exists (#213 decision 10, #266).
 			authContext.DeferredErrorCode = validationError.GetCode()
 			authContext.DeferredErrorDescription =
 				customerrors.ConformErrorDescription(validationError.GetDescription())

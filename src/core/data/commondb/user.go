@@ -732,13 +732,17 @@ func (d *CommonDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordH
 // submissions of one reset link both setting a password, with the later one winning.
 //
 // **Why the predicate is the code hash and not just the user id.** The reset flow keeps
-// its "this code was validated" marker in the session, which is a client-side encrypted
-// cookie: clearing it in a response replaces the browser's copy and cannot invalidate a
-// copy an attacker kept. A marker naming only the durable user id would therefore
-// outlive the password write, a newly issued code, and any other password change. Naming
-// the hash and claiming it here is what keeps a replayed marker from setting a password
-// a second time, which is the property the encrypted column's NULLing already gives the
-// pre-#112 flow.
+// its "this code was validated" marker in the session. A marker naming only the durable
+// user id would outlive the password write, a newly issued code, and any other password
+// change, for as long as the session holding it lives. Naming the hash and claiming it
+// here is what keeps a replayed marker from setting a password a second time, which is
+// the property the encrypted column's NULLing already gives the pre-#112 flow.
+//
+// The original argument for this was stronger and has expired: the session used to be a
+// client-side encrypted cookie, so clearing the marker could not invalidate a copy an
+// attacker kept. The session is a database row now and clearing it reaches every copy
+// (#266). The predicate stays because clearing at the end of a flow says nothing about a
+// code consumed or reissued inside a session nobody cleared.
 //
 // **A false return is not proof of replay**, the same imprecision MarkCodeAsUsed
 // documents: the code may have been consumed already, cleared by an unrelated password

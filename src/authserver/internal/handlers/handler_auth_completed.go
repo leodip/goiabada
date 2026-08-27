@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
+	"github.com/leodip/goiabada/core/user"
 	"github.com/pkg/errors"
 )
 
@@ -98,6 +99,30 @@ func HandleAuthCompletedGet(
 		var boundSession *models.UserSession
 
 		if hasValidUserSession && sessionBelongsToCeremony {
+			// Rotate the browser session's identifier before the privilege is committed,
+			// when this bump is going to raise one.
+			//
+			// The order is the whole of it. BumpUserSession opens its own transaction and
+			// commits before it returns, so rotating afterwards leaves a window in which
+			// the identifier the browser arrived with names a user session that is
+			// already at the higher level: an identifier stolen at level 1 would keep
+			// working after the step-up, which is the carryover rotation exists to stop.
+			// Deciding from the pre-bump session and rotating first means a failure
+			// between the two leaves a fresh identifier on a session that has not been
+			// raised, which is the safe direction.
+			//
+			// This arm is not fixation defence: reaching it means the browser already
+			// held a session this ceremony may reuse. Fixation is closed on the create
+			// arm below, inside StartNewUserSession. What this buys is the other half of
+			// OWASP's "regenerate on any privilege level change", and this server's ACR
+			// levels are privilege levels by construction (#266 decision 6).
+			if user.WillRaisePrivilege(userSession, authContext.AuthMethods, targetAcrLevel.String()) {
+				if err := authHelper.RegenerateSession(w, r); err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+			}
+
 			// Bump session with current auth context's methods and target ACR level.
 			// This handles step-up authentication: if the user had a level1 session but just
 			// completed OTP for a level2 client, the session's AuthMethods and AcrLevel

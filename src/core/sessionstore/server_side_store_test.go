@@ -745,3 +745,37 @@ func TestServerSideStore_PreAuthLifetimeIsThirtyMinutes(t *testing.T) {
 	assert.Equal(t, 30*time.Minute, PreAuthLifetime)
 	assert.Equal(t, 10*time.Second, TouchThreshold)
 }
+
+// --- deletion cookies --------------------------------------------------------------
+
+// TestServerSideStore_DeletionCookieCarriesWhatADeletionNeeds pins the attributes a
+// deletion must carry to land, which is the half of a cookie deletion that fails
+// silently: a browser matches a deletion to the cookie it replaces by name, domain and
+// path, and refuses a __Host- prefixed cookie outright unless it is Secure. A deletion
+// written with the wrong path, or without Secure on https, is accepted by every test that
+// only checks a Set-Cookie was emitted and does nothing at all in a browser.
+func TestServerSideStore_DeletionCookieCarriesWhatADeletionNeeds(t *testing.T) {
+	for _, secure := range []bool{true, false} {
+		store := newTestStore(newFakeBackend(), secure)
+		cookie := store.DeletionCookie(store.CookieName(storeTestName))
+
+		assert.Equal(t, -1, cookie.MaxAge)
+		assert.True(t, cookie.Expires.Before(time.Now()), "the expiry must be in the past")
+		assert.Empty(t, cookie.Value)
+		assert.Equal(t, store.Options.Path, cookie.Path)
+		assert.Equal(t, secure, cookie.Secure,
+			"a __Host- cookie is refused unless the deletion is Secure too")
+		assert.Equal(t, store.Options.HttpOnly, cookie.HttpOnly)
+		assert.Equal(t, store.Options.SameSite, cookie.SameSite)
+	}
+}
+
+// TestServerSideStore_DeletionCookieNamesWhatItWasGiven: the two callers name different
+// things, this store's own cookie and the chunked store's leftovers, so the name is passed
+// in whole rather than derived here.
+func TestServerSideStore_DeletionCookieNamesWhatItWasGiven(t *testing.T) {
+	store := newTestStore(newFakeBackend(), true)
+
+	assert.Equal(t, "__Host-"+storeTestName, store.DeletionCookie(store.CookieName(storeTestName)).Name)
+	assert.Equal(t, storeTestName+"-chunk-7", store.DeletionCookie(storeTestName+"-chunk-7").Name)
+}

@@ -101,6 +101,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
 
+		// Ordinary single sign-on raises nothing: the ceremony recorded no methods and the
+		// target ACR is the one the session already holds. Rotating here would replace the
+		// identifier on every page a signed-in user visits, and two concurrent requests
+		// from one browser would each strand the other's cookie (#266 decision 6).
+		authHelper.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything)
+
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
@@ -1106,6 +1112,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
+		// This ceremony's methods are "pwd otp" against a session holding none, so the bump
+		// would raise the session's privilege and the browser session's identifier is
+		// rotated first. Expected explicitly rather than allowed with Maybe(): the ordering
+		// is the point of the rotation, and one that stopped happening at all would
+		// otherwise be invisible from here (#266 decision 6).
+		authHelper.On("RegenerateSession", rr, req).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"pwd otp", enums.AcrLevel2Optional.String()).Return(userSession, nil)
@@ -1196,6 +1208,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
+		// This ceremony's methods are "pwd otp" against a session holding none, so the bump
+		// would raise the session's privilege and the browser session's identifier is
+		// rotated first. Expected explicitly rather than allowed with Maybe(): the ordering
+		// is the point of the rotation, and one that stopped happening at all would
+		// otherwise be invisible from here (#266 decision 6).
+		authHelper.On("RegenerateSession", rr, req).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"pwd", enums.AcrLevel1.String()).Return(userSession, nil)
@@ -1281,6 +1299,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
+		// This ceremony's methods are "pwd otp" against a session holding none, so the bump
+		// would raise the session's privilege and the browser session's identifier is
+		// rotated first. Expected explicitly rather than allowed with Maybe(): the ordering
+		// is the point of the rotation, and one that stopped happening at all would
+		// otherwise be invisible from here (#266 decision 6).
+		authHelper.On("RegenerateSession", rr, req).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"pwd otp", enums.AcrLevel2Optional.String()).Return(userSession, nil)

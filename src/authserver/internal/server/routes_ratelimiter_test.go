@@ -168,7 +168,7 @@ func newRoutesTestServer(t *testing.T) *Server {
 		sessionStore: sessions.NewCookieStore(securecookie.GenerateRandomKey(64)),
 		templateFS:   web.TemplateFS(),
 	}
-	s.initRoutes()
+	s.initRoutes(s.router)
 	return s
 }
 

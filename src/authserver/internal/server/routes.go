@@ -22,7 +22,11 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
-func (s *Server) initRoutes() {
+// initRoutes registers the application's routes on root, which is the branch
+// initMiddleware returns rather than s.router itself: the settings read, the session load
+// and the locale resolution belong to these routes and not to the static file server
+// registered beside them (#266).
+func (s *Server) initRoutes(root chi.Router) {
 
 	auditLogger := audit.NewAuditLogger(s.database)
 	authorizeValidator := validators.NewAuthorizeValidator(s.database)
@@ -73,35 +77,35 @@ func (s *Server) initRoutes() {
 		authServerConfig.TrustedProxies,
 	)
 
-	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))
-	s.router.Get("/", handlers.HandleIndexGet(httpHelper))
-	s.router.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
-	s.router.Get("/forgot-password", handlers.HandleForgotPasswordGet(httpHelper))
-	s.router.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", handlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender))
-	s.router.With(rateLimiter.LimitResetPwd).Get("/reset-password", handlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger))
-	s.router.With(rateLimiter.LimitResetPwd).Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger))
-	s.router.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper))
-	s.router.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
+	root.NotFound(handlers.HandleNotFoundGet(httpHelper))
+	root.Get("/", handlers.HandleIndexGet(httpHelper))
+	root.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
+	root.Get("/forgot-password", handlers.HandleForgotPasswordGet(httpHelper))
+	root.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", handlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender))
+	root.With(rateLimiter.LimitResetPwd).Get("/reset-password", handlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger))
+	root.With(rateLimiter.LimitResetPwd).Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger))
+	root.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper))
+	root.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
 	// RequireUserBoundToken comes AFTER the scope check so an insufficient-scope caller still
 	// receives the 403 it receives today. GET and POST are separate registrations: a guard added
 	// to only one of them leaves the other reachable.
-	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
-	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
-	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
-	s.router.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
-	s.router.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
-	s.router.Get("/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
+	root.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	root.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	root.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
+	root.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
+	root.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
+	root.Get("/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
 
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)
-	s.router.With(rateLimiter.LimitDCR).Post("/connect/register",
+	root.With(rateLimiter.LimitDCR).Post("/connect/register",
 		handlers.HandleDynamicClientRegistrationPost(httpHelper, s.database, auditLogger))
 
 	// Public API endpoints (no authentication required)
 	publicSettingsHandler := handlers.NewHandlerPublicSettings(s.database)
-	s.router.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
+	root.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
-	s.router.Route("/auth", func(r chi.Router) {
+	root.Route("/auth", func(r chi.Router) {
 		authorizeHandler := handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 		r.Get("/authorize", authorizeHandler)
 		r.Post("/authorize", authorizeHandler)
@@ -122,7 +126,7 @@ func (s *Server) initRoutes() {
 		r.Post("/logout", handlers.HandleAccountLogoutPost(httpHelper, s.sessionStore, authHelper, s.database, tokenParser, auditLogger))
 	})
 
-	s.router.Route("/account", func(r chi.Router) {
+	root.Route("/account", func(r chi.Router) {
 		r.Get("/register", accounthandlers.HandleAccountRegisterGet(httpHelper))
 		// The POST alone is limited: the GET renders a static form, while the POST probes
 		// whether an address already has an account, sends mail to it and writes a row.
@@ -131,7 +135,7 @@ func (s *Server) initRoutes() {
 	})
 
 	// Admin API routes
-	s.router.Route("/api/v1/admin", func(r chi.Router) {
+	root.Route("/api/v1/admin", func(r chi.Router) {
 		// FIRST in the group, ahead of the debug middleware and every guard. GET
 		// /api/v1/admin/clients/{id} returns a decrypted client secret, so RFC 6749
 		// section 5.1's MUST reaches this group, and the 401 and 403 refusals below
@@ -318,7 +322,7 @@ func (s *Server) initRoutes() {
 	})
 
 	// Account API routes (self-service)
-	s.router.Route("/api/v1/account", func(r chi.Router) {
+	root.Route("/api/v1/account", func(r chi.Router) {
 		// FIRST in the group, for the same reason as the admin group above. GET
 		// /api/v1/account/otp/enrollment serves a TOTP enrolment seed (#247).
 		r.Use(core_middleware.MiddlewareNoStore())
@@ -375,7 +379,7 @@ func (s *Server) initRoutes() {
 	// POST throughout, with the session identifier in the body and never in the request
 	// line: a handle in a path lands in this server's access log and in every proxy in
 	// front of it.
-	s.router.Route("/api/v1/sessions", func(r chi.Router) {
+	root.Route("/api/v1/sessions", func(r chi.Router) {
 		// FIRST in the group, for the same reason as the two groups above: every 200
 		// here carries session ciphertext, and RFC 6749 section 5.1's MUST covers "any
 		// response containing tokens, credentials, or other sensitive information".

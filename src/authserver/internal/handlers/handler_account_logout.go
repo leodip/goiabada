@@ -915,6 +915,15 @@ func finishLogout(
 		return
 	}
 	sess.Values = make(map[interface{}]interface{})
+
+	// MaxAge below zero is what makes the save a deletion rather than a rewrite. Emptying
+	// the values was enough when the session WAS the cookie, because an empty cookie is an
+	// empty session; against a server-side store it would leave a live row holding an
+	// empty blob, and the identifier naming it would keep working. Logging out has to
+	// invalidate both halves, which is OWASP's "active actions ... when the user actively
+	// logs out" (#266).
+	sess.Options.MaxAge = -1
+
 	if err := httpSession.Save(r, w, sess); err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return

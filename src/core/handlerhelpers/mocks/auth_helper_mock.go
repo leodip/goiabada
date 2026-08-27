@@ -393,6 +393,63 @@ func (_c *AuthHelper_RedirToAuthorize_Call) RunAndReturn(run func(w http.Respons
 	return _c
 }
 
+// RegenerateSession provides a mock function for the type AuthHelper
+func (_mock *AuthHelper) RegenerateSession(w http.ResponseWriter, r *http.Request) error {
+	ret := _mock.Called(w, r)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RegenerateSession")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request) error); ok {
+		r0 = returnFunc(w, r)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// AuthHelper_RegenerateSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegenerateSession'
+type AuthHelper_RegenerateSession_Call struct {
+	*mock.Call
+}
+
+// RegenerateSession is a helper method to define mock.On call
+//   - w http.ResponseWriter
+//   - r *http.Request
+func (_e *AuthHelper_Expecter) RegenerateSession(w any, r any) *AuthHelper_RegenerateSession_Call {
+	return &AuthHelper_RegenerateSession_Call{Call: _e.mock.On("RegenerateSession", w, r)}
+}
+
+func (_c *AuthHelper_RegenerateSession_Call) Run(run func(w http.ResponseWriter, r *http.Request)) *AuthHelper_RegenerateSession_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 http.ResponseWriter
+		if args[0] != nil {
+			arg0 = args[0].(http.ResponseWriter)
+		}
+		var arg1 *http.Request
+		if args[1] != nil {
+			arg1 = args[1].(*http.Request)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *AuthHelper_RegenerateSession_Call) Return(err error) *AuthHelper_RegenerateSession_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *AuthHelper_RegenerateSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request) error) *AuthHelper_RegenerateSession_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SaveAuthContext provides a mock function for the type AuthHelper
 func (_mock *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauth.AuthContext) error {
 	ret := _mock.Called(w, r, authContext)

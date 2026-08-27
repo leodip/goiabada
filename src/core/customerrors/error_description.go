@@ -15,7 +15,9 @@ import (
 // so the bound is more than double the longest legitimate text and truncates nothing the server says
 // on its own account. What it does bound is the part a caller chose: a description interpolates
 // request text, and an unbounded one ends up both on the wire and, since #213's deferral, inside a
-// cookie whose store caps a session at 50 chunks.
+// parked auth context that every request of that ceremony then carries. This bound is the only one
+// there is. It used to have the session store's 50-chunk cap behind it, and that store is gone
+// (#266).
 const maxErrorDescriptionBytes = 512
 
 // conformingErrorDescriptionRune answers whether r is admitted by RFC 6749 Appendix A.8's NQSCHAR.

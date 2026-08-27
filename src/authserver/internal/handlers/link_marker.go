@@ -61,13 +61,14 @@ const continuationIdLength = 32
 // LinkMarker records that an emailed link was followed and its code was valid, so
 // every later step of the flow can run on a URL with no credential in it (#112).
 //
-// It lives in the session, which is a client-side encrypted cookie
-// (sessionstore.NewChunkedCookieStore). That is what CodeHash is for: clearing the
-// marker replaces the browser's copy and cannot invalidate one an attacker kept, so a
-// marker naming only a durable id would outlive the password write, a newly issued
-// code and every other password change. Naming the code hash makes the marker durable
-// only for as long as that hash is still the outstanding one, and re-resolving it is
-// the consuming handler's job on every clean request.
+// It lives in the session, which is now a row in the database rather than a cookie in
+// the browser, so clearing the marker does invalidate every copy of it (#266). CodeHash
+// stays, and stays wanted, on a narrower argument than the one it was introduced with: a
+// marker naming only a durable id would still outlive the password write, a newly issued
+// code and every other password change WITHIN a session nobody cleared. Naming the code
+// hash makes the marker durable only for as long as that hash is still the outstanding
+// one, and re-resolving it is the consuming handler's job on every clean request. Defence
+// in depth now, where it used to be the whole boundary (#112, #266).
 type LinkMarker struct {
 	Flow LinkMarkerFlow `json:"flow"`
 	// Id is the userId for a reset and the pre-registration id for an activation.
@@ -251,10 +252,15 @@ func readLinkMarker(sess *sessions.Session, want LinkMarkerFlow,
 
 // ClearLinkMarker removes the marker from the session.
 //
-// Hygiene rather than a security boundary: the session is a client-side cookie, so
-// this replaces the browser's copy and cannot invalidate one that was captured
-// beforehand. What actually refuses a replayed marker is re-resolving its CodeHash,
-// which the consuming handlers do on every clean request.
+// This does invalidate the marker, for every copy of it: the session is a row in the
+// database and the browser holds only an identifier naming it, so removing the value
+// removes the only copy there is. That inverted with #266; before it, clearing replaced
+// the browser's own copy and could not reach one an attacker had captured.
+//
+// The consuming handlers still re-resolve the marker's CodeHash on every clean request,
+// and that is still worth keeping: it refuses a marker whose code has since been consumed
+// or reissued, which clearing at the end of a flow says nothing about. Defence in depth
+// now rather than the boundary itself.
 func ClearLinkMarker(httpSession sessions.Store, w http.ResponseWriter, r *http.Request) error {
 	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 	if err != nil {

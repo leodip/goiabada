@@ -93,9 +93,11 @@ type AuthContext struct {
 	// One field rather than the seed and its rendered QR code, because the URL is the
 	// library's own record of the whole key and both are derived from it, otp.SecretFromKeyURL
 	// for the verifier and otp.RenderQRCodeImage for the page. Two fields could disagree; one
-	// cannot. It is also what keeps an enrolment out of the browser's cookie budget: the URL
-	// is about 150 bytes where the base64 image was roughly 2.4 KB, an entire extra cookie
-	// chunk carried on every request for the duration of the enrolment (#247).
+	// cannot. It is also what keeps an enrolment small: the URL is about 150 bytes where the
+	// base64 image was roughly 2.4 KB. That used to be an entire extra cookie chunk on every
+	// request; since the session became a database row it is 2.4 KB written, read and, on the
+	// admin console, carried over an internal hop instead, for the duration of the enrolment
+	// (#247, #266).
 	//
 	// It lives on the ceremony rather than in a slot on the browser session, and that is what
 	// fixes the enrolment reload. The session had ONE pair of slots for the whole browser,
