@@ -24,7 +24,7 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
-func (s *Server) initRoutes() {
+func (s *Server) initRoutes(root chi.Router) {
 	// Prefer internal base URL for in-cluster communication
 	authBase := config.GetAuthServer().GetEffectiveBaseURL()
 
@@ -86,25 +86,25 @@ func (s *Server) initRoutes() {
 	}
 
 	// Base routes
-	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))
-	s.router.With(baseAuth...).Get("/", handlers.HandleIndexGet(authHelper, httpHelper))
+	root.NotFound(handlers.HandleNotFoundGet(httpHelper))
+	root.With(baseAuth...).Get("/", handlers.HandleIndexGet(authHelper, httpHelper))
 	// /unauthorized is reached by authenticated-but-forbidden users via the
 	// redirect in middleware_jwt's RequiresScope path. Wrapping it through
 	// baseAuth lets the user-locale refinement fire so the page renders
 	// in the user's stored locale. baseAuth tolerates missing-permission
 	// cases — the whole point of this page is that the user is
 	// authenticated but not authorized.
-	s.router.With(baseAuth...).Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
-	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
+	root.With(baseAuth...).Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
+	root.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 
 	// Auth routes
-	s.router.With(baseAuth...).Route("/auth", func(r chi.Router) {
+	root.With(baseAuth...).Route("/auth", func(r chi.Router) {
 		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenExchanger))
 		r.Get("/logout", accounthandlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, apiClient))
 	})
 
 	// Account routes
-	s.router.Route("/account", func(r chi.Router) {
+	root.Route("/account", func(r chi.Router) {
 		r.Use(accountAuth...)
 
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +137,7 @@ func (s *Server) initRoutes() {
 	})
 
 	// Admin routes
-	s.router.Route("/admin", func(r chi.Router) {
+	root.Route("/admin", func(r chi.Router) {
 		r.Use(adminAuth...)
 
 		r.Get("/get-permissions", handlers.HandleAdminGetPermissionsGet(httpHelper, apiClient))

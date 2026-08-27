@@ -36,6 +36,19 @@ const (
 	// the staleness observable to anyone (#266).
 	TouchThreshold = 10 * time.Second
 
+	// MaxSessionDataBytes bounds an encoded session blob, and it is the ceiling that
+	// actually binds rather than one the store advertises and does not enforce, which is
+	// the defect #266 exists to retire. securecookie checks it on the way in and on the
+	// way out, so an oversized session fails its save with a clear error instead of being
+	// written and then refused somewhere further along.
+	//
+	// A megabyte, matching what the session endpoint accepts as a request body: the store
+	// refuses first, and with a better error, rather than letting a blob be built here and
+	// rejected at the wire. The largest real payload is an admin console session holding a
+	// full token set, about 13 KB of ciphertext, so nothing a deployment can legitimately
+	// produce comes near it.
+	MaxSessionDataBytes = 1 << 20
+
 	// MaxCookieDecodeAgeSeconds is the oldest cookie securecookie will decode at all.
 	// It is a backstop and not the session's lifetime: the row's expires_at decides
 	// whether a session is alive, and a cookie older than its row simply names nothing.
@@ -130,10 +143,22 @@ func ExpiresAt(now, createdAt time.Time, authenticated bool, idleTimeout, maxLif
 // but an opaque, signed identifier. It implements sessions.Store, so the hundred places
 // that already take that interface are untouched (#266).
 type ServerSideStore struct {
-	// Codecs sign and encrypt the identifier in the cookie, and separately encrypt the
-	// session contents before they reach the backend. Both use this module's own keys,
-	// so a backend that is somebody else's server holds bytes it cannot read.
+	// Codecs sign and encrypt the identifier in the cookie. What they encode is 64 hex
+	// characters, so they keep securecookie's own 4096 byte ceiling: it finally has
+	// something to guard, where the store this replaced had to disable it.
 	Codecs []securecookie.Codec
+
+	// DataCodecs encrypt the session contents before they reach the backend, with this
+	// module's own keys, so a backend that is somebody else's server holds bytes it
+	// cannot read.
+	//
+	// A separate set from Codecs for one reason, and it is not cosmetic: securecookie's
+	// length ceiling is a property of the codec, and these two encode values whose sizes
+	// differ by four orders of magnitude. Sharing one set means either the cookie's
+	// identifier is guarded by a megabyte, which guards nothing, or the session blob is
+	// capped at a cookie's 4096 bytes, which is smaller than an ordinary admin console
+	// session and would fail every save it made.
+	DataCodecs []securecookie.Codec
 
 	// Options are the cookie defaults. MaxAge is not read from here: it is decided per
 	// save, from PersistentCookie and the row's own expiry.
@@ -167,18 +192,28 @@ type ServerSideStore struct {
 // authentication and encryption keys the cookie store used, in the same order.
 func NewServerSideStore(backend Backend, authenticatedKey string, secure bool, keyPairs ...[]byte) *ServerSideStore {
 	codecs := securecookie.CodecsFromPairs(keyPairs...)
+	dataCodecs := securecookie.CodecsFromPairs(keyPairs...)
 
-	// securecookie's own length guard is left at its default here, unlike the chunked
-	// store which had to disable it. The value being encoded is now a 64 character
-	// identifier, so a limit measured in kilobytes finally has something to guard.
+	// securecookie's own length guard is kept on both sets, unlike the chunked store which
+	// had to disable it, and set to what each set actually carries. The cookie's is left at
+	// securecookie's 4096 byte default, which is generous for 64 hex characters; the blob's
+	// is raised to the size a session is allowed to reach, because the default is a cookie's
+	// limit and the blob is no longer in a cookie.
 	for _, codec := range codecs {
 		if sc, ok := codec.(*securecookie.SecureCookie); ok {
 			sc.MaxAge(MaxCookieDecodeAgeSeconds)
 		}
 	}
+	for _, codec := range dataCodecs {
+		if sc, ok := codec.(*securecookie.SecureCookie); ok {
+			sc.MaxAge(MaxCookieDecodeAgeSeconds)
+			sc.MaxLength(MaxSessionDataBytes)
+		}
+	}
 
 	return &ServerSideStore{
-		Codecs: codecs,
+		Codecs:     codecs,
+		DataCodecs: dataCodecs,
 		Options: &sessions.Options{
 			Path:     "/",
 			HttpOnly: true,
@@ -267,7 +302,7 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*sessions.Session, 
 		return nil, errors.Wrap(err, "unable to load the browser session")
 	}
 
-	if err := securecookie.DecodeMulti(name, string(record.Data), &session.Values, s.Codecs...); err != nil {
+	if err := securecookie.DecodeMulti(name, string(record.Data), &session.Values, s.DataCodecs...); err != nil {
 		slog.Warn("stored browser session data did not decode, starting a fresh session",
 			"error", err, "sessionName", name)
 		return session, nil
@@ -334,7 +369,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 		return s.deleteSession(ctx, w, session)
 	}
 
-	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, s.Codecs...)
+	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, s.DataCodecs...)
 	if err != nil {
 		return errors.Wrap(err, "unable to encode the browser session")
 	}

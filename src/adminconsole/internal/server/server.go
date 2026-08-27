@@ -65,7 +65,11 @@ func (s *Server) Start() {
 		slog.Error("Missing admin console OAuth client configuration: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID and GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET must be set. If you're running the admin console for the first time, please look at the auth server logs for the generated credentials.")
 		os.Exit(1)
 	}
-	s.initMiddleware()
+	// The static branch and the application branch, in that order. Both are registered
+	// on s.router; only the second carries the middleware initMiddleware returns, which
+	// is what keeps a stylesheet from costing a session load, and here that load is an
+	// HTTP call to the auth server (see initMiddleware).
+	app := s.initMiddleware()
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
@@ -73,7 +77,7 @@ func (s *Server) Start() {
 	// <link rel="icon"> tags; point it at the real asset under /static.
 	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
 
-	s.initRoutes()
+	s.initRoutes(app)
 
 	httpsHost := config.GetAdminConsole().ListenHostHttps
 	httpsPort := config.GetAdminConsole().ListenPortHttps
@@ -153,7 +157,30 @@ func (s *Server) Start() {
 	}
 }
 
-func (s *Server) initMiddleware() {
+// initMiddleware mounts the chain and returns the router the application's own routes
+// belong on.
+//
+// Two branches, and the split is the point (#266). Everything mounted on s.router below
+// applies to every request this server answers, a stylesheet included: the request id, the
+// security headers, the real client IP, the panic recovery, the request log, the slash
+// strip and the CSRF origin check. What the returned router adds is the part a file server
+// has no use for and cannot use: the settings cache, the cookie reset, the session load and
+// the locale resolution.
+//
+// The cost that split removes is larger here than on the auth server. An admin console page
+// references nine to eleven same-origin assets, and this module's session now lives on the
+// far side of an HTTP call to the auth server, so unexempted a single page view would cost
+// ten calls across the wire and a database read at the other end of each, on the module that
+// was kept database-free precisely so it would stay light.
+//
+// It is a correctness fix too. MiddlewareCookieReset answers a cookie it cannot decode with
+// a 302 back to the request target, which is not a sensible answer to a request for a
+// stylesheet.
+//
+// chi refuses Use after a route has been registered on the same router, and With freezes the
+// parent's chain, so this is a restructure rather than a reorder: every root Use happens
+// here, before the branch, and both branches register their routes afterwards.
+func (s *Server) initMiddleware() chi.Router {
 
 	slog.Info("initializing middleware")
 
@@ -211,21 +238,28 @@ func (s *Server) initMiddleware() {
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
 	s.router.Use(custom_middleware.MiddlewareCsrf())
 
-	// Adds settings to the request context (fetched from cache, not database)
-	s.router.Use(adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache))
+	// Everything below is on the application branch, not the root.
 
-	// Clear the session cookie and redirect if unable to decode it
-	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AdminConsoleSessionName))
+	app := s.router.With(
+		// Adds settings to the request context (fetched from cache, not database)
+		adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache),
 
-	// Global locale middleware: resolves a tentative localizer from
-	// ?ui_locales, Accept-Language, or English. Adminconsole has no
-	// AuthContext concept (identity comes from the JWT later in the chain),
-	// so authHelper is nil. Per-route user-locale refinement lives in
-	// routes.go inside baseAuth/accountAuth/adminAuth, immediately after
-	// JWT validation.
-	s.router.Use(i18n.MiddlewareLocale(nil))
+		// Clear the session cookie and redirect if unable to decode it, and delete
+		// whatever the chunked cookie store left in this browser
+		custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AdminConsoleSessionName),
+
+		// Global locale middleware: resolves a tentative localizer from
+		// ?ui_locales, Accept-Language, or English. Adminconsole has no
+		// AuthContext concept (identity comes from the JWT later in the chain),
+		// so authHelper is nil. Per-route user-locale refinement lives in
+		// routes.go inside baseAuth/accountAuth/adminAuth, immediately after
+		// JWT validation.
+		i18n.MiddlewareLocale(nil),
+	)
 
 	slog.Info("finished initializing middleware")
+
+	return app
 }
 
 func (s *Server) serveStaticFiles(path string, root http.FileSystem) {

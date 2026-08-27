@@ -5,12 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 	_ "time/tzdata"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/server"
 	"github.com/leodip/goiabada/core/config"
@@ -107,18 +107,45 @@ func main() {
 	authKey, _ := hex.DecodeString(config.GetAdminConsole().SessionAuthenticationKey)
 	encKey, _ := hex.DecodeString(config.GetAdminConsole().SessionEncryptionKey)
 
-	// Use ChunkedCookieStore to support large sessions with custom JWT claims.
-	// No MaxAgeResolver here: the admin console's request context carries only
-	// public settings (not the session max lifetime), and its session is bounded
-	// by the auth server anyway, so the fixed one-year ceiling applies.
-	chunkedStore := sessionstore.NewChunkedCookieStore(authKey, encKey)
-	chunkedStore.Options.Path = "/"
-	chunkedStore.Options.MaxAge = sessionstore.MaxCookieAgeSeconds
-	chunkedStore.Options.HttpOnly = true
-	chunkedStore.Options.Secure = config.GetAdminConsole().IsCookieSecure()
-	chunkedStore.Options.SameSite = http.SameSiteLaxMode
+	// The session lives in a row on the auth server's side of the wire and the browser
+	// carries nothing but a signed, opaque identifier. This module keeps no database
+	// connection of its own, deliberately, so it reaches that row through the auth
+	// server's session endpoint with a client_credentials token carrying one narrow
+	// permission.
+	//
+	// What crosses the wire is ciphertext encrypted with this module's own session keys,
+	// so the auth server stores bytes it holds no key for: administrator tokens are the
+	// highest value tokens in the deployment, and a dump of the auth server's database
+	// yields none of them, which is the invariant it has today and this must not spend.
+	//
+	// What it replaces put the whole session, an entire token set included, in the cookie
+	// and split the ciphertext across up to fifty of them (#266).
+	tokenSource := apiclient.NewSessionTokenSource(
+		config.GetAuthServer().GetEffectiveBaseURL(),
+		adminConsoleConfig.OAuthClientID,
+		adminConsoleConfig.OAuthClientSecret,
+	)
 
-	slog.Info("initialized chunked cookie session store")
+	sessionStore := sessionstore.NewServerSideStore(
+		sessionstore.NewHTTPBackend(config.GetAuthServer().GetEffectiveBaseURL(), tokenSource),
+		constants.SessionKeyJwt,
+		config.GetAdminConsole().IsCookieSecure(),
+		authKey, encKey,
+	)
+
+	// PersistentCookie is left false, which is the half of the split the auth server does
+	// not take: its cookie carries an expiry so single sign-on survives a browser restart,
+	// and this one carries none so the browser drops it when it closes. An administrator
+	// pays one extra sign-in after a browser restart, and in exchange the handle to the
+	// deployment's most privileged session is not left sitting on the disk of a machine
+	// that can be stolen. Browser session restore can still bring such a cookie back, so
+	// this is real protection rather than a guarantee (#266).
+	//
+	// It also retires a defect: the store this replaces set a one year cookie expiry with
+	// no resolver, so a machine held a handle for a year for contents that stopped working
+	// in minutes.
+
+	slog.Info("initialized server-side session store")
 
 	// Initialize settings cache (fetches from authserver public API)
 	// Prefer internal base URL for server-to-server communication
@@ -126,7 +153,7 @@ func main() {
 	slog.Info("initialized settings cache with 30s TTL")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, chunkedStore, settingsCache)
+	s := server.NewServer(r, sessionStore, settingsCache)
 
 	s.Start()
 }

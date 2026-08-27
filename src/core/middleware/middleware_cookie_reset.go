@@ -12,10 +12,11 @@ import (
 // physically called, what a previous implementation left behind in the browser, and what
 // attributes a deletion has to carry to land.
 //
-// It is asserted rather than required because the two modules do not cut over in the same
-// release step: while one runs ServerSideStore and the other still runs the chunked cookie
-// store, this middleware serves both. A store that does not implement it gets the
-// behaviour this middleware has always had, which is the fallback below (#266).
+// It is asserted rather than required because this middleware takes the sessions.Store
+// interface, which says nothing about cookies: both modules now pass a ServerSideStore, but
+// the parameter admits any store and the mock in this package's own tests is one. A store
+// that does not implement this gets the behaviour the middleware had before there was one to
+// implement, which is the fallback below (#266).
 type cookieNamer interface {
 	CookieName(logicalName string) string
 	StaleCookieNames(logicalName string) []string

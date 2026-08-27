@@ -35,8 +35,15 @@ import (
 // used to carry ?email= too, and form-urlencoded query parsing turned a '+' in the address
 // into a space, so the pre-registration was never found.
 
-func newMarkerTestStore() *sessionstore.ChunkedCookieStore {
-	return sessionstore.NewChunkedCookieStore(
+// A real store rather than the mock, because these cases turn on the marker surviving a
+// round trip between the two hops and a mock cannot show one. A ServerSideStore over an
+// in-memory backend since #266 moved the session out of the browser; what these cases
+// assert is unchanged by that, since the marker round-trips either way.
+func newMarkerTestStore() *sessionstore.ServerSideStore {
+	return sessionstore.NewServerSideStore(
+		sessionstore.NewMemoryBackend(),
+		constants.SessionKeySessionIdentifier,
+		false,
 		[]byte("12345678901234567890123456789012"),
 		[]byte("abcdefghijklmnopqrstuvwxyz123456"),
 	)
