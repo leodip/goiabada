@@ -183,8 +183,10 @@ func (d *CommonDatabase) UpdateBrowserSessionData(tx *sql.Tx, owner, sessionIdHa
 // window is expressed in expires_at, so a touch that left it alone would never extend
 // the session and the idle timeout would behave as an absolute one.
 //
-// The expires_at > now term, the meaning of the false return and what RowsAffected
-// counts are all as UpdateBrowserSessionData above describes them.
+// The expires_at > now term and the meaning of the false return are as
+// UpdateBrowserSessionData above describes them. What RowsAffected counts is not: see
+// below, because the argument that discharges it for that statement is absent for this
+// one.
 func (d *CommonDatabase) TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash string,
 	now, expiresAt time.Time) (bool, error) {
 
@@ -220,7 +222,31 @@ func (d *CommonDatabase) TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash st
 		return false, errors.Wrap(err, "unable to get rows affected when touching browser session")
 	}
 
-	return rowsAffected == 1, nil
+	if rowsAffected == 1 {
+		return true, nil
+	}
+
+	// Zero is not by itself an answer here, and this is exactly where this statement
+	// differs from UpdateBrowserSessionData. MySQL reports rows CHANGED rather than
+	// MATCHED, and every column this one writes, last_accessed, expires_at and updated_at,
+	// is derived from the single `now` it was handed. Two concurrent requests from one
+	// browser that both find last_accessed stale and both stamp the same microsecond
+	// therefore write byte-identical values, and MySQL answers zero for a row that is
+	// plainly there. UpdateBrowserSessionData is safe from that because it also writes the
+	// session blob, which is freshly encrypted on every save and so never repeats; a touch
+	// writes no contents at all, so that clause simply does not exist for it.
+	//
+	// What a wrong false costs is the browser its session: the store reads it as "the row
+	// is gone" and hands back a fresh one, signing a user out mid-session for no reason
+	// they could see. So absence is confirmed rather than inferred, under the same
+	// predicate the read uses, and the extra statement runs only where the caller was
+	// already about to throw the session away (#266).
+	browserSession, err := d.GetBrowserSessionByOwnerAndSessionIdHash(tx, owner, sessionIdHash, now)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to confirm the browser session after touching it")
+	}
+
+	return browserSession != nil, nil
 }
 
 // DeleteBrowserSession removes one session, which is what logging out and rotating an
