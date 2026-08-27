@@ -24,13 +24,6 @@ Regardless of your Kubernetes setup, Goiabada requires:
 | **Shared database** | MySQL, PostgreSQL, or SQL Server (SQLite not supported - pods need a shared database) |
 | **Empty database** | For fresh deployments, the database must be empty - Goiabada seeds it with OAuth clients configured for your specific URLs |
 | **Proxy headers** | The generated manifests set `TRUST_PROXY_HEADERS=true` for proper client IP detection behind an ingress |
-| **Large proxy buffers** | OAuth responses have large headers; nginx needs `proxy-buffer-size: 128k` (the setup wizard configures this automatically) |
-
-<Aside type="caution" title="Proxy buffer size is critical">
-OAuth authentication generates large HTTP headers. The default nginx `proxy_buffer_size` (4k-8k) is too small, causing **502 Bad Gateway** errors after login.
-
-The setup wizard automatically adds `nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"` to the Ingress resources. If you create Ingress resources manually, you **must** include this annotation.
-</Aside>
 
 <Aside type="caution" title="Database must be empty">
 Goiabada automatically seeds the database on first startup with an admin user and OAuth clients configured for your URLs. If you redeploy with different URLs against an existing database, authentication will fail because the OAuth client redirect URIs won't match.
@@ -279,20 +272,6 @@ Then delete any failed certificate challenges to trigger a retry:
 ```bash
 kubectl delete challenges -n goiabada --all
 ```
-
-### 502 Bad Gateway after login
-
-If you see a 502 error after entering credentials (typically at `/auth/completed`), this is caused by nginx's proxy buffer being too small for OAuth's large response headers.
-
-**Solution:** Ensure your Ingress has the proxy buffer annotation:
-
-```yaml
-metadata:
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
-```
-
-The setup wizard adds this automatically. If you created Ingress resources manually, add this annotation and reapply.
 
 ### OAuth "Invalid redirect_uri" error
 

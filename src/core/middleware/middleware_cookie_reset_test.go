@@ -199,9 +199,10 @@ func deletedCookieNames(t *testing.T, rr *httptest.ResponseRecorder) []string {
 }
 
 // decodeFailingStore is a ServerSideStore whose Get answers the way a store answers a
-// cookie it cannot decode. ServerSideStore itself never does, by design, but this
-// middleware still serves the chunked cookie store in the other module, so the branch is
-// live and its deletion has to name the right cookie.
+// cookie it cannot decode. ServerSideStore itself never does, by design: it answers an
+// undecodable cookie with a fresh session. The branch is still reachable, because this
+// middleware takes sessions.Store and any store may report a decode failure, and what it
+// must get right when it fires is naming the physical cookie, which on https is prefixed.
 type decodeFailingStore struct {
 	*sessionstore.ServerSideStore
 }

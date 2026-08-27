@@ -19,12 +19,20 @@ import (
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
-// The marker tests run against a real ChunkedCookieStore rather than the store mock.
-// The marker's whole contract is that it survives a round trip through an encrypted
-// client-side cookie and that a copy of that cookie outlives its own clearing, and a
-// mock cannot show either.
-func newMarkerTestStore() *sessionstore.ChunkedCookieStore {
-	return sessionstore.NewChunkedCookieStore(
+// The marker tests run against a real store rather than the store mock. The marker's
+// whole contract is that it survives a round trip through the session and that clearing
+// it is visible on the next request, and a mock cannot show either.
+//
+// A ServerSideStore over an in-memory backend, since #266 moved the session out of the
+// browser. What changed for these tests is one property and it is the interesting one:
+// under the cookie store a copy of the cookie taken before the clear kept working, and
+// under this one it does not, because every copy names the same row. See
+// TestClearedLinkMarkerDoesNotSurviveInACapturedCookie.
+func newMarkerTestStore() *sessionstore.ServerSideStore {
+	return sessionstore.NewServerSideStore(
+		sessionstore.NewMemoryBackend(),
+		constants.SessionKeySessionIdentifier,
+		false,
 		[]byte("12345678901234567890123456789012"),
 		[]byte("abcdefghijklmnopqrstuvwxyz123456"),
 	)
@@ -393,11 +401,16 @@ func TestClearLinkMarker(t *testing.T) {
 	assert.Equal(t, LinkMarkerMissing, rejection)
 }
 
-// Clearing the marker cannot invalidate a copy of the cookie taken beforehand,
-// because the session is client-side. Executed here rather than asserted in prose,
-// since it is the whole reason the marker names a code hash and the reason
-// re-resolving that hash is the consuming handler's job on every clean request.
-func TestClearedLinkMarkerSurvivesInACapturedCookie(t *testing.T) {
+// Clearing the marker now invalidates a copy of the cookie taken beforehand, because the
+// session is a row and every copy of the cookie names the same one.
+//
+// This is the executed half of the correction #266 made to link_marker.go's comment. That
+// comment used to argue that a captured copy outlived its own clearing, which was true of a
+// client-side session and is the reason the marker names a code hash rather than carrying
+// the link's state: re-resolving the hash on every clean request was the whole security
+// boundary. It is now defence in depth instead, and this case is what makes that a fact
+// rather than a claim. The re-resolution stays, and stays correct.
+func TestClearedLinkMarkerDoesNotSurviveInACapturedCookie(t *testing.T) {
 	store := newMarkerTestStore()
 
 	req := httptest.NewRequest("GET", "/reset-password?code=abc123", nil)
@@ -415,13 +428,13 @@ func TestClearedLinkMarkerSurvivesInACapturedCookie(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, LinkMarkerMissing, rejection)
 
-	// The captured copy does not.
+	// And so does the captured copy, which is the change: it names the row the clear
+	// emptied, so holding an older copy of the handle buys nothing.
 	marker, rejection, err := GetLinkMarker(store, captured, LinkMarkerFlowResetPassword)
 
 	require.NoError(t, err)
-	assert.Empty(t, rejection)
-	require.NotNil(t, marker)
-	assert.Equal(t, "the-code-hash", marker.CodeHash)
+	assert.Equal(t, LinkMarkerMissing, rejection)
+	assert.Nil(t, marker)
 }
 
 // A value that will not unmarshal is a server fault, not a bad link: the session

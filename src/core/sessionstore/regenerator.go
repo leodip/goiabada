@@ -38,7 +38,7 @@ type Regenerator interface {
 // and emits no header at all, so the failing direction is a user who loses a session
 // rather than an attacker who keeps one.
 func (s *ServerSideStore) Regenerate(w http.ResponseWriter, r *http.Request, session *sessions.Session) error {
-	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, s.Codecs...)
+	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, s.DataCodecs...)
 	if err != nil {
 		return errors.Wrap(err, "unable to encode the browser session")
 	}

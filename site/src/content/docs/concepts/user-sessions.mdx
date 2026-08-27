@@ -23,6 +23,10 @@ A user session is "bumped" (receives a new `last_accessed` timestamp) in two sit
 1. When a new authorization request completes
 2. When a refresh token associated with the session is used to request a new access token
 
+## Closing the browser
+
+Closing the browser does not end a session at the login server, so reopening it within the idle timeout signs the person straight back in and a restarted machine or a laptop shut for lunch costs nobody a password. The admin console does the opposite on purpose: closing the browser signs an administrator out of it, and reopening it asks them to sign in again even while the login server still remembers them. An administrator's browser reaches every part of the deployment, so one extra sign-in is worth paying to keep a machine that is lost or left behind from still holding that access. Some browsers restore what was open after a crash or an update, and that can bring an admin console session back with it.
+
 ## Credential changes and live sessions
 
 When a user's credentials change, their existing sessions and refresh tokens stop being usable. This applies to:

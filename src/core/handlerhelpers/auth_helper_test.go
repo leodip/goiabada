@@ -205,12 +205,17 @@ func TestSaveAuthContext(t *testing.T) {
 	})
 }
 
-// The fixtures below back the RealStore* subtests of TestClearAuthContext, which drive the real
-// ChunkedCookieStore instead of a mock. The session store is cookie-only, so a Set-Cookie is the
-// only way a deletion reaches the browser and there is no server-side row to fall back on. Every
-// other subtest here inspects sess.Values, which is the store's in-memory state and says nothing
-// about the wire: that is how seven handlers came to clear the auth context after committing the
-// client response, where the header is never sent (#141).
+// The fixtures below back the RealStore* subtests of TestClearAuthContext, which drive a real
+// store instead of a mock. Every other subtest here inspects sess.Values, which is the store's
+// in-memory state and says nothing about the wire: that is how seven handlers came to clear the
+// auth context after committing the client response, where the header is never sent (#141).
+//
+// A ServerSideStore over an in-memory backend since #266. Which half of a clear these cases
+// observe changed with it, and the change is worth having: under the cookie store the Set-Cookie
+// was the only way a deletion reached anything, so a dropped header meant a retained auth
+// context. Now the row is written whether or not the header ships, and the ordering matters for
+// what the browser is told rather than for what the server believes. See
+// RealStoreClearAfterCommitIsDropped, which is where that difference is pinned.
 const (
 	realStoreSessionName = "test-session"
 	realStoreBaseURL     = "https://as.example.com"
@@ -221,25 +226,26 @@ const (
 // newRealStoreAuthHelper returns the helper and the store behind it. The store is returned because
 // requireSessionDecoded needs to read a replayed session directly, which is the only way to tell a
 // valid cleared session from an unreadable one.
-func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ChunkedCookieStore) {
+func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ServerSideStore) {
 	t.Helper()
 	authKey := []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	encKey := []byte("0123456789abcdef0123456789abcdef")
-	store := sessionstore.NewChunkedCookieStore(authKey, encKey)
+	store := sessionstore.NewServerSideStore(sessionstore.NewMemoryBackend(),
+		constants.SessionKeySessionIdentifier, false, authKey, encKey)
 	return NewAuthHelper(store, realStoreSessionName, realStoreBaseURL, realStoreBaseURL), store
 }
 
 // requireSessionDecoded proves the session the browser holds on req decoded successfully, and must
 // accompany every assertion that the auth context is absent.
 //
-// ChunkedCookieStore.New swallows every load failure (a metadata cookie that will not decode, a
-// missing chunk, a failed SHA-256 integrity check, an undecodable payload) and hands back a new
-// empty session. GetAuthContext finds no auth context in that session and reports ErrNoAuthContext,
-// which is the same error a genuine clear produces. So ErrNoAuthContext alone cannot distinguish
-// "the clear reached the browser and it decoded" from "the clearing write reached the browser
-// corrupt", and a regression that emitted malformed clearing state would leave the absence cases
-// green. IsNew is false only when the whole load succeeded, so it separates the two (#141).
-func requireSessionDecoded(t *testing.T, store *sessionstore.ChunkedCookieStore, req *http.Request) {
+// The store answers a load failure with a fresh empty session: a cookie that will not decode, a
+// cookie naming no row, stored data that will not decode. GetAuthContext finds no auth context in
+// that session and reports ErrNoAuthContext, which is the same error a genuine clear produces. So
+// ErrNoAuthContext alone cannot distinguish "the clear reached the browser and it decoded" from
+// "the clearing write reached the browser corrupt", and a regression that emitted malformed
+// clearing state would leave the absence cases green. IsNew is false only when the whole load
+// succeeded, so it separates the two (#141).
+func requireSessionDecoded(t *testing.T, store *sessionstore.ServerSideStore, req *http.Request) {
 	t.Helper()
 	sess, err := store.Get(req, realStoreSessionName)
 	require.NoError(t, err)
@@ -274,7 +280,12 @@ func replayThroughJar(t *testing.T, res *http.Response, extra []*http.Cookie) *h
 
 // multiChunkAuthContext returns a context whose encoded form spans more than one cookie chunk, so
 // every case also covers the stale higher chunks that a one-chunk clearing write leaves behind.
-func multiChunkAuthContext() *oauth.AuthContext {
+// largeAuthContext is a context far bigger than anything the ceremony normally carries: 400
+// scope entries, several kilobytes once encoded. Under the store this replaced it spilled across
+// several cookies, which is what the RealStore cases used to be built around. It stays large for
+// the opposite reason now: one cookie whatever the payload is the property #266 exists to
+// establish, and a fixture that fits comfortably would not test it.
+func largeAuthContext() *oauth.AuthContext {
 	long := ""
 	for i := 0; i < 400; i++ {
 		long += "scope" + string(rune('a'+i%26)) + ":permission "
@@ -348,14 +359,14 @@ func TestClearAuthContext(t *testing.T) {
 
 		seedReq := httptest.NewRequest(http.MethodGet, realStoreBaseURL+"/auth/issue", nil)
 		seedRR := httptest.NewRecorder()
-		err := helper.SaveAuthContext(seedRR, seedReq, multiChunkAuthContext())
+		err := helper.SaveAuthContext(seedRR, seedReq, largeAuthContext())
 		require.NoError(t, err)
 
 		seedRes := seedRR.Result()
-		// Master plus at least two chunks. Keep this: a change to DefaultChunkSize that collapsed
-		// the context into a single cookie would leave all four cases passing while none of them
-		// still covered the stale higher chunks the clearing write has to survive.
-		assert.Greater(t, len(seedRes.Cookies()), 2)
+		// Exactly one cookie, for a context of several kilobytes. That is the whole of #266 in
+		// one assertion, and it is the inverse of what this line used to say: the store this
+		// replaced answered the same fixture with a master cookie plus at least two chunks.
+		assert.Len(t, seedRes.Cookies(), 1)
 
 		browserReq := replayThroughJar(t, seedRes, nil)
 
@@ -381,13 +392,18 @@ func TestClearAuthContext(t *testing.T) {
 		// the other three cases mean something: delete it as obsolete and nothing is left recording
 		// why the ordering is load-bearing rather than a matter of style (#141).
 		//
-		// This case needs no requireSessionDecoded: it asserts the retained auth context decodes
-		// and carries ready_to_issue_code, which an unreadable session cannot satisfy.
-		helper, _ := newRealStoreAuthHelper(t)
+		// What the dropped response costs changed with #266, and this is the only place it is
+		// recorded. Under the cookie store the Set-Cookie was the entire clear, so a committed
+		// response meant the browser kept a working auth context. The clear now writes a row
+		// first, and that write lands whether or not the header ships, so the context is gone
+		// server-side even here. The ordering still matters, for the cookie rather than for the
+		// context, and the failure it causes is now a user losing a ceremony rather than a
+		// refused ceremony staying usable, which is the safe direction to fail in.
+		helper, store := newRealStoreAuthHelper(t)
 
 		seedReq := httptest.NewRequest(http.MethodGet, realStoreBaseURL+"/auth/issue", nil)
 		seedRR := httptest.NewRecorder()
-		err := helper.SaveAuthContext(seedRR, seedReq, multiChunkAuthContext())
+		err := helper.SaveAuthContext(seedRR, seedReq, largeAuthContext())
 		require.NoError(t, err)
 
 		seedRes := seedRR.Result()
@@ -399,14 +415,18 @@ func TestClearAuthContext(t *testing.T) {
 		require.NoError(t, err)
 
 		res := rr.Result()
-		// The clear succeeded and its Set-Cookie headers are in the live header map, but the
-		// response was committed before they were written, so none of them reach the wire.
+		// The clear succeeded and its Set-Cookie header is in the live header map, but the
+		// response was committed before it was written, so it does not reach the wire.
 		assert.Empty(t, res.Cookies())
 
-		// The dropped response set no cookies, so the browser still holds what it was seeded with.
-		authContext, err := helper.GetAuthContext(replayThroughJar(t, res, seedRes.Cookies()))
-		require.NoError(t, err)
-		assert.Equal(t, oauth.AuthStateReadyToIssueCode, authContext.AuthState)
+		// The browser therefore still holds the cookie it was seeded with. It names the row the
+		// clear emptied, so the auth context is gone anyway.
+		replayed := replayThroughJar(t, res, seedRes.Cookies())
+		_, err = helper.GetAuthContext(replayed)
+		assert.ErrorIs(t, err, customerrors.ErrNoAuthContext)
+		// And the session still loads, which is what separates "the clear landed" from "the
+		// browser is holding something unreadable".
+		requireSessionDecoded(t, store, replayed)
 	})
 
 	t.Run("RealStoreSaveThenClearLastWins", func(t *testing.T) {
@@ -419,7 +439,7 @@ func TestClearAuthContext(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, realStoreBaseURL+"/auth/authorize?client_id=test-client", nil)
 		rr := httptest.NewRecorder()
 
-		err := helper.SaveAuthContext(rr, req, multiChunkAuthContext())
+		err := helper.SaveAuthContext(rr, req, largeAuthContext())
 		require.NoError(t, err)
 		err = helper.ClearAuthContext(rr, req)
 		require.NoError(t, err)
@@ -431,11 +451,10 @@ func TestClearAuthContext(t *testing.T) {
 			counts[c.Name]++
 		}
 		// Both writes are on the wire, rather than the second having replaced the first in the
-		// header map. The clearing write fits in one chunk, so it re-sets only the master cookie
-		// and chunk 0; the stale higher chunks are ignored because the master's ChunkCount bounds
-		// the reassembly.
+		// header map. Each names the same session under the same single cookie, since the second
+		// save updates the row the first created rather than starting another.
 		assert.Equal(t, 2, counts[realStoreSessionName])
-		assert.Equal(t, 2, counts[realStoreSessionName+"-chunk-0"])
+		assert.Len(t, counts, 1, "a session costs one cookie name, however many times it is saved")
 
 		replayed := replayThroughJar(t, res, nil)
 		_, err = helper.GetAuthContext(replayed)
@@ -456,7 +475,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		err := helper.ClearAuthContext(rr, req)
 		require.NoError(t, err)
-		err = helper.SaveAuthContext(rr, req, multiChunkAuthContext())
+		err = helper.SaveAuthContext(rr, req, largeAuthContext())
 		require.NoError(t, err)
 		http.Redirect(rr, req, clientRefusalURL, http.StatusFound)
 

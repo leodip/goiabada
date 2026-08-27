@@ -3967,11 +3967,13 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 	}
 }
 
-// Decision 10's third boundary, which this stage adds. The description is conformed to RFC 6749
+// Decision 10's third boundary, which #213 added. The description is conformed to RFC 6749
 // Appendix A.8's character set on the way INTO the auth context, not only on the way out of the
-// emitter, because a bound applied at emission does nothing for a string already written to a
-// cookie: descriptions interpolate request text and ChunkedCookieStore caps a session at 50 chunks,
-// so an unbounded parked description answers 500 instead of deferring.
+// emitter, because a bound applied at emission does nothing for a string already parked in the
+// session: descriptions interpolate request text, so an unbounded one would be carried by every
+// request of the ceremony that parked it. The bound is ConformErrorDescription's own, which is
+// where it always really came from; it used to be attributed to the 50-chunk cap of the cookie
+// store, and that store no longer exists (#266).
 //
 // The filter is idempotent, which is what lets it run at both places and still leave the deferred
 // and immediate paths byte-identical. That end-to-end equality belongs to seam 3; what is pinned

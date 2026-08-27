@@ -4,11 +4,13 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -778,4 +780,262 @@ func TestServerSideStore_DeletionCookieNamesWhatItWasGiven(t *testing.T) {
 
 	assert.Equal(t, "__Host-"+storeTestName, store.DeletionCookie(store.CookieName(storeTestName)).Name)
 	assert.Equal(t, storeTestName+"-chunk-7", store.DeletionCookie(storeTestName+"-chunk-7").Name)
+}
+
+// The cutover matrix.
+//
+// Both owners, both schemes, against every state a browser can arrive in. It is here rather
+// than spread across the cases above because no stage before the admin console cut over had
+// both owners to run it against, and because the cross product is finite and small: the
+// interesting failures are the combinations, not the individual cells.
+//
+// The auth server's owner keeps a persistent cookie and looks for SessionIdentifier; the
+// admin console's keeps none and looks for Jwt. Those four values are what the two main.go
+// files pass, and getting either pair crossed would give administrators single sign-on
+// across browser restarts and end users none, silently (#266).
+
+type matrixOwner struct {
+	label            string
+	sessionName      string
+	authenticatedKey string
+	persistent       bool
+}
+
+var matrixOwners = []matrixOwner{
+	{"authserver", constants.AuthServerSessionName, constants.SessionKeySessionIdentifier, true},
+	{"adminconsole", constants.AdminConsoleSessionName, constants.SessionKeyJwt, false},
+}
+
+func newMatrixStore(owner matrixOwner, backend Backend, secure bool) *ServerSideStore {
+	store := NewServerSideStore(backend, owner.authenticatedKey, secure,
+		[]byte(storeTestAuthKey), []byte(storeTestEncKey))
+	store.PersistentCookie = owner.persistent
+	return store
+}
+
+// liveCookie saves a session carrying value and returns the cookie the browser would then
+// hold, along with the backend it was written to.
+func liveCookie(t *testing.T, store *ServerSideStore, owner matrixOwner, values map[interface{}]interface{}) *http.Cookie {
+	t.Helper()
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+
+	session, err := store.New(req, owner.sessionName)
+	require.NoError(t, err)
+	for k, v := range values {
+		session.Values[k] = v
+	}
+	require.NoError(t, store.Save(req, w, session))
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1, "a session must cost exactly one cookie, in either module")
+	return cookies[0]
+}
+
+// loadWith runs New against a request carrying the given cookies.
+func loadWith(t *testing.T, store *ServerSideStore, owner matrixOwner, cookies ...*http.Cookie) (*sessions.Session, error) {
+	t.Helper()
+
+	req := httptest.NewRequest("GET", "/", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	return store.New(req, owner.sessionName)
+}
+
+// isDecodeError is the branch MiddlewareCookieReset takes: a decode failure clears the cookie
+// and redirects, and anything else falls through to be answered as a server error. Which of
+// the two a storage failure produces is the single most consequential cell in this matrix.
+func isDecodeError(err error) bool {
+	multiErr, ok := err.(securecookie.MultiError)
+	return ok && multiErr.IsDecode()
+}
+
+func TestServerSideStore_CutoverMatrix(t *testing.T) {
+	for _, owner := range matrixOwners {
+		for _, secure := range []bool{false, true} {
+			label := owner.label
+			if secure {
+				label += "/https"
+			} else {
+				label += "/http"
+			}
+
+			t.Run(label+"/no cookie", func(t *testing.T) {
+				backend := newFakeBackend()
+				store := newMatrixStore(owner, backend, secure)
+
+				session, err := loadWith(t, store, owner)
+				require.NoError(t, err)
+				assert.True(t, session.IsNew)
+				assert.Zero(t, backend.loads, "a visitor presenting nothing costs no read")
+			})
+
+			t.Run(label+"/a valid cookie", func(t *testing.T) {
+				backend := newFakeBackend()
+				store := newMatrixStore(owner, backend, secure)
+				cookie := liveCookie(t, store, owner, map[interface{}]interface{}{
+					owner.authenticatedKey: "the-value",
+				})
+
+				// The physical name follows the scheme; the codec name does not.
+				expectedName := owner.sessionName
+				if secure {
+					expectedName = "__Host-" + owner.sessionName
+				}
+				assert.Equal(t, expectedName, cookie.Name)
+				assert.Equal(t, secure, cookie.Secure)
+
+				if owner.persistent {
+					assert.Greater(t, cookie.MaxAge, 0,
+						"the end user's cookie carries an expiry, so single sign-on survives a restart")
+				} else {
+					assert.Equal(t, 0, cookie.MaxAge)
+					assert.True(t, cookie.Expires.IsZero(),
+						"the administrator's cookie carries neither, so the browser drops it when it closes")
+				}
+
+				session, err := loadWith(t, store, owner, cookie)
+				require.NoError(t, err)
+				assert.False(t, session.IsNew)
+				assert.Equal(t, "the-value", session.Values[owner.authenticatedKey])
+			})
+
+			t.Run(label+"/an undecodable cookie", func(t *testing.T) {
+				backend := newFakeBackend()
+				store := newMatrixStore(owner, backend, secure)
+				cookie := liveCookie(t, store, owner, nil)
+				cookie.Value = "not-a-signed-value"
+
+				session, err := loadWith(t, store, owner, cookie)
+				require.NoError(t, err, "a cookie that will not decode is a fresh session, not an error")
+				assert.True(t, session.IsNew)
+			})
+
+			t.Run(label+"/a valid cookie naming no row", func(t *testing.T) {
+				backend := newFakeBackend()
+				store := newMatrixStore(owner, backend, secure)
+				cookie := liveCookie(t, store, owner, nil)
+				backend.rows = map[string]*Record{}
+
+				session, err := loadWith(t, store, owner, cookie)
+				require.NoError(t, err)
+				assert.True(t, session.IsNew,
+					"expired, logged out and reaped all mean the same thing to the browser")
+				assert.Equal(t, 1, backend.loads)
+			})
+
+			t.Run(label+"/a storage failure", func(t *testing.T) {
+				backend := newFakeBackend()
+				store := newMatrixStore(owner, backend, secure)
+				cookie := liveCookie(t, store, owner, nil)
+				backend.loadErr = errors.New("the database is unreachable")
+
+				session, err := loadWith(t, store, owner, cookie)
+				require.Error(t, err, "a lookup that could not be performed is not a fresh session")
+				assert.Nil(t, session)
+				assert.False(t, isDecodeError(err),
+					"a storage failure answered as a decode error would clear the cookie and "+
+						"sign everyone out for the duration of the outage")
+			})
+
+			t.Run(label+"/the old bare master cookie", func(t *testing.T) {
+				backend := newFakeBackend()
+				store := newMatrixStore(owner, backend, secure)
+
+				// What the chunked cookie store's master cookie looks like on arrival: the
+				// bare session name carrying a value this store cannot read.
+				stale := &http.Cookie{Name: owner.sessionName, Value: "the old master cookie"}
+
+				session, err := loadWith(t, store, owner, stale)
+				require.NoError(t, err)
+				assert.True(t, session.IsNew)
+
+				if secure {
+					assert.Contains(t, store.StaleCookieNames(owner.sessionName), owner.sessionName,
+						"on https the bare name is a leftover and is safe to delete")
+				} else {
+					assert.NotContains(t, store.StaleCookieNames(owner.sessionName), owner.sessionName,
+						"on plain http the bare name is this store's own live cookie")
+				}
+			})
+
+			t.Run(label+"/the chunk siblings", func(t *testing.T) {
+				backend := newFakeBackend()
+				store := newMatrixStore(owner, backend, secure)
+				cookie := liveCookie(t, store, owner, map[interface{}]interface{}{
+					owner.authenticatedKey: "the-value",
+				})
+
+				chunks := []*http.Cookie{cookie}
+				for i := 0; i < 3; i++ {
+					chunks = append(chunks, &http.Cookie{
+						Name:  chunkCookieName(owner.sessionName, i),
+						Value: "leftover",
+					})
+				}
+
+				session, err := loadWith(t, store, owner, chunks...)
+				require.NoError(t, err)
+				assert.False(t, session.IsNew,
+					"leftovers riding along must not stop the live session from loading")
+				assert.Equal(t, "the-value", session.Values[owner.authenticatedKey])
+
+				names := store.StaleCookieNames(owner.sessionName)
+				for i := 0; i < legacyMaxChunks; i++ {
+					assert.Contains(t, names, chunkCookieName(owner.sessionName, i))
+				}
+			})
+		}
+	}
+}
+
+// TestServerSideStore_ASessionLargerThanACookieRoundTrips is the regression for a ceiling
+// that used to bind where nothing said it did.
+//
+// securecookie caps an encoded value at 4096 bytes by default, and the store encodes two
+// very different things: a 64 character identifier for the cookie and the entire session for
+// the backend. Sharing one codec set left the second capped at the first's limit, so any
+// session over about 4 KB failed its save with "the value is too long". The auth server never
+// reached it, because its ceremony session is a couple of kilobytes; an admin console session
+// holds a whole token set, about 13 KB, so every save it made would have failed. Two codec
+// sets, each bounded by what it actually carries (#266).
+func TestServerSideStore_ASessionLargerThanACookieRoundTrips(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	// Comfortably past a cookie's 4096 bytes, and past it again once encoded.
+	large := strings.Repeat("scope:permission ", 1200)
+	require.Greater(t, len(large), 4096)
+
+	cookie := saveNew(t, store, map[interface{}]interface{}{"payload": large})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.AddCookie(cookie)
+	session, err := store.New(req, storeTestName)
+	require.NoError(t, err)
+	assert.Equal(t, large, session.Values["payload"])
+
+	// And the cookie stayed the fixed size the whole change exists to produce, which is what
+	// says the payload went to the backend rather than into the browser.
+	assert.Less(t, len(cookie.Value), 300)
+}
+
+// TestServerSideStore_ASessionPastTheStoresOwnCeilingIsRefused. The ceiling now binds, which
+// is the difference from the store this replaces: that one advertised fifty chunks, disabled
+// securecookie's length check, and encoded whatever it was given.
+func TestServerSideStore_ASessionPastTheStoresOwnCeilingIsRefused(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	session, err := store.New(req, storeTestName)
+	require.NoError(t, err)
+	session.Values["payload"] = strings.Repeat("x", MaxSessionDataBytes+1)
+
+	require.Error(t, store.Save(req, w, session))
+	assert.Zero(t, backend.creates, "nothing oversized reaches storage")
+	assert.Empty(t, w.Result().Cookies(), "and the browser is told nothing about a session that was not written")
 }
