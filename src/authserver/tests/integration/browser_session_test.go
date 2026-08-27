@@ -91,6 +91,68 @@ func TestBrowserSession_IdentifierRotatesAtSignIn(t *testing.T) {
 	assertIdentifierIsNotSignedIn(t, beforeCookie, client, redirectUri)
 }
 
+// TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified pins where the replacement
+// happens, which is a different question from whether it happens.
+//
+// Rotating only at /auth/completed satisfies "no identifier that existed before
+// authentication names the session authentication produced" while still losing the attack
+// that property exists to stop. Everything from the password POST to /auth/completed writes
+// into the row the arriving identifier names, and the two pages in between are plain GETs
+// gated on nothing but the recorded AuthState, with nothing about the requesting browser
+// compared. So a planted identifier polled against those paths while the victim's password
+// is being checked can arrive at /auth/completed first and be handed the session minted for
+// the victim. Replacing the identifier on acceptance leaves the race nothing to race for.
+//
+// The case therefore stops one redirect short of /auth/level1completed, where no user
+// session exists yet, and asserts the identifier has already moved. Run past that point and
+// it would pass with this rotation deleted, because the one at /auth/completed would cover
+// for it (#266 decision 20).
+func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T) {
+	client, redirectUri, user, password := newLevel1Actors(t)
+
+	httpClient := createHttpClient(t)
+
+	resp := beginAuthorize(t, httpClient, client, redirectUri)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// What the browser carries into the password POST, and what a planting attacker holds
+	// a copy of.
+	plantedCookie := requireSessionCookie(t, httpClient)
+	plantedId := decodeSessionIdentifier(t, plantedCookie)
+
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
+	defer func() { _ = resp.Body.Close() }()
+
+	assertRedirect(t, resp, "/auth/level1completed")
+
+	verifiedId := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
+	assert.NotEqual(t, plantedId, verifiedId,
+		"the identifier must be replaced when the password is accepted, not one redirect later")
+
+	// And the replacement invalidated the old handle rather than issuing a new one beside
+	// it. A browser holding only the planted cookie cannot walk the rest of the ceremony
+	// the victim's password just unlocked: /auth/level1completed finds no auth context
+	// under that identifier and sends it to the account profile, instead of onward to
+	// /auth/completed where the session would have been minted for it.
+	replay := createHttpClient(t)
+	baseURL, err := url.Parse(config.GetAuthServer().BaseURL)
+	require.NoError(t, err)
+	replay.Jar.SetCookies(baseURL, []*http.Cookie{plantedCookie})
+
+	resp = loadPage(t, replay, config.GetAuthServer().BaseURL+"/auth/level1completed")
+	defer func() { _ = resp.Body.Close() }()
+
+	assertRedirect(t, resp, "/account/profile")
+}
+
 // TestBrowserSession_IdentifierRotatesAtStepUp covers the second privilege transition.
 //
 // Reaching it means fixation already failed, so this is not fixation defence. What it buys
@@ -144,12 +206,25 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
+	// Nothing has rotated since the level 1 ceremony ended, so this is still the
+	// identifier the browser was reachable by at level 1.
+	beforeOtpId := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
+
 	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
 	require.NoError(t, err)
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+
+	// The second half of decision 20, and the reason it is asserted here rather than after
+	// the redirect below: an authenticator code is a credential, so accepting one replaces
+	// the identifier immediately. This ceremony reached level 1 by single sign-on and so
+	// has not rotated at all, which is what makes the window real. Reading the cookie after
+	// /auth/completed would pass with this rotation deleted, because the step-up rotation
+	// there would cover for it.
+	assert.NotEqual(t, beforeOtpId, decodeSessionIdentifier(t, requireSessionCookie(t, httpClient)),
+		"accepting an authenticator code must replace the identifier, not defer it to /auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 

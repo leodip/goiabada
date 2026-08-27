@@ -999,6 +999,19 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		auditLogger.On("Log", constants.AuditAuthSuccessOtp, mock.Anything).Return()
 
+		// An accepted authenticator code replaces the browser session's identifier at once,
+		// rather than leaving it to /auth/completed one redirect later. Ordering is asserted
+		// as well as occurrence: rotation persists the session's contents as they are, so
+		// running it after the save would leave a failure window in which the identifier the
+		// browser arrived with names a row already marked authentication_completed, which is
+		// what a planted identifier needs (#266 decision 20).
+		authContextSaved := false
+		authHelper.On("RegenerateSession", rr, req).Return(nil).Once().
+			Run(func(mock.Arguments) {
+				assert.False(t, authContextSaved,
+					"rotation must run before the auth context recording the OTP is saved")
+			})
+
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateAuthenticationCompleted &&
 				ac.AuthMethods == enums.AuthMethodOTP.String() &&
@@ -1007,12 +1020,13 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				// reusing a session rather than by entering a password, so setting this
 				// would let it recreate a session that was just ended (#129 decision 15).
 				!ac.Level1AuthCompleted
-		})).Return(nil)
+		})).Return(nil).Run(func(mock.Arguments) { authContextSaved = true })
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/completed", rr.Header().Get("Location"))
+		assert.True(t, authContextSaved, "the ceremony must still record that the code was accepted")
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1100,6 +1114,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return()
 		auditLogger.On("Log", constants.AuditAuthSuccessOtp, mock.Anything).Return()
 
+		// Rotation joins the ordering this case already tracks, which is what makes the
+		// sequence readable in one assertion: the enrolment commits, THEN the identifier is
+		// replaced, THEN the acceptance is recorded (#266 decision 20).
+		authHelper.On("RegenerateSession", rr, req).Return(nil).Once().
+			Run(func(mock.Arguments) { calls = append(calls, "rotate") })
+
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateAuthenticationCompleted &&
 				ac.AuthMethods == enums.AuthMethodOTP.String() &&
@@ -1120,18 +1140,21 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				// reusing a session rather than by entering a password, so setting this
 				// would let it recreate a session that was just ended (#129 decision 15).
 				!ac.Level1AuthCompleted
-		})).Return(nil)
+		})).Return(nil).Run(func(mock.Arguments) { calls = append(calls, "save") })
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/completed", rr.Header().Get("Location"))
 
-		assert.Equal(t, []string{"begin", "update", "increment", "clear", "commit"}, calls,
+		assert.Equal(t, []string{"begin", "update", "increment", "clear", "commit", "rotate", "save"}, calls,
 			"the enable write, the counter advance and the pending-enrolment clear belong inside "+
 				"one transaction, commit last. The clear is handed otpEnrolTx rather than nil: on "+
 				"a nil transaction it would commit on its own, and a rolled back enrolment would "+
-				"discard a pending seed the account API still owes the user (#247)")
+				"discard a pending seed the account API still owes the user (#247). The identifier "+
+				"is then replaced BEFORE the acceptance is saved, so a failure between the two "+
+				"cannot leave a planted identifier naming an authentication_completed row "+
+				"(#266 decision 20)")
 
 		assert.Empty(t, authContext.OTPKeyURL,
 			"a successful enrolment must leave no copy of the key on the ceremony")
@@ -1531,6 +1554,8 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		// Only the accepted-code case reaches it, and this table covers both outcomes.
+		authHelper.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 		user := &models.User{Id: 1, Enabled: true, OTPEnabled: enrolled}
 		template := "/auth_otp.html"

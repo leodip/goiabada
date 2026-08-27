@@ -300,6 +300,35 @@ func HandleAuthPwdPost(
 		// at the gate in handler_auth_completed (#129 decisions 6 and 15).
 		authContext.Level1AuthCompleted = true
 		authContext.AuthState = oauth.AuthStateLevel1PasswordCompleted
+
+		// Rotate the browser session's identifier here, the instant a credential is
+		// accepted, and not only at /auth/completed where the user session is minted.
+		//
+		// Everything between those two points writes into the row the arriving identifier
+		// names, and the pages in between are plain GETs gated on nothing but the recorded
+		// AuthState: /auth/level1completed admits level1_password_completed and
+		// /auth/completed admits authentication_completed, neither comparing anything about
+		// the browser making the request, because the session is deliberately not bound to
+		// IP or User-Agent. So an attacker who planted an identifier and polls those two
+		// paths while this password is being checked can reach /auth/completed before the
+		// victim's own redirect does, and be handed the session minted for the victim.
+		// Replacing the identifier the moment the password is accepted leaves that race
+		// nothing to race for. Undo this and the race is back, silently, with every
+		// existing test still green (#266).
+		//
+		// Before the save, never after. Rotation writes the session's CURRENT contents
+		// under the new identifier, so rotating first means the row carries the state this
+		// ceremony had before the password was accepted. A failure between the two then
+		// leaves a fresh identifier on a session that is not yet password-completed, which
+		// is the harmless direction; saving first and failing to rotate would leave the
+		// planted identifier naming a row that IS password-completed, which is exactly the
+		// state the attacker needs. Same ordering, and the same reason, as the step-up arm
+		// in handler_auth_completed.
+		if err := authHelper.RegenerateSession(w, r); err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
