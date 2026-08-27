@@ -4,10 +4,13 @@
 -- DROP TABLE takes both indexes with it on every engine, so they are not dropped
 -- separately.
 --
--- Resetting client_credentials_enabled to false is lossy by construction: an operator
--- could have enabled the client-credentials grant on admin-console-client themselves,
--- and nothing here can tell that apart from what the up migration set. This down exists
--- for the migration test and for a rollback of this change, not as a general undo.
+-- This down is lossy in two directions, both by construction. Resetting
+-- client_credentials_enabled to false discards the possibility that an operator enabled
+-- the client-credentials grant on admin-console-client themselves, which nothing here
+-- can tell apart from what the up migration set. And nothing can restore the other
+-- grants the up migration stripped from that client (decision 21): they were deleted
+-- without a record, because a migration has nowhere to keep one. This down exists for
+-- the migration test and for a rollback of this change, not as a general undo.
 --
 -- The grant goes before the permission it references, and the permission before the
 -- table, so no statement runs against a row another has already removed.

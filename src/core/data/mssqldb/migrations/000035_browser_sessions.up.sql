@@ -34,5 +34,17 @@ AND p.[permission_identifier] = 'browser-sessions'
 AND p.[resource_id] = (SELECT [id] FROM [resources] WHERE [resource_identifier] = 'authserver')
 AND NOT EXISTS (SELECT 1 FROM [clients_permissions] cp WHERE cp.[client_id] = c.[id] AND cp.[permission_id] = p.[id]);
 
+-- Every grant admin-console-client holds other than the browser-sessions one above is
+-- deleted, so an upgrade cannot reactivate a permission the client was left carrying
+-- (#266, decision 21). See the sqlite migration of the same number for why it runs
+-- before the UPDATE and why it excludes one row rather than deleting them all.
+DELETE FROM [clients_permissions]
+WHERE [client_id] = (SELECT [id] FROM [clients] WHERE [client_identifier] = 'admin-console-client')
+AND [permission_id] <> (
+    SELECT p.[id] FROM [permissions] p
+    JOIN [resources] r ON r.[id] = p.[resource_id]
+    WHERE p.[permission_identifier] = 'browser-sessions' AND r.[resource_identifier] = 'authserver'
+);
+
 -- client_credentials_enabled is BIT here, so the literal is 1.
 UPDATE [clients] SET [client_credentials_enabled] = 1 WHERE [client_identifier] = 'admin-console-client';

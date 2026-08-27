@@ -61,6 +61,35 @@ AND p.permission_identifier = 'browser-sessions'
 AND p.resource_id = (SELECT id FROM resources WHERE resource_identifier = 'authserver')
 AND NOT EXISTS (SELECT 1 FROM clients_permissions cp WHERE cp.client_id = c.id AND cp.permission_id = p.id);
 
+-- An upgrade must not reactivate a permission this client was already carrying (#266,
+-- decision 21). The UPDATE below turns the client-credentials grant back on and nothing
+-- above removes anything, so an installation where an administrator had once enabled
+-- that grant, given the client a wide permission such as the authserver resource's
+-- manage, and switched the grant off again would find that permission usable again from
+-- here: a client_credentials token requested without a scope carries every permission
+-- the client holds. Nor can the row be removed through the admin console, because the
+-- permissions editor refuses to save while client credentials is off.
+--
+-- So every grant this client holds other than the browser-sessions one created above is
+-- deleted. That is destructive and cannot be undone: an operator deliberately driving
+-- the admin API with the admin console's own secret loses that and must create a client
+-- of their own. The release notes say so in advance.
+--
+-- Two things about the shape. It runs BEFORE the UPDATE because MySQL and SQL Server do
+-- not run a migration file in one transaction, so on those engines the statements commit
+-- as they go and the wide grant has to be gone before the grant that makes it reachable
+-- is switched on. And it excludes one permission rather than deleting them all and
+-- re-inserting, because the subquery naming that permission yields NULL if it is somehow
+-- absent, and `<> NULL` is unknown, so the statement then deletes nothing rather than
+-- everything.
+DELETE FROM clients_permissions
+WHERE client_id = (SELECT id FROM clients WHERE client_identifier = 'admin-console-client')
+AND permission_id <> (
+    SELECT p.id FROM permissions p
+    JOIN resources r ON r.id = p.resource_id
+    WHERE p.permission_identifier = 'browser-sessions' AND r.resource_identifier = 'authserver'
+);
+
 -- The boolean literal differs by engine and a wrong one matches nothing SILENTLY rather
 -- than failing: client_credentials_enabled is `numeric` here, `tinyint(1)` on MySQL and
 -- `BIT` on SQL Server, all of which take 1, and `boolean` on PostgreSQL, which takes

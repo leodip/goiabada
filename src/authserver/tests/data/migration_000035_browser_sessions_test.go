@@ -11,10 +11,12 @@ import (
 // Seam 3 of #266: migration 000035, against an ISOLATED database of the configured
 // dialect (see migration_testdb_helper.go).
 //
-// The migration does four things and each is asserted below: it creates
+// The migration does five things and each is asserted below: it creates
 // browser_sessions with its unique lookup index and its expiry index, it adds the
 // browser-sessions permission on the authserver resource, it grants that permission to
-// admin-console-client, and it turns client_credentials_enabled on for that client.
+// admin-console-client, it strips every OTHER grant that client holds, and it turns
+// client_credentials_enabled on for that client. The strip has a test of its own further
+// down, because the fixture it needs is an installation this one does not describe.
 //
 // newIsolatedDB runs migrations and NOTHING else, so at 000034 the resources and clients
 // tables are empty and every guarded `INSERT ... SELECT ... FROM resources WHERE
@@ -94,6 +96,66 @@ func TestMigration000035_GuardedInsertsAreIdempotent(t *testing.T) {
 		"the UPDATE is naturally idempotent and must still have run")
 }
 
+// TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient covers decision 21,
+// answered "B" on #267.
+//
+// The migration turns client_credentials_enabled back on for admin-console-client. On a
+// fresh install the seeder gives that client the browser-sessions permission and nothing
+// else, so the grant is as narrow as decision 16 says. On an UPGRADE it need not be: an
+// administrator can enable client credentials on the built-in client through the admin
+// console, grant it the authserver resource's manage permission, and switch client
+// credentials off again, all through supported UI journeys, and the grant survives. Left
+// alone, this migration would make it usable again, silently, because a
+// client_credentials token requested without a scope carries every permission its client
+// holds.
+//
+// The fixture below is exactly that installation. Two properties are asserted beyond the
+// obvious one, and each is a way the DELETE could be written wrong while still passing
+// the first: the manage PERMISSION must survive, because deleting it would strip it from
+// every user and group that holds it, and another client's grant of the same permission
+// must survive, because the statement is keyed on this one client.
+//
+// Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
+//
+//	--run TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient
+func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T) {
+	h := newIsolatedDB(t)
+
+	require.NoError(t, h.Migrator.Migrate(34), "migrate to 000034")
+	resourceId, clientId := seedInstallation000035(t, h)
+
+	managePermissionId := seedPermission000035(t, h, resourceId, "manage",
+		"Manage the authorization server")
+	seedBrowserSessionsGrant000035(t, h, clientId, managePermissionId)
+
+	otherClientId := seedClient000035(t, h, "some-other-client")
+	seedBrowserSessionsGrant000035(t, h, otherClientId, managePermissionId)
+
+	require.Equal(t, 1, countGrantsForClient000035(t, h, "admin-console-client"),
+		"fixture: the admin console client starts holding the wide grant and nothing else")
+	require.Equal(t, 1, countGrantOfPermission000035(t, h, "some-other-client", "manage"),
+		"fixture: another client holds the same permission")
+
+	require.NoError(t, h.Migrator.Migrate(35), "apply 000035")
+
+	assert.Equal(t, 0, countGrantOfPermission000035(t, h, "admin-console-client", "manage"),
+		"the upgrade must remove the wide grant, or it becomes usable the moment the migration "+
+			"turns client credentials back on")
+	assert.Equal(t, 1, countBrowserSessionsGrant000035(t, h),
+		"the grant this same migration creates must survive its own strip")
+	assert.Equal(t, 1, countGrantsForClient000035(t, h, "admin-console-client"),
+		"browser-sessions is the only permission the admin console client is left holding")
+
+	assert.Equal(t, 1, countPermission000035(t, h, "manage"),
+		"only the GRANT is removed: deleting the permission itself would strip it from every "+
+			"user and group holding it")
+	assert.Equal(t, 1, countGrantOfPermission000035(t, h, "some-other-client", "manage"),
+		"the strip is keyed on the admin console client, so no other client's grants move")
+
+	assert.True(t, clientCredentialsEnabled000035(t, h),
+		"the rest of the migration still runs")
+}
+
 // assertAfter000035 is everything 000035 is responsible for, asserted in one place so the
 // apply arm and the down-then-up arm cannot drift apart.
 func assertAfter000035(t *testing.T, h *isolatedDB, when string) {
@@ -117,6 +179,9 @@ func assertAfter000035(t *testing.T, h *isolatedDB, when string) {
 		"%s: exactly one browser-sessions permission on the authserver resource", when)
 	assert.Equal(t, 1, countBrowserSessionsGrant000035(t, h),
 		"%s: admin-console-client must carry the grant exactly once", when)
+	assert.Equal(t, 1, countGrantsForClient000035(t, h, "admin-console-client"),
+		"%s: browser-sessions is the ONLY permission the admin console client is left holding, "+
+			"which is decision 21's answer to what an upgrade does with a wider one", when)
 	assert.True(t, clientCredentialsEnabled000035(t, h),
 		"%s: admin-console-client obtains its bearer token through client_credentials", when)
 }
@@ -127,8 +192,6 @@ func assertAfter000035(t *testing.T, h *isolatedDB, when string) {
 func seedInstallation000035(t *testing.T, h *isolatedDB) (resourceId, clientId int64) {
 	t.Helper()
 
-	falseLit, trueLit := boolLiterals000031()
-
 	_, err := h.SQL.Exec(fmt.Sprintf(
 		`INSERT INTO resources (resource_identifier, description) VALUES ('authserver', '%s')`,
 		"Authorization server (system-level)"))
@@ -137,20 +200,7 @@ func seedInstallation000035(t *testing.T, h *isolatedDB) (resourceId, clientId i
 		`SELECT id FROM resources WHERE resource_identifier = 'authserver'`).Scan(&resourceId),
 		"read back the seeded resource id")
 
-	// Every NOT NULL column without a default is named, so this insert does not depend on
-	// per-engine defaults agreeing.
-	_, err = h.SQL.Exec(fmt.Sprintf(`INSERT INTO clients
-		(client_identifier, enabled, consent_required, is_public, authorization_code_enabled,
-		 client_credentials_enabled, token_expiration_in_seconds,
-		 refresh_token_offline_idle_timeout_in_seconds, refresh_token_offline_max_lifetime_in_seconds,
-		 include_open_id_connect_claims_in_access_token, default_acr_level)
-		VALUES ('admin-console-client', %s, %s, %s, %s, %s, 300, 2592000, 5184000,
-		        'default', 'urn:goiabada:level2_optional')`,
-		trueLit, falseLit, falseLit, trueLit, falseLit))
-	require.NoError(t, err, "seed the admin console client")
-	require.NoError(t, h.SQL.QueryRow(
-		`SELECT id FROM clients WHERE client_identifier = 'admin-console-client'`).Scan(&clientId),
-		"read back the seeded client id")
+	clientId = seedClient000035(t, h, "admin-console-client")
 
 	require.False(t, clientCredentialsEnabled000035(t, h),
 		"the fixture must start with client_credentials_enabled off, or the migration's UPDATE "+
@@ -159,17 +209,48 @@ func seedInstallation000035(t *testing.T, h *isolatedDB) (resourceId, clientId i
 	return resourceId, clientId
 }
 
-func seedBrowserSessionsPermission000035(t *testing.T, h *isolatedDB, resourceId int64) int64 {
+// seedClient000035 inserts a client with client_credentials_enabled off. Every NOT NULL
+// column without a default is named, so the insert does not depend on per-engine defaults
+// agreeing.
+func seedClient000035(t *testing.T, h *isolatedDB, identifier string) int64 {
 	t.Helper()
-	_, err := h.SQL.Exec(fmt.Sprintf(
-		`INSERT INTO permissions (permission_identifier, description, resource_id)
-		 VALUES ('browser-sessions', 'Read and write admin console browser sessions', %d)`, resourceId))
-	require.NoError(t, err, "seed the browser-sessions permission")
+
+	falseLit, trueLit := boolLiterals000031()
+
+	_, err := h.SQL.Exec(fmt.Sprintf(`INSERT INTO clients
+		(client_identifier, enabled, consent_required, is_public, authorization_code_enabled,
+		 client_credentials_enabled, token_expiration_in_seconds,
+		 refresh_token_offline_idle_timeout_in_seconds, refresh_token_offline_max_lifetime_in_seconds,
+		 include_open_id_connect_claims_in_access_token, default_acr_level)
+		VALUES ('%s', %s, %s, %s, %s, %s, 300, 2592000, 5184000,
+		        'default', 'urn:goiabada:level2_optional')`,
+		identifier, trueLit, falseLit, falseLit, trueLit, falseLit))
+	require.NoErrorf(t, err, "seed the %s client", identifier)
 
 	var id int64
 	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-		`SELECT id FROM permissions WHERE permission_identifier = 'browser-sessions' AND resource_id = %d`,
-		resourceId)).Scan(&id), "read back the seeded permission id")
+		`SELECT id FROM clients WHERE client_identifier = '%s'`, identifier)).Scan(&id),
+		"read back the seeded client id")
+	return id
+}
+
+func seedBrowserSessionsPermission000035(t *testing.T, h *isolatedDB, resourceId int64) int64 {
+	t.Helper()
+	return seedPermission000035(t, h, resourceId, "browser-sessions",
+		"Read and write admin console browser sessions")
+}
+
+func seedPermission000035(t *testing.T, h *isolatedDB, resourceId int64, identifier, description string) int64 {
+	t.Helper()
+	_, err := h.SQL.Exec(fmt.Sprintf(
+		`INSERT INTO permissions (permission_identifier, description, resource_id)
+		 VALUES ('%s', '%s', %d)`, identifier, description, resourceId))
+	require.NoErrorf(t, err, "seed the %s permission", identifier)
+
+	var id int64
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
+		`SELECT id FROM permissions WHERE permission_identifier = '%s' AND resource_id = %d`,
+		identifier, resourceId)).Scan(&id), "read back the seeded permission id")
 	return id
 }
 
@@ -204,6 +285,42 @@ func countBrowserSessionsGrant000035(t *testing.T, h *isolatedDB) int {
 		   AND p.permission_identifier = 'browser-sessions'
 		   AND r.resource_identifier = 'authserver'`).Scan(&n),
 		"count the admin console client's browser-sessions grant")
+	return n
+}
+
+// countGrantsForClient000035 counts every permission a client holds, whatever it is. The
+// migration's strip is the only thing that makes this number smaller, so an assertion on
+// the browser-sessions grant alone would pass with the strip deleted.
+func countGrantsForClient000035(t *testing.T, h *isolatedDB, clientIdentifier string) int {
+	t.Helper()
+	var n int
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
+		`SELECT COUNT(*) FROM clients_permissions cp
+		 JOIN clients c ON c.id = cp.client_id
+		 WHERE c.client_identifier = '%s'`, clientIdentifier)).Scan(&n),
+		"count every grant the client holds")
+	return n
+}
+
+func countGrantOfPermission000035(t *testing.T, h *isolatedDB, clientIdentifier, permissionIdentifier string) int {
+	t.Helper()
+	var n int
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
+		`SELECT COUNT(*) FROM clients_permissions cp
+		 JOIN clients c ON c.id = cp.client_id
+		 JOIN permissions p ON p.id = cp.permission_id
+		 WHERE c.client_identifier = '%s' AND p.permission_identifier = '%s'`,
+		clientIdentifier, permissionIdentifier)).Scan(&n),
+		"count one client's grant of one permission")
+	return n
+}
+
+func countPermission000035(t *testing.T, h *isolatedDB, permissionIdentifier string) int {
+	t.Helper()
+	var n int
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
+		`SELECT COUNT(*) FROM permissions WHERE permission_identifier = '%s'`,
+		permissionIdentifier)).Scan(&n), "count the permission rows themselves")
 	return n
 }
 
