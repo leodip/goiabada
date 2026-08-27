@@ -364,4 +364,42 @@ func (s *Server) initRoutes() {
 		r.Post("/profile-picture", apihandlers.HandleAPIAccountProfilePicturePost(s.database, auditLogger))
 		r.Delete("/profile-picture", apihandlers.HandleAPIAccountProfilePictureDelete(httpHelper, s.database, auditLogger))
 	})
+
+	// Browser session store, for the admin console (#266).
+	//
+	// The admin console keeps no database connection, so its browser sessions live in a
+	// row here and it reaches them through these five operations. What it sends is
+	// ciphertext encrypted with its own session keys, so nothing crossing this boundary
+	// is readable on this side.
+	//
+	// POST throughout, with the session identifier in the body and never in the request
+	// line: a handle in a path lands in this server's access log and in every proxy in
+	// front of it.
+	s.router.Route("/api/v1/sessions", func(r chi.Router) {
+		// FIRST in the group, for the same reason as the two groups above: every 200
+		// here carries session ciphertext, and RFC 6749 section 5.1's MUST covers "any
+		// response containing tokens, credentials, or other sensitive information".
+		r.Use(core_middleware.MiddlewareNoStore())
+		r.Use(middleware.APIDebugMiddleware())
+		r.Use(authHeaderToContext)
+		// One narrow permission of its own, deliberately not one of the manage-* admin
+		// API scopes: holding the admin console's client secret must not be a way to
+		// drive the whole admin API with no user present.
+		r.Use(middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier + ":" + constants.BrowserSessionsPermissionIdentifier))
+
+		// No RequireUserBoundToken and no RequireValidSession here, and both absences are
+		// deliberate. This endpoint is reached only by a client_credentials token, which
+		// has no user behind it: RequireUserBoundToken would refuse every call, and
+		// RequireValidSession passes such a token straight through, so mounting it would
+		// add a line that reads like a guard and enforces nothing.
+		//
+		// The handlers take a database and name the owner themselves. There is no owner
+		// parameter anywhere in this group's contract, which is what makes reaching an
+		// auth server session impossible to ask for rather than merely refused.
+		r.Post("/load", apihandlers.HandleAPISessionLoadPost(s.database))
+		r.Post("/create", apihandlers.HandleAPISessionCreatePost(s.database))
+		r.Post("/update", apihandlers.HandleAPISessionUpdatePost(s.database))
+		r.Post("/touch", apihandlers.HandleAPISessionTouchPost(s.database))
+		r.Post("/delete", apihandlers.HandleAPISessionDeletePost(s.database))
+	})
 }

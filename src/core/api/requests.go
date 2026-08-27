@@ -365,3 +365,42 @@ type DynamicClientRegistrationRequest struct {
 	// "The authorization server MUST ignore any client metadata
 	//  sent by the client that it does not understand"
 }
+
+// The browser session endpoint's request bodies (#266).
+//
+// The admin console keeps no database connection, so it reaches its own browser sessions
+// through the auth server. These are the wire form of sessionstore.Backend, method for
+// method, and there is deliberately no `owner` field anywhere: the handler names the
+// owner itself, so no request can reach an auth server session.
+//
+// The identifier travels in the body and never in the request line. A handle in a path
+// lands in the auth server's access log, in every proxy in front of it, and in anything
+// that reports slow requests, which is one of the reasons a capability-style endpoint was
+// rejected in the first place.
+//
+// `data` is a string because it is a string in the column: it is securecookie output,
+// which is base64 text, and it is ciphertext the auth server holds no key for.
+
+// SessionLoadRequest names the session to read or remove.
+type SessionLoadRequest struct {
+	Id string `json:"id"`
+}
+
+// SessionWriteRequest carries a session's contents.
+//
+// `authenticated` is a fact about the container and not about its contents: it says
+// whether the calling module considers this session signed in, which is what decides
+// which of the two lifetimes applies to it. Only the caller can answer it, because only
+// the caller can see inside the blob, and only the auth server can turn it into a
+// timestamp, because only the auth server can read the deployment's session settings.
+type SessionWriteRequest struct {
+	Id            string `json:"id"`
+	Data          string `json:"data"`
+	Authenticated bool   `json:"authenticated"`
+}
+
+// SessionTouchRequest records that a live session was used.
+type SessionTouchRequest struct {
+	Id            string `json:"id"`
+	Authenticated bool   `json:"authenticated"`
+}

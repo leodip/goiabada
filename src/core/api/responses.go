@@ -1112,3 +1112,25 @@ type GetAuditLogsResponse struct {
 	Page      int                `json:"page"`
 	Size      int                `json:"size"`
 }
+
+// The browser session endpoint's response bodies (#266). See the request types for why
+// there is no owner anywhere in this contract.
+
+// SessionLoadResponse is one stored session.
+//
+// lastAccessed is here because the caller decides whether to touch, and it makes that
+// decision against a threshold rather than on every read: without the timestamp the hop
+// would have to happen twice or the laziness would have to move to the server, and it
+// belongs with the store that owns the threshold.
+type SessionLoadResponse struct {
+	Data         string    `json:"data"`
+	LastAccessed time.Time `json:"lastAccessed"`
+	ExpiresAt    time.Time `json:"expiresAt"`
+}
+
+// SessionWriteResponse is the deadline the auth server chose for a session it just
+// wrote. The caller sets its cookie's own expiry from it, so the browser never holds a
+// handle that outlives what it names.
+type SessionWriteResponse struct {
+	ExpiresAt time.Time `json:"expiresAt"`
+}

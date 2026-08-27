@@ -89,6 +89,14 @@ tags:
     description: System settings (Admin API)
   - name: Account
     description: Self-service account management (Account API)
+  - name: Browser Sessions
+    description: |
+      Browser session storage for the admin console (Internal API). The admin console keeps no
+      database connection of its own, so the browser session it used to hold in a cookie lives in
+      a row on the auth server and it reaches that row through these operations. Not a public
+      surface: it is the network transport of one internal interface between the two applications
+      that ship together, and it is authenticated with a permission of its own that grants nothing
+      else.
 
 security:
   - BearerAuth: []
@@ -3236,6 +3244,182 @@ paths:
               schema:
                 type: string
 
+  # =============================================================================
+  # INTERNAL API - BROWSER SESSIONS
+  # =============================================================================
+  # Five operations, one per method of the store interface behind them. Every one is a POST
+  # carrying the session identifier in the body and never in the request line: a session handle
+  # in a path lands in this server's access log, in the Referer of anything a page loads, and in
+  # every proxy in front of the deployment.
+  #
+  # `data` is opaque here in the strongest sense. The admin console encrypts it with its own
+  # session keys before sending it, so the auth server stores bytes it holds no key for and a
+  # dump of this database yields no administrator token.
+  #
+  # None of these operations names an owner. The handler fixes it, so a request cannot ask for
+  # a session belonging to the auth server; one that names a correct identifier for such a
+  # session is answered 404, exactly as if it did not exist.
+
+  /api/v1/sessions/load:
+    post:
+      tags: [Browser Sessions]
+      summary: Read a browser session
+      description: |
+        Return one stored browser session. 404 means the session is gone: no such session, one
+        that was logged out or reaped, or one that has expired. It is distinct from 500, which
+        means the lookup could not be performed; a caller must treat 404 as "start a fresh
+        session" and 500 as a refused request, never the other way round.
+      operationId: loadBrowserSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionLoadRequest'
+      responses:
+        '200':
+          description: The stored session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionLoadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/sessions/create:
+    post:
+      tags: [Browser Sessions]
+      summary: Create a browser session
+      description: |
+        Store a session under an identifier the caller generated. No 404: creating names no
+        existing session, so there is nothing here that can be absent.
+      operationId: createBrowserSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionWriteRequest'
+      responses:
+        '200':
+          description: The deadline chosen for the new session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionWriteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/sessions/update:
+    post:
+      tags: [Browser Sessions]
+      summary: Replace a browser session's contents
+      description: |
+        Replace the contents of a session that already exists. It never inserts, and that is
+        load bearing rather than incidental: a session that is gone was most likely removed by a
+        request rotating the identifier, so re-creating its row would undo that rotation from a
+        request still in flight under the old identifier. A caller meeting 404 must fail its save
+        rather than fall back to creating.
+      operationId: updateBrowserSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionWriteRequest'
+      responses:
+        '200':
+          description: The deadline chosen for the session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionWriteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/sessions/touch:
+    post:
+      tags: [Browser Sessions]
+      summary: Record that a browser session was used
+      description: |
+        Move a live session's last-accessed stamp and its deadline, without sending its contents.
+        Both move together because the idle window is expressed in the deadline: a touch that
+        left it alone would never extend the session and the idle timeout would behave as an
+        absolute one.
+      operationId: touchBrowserSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionTouchRequest'
+      responses:
+        '200':
+          description: The deadline chosen for the session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionWriteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/sessions/delete:
+    post:
+      tags: [Browser Sessions]
+      summary: Delete a browser session
+      description: |
+        Remove a session. 204 whether or not a row was there, so there is no 404: deleting a
+        session that is already gone is the outcome the caller asked for, and reporting a failure
+        would make a logout that raced the reaper look like one.
+      operationId: deleteBrowserSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionLoadRequest'
+      responses:
+        '204':
+          description: The session is gone
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -3252,6 +3436,10 @@ components:
         Account API: scope `authserver:manage-account`, on a token issued for a user. A client
         credentials token carries no `auth_time` claim and is refused with 403
         `USER_CONTEXT_REQUIRED`.
+
+        Browser sessions: scope `authserver:browser-sessions`, and only that scope. It is
+        deliberately not one of the manage-* scopes, so holding the admin console's client secret
+        is not a way to drive the admin API with no user present.
 
   parameters:
     UserIdParam:
@@ -3376,6 +3564,88 @@ components:
     # =========================================================================
     # Common Responses
     # =========================================================================
+    SessionLoadRequest:
+      type: object
+      description: |
+        Names the browser session to read or remove. There is deliberately no owner field: the
+        handler fixes the owner, which is what makes reaching another application's session
+        impossible to ask for rather than merely refused.
+      required: [id]
+      properties:
+        id:
+          type: string
+          description: |
+            The session identifier, 64 hexadecimal characters. It is a handle and not a name:
+            only its SHA-256 digest is stored, so the value here is never written to a column.
+
+    SessionWriteRequest:
+      type: object
+      description: A browser session's contents, for create and update.
+      required: [id, data, authenticated]
+      properties:
+        id:
+          type: string
+          description: The session identifier, 64 hexadecimal characters.
+        data:
+          type: string
+          description: |
+            The session contents, encrypted by the caller with its own session keys. The auth
+            server stores these bytes and holds no key for them.
+        authenticated:
+          type: boolean
+          description: |
+            Whether the caller considers this session signed in. It is a fact about the container
+            and not about its contents, and it is what decides which of the two lifetimes applies:
+            a session that has not authenticated gets a short fixed window, and one that has gets
+            the deployment's configured idle timeout and maximum lifetime. The caller answers it
+            because only the caller can see inside the blob; the auth server turns it into a
+            deadline because only the auth server can read those settings.
+
+    SessionTouchRequest:
+      type: object
+      description: Records that a live browser session was used, without sending its contents.
+      required: [id, authenticated]
+      properties:
+        id:
+          type: string
+          description: The session identifier, 64 hexadecimal characters.
+        authenticated:
+          type: boolean
+          description: As for SessionWriteRequest.
+
+    SessionLoadResponse:
+      type: object
+      description: One stored browser session.
+      required: [data, lastAccessed, expiresAt]
+      properties:
+        data:
+          type: string
+          description: The session contents, as the caller encrypted them.
+        lastAccessed:
+          type: string
+          format: date-time
+          description: |
+            When this session was last recorded as used. The caller needs it because it decides
+            whether to touch against a staleness threshold rather than on every read, which is
+            what keeps ordinary browsing from putting a write in front of every page.
+        expiresAt:
+          type: string
+          format: date-time
+          description: When this session stops being usable.
+
+    SessionWriteResponse:
+      type: object
+      description: |
+        The deadline the auth server chose for a session it just wrote. A caller sets its
+        cookie's own expiry from this, so the browser never holds a handle that outlives what it
+        names.
+      required: [expiresAt]
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+          description: When this session stops being usable.
+
     ErrorResponse:
       type: object
       description: |
