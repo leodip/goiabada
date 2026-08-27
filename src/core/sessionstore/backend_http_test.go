@@ -448,3 +448,74 @@ func TestHTTPBackend_ACancelledContextIsNotRetried(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, stub.recorded())
 }
+
+// TestHTTPBackend_AnAnswerThatCouldNotBeReadIsNotRetried is the other side of the retry,
+// and the one a dropped-connection case cannot reach: the far end answered, so it has
+// already run the operation, and only the answer was lost on the way back.
+//
+// Create is where repeating it does damage. The second attempt collides with the first
+// attempt's own row on the unique index, the endpoint answers 500, and a write that
+// succeeded reaches the caller as a failure. The assertion is therefore a count and not an
+// outcome: one request left here, whatever the caller was told (#266, final review round 2
+// finding 2).
+func TestHTTPBackend_AnAnswerThatCouldNotBeReadIsNotRetried(t *testing.T) {
+	stub := newStubEndpoint(t, func(w http.ResponseWriter, _ int) {
+		// Announce a body longer than the one written, then hijack and close. The status
+		// line and headers arrive, so the client has an answer; the body is truncated, so
+		// reading it fails. That is the create-committed-then-lost shape.
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Length", "4096")
+		w.WriteHeader(http.StatusOK)
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		hijacker, ok := w.(http.Hijacker)
+		require.True(t, ok)
+		conn, _, err := hijacker.Hijack()
+		require.NoError(t, err)
+		_ = conn.Close()
+	})
+	backend := NewHTTPBackend(stub.server.URL, newStubTokens())
+
+	_, err := backend.Create(context.Background(), httpTestSessionId, []byte("ciphertext"), true)
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrNotFound)
+	assert.Len(t, stub.recorded(), 1, "the create is not sent a second time: the first one committed")
+}
+
+// TestHTTPBackend_AMaximalSessionCrossesTheWireInBothDirections pins the relationship
+// between the two ceilings rather than either value: a blob the store admits has to fit
+// through the endpoint's request cap on the way out and through this backend's response cap
+// on the way back.
+//
+// Both were a flat megabyte once, equal to the blob ceiling itself, so the envelope pushed
+// a maximal session over in both directions: the write was refused as oversized and the read
+// truncated before it decoded, at exactly the size the store had just admitted. Written
+// against MaxSessionDataBytes, this fails if the allowance is ever removed (#266, final
+// review round 2 finding 3).
+func TestHTTPBackend_AMaximalSessionCrossesTheWireInBothDirections(t *testing.T) {
+	maximal := strings.Repeat("x", MaxSessionDataBytes)
+
+	stub := newStubEndpoint(t, func(w http.ResponseWriter, _ int) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(api.SessionLoadResponse{
+			Data:         maximal,
+			LastAccessed: time.Now().UTC(),
+			ExpiresAt:    time.Now().UTC().Add(time.Hour),
+		})
+	})
+	backend := NewHTTPBackend(stub.server.URL, newStubTokens())
+
+	record, err := backend.Load(context.Background(), httpTestSessionId)
+	require.NoError(t, err, "a maximal blob must survive the response cap, envelope included")
+	assert.Len(t, record.Data, MaxSessionDataBytes)
+
+	// The request half, measured rather than sent: the endpoint reads the whole body under
+	// one MaxBytesReader, so what has to fit is the encoded envelope and not the blob.
+	encoded, err := json.Marshal(api.SessionWriteRequest{
+		Id: httpTestSessionId, Data: maximal, Authenticated: true,
+	})
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(encoded), MaxSessionWireBytes,
+		"a maximal blob must survive the endpoint's request cap, envelope included")
+}
