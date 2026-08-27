@@ -1,0 +1,21 @@
+-- audit_logs.details carries DEFAULT '{}' on SQLite, PostgreSQL and SQL Server and
+-- carried none on MySQL (#282).
+--
+-- Three facts about this statement, each measured rather than assumed:
+--
+-- 1. MySQL refuses a literal default on a TEXT column. ALTER TABLE ... ALTER COLUMN
+--    details SET DEFAULT '{}' fails ERROR 1101 ("BLOB, TEXT, GEOMETRY or JSON column
+--    can't have a default value"), and so does the parenthesised form of SET DEFAULT.
+--    MODIFY with a parenthesised EXPRESSION default is the only accepted spelling.
+-- 2. An expression default is stamped with the DDL connection's character set, so
+--    MySQL records this one as (_utf8mb4'{}') where the other three engines record
+--    '{}'. The four engines therefore agree on the default's EFFECT and not on its
+--    recorded text. Anything comparing catalogs across engines has to carry that.
+-- 3. Nothing exercises the default on any engine. CreateAuditLog inserts through
+--    sqlbuilder.NewStruct, which writes every non-pk column, so every insert supplies
+--    a value. This is catalog parity with no observable behaviour attached.
+--
+-- The MODIFY is metadata-only: it is accepted with both ALGORITHM=INSTANT and
+-- ALGORITHM=INPLACE, so what is typically the largest table in a deployment is not
+-- rebuilt.
+ALTER TABLE `audit_logs` MODIFY `details` TEXT NOT NULL DEFAULT ('{}');

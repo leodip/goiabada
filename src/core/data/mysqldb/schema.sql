@@ -266,11 +266,15 @@ CREATE TABLE `client_logos` (
   CONSTRAINT `fk_client_logos_client_id` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- details' default is an EXPRESSION, which is the only form MySQL accepts on a TEXT
+-- column, and MySQL stamps it with the DDL connection's charset. So its recorded text
+-- differs from the plain '{}' the other three engines record, while the effect is the
+-- same. See migration 000037.
 CREATE TABLE `audit_logs` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `created_at` datetime(6) NOT NULL,
   `audit_event` varchar(128) NOT NULL,
-  `details` text NOT NULL,
+  `details` text NOT NULL DEFAULT (_utf8mb4'{}'),
   PRIMARY KEY (`id`),
   KEY `idx_audit_logs_created_at` (`created_at`),
   KEY `idx_audit_logs_audit_event` (`audit_event`)

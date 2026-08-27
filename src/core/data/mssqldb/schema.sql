@@ -30,7 +30,7 @@ CREATE TABLE [clients] (
     [pkce_required] BIT NULL DEFAULT (NULL),
     [implicit_grant_enabled] BIT DEFAULT NULL,
     [resource_owner_password_credentials_enabled] BIT DEFAULT NULL,
-    [include_open_id_connect_claims_in_id_token] VARCHAR(10) NOT NULL DEFAULT 'default',
+    [include_open_id_connect_claims_in_id_token] NVARCHAR(10) NOT NULL CONSTRAINT [df_clients_include_open_id_connect_claims_in_id_token] DEFAULT 'default',
     [created_via_dcr] BIT NOT NULL CONSTRAINT [df_clients_created_via_dcr] DEFAULT 0,
     CONSTRAINT [PK_clients] PRIMARY KEY ([id])
 );
@@ -52,8 +52,8 @@ CREATE TABLE [codes] (
     [updated_at] DATETIME2(6) NULL,
     [code_hash] NVARCHAR(64) NOT NULL,
     [client_id] BIGINT NOT NULL,
-    [code_challenge] VARCHAR(256) NULL,
-    [code_challenge_method] VARCHAR(10) NULL,
+    [code_challenge] NVARCHAR(256) NULL,
+    [code_challenge_method] NVARCHAR(10) NULL,
     [scope] NVARCHAR(512) NOT NULL,
     [state] NVARCHAR(512) NOT NULL,
     [nonce] NVARCHAR(512) NOT NULL,
@@ -265,7 +265,7 @@ CREATE TABLE [user_profile_pictures] (
     [updated_at] DATETIME2(6) NULL,
     [user_id] BIGINT NOT NULL,
     [picture] VARBINARY(MAX) NOT NULL,
-    [content_type] VARCHAR(64) NOT NULL,
+    [content_type] NVARCHAR(64) NOT NULL,
     CONSTRAINT [PK_user_profile_pictures] PRIMARY KEY ([id])
 );
 
@@ -276,7 +276,7 @@ CREATE TABLE [client_logos] (
     [updated_at] DATETIME2(6) NULL,
     [client_id] BIGINT NOT NULL,
     [logo] VARBINARY(MAX) NOT NULL,
-    [content_type] VARCHAR(64) NOT NULL,
+    [content_type] NVARCHAR(64) NOT NULL,
     CONSTRAINT [PK_client_logos] PRIMARY KEY ([id])
 );
 
