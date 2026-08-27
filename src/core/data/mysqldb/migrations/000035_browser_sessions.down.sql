@@ -1,5 +1,5 @@
 -- Reverses migration 000035 (#266). See the sqlite migration of the same number for why
--- resetting client_credentials_enabled is lossy, and why the indexes are not dropped
+-- this down is lossy in two directions, and why the indexes are not dropped
 -- separately.
 DELETE cp FROM `clients_permissions` cp
 JOIN `permissions` p ON p.`id` = cp.`permission_id`
