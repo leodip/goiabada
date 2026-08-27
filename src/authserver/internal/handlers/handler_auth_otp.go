@@ -441,6 +441,28 @@ func HandleAuthOtpPost(
 		// maximum age. Same discipline as User.SetOTPSecret, which blanks the plaintext seed
 		// once it has encrypted it (#82, #247).
 		authContext.OTPKeyURL = ""
+
+		// Rotate the browser session's identifier here too, for the same reason the
+		// password handler does: a credential has just been verified, and that is a
+		// privilege change wherever it happens.
+		//
+		// The window this closes is smaller than the password one, since a ceremony
+		// reaching level 2 has usually already rotated at level 1, but it is not empty: a
+		// session that arrived at level 1 by single sign-on and is stepping up has not
+		// rotated in this ceremony at all, so until /auth/completed runs the identifier it
+		// carried at level 1 still names the row that is about to become level 2. Rotating
+		// on acceptance means an identifier stolen at level 1 is dead the moment the
+		// authenticator code is accepted rather than one redirect later.
+		//
+		// Before the save, for the ordering argument written out in handler_auth_pwd:
+		// rotation persists the contents as they are now, so a failure between the two
+		// leaves a fresh identifier on a session that has not been marked
+		// authentication_completed (#266).
+		if err := authHelper.RegenerateSession(w, r); err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

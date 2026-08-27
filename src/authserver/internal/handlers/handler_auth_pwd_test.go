@@ -767,6 +767,21 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			return details["userId"] == int64(1)
 		})).Return()
 
+		// The identifier is replaced the instant the password is accepted, and before the
+		// auth context recording that acceptance is saved. Asserted here as well as at the
+		// integration tier because this is the only place the ordering is visible: the
+		// integration case can see that the cookie moved but not that it moved first
+		// (#266 decision 20).
+		authContextSaved := false
+		authHelper.On("RegenerateSession", rr, mock.Anything).Return(nil).Once().
+			Run(func(mock.Arguments) {
+				assert.False(t, authContextSaved,
+					"rotation must run before the password-completed auth context is saved: "+
+						"saving first and then failing to rotate would leave a planted "+
+						"identifier naming a row that is already password-completed, which is "+
+						"the state the fixation race needs")
+			})
+
 		// mock.Anything for the request: handler_auth_pwd.go calls
 		// i18n.RefineLocalizerWithUser after password verifies, which returns
 		// a fresh *http.Request, so the pointer no longer matches `req`.
@@ -790,12 +805,13 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				// through /auth/level2 and overwrites this, and it is asserted here for that
 				// reason: this is the only place the write is observable at all (#242).
 				ac.OtpConfigGeneration != nil && *ac.OtpConfigGeneration == 4
-		})).Return(nil)
+		})).Return(nil).Run(func(mock.Arguments) { authContextSaved = true })
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+		assert.True(t, authContextSaved, "the ceremony must still record that the password was accepted")
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -911,6 +927,8 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		// Only the accepted-password case reaches it, and this table covers both outcomes.
+		authHelper.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
 		database.On("GetUserByEmail", mock.Anything, email).Return(account, nil)
