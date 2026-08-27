@@ -234,3 +234,97 @@ func TestSessionTokenSource_AFailureDoesNotLeaveAStaleTokenCached(t *testing.T) 
 	assert.Empty(t, third)
 	assert.Len(t, stub.recorded(), 3)
 }
+
+// TestSessionTokenSource_ARefusalNamesTheClientAndTheRemedy pins decision 23.
+//
+// The deployment this protects is one that set GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID to a
+// client of its own. Migration 000035 provisions the switch and the permission against the
+// literal `admin-console-client`, so that deployment upgrades into a token endpoint that
+// refuses it, every admin console page fails, and the way back in does not go through the
+// admin console. The log line is the whole remedy an operator gets, so it is asserted rather
+// than left to whoever reads the source next.
+//
+// unauthorized_client is client credentials being off on that client and invalid_scope is
+// that client not holding the permission, which are the two refusals the token endpoint
+// actually produces here.
+func TestSessionTokenSource_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
+	refuses := func(status int, code string) func(http.ResponseWriter, int) {
+		return func(w http.ResponseWriter, _ int) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error":             code,
+				"error_description": "some description the endpoint chose",
+			})
+		}
+	}
+
+	permission := constants.AuthServerResourceIdentifier + ":" +
+		constants.BrowserSessionsPermissionIdentifier
+
+	for _, code := range []string{"unauthorized_client", "invalid_scope"} {
+		t.Run(code, func(t *testing.T) {
+			stub := newTokenStub(t, refuses(http.StatusBadRequest, code))
+			source := NewSessionTokenSource(stub.server.URL, "a-client-of-my-own", "the-secret")
+
+			_, err := source.Token(context.Background())
+			require.Error(t, err)
+
+			message := err.Error()
+			assert.Contains(t, message, code,
+				"the endpoint's error field is the difference between a diagnosable failure and a bare status")
+			assert.Contains(t, message, "a-client-of-my-own",
+				"the configured client id is what an operator has to go and fix")
+			assert.Contains(t, message, permission,
+				"the permission to grant")
+			assert.Contains(t, message, "client credentials",
+				"the switch to turn on")
+		})
+	}
+
+	// A refusal that is not a provisioning fault must not send an operator to the Clients
+	// page. It still names the code and the client, because both are useful either way.
+	t.Run("server_error carries no remedy", func(t *testing.T) {
+		stub := newTokenStub(t, refuses(http.StatusInternalServerError, "server_error"))
+		source := NewSessionTokenSource(stub.server.URL, "a-client-of-my-own", "the-secret")
+
+		_, err := source.Token(context.Background())
+		require.Error(t, err)
+
+		message := err.Error()
+		assert.Contains(t, message, "server_error")
+		assert.Contains(t, message, "a-client-of-my-own")
+		assert.NotContains(t, message, permission,
+			"a server_error is not a missing grant, and saying so would misdirect the repair")
+	})
+
+	// A refusal with no JSON body at all still has to produce a message, since a proxy in
+	// front of the auth server can answer before the token endpoint is reached.
+	t.Run("a bodyless refusal still names the client", func(t *testing.T) {
+		stub := newTokenStub(t, func(w http.ResponseWriter, _ int) {
+			w.WriteHeader(http.StatusBadGateway)
+		})
+		source := NewSessionTokenSource(stub.server.URL, "a-client-of-my-own", "the-secret")
+
+		_, err := source.Token(context.Background())
+		require.Error(t, err)
+
+		message := err.Error()
+		assert.Contains(t, message, "502")
+		assert.Contains(t, message, "a-client-of-my-own")
+		assert.NotContains(t, message, permission)
+	})
+
+	// The endpoint's error field arrives over the wire, so it is filtered on the way into a
+	// log line exactly as the auth server filters it on the way out (RFC 6749 Appendix A.8).
+	t.Run("a forbidden rune in the error code cannot forge a log line", func(t *testing.T) {
+		stub := newTokenStub(t, refuses(http.StatusBadRequest, "bad\ncode"))
+		source := NewSessionTokenSource(stub.server.URL, "a-client-of-my-own", "the-secret")
+
+		_, err := source.Token(context.Background())
+		require.Error(t, err)
+
+		assert.NotContains(t, err.Error(), "\n",
+			"a newline from the endpoint would forge a line in the admin console's log")
+	})
+}

@@ -3,6 +3,7 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
 )
@@ -130,8 +132,8 @@ func (s *SessionTokenSource) fetch(ctx context.Context) (string, time.Time, erro
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return "", time.Time{}, errors.WithStack(errors.Errorf(
-			"the auth server's token endpoint answered %d", response.StatusCode))
+		return "", time.Time{}, errors.WithStack(errors.New(
+			s.refusalMessage(response.StatusCode, body)))
 	}
 
 	var tokenResponse oauth.TokenResponse
@@ -148,4 +150,53 @@ func (s *SessionTokenSource) fetch(ctx context.Context) (string, time.Time, erro
 
 	return tokenResponse.AccessToken,
 		time.Now().UTC().Add(time.Duration(tokenResponse.ExpiresIn) * time.Second), nil
+}
+
+// refusalMessage explains a refused token request, naming the client that was refused and,
+// where the refusal says the client is not provisioned for this, the two things it needs.
+//
+// The reason it is worth more than a status code: a deployment this fails on cannot be
+// repaired through the admin console, because obtaining this token is what every admin
+// console page needs, so an administrator locked out by it has no page to fix it from. The
+// route back in is direct SQL or a temporary swap of the configured client id, and neither
+// is discoverable from "answered 400" (#266).
+//
+// How a deployment reaches it: migration 000035 provisions the client-credentials switch and
+// the browser-sessions permission against the literal identifier `admin-console-client`,
+// while this source authenticates as whatever GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID names,
+// for which that literal is only the default. A deployment that pointed the variable at a
+// client of its own therefore upgrades into a token endpoint that refuses it, and the two
+// codes below are the two ways it says so: unauthorized_client when client credentials is off
+// on that client, invalid_scope when that client does not hold the permission.
+//
+// The remedy sentence is attached to exactly those two codes rather than to every refusal,
+// because a server_error or a gateway's 502 is not a provisioning fault and telling an
+// operator to grant a permission would send them to the wrong place.
+//
+// The `error` field is a fixed OAuth code, but it arrives over the wire, so it goes through
+// the same RFC 6749 Appendix A.8 filter the auth server applies on the way out (RFC 6749
+// section 5.2) rather than reaching a log line unbounded and carrying its own newlines.
+func (s *SessionTokenSource) refusalMessage(statusCode int, body []byte) string {
+	var refusal struct {
+		Error string `json:"error"`
+	}
+	// Best effort: a refusal with no JSON body at all, or one written by a proxy rather than
+	// by the token endpoint, still has to produce a message.
+	_ = json.Unmarshal(body, &refusal)
+	code := customerrors.ConformErrorDescription(refusal.Error)
+
+	message := fmt.Sprintf("the auth server's token endpoint answered %d", statusCode)
+	if code != "" {
+		message += fmt.Sprintf(" (%s)", code)
+	}
+	// %q rather than %s: the client id comes from the deployment's own environment, and a
+	// stray control character in it must not forge a line in the log this lands in.
+	message += fmt.Sprintf(" for client_id %q", s.clientId)
+
+	if code == "unauthorized_client" || code == "invalid_scope" {
+		message += fmt.Sprintf(", which needs the client credentials flow enabled and the"+
+			" %s permission granted", s.scope)
+	}
+
+	return message
 }
