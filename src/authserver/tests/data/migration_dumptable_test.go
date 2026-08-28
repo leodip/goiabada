@@ -118,6 +118,107 @@ func TestDumpTable_ReadsTheCatalog(t *testing.T) {
 	assert.Equalf(t, wantChallengeNullable, codes.column(t, "code_challenge").Nullable,
 		"codes.code_challenge is NOT NULL on sqlite and nullable on the other three at 000035 (%s)",
 		dbType())
+
+	// The default constraint's NAME, which SQL Server alone gives one. It is asserted in
+	// both polarities for the reason nullability is: a branch reporting a constant passes
+	// one and fails the other.
+	assertDefaultNameProjection(t, refreshTokens)
+
+	assertCollationProjectionIsNotAConstant(t, h)
+}
+
+// assertDefaultNameProjection holds columnShape.DefaultName to what each engine can
+// actually report. SQL Server names default constraints and the other three do not: MySQL,
+// PostgreSQL and SQLite attach a default to the column with no nameable object behind it,
+// so "" there is the truth and not an unfilled field.
+func assertDefaultNameProjection(t *testing.T, refreshTokens tableShape) {
+	t.Helper()
+
+	gen := refreshTokens.column(t, "auth_state_generation")
+	jti := refreshTokens.column(t, "refresh_token_jti")
+
+	assert.Emptyf(t, jti.DefaultName,
+		"refresh_tokens.refresh_token_jti carries no default at all, so it can carry no default constraint name on %s",
+		dbType())
+
+	if dbType() != "mssql" {
+		assert.Emptyf(t, gen.DefaultName,
+			"%s names no default constraint, so DefaultName must stay empty even for a column that has a default",
+			dbType())
+		return
+	}
+	assert.Equal(t, "df_refresh_tokens_auth_state_generation", gen.DefaultName,
+		"000024 named this constraint so a later migration could drop it without a catalog lookup")
+}
+
+// assertCollationProjectionIsNotAConstant is the control for columnShape.Collation, and it
+// builds its own table to be one.
+//
+// Reading the collation off the schema instead would prove nothing on any engine: every
+// string column in the migrated schema carries the same collation, so a branch that
+// returned that one name as a literal, or that read the DATABASE default rather than the
+// COLUMN's, would pass. SQLite is the sharpest case, because its collation is parsed out of
+// the CREATE TABLE text rather than projected by a pragma, and every column in the real
+// schema is BINARY.
+//
+// So: two string columns in one table, one at the engine's default and one at an explicitly
+// different collation, plus an integer column. The projection has to tell all three apart.
+func assertCollationProjectionIsNotAConstant(t *testing.T, h *isolatedDB) {
+	t.Helper()
+
+	var ddl, wantOverride string
+	switch dbType() {
+	case "mysql":
+		ddl = `CREATE TABLE dumptable_collation_probe (
+			inherited VARCHAR(16) NOT NULL,
+			overridden VARCHAR(16) COLLATE utf8mb4_bin NOT NULL,
+			n BIGINT NOT NULL)`
+		wantOverride = "utf8mb4_bin"
+	case "postgres":
+		ddl = `CREATE TABLE dumptable_collation_probe (
+			inherited text NOT NULL,
+			overridden text COLLATE "C" NOT NULL,
+			n bigint NOT NULL)`
+		wantOverride = "C"
+	case "mssql":
+		ddl = `CREATE TABLE dumptable_collation_probe (
+			inherited NVARCHAR(16) NOT NULL,
+			overridden NVARCHAR(16) COLLATE Latin1_General_BIN2 NOT NULL,
+			n BIGINT NOT NULL)`
+		wantOverride = "Latin1_General_BIN2"
+	default: // sqlite
+		ddl = `CREATE TABLE dumptable_collation_probe (
+			inherited TEXT NOT NULL,
+			overridden TEXT COLLATE NOCASE NOT NULL,
+			n INTEGER NOT NULL)`
+		wantOverride = "NOCASE"
+	}
+
+	_, err := h.SQL.Exec(ddl)
+	require.NoError(t, err, "create the collation probe table")
+	t.Cleanup(func() { _, _ = h.SQL.Exec("DROP TABLE dumptable_collation_probe") })
+
+	probe := dumpTable(t, h, "dumptable_collation_probe")
+	inherited := probe.column(t, "inherited").Collation
+	overridden := probe.column(t, "overridden").Collation
+	numeric := probe.column(t, "n").Collation
+
+	assert.NotEmptyf(t, inherited, "the collation projection returned nothing for a string column on %s", dbType())
+	assert.Equalf(t, wantOverride, overridden,
+		"the collation projection must read the COLUMN's own collation, not the database's, on %s", dbType())
+	assert.NotEqualf(t, inherited, overridden,
+		"two columns at different collations must not report the same one on %s", dbType())
+
+	if dbType() == "" || dbType() == "sqlite" {
+		// SQLite assigns BINARY to every column whatever it holds, and reports no
+		// collation for any of them, so its integer column reads BINARY rather than "".
+		assert.Equal(t, "BINARY", numeric,
+			"SQLite's declared collating sequence is BINARY wherever a declaration omits one")
+		return
+	}
+	assert.Emptyf(t, numeric,
+		"a column that holds no string has no collation on %s, and reporting one would mean the projection is a constant",
+		dbType())
 }
 
 // authStateGenerationShape is the type and default that refresh_tokens

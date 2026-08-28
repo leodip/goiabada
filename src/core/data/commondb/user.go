@@ -335,6 +335,16 @@ func (d *CommonDatabase) GetUserBySubject(tx *sql.Tx, subject string) (*models.U
 	if err != nil {
 		return nil, err
 	}
+	// The engine may have folded a value this lookup did not ask for; see
+	// engineFoldedTheMatch. OpenID Connect Core section 2 makes sub case sensitive.
+	//
+	// Subject.String() is the stored spelling rather than a normalisation of it: the column
+	// is only ever written from a uuid.UUID, whose Value() is String(), so every row holds
+	// the canonical lowercase hyphenated form. Comparing the parsed value would otherwise
+	// be exactly the re-normalisation this guard must not do.
+	if user != nil && engineFoldedTheMatch(user.Subject.String(), subject) {
+		return nil, nil
+	}
 
 	return user, nil
 }
@@ -350,6 +360,13 @@ func (d *CommonDatabase) GetUserByEmail(tx *sql.Tx, email string) (*models.User,
 	user, err := d.getUserCommon(tx, selectBuilder, userStruct)
 	if err != nil {
 		return nil, err
+	}
+	// The engine may have folded a value this lookup did not ask for; see
+	// engineFoldedTheMatch. Both credential paths hand this a trimmed, lowercased address
+	// and every write path stores one, so a stored address that differs from the one asked
+	// for differs in something no engine should be resolving away.
+	if user != nil && engineFoldedTheMatch(user.Email, email) {
+		return nil, nil
 	}
 
 	return user, nil

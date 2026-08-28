@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -299,4 +300,60 @@ func createTestGroup(t *testing.T) *models.Group {
 		t.Fatalf("Failed to create test group: %v", err)
 	}
 	return group
+}
+
+// TestGetGroupByGroupIdentifierIsCaseSensitive is the client test's property for groups,
+// and it is here rather than only there because the collation is a property of the column
+// and not of the table: idx_group_identifier folded case on MySQL and SQL Server exactly as
+// idx_client_identifier did, so "developers" and "Developers" were one group on two engines
+// and two on the other two.
+//
+// The padded lookup covers the fold no collation reaches: SQL Server pads for `=`, so the
+// row comes back and the data layer discards it (commondb.engineFoldedTheMatch). See
+// TestGetClientByClientIdentifierIsCaseSensitive for the whole of the reasoning.
+func TestGetGroupByGroupIdentifierIsCaseSensitive(t *testing.T) {
+	lower := "case_group_" + strings.ToLower(gofakeit.LetterN(6))
+	upper := strings.ToUpper(lower)
+
+	lowerGroup := &models.Group{GroupIdentifier: lower, Description: "lowercase"}
+	if err := database.CreateGroup(nil, lowerGroup); err != nil {
+		t.Fatalf("Failed to create the lowercase group: %v", err)
+	}
+
+	// A second group differing from the first only by case, which MySQL and SQL Server
+	// refused before 000040.
+	upperGroup := &models.Group{GroupIdentifier: upper, Description: "uppercase"}
+	if err := database.CreateGroup(nil, upperGroup); err != nil {
+		t.Fatalf("Failed to create a group differing only by case, which every engine must now accept: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		lookup string
+		wantId int64
+	}{
+		{"the lowercase name resolves the lowercase group", lower, lowerGroup.Id},
+		{"the uppercase name resolves the uppercase group", upper, upperGroup.Id},
+		{"a mis-cased name resolves nothing", "Case_Group_" + strings.ToUpper(lower[11:]), 0},
+		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
+	} {
+		got, err := database.GetGroupByGroupIdentifier(nil, tc.lookup)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", tc.name, err)
+		}
+		if tc.wantId == 0 {
+			if got != nil {
+				t.Errorf("%s: expected nil, got the group with id %d and identifier %q",
+					tc.name, got.Id, got.GroupIdentifier)
+			}
+			continue
+		}
+		if got == nil {
+			t.Fatalf("%s: expected the group with id %d, got nil", tc.name, tc.wantId)
+		}
+		if got.Id != tc.wantId {
+			t.Errorf("%s: expected the group with id %d, got id %d (identifier %q)",
+				tc.name, tc.wantId, got.Id, got.GroupIdentifier)
+		}
+	}
 }

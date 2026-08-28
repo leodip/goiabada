@@ -121,6 +121,12 @@ func (d *CommonDatabase) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIde
 	if err != nil {
 		return nil, err
 	}
+	// The engine may have folded a value this lookup did not ask for; see
+	// engineFoldedTheMatch. RFC 6749 section 3.3 makes the scope string, whose first half
+	// this resolves, case sensitive.
+	if resource != nil && engineFoldedTheMatch(resource.ResourceIdentifier, resourceIdentifier) {
+		return nil, nil
+	}
 
 	return resource, nil
 }

@@ -61,8 +61,15 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 	}
 	defer func() { _ = tempDB.Close() }()
 
-	// create the database if it does not exist
-	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;", dbConfig.Name)
+	// create the database if it does not exist.
+	//
+	// The collation is case- and accent-SENSITIVE, so a value that differs in case is a
+	// different value here exactly as it is on SQLite and PostgreSQL. RFC 6749 section 1.9
+	// requires that of client_id, section 3.3 of scope and OpenID Connect Core section 2 of
+	// sub; the previous _ai_ci collation folded all three, so client_id=myapp resolved a
+	// client registered as MyApp (#283). Migration 000040 converts an existing database,
+	// its default included, so a fresh install and a migrated one agree.
+	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;", dbConfig.Name)
 	_, err = tempDB.Exec(createDatabaseCommand)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create database")

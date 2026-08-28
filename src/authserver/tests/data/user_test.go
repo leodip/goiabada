@@ -1705,3 +1705,129 @@ func TestTryConsumeForgotPasswordCode_ConcurrentCallersProduceOneWinner(t *testi
 		}
 	}
 }
+
+// TestGetUserByEmailIsCaseSensitive holds the sign-in lookup to one meaning on four
+// engines. RFC 5321 section 2.4 says "The local-part of a mailbox MUST BE treated as case
+// sensitive", and MySQL and SQL Server did not: a row stored as Alice@x.com signed in there
+// for alice@x.com and could not sign in at all on SQLite or PostgreSQL (#219, #221).
+//
+// The answer is not to make the lookup fold. Every write path stores
+// strings.ToLower(strings.TrimSpace(...)), both credential paths look the lowercased
+// address up, and a startup pass lowercases the legacy rows, so after #283 a stored address
+// IS its own lowercase form and an exact lookup reaches it on every engine.
+//
+// Two of the cases below reach a fold no collation turns off, and both are the reason
+// commondb.engineFoldedTheMatch exists:
+//
+//   - the padded address, which SQL Server compares equal to the unpadded one under every
+//     collation it has, BIN2 included;
+//   - the same address spelled in NFD, a base letter followed by a combining accent, which
+//     MySQL and SQL Server compare equal to the NFC spelling and which SQLite and
+//     PostgreSQL do not.
+//
+// Every non-ASCII character here is written as a hex escape on purpose. Typed literally, an
+// editor or a tool that normalises the file would silently turn the NFD case into a
+// comparison of a string with itself, and the test would pass having stopped testing.
+func TestGetUserByEmailIsCaseSensitive(t *testing.T) {
+	random := strings.ToLower(gofakeit.LetterN(6))
+	lower := "case_email_" + random + "@case.local"
+	upper := strings.ToUpper(lower)
+
+	lowerUser := createUserWithEmail(t, lower)
+	// A second address differing from the first only by case. idx_email is UNIQUE and
+	// folded on MySQL and SQL Server before 000040, so this insert was refused there.
+	upperUser := createUserWithEmail(t, upper)
+
+	// The same address twice: once with a precomposed U+00E9, once with an ASCII e
+	// followed by U+0301 COMBINING ACUTE ACCENT.
+	nfcAddress := "case_jos\u00e9_" + random + "@case.local"
+	nfdAddress := "case_jose\u0301_" + random + "@case.local"
+	nfcUser := createUserWithEmail(t, nfcAddress)
+
+	for _, tc := range []struct {
+		name   string
+		lookup string
+		wantId int64
+	}{
+		{"the lowercase address resolves the lowercase user", lower, lowerUser.Id},
+		{"the uppercase address resolves the uppercase user", upper, upperUser.Id},
+		{"a mis-cased address resolves nothing", "Case_Email_" + strings.ToUpper(random) + "@case.local", 0},
+		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
+		{"the NFC spelling resolves the row stored in NFC", nfcAddress, nfcUser.Id},
+		{"the NFD spelling resolves nothing, which MySQL's and SQL Server's normalisation fold would otherwise defeat", nfdAddress, 0},
+	} {
+		got, err := database.GetUserByEmail(nil, tc.lookup)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", tc.name, err)
+		}
+		if tc.wantId == 0 {
+			if got != nil {
+				t.Errorf("%s: expected nil, got the user with id %d and email %q",
+					tc.name, got.Id, got.Email)
+			}
+			continue
+		}
+		if got == nil {
+			t.Fatalf("%s: expected the user with id %d, got nil", tc.name, tc.wantId)
+		}
+		if got.Id != tc.wantId {
+			t.Errorf("%s: expected the user with id %d, got id %d (email %q)",
+				tc.name, tc.wantId, got.Id, got.Email)
+		}
+	}
+}
+
+// TestGetUserBySubjectIsCaseSensitive is OpenID Connect Core section 2 in the data tier:
+// "The sub value is a case-sensitive string". The subject is a UUID Goiabada generates, so
+// case is not the exposure here; SQL Server's padding is, and it is reachable because
+// nothing between a token's sub claim and this lookup trims. See
+// commondb.engineFoldedTheMatch.
+func TestGetUserBySubjectIsCaseSensitive(t *testing.T) {
+	user := createTestUser(t)
+	subject := user.Subject.String()
+
+	for _, tc := range []struct {
+		name   string
+		lookup string
+		wantId int64
+	}{
+		{"the subject as stored resolves the user", subject, user.Id},
+		{"an upper-cased subject resolves nothing", strings.ToUpper(subject), 0},
+		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", subject + " ", 0},
+	} {
+		got, err := database.GetUserBySubject(nil, tc.lookup)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", tc.name, err)
+		}
+		if tc.wantId == 0 {
+			if got != nil {
+				t.Errorf("%s: expected nil, got the user with id %d and subject %q",
+					tc.name, got.Id, got.Subject)
+			}
+			continue
+		}
+		if got == nil {
+			t.Fatalf("%s: expected the user with id %d, got nil", tc.name, tc.wantId)
+		}
+		if got.Id != tc.wantId {
+			t.Errorf("%s: expected the user with id %d, got id %d", tc.name, tc.wantId, got.Id)
+		}
+	}
+}
+
+// createUserWithEmail is the minimum a users row needs, at a chosen address.
+func createUserWithEmail(t *testing.T, email string) *models.User {
+	t.Helper()
+
+	user := &models.User{
+		Enabled:      true,
+		Subject:      uuid.New(),
+		Username:     "case_" + gofakeit.LetterN(10),
+		Email:        email,
+		PasswordHash: gofakeit.Password(true, true, true, true, false, 60),
+	}
+	if err := database.CreateUser(nil, user); err != nil {
+		t.Fatalf("Failed to create a user at %q, which every engine must now accept: %v", email, err)
+	}
+	return user
+}

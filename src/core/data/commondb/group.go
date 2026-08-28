@@ -261,6 +261,11 @@ func (d *CommonDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier s
 	if err != nil {
 		return nil, err
 	}
+	// The engine may have folded a value this lookup did not ask for; see
+	// engineFoldedTheMatch.
+	if group != nil && engineFoldedTheMatch(group.GroupIdentifier, groupIdentifier) {
+		return nil, nil
+	}
 
 	return group, nil
 }
