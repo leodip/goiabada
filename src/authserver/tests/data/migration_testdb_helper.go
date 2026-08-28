@@ -203,6 +203,25 @@ type columnShape struct {
 	Type     string // the engine's own spelling, verbatim
 	Nullable bool
 	Default  string // the engine's own default expression, verbatim; "" when there is none
+
+	// Collation is what the engine says decides `=` and ordering for this column, in the
+	// engine's own vocabulary: a utf8mb4_* name on MySQL, a pg_collation name on
+	// PostgreSQL (which is "default" for every column here, since none carries an
+	// override), a Latin1_General_* name on SQL Server, and the declared COLLATE on
+	// SQLite, or BINARY when the declaration omits one. "" for a column that holds no
+	// string. It is read because collation is the whole of what migration 000040 changes,
+	// and nothing else in this dump can see it: two columns identical in type,
+	// nullability, default and index can still disagree about whether MyApp and myapp are
+	// one value (#283).
+	Collation string
+
+	// DefaultName is the default constraint's own name, which SQL Server alone gives one.
+	// MySQL, PostgreSQL and SQLite attach a default to the column with no nameable object
+	// behind it, so this stays "" there. It is in the shape because a migration that drops
+	// an auto-named constraint and adds a named one back leaves Default identical and is
+	// otherwise invisible to a before/after comparison, and the name is the entire reason
+	// a later migration can drop the constraint without a catalog lookup.
+	DefaultName string
 }
 
 // foreignKeyShape identifies a foreign key by the tuple every catalog reports, and
@@ -275,6 +294,10 @@ func dumpTable(t *testing.T, h *isolatedDB, table string) tableShape {
 	return shape
 }
 
+// dumpColumns reads one table's columns. Every branch returns the same six values in the
+// same order, so the scan below is one loop: name, type, nullability, default expression,
+// collation and default constraint name. The last two are the columns migration 000040
+// moves and are documented on columnShape.
 func dumpColumns(t *testing.T, h *isolatedDB, table string) []columnShape {
 	t.Helper()
 
@@ -282,19 +305,28 @@ func dumpColumns(t *testing.T, h *isolatedDB, table string) []columnShape {
 	switch dbType() {
 	case "mysql":
 		// COLUMN_TYPE rather than DATA_TYPE: it carries the length, so varchar(64)
-		// shrinking to varchar(16) is visible.
+		// shrinking to varchar(16) is visible. COLLATION_NAME is NULL for a column that
+		// holds no string, which is the '' this reports.
 		q = fmt.Sprintf(`SELECT COLUMN_NAME, COLUMN_TYPE,
 			CASE WHEN IS_NULLABLE = 'YES' THEN '1' ELSE '0' END,
-			COALESCE(COLUMN_DEFAULT, '')
+			COALESCE(COLUMN_DEFAULT, ''),
+			COALESCE(COLLATION_NAME, ''), ''
 			FROM information_schema.columns
 			WHERE table_schema = DATABASE() AND table_name = '%s'`, table)
 	case "postgres":
 		// format_type renders the length the way the DDL spells it; pg_get_expr renders
 		// the default the same way. information_schema would give both in two columns
 		// that then have to be pasted together in Go.
+		//
+		// attcollation is the collation the column actually uses, which for every column
+		// in this schema is the database's own: none declares an override. It resolves
+		// through pg_collation to the name "default", and 0 for a column that holds no
+		// string, which is the '' this reports. PostgreSQL names no default constraint,
+		// so the sixth value is a literal.
 		q = fmt.Sprintf(`SELECT a.attname, format_type(a.atttypid, a.atttypmod),
 			CASE WHEN a.attnotnull THEN '0' ELSE '1' END,
-			COALESCE(pg_get_expr(d.adbin, d.adrelid), '')
+			COALESCE(pg_get_expr(d.adbin, d.adrelid), ''),
+			COALESCE((SELECT co.collname FROM pg_collation co WHERE co.oid = a.attcollation), ''), ''
 			FROM pg_attribute a
 			JOIN pg_class c ON c.oid = a.attrelid
 			JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -316,7 +348,8 @@ func dumpColumns(t *testing.T, h *isolatedDB, table string) []columnShape {
 			  WHEN ty.name IN ('datetime2','time','datetimeoffset') THEN '(' + CAST(c.scale AS VARCHAR(10)) + ')'
 			  ELSE '' END,
 			CASE WHEN c.is_nullable = 1 THEN '1' ELSE '0' END,
-			COALESCE(dc.definition, '')
+			COALESCE(dc.definition, ''),
+			COALESCE(c.collation_name, ''), COALESCE(dc.name, '')
 			FROM sys.columns c
 			JOIN sys.types ty ON ty.user_type_id = c.user_type_id
 			LEFT JOIN sys.default_constraints dc
@@ -326,9 +359,15 @@ func dumpColumns(t *testing.T, h *isolatedDB, table string) []columnShape {
 		// pragma_table_info reports the DECLARED type, which is what a rebuild has to
 		// reproduce; SQLite's own storage class would collapse every spelling onto five
 		// values and hide exactly the drift this exists to catch.
+		//
+		// pragma_table_info projects cid, name, type, notnull, dflt_value and pk, and
+		// nothing else: a TEXT column and a TEXT COLLATE NOCASE column are
+		// indistinguishable through it, measured. So the collation is filled in below
+		// from the declaration in sqlite_schema, and the two literals here keep every
+		// branch returning the same six values.
 		q = fmt.Sprintf(`SELECT name, type,
 			CASE WHEN "notnull" = 0 THEN '1' ELSE '0' END,
-			COALESCE(dflt_value, '')
+			COALESCE(dflt_value, ''), '', ''
 			FROM pragma_table_info('%s')`, table)
 	}
 
@@ -338,12 +377,97 @@ func dumpColumns(t *testing.T, h *isolatedDB, table string) []columnShape {
 
 	var cols []columnShape
 	for rows.Next() {
-		var name, typ, nullable, def string
-		require.NoErrorf(t, rows.Scan(&name, &typ, &nullable, &def), "scan column catalog row on %s", table)
-		cols = append(cols, columnShape{Name: name, Type: typ, Nullable: nullable == "1", Default: def})
+		var name, typ, nullable, def, collation, defName string
+		require.NoErrorf(t, rows.Scan(&name, &typ, &nullable, &def, &collation, &defName),
+			"scan column catalog row on %s", table)
+		cols = append(cols, columnShape{Name: name, Type: typ, Nullable: nullable == "1",
+			Default: def, Collation: collation, DefaultName: defName})
 	}
 	require.NoErrorf(t, rows.Err(), "iterate column catalog on %s", table)
+
+	if dbType() == "" || dbType() == "sqlite" {
+		declared := sqliteDeclaredCollations(t, h, table)
+		for i := range cols {
+			cols[i].Collation = declared[cols[i].Name]
+		}
+	}
 	return cols
+}
+
+// sqliteDeclaredCollations reads each column's COLLATE out of the CREATE TABLE text
+// SQLite keeps in sqlite_schema, which is the engine's own catalog and not the
+// schema.sql documentation snapshot. A column whose declaration names no collation gets
+// BINARY, which is SQLite's default and what every column in this schema is.
+//
+// Text rather than a projection because SQLite has no other place to read it from:
+// pragma_table_info does not carry collation, and pragma_index_xinfo carries it only for
+// a column an index happens to cover. Filling the field from a constant instead would
+// make it assert nothing, which is the trap this exists to avoid.
+func sqliteDeclaredCollations(t *testing.T, h *isolatedDB, table string) map[string]string {
+	t.Helper()
+
+	var ddl string
+	require.NoErrorf(t, h.SQL.QueryRow(
+		`SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&ddl),
+		"read the CREATE TABLE text for %s out of sqlite_schema", table)
+
+	out := map[string]string{}
+	for _, def := range splitTopLevel(columnDefsOf(ddl)) {
+		fields := strings.Fields(def)
+		if len(fields) == 0 {
+			continue
+		}
+		name := strings.Trim(fields[0], "[]`\"'")
+		switch strings.ToUpper(name) {
+		case "CONSTRAINT", "PRIMARY", "UNIQUE", "CHECK", "FOREIGN":
+			continue // a table constraint, not a column
+		}
+		collation := "BINARY"
+		for i, f := range fields {
+			if strings.EqualFold(f, "COLLATE") && i+1 < len(fields) {
+				collation = strings.ToUpper(strings.Trim(fields[i+1], "[]`\"',"))
+			}
+		}
+		out[name] = collation
+	}
+	return out
+}
+
+// columnDefsOf returns what a CREATE TABLE statement holds between its outermost
+// parentheses, which is the column and table-constraint list.
+func columnDefsOf(ddl string) string {
+	open := strings.Index(ddl, "(")
+	close := strings.LastIndex(ddl, ")")
+	if open < 0 || close < open {
+		return ""
+	}
+	return ddl[open+1 : close]
+}
+
+// splitTopLevel splits on commas that are not inside parentheses or a quoted string, so
+// a type like DECIMAL(10,2) or a default like DEFAULT 'a,b' stays in one piece.
+func splitTopLevel(s string) []string {
+	var out []string
+	depth, start := 0, 0
+	var quote rune
+	for i, r := range s {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			}
+		case r == '\'' || r == '"' || r == '`':
+			quote = r
+		case r == '(':
+			depth++
+		case r == ')':
+			depth--
+		case r == ',' && depth == 0:
+			out = append(out, s[start:i])
+			start = i + 1
+		}
+	}
+	return append(out, s[start:])
 }
 
 func dumpIndexes(t *testing.T, h *isolatedDB, table string) []indexShape {
@@ -536,7 +660,63 @@ func dropPostgres(t *testing.T, cfg *config.DatabaseConfig, name string) {
 	}
 }
 
-func dropMsSQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
+// newPreCreatedMsSQLDB is newIsolatedDB for the case an OPERATOR would produce: the
+// database already exists, at a collation somebody else chose, before Goiabada ever
+// connects. NewMsSQLDatabase creates IF NOT EXISTS, so its own CREATE DATABASE does not
+// fire and the collation stands.
+//
+// Two tests need it and they need different collations, which is why it takes one.
+// Migration 000040's own test needs a fixture at Latin1_General_100_CI_AI_SC_UTF8,
+// Goiabada's collation before #283, because newIsolatedDB would build the fixture through
+// NewMsSQLDatabase and that now creates at the TARGET collation: no migration before
+// 000040 declares a column collation, so all 92 columns would inherit the target from the
+// database default and satisfy the post-migration assertion before the migration existed.
+// The pre-created guard needs it at SQL_Latin1_General_CP1_CI_AS, a stock server default,
+// to prove every column is pinned explicitly rather than inherited.
+//
+// SQL Server only. MySQL's 000040 repairs the database default and every table with it,
+// PostgreSQL's database collation is deterministic whatever the locale, and SQLite has no
+// database collation at all.
+func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
+	t.Helper()
+	require.Equal(t, "mssql", dbType(), "newPreCreatedMsSQLDB is SQL Server only")
+
+	cfg := config.GetDatabase()
+	name := isolatedDBName()
+
+	master, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
+	require.NoErrorf(t, err, "open master to pre-create %s", name)
+	defer func() { _ = master.Close() }()
+
+	// The collation is interpolated because SQL Server takes no parameter in a CREATE
+	// DATABASE clause. It is a constant from this package's own tests, never a value that
+	// reached the process from outside it.
+	_, err = master.Exec(fmt.Sprintf("CREATE DATABASE [%s] COLLATE %s", name, collation))
+	require.NoErrorf(t, err, "pre-create %s at %s", name, collation)
+
+	db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
+		Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+		Host: cfg.Host, Port: cfg.Port, Name: name,
+	}, false)
+	require.NoError(t, err, "NewMsSQLDatabase over a pre-created database")
+	t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
+
+	// The point of the helper, asserted rather than assumed: if IF NOT EXISTS ever stopped
+	// being IF NOT EXISTS, every test built on this would go on passing for the wrong
+	// reason.
+	var got string
+	require.NoError(t, db.DB.QueryRow(
+		`SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS NVARCHAR(128))`).Scan(&got),
+		"read back the pre-created database's collation")
+	require.Equal(t, collation, got,
+		"NewMsSQLDatabase must leave a database it did not create alone; its CREATE DATABASE is IF NOT EXISTS")
+
+	return newIsolated(t, db, db.DB)
+}
+
+// msSQLMasterDSN is the connection string for the master database, which is where a
+// database is created and dropped from.
+func msSQLMasterDSN(cfg *config.DatabaseConfig) string {
 	q := url.Values{}
 	q.Add("database", "master")
 	q.Add("encrypt", "disable")
@@ -546,7 +726,11 @@ func dropMsSQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
 		Host:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		RawQuery: q.Encode(),
 	}
-	sqlDB, err := sql.Open("sqlserver", u.String())
+	return u.String()
+}
+
+func dropMsSQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
+	sqlDB, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
 	if err != nil {
 		t.Logf("dropMsSQL open: %v", err)
 		return

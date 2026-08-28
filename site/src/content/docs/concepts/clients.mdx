@@ -11,6 +11,8 @@ This access can either be on behalf of a user (using the authorization code flow
 
 Clients can be created through the admin console or dynamically via the [dynamic client registration](/concepts/clients/#dynamic-client-registration-rfc-7591) endpoint (RFC 7591).
 
+The client identifier is case-sensitive: `my-app` and `My-App` are two different clients, so an application whose `client_id` reaches the authorization or token endpoint in a different case than it was registered under is not found.
+
 ## Public or confidential clients
 
 Clients can be either public or confidential, depending on whether they can securely store credentials.

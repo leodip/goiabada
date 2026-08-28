@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -236,4 +237,61 @@ func createTestResource(t *testing.T) *models.Resource {
 		t.Fatalf("Failed to create test resource: %v", err)
 	}
 	return resource
+}
+
+// TestGetResourceByResourceIdentifierIsCaseSensitive is the client test's property for
+// resources, and this lookup is the one RFC 6749 section 3.3 reaches: a scope is
+// "resource-identifier:permission-identifier" and the section says the scope parameter is
+// "expressed as a list of space-delimited, case-sensitive strings". The permission half is
+// already resolved in Go, by comparing against the resource's own permissions, so this
+// lookup is the whole of the scope string's exposure to the collation.
+//
+// The padded lookup covers the fold no collation reaches: SQL Server pads for `=`, so the
+// row comes back and the data layer discards it (commondb.engineFoldedTheMatch). See
+// TestGetClientByClientIdentifierIsCaseSensitive for the whole of the reasoning.
+func TestGetResourceByResourceIdentifierIsCaseSensitive(t *testing.T) {
+	lower := "case_resource_" + strings.ToLower(gofakeit.LetterN(6))
+	upper := strings.ToUpper(lower)
+
+	lowerResource := &models.Resource{ResourceIdentifier: lower, Description: "lowercase"}
+	if err := database.CreateResource(nil, lowerResource); err != nil {
+		t.Fatalf("Failed to create the lowercase resource: %v", err)
+	}
+
+	// A second resource differing from the first only by case, which MySQL and SQL Server
+	// refused before 000040.
+	upperResource := &models.Resource{ResourceIdentifier: upper, Description: "uppercase"}
+	if err := database.CreateResource(nil, upperResource); err != nil {
+		t.Fatalf("Failed to create a resource differing only by case, which every engine must now accept: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		lookup string
+		wantId int64
+	}{
+		{"the lowercase name resolves the lowercase resource", lower, lowerResource.Id},
+		{"the uppercase name resolves the uppercase resource", upper, upperResource.Id},
+		{"a mis-cased name resolves nothing", "Case_Resource_" + strings.ToUpper(lower[14:]), 0},
+		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
+	} {
+		got, err := database.GetResourceByResourceIdentifier(nil, tc.lookup)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", tc.name, err)
+		}
+		if tc.wantId == 0 {
+			if got != nil {
+				t.Errorf("%s: expected nil, got the resource with id %d and identifier %q",
+					tc.name, got.Id, got.ResourceIdentifier)
+			}
+			continue
+		}
+		if got == nil {
+			t.Fatalf("%s: expected the resource with id %d, got nil", tc.name, tc.wantId)
+		}
+		if got.Id != tc.wantId {
+			t.Errorf("%s: expected the resource with id %d, got id %d (identifier %q)",
+				tc.name, tc.wantId, got.Id, got.ResourceIdentifier)
+		}
+	}
 }

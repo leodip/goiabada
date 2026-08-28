@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -1589,4 +1590,84 @@ func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
 			string(o.refreshed.ClientSecretEncrypted))
 	}
 	_ = database.RollbackTransaction(saver)
+}
+
+// TestGetClientByClientIdentifierIsCaseSensitive is RFC 6749 section 1.9 in the data tier:
+// "Unless otherwise noted, all the protocol parameter names and values are case sensitive",
+// and section 2.2 notes no exception for client_id. Two values that differ in case are two
+// clients, and one is not found by the other's name.
+//
+// It is the seam the whole of #283 turns on, because it answers differently per engine
+// unless something makes it not. MySQL and SQL Server folded case in `=` and in the UNIQUE
+// index behind idx_client_identifier, so registering MyApp and then myapp gave "already in
+// use" there and two rows on SQLite and PostgreSQL, and client_id=myapp resolved MyApp.
+// Migration 000040 moves both engines to a case-sensitive collation; this runs on all four
+// and passes on all four only once it has.
+//
+// The padded lookup is the other half, and no collation reaches it. SQL Server pads for `=`
+// under every collation it has, BIN2 included, so 'myapp' = 'myapp ' is true there and the
+// row comes back. The data layer discards it (see commondb.engineFoldedTheMatch), which is
+// what makes this assertion mean the same thing on four engines.
+func TestGetClientByClientIdentifierIsCaseSensitive(t *testing.T) {
+	lower := "case_client_" + strings.ToLower(gofakeit.LetterN(6))
+	upper := strings.ToUpper(lower)
+
+	lowerClient := newCaseTestClient(t, lower)
+	if err := database.CreateClient(nil, lowerClient); err != nil {
+		t.Fatalf("Failed to create the lowercase client: %v", err)
+	}
+
+	// A second client differing from the first only by case. This is the insert MySQL and
+	// SQL Server refused before 000040, because their UNIQUE index folded.
+	upperClient := newCaseTestClient(t, upper)
+	if err := database.CreateClient(nil, upperClient); err != nil {
+		t.Fatalf("Failed to create a client differing only by case, which every engine must now accept: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		lookup string
+		wantId int64
+	}{
+		{"the lowercase name resolves the lowercase client", lower, lowerClient.Id},
+		{"the uppercase name resolves the uppercase client", upper, upperClient.Id},
+		{"a mis-cased name resolves nothing", "Case_Client_" + strings.ToUpper(lower[12:]), 0},
+		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
+		{"a leading space resolves nothing", " " + lower, 0},
+	} {
+		got, err := database.GetClientByClientIdentifier(nil, tc.lookup)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", tc.name, err)
+		}
+		if tc.wantId == 0 {
+			if got != nil {
+				t.Errorf("%s: expected nil, got the client with id %d and identifier %q",
+					tc.name, got.Id, got.ClientIdentifier)
+			}
+			continue
+		}
+		if got == nil {
+			t.Fatalf("%s: expected the client with id %d, got nil", tc.name, tc.wantId)
+		}
+		if got.Id != tc.wantId {
+			t.Errorf("%s: expected the client with id %d, got id %d (identifier %q)",
+				tc.name, tc.wantId, got.Id, got.ClientIdentifier)
+		}
+	}
+}
+
+// newCaseTestClient is the minimum a client row needs to satisfy the NOT NULL columns.
+func newCaseTestClient(t *testing.T, identifier string) *models.Client {
+	t.Helper()
+	return &models.Client{
+		ClientIdentifier:                        identifier,
+		ClientSecretEncrypted:                   []byte("encrypted_secret"),
+		Enabled:                                 true,
+		AuthorizationCodeEnabled:                true,
+		TokenExpirationInSeconds:                3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         enums.AcrLevel1,
+	}
 }

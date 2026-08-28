@@ -35,7 +35,7 @@ CREATE TABLE `clients` (
   `created_via_dcr` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_client_identifier` (`client_identifier`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `groups` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -47,7 +47,7 @@ CREATE TABLE `groups` (
   `include_in_access_token` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_group_identifier` (`group_identifier`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 
 CREATE TABLE `key_pairs` (
@@ -65,7 +65,7 @@ CREATE TABLE `key_pairs` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_key_pairs_state` (`state`),
   KEY `idx_state` (`state`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `pre_registrations` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -79,7 +79,7 @@ CREATE TABLE `pre_registrations` (
   PRIMARY KEY (`id`),
   KEY `idx_pre_reg_email` (`email`),
   UNIQUE KEY `idx_pre_reg_verification_code_hash` (`verification_code_hash`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `resources` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -89,7 +89,7 @@ CREATE TABLE `resources` (
   `description` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_resource_identifier` (`resource_identifier`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `schema_migrations` (
   `version` bigint NOT NULL,
@@ -132,7 +132,7 @@ CREATE TABLE `settings` (
   `audit_log_retention_days` int NOT NULL DEFAULT '180',
   `last_cleanup_at` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `users` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -187,7 +187,7 @@ CREATE TABLE `users` (
   KEY `idx_middle_name` (`middle_name`),
   KEY `idx_family_name` (`family_name`),
   KEY `idx_users_forgot_password_code_hash` (`forgot_password_code_hash`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 -- Tables with foreign key dependencies (level 1 - depend on base tables)
 
@@ -203,7 +203,7 @@ CREATE TABLE `group_attributes` (
   PRIMARY KEY (`id`),
   KEY `fk_groups_attributes` (`group_id`),
   CONSTRAINT `fk_groups_attributes` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `permissions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -216,7 +216,7 @@ CREATE TABLE `permissions` (
   UNIQUE KEY `idx_permission_identifier_resource` (`permission_identifier`,`resource_id`),
   KEY `fk_permissions_resource` (`resource_id`),
   CONSTRAINT `fk_permissions_resource` FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `redirect_uris` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -226,7 +226,7 @@ CREATE TABLE `redirect_uris` (
   PRIMARY KEY (`id`),
   KEY `fk_clients_redirect_uris` (`client_id`),
   CONSTRAINT `fk_clients_redirect_uris` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `user_attributes` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -240,7 +240,7 @@ CREATE TABLE `user_attributes` (
   PRIMARY KEY (`id`),
   KEY `fk_users_attributes` (`user_id`),
   CONSTRAINT `fk_users_attributes` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `user_profile_pictures` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -248,11 +248,11 @@ CREATE TABLE `user_profile_pictures` (
   `updated_at` datetime(6) DEFAULT NULL,
   `user_id` bigint unsigned NOT NULL,
   `picture` longblob NOT NULL,
-  `content_type` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `content_type` varchar(64) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_user_profile_pictures_user_id` (`user_id`),
   CONSTRAINT `fk_user_profile_pictures_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `client_logos` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -260,11 +260,11 @@ CREATE TABLE `client_logos` (
   `updated_at` datetime(6) DEFAULT NULL,
   `client_id` bigint unsigned NOT NULL,
   `logo` longblob NOT NULL,
-  `content_type` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `content_type` varchar(64) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_client_logos_client_id` (`client_id`),
   CONSTRAINT `fk_client_logos_client_id` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 -- details' default is an EXPRESSION, which is the only form MySQL accepts on a TEXT
 -- column, and MySQL stamps it with the DDL connection's charset. So its recorded text
@@ -278,7 +278,7 @@ CREATE TABLE `audit_logs` (
   PRIMARY KEY (`id`),
   KEY `idx_audit_logs_created_at` (`created_at`),
   KEY `idx_audit_logs_audit_event` (`audit_event`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `user_sessions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -301,7 +301,7 @@ CREATE TABLE `user_sessions` (
   UNIQUE KEY `idx_session_identifier` (`session_identifier`),
   KEY `fk_user_sessions_user` (`user_id`),
   CONSTRAINT `fk_user_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `users_groups` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -314,7 +314,7 @@ CREATE TABLE `users_groups` (
   KEY `fk_users_groups_user` (`user_id`),
   CONSTRAINT `fk_users_groups_group` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_users_groups_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `web_origins` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -325,7 +325,7 @@ CREATE TABLE `web_origins` (
   UNIQUE KEY `idx_web_origins_origin_client` (`origin`,`client_id`),
   KEY `fk_clients_web_origins` (`client_id`),
   CONSTRAINT `fk_clients_web_origins` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 -- Tables with foreign key dependencies (level 2 - depend on level 1 tables)
 
@@ -340,7 +340,7 @@ CREATE TABLE `clients_permissions` (
   KEY `fk_clients_permissions_permission` (`permission_id`),
   CONSTRAINT `fk_clients_permissions_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_clients_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `codes` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -372,7 +372,7 @@ CREATE TABLE `codes` (
   CONSTRAINT `fk_codes_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   KEY `idx_codes_session_identifier` (`session_identifier`),
   CONSTRAINT `fk_codes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `groups_permissions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -385,7 +385,7 @@ CREATE TABLE `groups_permissions` (
   KEY `fk_groups_permissions_permission` (`permission_id`),
   CONSTRAINT `fk_groups_permissions_group` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_groups_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `user_consents` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -400,7 +400,7 @@ CREATE TABLE `user_consents` (
   KEY `fk_user_consents_client` (`client_id`),
   CONSTRAINT `fk_user_consents_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_user_consents_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `user_session_clients` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -415,7 +415,7 @@ CREATE TABLE `user_session_clients` (
   KEY `fk_user_session_clients_client` (`client_id`),
   CONSTRAINT `fk_user_session_clients_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_user_sessions_clients` FOREIGN KEY (`user_session_id`) REFERENCES `user_sessions` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `users_permissions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -428,7 +428,7 @@ CREATE TABLE `users_permissions` (
   KEY `fk_users_permissions_permission` (`permission_id`),
   CONSTRAINT `fk_users_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_users_permissions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 -- Tables with foreign key dependencies (level 3 - depend on level 2 tables)
 
@@ -459,7 +459,7 @@ CREATE TABLE `refresh_tokens` (
   CONSTRAINT `fk_refresh_tokens_code` FOREIGN KEY (`code_id`) REFERENCES `codes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_refresh_tokens_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE NO ACTION,
   CONSTRAINT `fk_refresh_tokens_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
 CREATE TABLE `browser_sessions` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -473,4 +473,4 @@ CREATE TABLE `browser_sessions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_browser_sessions_owner_hash` (`owner`,`session_id_hash`),
   KEY `idx_browser_sessions_expires_at` (`expires_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;

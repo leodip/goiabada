@@ -68,12 +68,27 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 		return nil, errors.Wrap(err, "unable to connect to master database")
 	}
 
-	// Create database if it doesn't exist
+	// Create database if it doesn't exist.
+	//
+	// The collation is case-, accent-, width- and kanatype-SENSITIVE, so a value that
+	// differs in case is a different value here exactly as it is on SQLite and PostgreSQL.
+	// RFC 6749 section 1.9 requires that of client_id, section 3.3 of scope and OpenID
+	// Connect Core section 2 of sub; the previous CI_AI collation folded all three, so
+	// client_id=myapp resolved a client registered as MyApp (#283). Migration 000040
+	// converts an existing database's 92 string columns to the same collation.
+	//
+	// IF NOT EXISTS, so a database an OPERATOR pre-created keeps their collation: the
+	// database default cannot be moved from a migration, because ALTER DATABASE ...
+	// COLLATE blocks until it times out with a second session attached, which is what a
+	// running application is. That is why every string column a future migration adds must
+	// spell its own COLLATE clause explicitly, naming the collation below, rather than
+	// relying on this line, and why a data test migrates the whole chain into a hostile
+	// database and asserts all 92 columns.
 	createDatabaseCommand := fmt.Sprintf(`
         IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = N'%s')
         BEGIN
             CREATE DATABASE [%s]
-            COLLATE Latin1_General_100_CI_AI_SC_UTF8
+            COLLATE Latin1_General_100_CS_AS_KS_WS_SC_UTF8
         END`,
 		dbConfig.Name,
 		dbConfig.Name,

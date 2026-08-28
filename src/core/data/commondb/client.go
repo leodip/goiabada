@@ -261,6 +261,11 @@ func (d *CommonDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifie
 	if err != nil {
 		return nil, err
 	}
+	// The engine may have folded a value this lookup did not ask for; see
+	// engineFoldedTheMatch. RFC 6749 section 1.9 makes client_id case sensitive.
+	if client != nil && engineFoldedTheMatch(client.ClientIdentifier, clientIdentifier) {
+		return nil, nil
+	}
 
 	return client, nil
 }
