@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"database/sql"
 	"log/slog"
 	"sort"
 	"strings"
@@ -38,6 +39,10 @@ type emailRow struct {
 // and the survivor is the row that can sign in today (see pickEmailSurvivor). Such a pair can
 // only exist on SQLite and PostgreSQL: MySQL and SQL Server's folding UNIQUE index on email has
 // never permitted one, so the conversion there is collision-free by construction.
+//
+// Disabling a row also revokes its authentication state, in the same transaction as the flag,
+// which is the invariant #106 established for every other enabled-to-disabled transition. See
+// disableAndRevoke for why writing the flag alone is not enough.
 //
 // It is idempotent and resumable, on BackfillEncryptedOTPSecrets' terms (#82): a converged row
 // no longer differs from its own lowercase form and is not reselected, a disabled non-survivor
@@ -135,14 +140,13 @@ func (d *CommonDatabase) BackfillLowercaseEmails() (int, int, error) {
 				continue
 			}
 
-			ub := sqlbuilder.NewUpdateBuilder()
-			ub.Update("users")
-			ub.Set(ub.Assign("enabled", false))
-			ub.Where(ub.Equal("id", member.id))
-			uq, uargs := ub.BuildWithFlavor(d.Flavor)
-			if _, err := d.ExecSql(nil, uq, uargs...); err != nil {
+			transitioned, err := d.disableAndRevoke(member.id)
+			if err != nil {
 				return rowsLowercased, rowsDisabled,
 					errors.Wrapf(err, "unable to disable duplicate email user id %d", member.id)
+			}
+			if !transitioned {
+				continue
 			}
 			rowsDisabled++
 
@@ -156,6 +160,90 @@ func (d *CommonDatabase) BackfillLowercaseEmails() (int, int, error) {
 	}
 
 	return rowsLowercased, rowsDisabled, nil
+}
+
+// disableAndRevoke turns a collision loser off and, in the SAME transaction, invalidates
+// every credential that row had authenticated under: the user's authentication generation is
+// advanced, every refresh token belonging to them is revoked, and every session of theirs is
+// deleted. It reports whether THIS call performed the enabled-to-disabled transition.
+//
+// The revocation is not decoration on the disable, it is what the disable means. #106
+// established that enabled going true-to-false is the moment a user's outstanding credentials
+// die, and the administrative path upholds it by pairing TrySetUserEnabled with
+// RevokeUserAuthState inside one transaction. Writing enabled = false on its own does NOT
+// invalidate anything: sessions, authorization codes and refresh tokens keep the generation
+// they were issued under, and that generation still matches the user's. Nothing is observable
+// while the flag is off, because every credential path also refuses a disabled user, which is
+// exactly what makes the gap easy to miss. It becomes observable the moment an administrator
+// re-enables the account, most plausibly right after resolving the email collision by hand:
+// the pre-backfill sessions and refresh tokens are live again, with whatever access they
+// carried. An administrator who disables and later re-enables has every reason to believe the
+// first action killed them (#283).
+//
+// The sequence is written out here rather than delegated to handlers.RevokeUserAuthState
+// because that helper lives in the authserver module and core cannot import it. Every
+// primitive it needs is already a method on this type, so what is repeated is the order of
+// four calls, not the logic inside them. Authorization codes need no statement of their own:
+// they carry auth_state_generation too, so advancing it is what invalidates them, which is why
+// the administrative path does not delete them either.
+//
+// Compare-and-set rather than an unconditional UPDATE, so a row some other process disabled
+// first is neither counted again nor given a second generation advance. That also makes the
+// pass idempotent across a restart that interrupted it.
+func (d *CommonDatabase) disableAndRevoke(userId int64) (bool, error) {
+	transitioned := false
+
+	err := d.inTransaction(nil, func(tx *sql.Tx) error {
+		var err error
+		transitioned, err = d.TrySetUserEnabled(tx, userId, true, false)
+		if err != nil {
+			return err
+		}
+		if !transitioned {
+			// Already disabled. Nothing was taken away, so there is nothing to revoke, and
+			// advancing the generation here would evict credentials a previous disable has
+			// already dealt with.
+			return nil
+		}
+
+		if _, err := d.IncrementUserAuthStateGeneration(tx, userId); err != nil {
+			return err
+		}
+
+		// User-scoped, so it covers both linkage shapes: auth-code tokens through the code's
+		// user and ROPC tokens through the token's own. Nothing is preserved here, unlike the
+		// administrative path's exceptSid: this account is not the one asking.
+		tokens, err := d.GetRefreshTokensByUserId(tx, userId)
+		if err != nil {
+			return err
+		}
+		for _, rt := range tokens {
+			if rt.Revoked {
+				continue
+			}
+			rt.Revoked = true
+			if err := d.UpdateRefreshToken(tx, rt); err != nil {
+				return err
+			}
+		}
+
+		sessions, err := d.GetUserSessionsByUserId(tx, userId)
+		if err != nil {
+			return err
+		}
+		for i := range sessions {
+			if err := d.DeleteUserSession(tx, sessions[i].Id); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return transitioned, nil
 }
 
 // pickEmailSurvivor returns the member of a group that keeps the address: the row whose address

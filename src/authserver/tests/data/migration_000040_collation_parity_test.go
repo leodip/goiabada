@@ -157,13 +157,89 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 
 	// The pair that could not have existed before this migration. That it can be inserted at
 	// all is the whole of what #283 fixes, so seeding it is also an assertion.
-	seedClient000035(t, h, "Dupe40Client")
+	dupeId := seedClient000035(t, h, "Dupe40Client")
 	seedClient000035(t, h, "dupe40client")
+
+	// The catalog shape the refusal must leave exactly as it found it, on SQL Server. Read as
+	// a DIFFERENCE rather than as a list of 23 index names, for seam 2's reason: a hand-written
+	// list drifts as migrations are added and a difference cannot.
+	var shapeBefore []string
+	if dbType() == "mssql" {
+		shapeBefore = mssqlSchemaShape000040(t, h)
+		require.NotEmpty(t, shapeBefore, "the catalog sweep read no index or default at all")
+	}
 
 	err := h.Migrator.Migrate(priorVersion000040())
 	require.Errorf(t, err, "the down migration must refuse a case-variant pair the new collation permitted")
 	assert.Containsf(t, strings.ToLower(err.Error()), "dupe40client",
 		"the engine must name the offending value, so an operator can resolve it: %v", err)
+
+	// A refusal that dismantles the schema is not a refusal, it is a wreck. SQL Server's down
+	// file drops 6 defaults and 23 indexes and alters 92 columns BEFORE it reaches the
+	// CREATE UNIQUE INDEX that fails, and golang-migrate's driver submits the file as one
+	// batch with no transaction of its own, so without the SET XACT_ABORT ON and explicit
+	// transaction in that file every one of those statements would have autocommitted. The
+	// operator would be holding a database with no UNIQUE index on client_identifier, email,
+	// subject, code_hash or refresh_token_jti and no way to retry, because the first
+	// DROP INDEX would then fail with Msg 3701 on an index that no longer exists.
+	//
+	// MySQL is deliberately not asserted here. Its refusal fires inside the per-table
+	// CONVERT TO, its DDL is not transactional so the tables converted before the failing one
+	// stay converted, and each statement is idempotent, so what makes MySQL survivable is the
+	// retry below rather than atomicity.
+	if dbType() == "mssql" {
+		assert.Equalf(t, shapeBefore, mssqlSchemaShape000040(t, h),
+			"the refused rollback must leave every index and default constraint exactly as it found them")
+		assertCollations000040(t, h, collationAfter000040, "after the refused rollback")
+	}
+
+	// And the recovery the file tells the operator to perform actually works. Resolve the
+	// duplicate, clear the dirty version by hand, run it again. This is the half that a
+	// refusal test asserting only the error message cannot see, and it is the half an
+	// operator is standing in.
+	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM clients WHERE id = %d", dupeId))
+	require.NoError(t, err, "resolve the duplicate by hand, as the down file says to")
+
+	// By id, not by identifier: on MySQL the clients table may or may not have been converted
+	// back to the folding collation by the failed attempt, and a predicate on
+	// client_identifier would mean different things in the two cases.
+	require.NoError(t, h.Migrator.Force(40),
+		"clear the dirty version the deliberate failure left, which is the operator's own step")
+	require.NoError(t, h.Migrator.Migrate(priorVersion000040()),
+		"the rollback must succeed once the duplicate is gone; if it does not, the first attempt destroyed something it cannot rebuild")
+
+	assertCollations000040(t, h, collationBefore000040, "after the retried rollback")
+}
+
+// mssqlSchemaShape000040 is every named index and every default constraint on a non-system
+// table, as the engine's own catalog reports it, sorted. It exists so a refused rollback can be
+// held to leaving the schema untouched without anybody maintaining a list of what "untouched"
+// means: the assertion is this value before against this value after.
+func mssqlSchemaShape000040(t *testing.T, h *isolatedDB) []string {
+	t.Helper()
+
+	rows, err := h.SQL.Query(`
+		SELECT 'index ' + t.[name] + '.' + i.[name]
+		  FROM sys.indexes i
+		  JOIN sys.tables t ON t.[object_id] = i.[object_id] AND t.[is_ms_shipped] = 0
+		 WHERE i.[name] IS NOT NULL
+		UNION ALL
+		SELECT 'default ' + t.[name] + '.' + dc.[name]
+		  FROM sys.default_constraints dc
+		  JOIN sys.tables t ON t.[object_id] = dc.[parent_object_id] AND t.[is_ms_shipped] = 0`)
+	require.NoError(t, err, "sweep indexes and default constraints")
+	defer func() { _ = rows.Close() }()
+
+	shape := []string{}
+	for rows.Next() {
+		var entry string
+		require.NoError(t, rows.Scan(&entry), "scan a catalog entry")
+		shape = append(shape, entry)
+	}
+	require.NoError(t, rows.Err(), "iterate the catalog")
+
+	sort.Strings(shape)
+	return shape
 }
 
 // engineMoves000040 is the two engines that fold case today and stop after 000040.

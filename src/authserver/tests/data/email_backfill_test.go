@@ -1,12 +1,15 @@
 package datatests
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -166,4 +169,221 @@ func TestBackfillLowercaseEmails(t *testing.T) {
 		assert.Equalf(t, want, got.Email, "%q must be unchanged by a second run", c.seed)
 		assert.Equalf(t, wantEnabled, got.Enabled, "%q must be unchanged by a second run", c.seed)
 	}
+}
+
+// TestBackfillLowercaseEmails_DisablingALoserRevokesItsAuthState pins the invariant #106
+// established, which the collision backfill is the newest site obliged to uphold: enabled
+// going true-to-false is the moment a user's outstanding credentials die.
+//
+// Writing enabled = false on its own invalidates nothing durable. A session, an authorization
+// code and a refresh token each carry the auth_state_generation they were issued under, and
+// that value still equals the user's, so the only thing between a stale credential and its old
+// access is the disabled flag that every credential path also checks. Turn the flag back on,
+// which an administrator most plausibly does immediately after resolving the email collision by
+// hand, and every pre-backfill credential is authoritative again. The administrative disable
+// path never had that hole: it pairs the flag with RevokeUserAuthState in one transaction.
+//
+// So the assertions come in two halves. Before the re-enable: disabled, generation advanced,
+// sessions gone, refresh tokens revoked. After it: still nothing usable, which is the half that
+// says the first half was durable rather than a consequence of the flag.
+//
+// The survivor is asserted throughout as the control. A pass that revoked the whole colliding
+// group would satisfy every assertion in the first half and would have logged out the one
+// account the collision policy exists to protect.
+//
+// The data tier is the tier for it. The claim is about rows in four tables written inside one
+// transaction, on four engines, and no other tier can see whether the transaction happened.
+//
+// Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
+//
+//	--run TestBackfillLowercaseEmails_DisablingALoserRevokesItsAuthState
+func TestBackfillLowercaseEmails_DisablingALoserRevokesItsAuthState(t *testing.T) {
+	h := newIsolatedDB(t)
+	if err := h.Migrator.Up(); err != nil && !errors.Is(err, gomigrate.ErrNoChange) {
+		require.NoError(t, err, "migrate to head before seeding")
+	}
+
+	// The loser is seeded first, so it holds the lower id and the survivor rule has to reach
+	// past id order to pick the lowercase row. Both rows exist on every engine only because
+	// migration 000040 made idx_email case-sensitive.
+	loser := &models.User{Enabled: true, Subject: uuid.New(), Username: "revokeloser", Email: "Revoke@x.com"}
+	require.NoError(t, h.DB.CreateUser(nil, loser), "seed the mixed-case loser")
+	survivor := &models.User{Enabled: true, Subject: uuid.New(), Username: "revokesurvivor", Email: "revoke@x.com"}
+	require.NoError(t, h.DB.CreateUser(nil, survivor), "seed the lowercase survivor")
+
+	clientId := seedClient000035(t, h, "revoke-backfill-client")
+
+	// Everything the loser authenticated under, in every shape that carries a generation.
+	loserSession := seedSessionForBackfill(t, h, loser.Id)
+	loserCode := seedCodeForBackfill(t, h, clientId, loser.Id)
+	loserAuthCodeToken := seedRefreshTokenForBackfill(t, h, clientId, loser.Id, loserCode.Id)
+	loserRopcToken := seedRefreshTokenForBackfill(t, h, clientId, loser.Id, 0)
+
+	// And the same for the survivor, which none of it may touch.
+	survivorSession := seedSessionForBackfill(t, h, survivor.Id)
+	survivorRopcToken := seedRefreshTokenForBackfill(t, h, clientId, survivor.Id, 0)
+
+	before, err := h.DB.GetUserById(nil, loser.Id)
+	require.NoError(t, err, "read the loser's generation before the pass")
+	generationBefore := before.AuthStateGeneration
+	require.Equalf(t, generationBefore, loserSession.AuthStateGeneration,
+		"the fixture is only meaningful if the session starts out matching the user: it does not, so nothing below would prove anything")
+
+	_, disabled, err := h.DB.BackfillLowercaseEmails()
+	require.NoError(t, err, "BackfillLowercaseEmails")
+	require.Equalf(t, 1, disabled, "exactly the loser must be disabled on %s", dbType())
+
+	// Half one: the disable took the credentials with it.
+	got, err := h.DB.GetUserById(nil, loser.Id)
+	require.NoError(t, err, "read the loser back")
+	assert.False(t, got.Enabled, "the loser must be disabled")
+	assert.Equalf(t, generationBefore+1, got.AuthStateGeneration,
+		"disabling must advance the authentication generation, which is what invalidates the code and any token that outlives this pass; it is at %d and the loser's credentials were issued at %d",
+		got.AuthStateGeneration, generationBefore)
+
+	sessions, err := h.DB.GetUserSessionsByUserId(nil, loser.Id)
+	require.NoError(t, err, "read the loser's sessions")
+	assert.Emptyf(t, sessions, "every session of a disabled loser must be deleted; session %d survived", loserSession.Id)
+
+	for _, tok := range []struct {
+		id   int64
+		what string
+	}{
+		{loserAuthCodeToken.Id, "the authorization-code shape, linked through codes.user_id"},
+		{loserRopcToken.Id, "the ROPC shape, linked through refresh_tokens.user_id"},
+	} {
+		read, err := h.DB.GetRefreshTokenById(nil, tok.id)
+		require.NoErrorf(t, err, "read refresh token %d back", tok.id)
+		require.NotNilf(t, read, "refresh token %d must still exist; nothing here deletes tokens", tok.id)
+		assert.Truef(t, read.Revoked,
+			"a disabled loser's refresh token must be revoked, and the sweep is user-scoped precisely so it reaches both linkage shapes: %s", tok.what)
+	}
+
+	// The control. The survivor keeps its session, its token and its generation, because
+	// nothing was taken away from it.
+	survivorAfter, err := h.DB.GetUserById(nil, survivor.Id)
+	require.NoError(t, err, "read the survivor back")
+	assert.True(t, survivorAfter.Enabled, "the survivor must stay enabled")
+	assert.Equalf(t, survivor.AuthStateGeneration, survivorAfter.AuthStateGeneration,
+		"the survivor's generation must not move: advancing it would log out the one account the collision policy exists to keep working")
+	survivorSessions, err := h.DB.GetUserSessionsByUserId(nil, survivor.Id)
+	require.NoError(t, err, "read the survivor's sessions")
+	require.Lenf(t, survivorSessions, 1, "the survivor's session must survive")
+	assert.Equal(t, survivorSession.SessionIdentifier, survivorSessions[0].SessionIdentifier)
+	survivorTokenAfter, err := h.DB.GetRefreshTokenById(nil, survivorRopcToken.Id)
+	require.NoError(t, err, "read the survivor's token back")
+	require.NotNil(t, survivorTokenAfter)
+	assert.False(t, survivorTokenAfter.Revoked, "the survivor's refresh token must not be revoked")
+
+	// Half two: an administrator re-enables the loser, which is what the collision leaves them
+	// to do, and the enabling path deliberately revokes nothing because there is nothing to
+	// take away. Every pre-backfill credential must STILL be dead, and it is dead because the
+	// generation moved rather than because the flag was off.
+	transitioned, err := h.DB.TrySetUserEnabled(nil, loser.Id, false, true)
+	require.NoError(t, err, "re-enable the loser")
+	require.True(t, transitioned, "the loser must have been disabled for this to be a re-enable")
+
+	reenabled, err := h.DB.GetUserById(nil, loser.Id)
+	require.NoError(t, err, "read the re-enabled loser")
+	require.True(t, reenabled.Enabled, "the loser must be enabled again")
+
+	sessionsAfter, err := h.DB.GetUserSessionsByUserId(nil, loser.Id)
+	require.NoError(t, err, "read the loser's sessions after the re-enable")
+	assert.Emptyf(t, sessionsAfter, "a session deleted by the backfill cannot come back, and one that was never deleted would be usable now")
+
+	codeAfter, err := h.DB.GetCodeById(nil, loserCode.Id)
+	require.NoError(t, err, "read the loser's authorization code after the re-enable")
+	require.NotNil(t, codeAfter, "nothing deletes codes, which is why the generation has to be what invalidates them")
+	assert.Lessf(t, codeAfter.AuthStateGeneration, reenabled.AuthStateGeneration,
+		"the code was issued at generation %d and the user is at %d; equal would mean this code is redeemable again on a re-enabled account",
+		codeAfter.AuthStateGeneration, reenabled.AuthStateGeneration)
+
+	for _, id := range []int64{loserAuthCodeToken.Id, loserRopcToken.Id} {
+		read, err := h.DB.GetRefreshTokenById(nil, id)
+		require.NoErrorf(t, err, "read refresh token %d after the re-enable", id)
+		require.NotNil(t, read)
+		assert.Truef(t, read.Revoked, "refresh token %d must stay revoked across a re-enable", id)
+		assert.Lessf(t, read.AuthStateGeneration, reenabled.AuthStateGeneration,
+			"and it must also be behind the user's generation, so revoked = false written by hand would not resurrect it")
+	}
+}
+
+// seedSessionForBackfill gives a user one session at whatever generation they currently hold,
+// which is what makes it a credential the backfill has to invalidate rather than a row.
+func seedSessionForBackfill(t *testing.T, h *isolatedDB, userId int64) *models.UserSession {
+	t.Helper()
+
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	session := &models.UserSession{
+		SessionIdentifier: uuid.NewString(),
+		Started:           now,
+		LastAccessed:      now,
+		AuthMethods:       "pwd",
+		AcrLevel:          enums.AcrLevel1.String(),
+		AuthTime:          now,
+		IpAddress:         "192.0.2.10",
+		DeviceName:        "backfill-fixture",
+		DeviceType:        "desktop",
+		DeviceOS:          "Linux",
+		UserId:            userId,
+	}
+	require.NoErrorf(t, h.DB.CreateUserSession(nil, session), "seed a session for user %d", userId)
+	return session
+}
+
+// seedCodeForBackfill gives a user one authorization code. It is never deleted by anything in
+// this pass, deliberately: the generation is what invalidates a code, so a surviving row at a
+// stale generation is exactly the evidence the assertions want.
+func seedCodeForBackfill(t *testing.T, h *isolatedDB, clientId, userId int64) *models.Code {
+	t.Helper()
+
+	suffix := uuid.NewString()
+	code := &models.Code{
+		ClientId:            clientId,
+		UserId:              userId,
+		Code:                "backfill_" + suffix,
+		CodeHash:            "backfillhash_" + suffix,
+		CodeChallenge:       sql.NullString{String: "backfillchallenge", Valid: true},
+		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+		RedirectURI:         "https://example.com/callback",
+		Scope:               "openid profile",
+		State:               "backfillstate",
+		Nonce:               "backfillnonce",
+		IpAddress:           "192.0.2.10",
+		UserAgent:           "backfill-fixture",
+		ResponseMode:        "query",
+		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+		SessionIdentifier:   uuid.NewString(),
+		AcrLevel:            enums.AcrLevel1.String(),
+		AuthMethods:         "pwd",
+	}
+	require.NoErrorf(t, h.DB.CreateCode(nil, code), "seed a code for user %d", userId)
+	return code
+}
+
+// seedRefreshTokenForBackfill gives a user one refresh token in one of the two linkage shapes:
+// codeId non-zero is the authorization-code shape, where the user is reached through the code,
+// and codeId zero is the ROPC shape, where the user is on the token itself. Both exist because
+// the revocation sweep is user-scoped in order to cover both, and a sweep that covered one
+// would pass a test that seeded only the other.
+func seedRefreshTokenForBackfill(t *testing.T, h *isolatedDB, clientId, userId, codeId int64) *models.RefreshToken {
+	t.Helper()
+
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	token := &models.RefreshToken{
+		ClientId:         sql.NullInt64{Int64: clientId, Valid: true},
+		RefreshTokenJti:  uuid.NewString(),
+		RefreshTokenType: "Bearer",
+		Scope:            "openid profile offline_access",
+		IssuedAt:         sql.NullTime{Time: now, Valid: true},
+		ExpiresAt:        sql.NullTime{Time: now.Add(time.Hour), Valid: true},
+		MaxLifetime:      sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
+	}
+	if codeId != 0 {
+		token.CodeId = sql.NullInt64{Int64: codeId, Valid: true}
+	} else {
+		token.UserId = sql.NullInt64{Int64: userId, Valid: true}
+	}
+	require.NoErrorf(t, h.DB.CreateRefreshToken(nil, token), "seed a refresh token for user %d", userId)
+	return token
 }
