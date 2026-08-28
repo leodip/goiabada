@@ -214,11 +214,11 @@ const (
 	AuditChangedPassword              = "changed_password"
 	// AuditRevokedUserAuthState records that a credential change invalidated a user's live
 	// authentication state: their generation advanced, their sessions were terminated and their
-	// refresh tokens revoked. Emitted by the four credential sites AFTER their transaction
-	// commits, on success only, and emitted even when nothing was found to revoke, so the event
-	// attests that the action happened rather than that something was there to sweep (#106
-	// decision 7). Its `reason` field distinguishes the sites: password_reset,
-	// password_change, admin_password_set or account_disabled.
+	// refresh tokens revoked. Emitted by the five sites that perform that action AFTER their
+	// transaction commits, on success only, and emitted even when nothing was found to revoke,
+	// so the event attests that the action happened rather than that something was there to
+	// sweep (#106 decision 7). Its `reason` field distinguishes the sites: password_reset,
+	// password_change, admin_password_set, account_disabled or email_collision_backfill.
 	//
 	// Deliberately NOT AuditUserDisabled, which already means "a disabled user was rejected"
 	// and is emitted from six auth paths; overloading it would make that event ambiguous.
@@ -348,6 +348,19 @@ const (
 	// was deliberately pulled.
 	AuditRedemptionRefusedRedirectURI = "redemption_refused_redirect_uri"
 )
+
+// RevocationReasonEmailCollisionBackfill is the `reason` for AuditRevokedUserAuthState at the
+// one revoking site that is not a credential endpoint: the startup pass that lowercases stored
+// email addresses disables the losers of a case-variant collision, and a disable revokes what
+// the account authenticated under (#283).
+//
+// It lives HERE and not beside its four siblings in the authserver handlers package, which is
+// where RevocationReasonPasswordReset and the rest are declared, because the site emitting it
+// is in core and core cannot import that package. The four are unchanged rather than moved:
+// relocating them would touch four handlers and their tests for a tidiness this change does
+// not otherwise need. What keeps the two homes in step is the doc comment on
+// AuditRevokedUserAuthState above, which enumerates all five reasons in one place.
+const RevocationReasonEmailCollisionBackfill = "email_collision_backfill"
 
 // AuditEventTypes is the canonical list of all audit event type strings.
 // Used by the admin UI filter dropdown.

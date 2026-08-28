@@ -21,6 +21,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The collations migration 000040 moves between. MySQL and SQL Server only: SQLite compares
+// BINARY and PostgreSQL's en_US.utf8 is deterministic, so both already answer `=` the way
+// #283 asks for and neither has a 000040 file.
+//
+// Declared HERE rather than beside the 000040 test because this file is the package's only
+// non-test file, so it cannot see a constant a _test.go file declares, and
+// assertCreatedDatabaseCollation below needs the same two target names the migration test
+// asserts columns against. One definition is the point: the constructor and the migration have
+// to land on the same collation or a fresh install and a migrated one disagree, which is
+// exactly what #283 decision 4 is about.
+const (
+	mysqlCollationBefore000040        = "utf8mb4_0900_ai_ci"
+	mysqlUnicodeCollationBefore000040 = "utf8mb4_unicode_ci"
+	mysqlCollationAfter000040         = "utf8mb4_0900_as_cs"
+
+	mssqlCollationBefore000040 = "Latin1_General_100_CI_AI_SC_UTF8"
+	mssqlCollationAfter000040  = "Latin1_General_100_CS_AS_KS_WS_SC_UTF8"
+)
+
 // isolatedDB is a throwaway database of the CONFIGURED dialect, used by
 // migration tests that must control the exact schema version. The shared test
 // database (data_test.go) is always fully migrated, so it can't be used to
@@ -67,6 +86,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		}, false)
 		require.NoError(t, err, "NewMySQLDatabase")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMySQL(t, cfg, name) })
+		assertCreatedDatabaseCollation(t, db.DB)
 		return newIsolated(t, db, db.DB)
 
 	case "postgres":
@@ -87,12 +107,75 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		}, false)
 		require.NoError(t, err, "NewMsSQLDatabase")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
+		assertCreatedDatabaseCollation(t, db.DB)
 		return newIsolated(t, db, db.DB)
 
 	default:
 		t.Fatalf("unsupported db type %q", dbType())
 		return nil
 	}
+}
+
+// assertCreatedDatabaseCollation holds a database Goiabada CREATED to the collation decision 4
+// pins for it, read out of the engine's own catalog rather than trusted from the statement that
+// made it.
+//
+// It runs immediately after the constructor and BEFORE any migration, and that order is
+// load-bearing on MySQL: 000040 issues its own ALTER DATABASE, so a fixture asserted after the
+// chain would report the target collation with the constructor still wrong.
+//
+// Why it needs asserting at all, which is not obvious. Migration 000040 pins all 92 SQL Server
+// columns and all 25 MySQL tables EXPLICITLY, so no column collation any other assertion in
+// this package reads is decided by the database default; reverting either constructor to the
+// case-insensitive collation it used before #283 leaves the whole four-engine data tier green.
+// What the default still decides is what a string column added by a LATER migration inherits.
+// That is the whole of the residue decision 4 accepts on SQL Server, where ALTER DATABASE
+// blocks against a live connection pool and the migration therefore cannot repair it, and the
+// whole of decision 12's finding that MySQL is not exposed to the same problem.
+//
+// SQL Server and MySQL only. PostgreSQL's CREATE DATABASE inherits the cluster template and is
+// deterministic whatever the locale, and SQLite has no database-level collation.
+func assertCreatedDatabaseCollation(t *testing.T, sqlDB *sql.DB) {
+	t.Helper()
+
+	var want string
+	switch dbType() {
+	case "mysql":
+		want = mysqlCollationAfter000040
+	case "mssql":
+		want = mssqlCollationAfter000040
+	default:
+		return
+	}
+
+	require.Equalf(t, want, readDatabaseDefaultCollation(t, sqlDB),
+		"a database Goiabada creates must be created at %s (#283 decision 4), because every string column a later migration adds inherits it and no migration can repair that on SQL Server", want)
+}
+
+// readDatabaseDefaultCollation returns the DATABASE-level default collation, which is a
+// different thing from any column's: nothing existing inherits it, and what it decides is the
+// collation a string column added later lands at when its DDL does not spell COLLATE.
+//
+// Read from the engine's own catalog on both engines that have one. MySQL reports it in
+// information_schema.SCHEMATA for the connection's current database; SQL Server has no
+// catalog view for it and answers through DATABASEPROPERTYEX.
+func readDatabaseDefaultCollation(t *testing.T, sqlDB *sql.DB) string {
+	t.Helper()
+
+	var query string
+	switch dbType() {
+	case "mysql":
+		query = "SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = DATABASE()"
+	case "mssql":
+		query = `SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS NVARCHAR(128))`
+	default:
+		t.Fatalf("%s has no database-level default collation to read", dbType())
+		return ""
+	}
+
+	var got string
+	require.NoError(t, sqlDB.QueryRow(query).Scan(&got), "read the database's default collation")
+	return got
 }
 
 // migratable is satisfied by every concrete dialect DB (they all expose
@@ -704,11 +787,7 @@ func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
 	// The point of the helper, asserted rather than assumed: if IF NOT EXISTS ever stopped
 	// being IF NOT EXISTS, every test built on this would go on passing for the wrong
 	// reason.
-	var got string
-	require.NoError(t, db.DB.QueryRow(
-		`SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS NVARCHAR(128))`).Scan(&got),
-		"read back the pre-created database's collation")
-	require.Equal(t, collation, got,
+	require.Equal(t, collation, readDatabaseDefaultCollation(t, db.DB),
 		"NewMsSQLDatabase must leave a database it did not create alone; its CREATE DATABASE is IF NOT EXISTS")
 
 	return newIsolated(t, db, db.DB)
