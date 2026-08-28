@@ -30,8 +30,6 @@ import (
 func challengelessCode(t *testing.T, clientSecret string) (*models.Code, string) {
 	t.Helper()
 
-	requireChallengelessCodesAreStorable(t)
-
 	pkceRequired := false
 	_, code := createAuthCode(t, clientSecret, "openid profile email",
 		authCodeOptions{noPKCE: true, pkceRequired: &pkceRequired})

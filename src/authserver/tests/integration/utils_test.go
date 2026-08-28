@@ -739,28 +739,6 @@ type authCodeOptions struct {
 	userAgent string
 }
 
-// requireChallengelessCodesAreStorable skips the calling test on SQLite, where a code carrying
-// no PKCE challenge cannot be persisted at all.
-//
-// This is a defect in the server rather than a limitation of the tests, and it is pre-existing:
-// migration 000007 made codes.code_challenge and codes.code_challenge_method nullable on MySQL,
-// PostgreSQL and SQL Server, and its SQLite file is a no-op whose comment claims "SQLite VARCHAR
-// columns can store NULL regardless of NOT NULL constraint". SQLite does enforce NOT NULL, so
-// /auth/issue answers 500 with "NOT NULL constraint failed: codes.code_challenge" and the
-// PKCE-optional configuration does not work on that engine. Drafted as a follow-up rather than
-// fixed here: relaxing it needs a table rebuild, which is a migration and its own data test.
-//
-// The rows that skip here are NOT losing their coverage. The check suite runs this tier on all
-// four engines, so they execute for real on the other three, which is also the only tier that
-// could have told the two behaviours apart.
-func requireChallengelessCodesAreStorable(t *testing.T) {
-	t.Helper()
-
-	if strings.Trim(config.GetDatabase().Type, `"'`) == "sqlite" {
-		t.Skip("sqlite still has NOT NULL on codes.code_challenge; see the #245 follow-up")
-	}
-}
-
 func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...authCodeOptions) (*http.Client, *models.Code) {
 
 	var opt authCodeOptions

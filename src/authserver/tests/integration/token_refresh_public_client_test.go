@@ -29,8 +29,6 @@ import (
 func challengelessRefreshToken(t *testing.T, clientSecret string) (string, int64, string, string) {
 	t.Helper()
 
-	requireChallengelessCodesAreStorable(t)
-
 	pkceRequired := false
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email",
 		authCodeOptions{noPKCE: true, pkceRequired: &pkceRequired})
