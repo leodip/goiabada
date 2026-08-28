@@ -42,14 +42,19 @@ import (
 //
 // THE BOUNDARY, stated because it decides what this file is worth. It compares method NAMES: a
 // name declared by either dialect with a body that is not a single delegation to
-// d.CommonDB.<same name>(...) is treated as divergent, and this package may not call it on
-// itself. That over-approximates, deliberately. A dialect method that diverges for a reason
-// unrelated to the caller is still a method whose behaviour depends on which engine is running,
-// and a self-call to one is still engine-dependent behaviour written as though it were not, so
-// it is worth a look either way. What it does NOT see is a call made through a value that is not
-// the receiver, or a method name assembled at run time; neither is how this regression happens.
-// The way it happens is somebody writing d.SomethingObvious(...) in this package, which is
-// exactly the shape below.
+// d.CommonDB.<same name>(...) is treated as divergent, and this package may not take it on a
+// *CommonDatabase anywhere. That over-approximates, deliberately. A dialect method that diverges
+// for a reason unrelated to the caller is still a method whose behaviour depends on which engine
+// is running, and a self-call to one is still engine-dependent behaviour written as though it
+// were not, so it is worth a look either way.
+//
+// WHAT COUNTS AS THE CALL is wider than d.M(...) on the receiver, and deliberately so. A guard
+// keyed to one spelling guards the spelling rather than the defect: x := d; x.M(...), a
+// package-level helper taking *CommonDatabase, a closure capturing either, and the method value
+// f := d.M all resolve statically to the same common implementation and cost the same two engines
+// the same wrong SQL, while reading no more suspiciously than the shape that actually shipped. So
+// selfCalls tracks the names known to hold a *CommonDatabase rather than the receiver's name, and
+// states there what remains outside it.
 func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 	divergent := map[string][]string{}
 	for _, dialect := range []struct{ dir, recvType string }{
@@ -68,8 +73,8 @@ func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 	for _, call := range selfCalls(t, ".") {
 		if owners, ok := divergent[call.method]; ok {
 			sort.Strings(owners)
-			offenders = append(offenders, call.pos+": d."+call.method+"(...) takes the "+
-				"MySQL/SQLite implementation always, but "+strings.Join(owners, " and ")+
+			offenders = append(offenders, call.pos+": ."+call.method+" on a *CommonDatabase takes "+
+				"the MySQL/SQLite implementation always, but "+strings.Join(owners, " and ")+
 				" override it")
 		}
 	}
@@ -152,7 +157,29 @@ type selfCall struct {
 	pos    string
 }
 
-// selfCalls returns every call this package makes on a *CommonDatabase receiver, as d.X(...).
+// selfCalls returns every method this package takes on a *CommonDatabase value, wherever the value
+// came from and whether or not the result is called on the spot.
+//
+// It tracks NAMES KNOWN TO HOLD ONE rather than the enclosing method's receiver: a receiver
+// declared *CommonDatabase, a parameter declared *CommonDatabase on a method, a plain function or
+// a function literal, and any local aliased from one of those (x := d, var x = d, and a var
+// declared *CommonDatabase outright). A function literal inherits the names its enclosing function
+// had, because a closure over d is d. Every selector taken on such a name is reported, so the
+// method value f := d.M counts as much as the call d.M(...) does; the value is the dangerous part
+// and calling it later is a formality.
+//
+// WHAT IS STILL OUTSIDE IT, by construction rather than by oversight: a *CommonDatabase reached
+// through a struct field, a map, a slice, or the return of a call, where no name in the function
+// says what the value is. Closing that class needs go/types over a loaded package instead of a
+// parse of one, which means golang.org/x/tools, a dependency this repository is deliberately
+// shedding rather than adding (#268-#281). The trade is worth naming: what is covered is every
+// shape a person writes by hand while believing they are calling the method that runs, and what is
+// not is the shapes where the value's type is already invisible to the reader too.
+//
+// The over-approximation also runs the other way, since a selector is matched by name alone: a
+// FIELD on CommonDatabase sharing a name with a divergent dialect method would be reported. There
+// are three fields (DB, Flavor, logSQL), none of them a method name on either dialect, so the case
+// is theoretical today and a false report would name a line and be dismissed in a second.
 func selfCalls(t *testing.T, dir string) []selfCall {
 	t.Helper()
 
@@ -160,48 +187,111 @@ func selfCalls(t *testing.T, dir string) []selfCall {
 	for _, file := range goFiles(t, dir) {
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Recv == nil || len(fn.Recv.List) != 1 || fn.Body == nil {
+			if !ok || fn.Body == nil {
 				continue
 			}
-			star, ok := fn.Recv.List[0].Type.(*ast.StarExpr)
-			if !ok {
-				continue
-			}
-			ident, ok := star.X.(*ast.Ident)
-			if !ok || ident.Name != "CommonDatabase" {
-				continue
-			}
-			// An unnamed receiver cannot be called through, so there is nothing to find.
-			if len(fn.Recv.List[0].Names) != 1 {
-				continue
-			}
-			receiver := fn.Recv.List[0].Names[0].Name
-			if receiver == "_" {
-				continue
-			}
-
-			ast.Inspect(fn.Body, func(n ast.Node) bool {
-				call, ok := n.(*ast.CallExpr)
-				if !ok {
-					return true
-				}
-				sel, ok := call.Fun.(*ast.SelectorExpr)
-				if !ok {
-					return true
-				}
-				x, ok := sel.X.(*ast.Ident)
-				if !ok || x.Name != receiver {
-					return true
-				}
-				out = append(out, selfCall{
-					method: sel.Sel.Name,
-					pos:    fileSet.Position(sel.Sel.Pos()).String(),
-				})
-				return true
-			})
+			holders := map[string]bool{}
+			addCommonDatabaseNames(holders, fn.Recv)
+			addCommonDatabaseNames(holders, fn.Type.Params)
+			scanForSelfCalls(holders, fn.Body, &out)
 		}
 	}
 	return out
+}
+
+// addCommonDatabaseNames records every name in fields declared *CommonDatabase. An unnamed or
+// blank one cannot be called through, so there is nothing to record.
+func addCommonDatabaseNames(holders map[string]bool, fields *ast.FieldList) {
+	if fields == nil {
+		return
+	}
+	for _, field := range fields.List {
+		if !isCommonDatabasePointer(field.Type) {
+			continue
+		}
+		for _, name := range field.Names {
+			if name.Name != "_" {
+				holders[name.Name] = true
+			}
+		}
+	}
+}
+
+// isCommonDatabasePointer reports whether expr is written *CommonDatabase. Inside this package the
+// type is always spelled unqualified, so there is no selector form to accept.
+func isCommonDatabasePointer(expr ast.Expr) bool {
+	star, ok := expr.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := star.X.(*ast.Ident)
+	return ok && ident.Name == "CommonDatabase"
+}
+
+// scanForSelfCalls walks one function body carrying the names known to hold a *CommonDatabase,
+// growing that set as aliases appear and reporting the selectors taken on any of them. The walk is
+// pre-order, which is the order Go requires anyway: an alias is declared before it can be used.
+//
+// It descends into function literals itself, with a copy of the current names, and then stops the
+// outer walk entering them a second time. Copying rather than sharing keeps a parameter that
+// shadows an outer name from leaking back out.
+func scanForSelfCalls(holders map[string]bool, body *ast.BlockStmt, out *[]selfCall) {
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.FuncLit:
+			inner := map[string]bool{}
+			for name := range holders {
+				inner[name] = true
+			}
+			addCommonDatabaseNames(inner, node.Type.Params)
+			scanForSelfCalls(inner, node.Body, out)
+			return false
+
+		case *ast.AssignStmt:
+			// x := d, and x = d. Only a bare name on the right aliases the value; anything
+			// else is a call or a field read, which is the class named in selfCalls' comment.
+			for i, rhs := range node.Rhs {
+				if i >= len(node.Lhs) {
+					break
+				}
+				ident, ok := rhs.(*ast.Ident)
+				if !ok || !holders[ident.Name] {
+					continue
+				}
+				if lhs, ok := node.Lhs[i].(*ast.Ident); ok && lhs.Name != "_" {
+					holders[lhs.Name] = true
+				}
+			}
+
+		case *ast.ValueSpec:
+			// var x *CommonDatabase, whatever it is assigned, and var x = d.
+			for i, name := range node.Names {
+				if name.Name == "_" {
+					continue
+				}
+				if isCommonDatabasePointer(node.Type) {
+					holders[name.Name] = true
+					continue
+				}
+				if i < len(node.Values) {
+					if ident, ok := node.Values[i].(*ast.Ident); ok && holders[ident.Name] {
+						holders[name.Name] = true
+					}
+				}
+			}
+
+		case *ast.SelectorExpr:
+			ident, ok := node.X.(*ast.Ident)
+			if !ok || !holders[ident.Name] {
+				return true
+			}
+			*out = append(*out, selfCall{
+				method: node.Sel.Name,
+				pos:    fileSet.Position(node.Sel.Pos()).String(),
+			})
+		}
+		return true
+	})
 }
 
 // fileSet is shared so a position printed in a failure names the file it came from.
