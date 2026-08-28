@@ -381,3 +381,62 @@ func splitQualified000040(key string) (table, column string) {
 	table, column, _ = strings.Cut(key, ".")
 	return table, column
 }
+
+// TestMigration000040_PreCreatedDatabaseIsFullyCollated is decision 12's guard, and what it watches
+// is a deployment Goiabada did not build. NewMsSQLDatabase creates the database IF NOT EXISTS, so
+// an operator who creates it themselves keeps their own collation, and on SQL Server a migration
+// that omits COLLATE then lands the column at THAT collation rather than at ours. Measured before
+// #283, through the repository's own constructor and migrator against a database pre-created at the
+// container's server default: the collation was left untouched, every migration ran to completion,
+// and all 92 string columns ended up accent-sensitive and not UTF-8.
+//
+// The fix is a guard rather than a warning, because there is nothing an operator could usefully do
+// about a warning: ALTER DATABASE ... COLLATE blocks until it times out whenever a second session
+// is attached, which is what a running application and its connection pool are (decision 4). What
+// closes it instead is that EVERY migration spells COLLATE, after which the operator's database
+// default never decides anything. So the property is exactly that, and the way to hold it is to
+// migrate the FULL chain into a deliberately hostile database and sweep the catalog.
+//
+// NO ALLOWLIST AND NO COLUMN LIST, deliberately, which is the whole reason this is a test and not a
+// review checklist: a future migration that adds a string column without COLLATE fails here on the
+// day it is written, rather than on the day somebody notices a lookup answering two ways.
+//
+// SQL Server only. MySQL's own 000040 repairs the database default, the table defaults and every
+// existing column, and a column and a table added afterwards both inherit the repaired default
+// (executed against a database pre-created at latin1_swedish_ci). PostgreSQL's database collation
+// is deterministic whatever the locale, and SQLite has no database collation at all.
+//
+// Run via: ./run-tests.sh --type data --db mssql --run TestMigration000040_PreCreated
+func TestMigration000040_PreCreatedDatabaseIsFullyCollated(t *testing.T) {
+	if dbType() != "mssql" {
+		t.Skipf("%s cannot inherit a wrong collation from a pre-created database", dbType())
+	}
+
+	// Chosen for what it is not. This is the container's stock server default, and it is
+	// case-insensitive, accent-SENSITIVE and not UTF-8, so it differs both from the collation
+	// Goiabada pinned before #283 and from the one it pins after. A column that inherited it
+	// therefore cannot be mistaken for a column 000040 converted.
+	const operatorCollation = "SQL_Latin1_General_CP1_CI_AS"
+
+	// The helper asserts on its own that NewMsSQLDatabase left this collation alone; without
+	// that, every assertion below would go on passing for the wrong reason if IF NOT EXISTS
+	// ever stopped being IF NOT EXISTS.
+	h := newPreCreatedMsSQLDB(t, operatorCollation)
+
+	// Up() rather than a target version: the guard is about every migration in the chain, not
+	// about 000040, and the one that breaks it will be a migration nobody has written yet.
+	require.NoError(t, h.Migrator.Up(), "migrate the full chain into a pre-created database")
+
+	// The database default is still the operator's, which is what makes the sweep below mean
+	// anything: every column it reads is pinned by its own COLLATE clause rather than by
+	// anything it inherited. If a migration ever did repair the default, this assertion would
+	// fail and the sweep would quietly become vacuous, which is the failure worth catching.
+	var dbCollation string
+	require.NoError(t, h.SQL.QueryRow(
+		`SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS NVARCHAR(128))`).Scan(&dbCollation),
+		"read the database default after the full chain")
+	require.Equal(t, operatorCollation, dbCollation,
+		"nothing in the chain moves the database default, and the guard is that no column depends on it")
+
+	assertCollations000040(t, h, collationAfter000040, "full chain into a pre-created database")
+}
