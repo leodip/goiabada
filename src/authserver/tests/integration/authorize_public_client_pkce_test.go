@@ -187,8 +187,6 @@ func TestAuthorize_PublicClient_WithPKCE_CompletesAndIssuesTokens(t *testing.T) 
 // challenge-less ceremony to completion, so nothing here has widened into the population #245
 // is not about.
 func TestAuthorize_ConfidentialClient_PKCEOff_WithoutCodeChallenge_Succeeds(t *testing.T) {
-	requireChallengelessCodesAreStorable(t)
-
 	pkceRequired := false
 	_, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email",
 		authCodeOptions{noPKCE: true, pkceRequired: &pkceRequired})
