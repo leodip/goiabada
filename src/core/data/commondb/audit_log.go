@@ -38,6 +38,49 @@ func (d *CommonDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) e
 	return nil
 }
 
+// insertAuditLogWithoutId writes one audit_logs row and never reads its id back.
+//
+// It exists because CreateAuditLog cannot serve a caller inside this package. That method
+// ends at result.LastInsertId(), which two of the four drivers refuse outright: pgx's stdlib
+// wrapper answers with driver.RowsAffected, whose LastInsertId reports "not supported by this
+// driver", and go-mssqldb reports "LastInsertId is not supported. Please use the OUTPUT
+// clause". PostgresDatabase and MsSQLDatabase override CreateAuditLog with RETURNING and
+// OUTPUT forms precisely for that reason.
+//
+// An override is only reached through the Database interface. A d.CreateAuditLog(...) call
+// from inside commondb binds statically to the common implementation and cannot reach one, so
+// on those two engines the INSERT lands and commits and the id read then fails, handing the
+// caller an error that describes a write which in fact succeeded. Where the caller logs that
+// error, every successful audit write reports itself as a failed one, and a genuine
+// persistence failure becomes indistinguishable from normal operation (#283).
+//
+// The id is the whole of the difference: no caller in this package wants it, so this stops at
+// the statement and reports only whether the statement itself failed. Anyone who does want the
+// id keeps calling CreateAuditLog through the interface, where the override applies and the id
+// is real. Relaxing CreateAuditLog to tolerate a missing id would instead hand MySQL and SQLite
+// callers a silent zero for a value that is available there.
+func (d *CommonDatabase) insertAuditLogWithoutId(tx *sql.Tx, auditLog *models.AuditLog) error {
+
+	if auditLog.AuditEvent == "" {
+		return errors.WithStack(errors.New("can't create audit log with empty audit_event"))
+	}
+
+	// Always set CreatedAt to current time (ignore any incoming value), as CreateAuditLog does
+	auditLog.CreatedAt = time.Now().UTC()
+
+	auditLogStruct := sqlbuilder.NewStruct(new(models.AuditLog)).
+		For(d.Flavor)
+
+	insertBuilder := auditLogStruct.WithoutTag("pk").InsertInto("audit_logs", auditLog)
+
+	sqlStr, args := insertBuilder.Build()
+	if _, err := d.ExecSql(tx, sqlStr, args...); err != nil {
+		return errors.Wrap(err, "unable to insert audit log")
+	}
+
+	return nil
+}
+
 func (d *CommonDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
 
 	// SQLite and MySQL support LIMIT on DELETE

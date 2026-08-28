@@ -562,7 +562,13 @@ func (d *CommonDatabase) auditRevokedUserAuthState(userId int64, swept revocatio
 		}
 		// nil tx on purpose: the revocation's transaction is committed and gone, and enlisting
 		// the audit row in a new one would buy nothing to be atomic with.
-		if err := d.CreateAuditLog(nil, &models.AuditLog{
+		//
+		// insertAuditLogWithoutId rather than CreateAuditLog, and the difference is not
+		// cosmetic: a self-call from inside commondb cannot reach the PostgreSQL and SQL Server
+		// overrides of CreateAuditLog, so on those two engines it would take the id-reading
+		// implementation their drivers cannot satisfy and report every successful write as a
+		// failure. See insertAuditLogWithoutId.
+		if err := d.insertAuditLogWithoutId(nil, &models.AuditLog{
 			AuditEvent: constants.AuditRevokedUserAuthState,
 			Details:    string(detailsJSON),
 		}); err != nil {
