@@ -5,6 +5,7 @@ package datatests
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -201,6 +202,155 @@ func TestSearchUsersPaginated(t *testing.T) {
 	if total < 5 {
 		t.Errorf("Expected total of at least 5, got %d", total)
 	}
+
+	// The search has to mean one thing on all four engines, and the term has to be data rather
+	// than a pattern the caller of the admin API chooses. Neither was true before: the fold was
+	// left to the column's collation, which compares case-sensitively on SQLite and PostgreSQL
+	// and folds on MySQL and SQL Server, so the same search returned different rows per engine
+	// (#283); and a term of "%" matched every user in the deployment (#95).
+	//
+	// Every subtest seeds its rows under one random tag carrying both cases, and asserts only
+	// about rows it seeded. The shared test databases keep their users across runs, so a case
+	// that counted every matching row would be decided by whatever an earlier test left behind.
+
+	t.Run("the search folds case on every engine", func(t *testing.T) {
+		// The tag begins "Tag", so it differs from both its own lowercase and its own uppercase
+		// form whatever LetterN returns, which is what makes the two folding queries real.
+		tag := "Tag" + gofakeit.LetterN(10)
+		want := createSearchUser(t, tag, "u"+gofakeit.LetterN(12))
+
+		for _, c := range []struct {
+			name  string
+			query string
+		}{
+			// The gate for both folding cases is LOWER() on the two sides of the predicate.
+			// PostgreSQL is where they fail without it, since its collation folds nothing;
+			// SQLite's LIKE folds ASCII on its own, and MySQL and SQL Server fold until the
+			// collation moves.
+			{"folded down", strings.ToLower(tag)},
+			{"folded up", strings.ToUpper(tag)},
+			// The exact spelling has always worked. Keep it: it is what says the folding was
+			// added without trading the plain case away.
+			{"exact", tag},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				assertSearchFindsExactly(t, c.query, want.Id)
+			})
+		}
+	})
+
+	t.Run("a % in the term is matched literally", func(t *testing.T) {
+		tag := "Tag" + gofakeit.LetterN(10)
+		withPercent := createSearchUser(t, tag+"%x", "u"+gofakeit.LetterN(12))
+		// Differs from the row above in exactly one character, the one under test, so it can
+		// only be matched by reading "%" as a wildcard.
+		createSearchUser(t, tag+"zx", "u"+gofakeit.LetterN(12))
+
+		assertSearchFindsExactly(t, tag+"%x", withPercent.Id)
+	})
+
+	t.Run("a term of % stops matching every user", func(t *testing.T) {
+		// #95 as reported: the term is the wildcard itself, so the search returns the whole
+		// user table a page at a time.
+		tag := "Tag" + gofakeit.LetterN(10)
+		withPercent := createSearchUser(t, tag+"%x", "u"+gofakeit.LetterN(12))
+		plain := createSearchUser(t, tag+"plain", "u"+gofakeit.LetterN(12))
+
+		// Large enough that the whole result set fits on one page in a test database of any
+		// plausible size, and the guard below turns an overflow into this test's own failure
+		// rather than a silent pass: a "%" read as a wildcard matches every user there is.
+		const pageSize = 2000
+		users, total, err := database.SearchUsersPaginated(nil, "%", 1, pageSize)
+		if err != nil {
+			t.Fatalf("Failed to search users: %v", err)
+		}
+		if total > len(users) {
+			t.Fatalf("A search for %%%% matched %d users, more than the %d this page holds: the term is being read as a wildcard", total, len(users))
+		}
+		ids := userIds(users)
+		if !ids[withPercent.Id] {
+			t.Errorf("Expected the user whose given name contains a literal %%%% to be found, got %d rows", len(users))
+		}
+		if ids[plain.Id] {
+			t.Errorf("Expected a user with no %%%% in any searched column to be absent, but a term of %%%% matched it")
+		}
+	})
+
+	t.Run("an _ in the term is matched literally", func(t *testing.T) {
+		tag := "Tag" + gofakeit.LetterN(10)
+		withUnderscore := createSearchUser(t, "g"+gofakeit.LetterN(12), tag+"a_b")
+		// Again one character apart: "_" matches any single character until it is escaped.
+		createSearchUser(t, "g"+gofakeit.LetterN(12), tag+"axb")
+
+		assertSearchFindsExactly(t, tag+"a_b", withUnderscore.Id)
+	})
+
+	t.Run("a literal ! is findable", func(t *testing.T) {
+		// "!" is the escape character the predicate declares, so the escaper has to double it.
+		// Undoubled, the pattern reads "!e" as an escaped "e" and finds a row spelled without
+		// the "!" instead of this one. An email local part may legally contain "!".
+		tag := "Tag" + gofakeit.LetterN(10)
+		withBang := createSearchUser(t, tag+"!e", "u"+gofakeit.LetterN(12))
+
+		assertSearchFindsExactly(t, tag+"!e", withBang.Id)
+	})
+
+	t.Run("a [ in the term is matched literally", func(t *testing.T) {
+		// SQL Server's LIKE has a third wildcard the other three do not, the [abc] character
+		// class, so this case is only rejected there: unescaped, "[x]" matches a single "x" and
+		// finds the second row instead of the first. On the other three "[" is already a
+		// literal and both spellings pass, which is why the data tier has to run on all four.
+		tag := "Tag" + gofakeit.LetterN(10)
+		withClass := createSearchUser(t, tag+"[x]y", "u"+gofakeit.LetterN(12))
+		createSearchUser(t, tag+"xy", "u"+gofakeit.LetterN(12))
+
+		assertSearchFindsExactly(t, tag+"[x]y", withClass.Id)
+	})
+}
+
+// createSearchUser creates a user with both of the columns the search cases vary, given_name and
+// username. The other searched columns get values that cannot collide with a tag.
+func createSearchUser(t *testing.T, givenName string, username string) *models.User {
+	t.Helper()
+	user := &models.User{
+		Enabled:   true,
+		Subject:   uuid.New(),
+		Username:  username,
+		GivenName: givenName,
+		Email:     gofakeit.LetterN(12) + "@example.com",
+	}
+	if err := database.CreateUser(nil, user); err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+	return user
+}
+
+// assertSearchFindsExactly checks both halves of the query SearchUsersPaginated builds: the rows
+// the page returns, and the total, which is a second set of predicates over the same columns and
+// would otherwise go unasserted.
+func assertSearchFindsExactly(t *testing.T, query string, wantId int64) {
+	t.Helper()
+	users, total, err := database.SearchUsersPaginated(nil, query, 1, 10)
+	if err != nil {
+		t.Fatalf("Failed to search users for %q: %v", query, err)
+	}
+	if total != 1 {
+		t.Fatalf("Expected a total of 1 for %q, got %d", query, total)
+	}
+	if len(users) != 1 {
+		t.Fatalf("Expected 1 user for %q, got %d", query, len(users))
+	}
+	if users[0].Id != wantId {
+		t.Errorf("Expected user %d for %q, got %d", wantId, query, users[0].Id)
+	}
+}
+
+func userIds(users []models.User) map[int64]bool {
+	ids := make(map[int64]bool, len(users))
+	for _, user := range users {
+		ids[user.Id] = true
+	}
+	return ids
 }
 
 // A page is a slice of an order, so paging is only correct when that order is total.
