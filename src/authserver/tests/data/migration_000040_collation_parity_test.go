@@ -10,18 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The collations migration 000040 moves between. MySQL and SQL Server only: SQLite compares
-// BINARY and PostgreSQL's en_US.utf8 is deterministic, so both already answer `=` the way
-// #283 asks for and neither has a 000040 file.
-const (
-	mysqlCollationBefore000040        = "utf8mb4_0900_ai_ci"
-	mysqlUnicodeCollationBefore000040 = "utf8mb4_unicode_ci"
-	mysqlCollationAfter000040         = "utf8mb4_0900_as_cs"
-
-	mssqlCollationBefore000040 = "Latin1_General_100_CI_AI_SC_UTF8"
-	mssqlCollationAfter000040  = "Latin1_General_100_CS_AS_KS_WS_SC_UTF8"
-)
-
 // mysqlUnicodeTables000040 are the three tables 000008, 000014 and 000018 built at
 // utf8mb4_unicode_ci while the other 22 were built at utf8mb4_0900_ai_ci. They matter twice:
 // the before-dump has to expect their collation rather than the majority one, and the down
@@ -110,12 +98,14 @@ func TestMigration000040_CollationParity(t *testing.T) {
 
 	before := dumpTables000040(t, h)
 	assertCollations000040(t, h, collationBefore000040, "at "+fmt.Sprint(prior))
+	assertDatabaseDefault000040(t, h, databaseDefaultBefore000040(), "at "+fmt.Sprint(prior))
 	assertDefaultsAreAutoNamed000040(t, before, "at "+fmt.Sprint(prior))
 
 	require.NoError(t, h.Migrator.Migrate(40), "apply 000040")
 
 	after := dumpTables000040(t, h)
 	assertCollations000040(t, h, collationAfter000040, "after apply")
+	assertDatabaseDefault000040(t, h, databaseDefaultAfter000040(), "after apply")
 	assertOnlyCollationMoved000040(t, before, after, "after apply")
 	assertDefaultsAreNamed000040(t, after, "after apply")
 	assertSeededRowsSurvive000040(t, h, clientId, userId, "after apply")
@@ -124,6 +114,7 @@ func TestMigration000040_CollationParity(t *testing.T) {
 
 	down := dumpTables000040(t, h)
 	assertCollations000040(t, h, collationBefore000040, "after roll back")
+	assertDatabaseDefault000040(t, h, databaseDefaultBefore000040(), "after roll back")
 	assertOnlyCollationMoved000040(t, before, down, "after roll back")
 	assertDefaultsAreAutoNamed000040(t, down, "after roll back")
 	assertSeededRowsSurvive000040(t, h, clientId, userId, "after roll back")
@@ -132,6 +123,7 @@ func TestMigration000040_CollationParity(t *testing.T) {
 
 	reapplied := dumpTables000040(t, h)
 	assertCollations000040(t, h, collationAfter000040, "after down/up round trip")
+	assertDatabaseDefault000040(t, h, databaseDefaultAfter000040(), "after down/up round trip")
 	assertOnlyCollationMoved000040(t, before, reapplied, "after down/up round trip")
 	assertDefaultsAreNamed000040(t, reapplied, "after down/up round trip")
 	assertSeededRowsSurvive000040(t, h, clientId, userId, "after down/up round trip")
@@ -347,12 +339,63 @@ func priorVersion000040() uint {
 
 // newFixture000040 builds the database this test migrates. See the test's comment for why
 // SQL Server's is pre-created at the OLD collation rather than left to newIsolatedDB.
+//
+// MySQL's needs the same treatment for the same reason, one statement instead of a helper.
+// NewMySQLDatabase now creates at the TARGET collation, so a fixture left as the constructor
+// built it already holds the value 000040's opening ALTER DATABASE is there to write, and
+// deleting that statement outright would change nothing this test can see. Moved back to
+// utf8mb4_0900_ai_ci, where a database created before #283 stands, the statement is load
+// bearing again. ALTER DATABASE with no name applies to the connection's default database,
+// which is what the migration itself relies on.
 func newFixture000040(t *testing.T) *isolatedDB {
 	t.Helper()
 	if dbType() == "mssql" {
 		return newPreCreatedMsSQLDB(t, mssqlCollationBefore000040)
 	}
-	return newIsolatedDB(t)
+
+	h := newIsolatedDB(t)
+	if dbType() == "mysql" {
+		_, err := h.SQL.Exec("ALTER DATABASE CHARACTER SET utf8mb4 COLLATE " + mysqlCollationBefore000040)
+		require.NoError(t, err, "put the fixture's database default back where a pre-#283 install stands")
+	}
+	return h
+}
+
+// databaseDefaultBefore000040 and databaseDefaultAfter000040 are what the DATABASE-level
+// default collation must read either side of the migration. They are not the column
+// collations asserted by collationBefore000040 and collationAfter000040: nothing already in
+// the schema inherits this value, and what it decides is the collation a string column added
+// by a LATER migration lands at when its DDL does not spell COLLATE.
+//
+// MySQL's moves, because 000040 opens with ALTER DATABASE and the down file closes with the
+// inverse, and decision 12 rests entirely on that: it is why a MySQL database an operator
+// pre-created at their own collation ends up indistinguishable from one Goiabada created.
+//
+// SQL Server's does NOT move, and asserting that it does not is the point rather than an
+// omission. Measured, ALTER DATABASE ... COLLATE blocks until it times out whenever a second
+// session is attached, which is what a running application and its connection pool are, so
+// decision 4 accepts the operator's default there and pins all 92 columns explicitly instead.
+// A future 000040 that tried to move it would hang a real upgrade and fails here first.
+func databaseDefaultBefore000040() string {
+	if dbType() == "mssql" {
+		return mssqlCollationBefore000040
+	}
+	return mysqlCollationBefore000040
+}
+
+func databaseDefaultAfter000040() string {
+	if dbType() == "mssql" {
+		return mssqlCollationBefore000040
+	}
+	return mysqlCollationAfter000040
+}
+
+// assertDatabaseDefault000040 reads the database default out of the engine and names the phase
+// in the failure, following assertCollations000040.
+func assertDatabaseDefault000040(t *testing.T, h *isolatedDB, want string, phase string) {
+	t.Helper()
+	require.Equalf(t, want, readDatabaseDefaultCollation(t, h.SQL),
+		"the database default collation must be %s %s: it decides what a string column added by a later migration inherits", want, phase)
 }
 
 // collationBefore000040 and collationAfter000040 are what each string column of the named

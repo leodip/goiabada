@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
@@ -386,4 +388,161 @@ func seedRefreshTokenForBackfill(t *testing.T, h *isolatedDB, clientId, userId, 
 	}
 	require.NoErrorf(t, h.DB.CreateRefreshToken(nil, token), "seed a refresh token for user %d", userId)
 	return token
+}
+
+// TestBackfillLowercaseEmails_DisablingALoserIsAudited pins the OTHER half of the invariant
+// #106 decision 7 established. Its sibling above proves the backfill revokes; this proves it
+// attests to having revoked.
+//
+// The distinction is the whole reason the event exists. constants.AuditRevokedUserAuthState is
+// documented as emitted by every site that invalidates a user's live authentication state,
+// "even when nothing was found to revoke, so the event attests that the action happened rather
+// than that something was there to sweep". Four credential endpoints uphold that through
+// handlers.LogRevokedUserAuthState. The collision backfill is the fifth site and the only one
+// nobody asked for: it disables an account and destroys every credential it held, at startup,
+// because two stored addresses differed only by case. An operator who finds an account disabled
+// has audit_logs to ask, and a slog line in a process a rolling deployment may already have
+// replaced is not the same record.
+//
+// The data tier is the tier for it. The claim is that a row lands in audit_logs on four
+// engines, carrying a details payload that survived a round trip through JSON and the column
+// type each engine gives it, and no other tier writes that row at all: the AuditLogger the
+// handlers use lives in the authserver module, and this site cannot reach it.
+//
+// Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
+func TestBackfillLowercaseEmails_DisablingALoserIsAudited(t *testing.T) {
+	// revokedUserAuthStateDetails is the payload as a consumer parses it. Typed rather than
+	// map[string]interface{} so a number that arrived as a JSON float is compared as the id it
+	// is meant to be, and so a field renamed on one side of the wire fails here.
+	type revokedUserAuthStateDetails struct {
+		UserId                       int64    `json:"userId"`
+		Reason                       string   `json:"reason"`
+		LoggedInUser                 string   `json:"loggedInUser"`
+		TerminatedSessionIdentifiers []string `json:"terminatedSessionIdentifiers"`
+		RevokedRefreshTokenJtis      []string `json:"revokedRefreshTokenJtis"`
+		PreservedSessionIdentifier   string   `json:"preservedSessionIdentifier"`
+		OldGeneration                int64    `json:"oldGeneration"`
+		NewGeneration                int64    `json:"newGeneration"`
+	}
+
+	// seedAuditFixture builds the collision this test is about, on a database whose audit
+	// settings are whatever the caller asks for. Returns the two users and the credentials the
+	// loser held, so both subtests assert against the same shape.
+	seedAuditFixture := func(t *testing.T, auditToDatabase bool) (*isolatedDB, *models.User, *models.User, *models.UserSession, *models.RefreshToken) {
+		t.Helper()
+		h := newIsolatedDB(t)
+		if err := h.Migrator.Up(); err != nil && !errors.Is(err, gomigrate.ErrNoChange) {
+			require.NoError(t, err, "migrate to head before seeding")
+		}
+
+		// No migration writes a settings row: the SEEDER does, and it runs after the backfill,
+		// so an isolated migrated database has none. The pass reads settings to decide where
+		// the event goes, exactly as AuditLogger.Log does, so the row is a precondition of
+		// this test rather than incidental fixture.
+		settings := &models.Settings{
+			// Empty rather than absent: aes_encryption_key is NOT NULL on MySQL, so a nil
+			// slice is refused. Empty and not 32 bytes on purpose, because that length is what
+			// runStartupDataTasks reads as a legacy data key still to be migrated.
+			AESEncryptionKeyLegacy:     []byte{},
+			AuditLogsInConsoleEnabled:  true,
+			AuditLogsInDatabaseEnabled: auditToDatabase,
+		}
+		require.NoError(t, h.DB.CreateSettings(nil, settings), "seed the settings row")
+		require.Equalf(t, int64(1), settings.Id,
+			"the pass reads settings id 1, so a fixture whose row landed at %d would prove nothing", settings.Id)
+
+		loser := &models.User{Enabled: true, Subject: uuid.New(), Username: "auditloser", Email: "Audited@x.com"}
+		require.NoError(t, h.DB.CreateUser(nil, loser), "seed the mixed-case loser")
+		survivor := &models.User{Enabled: true, Subject: uuid.New(), Username: "auditsurvivor", Email: "audited@x.com"}
+		require.NoError(t, h.DB.CreateUser(nil, survivor), "seed the lowercase survivor")
+
+		clientId := seedClient000035(t, h, "audit-backfill-client")
+		session := seedSessionForBackfill(t, h, loser.Id)
+		token := seedRefreshTokenForBackfill(t, h, clientId, loser.Id, 0)
+
+		// The survivor holds credentials too, so a payload that swept the whole group rather
+		// than the loser would name them and fail below.
+		seedSessionForBackfill(t, h, survivor.Id)
+		seedRefreshTokenForBackfill(t, h, clientId, survivor.Id, 0)
+
+		return h, loser, survivor, session, token
+	}
+
+	t.Run("the disable writes one revoked_user_auth_state row naming the loser", func(t *testing.T) {
+		h, loser, survivor, session, token := seedAuditFixture(t, true)
+
+		before, err := h.DB.GetUserById(nil, loser.Id)
+		require.NoError(t, err, "read the loser's generation before the pass")
+
+		_, disabled, err := h.DB.BackfillLowercaseEmails()
+		require.NoError(t, err, "BackfillLowercaseEmails")
+		require.Equalf(t, 1, disabled, "exactly the loser must be disabled on %s", dbType())
+
+		logs, total, err := h.DB.GetAuditLogsPaginated(nil, 1, 50, constants.AuditRevokedUserAuthState)
+		require.NoError(t, err, "read audit_logs back")
+		require.Equalf(t, 1, total,
+			"disabling one account must leave exactly one %s row; got %d",
+			constants.AuditRevokedUserAuthState, total)
+		require.Len(t, logs, 1)
+
+		var details revokedUserAuthStateDetails
+		require.NoError(t, json.Unmarshal([]byte(logs[0].Details), &details),
+			"the details column must hold the payload as JSON: %q", logs[0].Details)
+
+		assert.Equalf(t, loser.Id, details.UserId,
+			"the event must name the account that lost its credentials, not the one that kept them (survivor is id %d)", survivor.Id)
+		assert.NotEqual(t, survivor.Id, details.UserId, "the survivor was never revoked, so nothing may attest that it was")
+		assert.Equal(t, constants.RevocationReasonEmailCollisionBackfill, details.Reason,
+			"the reason field is what tells this site apart from the four credential sites sharing the event")
+		assert.Empty(t, details.LoggedInUser, "no administrator is acting during a startup pass")
+		assert.Empty(t, details.PreservedSessionIdentifier,
+			"the preservation exception exists so an administrator does not sign themselves out; nobody is signed in here")
+
+		// The lists name what this call TRANSITIONED. Asserted against the seeded credentials
+		// rather than for non-emptiness, so a payload that reported the wrong user's sweep
+		// would fail even though it was well-formed.
+		assert.Equal(t, []string{session.SessionIdentifier}, details.TerminatedSessionIdentifiers,
+			"the deleted session must be named")
+		assert.Equal(t, []string{token.RefreshTokenJti}, details.RevokedRefreshTokenJtis,
+			"the revoked token must be named")
+
+		assert.Equalf(t, before.AuthStateGeneration, details.OldGeneration,
+			"oldGeneration must be the generation this call invalidated")
+		assert.Equalf(t, before.AuthStateGeneration+1, details.NewGeneration,
+			"newGeneration must be the value that landed")
+
+		// The pass is idempotent, and so is its trace. A second run disables nobody, so a
+		// second event would be attesting to an action that did not happen: an auditor
+		// counting these rows would read one forced logout per restart.
+		_, disabledAgain, err := h.DB.BackfillLowercaseEmails()
+		require.NoError(t, err, "second BackfillLowercaseEmails")
+		require.Equal(t, 0, disabledAgain, "the second run must disable nobody")
+
+		_, totalAfter, err := h.DB.GetAuditLogsPaginated(nil, 1, 50, constants.AuditRevokedUserAuthState)
+		require.NoError(t, err, "re-read audit_logs")
+		assert.Equalf(t, 1, totalAfter,
+			"a run that disabled nobody must audit nothing; the count went %d to %d", 1, totalAfter)
+	})
+
+	t.Run("the operator's audit settings decide the database target", func(t *testing.T) {
+		h, loser, _, _, _ := seedAuditFixture(t, false)
+
+		_, disabled, err := h.DB.BackfillLowercaseEmails()
+		require.NoError(t, err, "BackfillLowercaseEmails")
+		require.Equal(t, 1, disabled, "the disable happens whatever the audit settings say")
+
+		_, total, err := h.DB.GetAuditLogsPaginated(nil, 1, 50, constants.AuditRevokedUserAuthState)
+		require.NoError(t, err, "read audit_logs back")
+		assert.Equalf(t, 0, total,
+			"with audit_logs_in_database_enabled off this event must not be written; it is the one event an operator could not turn off otherwise, and %d rows say it is", total)
+
+		// And the revocation still happened, which is the half that must never depend on the
+		// audit configuration.
+		got, err := h.DB.GetUserById(nil, loser.Id)
+		require.NoError(t, err, "read the loser back")
+		assert.False(t, got.Enabled, "the loser must be disabled whether or not the event was recorded")
+		sessions, err := h.DB.GetUserSessionsByUserId(nil, loser.Id)
+		require.NoError(t, err, "read the loser's sessions")
+		assert.Empty(t, sessions, "the sweep must not depend on the audit configuration either")
+	})
 }

@@ -2,12 +2,15 @@ package commondb
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log/slog"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/pkg/errors"
 )
 
@@ -374,8 +377,17 @@ func (d *CommonDatabase) trySetUserEmail(userId int64, expected string, desired 
 // or renamed out of the collision first, is neither counted again nor given a second generation
 // advance. A false return therefore means one of three things and the caller treats them
 // identically, by recomputing the group: already disabled, address moved, row gone.
+//
+// It also emits AuditRevokedUserAuthState, once per transition, after the commit. That is the
+// second half of the same invariant #106 established: the four credential sites do not merely
+// revoke, they attest to having revoked, so a forced logout is never invisible to whoever has
+// to explain it afterwards. See auditRevokedUserAuthState.
 func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (bool, error) {
 	transitioned := false
+	swept := revocationSweep{
+		TerminatedSessionIdentifiers: []string{},
+		RevokedRefreshTokenJtis:      []string{},
+	}
 
 	err := d.inTransaction(nil, func(tx *sql.Tx) error {
 		var err error
@@ -390,9 +402,16 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 			return nil
 		}
 
-		if _, err := d.IncrementUserAuthStateGeneration(tx, userId); err != nil {
+		newGeneration, err := d.IncrementUserAuthStateGeneration(tx, userId)
+		if err != nil {
 			return err
 		}
+		swept.NewGeneration = newGeneration
+		// Derived rather than read beforehand, which is RevokeUserAuthState's own reasoning
+		// (#106): an ordinary SELECT is not a locking read, so a value read before the
+		// increment can be one another writer has already moved away from, while new-1 is by
+		// construction the generation THIS increment invalidated.
+		swept.OldGeneration = newGeneration - 1
 
 		// User-scoped, so it covers both linkage shapes: auth-code tokens through the code's
 		// user and ROPC tokens through the token's own. Nothing is preserved here, unlike the
@@ -409,6 +428,10 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 			if err := d.UpdateRefreshToken(tx, rt); err != nil {
 				return err
 			}
+			// Recorded after the write, so the list names what this call TRANSITIONED rather
+			// than what the user held. A token already revoked is skipped above and stays
+			// absent, which is revokeRefreshTokens' rule at the four other sites.
+			swept.RevokedRefreshTokenJtis = append(swept.RevokedRefreshTokenJtis, rt.RefreshTokenJti)
 		}
 
 		sessions, err := d.GetUserSessionsByUserId(tx, userId)
@@ -419,6 +442,8 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 			if err := d.DeleteUserSession(tx, sessions[i].Id); err != nil {
 				return err
 			}
+			swept.TerminatedSessionIdentifiers = append(
+				swept.TerminatedSessionIdentifiers, sessions[i].SessionIdentifier)
 		}
 
 		return nil
@@ -427,7 +452,124 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 		return false, err
 	}
 
+	// AFTER the commit and only on a real transition, which is the contract
+	// constants.AuditRevokedUserAuthState states and the four credential sites keep. Emitting
+	// inside the transaction would record a revocation that a later rollback undid, and
+	// emitting on a false return would record one that never happened.
+	if transitioned {
+		d.auditRevokedUserAuthState(userId, swept)
+	}
+
 	return transitioned, nil
+}
+
+// revocationSweep is what one disableAndRevoke transaction took away, collected so the audit
+// event can name it. It mirrors handlers.RevocationResult field for field, minus
+// PreservedSessionIdentifier, which is always "" here: that exception exists so an
+// administrator does not sign themselves out, and nobody is signed in during a startup pass.
+//
+// Both slices are initialised rather than left nil, so an account that held nothing logs []
+// instead of null and a consumer never has to tell "swept nothing" from "field absent". That is
+// LogRevokedUserAuthState's rule and the reason it is worth repeating is that the two payloads
+// are read by the same consumer.
+type revocationSweep struct {
+	TerminatedSessionIdentifiers []string
+	RevokedRefreshTokenJtis      []string
+	OldGeneration                int64
+	NewGeneration                int64
+}
+
+// auditRevokedUserAuthState emits AuditRevokedUserAuthState for one collision loser.
+//
+// #106 decision 7 made the event mandatory for the action rather than for the endpoint: it is
+// emitted by every site that invalidates a user's live authentication state, so that a forced
+// logout never happens without a trace. The four credential sites reach it through
+// handlers.LogRevokedUserAuthState. This one cannot, because that helper and AuditLogger both
+// live in the authserver module and core cannot import it, so the payload is written out here
+// and the shape is kept identical field for field. A consumer matching on
+// revoked_user_auth_state finds the same keys whichever site produced the row, and tells them
+// apart by `reason` as the event's contract says.
+//
+// WHY THE RECORD MATTERS MORE HERE THAN AT THE OTHER FOUR. Those four are things a person did
+// and can account for. This one is the server disabling an account and destroying every
+// credential it held, at startup, because two addresses differed only by case, with nobody
+// asking (decision 10 records that reservation about the action itself). The slog.Warn beside
+// it is not a substitute: it is a startup log line in a process a rolling deployment may
+// already have replaced, while this row is in audit_logs where the admin console queries it.
+//
+// NON-FATAL, deliberately, and that is AuditLogger.Log's behaviour rather than a weaker
+// standard adopted here: it logs a failure to persist and returns, so a full disk in the audit
+// path cannot take an authentication server down. The same reasoning is stronger at startup,
+// where returning an error aborts the boot. What is NOT sacrificed is ordering: the revocation
+// is already committed and durable before this runs, so a lost audit row costs the trace and
+// never the action.
+func (d *CommonDatabase) auditRevokedUserAuthState(userId int64, swept revocationSweep) {
+	details := map[string]interface{}{
+		"userId": userId,
+		"reason": constants.RevocationReasonEmailCollisionBackfill,
+		// "" rather than absent, matching the other four: no administrator is acting here, and
+		// a consumer reading this field gets the same type from every site.
+		"loggedInUser":                 "",
+		"terminatedSessionIdentifiers": swept.TerminatedSessionIdentifiers,
+		"revokedRefreshTokenJtis":      swept.RevokedRefreshTokenJtis,
+		"preservedSessionIdentifier":   "",
+		"oldGeneration":                swept.OldGeneration,
+		"newGeneration":                swept.NewGeneration,
+	}
+
+	// Both targets, in AuditLogger.Log's order, so the operator's audit configuration decides
+	// where this event goes exactly as it decides for the other four. A site that ignored the
+	// settings would be the one event an operator could not turn off, or could not turn on.
+	settings, err := d.GetSettingsById(nil, 1)
+	if err != nil {
+		slog.Error("failed to read settings for audit logging",
+			"error", err, "event", constants.AuditRevokedUserAuthState)
+		return
+	}
+	if settings == nil {
+		// No settings row at all, which is a real state and not a defensive branch: no
+		// migration writes that row, the SEEDER does, and the seeder runs after this pass. So
+		// a first-ever boot reaches here. It reaches here having disabled nobody, because a
+		// database with no settings row has no users either, so what this branch loses is an
+		// event that had nothing to attest. Warn rather than fail: an unauditable revocation
+		// is still a revocation that already committed.
+		slog.Warn("no settings row, so a revocation could not be audited",
+			"event", constants.AuditRevokedUserAuthState, "userId", userId)
+		return
+	}
+
+	if settings.AuditLogsInConsoleEnabled {
+		evt := struct {
+			AuditEvent string                 `json:"audit_event"`
+			Details    map[string]interface{} `json:"details"`
+		}{AuditEvent: constants.AuditRevokedUserAuthState, Details: details}
+
+		eventJSON, err := json.Marshal(evt)
+		if err != nil {
+			slog.Error("failed to marshal audit event",
+				"error", err, "event", constants.AuditRevokedUserAuthState)
+		} else {
+			slog.Info(string(eventJSON))
+		}
+	}
+
+	if settings.AuditLogsInDatabaseEnabled {
+		detailsJSON, err := json.Marshal(details)
+		if err != nil {
+			slog.Error("failed to marshal audit event details for DB",
+				"error", err, "event", constants.AuditRevokedUserAuthState)
+			return
+		}
+		// nil tx on purpose: the revocation's transaction is committed and gone, and enlisting
+		// the audit row in a new one would buy nothing to be atomic with.
+		if err := d.CreateAuditLog(nil, &models.AuditLog{
+			AuditEvent: constants.AuditRevokedUserAuthState,
+			Details:    string(detailsJSON),
+		}); err != nil {
+			slog.Error("failed to persist audit log to database",
+				"error", err, "event", constants.AuditRevokedUserAuthState)
+		}
+	}
 }
 
 // tryDisableUserWithEmail is TrySetUserEnabled's compare-and-set with the address in the

@@ -208,6 +208,12 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 // Reasons for AuditRevokedUserAuthState, one per credential site (#106 decision 7). Constants
 // rather than inline strings so the four sites cannot drift and a log consumer has something to
 // match against.
+//
+// A fifth reason exists and is NOT here: constants.RevocationReasonEmailCollisionBackfill, for
+// the startup pass that disables the losers of an email case collision (#283). It is declared
+// in core because the site emitting it is commondb, which cannot import this package. Adding a
+// sixth means deciding which module its site lives in; the full list is enumerated on
+// constants.AuditRevokedUserAuthState.
 const (
 	RevocationReasonPasswordReset    = "password_reset"
 	RevocationReasonPasswordChange   = "password_change"
