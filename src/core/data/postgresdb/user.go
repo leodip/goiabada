@@ -62,6 +62,10 @@ func (d *PostgresDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, erro
 	return d.CommonDB.BackfillEncryptedOTPSecrets(aesKey)
 }
 
+func (d *PostgresDatabase) BackfillLowercaseEmails() (int, int, error) {
+	return d.CommonDB.BackfillLowercaseEmails()
+}
+
 func (d *PostgresDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
 	return d.CommonDB.ReencryptDataToNewKey(oldKey, newKey)
 }

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
@@ -196,8 +197,13 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 	passwordHash, _ := hashutil.HashPassword(adminPassword)
 
 	user := &models.User{
-		Subject:       uuid.New(),
-		Email:         adminEmail,
+		Subject: uuid.New(),
+		// Lowercased at the write, exactly as every other path that stores an email does.
+		// Without it GOIABADA_ADMIN_EMAIL reaches the column verbatim, and an operator who
+		// sets Admin@Example.com gets an admin who cannot sign in at all on SQLite or
+		// PostgreSQL, on first run: both compare "=" exactly, and the password handler and
+		// the ROPC grant each look the account up by the lowercased address (#221, #283).
+		Email:         strings.ToLower(strings.TrimSpace(adminEmail)),
 		EmailVerified: true,
 		PasswordHash:  passwordHash,
 		Enabled:       true,

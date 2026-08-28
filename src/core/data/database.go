@@ -23,6 +23,12 @@ type Database interface {
 	RollbackTransaction(tx *sql.Tx) error
 	Migrate() error
 	BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
+	// BackfillLowercaseEmails brings every stored users.email down to its lowercase form,
+	// so a credential path that lowercases the address it was given can reach the row, on
+	// every engine rather than only the two that fold case in "=" (#221, #283). Where two
+	// rows differ only by case one survives, lowercased, and the rest are disabled with
+	// their address intact. Returns rows lowercased and rows disabled.
+	BackfillLowercaseEmails() (int, int, error)
 	ReencryptDataToNewKey(oldKey, newKey []byte) error
 	RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error)
 	IsEmpty() (bool, error)
@@ -613,6 +619,23 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 	}
 	if migrated > 0 {
 		slog.Info(fmt.Sprintf("encrypted %d legacy plaintext OTP secret(s) at rest", migrated))
+	}
+
+	// Lowercase any legacy mixed-case email addresses (issues #221 and #283). Fail-closed and
+	// idempotent, and a no-op on a fresh DB. It runs here, after the migration chain and before
+	// either application serves, because the alternative is a window in which a row's address
+	// cannot be matched by the lowercased value every credential path looks it up with.
+	//
+	// Not a migration file: the rule is Go's strings.ToLower over the whole alphabet, and
+	// SQLite's SQL LOWER() maps ASCII only, so the same statement would mean two different
+	// things on four engines.
+	lowercased, disabled, err := database.BackfillLowercaseEmails()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to lowercase legacy user email addresses")
+	}
+	if lowercased > 0 || disabled > 0 {
+		slog.Info(fmt.Sprintf("lowercased %d legacy user email address(es); disabled %d that differed from another only by case",
+			lowercased, disabled))
 	}
 
 	return database, nil
