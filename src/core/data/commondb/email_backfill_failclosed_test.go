@@ -7,12 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +29,9 @@ import (
 //     failure after the enabled-to-disabled transition rolls the whole of it back.
 //  3. The group is re-read immediately before it is decided, and each write is guarded on the
 //     address that re-read saw, so a row somebody else changed in between is left alone.
+//  4. The revocation's audit event reaches whichever of the two targets the operator's settings
+//     name, and reaching the database target does not itself report a failure on a driver that
+//     refuses LastInsertId, which is what pgx and go-mssqldb both do.
 //
 // The rule the pass applies is TestPickEmailSurvivor's, and its four-engine behaviour is the
 // data tier's. Neither is retested here.
@@ -316,8 +322,26 @@ func modelRow(t *testing.T, model interface{}) *scriptedRows {
 				vals[i] = v.Time
 			}
 		default:
-			// Anything else is a nullable the pass does not read, and NULL is what a
-			// nullable scans from.
+			// Everything the switch does not name, by kind. A plain int, or a named integer
+			// type like enums.PasswordPolicy, is NOT nullable, and scanning NULL into one
+			// fails the Scan with "converting NULL to int is unsupported" for a reason that
+			// has nothing to do with what the test asserts. models.Settings has nine such
+			// fields, which is why this branch cannot simply leave the value nil.
+			rv := reflect.ValueOf(addr).Elem()
+			switch rv.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				vals[i] = rv.Int()
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				vals[i] = int64(rv.Uint())
+			case reflect.Float32, reflect.Float64:
+				vals[i] = rv.Float()
+			case reflect.Slice:
+				// []byte carries as itself; any other slice is not a driver.Value and stays
+				// NULL, which is what a nullable column scans from.
+				if rv.Type().Elem().Kind() == reflect.Uint8 {
+					vals[i] = rv.Bytes()
+				}
+			}
 		}
 	}
 
@@ -695,4 +719,196 @@ func TestBackfillLowercaseEmails_GivesUpRatherThanSpinning(t *testing.T) {
 	assert.Equalf(t, emailGroupAttempts, d.execCount,
 		"the pass must try exactly emailGroupAttempts times and stop; %d means it is unbounded or gave up early", d.execCount)
 	assert.Equal(t, emailGroupAttempts+1, d.queryCount, "the scan plus one re-read per attempt")
+}
+
+// capturedLogs is a slog.Handler that keeps what was written to it, so a test can assert on
+// output that otherwise only a person reading a terminal would ever see.
+//
+// It exists because one half of the audit emission has no other observable: the console target
+// is a slog.Info call and nothing else. Before this, no test in the repository read slog output
+// at all, which is why forcing the console branch to false left the whole four-engine data tier
+// green.
+type capturedLogs struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (c *capturedLogs) Enabled(context.Context, slog.Level) bool { return true }
+
+func (c *capturedLogs) Handle(_ context.Context, r slog.Record) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.records = append(c.records, r.Clone())
+	return nil
+}
+
+func (c *capturedLogs) WithAttrs([]slog.Attr) slog.Handler { return c }
+func (c *capturedLogs) WithGroup(string) slog.Handler      { return c }
+
+// messagesAt returns the messages logged at one level, in order.
+func (c *capturedLogs) messagesAt(level slog.Level) []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	out := []string{}
+	for _, r := range c.records {
+		if r.Level == level {
+			out = append(out, r.Message)
+		}
+	}
+	return out
+}
+
+// captureLogs redirects the default logger for one test and restores it afterwards.
+//
+// slog.SetDefault is process-wide, so this is only safe while no test in this package calls
+// t.Parallel(). None does, and a parallel test here would break far more than this helper: the
+// scripted driver counts statements globally per script.
+func captureLogs(t *testing.T) *capturedLogs {
+	t.Helper()
+
+	c := &capturedLogs{}
+	previous := slog.Default()
+	slog.SetDefault(slog.New(c))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return c
+}
+
+// auditedGroup is the script for one collision the pass resolves in full: a survivor already
+// spelled in lowercase, one enabled loser holding a refresh token and a session, and the
+// settings row auditRevokedUserAuthState reads after the commit to decide where the event goes.
+func auditedGroup(t *testing.T, console bool, database bool) *scriptedDriver {
+	t.Helper()
+
+	return &scriptedDriver{rows: []*scriptedRows{
+		scanResult(scanRow(1, "Alice@x.com")),
+		groupResult(groupRow(1, "Alice@x.com", true), groupRow(2, "alice@x.com", true)),
+		generationReadBack(5),
+		modelRow(t, &models.RefreshToken{Id: 7}),
+		modelRow(t, &models.UserSession{Id: 9}),
+		modelRow(t, &models.Settings{
+			Id:                         1,
+			AuditLogsInConsoleEnabled:  console,
+			AuditLogsInDatabaseEnabled: database,
+		}),
+	}}
+}
+
+// auditRowsWritten counts the statements whose arguments carry the audit event name, which is
+// the INSERT into audit_logs and nothing else in this sequence. Read off the recorded arguments
+// rather than the query text, like everything else in this file, so a rewritten clause does not
+// break it.
+func auditRowsWritten(d *scriptedDriver) int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	written := 0
+	for _, args := range d.execArgs {
+		for _, arg := range args {
+			if s, ok := arg.(string); ok && s == constants.AuditRevokedUserAuthState {
+				written++
+			}
+		}
+	}
+	return written
+}
+
+// TestBackfillLowercaseEmails_TheAuditSettingsDecideBothTargets pins where the revocation's
+// audit event goes, in both polarities of both targets.
+//
+// The rule is a hand-copy and that is why it needs pinning. auditRevokedUserAuthState writes the
+// event out itself, because handlers.LogRevokedUserAuthState and AuditLogger both live in the
+// authserver module and core cannot import them, so nothing but a test holds the copy to the
+// original. The database target was pinned in both polarities by the data tier from the start;
+// the console target was pinned in neither, and forcing its branch to false left every engine
+// green (#283, final review round 4).
+//
+// The console half is not the lesser one. The audit-log documentation recommends console output
+// precisely where the database is the resource being audited, and this event is the server
+// disabling an account and destroying every credential it held with nobody having asked.
+func TestBackfillLowercaseEmails_TheAuditSettingsDecideBothTargets(t *testing.T) {
+	tests := []struct {
+		name     string
+		console  bool
+		database bool
+	}{
+		{name: "both targets on", console: true, database: true},
+		{name: "console only", console: true, database: false},
+		{name: "database only", console: false, database: true},
+		{name: "both targets off", console: false, database: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := captureLogs(t)
+			d := auditedGroup(t, tc.console, tc.database)
+
+			_, disabled, err := scriptedDB(t, d).BackfillLowercaseEmails()
+
+			require.NoError(t, err, "the audit emission is non-fatal and must never fail the pass")
+			require.Equal(t, 1, disabled,
+				"the fixture only says anything about auditing if the loser was actually disabled")
+
+			console := 0
+			for _, message := range logs.messagesAt(slog.LevelInfo) {
+				if strings.Contains(message, constants.AuditRevokedUserAuthState) {
+					console++
+				}
+			}
+			if tc.console {
+				assert.Equal(t, 1, console,
+					"audit_logs_in_console_enabled is on, so the event must reach the console exactly once")
+			} else {
+				assert.Zero(t, console,
+					"audit_logs_in_console_enabled is off, so the operator has turned this event's console copy off and it must not appear")
+			}
+
+			if tc.database {
+				assert.Equal(t, 1, auditRowsWritten(d),
+					"audit_logs_in_database_enabled is on, so exactly one audit_logs row must be written")
+			} else {
+				assert.Zero(t, auditRowsWritten(d),
+					"audit_logs_in_database_enabled is off, so no audit_logs row may be written")
+			}
+
+			// The emission must not report a failure it did not have. This driver answers every
+			// statement with driver.RowsAffected, whose LastInsertId refuses exactly as pgx's
+			// stdlib wrapper does, so a call that reads the id back logs a persistence failure
+			// over a row that landed. That is what jammed the operator's only alarm for the
+			// audit trail on PostgreSQL and SQL Server (#283).
+			assert.Emptyf(t, logs.messagesAt(slog.LevelError),
+				"nothing here failed, so nothing may be logged at ERROR; got %v",
+				logs.messagesAt(slog.LevelError))
+		})
+	}
+}
+
+// TestInsertAuditLogWithoutId_SurvivesADriverThatRefusesLastInsertId pins the helper itself
+// against the driver behaviour it exists for.
+//
+// database/sql's own driver.RowsAffected is the faithful stand-in: it is literally what pgx's
+// stdlib wrapper returns from an Exec, and its LastInsertId reports "not supported by this
+// driver". go-mssqldb refuses the same call with its own wording.
+func TestInsertAuditLogWithoutId_SurvivesADriverThatRefusesLastInsertId(t *testing.T) {
+	db := scriptedDB(t, &scriptedDriver{})
+
+	err := db.insertAuditLogWithoutId(nil, &models.AuditLog{
+		AuditEvent: constants.AuditRevokedUserAuthState,
+		Details:    "{}",
+	})
+	require.NoError(t, err,
+		"the row landed, so the helper must report success on a driver that cannot hand back an id")
+
+	// What keeps the case from being vacuous: the same insert through CreateAuditLog, on the
+	// same driver, is the failure the helper exists to avoid. If this half ever stops failing,
+	// CreateAuditLog has stopped reading the id back, the helper has no further reason to exist,
+	// and this line is where that gets noticed.
+	err = db.CreateAuditLog(nil, &models.AuditLog{
+		AuditEvent: constants.AuditRevokedUserAuthState,
+		Details:    "{}",
+	})
+	require.Error(t, err,
+		"CreateAuditLog reads the id back, which is why a caller inside commondb cannot use it")
+	assert.Contains(t, err.Error(), "unable to get last insert id",
+		"and the failure is the id read rather than the insert")
 }

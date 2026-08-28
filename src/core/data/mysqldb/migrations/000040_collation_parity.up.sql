@@ -1,3 +1,9 @@
+-- parity: mysql and mssql only. SQLite and PostgreSQL compare strings byte-wise already, and
+-- neither has a per-column collation to pin, so there is no conversion for them to carry. The
+-- other half of #283, lowercasing every stored users.email, runs on all four engines in Go
+-- rather than in SQL (commondb.BackfillLowercaseEmails), because SQLite's LOWER() maps ASCII
+-- only through modernc.org/sqlite and would leave a non-ASCII address behind.
+--
 -- Every string column on this engine moves to utf8mb4_0900_as_cs, the case- and
 -- accent-SENSITIVE collation, so `=` and every UNIQUE index over a string mean here what
 -- they already mean on SQLite and PostgreSQL (#283).
