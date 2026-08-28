@@ -1,6 +1,7 @@
 package mssqldb
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/url"
 
 	gomigrate "github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/sqlserver"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
@@ -146,7 +148,88 @@ func (d *MsSQLDatabase) RollbackTransaction(tx *sql.Tx) error {
 // NewMigrator builds a golang-migrate instance bound to this database and the
 // embedded migration files. Migrate delegates to it; tests use it to step to a
 // specific version (e.g. seed at 000020, then apply 000021 in isolation).
+// schemaMigrationsTableDDL pins the shape of golang-migrate's own version table, which
+// Goiabada creates before handing the database over rather than leaving to the driver
+// (#284 decision 7). It builds what golang-migrate v4.19.1's SQL Server driver would build
+// itself, so issuing it first makes the driver's own statement a no-op and the shape
+// Goiabada's: this table then has one shape on all four engines and a dependency bump that
+// changed the driver's DDL cannot silently change what Goiabada builds. SQLite is the
+// engine where this actually differs today; here it pins what is already true.
+//
+// Unqualified, so it lands in the caller's default schema, which is the same one
+// sqlserver.WithInstance resolves through SCHEMA_NAME().
+const schemaMigrationsTableDDL = `IF OBJECT_ID(N'schema_migrations', N'U') IS NULL
+	CREATE TABLE schema_migrations (
+		version BIGINT PRIMARY KEY NOT NULL,
+		dirty BIT NOT NULL
+	);`
+
+// ensureSchemaMigrationsTable creates the version table at Goiabada's shape when it is not
+// there yet, holding golang-migrate's own migration lock while it does.
+//
+// SQL Server has no atomic CREATE TABLE IF NOT EXISTS, so the statement above is a check
+// followed by a create and two processes starting against one empty database can both pass
+// the check: the loser gets Msg 2714, "There is already an object named
+// 'schema_migrations'", and fails to start. Two replicas against one database is an
+// ordinary topology, not a hypothetical one. golang-migrate's own ensureVersionTable runs
+// exactly this sequence and is safe only because it holds sp_getapplock around it, so this
+// takes the same lock on the same resource, and it must go on doing so: without it this
+// function REMOVES a property the driver already had.
+//
+// The resource name is computed by the library's own exported function from the library's
+// own two arguments, rather than by a formula copied out of the driver, so the two cannot
+// drift onto different resources. schemaName is what sqlserver.WithInstance fills its empty
+// Config.SchemaName from.
+//
+// sp_getapplock at LockOwner = 'Session' is scoped to one session, so the lock has to be
+// taken, used and released on a single connection pinned out of the pool. Issued against
+// the pooled *sql.DB, the release could land on a different session and leave the lock held
+// for the life of the process, blocking every later migrator.
+func (d *MsSQLDatabase) ensureSchemaMigrationsTable() error {
+	ctx := context.Background()
+
+	var schemaName string
+	if err := d.DB.QueryRowContext(ctx, "SELECT SCHEMA_NAME()").Scan(&schemaName); err != nil {
+		return errors.Wrap(err, "unable to read the default schema name")
+	}
+	lockID, err := database.GenerateAdvisoryLockId(d.dbConfig.Name, schemaName)
+	if err != nil {
+		return errors.Wrap(err, "unable to derive the migration lock id")
+	}
+
+	conn, err := d.DB.Conn(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to pin a connection for the migration lock")
+	}
+	defer func() { _ = conn.Close() }()
+
+	// LockTimeout = -1 blocks until the lock is free, which is what the driver does: the
+	// holder is another process's pre-create or migration, and both are short.
+	const takeLock = `DECLARE @lockResult int;
+		EXEC @lockResult = sp_getapplock @Resource = @p1, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = -1;
+		SELECT @lockResult;`
+	var status int
+	if err := conn.QueryRowContext(ctx, takeLock, lockID).Scan(&status); err != nil {
+		return errors.Wrap(err, "unable to take the migration lock")
+	}
+	if status < 0 {
+		return errors.Errorf("unable to take the migration lock: sp_getapplock returned %d", status)
+	}
+	defer func() {
+		_, _ = conn.ExecContext(ctx, `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`, lockID)
+	}()
+
+	if _, err := conn.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
+		return errors.Wrap(err, "unable to create the schema_migrations table")
+	}
+	return nil
+}
+
 func (d *MsSQLDatabase) NewMigrator() (*gomigrate.Migrate, error) {
+	if err := d.ensureSchemaMigrationsTable(); err != nil {
+		return nil, err
+	}
+
 	driver, err := sqlserver.WithInstance(d.DB, &sqlserver.Config{
 		DatabaseName: d.dbConfig.Name,
 	})
