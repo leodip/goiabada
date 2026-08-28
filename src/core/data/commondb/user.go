@@ -2,6 +2,7 @@ package commondb
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -410,6 +411,72 @@ func (d *CommonDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState boo
 	return user, nil
 }
 
+// The columns the admin console's user search reads. The page query and the count query both
+// build their predicates from this one list, through searchUserLikeClauses, so the two cannot
+// drift apart and start disagreeing about how many rows a page is a slice of.
+var searchUserColumns = []string{"subject", "username", "given_name", "middle_name", "family_name", "email"}
+
+// likeEscapeChar is the character the search predicates declare in their ESCAPE clause and the
+// one escapeLikePattern writes. It is "!" rather than the usual backslash because the clause has
+// to parse on all four engines: MySQL reads backslash escapes inside string literals, so
+// ESCAPE '\' is ERROR 1064 there, while PostgreSQL, SQL Server and SQLite read it as one
+// backslash. A character that is special nowhere avoids an engine branch entirely (#95).
+const likeEscapeChar = '!'
+
+// escapeLikePattern makes a user's search term match literally, by prefixing likeEscapeChar
+// before every character LIKE would otherwise read as a wildcard. The caller wraps the %...%
+// around the result, so those two are the only wildcards left.
+//
+// Without it the term is not data but a pattern the caller of the admin API chooses: a search
+// for "%" matches every user in the deployment and returns them a page at a time, and
+// "bob_smith" matches "bobxsmith" as well (#95).
+//
+// The four characters are the union of what the engines treat as special, not what any one of
+// them does. "[" is here because SQL Server's LIKE has a third wildcard the other three do not,
+// the [abc] character class, so leaving it would keep search meaning one thing there and another
+// everywhere else, which is the divergence #283 exists to end. Escaping it is a plain literal on
+// the other three, measured on all four. And likeEscapeChar escapes itself because an email
+// local part may legally contain "!", so a term carrying one has to survive.
+func escapeLikePattern(term string) string {
+	var b strings.Builder
+	b.Grow(len(term))
+	// Byte-wise rather than rune-wise on purpose: every character escaped here is ASCII, and a
+	// UTF-8 continuation byte is never one of them, so the multi-byte runes pass through whole.
+	// One pass also means an escape this writes is never re-read as input and escaped again.
+	for i := 0; i < len(term); i++ {
+		switch c := term[i]; c {
+		case likeEscapeChar, '%', '_', '[':
+			b.WriteByte(likeEscapeChar)
+			b.WriteByte(c)
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
+// searchUserLikeClauses builds one predicate per searched column, to be OR'd together.
+//
+// LOWER() on both sides rather than leaving the fold to the column's collation, because the
+// collation means four different things: PostgreSQL and SQLite compare case-sensitively, so a
+// search for "alice" misses "Alice" there today, while MySQL and SQL Server fold. Deciding it in
+// the query is the only spelling that is the same on all four (#283). sqlbuilder's Cond.ILike
+// would fold too, and is not used because it has no ESCAPE parameter, without which the term's
+// own wildcards survive (#95).
+//
+// sb.Var supplies each flavor's own placeholder, so this is written once and no engine branch
+// appears. Removing the LOWER() calls puts PostgreSQL's case-sensitive search back and takes the
+// other three with it; removing the ESCAPE clause makes the escaping above inert.
+func searchUserLikeClauses(sb *sqlbuilder.SelectBuilder, query string) []string {
+	pattern := "%" + escapeLikePattern(query) + "%"
+	clauses := make([]string, 0, len(searchUserColumns))
+	for _, col := range searchUserColumns {
+		clauses = append(clauses,
+			"LOWER("+col+") LIKE LOWER("+sb.Var(pattern)+") ESCAPE '"+string(likeEscapeChar)+"'")
+	}
+	return clauses
+}
+
 func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error) {
 
 	if page < 1 {
@@ -427,14 +494,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 
 	if query != "" {
 		selectBuilder.Where(
-			selectBuilder.Or(
-				selectBuilder.Like("subject", "%"+query+"%"),
-				selectBuilder.Like("username", "%"+query+"%"),
-				selectBuilder.Like("given_name", "%"+query+"%"),
-				selectBuilder.Like("middle_name", "%"+query+"%"),
-				selectBuilder.Like("family_name", "%"+query+"%"),
-				selectBuilder.Like("email", "%"+query+"%"),
-			),
+			selectBuilder.Or(searchUserLikeClauses(selectBuilder, query)...),
 		)
 	}
 	// given_name is not unique, so it does not order the rows totally, and a page is a slice
@@ -472,14 +532,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 
 	if query != "" {
 		selectBuilder.Where(
-			selectBuilder.Or(
-				selectBuilder.Like("subject", "%"+query+"%"),
-				selectBuilder.Like("username", "%"+query+"%"),
-				selectBuilder.Like("given_name", "%"+query+"%"),
-				selectBuilder.Like("middle_name", "%"+query+"%"),
-				selectBuilder.Like("family_name", "%"+query+"%"),
-				selectBuilder.Like("email", "%"+query+"%"),
-			),
+			selectBuilder.Or(searchUserLikeClauses(selectBuilder, query)...),
 		)
 	}
 
