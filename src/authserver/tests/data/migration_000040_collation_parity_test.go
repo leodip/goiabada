@@ -211,6 +211,96 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 	assertCollations000040(t, h, collationBefore000040, "after the retried rollback")
 }
 
+// TestMigration000040_UpRollsBackALateFailure is the up direction's atomicity boundary. The
+// down direction has one already, in TestMigration000040_DownRefusesACaseVariantPair, and the
+// up direction is the one whose transaction wrapper had no test at all: every committed case
+// migrates successfully, so removing SET XACT_ABORT ON and the explicit transaction from the up
+// file left the whole suite green.
+//
+// The up direction has no failure the DATA can cause, which the file's own comment establishes:
+// going from a folding collation to a non-folding one only ever relaxes uniqueness. That is
+// exactly why it needs this test rather than exempting it. A lock timeout, a full transaction
+// log, a dropped connection or a dependency the migration does not manage all stop it part way,
+// and golang-migrate's SQL Server driver submits the file as ONE batch and opens no transaction
+// of its own, so every statement before the failure would autocommit. The operator would then be
+// holding a database with no UNIQUE index on client_identifier, email, subject, code_hash or
+// refresh_token_jti, 90 of 92 columns converted, and no way forward: the retry dies at the first
+// DROP INDEX with Msg 3701 on an index that no longer exists.
+//
+// SQL Server only. MySQL's DDL is not transactional, so its up file cannot be wrapped and does
+// not claim to be; what makes MySQL survivable is that each of its statements is idempotent and
+// the run can simply be retried. SQLite and PostgreSQL have no 000040 file.
+//
+// It runs on its own fixture because it deliberately ends the first attempt with a dirty
+// migration state, which nothing after it in the same database could survive.
+//
+// Run via: ./run-tests.sh --type data --db mssql --run TestMigration000040_UpRollsBack
+func TestMigration000040_UpRollsBackALateFailure(t *testing.T) {
+	if dbType() != "mssql" {
+		t.Skipf("%s has no transactional 000040 up file to roll back", dbType())
+	}
+
+	h := newFixture000040(t)
+	prior := priorVersion000040()
+	require.NoErrorf(t, h.Migrator.Migrate(prior), "migrate to %d", prior)
+
+	// The failure, injected as a dependency the migration knows nothing about: an index of the
+	// operator's own on a string column 000040 has to ALTER. SQL Server refuses that with
+	// Msg 5074, which is the same refusal the migration drops its own 23 indexes to avoid.
+	//
+	// On users.forgot_password_code_hash deliberately, because it is the LAST column the file
+	// alters on users, the second-to-last table in its conversion. The refusal therefore lands
+	// after 6 default constraints and 23 indexes have been dropped and 90 of the 92 columns
+	// converted. That lateness is the whole point: a failure on the first statement would pass
+	// against an unwrapped file too, and prove nothing about the state this one exists to
+	// prevent.
+	const unmanagedIndex = "idx_operators_own_000040"
+	_, err := h.SQL.Exec(fmt.Sprintf(
+		"CREATE INDEX [%s] ON [users]([forgot_password_code_hash])", unmanagedIndex))
+	require.NoError(t, err, "seed an index 000040 does not manage")
+
+	before := dumpTables000040(t, h)
+	shapeBefore := mssqlSchemaShape000040(t, h)
+	require.NotEmpty(t, shapeBefore, "the catalog sweep read no index or default at all")
+
+	err = h.Migrator.Migrate(40)
+	require.Error(t, err, "an ALTER COLUMN under an index the migration does not manage must fail")
+
+	// Msg 5074 names the COLUMN and not the object: "ALTER TABLE ALTER COLUMN
+	// forgot_password_code_hash failed because one or more objects access this column." So the
+	// column is what an operator gets, and the assertion is what they actually get rather than
+	// what would be more useful. Asserted at all because the failure has to be the one this
+	// test injected: any other error would prove the rollback of something else.
+	assert.Containsf(t, strings.ToLower(err.Error()), "forgot_password_code_hash",
+		"the failure must be the injected one, on the last column of the last-but-one table: %v", err)
+
+	// A failure that dismantles the schema is not a failure, it is a wreck. Compared as the
+	// whole dump and the whole catalog shape rather than as a list of what should have stayed,
+	// for seam 2's reason: a hand-written list drifts as migrations are added and a difference
+	// cannot. Equality rather than assertOnlyCollationMoved000040 because after a rollback the
+	// collation must not have moved either.
+	assertCollations000040(t, h, collationBefore000040, "after the failed up")
+	assert.Equalf(t, shapeBefore, mssqlSchemaShape000040(t, h),
+		"the failed up must leave every index and default constraint exactly as it found them")
+	assert.Equal(t, before, dumpTables000040(t, h),
+		"and every column of every table, including the ones it had already converted before the failure")
+
+	// And the recovery works. Resolve the dependency, clear the dirty version by hand, run it
+	// again. This is the half a test asserting only the error message cannot see, and it is the
+	// half an operator is standing in: without the transaction, this retry is what dies at
+	// Msg 3701.
+	_, err = h.SQL.Exec(fmt.Sprintf("DROP INDEX [%s] ON [users]", unmanagedIndex))
+	require.NoError(t, err, "resolve the dependency by hand")
+
+	require.NoError(t, h.Migrator.Force(int(prior)),
+		"clear the dirty version the deliberate failure left, which is the operator's own step")
+	require.NoError(t, h.Migrator.Migrate(40),
+		"the retry must reach 40; if it does not, the first attempt destroyed something it cannot rebuild")
+
+	assertCollations000040(t, h, collationAfter000040, "after the retried up")
+	assertDefaultsAreNamed000040(t, dumpTables000040(t, h), "after the retried up")
+}
+
 // mssqlSchemaShape000040 is every named index and every default constraint on a non-system
 // table, as the engine's own catalog reports it, sorted. It exists so a refused rollback can be
 // held to leaving the schema untouched without anybody maintaining a list of what "untouched"
