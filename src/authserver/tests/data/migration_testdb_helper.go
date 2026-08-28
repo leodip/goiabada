@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/leodip/goiabada/core/data/mysqldb"
 	"github.com/leodip/goiabada/core/data/postgresdb"
+	"github.com/leodip/goiabada/core/data/schemadump"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
 	"github.com/stretchr/testify/require"
 )
@@ -195,523 +195,101 @@ func newIsolated(t *testing.T, db migratable, sqlDB *sql.DB) *isolatedDB {
 	return &isolatedDB{DB: db, SQL: sqlDB, Migrator: m}
 }
 
-// indexShape is one index as the engine's catalog reports it. Exists is derived from
-// Columns rather than counted separately: an index with no key columns is not a thing
-// any of the four engines can produce.
-type indexShape struct {
-	Name    string
-	Exists  bool
-	Unique  bool
-	Columns []string // key columns, in index order
-}
-
-// describeIndex reads an index's uniqueness and key columns from the configured
-// dialect's catalog. It exists because asserting only that an index NAME is present
-// lets a wrongly built index pass: created on the wrong column, or created UNIQUE on
-// a column that is deliberately repeated, both of which are the failures worth
-// catching.
+// The shapes and the dumper live in the core module now, at data/schemadump, because the
+// generator command that writes the golden files cannot reach an unexported helper in
+// another module's test package (#284). What stays here is the thin layer this package's
+// migration tests were written against.
 //
-// Every query normalises uniqueness to '1' or '0' in SQL rather than in Go. The
-// polarity is not consistent across the catalogs (MySQL reports NON_UNIQUE, which is
-// 0 for a unique index) and the types are not either (a PostgreSQL boolean, a SQL
-// Server bit, a SQLite integer), so resolving both at the source keeps one meaning
-// on the Go side.
-func describeIndex(t *testing.T, h *isolatedDB, table, index string) indexShape {
+// tableShape is a defined type over schemadump.TableShape rather than an alias or an
+// embedding. An alias would forbid the three methods below, which Go can only hang on a type
+// declared in this package; an embedding would break every composite literal the migration
+// tests build. Identical fields make the two directly convertible.
+type (
+	columnShape     = schemadump.ColumnShape
+	indexShape      = schemadump.IndexShape
+	foreignKeyShape = schemadump.ForeignKeyShape
+
+	tableShape schemadump.TableShape
+)
+
+// dumpDialect is the configured dialect in the vocabulary schemadump takes. The package
+// takes it as a parameter rather than reading the configuration itself, because the
+// generator connects to all four engines in one process.
+func dumpDialect(t *testing.T) schemadump.Dialect {
 	t.Helper()
-
-	var q string
-	switch dbType() {
-	case "mysql":
-		q = fmt.Sprintf(`SELECT COLUMN_NAME, CASE WHEN NON_UNIQUE = 0 THEN '1' ELSE '0' END
-			FROM information_schema.statistics
-			WHERE table_schema = DATABASE() AND table_name = '%s' AND index_name = '%s'
-			ORDER BY SEQ_IN_INDEX`, table, index)
-	case "postgres":
-		// indkey is an int2vector of column numbers; unnesting it WITH ORDINALITY is
-		// what preserves the index's own column order. indkey holds INCLUDE columns
-		// after the key ones, so the position is bounded by indnkeyatts to keep this
-		// branch reporting key columns only, which is what the mssql branch's
-		// is_included_column filter does and what Columns is documented to hold.
-		q = fmt.Sprintf(`SELECT a.attname, CASE WHEN ix.indisunique THEN '1' ELSE '0' END
-			FROM pg_index ix
-			JOIN pg_class i ON i.oid = ix.indexrelid
-			JOIN pg_class tb ON tb.oid = ix.indrelid
-			JOIN unnest(ix.indkey::smallint[]) WITH ORDINALITY AS k(attnum, ord) ON true
-			JOIN pg_attribute a ON a.attrelid = tb.oid AND a.attnum = k.attnum
-			WHERE tb.relname = '%s' AND i.relname = '%s'
-			  AND k.ord <= ix.indnkeyatts
-			ORDER BY k.ord`, table, index)
-	case "mssql":
-		// is_included_column = 0 keeps INCLUDE columns out: they are payload, not key
-		// columns, and they carry key_ordinal 0.
-		q = fmt.Sprintf(`SELECT c.name, CASE WHEN i.is_unique = 1 THEN '1' ELSE '0' END
-			FROM sys.indexes i
-			JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-			JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-			WHERE i.object_id = OBJECT_ID('dbo.%s') AND i.name = '%s'
-			  AND ic.is_included_column = 0
-			ORDER BY ic.key_ordinal`, table, index)
-	default: // sqlite
-		// The comma join is required: pragma_index_info takes its argument from the
-		// row to its left, which SQLite only allows for table-valued functions in
-		// that position.
-		q = fmt.Sprintf(`SELECT ii.name, CASE WHEN il."unique" = 1 THEN '1' ELSE '0' END
-			FROM pragma_index_list('%s') AS il, pragma_index_info(il.name) AS ii
-			WHERE il.name = '%s'
-			ORDER BY ii.seqno`, table, index)
-	}
-
-	rows, err := h.SQL.Query(q)
-	require.NoErrorf(t, err, "index catalog lookup: %s on %s", index, table)
-	defer func() { _ = rows.Close() }()
-
-	shape := indexShape{Name: index}
-	for rows.Next() {
-		var col, uniqueFlag string
-		require.NoErrorf(t, rows.Scan(&col, &uniqueFlag),
-			"scan index catalog row: %s on %s", index, table)
-		shape.Columns = append(shape.Columns, col)
-		shape.Unique = uniqueFlag == "1"
-	}
-	require.NoErrorf(t, rows.Err(), "iterate index catalog: %s on %s", index, table)
-
-	shape.Exists = len(shape.Columns) > 0
-	return shape
-}
-
-// columnShape, foreignKeyShape and tableShape are one table as the engine's catalog
-// reports it. dumpTable fills them; see its comment for why the fields are these.
-type columnShape struct {
-	Name     string
-	Type     string // the engine's own spelling, verbatim
-	Nullable bool
-	Default  string // the engine's own default expression, verbatim; "" when there is none
-
-	// Collation is what the engine says decides `=` and ordering for this column, in the
-	// engine's own vocabulary: a utf8mb4_* name on MySQL, a pg_collation name on
-	// PostgreSQL (which is "default" for every column here, since none carries an
-	// override), a Latin1_General_* name on SQL Server, and the declared COLLATE on
-	// SQLite, or BINARY when the declaration omits one. "" for a column that holds no
-	// string. It is read because collation is the whole of what migration 000040 changes,
-	// and nothing else in this dump can see it: two columns identical in type,
-	// nullability, default and index can still disagree about whether MyApp and myapp are
-	// one value (#283).
-	Collation string
-
-	// DefaultName is the default constraint's own name, which SQL Server alone gives one.
-	// MySQL, PostgreSQL and SQLite attach a default to the column with no nameable object
-	// behind it, so this stays "" there. It is in the shape because a migration that drops
-	// an auto-named constraint and adds a named one back leaves Default identical and is
-	// otherwise invisible to a before/after comparison, and the name is the entire reason
-	// a later migration can drop the constraint without a catalog lookup.
-	DefaultName string
-}
-
-// foreignKeyShape identifies a foreign key by the tuple every catalog reports, and
-// deliberately not by its constraint name. SQLite's PRAGMA foreign_key_list returns
-// (id, seq, table, from, to, on_update, on_delete, match) and omits the name even when
-// the table declares CONSTRAINT fk_named, so requiring a name would force a parser over
-// sqlite_schema.sql. A composite key would produce one entry per column pair, which the
-// two tables this is used on do not have.
-type foreignKeyShape struct {
-	Column    string
-	RefTable  string
-	RefColumn string
-	OnDelete  string // CASCADE, NO ACTION, RESTRICT, SET NULL or SET DEFAULT
-}
-
-// tableShape holds the three projections sorted, so two dumps of the same table compare
-// directly. Columns are sorted by name rather than left in ordinal order on purpose:
-// column order is not something this change is trying to make equal across engines, and
-// a rebuild that reorders columns is not a defect.
-type tableShape struct {
-	Columns     []columnShape
-	Indexes     []indexShape
-	ForeignKeys []foreignKeyShape
+	d, err := schemadump.ParseDialect(config.GetDatabase().Type)
+	require.NoErrorf(t, err, "the configured database type %q is not one of the four dialects", dbType())
+	return d
 }
 
 // dumpTable reads a table's columns, indexes and foreign keys out of the configured
-// dialect's catalog, so a migration that rebuilds a table can be checked by comparing
-// the dump before against the dump after. That is the property a hand-written
-// CREATE TABLE cannot otherwise be held to: a dropped column, a lost index or a changed
-// foreign key action are all silent, and PRAGMA foreign_key_check does not see any of
-// them.
-//
-// It compares a table against ITSELF on one engine, never across engines, so it records
-// each engine's own spelling verbatim and makes no attempt to map TEXT, varchar(256) and
-// nvarchar(256) onto a common vocabulary. A four-engine comparison needs that mapping
-// and is #284's job, not this helper's.
-//
-// Every branch normalises in SQL rather than in Go, following describeIndex and for the
-// same reason: nullability is a flag on SQLite, a boolean on PostgreSQL, a bit on SQL
-// Server and a YES/NO string on MySQL, and the on-delete action is a word on three
-// engines and a pg_constraint.confdeltype letter on the fourth. Sorting is the one thing
-// done in Go, so it is one rule rather than four.
+// dialect's catalog, failing the test on the errors schemadump returns rather than handing
+// them back. Every failure it can report means the dump is not usable: a table that read no
+// columns, or one carrying a construct the shape cannot record.
 func dumpTable(t *testing.T, h *isolatedDB, table string) tableShape {
 	t.Helper()
+	shape, err := schemadump.DumpTable(h.SQL, dumpDialect(t), table)
+	require.NoErrorf(t, err, "dump table %s on %s", table, dbType())
+	return tableShape(shape)
+}
 
-	shape := tableShape{
-		Columns:     dumpColumns(t, h, table),
-		Indexes:     dumpIndexes(t, h, table),
-		ForeignKeys: dumpForeignKeys(t, h, table),
-	}
-
-	// A table with no columns is not something any of the four engines can produce, so
-	// it means the branch above read the wrong catalog or the wrong name. Failing here
-	// is what stops an empty dump being compared against another empty dump and read as
-	// "nothing changed".
-	require.NotEmptyf(t, shape.Columns, "dumpTable(%s) read no columns on %s", table, dbType())
-
-	sort.Slice(shape.Columns, func(i, j int) bool { return shape.Columns[i].Name < shape.Columns[j].Name })
-	sort.Slice(shape.Indexes, func(i, j int) bool { return shape.Indexes[i].Name < shape.Indexes[j].Name })
-	sort.Slice(shape.ForeignKeys, func(i, j int) bool {
-		a, b := shape.ForeignKeys[i], shape.ForeignKeys[j]
-		if a.Column != b.Column {
-			return a.Column < b.Column
-		}
-		if a.RefTable != b.RefTable {
-			return a.RefTable < b.RefTable
-		}
-		return a.RefColumn < b.RefColumn
-	})
+// describeIndex reads one index's uniqueness, key columns and origin from the configured
+// dialect's catalog, returning a zero indexShape (Exists false) when the table does not
+// carry it.
+func describeIndex(t *testing.T, h *isolatedDB, table, index string) indexShape {
+	t.Helper()
+	shape, err := schemadump.DescribeIndex(h.SQL, dumpDialect(t), table, index)
+	require.NoErrorf(t, err, "describe index %s on %s (%s)", index, table, dbType())
 	return shape
 }
 
-// dumpColumns reads one table's columns. Every branch returns the same six values in the
-// same order, so the scan below is one loop: name, type, nullability, default expression,
-// collation and default constraint name. The last two are the columns migration 000040
-// moves and are documented on columnShape.
-func dumpColumns(t *testing.T, h *isolatedDB, table string) []columnShape {
+// listTables is every application table in the isolated database, sorted. It fails the test
+// on an empty list, which schemadump treats as a fault rather than a result: a dump of no
+// tables compared against a golden file of no tables reads as "nothing changed".
+func listTables(t *testing.T, h *isolatedDB) []string {
 	t.Helper()
-
-	var q string
-	switch dbType() {
-	case "mysql":
-		// COLUMN_TYPE rather than DATA_TYPE: it carries the length, so varchar(64)
-		// shrinking to varchar(16) is visible. COLLATION_NAME is NULL for a column that
-		// holds no string, which is the '' this reports.
-		q = fmt.Sprintf(`SELECT COLUMN_NAME, COLUMN_TYPE,
-			CASE WHEN IS_NULLABLE = 'YES' THEN '1' ELSE '0' END,
-			COALESCE(COLUMN_DEFAULT, ''),
-			COALESCE(COLLATION_NAME, ''), ''
-			FROM information_schema.columns
-			WHERE table_schema = DATABASE() AND table_name = '%s'`, table)
-	case "postgres":
-		// format_type renders the length the way the DDL spells it; pg_get_expr renders
-		// the default the same way. information_schema would give both in two columns
-		// that then have to be pasted together in Go.
-		//
-		// attcollation is the collation the column actually uses, which for every column
-		// in this schema is the database's own: none declares an override. It resolves
-		// through pg_collation to the name "default", and 0 for a column that holds no
-		// string, which is the '' this reports. PostgreSQL names no default constraint,
-		// so the sixth value is a literal.
-		q = fmt.Sprintf(`SELECT a.attname, format_type(a.atttypid, a.atttypmod),
-			CASE WHEN a.attnotnull THEN '0' ELSE '1' END,
-			COALESCE(pg_get_expr(d.adbin, d.adrelid), ''),
-			COALESCE((SELECT co.collname FROM pg_collation co WHERE co.oid = a.attcollation), ''), ''
-			FROM pg_attribute a
-			JOIN pg_class c ON c.oid = a.attrelid
-			JOIN pg_namespace n ON n.oid = c.relnamespace
-			LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-			WHERE c.relname = '%s' AND n.nspname = current_schema()
-			  AND a.attnum > 0 AND NOT a.attisdropped`, table)
-	case "mssql":
-		// sys.columns.max_length is bytes, so an NVARCHAR's declared length is half of
-		// it, and -1 is the (max) form. sys.default_constraints is joined rather than
-		// reading INFORMATION_SCHEMA.COLUMN_DEFAULT because it is the same value and
-		// this is the catalog the rest of the mssql migrations already work against.
-		q = fmt.Sprintf(`SELECT c.name,
-			ty.name + CASE
-			  WHEN ty.name IN ('nvarchar','nchar') AND c.max_length = -1 THEN '(max)'
-			  WHEN ty.name IN ('nvarchar','nchar') THEN '(' + CAST(c.max_length / 2 AS VARCHAR(10)) + ')'
-			  WHEN ty.name IN ('varchar','char','varbinary','binary') AND c.max_length = -1 THEN '(max)'
-			  WHEN ty.name IN ('varchar','char','varbinary','binary') THEN '(' + CAST(c.max_length AS VARCHAR(10)) + ')'
-			  WHEN ty.name IN ('decimal','numeric') THEN '(' + CAST(c.precision AS VARCHAR(10)) + ',' + CAST(c.scale AS VARCHAR(10)) + ')'
-			  WHEN ty.name IN ('datetime2','time','datetimeoffset') THEN '(' + CAST(c.scale AS VARCHAR(10)) + ')'
-			  ELSE '' END,
-			CASE WHEN c.is_nullable = 1 THEN '1' ELSE '0' END,
-			COALESCE(dc.definition, ''),
-			COALESCE(c.collation_name, ''), COALESCE(dc.name, '')
-			FROM sys.columns c
-			JOIN sys.types ty ON ty.user_type_id = c.user_type_id
-			LEFT JOIN sys.default_constraints dc
-			  ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id
-			WHERE c.object_id = OBJECT_ID('dbo.%s')`, table)
-	default: // sqlite
-		// pragma_table_info reports the DECLARED type, which is what a rebuild has to
-		// reproduce; SQLite's own storage class would collapse every spelling onto five
-		// values and hide exactly the drift this exists to catch.
-		//
-		// pragma_table_info projects cid, name, type, notnull, dflt_value and pk, and
-		// nothing else: a TEXT column and a TEXT COLLATE NOCASE column are
-		// indistinguishable through it, measured. So the collation is filled in below
-		// from the declaration in sqlite_schema, and the two literals here keep every
-		// branch returning the same six values.
-		q = fmt.Sprintf(`SELECT name, type,
-			CASE WHEN "notnull" = 0 THEN '1' ELSE '0' END,
-			COALESCE(dflt_value, ''), '', ''
-			FROM pragma_table_info('%s')`, table)
-	}
-
-	rows, err := h.SQL.Query(q)
-	require.NoErrorf(t, err, "column catalog lookup on %s", table)
-	defer func() { _ = rows.Close() }()
-
-	var cols []columnShape
-	for rows.Next() {
-		var name, typ, nullable, def, collation, defName string
-		require.NoErrorf(t, rows.Scan(&name, &typ, &nullable, &def, &collation, &defName),
-			"scan column catalog row on %s", table)
-		cols = append(cols, columnShape{Name: name, Type: typ, Nullable: nullable == "1",
-			Default: def, Collation: collation, DefaultName: defName})
-	}
-	require.NoErrorf(t, rows.Err(), "iterate column catalog on %s", table)
-
-	if dbType() == "" || dbType() == "sqlite" {
-		declared := sqliteDeclaredCollations(t, h, table)
-		for i := range cols {
-			cols[i].Collation = declared[cols[i].Name]
-		}
-	}
-	return cols
+	names, err := schemadump.Tables(h.SQL, dumpDialect(t))
+	require.NoErrorf(t, err, "list tables on %s", dbType())
+	return names
 }
 
-// sqliteDeclaredCollations reads each column's COLLATE out of the CREATE TABLE text
-// SQLite keeps in sqlite_schema, which is the engine's own catalog and not the
-// schema.sql documentation snapshot. A column whose declaration names no collation gets
-// BINARY, which is SQLite's default and what every column in this schema is.
-//
-// Text rather than a projection because SQLite has no other place to read it from:
-// pragma_table_info does not carry collation, and pragma_index_xinfo carries it only for
-// a column an index happens to cover. Filling the field from a constant instead would
-// make it assert nothing, which is the trap this exists to avoid.
-func sqliteDeclaredCollations(t *testing.T, h *isolatedDB, table string) map[string]string {
+// dumpSchema is every table in the isolated database, which is what the generator writes a
+// golden file from and what the per-engine assertion reads through.
+func dumpSchema(t *testing.T, h *isolatedDB) schemadump.Schema {
 	t.Helper()
-
-	var ddl string
-	require.NoErrorf(t, h.SQL.QueryRow(
-		`SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&ddl),
-		"read the CREATE TABLE text for %s out of sqlite_schema", table)
-
-	out := map[string]string{}
-	for _, def := range splitTopLevel(columnDefsOf(ddl)) {
-		fields := strings.Fields(def)
-		if len(fields) == 0 {
-			continue
-		}
-		name := strings.Trim(fields[0], "[]`\"'")
-		switch strings.ToUpper(name) {
-		case "CONSTRAINT", "PRIMARY", "UNIQUE", "CHECK", "FOREIGN":
-			continue // a table constraint, not a column
-		}
-		collation := "BINARY"
-		for i, f := range fields {
-			if strings.EqualFold(f, "COLLATE") && i+1 < len(fields) {
-				collation = strings.ToUpper(strings.Trim(fields[i+1], "[]`\"',"))
-			}
-		}
-		out[name] = collation
-	}
-	return out
-}
-
-// columnDefsOf returns what a CREATE TABLE statement holds between its outermost
-// parentheses, which is the column and table-constraint list.
-func columnDefsOf(ddl string) string {
-	open := strings.Index(ddl, "(")
-	close := strings.LastIndex(ddl, ")")
-	if open < 0 || close < open {
-		return ""
-	}
-	return ddl[open+1 : close]
-}
-
-// splitTopLevel splits on commas that are not inside parentheses or a quoted string, so
-// a type like DECIMAL(10,2) or a default like DEFAULT 'a,b' stays in one piece.
-func splitTopLevel(s string) []string {
-	var out []string
-	depth, start := 0, 0
-	var quote rune
-	for i, r := range s {
-		switch {
-		case quote != 0:
-			if r == quote {
-				quote = 0
-			}
-		case r == '\'' || r == '"' || r == '`':
-			quote = r
-		case r == '(':
-			depth++
-		case r == ')':
-			depth--
-		case r == ',' && depth == 0:
-			out = append(out, s[start:i])
-			start = i + 1
-		}
-	}
-	return append(out, s[start:])
-}
-
-func dumpIndexes(t *testing.T, h *isolatedDB, table string) []indexShape {
-	t.Helper()
-
-	// Each query returns one row per key column, ordered by index and then by the
-	// index's own column order, so the loop below can fold them into one indexShape per
-	// name without sorting the columns.
-	var q string
-	switch dbType() {
-	case "mysql":
-		q = fmt.Sprintf(`SELECT INDEX_NAME, CASE WHEN NON_UNIQUE = 0 THEN '1' ELSE '0' END, COLUMN_NAME
-			FROM information_schema.statistics
-			WHERE table_schema = DATABASE() AND table_name = '%s'
-			ORDER BY INDEX_NAME, SEQ_IN_INDEX`, table)
-	case "postgres":
-		q = fmt.Sprintf(`SELECT i.relname, CASE WHEN ix.indisunique THEN '1' ELSE '0' END, a.attname
-			FROM pg_index ix
-			JOIN pg_class i ON i.oid = ix.indexrelid
-			JOIN pg_class tb ON tb.oid = ix.indrelid
-			JOIN pg_namespace n ON n.oid = tb.relnamespace
-			JOIN unnest(ix.indkey::smallint[]) WITH ORDINALITY AS k(attnum, ord) ON true
-			JOIN pg_attribute a ON a.attrelid = tb.oid AND a.attnum = k.attnum
-			WHERE tb.relname = '%s' AND n.nspname = current_schema()
-			  AND k.ord <= ix.indnkeyatts
-			ORDER BY i.relname, k.ord`, table)
-	case "mssql":
-		// i.name IS NULL is the heap, which is not an index and has no shape to record.
-		q = fmt.Sprintf(`SELECT i.name, CASE WHEN i.is_unique = 1 THEN '1' ELSE '0' END, c.name
-			FROM sys.indexes i
-			JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-			JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-			WHERE i.object_id = OBJECT_ID('dbo.%s') AND i.name IS NOT NULL
-			  AND ic.is_included_column = 0
-			ORDER BY i.name, ic.key_ordinal`, table)
-	default: // sqlite
-		q = fmt.Sprintf(`SELECT il.name, CASE WHEN il."unique" = 1 THEN '1' ELSE '0' END, ii.name
-			FROM pragma_index_list('%s') AS il, pragma_index_info(il.name) AS ii
-			ORDER BY il.name, ii.seqno`, table)
-	}
-
-	rows, err := h.SQL.Query(q)
-	require.NoErrorf(t, err, "index catalog sweep on %s", table)
-	defer func() { _ = rows.Close() }()
-
-	var indexes []indexShape
-	byName := map[string]int{}
-	for rows.Next() {
-		var name, uniqueFlag, col string
-		require.NoErrorf(t, rows.Scan(&name, &uniqueFlag, &col), "scan index catalog row on %s", table)
-		pos, seen := byName[name]
-		if !seen {
-			indexes = append(indexes, indexShape{Name: name, Exists: true, Unique: uniqueFlag == "1"})
-			pos = len(indexes) - 1
-			byName[name] = pos
-		}
-		indexes[pos].Columns = append(indexes[pos].Columns, col)
-	}
-	require.NoErrorf(t, rows.Err(), "iterate index catalog on %s", table)
-	return indexes
-}
-
-func dumpForeignKeys(t *testing.T, h *isolatedDB, table string) []foreignKeyShape {
-	t.Helper()
-
-	var q string
-	switch dbType() {
-	case "mysql":
-		q = fmt.Sprintf(`SELECT k.COLUMN_NAME, k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME, r.DELETE_RULE
-			FROM information_schema.KEY_COLUMN_USAGE k
-			JOIN information_schema.REFERENTIAL_CONSTRAINTS r
-			  ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
-			WHERE k.TABLE_SCHEMA = DATABASE() AND k.TABLE_NAME = '%s'
-			  AND k.REFERENCED_TABLE_NAME IS NOT NULL`, table)
-	case "postgres":
-		// confdeltype is a single letter; the CASE is what puts it in the same
-		// vocabulary as the other three catalogs. conkey and confkey are parallel
-		// arrays, so they are unnested together on the shared ordinality.
-		q = fmt.Sprintf(`SELECT att.attname, ref.relname, ratt.attname,
-			CASE con.confdeltype
-			  WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE'
-			  WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' ELSE con.confdeltype::text END
-			FROM pg_constraint con
-			JOIN pg_class tb ON tb.oid = con.conrelid
-			JOIN pg_namespace n ON n.oid = tb.relnamespace
-			JOIN pg_class ref ON ref.oid = con.confrelid
-			JOIN unnest(con.conkey) WITH ORDINALITY AS lk(attnum, ord) ON true
-			JOIN unnest(con.confkey) WITH ORDINALITY AS rk(attnum, ord) ON rk.ord = lk.ord
-			JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = lk.attnum
-			JOIN pg_attribute ratt ON ratt.attrelid = con.confrelid AND ratt.attnum = rk.attnum
-			WHERE con.contype = 'f' AND tb.relname = '%s' AND n.nspname = current_schema()`, table)
-	case "mssql":
-		// delete_referential_action_desc spells it NO_ACTION and SET_NULL, so the
-		// underscore is replaced to match the other three.
-		q = fmt.Sprintf(`SELECT pc.name, rt.name, rc.name,
-			REPLACE(fk.delete_referential_action_desc, '_', ' ')
-			FROM sys.foreign_keys fk
-			JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
-			JOIN sys.columns pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id
-			JOIN sys.columns rc ON rc.object_id = fkc.referenced_object_id AND rc.column_id = fkc.referenced_column_id
-			JOIN sys.tables rt ON rt.object_id = fkc.referenced_object_id
-			WHERE fk.parent_object_id = OBJECT_ID('dbo.%s')`, table)
-	default: // sqlite
-		// "to" is NULL when the reference names no column and means the referenced
-		// table's primary key; every foreign key in this schema names one.
-		q = fmt.Sprintf(`SELECT "from", "table", COALESCE("to", ''), UPPER(on_delete)
-			FROM pragma_foreign_key_list('%s')`, table)
-	}
-
-	rows, err := h.SQL.Query(q)
-	require.NoErrorf(t, err, "foreign key catalog lookup on %s", table)
-	defer func() { _ = rows.Close() }()
-
-	var fks []foreignKeyShape
-	for rows.Next() {
-		var col, refTable, refCol, onDelete string
-		require.NoErrorf(t, rows.Scan(&col, &refTable, &refCol, &onDelete),
-			"scan foreign key catalog row on %s", table)
-		fks = append(fks, foreignKeyShape{Column: col, RefTable: refTable, RefColumn: refCol, OnDelete: onDelete})
-	}
-	require.NoErrorf(t, rows.Err(), "iterate foreign key catalog on %s", table)
-	return fks
+	schema, err := schemadump.Dump(h.SQL, dumpDialect(t))
+	require.NoErrorf(t, err, "dump the whole schema on %s", dbType())
+	return schema
 }
 
 // column returns the named column, failing the test when the dump does not carry it.
 func (s tableShape) column(t *testing.T, name string) columnShape {
 	t.Helper()
-	for _, c := range s.Columns {
-		if c.Name == name {
-			return c
-		}
+	c, ok := schemadump.TableShape(s).Column(name)
+	if !ok {
+		require.FailNowf(t, "column not found", "no column %q in the dump (%d columns read on %s)",
+			name, len(s.Columns), dbType())
 	}
-	require.FailNowf(t, "column not found", "no column %q in the dump (%d columns read on %s)",
-		name, len(s.Columns), dbType())
-	return columnShape{}
+	return c
 }
 
 // index returns the named index, or a zero indexShape (Exists false) when the table does
 // not carry it, matching describeIndex's contract.
 func (s tableShape) index(name string) indexShape {
-	for _, i := range s.Indexes {
-		if i.Name == name {
-			return i
-		}
-	}
-	return indexShape{Name: name}
+	return schemadump.TableShape(s).Index(name)
 }
 
 // foreignKey returns the foreign key whose LOCAL column is name, failing the test when
 // there is none. Keyed by local column because that is what identifies a foreign key
-// without a constraint name, per foreignKeyShape.
+// without a constraint name, per schemadump.ForeignKeyShape.
 func (s tableShape) foreignKey(t *testing.T, column string) foreignKeyShape {
 	t.Helper()
-	for _, fk := range s.ForeignKeys {
-		if fk.Column == column {
-			return fk
-		}
+	fk, ok := schemadump.TableShape(s).ForeignKey(column)
+	if !ok {
+		require.FailNowf(t, "foreign key not found", "no foreign key on column %q in the dump (%d read on %s)",
+			column, len(s.ForeignKeys), dbType())
 	}
-	require.FailNowf(t, "foreign key not found", "no foreign key on column %q in the dump (%d read on %s)",
-		column, len(s.ForeignKeys), dbType())
-	return foreignKeyShape{}
+	return fk
 }
 
 func dropMySQL(t *testing.T, cfg *config.DatabaseConfig, name string) {

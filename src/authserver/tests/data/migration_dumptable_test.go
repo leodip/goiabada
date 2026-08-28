@@ -1,8 +1,11 @@
 package datatests
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/data/schemadump"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -122,16 +125,145 @@ func TestDumpTable_ReadsTheCatalog(t *testing.T) {
 	// The default constraint's NAME, which SQL Server alone gives one. It is asserted in
 	// both polarities for the reason nullability is: a branch reporting a constant passes
 	// one and fails the other.
-	assertDefaultNameProjection(t, refreshTokens)
+	assertDefaultNameProjection(t, h, refreshTokens)
 
+	// The two projections #284 added that sweep the WHOLE schema run before anything below
+	// creates a probe table, and the order is load-bearing: both count what the migrations
+	// built, and a table this test made itself would be counted with them.
+	assertEnumerationReachesEveryTable(t, h)
+	assertGenerationProjection(t, h, refreshTokens)
+
+	// These two build a table each, so they come last.
 	assertCollationProjectionIsNotAConstant(t, h)
+	assertOriginProjectionIsNotAConstant(t, h)
+}
+
+// tablesAt000035 is how many tables a database migrated to 000035 holds: the 25 application
+// tables plus schema_migrations. Recounted from
+// grep -ci "^CREATE TABLE" src/core/data/<engine>db/schema.sql, which reports 26 on every
+// engine at head, and checked against 000036 to 000040, none of which adds or drops a table:
+// 000039 rebuilds two on SQLite and puts both back.
+//
+// A mismatch here is a finding rather than a number to adjust. It means enumeration reached
+// a different set of tables than the migrations build, which is the whole property.
+const tablesAt000035 = 26
+
+// assertEnumerationReachesEveryTable is the control for the enumeration schemadump added, so
+// the dump is of a whole schema rather than a named table. A branch listing the wrong catalog
+// returns nothing and is refused; one listing too much, views on MySQL or the internal
+// sqlite_% tables on SQLite, fails the count.
+func assertEnumerationReachesEveryTable(t *testing.T, h *isolatedDB) {
+	t.Helper()
+
+	names := listTables(t, h)
+	assert.Lenf(t, names, tablesAt000035,
+		"a database at 000035 holds %d tables on every engine; %s reported %v",
+		tablesAt000035, dbType(), names)
+
+	assert.Containsf(t, names, "schema_migrations",
+		"schema_migrations is dumped like any other table (#284 decision 7), not excluded by name")
+	assert.Containsf(t, names, "browser_sessions",
+		"browser_sessions is 000035's own table, so enumeration that stopped short would miss it")
+	for _, name := range names {
+		assert.NotContainsf(t, name, "sqlite_",
+			"SQLite's internal tables are not part of the schema and must not be enumerated on %s", dbType())
+	}
+
+	assert.Lenf(t, dumpSchema(t, h), len(names),
+		"Dump must reach every table Tables enumerates on %s", dbType())
+}
+
+// assertOriginProjectionIsNotAConstant is the control for IndexShape.Origin, and it builds
+// its own table to be one.
+//
+// The migrated schema cannot serve: every index in it is an explicit CREATE INDEX or a named
+// inline KEY, so a branch reporting the constant "c" would pass on all 26 tables. And every
+// primary key in it is a single auto-numbered column, which SQLite makes a rowid alias with
+// no index object at all, so SQLite has no origin "pk" anywhere to read.
+//
+// So: a composite primary key, which every engine including SQLite backs with a real index,
+// an inline UNIQUE, and an index created by name.
+//
+// MySQL is asserted for two of the three rather than all three, because its catalog cannot
+// answer the difference: it maps CREATE UNIQUE INDEX onto ALTER TABLE ADD UNIQUE INDEX, so
+// both spellings report the same constraint type. Its unique key is named here for the same
+// reason the migrations name theirs, and reads as "c".
+func assertOriginProjectionIsNotAConstant(t *testing.T, h *isolatedDB) {
+	t.Helper()
+
+	unique := "u BIGINT NOT NULL UNIQUE,"
+	if dbType() == "mysql" {
+		unique = "u BIGINT NOT NULL, UNIQUE KEY uq_dumptable_origin_probe_u (u),"
+	}
+	ddl := fmt.Sprintf(`CREATE TABLE dumptable_origin_probe (
+		a BIGINT NOT NULL,
+		b BIGINT NOT NULL,
+		%s
+		c BIGINT NOT NULL,
+		PRIMARY KEY (a, b))`, unique)
+
+	_, err := h.SQL.Exec(ddl)
+	require.NoError(t, err, "create the index origin probe table")
+	t.Cleanup(func() { _, _ = h.SQL.Exec("DROP TABLE dumptable_origin_probe") })
+	_, err = h.SQL.Exec("CREATE INDEX idx_dumptable_origin_probe_c ON dumptable_origin_probe (c)")
+	require.NoError(t, err, "create the named index on the origin probe table")
+
+	probe := dumpTable(t, h, "dumptable_origin_probe")
+	origins := map[schemadump.IndexOrigin]int{}
+	for _, ix := range probe.Indexes {
+		origins[ix.Origin]++
+	}
+
+	assert.NotZerof(t, origins[schemadump.OriginPrimaryKey],
+		"a composite primary key is backed by an index on every engine, and it must read pk on %s; got %v",
+		dbType(), probe.Indexes)
+	assert.NotZerof(t, origins[schemadump.OriginCreated],
+		"an index created by name must read c on %s; got %v", dbType(), probe.Indexes)
+
+	if dbType() == "mysql" {
+		assert.Zerof(t, origins[schemadump.OriginUnique],
+			"MySQL's catalog cannot report u, so reporting one would mean the branch is guessing; got %v",
+			probe.Indexes)
+		return
+	}
+	assert.NotZerof(t, origins[schemadump.OriginUnique],
+		"an inline UNIQUE is named by the engine and must read u on %s; got %v", dbType(), probe.Indexes)
+}
+
+// assertGenerationProjection is the control for ColumnShape.Generated, decision 11's answer.
+//
+// Both polarities on the same table, so a branch returning either constant fails one of them.
+// Then the claim the four golden files are expected to agree on with no allowlist rule: every
+// application table's id is auto-numbered on every engine. schema_migrations is the one table
+// with no id at all, which is golang-migrate's shape and not Goiabada's.
+func assertGenerationProjection(t *testing.T, h *isolatedDB, refreshTokens tableShape) {
+	t.Helper()
+
+	assert.Truef(t, refreshTokens.column(t, "id").Generated,
+		"refresh_tokens.id is auto-numbered on %s: AUTO_INCREMENT, IDENTITY, BIGSERIAL or AUTOINCREMENT",
+		dbType())
+	assert.Falsef(t, refreshTokens.column(t, "refresh_token_jti").Generated,
+		"refresh_tokens.refresh_token_jti is not auto-numbered on any engine, so a projection returning a constant fails here")
+
+	seen := 0
+	for _, entry := range dumpSchema(t, h) {
+		if entry.Name == "schema_migrations" {
+			continue
+		}
+		col, ok := entry.Table.Column("id")
+		require.Truef(t, ok, "%s carries an id column on %s", entry.Name, dbType())
+		assert.Truef(t, col.Generated, "%s.id is auto-numbered on %s", entry.Name, dbType())
+		seen++
+	}
+	assert.Equalf(t, tablesAt000035-1, seen,
+		"every table but schema_migrations was checked for an auto-numbered id on %s", dbType())
 }
 
 // assertDefaultNameProjection holds columnShape.DefaultName to what each engine can
 // actually report. SQL Server names default constraints and the other three do not: MySQL,
 // PostgreSQL and SQLite attach a default to the column with no nameable object behind it,
 // so "" there is the truth and not an unfilled field.
-func assertDefaultNameProjection(t *testing.T, refreshTokens tableShape) {
+func assertDefaultNameProjection(t *testing.T, h *isolatedDB, refreshTokens tableShape) {
 	t.Helper()
 
 	gen := refreshTokens.column(t, "auth_state_generation")
@@ -140,15 +272,32 @@ func assertDefaultNameProjection(t *testing.T, refreshTokens tableShape) {
 	assert.Emptyf(t, jti.DefaultName,
 		"refresh_tokens.refresh_token_jti carries no default at all, so it can carry no default constraint name on %s",
 		dbType())
+	assert.Falsef(t, jti.DefaultIsSystemNamed,
+		"a column with no default constraint has no name for the engine to have invented, on %s", dbType())
 
 	if dbType() != "mssql" {
 		assert.Emptyf(t, gen.DefaultName,
 			"%s names no default constraint, so DefaultName must stay empty even for a column that has a default",
 			dbType())
+		assert.Falsef(t, gen.DefaultIsSystemNamed,
+			"%s names no default constraint at all, so none of them can be system-named", dbType())
 		return
 	}
 	assert.Equal(t, "df_refresh_tokens_auth_state_generation", gen.DefaultName,
 		"000024 named this constraint so a later migration could drop it without a catalog lookup")
+	assert.False(t, gen.DefaultIsSystemNamed,
+		"000024 chose this name, so SQL Server did not invent it")
+
+	// The other polarity, which is the one section 4.2 needs: 42 of the 64 SQL Server
+	// defaults are unnamed in the migrations, and the golden file has to mask exactly those
+	// because their generated names carry a per-database suffix. dc.name alone cannot
+	// separate them from the 22 a migration named. clients.display_name is one of the three
+	// 000040 later renames, so at 000035 it still carries SQL Server's own.
+	display := dumpTable(t, h, "clients").column(t, "display_name")
+	assert.Truef(t, display.DefaultIsSystemNamed,
+		"clients.display_name still carries the name SQL Server invented at 000035; got %q", display.DefaultName)
+	assert.Truef(t, strings.HasPrefix(display.DefaultName, "DF__"),
+		"a system-named SQL Server default is spelled DF__<table>__<column>__<random>; got %q", display.DefaultName)
 }
 
 // assertCollationProjectionIsNotAConstant is the control for columnShape.Collation, and it
