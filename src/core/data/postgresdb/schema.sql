@@ -1601,7 +1601,7 @@ ALTER TABLE ONLY public.refresh_tokens
 --
 
 ALTER TABLE ONLY public.refresh_tokens
-    ADD CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE NO ACTION;
 
 
 --
@@ -1609,7 +1609,7 @@ ALTER TABLE ONLY public.refresh_tokens
 --
 
 ALTER TABLE ONLY public.refresh_tokens
-    ADD CONSTRAINT fk_refresh_tokens_client FOREIGN KEY (client_id) REFERENCES public.clients(id) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_refresh_tokens_client FOREIGN KEY (client_id) REFERENCES public.clients(id) ON DELETE NO ACTION;
 
 
 --

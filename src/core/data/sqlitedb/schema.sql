@@ -110,8 +110,8 @@ CREATE TABLE codes (
   updated_at DATETIME,
   code_hash TEXT NOT NULL,
   client_id INTEGER NOT NULL,
-  code_challenge TEXT NOT NULL,
-  code_challenge_method TEXT NOT NULL,
+  code_challenge TEXT NULL,
+  code_challenge_method TEXT NULL,
   scope TEXT NOT NULL,
   `state` TEXT NOT NULL,
   nonce TEXT NOT NULL,
@@ -124,9 +124,9 @@ CREATE TABLE codes (
   session_identifier TEXT NOT NULL,
   acr_level TEXT NOT NULL,
   auth_methods TEXT NOT NULL,
-  used numeric NOT NULL,  
-  revoked numeric NOT NULL DEFAULT 0,
+  used numeric NOT NULL,
   auth_state_generation INTEGER NOT NULL DEFAULT 0,
+  revoked numeric NOT NULL DEFAULT 0,
   CONSTRAINT fk_codes_client FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
   CONSTRAINT fk_codes_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
@@ -215,8 +215,8 @@ CREATE TABLE refresh_tokens (
   revoked numeric NOT NULL,
   auth_state_generation INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT fk_refresh_tokens_code FOREIGN KEY (code_id) REFERENCES codes (id) ON DELETE CASCADE,
-  CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-  CONSTRAINT fk_refresh_tokens_client FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE
+  CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE NO ACTION,
+  CONSTRAINT fk_refresh_tokens_client FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE NO ACTION
 );
 
 CREATE TABLE user_attributes (
