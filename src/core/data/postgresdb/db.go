@@ -97,7 +97,35 @@ func (d *PostgresDatabase) RollbackTransaction(tx *sql.Tx) error {
 // NewMigrator builds a golang-migrate instance bound to this database and the
 // embedded migration files. Migrate delegates to it; tests use it to step to a
 // specific version (e.g. seed at 000020, then apply 000021 in isolation).
+// schemaMigrationsTableDDL pins the shape of golang-migrate's own version table, which
+// Goiabada creates before handing the database over rather than leaving to the driver
+// (#284 decision 7). It is the statement golang-migrate v4.19.1's PostgreSQL driver would
+// issue itself, verbatim, and the driver reaches it behind an information_schema count.
+//
+// Issuing it first makes the driver's own statement a no-op and the shape Goiabada's, so
+// this table has one shape on all four engines and a dependency bump that changed the
+// driver's DDL cannot silently change what Goiabada builds. SQLite is the engine where this
+// actually differs today; here it pins what is already true.
+//
+// Unqualified, so it lands in the connection's current schema, which is the same one
+// postgres.WithInstance resolves through CURRENT_SCHEMA().
+const schemaMigrationsTableDDL = "CREATE TABLE IF NOT EXISTS schema_migrations " +
+	"(version bigint not null primary key, dirty boolean not null)"
+
+// ensureSchemaMigrationsTable creates the version table at Goiabada's shape when it is not
+// there yet.
+func (d *PostgresDatabase) ensureSchemaMigrationsTable() error {
+	if _, err := d.DB.Exec(schemaMigrationsTableDDL); err != nil {
+		return errors.Wrap(err, "unable to create the schema_migrations table")
+	}
+	return nil
+}
+
 func (d *PostgresDatabase) NewMigrator() (*gomigrate.Migrate, error) {
+	if err := d.ensureSchemaMigrationsTable(); err != nil {
+		return nil, err
+	}
+
 	driver, err := postgres.WithInstance(d.DB, &postgres.Config{
 		DatabaseName: d.dbConfig.Name,
 	})

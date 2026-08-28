@@ -135,7 +135,47 @@ func (d *SQLiteDatabase) RollbackTransaction(tx *sql.Tx) error {
 // NewMigrator builds a golang-migrate instance bound to this database and the
 // embedded migration files. Migrate delegates to it; tests use it to step to a
 // specific version (e.g. seed at 000020, then apply 000021 in isolation).
+// schemaMigrationsTableDDL pins the shape of golang-migrate's own version table, which
+// Goiabada creates before handing the database over rather than leaving to the driver
+// (#284 decision 7).
+//
+// SQLite is the one engine whose driver is out of line. golang-migrate v4.19.1 builds
+// `(version uint64, dirty bool)` here: both columns nullable, no primary key, and a
+// separate version_unique index. The MySQL, PostgreSQL and SQL Server drivers all build
+// `version bigint not null primary key, dirty boolean not null`. A nullable version is not
+// cosmetic: the driver's own shape accepts a NULL row that Version() then cannot read back,
+// and the four engines have to agree on this table's shape because the parity check reads
+// it like any other.
+//
+// Every driver creates the table only if it is absent, so issuing this first makes the
+// driver's statement a no-op and the shape Goiabada's on a new install; a dependency bump
+// that changed the driver's DDL cannot silently change what Goiabada builds. Migration
+// 000041 does the same for a database created before this existed.
+//
+// INTEGER and not BIGINT. Only `INTEGER PRIMARY KEY` is a rowid alias; spelled BIGINT,
+// SQLite builds sqlite_autoindex_schema_migrations_1 to enforce the key and the driver's
+// unconditional `CREATE UNIQUE INDEX IF NOT EXISTS version_unique` lands on top of it,
+// leaving two unique indexes on one column where the other three engines have one.
+const schemaMigrationsTableDDL = `CREATE TABLE IF NOT EXISTS schema_migrations (
+	version INTEGER NOT NULL PRIMARY KEY,
+	dirty BOOLEAN NOT NULL
+)`
+
+// ensureSchemaMigrationsTable creates the version table at Goiabada's shape when it is not
+// there yet. The driver's own ensureVersionTable then runs on every migrator construction
+// and, on this engine, adds only its version_unique index on top.
+func (d *SQLiteDatabase) ensureSchemaMigrationsTable() error {
+	if _, err := d.DB.Exec(schemaMigrationsTableDDL); err != nil {
+		return errors.Wrap(err, "unable to create the schema_migrations table")
+	}
+	return nil
+}
+
 func (d *SQLiteDatabase) NewMigrator() (*gomigrate.Migrate, error) {
+	if err := d.ensureSchemaMigrationsTable(); err != nil {
+		return nil, err
+	}
+
 	driver, err := sqlite.WithInstance(d.DB, &sqlite.Config{})
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create migration driver")

@@ -3,7 +3,10 @@
 -- Generated from migrations, not intended for direct execution in production.
 -- Use migrations for schema changes.
 
-CREATE TABLE schema_migrations (version uint64,dirty bool);
+CREATE TABLE schema_migrations (
+    version INTEGER NOT NULL PRIMARY KEY,
+    dirty BOOLEAN NOT NULL
+);
 CREATE UNIQUE INDEX version_unique ON schema_migrations (version);
 
 CREATE TABLE clients (
