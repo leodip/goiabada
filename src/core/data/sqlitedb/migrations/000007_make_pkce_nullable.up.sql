@@ -1,8 +1,6 @@
 -- SQLite doesn't support ALTER COLUMN to change NULL constraints directly
--- The columns are already effectively nullable in SQLite (it doesn't enforce NOT NULL strictly for VARCHAR)
--- This migration is a no-op for SQLite but included for consistency
--- If strict enforcement is needed, a table rebuild would be required
+-- This migration is a no-op for SQLite; the constraint is actually dropped by 000039,
+-- which rebuilds the codes table (SQLite enforces NOT NULL on every column type, so
+-- leaving it here left codes.code_challenge NOT NULL on this engine alone until then)
 
--- No operation needed - SQLite VARCHAR columns can store NULL regardless of NOT NULL constraint
--- when inserting via prepared statements that explicitly set NULL
 SELECT 1;
