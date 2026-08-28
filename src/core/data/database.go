@@ -27,7 +27,9 @@ type Database interface {
 	// so a credential path that lowercases the address it was given can reach the row, on
 	// every engine rather than only the two that fold case in "=" (#221, #283). Where two
 	// rows differ only by case one survives, lowercased, and the rest are disabled with
-	// their address intact. Returns rows lowercased and rows disabled.
+	// their address intact, their authentication generation advanced and their sessions
+	// and refresh tokens gone, in one transaction each (#106's invariant for any
+	// enabled-to-disabled transition). Returns rows lowercased and rows disabled.
 	BackfillLowercaseEmails() (int, int, error)
 	ReencryptDataToNewKey(oldKey, newKey []byte) error
 	RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error)
@@ -579,9 +581,33 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 		return nil, errors.WithStack(errors.New("GOIABADA_AES_ENCRYPTION_KEY must be set to a 32-byte hex key"))
 	}
 
+	if err := runStartupDataTasks(database, envKey, config.GetAESEncryptionKeyPrevious()); err != nil {
+		return nil, err
+	}
+
+	return database, nil
+}
+
+// runStartupDataTasks is everything that has to happen to the stored data after the migration
+// chain and before either application serves a request: the one-shot move of the data key out
+// of the database, an optional env-to-env key rotation, the TOTP secret encryption pass (#82)
+// and the email lowercase pass (#221, #283).
+//
+// EVERY ONE OF THEM IS FAIL-CLOSED, and that is the property this function exists to make
+// testable rather than merely true. Each returns an error that must stop startup, because each
+// leaves the data half-converted when it fails: a users table where some addresses are
+// lowercase and some are not, served by an application whose credential paths look up only the
+// lowercase form, is a set of accounts that silently cannot sign in. NewDatabase builds a real
+// database out of global configuration, so no test can drive it into any of these branches;
+// extracted, every branch is one mock call away.
+//
+// The keys are parameters rather than config reads for the same reason. The caller has already
+// validated envKey as 32 bytes; previousKey is optional and is acted on only at that length.
+func runStartupDataTasks(database Database, envKey []byte, previousKey []byte) error {
+
 	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to load settings for encryption migration")
+		return errors.Wrap(err, "unable to load settings for encryption migration")
 	}
 
 	// Existing installs historically stored the data key in the DB. If it is
@@ -592,7 +618,7 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 	// skipped and the seeder encrypts directly with the env key.
 	if settings != nil && len(settings.AESEncryptionKeyLegacy) == 32 {
 		if err := database.ReencryptDataToNewKey(settings.AESEncryptionKeyLegacy, envKey); err != nil {
-			return nil, errors.Wrap(err, "failed to migrate data-at-rest encryption to GOIABADA_AES_ENCRYPTION_KEY")
+			return errors.Wrap(err, "failed to migrate data-at-rest encryption to GOIABADA_AES_ENCRYPTION_KEY")
 		}
 		slog.Info("migrated data-at-rest encryption (secrets and RSA signing keys) to GOIABADA_AES_ENCRYPTION_KEY")
 	}
@@ -601,10 +627,10 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 	// data is still encrypted under it, re-encrypt everything to the current key.
 	// Idempotent (safe to leave the previous key set across restarts) and
 	// fail-closed.
-	if prevKey := config.GetAESEncryptionKeyPrevious(); len(prevKey) == 32 {
-		rotated, err := database.RotateEncryptionKeyIfNeeded(envKey, prevKey)
+	if len(previousKey) == 32 {
+		rotated, err := database.RotateEncryptionKeyIfNeeded(envKey, previousKey)
 		if err != nil {
-			return nil, errors.Wrap(err, "AES data key rotation failed")
+			return errors.Wrap(err, "AES data key rotation failed")
 		}
 		if rotated {
 			slog.Info("rotated data-at-rest encryption to the new GOIABADA_AES_ENCRYPTION_KEY")
@@ -615,7 +641,7 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 	// the env key. Fail-closed, idempotent, resumable; a no-op on a fresh DB.
 	migrated, err := database.BackfillEncryptedOTPSecrets(envKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to encrypt legacy plaintext OTP secrets")
+		return errors.Wrap(err, "failed to encrypt legacy plaintext OTP secrets")
 	}
 	if migrated > 0 {
 		slog.Info(fmt.Sprintf("encrypted %d legacy plaintext OTP secret(s) at rest", migrated))
@@ -631,12 +657,12 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 	// things on four engines.
 	lowercased, disabled, err := database.BackfillLowercaseEmails()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to lowercase legacy user email addresses")
+		return errors.Wrap(err, "failed to lowercase legacy user email addresses")
 	}
 	if lowercased > 0 || disabled > 0 {
 		slog.Info(fmt.Sprintf("lowercased %d legacy user email address(es); disabled %d that differed from another only by case",
 			lowercased, disabled))
 	}
 
-	return database, nil
+	return nil
 }

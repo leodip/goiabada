@@ -19,6 +19,26 @@
 --
 -- The nullability keyword is restated on every column here for the same reason the up
 -- migration gives: omitting it makes the column nullable.
+--
+-- ATOMIC, and that is what makes the allowed failure survivable. golang-migrate's SQL Server
+-- driver submits this file as ONE batch through a single ExecContext and opens no transaction
+-- of its own, so without the pair below every statement autocommits as it runs. The refusal
+-- above fires at step 4, by which point the 6 defaults and 23 indexes of steps 1 and 2 are
+-- already gone for good and the 92 columns of step 3 have already moved: the operator is left
+-- with a schema holding no UNIQUE index on client_identifier, email, subject, code_hash or
+-- refresh_token_jti, and RETRYING after resolving the duplicate fails at the first DROP INDEX
+-- with Msg 3701, because that index no longer exists. Decision 7 allows this direction to
+-- fail; it does not allow it to leave a schema nobody can rebuild.
+--
+-- SET XACT_ABORT ON is required and not belt-and-braces. Msg 1505 is severity 16, which
+-- terminates the statement and NOT the batch, so a bare BEGIN TRANSACTION would carry on to
+-- the next CREATE INDEX and reach the COMMIT, committing exactly the half-dismantled schema
+-- this is written to prevent. With it, the failure aborts the batch and rolls the whole file
+-- back, so the operator finds every index, every default and the collation as they were,
+-- resolves the duplicate, clears the dirty version by hand and runs it again.
+
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
 
 -- 1. The defaults. The three the up migration NAMED go back UNNAMED, so a rollback lands
 --    on exactly the shape 000008, 000013 and 000016 left: an auto-generated name.
@@ -181,3 +201,6 @@ ALTER TABLE [clients] ADD DEFAULT '' FOR [website_url];
 ALTER TABLE [clients] ADD CONSTRAINT [df_clients_include_open_id_connect_claims_in_id_token] DEFAULT 'default' FOR [include_open_id_connect_claims_in_id_token];
 ALTER TABLE [pre_registrations] ADD CONSTRAINT [df_pre_registrations_verification_code_hash] DEFAULT '' FOR [verification_code_hash];
 ALTER TABLE [users] ADD CONSTRAINT [df_users_forgot_password_code_hash] DEFAULT '' FOR [forgot_password_code_hash];
+
+COMMIT TRANSACTION;
+SET XACT_ABORT OFF;

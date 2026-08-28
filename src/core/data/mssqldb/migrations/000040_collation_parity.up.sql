@@ -44,6 +44,25 @@
 -- column. 23 indexes and 6 default constraints have to come off first, because ALTER
 -- COLUMN under either fails Msg 5074 then Msg 4922.
 
+-- ATOMIC, for the reason the down file spells out at length: golang-migrate's SQL Server
+-- driver submits this file as ONE batch and opens no transaction, so without the pair below
+-- every statement autocommits and ANY failure part way leaves the schema dismantled. This
+-- direction has no failure the data can cause, which is what the paragraph above establishes,
+-- but it can still be stopped by a lock timeout, a full transaction log or a disconnect, and
+-- the state it would leave behind is identical: 23 UNIQUE and non-unique indexes gone, the
+-- columns half converted, and a retry dying at the first DROP INDEX with Msg 3701. Wrapped,
+-- any such failure rolls back to the schema this file started from and the operator can simply
+-- clear the dirty version and run it again.
+--
+-- The cost, named because it is real: the whole conversion holds its schema locks and its log
+-- space until the COMMIT rather than releasing them statement by statement, so peak log usage
+-- is the size of the 23 index rebuilds instead of the largest single one. That is the right
+-- trade here, because a log-full failure inside the transaction is recoverable by growing the
+-- log and retrying, while the same failure without it is not recoverable at all.
+
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+
 -- 1. The six default constraints. Three were added without a name, so SQL Server generated
 --    one, and a generated name DIFFERS PER DATABASE: a literal would work on exactly one
 --    installation. They are read from the catalog and dropped through EXEC, which is what
@@ -230,3 +249,6 @@ ALTER TABLE [clients] ADD CONSTRAINT [df_clients_website_url] DEFAULT '' FOR [we
 ALTER TABLE [clients] ADD CONSTRAINT [df_clients_include_open_id_connect_claims_in_id_token] DEFAULT 'default' FOR [include_open_id_connect_claims_in_id_token];
 ALTER TABLE [pre_registrations] ADD CONSTRAINT [df_pre_registrations_verification_code_hash] DEFAULT '' FOR [verification_code_hash];
 ALTER TABLE [users] ADD CONSTRAINT [df_users_forgot_password_code_hash] DEFAULT '' FOR [forgot_password_code_hash];
+
+COMMIT TRANSACTION;
+SET XACT_ABORT OFF;
