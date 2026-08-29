@@ -1,3 +1,6 @@
+-- parity: sqlite only. MySQL, PostgreSQL and SQL Server all build idx_refresh_tokens_client_id
+-- already, so there is nothing for them to add and SQLite is the one engine out of line.
+--
 -- refresh_tokens(client_id) is indexed on MySQL, PostgreSQL and SQL Server and was
 -- never indexed on SQLite (#282). Migration 000011 rebuilt refresh_tokens and restored
 -- only idx_refresh_token_jti, and 000024 later added idx_refresh_tokens_user_id and not

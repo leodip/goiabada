@@ -1,3 +1,10 @@
+-- parity: mysql and sqlite only. PostgreSQL and SQL Server were both written after v0.7,
+-- so their 000001_initial_create already builds everything this file adds: the
+-- idx_permission_identifier_resource unique index, users.phone_number_country_uniqueid and
+-- phone_number_country_callingcode, and user_sessions.level2_auth_config_has_changed. Neither
+-- of them ever created the settings.sms_provider and sms_config_encrypted columns this file
+-- drops, so there is nothing there to drop either.
+
 -- 000002_v0_7.up.sql
 
 -- Modify permissions table

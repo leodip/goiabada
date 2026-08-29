@@ -1,3 +1,6 @@
+-- parity: mysql only. SQLite, PostgreSQL and SQL Server already carry the default this adds,
+-- so MySQL is the one engine that needs a file.
+--
 -- audit_logs.details carries DEFAULT '{}' on SQLite, PostgreSQL and SQL Server and
 -- carried none on MySQL (#282).
 --

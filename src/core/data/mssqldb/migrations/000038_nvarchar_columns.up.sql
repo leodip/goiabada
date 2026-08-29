@@ -1,3 +1,7 @@
+-- parity: mssql only. VARCHAR against NVARCHAR is a SQL Server distinction. MySQL, PostgreSQL
+-- and SQLite each have a single string type and declared these five columns in it from the
+-- start, so none of them has a conversion to carry.
+--
 -- Five columns were declared VARCHAR where every comparable column on this engine is
 -- NVARCHAR (#282). Two of them, codes.code_challenge and codes.code_challenge_method,
 -- are a regression: 000001 created them NVARCHAR and 000007 rewrote them as VARCHAR
