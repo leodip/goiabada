@@ -53,55 +53,63 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	queryParams.Add("database", "master") // Connect to master first to create DB
 	queryParams.Add("encrypt", "disable") // Disable encryption requirement
 
-	connStringMaster := url.URL{
-		Scheme:   "sqlserver",
-		User:     url.UserPassword(dbConfig.Username, dbConfig.Password),
-		Host:     fmt.Sprintf("%s:%d", dbConfig.Host, dbConfig.Port),
-		RawQuery: queryParams.Encode(),
-	}
+	if dbConfig.Create {
+		connStringMaster := url.URL{
+			Scheme:   "sqlserver",
+			User:     url.UserPassword(dbConfig.Username, dbConfig.Password),
+			Host:     fmt.Sprintf("%s:%d", dbConfig.Host, dbConfig.Port),
+			RawQuery: queryParams.Encode(),
+		}
 
-	// Connect to master database first
-	masterDB, err := sql.Open("sqlserver", connStringMaster.String())
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to open master database")
-	}
-	defer func() { _ = masterDB.Close() }() // Ensure we close the master connection
+		// Connect to master database first
+		masterDB, err := sql.Open("sqlserver", connStringMaster.String())
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to open master database")
+		}
+		defer func() { _ = masterDB.Close() }() // Ensure we close the master connection
 
-	// Test the connection
-	err = masterDB.Ping()
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to connect to master database")
-	}
+		// Test the connection
+		err = masterDB.Ping()
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to connect to master database")
+		}
 
-	// Create database if it doesn't exist.
-	//
-	// The collation is case-, accent-, width- and kanatype-SENSITIVE, so a value that
-	// differs in case is a different value here exactly as it is on SQLite and PostgreSQL.
-	// RFC 6749 section 1.9 requires that of client_id, section 3.3 of scope and OpenID
-	// Connect Core section 2 of sub; the previous CI_AI collation folded all three, so
-	// client_id=myapp resolved a client registered as MyApp (#283). Migration 000040
-	// converts an existing database's 92 string columns to the same collation.
-	//
-	// IF NOT EXISTS, so a database an OPERATOR pre-created keeps their collation: the
-	// database default cannot be moved from a migration, because ALTER DATABASE ...
-	// COLLATE blocks until it times out with a second session attached, which is what a
-	// running application is. That is why every string column a future migration adds must
-	// spell its own COLLATE clause explicitly, naming the collation below, rather than
-	// relying on this line, and why a data test migrates the whole chain into a hostile
-	// database and asserts all 92 columns.
-	createDatabaseCommand := fmt.Sprintf(`
+		// Create database if it doesn't exist.
+		//
+		// The collation is case-, accent-, width- and kanatype-SENSITIVE, so a value that
+		// differs in case is a different value here exactly as it is on SQLite and PostgreSQL.
+		// RFC 6749 section 1.9 requires that of client_id, section 3.3 of scope and OpenID
+		// Connect Core section 2 of sub; the previous CI_AI collation folded all three, so
+		// client_id=myapp resolved a client registered as MyApp (#283). Migration 000040
+		// converts an existing database's 92 string columns to the same collation.
+		//
+		// IF NOT EXISTS, so a database an OPERATOR pre-created keeps their collation: the
+		// database default cannot be moved from a migration, because ALTER DATABASE ...
+		// COLLATE blocks until it times out with a second session attached, which is what a
+		// running application is. That is why every string column a future migration adds must
+		// spell its own COLLATE clause explicitly, naming the collation below, rather than
+		// relying on this line, and why a data test migrates the whole chain into a hostile
+		// database and asserts all 92 columns.
+		createDatabaseCommand := fmt.Sprintf(`
         IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = N'%s')
         BEGIN
             CREATE DATABASE [%s]
             COLLATE Latin1_General_100_CS_AS_KS_WS_SC_UTF8
         END`,
-		dbConfig.Name,
-		dbConfig.Name,
-	)
+			dbConfig.Name,
+			dbConfig.Name,
+		)
 
-	_, err = masterDB.Exec(createDatabaseCommand)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to create database")
+		_, err = masterDB.Exec(createDatabaseCommand)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to create database")
+		}
+	} else {
+		// The operator says the database is already there, so nothing is created and master is
+		// never opened, let alone pinged. That matters more here than on the other two engines:
+		// an Azure SQL contained user cannot reach master at all, so the ping above would stop
+		// a start that has everything it needs inside the application database (#293).
+		slog.Info("db create: disabled, the database must already exist (GOIABADA_DB_CREATE=false)")
 	}
 
 	// Now connect to the actual database
@@ -119,11 +127,13 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 		return nil, errors.Wrap(err, "unable to open database")
 	}
 
-	// Test the connection to the new database
+	// Test the connection to the application database. This is also what makes an absent
+	// database the constructor's error rather than the migrator's on the skipping arm: SQL
+	// Server answers "Cannot open database ... requested by the login" here (#293).
 	err = db.Ping()
 	if err != nil {
 		_ = db.Close()
-		return nil, errors.Wrap(err, "unable to connect to created database")
+		return nil, errors.Wrap(err, "unable to connect to database")
 	}
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLServer, logSQL)

@@ -58,29 +58,49 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		dbConfig.Port,
 		dbConfig.Name)
 
-	tempDB, err := sql.Open("mysql", dsnWithoutDBname)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to open database")
-	}
-	defer func() { _ = tempDB.Close() }()
+	if dbConfig.Create {
+		tempDB, err := sql.Open("mysql", dsnWithoutDBname)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to open database")
+		}
+		defer func() { _ = tempDB.Close() }()
 
-	// create the database if it does not exist.
-	//
-	// The collation is case- and accent-SENSITIVE, so a value that differs in case is a
-	// different value here exactly as it is on SQLite and PostgreSQL. RFC 6749 section 1.9
-	// requires that of client_id, section 3.3 of scope and OpenID Connect Core section 2 of
-	// sub; the previous _ai_ci collation folded all three, so client_id=myapp resolved a
-	// client registered as MyApp (#283). Migration 000040 converts an existing database,
-	// its default included, so a fresh install and a migrated one agree.
-	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;", dbConfig.Name)
-	_, err = tempDB.Exec(createDatabaseCommand)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to create database")
+		// create the database if it does not exist.
+		//
+		// The collation is case- and accent-SENSITIVE, so a value that differs in case is a
+		// different value here exactly as it is on SQLite and PostgreSQL. RFC 6749 section 1.9
+		// requires that of client_id, section 3.3 of scope and OpenID Connect Core section 2 of
+		// sub; the previous _ai_ci collation folded all three, so client_id=myapp resolved a
+		// client registered as MyApp (#283). Migration 000040 converts an existing database,
+		// its default included, so a fresh install and a migrated one agree.
+		createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;", dbConfig.Name)
+		_, err = tempDB.Exec(createDatabaseCommand)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to create database")
+		}
+	} else {
+		// The operator says the database is already there, so nothing is created and the
+		// maintenance connection above is never opened: a login with rights only inside the
+		// application schema is enough to start (#293). Logged because the operator who set
+		// this weeks ago needs the missing-database error below connected back to it.
+		slog.Info("db create: disabled, the database must already exist (GOIABADA_DB_CREATE=false)")
 	}
 
 	db, err := sql.Open("mysql", dsnWithDBname)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open database")
+	}
+
+	if !dbConfig.Create {
+		// sql.Open only parses the DSN, so without this an absent database would come back as
+		// a usable handle and a nil error, and the failure would surface inside the migrator
+		// as somebody else's problem. Ping forces first use here, so the caller gets MySQL's
+		// own "Error 1049 (42000): Unknown database" from the constructor. Not on the creating
+		// arm, where the CREATE DATABASE above already forces it (#293).
+		if err := db.Ping(); err != nil {
+			_ = db.Close()
+			return nil, errors.Wrap(err, "unable to connect to database")
+		}
 	}
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.MySQL, logSQL)

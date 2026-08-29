@@ -1,0 +1,50 @@
+---
+title: Database setup
+description: Pre-create the Goiabada database and run with a least-privilege database user.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+By default Goiabada creates its database at startup if it is not already there, which requires a
+login allowed to create databases on the server. Set `GOIABADA_DB_CREATE=false` when you have
+created the database yourself, or when the login is not allowed to: Goiabada then issues no
+`CREATE DATABASE` and opens no connection to `master` or `postgres`.
+
+Create the database with the statement for your engine, then give the login full rights inside it.
+
+## PostgreSQL
+
+```sql
+CREATE DATABASE goiabada ENCODING 'UTF8';
+```
+
+Make the login the owner, or grant it full rights in the database. It needs no `CREATEDB`
+attribute and no access to the `postgres` database.
+
+## MySQL
+
+```sql
+CREATE DATABASE goiabada CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;
+```
+
+`GRANT ALL PRIVILEGES ON goiabada.* TO 'goiabada'@'%';` is enough. No server-wide privilege is
+needed.
+
+## SQL Server
+
+```sql
+CREATE DATABASE goiabada COLLATE Latin1_General_100_CS_AS_KS_WS_SC_UTF8;
+```
+
+Map the login into the database and add it to `db_owner`. It needs no access to `master`.
+
+<Aside type="caution">
+On SQL Server, spell the `COLLATE` clause. A database default cannot be changed afterwards, because
+`ALTER DATABASE ... COLLATE` blocks while the application is connected, and every text column a
+future Goiabada migration adds inherits it.
+</Aside>
+
+## SQLite
+
+There is nothing to pre-create, and `GOIABADA_DB_CREATE` does not apply: the driver creates the file.
+To refuse an absent file instead of creating one, put `mode=rw` in `GOIABADA_DB_DSN`.
