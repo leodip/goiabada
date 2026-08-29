@@ -35,6 +35,10 @@ type DatabaseConfig struct {
 	DSN      string
 }
 
+// GOIABADA_DB_CREATE does not apply here, which is why DatabaseConfig has no Create field: there
+// is no create statement and no maintenance connection on SQLite, and what decides whether an
+// absent file is created is the operator's own DSN. The equivalent is mode=rw in it, which the
+// driver honours by refusing to create the file (#293).
 func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, error) {
 
 	dsn := dbConfig.DSN

@@ -35,6 +35,9 @@ type DatabaseConfig struct {
 	Port     int
 	Name     string
 	DSN      string
+	// Create decides whether the constructor may create the database when it is absent. It is
+	// positive-sense, so the zero value does not create: every literal has to set it (#293).
+	Create bool
 }
 
 func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, error) {
