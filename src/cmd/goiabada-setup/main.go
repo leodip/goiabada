@@ -636,7 +636,6 @@ func main() {
 		AdminSessionAuthKey: adminSessionAuthKey,
 		AdminSessionEncKey:  adminSessionEncKey,
 		AESEncryptionKey:    aesEncryptionKey,
-		OAuthClientID:       "admin-console-client",
 		OAuthClientSecret:   oauthClientSecret,
 		K8sNamespace:        k8sNamespace,
 	}
@@ -749,7 +748,6 @@ type Config struct {
 	AdminSessionAuthKey string
 	AdminSessionEncKey  string
 	AESEncryptionKey    string
-	OAuthClientID       string
 	OAuthClientSecret   string
 	K8sNamespace        string
 }
@@ -1716,7 +1714,6 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString("      - goiabada-network\n")
 	sb.WriteString("    environment:\n")
 	sb.WriteString("      - TZ=UTC\n")
-	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=%s\n", config.OAuthClientID)
 	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s\n", config.OAuthClientSecret)
 	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=%s\n", config.AdminSessionAuthKey)
 	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s\n", config.AdminSessionEncKey)
@@ -1809,7 +1806,6 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("# =============================================================================\n")
 	sb.WriteString("# OAuth client for admin console\n")
 	sb.WriteString("# =============================================================================\n")
-	fmt.Fprintf(&sb, "export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=\"%s\"\n", config.OAuthClientID)
 	fmt.Fprintf(&sb, "export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=\"%s\"\n", config.OAuthClientSecret)
 	fmt.Fprintf(&sb, "export GOIABADA_AUTHSERVER_INTERNALBASEURL=\"%s\"\n", config.AuthServerURL)
 	sb.WriteString("\n")
@@ -1881,7 +1877,6 @@ func generateKubernetesManifests(config *Config) string {
 	fmt.Fprintf(&sb, "  GOIABADA_DB_PORT: \"%s\"\n", config.DBPort)
 	fmt.Fprintf(&sb, "  GOIABADA_DB_NAME: \"%s\"\n", config.DBName)
 	fmt.Fprintf(&sb, "  GOIABADA_DB_USERNAME: \"%s\"\n", config.DBUsername)
-	sb.WriteString("  GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID: \"admin-console-client\"\n")
 	sb.WriteString("\n")
 
 	// Auth Server Deployment
