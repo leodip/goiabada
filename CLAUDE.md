@@ -272,6 +272,12 @@ repository-wide from each tier because `cmd/goiabada-setup` has no tier of its o
 checks the same thing per module, where an unformatted file also costs that module its vet,
 unparam and golangci-lint run.
 
+**Schema golden files**: each engine's fully migrated catalog is recorded in
+`src/core/data/<engine>db/schema.golden`, and the data tier compares a freshly migrated database
+against the file for the engine it is running on. A migration therefore has one more step:
+`cd src/core && go run ./cmd/schemadump` inside the dev container, which regenerates all four
+files at once, and commit them. Skip it and CI goes red on every database job.
+
 ## Important Patterns
 
 1. **Handler signature**: `HandleXxxGet/Post(dependencies...) http.HandlerFunc`
