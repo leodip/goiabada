@@ -99,9 +99,23 @@ func identifierQuotes(d schemadump.Dialect) (open, close byte) {
 	}
 }
 
-// scanSQL walks one migration file once and returns two things: the file with every comment byte
-// blanked to a space, the same length as the input so every offset still names its own line, and
-// one mark per ';', ',', '(' and ')' that sits at the top lexical level.
+// scanSQL walks one migration file once and returns three things: the file with every comment
+// byte blanked to a space, a second copy with the INTERIOR of every string literal and quoted
+// identifier masked as well, and one mark per ';', ',', '(' and ')' that sits at the top lexical
+// level. All three are the same length as the input, so every offset still names its own line.
+//
+// WHY TWO COPIES. The first is what a finding quotes, so a reader sees the declaration they
+// wrote. The second is what every content rule MATCHES against, and that separation is the rule
+// this file gets wrong if it keeps only one: a rule reading the first accepts `DEFAULT
+// 'constraint'` as a named constraint, accepts a table whose only mention of the collation pin
+// is inside a default value, and reports `DEFAULT 'varchar(64)'` as a bare VARCHAR declaration.
+// A value is not a declaration and a name is not a keyword, and the mask is what says so.
+//
+// Literals are masked to spaces because their content is a value no rule reads. Quoted
+// identifiers are masked to 'x' rather than blanked, because their SHAPE is read: a column
+// declaration is `<name> <type>`, so a name that vanished would stop the type being recognised.
+// Masking them is what keeps a column called [constraint] or [varchar] from reading as the
+// keyword it is spelled like. Newlines survive both, so an offset still names its own line.
 //
 // WHY A SCANNER RATHER THAN A LINE MATCH. The rules have to be able to say where one statement
 // or one column declaration ends, and a rule keyed to lines can refuse correct input: a ';' or a
@@ -114,11 +128,12 @@ func identifierQuotes(d schemadump.Dialect) (open, close byte) {
 // '"' anywhere at the top level for the reason identifierQuotes gives, and unbalanced state at
 // end of file. A scanner that cannot say where the statements are must not be the reason a file
 // reports clean, so it fails loudly and names the line.
-func scanSQL(d schemadump.Dialect, text string) (string, []sqlMark, error) {
+func scanSQL(d schemadump.Dialect, text string) (string, string, []sqlMark, error) {
 	idOpen, idClose := identifierQuotes(d)
 	backslashEscapes := d == schemadump.MySQL
 
 	clean := []byte(text)
+	masked := []byte(text)
 	var marks []sqlMark
 	depth := 0
 	line := 1
@@ -132,26 +147,29 @@ func scanSQL(d schemadump.Dialect, text string) (string, []sqlMark, error) {
 		case c == '-' && i+1 < len(text) && text[i+1] == '-':
 			for i < len(text) && text[i] != '\n' {
 				clean[i] = ' '
+				masked[i] = ' '
 				i++
 			}
 		case c == '/' && i+1 < len(text) && text[i+1] == '*':
-			return "", nil, fmt.Errorf("line %d: a /* block comment, which this scanner does not model; no migration uses one", line)
+			return "", "", nil, fmt.Errorf("line %d: a /* block comment, which this scanner does not model; no migration uses one", line)
 		case c == '"':
-			return "", nil, fmt.Errorf("line %d: a double quote, which would be an identifier on postgres and sqlite and a string on mysql; no migration uses one", line)
+			return "", "", nil, fmt.Errorf("line %d: a double quote, which would be an identifier on postgres and sqlite and a string on mysql; no migration uses one", line)
 		case c == '$':
-			return "", nil, fmt.Errorf("line %d: a $ at the top level, which is how postgres opens a dollar-quoted body; this scanner does not model one and no migration uses one", line)
+			return "", "", nil, fmt.Errorf("line %d: a $ at the top level, which is how postgres opens a dollar-quoted body; this scanner does not model one and no migration uses one", line)
 		case c == '\'':
 			end, newlines, ok := skipQuoted(text, i, '\'', backslashEscapes)
 			if !ok {
-				return "", nil, fmt.Errorf("line %d: a single-quoted literal that is never closed", line)
+				return "", "", nil, fmt.Errorf("line %d: a single-quoted literal that is never closed", line)
 			}
+			maskRange(masked, i+1, end-1, ' ')
 			line += newlines
 			i = end
 		case idOpen != 0 && c == idOpen:
 			end, newlines, ok := skipQuoted(text, i, idClose, false)
 			if !ok {
-				return "", nil, fmt.Errorf("line %d: a %c quoted identifier that is never closed", line, idOpen)
+				return "", "", nil, fmt.Errorf("line %d: a %c quoted identifier that is never closed", line, idOpen)
 			}
+			maskRange(masked, i+1, end-1, 'x')
 			line += newlines
 			i = end
 		case c == '(':
@@ -161,7 +179,7 @@ func scanSQL(d schemadump.Dialect, text string) (string, []sqlMark, error) {
 		case c == ')':
 			depth--
 			if depth < 0 {
-				return "", nil, fmt.Errorf("line %d: a closing parenthesis with nothing open", line)
+				return "", "", nil, fmt.Errorf("line %d: a closing parenthesis with nothing open", line)
 			}
 			marks = append(marks, sqlMark{Off: i, Rune: ')', Depth: depth})
 			i++
@@ -173,9 +191,19 @@ func scanSQL(d schemadump.Dialect, text string) (string, []sqlMark, error) {
 		}
 	}
 	if depth != 0 {
-		return "", nil, fmt.Errorf("the file ends with %d parenthesis(es) still open", depth)
+		return "", "", nil, fmt.Errorf("the file ends with %d parenthesis(es) still open", depth)
 	}
-	return string(clean), marks, nil
+	return string(clean), string(masked), marks, nil
+}
+
+// maskRange overwrites [from, to) with fill, leaving every newline where it was so the masked
+// copy stays the same length as the input and an offset in it still names its own line.
+func maskRange(buf []byte, from, to int, fill byte) {
+	for i := from; i >= 0 && i < to && i < len(buf); i++ {
+		if buf[i] != '\n' {
+			buf[i] = fill
+		}
+	}
 }
 
 // skipQuoted walks a single-quoted literal or a quoted identifier from its opening delimiter and
@@ -216,20 +244,26 @@ func skipQuoted(text string, i int, close byte, backslashEscapes bool) (int, int
 // sqlStatement is one statement of a migration file, addressable on its own: its text with every
 // comment already blanked, and the line it starts on.
 type sqlStatement struct {
-	Text  string
-	Line  int
-	clean string
-	start int
-	end   int
-	marks []sqlMark
+	// Text is what a finding quotes; Match is the same span with literal and identifier
+	// interiors masked, and it is what every rule matches against. See scanSQL.
+	Text   string
+	Match  string
+	Line   int
+	clean  string
+	masked string
+	start  int
+	end    int
+	marks  []sqlMark
 }
 
 // sqlFragment is one top-level comma-separated unit of a CREATE TABLE or ALTER TABLE body: one
 // column declaration, one table constraint, one ADD clause. It is the unit a content rule binds
 // to, so a rule reports the column that is wrong rather than the file it is in.
 type sqlFragment struct {
-	Text string
-	Line int
+	// Text is quoted back to the author; Match is what the rules read. See scanSQL.
+	Text  string
+	Match string
+	Line  int
 }
 
 // splitStatements cuts the blanked text at every ';' that sits at parenthesis depth 0 outside a
@@ -238,31 +272,33 @@ type sqlFragment struct {
 // A trailing statement with no ';' is emitted rather than refused. golang-migrate sends the file
 // to the driver as one batch and does not require the terminator, so refusing would be a false
 // alarm on a legitimate migration; every file in the tree happens to end with one today.
-func splitStatements(clean string, marks []sqlMark) []sqlStatement {
+func splitStatements(clean, masked string, marks []sqlMark) []sqlStatement {
 	var out []sqlStatement
 	start, from := 0, 0
 	for k, m := range marks {
 		if m.Rune != ';' || m.Depth != 0 {
 			continue
 		}
-		out = appendStatement(out, clean, start, m.Off, marks[from:k])
+		out = appendStatement(out, clean, masked, start, m.Off, marks[from:k])
 		start, from = m.Off+1, k+1
 	}
-	return appendStatement(out, clean, start, len(clean), marks[from:])
+	return appendStatement(out, clean, masked, start, len(clean), marks[from:])
 }
 
-func appendStatement(out []sqlStatement, clean string, start, end int, marks []sqlMark) []sqlStatement {
+func appendStatement(out []sqlStatement, clean, masked string, start, end int, marks []sqlMark) []sqlStatement {
 	first, last := trimRange(clean, start, end)
 	if first == last {
 		return out
 	}
 	return append(out, sqlStatement{
-		Text:  clean[first:last],
-		Line:  lineAt(clean, first),
-		clean: clean,
-		start: first,
-		end:   last,
-		marks: marks,
+		Text:   clean[first:last],
+		Match:  masked[first:last],
+		Line:   lineAt(clean, first),
+		clean:  clean,
+		masked: masked,
+		start:  first,
+		end:    last,
+		marks:  marks,
 	})
 }
 
@@ -283,28 +319,57 @@ var (
 // first one spells its collation would otherwise pass without spelling its own (decision 7).
 func (s sqlStatement) declarations() []sqlFragment {
 	switch {
-	case createTableRe.MatchString(s.Text):
-		open, close := -1, -1
-		for _, m := range s.marks {
-			if m.Off < s.start || m.Off >= s.end {
-				continue
-			}
-			if m.Rune == '(' && m.Depth == 0 && open < 0 {
-				open = m.Off
-			}
-			if m.Rune == ')' && m.Depth == 0 && open >= 0 {
-				close = m.Off
-				break
-			}
-		}
+	case createTableRe.MatchString(s.Match):
+		open, close := s.body()
 		if open < 0 || close < 0 {
 			return nil
 		}
 		return s.splitRange(open+1, close, 1)
-	case alterTableRe.MatchString(s.Text):
+	case alterTableRe.MatchString(s.Match):
 		return s.splitRange(s.start, s.end, 0)
 	}
 	return nil
+}
+
+// body is the offsets of a statement's first top-level (...) pair, which for a CREATE TABLE is
+// the column list. Either is -1 when there is no such pair.
+func (s sqlStatement) body() (open, close int) {
+	open, close = -1, -1
+	for _, m := range s.marks {
+		if m.Off < s.start || m.Off >= s.end {
+			continue
+		}
+		if m.Rune == '(' && m.Depth == 0 && open < 0 {
+			open = m.Off
+		}
+		if m.Rune == ')' && m.Depth == 0 && open >= 0 {
+			close = m.Off
+			break
+		}
+	}
+	return open, close
+}
+
+// tableOptions is a CREATE TABLE's suffix, everything after the column list closes, masked. That
+// is where MySQL writes ENGINE, CHARSET and the table's own COLLATE, and it is the only place a
+// table-level collation can be spelled.
+//
+// SCOPE IS THE POINT. Asking whether the pin appears anywhere in the statement passes a table
+// that spells it on one column and leaves every other string column inheriting the database
+// default, which on a database created before mysqldb/000040 folds case. A column's pin is not
+// the table's, and the two are a `WHERE client_id = ...` apart.
+//
+// A CREATE TABLE with no column list at all returns an empty suffix rather than nothing, so it
+// reports as unpinned instead of slipping through a shape the scanner could not read.
+func (s sqlStatement) tableOptions() (string, bool) {
+	if !createTableRe.MatchString(s.Match) {
+		return "", false
+	}
+	_, close := s.body()
+	if close < 0 || close+1 > s.end {
+		return "", true
+	}
+	return s.masked[close+1 : s.end], true
 }
 
 func (s sqlStatement) splitRange(from, to, depth int) []sqlFragment {
@@ -314,18 +379,22 @@ func (s sqlStatement) splitRange(from, to, depth int) []sqlFragment {
 		if m.Rune != ',' || m.Depth != depth || m.Off < from || m.Off >= to {
 			continue
 		}
-		out = appendFragment(out, s.clean, start, m.Off)
+		out = appendFragment(out, s.clean, s.masked, start, m.Off)
 		start = m.Off + 1
 	}
-	return appendFragment(out, s.clean, start, to)
+	return appendFragment(out, s.clean, s.masked, start, to)
 }
 
-func appendFragment(out []sqlFragment, clean string, start, end int) []sqlFragment {
+func appendFragment(out []sqlFragment, clean, masked string, start, end int) []sqlFragment {
 	first, last := trimRange(clean, start, end)
 	if first == last {
 		return out
 	}
-	return append(out, sqlFragment{Text: clean[first:last], Line: lineAt(clean, first)})
+	return append(out, sqlFragment{
+		Text:  clean[first:last],
+		Match: masked[first:last],
+		Line:  lineAt(clean, first),
+	})
 }
 
 func trimRange(s string, start, end int) (int, int) {
@@ -396,6 +465,7 @@ type migrationFile struct {
 	Half       string
 	Text       string
 	Clean      string
+	Masked     string
 	Statements []sqlStatement
 	ScanErr    error
 }
@@ -408,12 +478,13 @@ func readMigrationFiles(tree migrationTree) []migrationFile {
 		for _, name := range sortedFilenames(tree[d]) {
 			f := migrationFile{Dialect: d, Name: name, Text: tree[d][name]}
 			f.Number, f.Slug, f.Half, _ = parseMigrationFilename(name)
-			clean, marks, err := scanSQL(d, f.Text)
+			clean, masked, marks, err := scanSQL(d, f.Text)
 			if err != nil {
 				f.ScanErr = err
 			} else {
 				f.Clean = clean
-				f.Statements = splitStatements(clean, marks)
+				f.Masked = masked
+				f.Statements = splitStatements(clean, masked, marks)
 			}
 			files = append(files, f)
 		}
@@ -540,40 +611,72 @@ func checkPairing(tree migrationTree) []migrationFinding {
 	return out
 }
 
-// migrationNumbers is the number index every cross-engine rule reads: number -> engine -> slug,
-// built from the up migrations, which are the ones that define what a number means.
-func migrationNumbers(files []migrationFile) map[int]map[schemadump.Dialect]string {
-	numbers := map[int]map[schemadump.Dialect]string{}
+// migrationNumbers is the number index every cross-engine rule reads: number -> engine -> the
+// slugs of the up migrations at that number, built from the up halves, which are the ones that
+// define what a number means.
+//
+// IT KEEPS A SLICE, and that is not tidiness. One engine carrying two up migrations at the same
+// number is itself a violation, and an index storing one slug per engine cannot report it: the
+// two files overwrite each other and whichever sorts last is the only one any rule ever sees. A
+// duplicate whose slug sorts first then disappears completely, and a tree naming one version
+// twice passes every rule in this file while golang-migrate's own source loader refuses to open
+// it. Uniqueness has to be decided before the index is flattened, so the index cannot be the
+// thing that flattens it.
+func migrationNumbers(files []migrationFile) map[int]map[schemadump.Dialect][]string {
+	numbers := map[int]map[schemadump.Dialect][]string{}
 	for _, f := range files {
 		if f.Half != "up" {
 			continue
 		}
 		if numbers[f.Number] == nil {
-			numbers[f.Number] = map[schemadump.Dialect]string{}
+			numbers[f.Number] = map[schemadump.Dialect][]string{}
 		}
-		numbers[f.Number][f.Dialect] = f.Slug
+		numbers[f.Number][f.Dialect] = append(numbers[f.Number][f.Dialect], f.Slug)
 	}
 	return numbers
 }
 
-// checkNumberIdentity refuses a number that names a different change per engine. A number is a
-// version, recorded in schema_migrations and shared by the four engines, so one number meaning
-// two changes is how an engine silently skips the one it did not get.
+// checkNumberIdentity refuses a number that names a different change per engine, and a number
+// that names two changes on one engine. A number is a version, recorded in schema_migrations and
+// shared by the four engines, so one number meaning two changes is how an engine silently skips
+// the one it did not get.
+//
+// The two halves run in that order because the second only means anything once the first holds:
+// comparing slugs across engines when one engine has two of them compares an arbitrary pick.
 func checkNumberIdentity(files []migrationFile) []migrationFinding {
 	numbers := migrationNumbers(files)
 	var out []migrationFinding
 	for _, num := range sortedNumbers(numbers) {
+		// Two up migrations at one number on one engine. golang-migrate's own source loader
+		// refuses this tree with ErrDuplicateMigration, so it is a build that never starts
+		// rather than a divergence, but the four directories are written by hand and nothing
+		// else reads them before a database job does.
+		duplicated := false
+		for _, d := range indexDialects(numbers[num]) {
+			slugs := numbers[num][d]
+			if len(slugs) < 2 {
+				continue
+			}
+			duplicated = true
+			out = append(out, migrationFinding{"number identity", fmt.Sprintf("%06d", num),
+				"is two up migrations on " + string(d) + "db, " + strings.Join(slugs, " and ") +
+					"; a number is one version and can only name one change"})
+		}
+		if duplicated {
+			continue
+		}
+
 		slugs := map[string]bool{}
-		for _, slug := range numbers[num] {
-			slugs[slug] = true
+		for _, list := range numbers[num] {
+			slugs[list[0]] = true
 		}
 		if len(slugs) < 2 {
 			continue
 		}
 		named := make([]string, 0, len(numbers[num]))
 		for _, d := range migrationDialects {
-			if slug, ok := numbers[num][d]; ok {
-				named = append(named, string(d)+"="+slug)
+			if list, ok := numbers[num][d]; ok {
+				named = append(named, string(d)+"="+list[0])
 			}
 		}
 		out = append(out, migrationFinding{"number identity", fmt.Sprintf("%06d", num),
@@ -777,7 +880,17 @@ var (
 	// mssqlStringColumnRe is a string column being declared: a name, then a char type. The
 	// three openings are the three places a declaration starts, once a statement has been split
 	// into its top-level units: the head of a CREATE TABLE column, an ALTER COLUMN, and an ADD.
-	mssqlStringColumnRe = regexp.MustCompile(`(?i)(?:^|\balter\s+column\s+|\badd\s+)\[?\w+\]?\s+n?(?:var)?char\s*\(`)
+	//
+	// The length is OPTIONAL. `[x] NVARCHAR` is a legal declaration of a one-character column,
+	// and requiring the parenthesis would have let one through carrying no collation at all.
+	mssqlStringColumnRe = regexp.MustCompile(`(?i)(?:^|\balter\s+column\s+|\badd\s+)\[?\w+\]?\s+n?(?:var)?char\b`)
+
+	// mssqlUnpinnableStringRe is a string column declared with a type that CANNOT carry the
+	// pin. A UTF-8 collation is only valid on char, varchar, nchar and nvarchar, so TEXT and
+	// NTEXT cannot be written correctly under these rules at all and are refused by type rather
+	// than asked for a COLLATE clause they cannot legally take. Both are deprecated by
+	// Microsoft, both fold under the server default, and neither appears in the tree.
+	mssqlUnpinnableStringRe = regexp.MustCompile(`(?i)(?:^|\balter\s+column\s+|\badd\s+)\[?\w+\]?\s+n?text\b`)
 
 	// mssqlNotAColumnRe are the words that make a char( somewhere other than a declaration: a
 	// cast inside a CHECK constraint, a variable, a computed column's expression.
@@ -822,7 +935,7 @@ func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 				// Every string column on SQL Server is NVARCHAR. Under a non-UTF-8 server
 				// collation VARCHAR replaces anything outside the code page with '?', and
 				// that loss is irreversible (#282 D4).
-				if f.Number > cutoffs.MSSQLNVarchar && bareVarcharRe.MatchString(decl.Text) {
+				if f.Number > cutoffs.MSSQLNVarchar && bareVarcharRe.MatchString(decl.Match) {
 					out = append(out, migrationFinding{"mssql/nvarchar", at(f, decl.Line),
 						"declares a bare VARCHAR, which loses anything outside the code page " +
 							"under a non-UTF-8 server collation; every string column here is NVARCHAR: " +
@@ -833,8 +946,14 @@ func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 				// it IF NOT EXISTS, so a database an operator pre-created keeps their own
 				// default and an unpinned column silently lands case-insensitive there. RFC
 				// 6749 section 1.9 makes every protocol parameter value case-sensitive (#283).
-				if f.Number > cutoffs.MSSQLCollate && isMSSQLStringColumn(decl.Text) {
-					if m := collateClauseRe.FindStringSubmatch(decl.Text); m == nil {
+				if f.Number > cutoffs.MSSQLCollate && isMSSQLUnpinnableString(decl.Match) {
+					out = append(out, migrationFinding{"mssql/collate", at(f, decl.Line),
+						"declares a TEXT or NTEXT column, which cannot carry COLLATE " +
+							migrationMSSQLCollation + " at all, since a UTF-8 collation is only " +
+							"valid on char, varchar, nchar and nvarchar; declare it NVARCHAR: " +
+							shorten(decl.Text)})
+				} else if f.Number > cutoffs.MSSQLCollate && isMSSQLStringColumn(decl.Match) {
+					if m := collateClauseRe.FindStringSubmatch(decl.Match); m == nil {
 						out = append(out, migrationFinding{"mssql/collate", at(f, decl.Line),
 							"declares a string column that spells no COLLATE, so it inherits " +
 								"whatever the database was created at; write COLLATE " +
@@ -851,7 +970,7 @@ func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 				// sys.default_constraints, which is what mssqldb/000038 and 000040 both had to
 				// do (#282 D4).
 				if f.Number > cutoffs.MSSQLNamedDefault &&
-					addDefaultRe.MatchString(decl.Text) && !constraintWordRe.MatchString(decl.Text) {
+					addDefaultRe.MatchString(decl.Match) && !constraintWordRe.MatchString(decl.Match) {
 					out = append(out, migrationFinding{"mssql/named-default", at(f, decl.Line),
 						"adds a DEFAULT with no CONSTRAINT name, so SQL Server invents a " +
 							"per-database one that nothing can later drop by name; write " +
@@ -861,7 +980,7 @@ func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 				// ALTER COLUMN c <type> with no NULL keyword makes the column NULLABLE
 				// whatever it was before, so a restated type silently drops NOT NULL. No
 				// cutoff: the tree has never done it, including all 92 in 000040.
-				if alterColumnRe.MatchString(decl.Text) && !nullWordRe.MatchString(decl.Text) {
+				if alterColumnRe.MatchString(decl.Match) && !nullWordRe.MatchString(decl.Match) {
 					out = append(out, migrationFinding{"mssql/nullability", at(f, decl.Line),
 						"restates a column's type without NULL or NOT NULL, which makes it " +
 							"nullable whatever it was before: " + shorten(decl.Text)})
@@ -874,6 +993,10 @@ func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 
 func isMSSQLStringColumn(text string) bool {
 	return mssqlStringColumnRe.MatchString(text) && !mssqlNotAColumnRe.MatchString(text)
+}
+
+func isMSSQLUnpinnableString(text string) bool {
+	return mssqlUnpinnableStringRe.MatchString(text) && !mssqlNotAColumnRe.MatchString(text)
 }
 
 // checkMySQLContent is the one MySQL rule in its two forms, and the second form is why it binds
@@ -891,8 +1014,8 @@ func checkMySQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 			// Spelled, and spelled wrong. Read off the statement rather than the declaration
 			// because MySQL's table-level clause sits after the closing parenthesis, outside
 			// every declaration in the body.
-			for _, m := range collateClauseRe.FindAllStringSubmatchIndex(s.Text, -1) {
-				if name := s.Text[m[2]:m[3]]; name != migrationMySQLCollation {
+			for _, m := range collateClauseRe.FindAllStringSubmatchIndex(s.Match, -1) {
+				if name := s.Match[m[2]:m[3]]; name != migrationMySQLCollation {
 					out = append(out, migrationFinding{"mysql/collation",
 						at(f, lineAt(s.clean, s.start+m[0])),
 						"names COLLATE " + name + ", which folds where " + migrationMySQLCollation +
@@ -900,16 +1023,17 @@ func checkMySQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 				}
 			}
 
-			// Not spelled at all. ONE STATEMENT, not one file: a rule asking whether the pin
-			// appears anywhere in the file passes a second CREATE TABLE that inherits the
-			// database default, which is right today and silently wrong on any deployment
-			// whose database was created before 000040 moved it.
-			if createTableRe.MatchString(s.Text) &&
-				!strings.Contains(strings.ToLower(s.Text), strings.ToLower(migrationMySQLCollation)) {
+			// Not spelled at all. ONE TABLE OPTION, not one statement and certainly not one
+			// file: a rule asking whether the pin appears anywhere passes a second CREATE TABLE
+			// that inherits the database default, and it also passes a table that spells the pin
+			// on one column while every other string column inherits. Only the clause after the
+			// column list sets what the table's own columns default to.
+			if opts, ok := s.tableOptions(); ok &&
+				!strings.Contains(strings.ToLower(opts), strings.ToLower(migrationMySQLCollation)) {
 				out = append(out, migrationFinding{"mysql/collation", at(f, s.Line),
-					"creates a table without spelling its collation, so it inherits the database " +
-						"default; write ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=" +
-						migrationMySQLCollation})
+					"creates a table without spelling its collation in its table options, so its " +
+						"columns inherit the database default; write ) ENGINE=InnoDB DEFAULT " +
+						"CHARSET=utf8mb4 COLLATE=" + migrationMySQLCollation})
 			}
 		}
 	}
@@ -1027,12 +1151,25 @@ func sortedFilenames(files map[string]string) []string {
 	return out
 }
 
-func sortedNumbers(numbers map[int]map[schemadump.Dialect]string) []int {
+func sortedNumbers(numbers map[int]map[schemadump.Dialect][]string) []int {
 	out := make([]int, 0, len(numbers))
 	for n := range numbers {
 		out = append(out, n)
 	}
 	sort.Ints(out)
+	return out
+}
+
+// indexDialects is the engines one number was found on, in a stable order. It reads the index
+// rather than migrationDialects so a directory that is not one of the four is still judged: a
+// fifth engine is a finding of its own (checkMigrationDirectories) and not a reason to stop
+// looking at its files.
+func indexDialects(byDialect map[schemadump.Dialect][]string) []schemadump.Dialect {
+	out := make([]schemadump.Dialect, 0, len(byDialect))
+	for d := range byDialect {
+		out = append(out, d)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
 }
 
@@ -1201,7 +1338,7 @@ func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clean, marks, err := scanSQL(tt.dialect, tt.text)
+			clean, masked, marks, err := scanSQL(tt.dialect, tt.text)
 			if tt.refuseOn != "" {
 				require.Error(t, err, "this form has to be refused, not guessed at")
 				require.Contains(t, err.Error(), tt.refuseOn)
@@ -1209,12 +1346,73 @@ func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Len(t, clean, len(tt.text), "the blanked text keeps every offset")
+			require.Len(t, masked, len(tt.text), "the masked text keeps every offset")
 
 			got := make([]string, 0, len(tt.want))
-			for _, s := range splitStatements(clean, marks) {
+			for _, s := range splitStatements(clean, masked, marks) {
 				got = append(got, s.Text)
 			}
 			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestMigrationScanner_MasksValueAndNameText is what makes a content rule location-aware, and
+// it is asserted on its own because every content case below rides on it: a rule matching the
+// unmasked text reads a value as a declaration and a column name as a keyword.
+//
+// The delimiters survive on both sides. What is masked is what a rule must not read: the bytes
+// BETWEEN them.
+func TestMigrationScanner_MasksValueAndNameText(t *testing.T) {
+	tests := []struct {
+		name    string
+		dialect schemadump.Dialect
+		text    string
+		want    string
+	}{
+		{
+			name:    "a literal's interior is blanked and its quotes stay",
+			dialect: schemadump.SQLite,
+			text:    "UPDATE t SET a = 'x;y';",
+			want:    "UPDATE t SET a = '   ';",
+		},
+		{
+			// A column called [constraint] is a name, and the named-default rule asks whether
+			// the word CONSTRAINT is present. Masking is what keeps the two apart.
+			name:    "a quoted identifier keeps its shape and loses its spelling",
+			dialect: schemadump.MSSQL,
+			text:    "ALTER TABLE [constraint] ADD [a] INT;",
+			want:    "ALTER TABLE [xxxxxxxxxx] ADD [x] INT;",
+		},
+		{
+			name:    "a comment is blanked in the mask as well",
+			dialect: schemadump.Postgres,
+			text:    "-- note\nALTER TABLE t ADD a INT;",
+			want:    "       \nALTER TABLE t ADD a INT;",
+		},
+		{
+			// mssqldb/000029's shape. Every newline survives, so an offset in the mask still
+			// names the line a finding will report.
+			name:    "a literal spanning two lines keeps its newline",
+			dialect: schemadump.MSSQL,
+			text:    "EXEC('line one\nline two');",
+			want:    "EXEC('        \n        ');",
+		},
+		{
+			name:    "a doubled quote inside a literal is masked with the rest of it",
+			dialect: schemadump.MSSQL,
+			text:    "EXEC('a''b');",
+			want:    "EXEC('    ');",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clean, masked, _, err := scanSQL(tt.dialect, tt.text)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, masked)
+			require.Len(t, clean, len(tt.text), "the blanked text keeps every offset")
+			require.Len(t, masked, len(tt.text), "the masked text keeps every offset")
 		})
 	}
 }
@@ -1267,10 +1465,10 @@ func TestMigrationScanner_SplitsDeclarationsAtTheTopLevelOnly(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clean, marks, err := scanSQL(tt.dialect, tt.text)
+			clean, masked, marks, err := scanSQL(tt.dialect, tt.text)
 			require.NoError(t, err)
 
-			statements := splitStatements(clean, marks)
+			statements := splitStatements(clean, masked, marks)
 			require.Len(t, statements, 1)
 
 			var got []string
@@ -1383,6 +1581,33 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 			},
 			wantRule: "number identity",
 			wantSay:  "names a different change per engine",
+		},
+
+		{
+			// The added slug sorts BEFORE initial_create, which is the shape an index keeping
+			// one slug per engine loses completely: the ordinary file overwrites the duplicate
+			// and there is nothing left for any rule to disagree with. golang-migrate's source
+			// loader refuses this tree outright, so nothing here would ever have run.
+			name: "two up migrations at one number on one engine are refused",
+			breaks: func(tr migrationTree) {
+				addMigration(tr, schemadump.MySQL, "000001_a_second_change",
+					"ALTER TABLE widgets ADD gadgets int;\n")
+			},
+			wantRule: "number identity",
+			wantSay:  "is two up migrations on mysqldb",
+		},
+		{
+			// On all four, so the slug still agrees across engines and the cross-engine half
+			// of the rule stays quiet: only the duplicate is left to report.
+			name: "the same duplicate on all four engines is refused too",
+			breaks: func(tr migrationTree) {
+				for _, d := range migrationDialects {
+					addMigration(tr, d, "000001_a_second_change",
+						"ALTER TABLE widgets ADD gadgets int;\n")
+				}
+			},
+			wantRule: "number identity",
+			wantSay:  "is two up migrations on mssqldb",
 		},
 
 		// coverage
@@ -1721,11 +1946,80 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			},
 		},
 
+		{
+			// NTEXT is a string type that CANNOT carry the pin: a UTF-8 collation is only
+			// valid on char, varchar, nchar and nvarchar. A rule that only recognises those
+			// four reads NTEXT as a non-string column and lets it inherit the database
+			// default, which on a database created outside NewMsSQLDatabase folds case.
+			name: "an NTEXT column is refused by its type rather than asked for a COLLATE",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] NTEXT NULL")
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "cannot carry COLLATE",
+		},
+		{
+			// NVARCHAR with no length is a legal one-character column, so a rule keyed to the
+			// opening parenthesis would never see it.
+			name: "a length-less NVARCHAR is still a string column",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] NVARCHAR NULL")
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "spells no COLLATE",
+		},
+		{
+			name: "a length-less NVARCHAR that spells the pin passes",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] NVARCHAR COLLATE "+migrationMSSQLCollation+" NULL")
+			},
+		},
+		{
+			// The word varchar( inside a default VALUE declares nothing. A rule reading the
+			// unmasked text refuses a legitimate migration here, which is the failure decision
+			// 7 exists to avoid: a gate whose failure mode is a false alarm.
+			name: "a VARCHAR spelled inside a default value is not a declaration",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50, "DEFAULT ''", "DEFAULT 'varchar(64)'")
+			},
+		},
+
 		// mssql/named-default
 		{
 			name: "an unnamed default constraint is refused",
 			breaks: func(tr migrationTree) {
 				editUp(tr, schemadump.MSSQL, 50, "CONSTRAINT [df_widgets_note] DEFAULT", "DEFAULT")
+			},
+			wantRule: "mssql/named-default",
+			wantSay:  "no CONSTRAINT name",
+		},
+		{
+			// The other direction of the same confusion: the word CONSTRAINT inside a default
+			// VALUE names no constraint, so this default is still unnamed.
+			name: "a CONSTRAINT spelled inside a default value names nothing",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"CONSTRAINT [df_widgets_note] DEFAULT ''", "DEFAULT 'constraint'")
+			},
+			wantRule: "mssql/named-default",
+			wantSay:  "no CONSTRAINT name",
+		},
+		{
+			// And a column NAMED constraint is a name, not a keyword. Masking the identifier's
+			// spelling while keeping its shape is what tells the two apart.
+			name: "a column called constraint does not name the default",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[note] NVARCHAR(16) COLLATE "+migrationMSSQLCollation+
+						" NOT NULL CONSTRAINT [df_widgets_note] DEFAULT ''",
+					"[constraint] NVARCHAR(16) COLLATE "+migrationMSSQLCollation+
+						" NOT NULL DEFAULT ''")
 			},
 			wantRule: "mssql/named-default",
 			wantSay:  "no CONSTRAINT name",
@@ -1769,6 +2063,43 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			},
 			wantRule: "mysql/collation",
 			wantSay:  "names COLLATE " + wrongMySQL,
+		},
+		{
+			// The pin on ONE COLUMN is not the table's own. Every other string column, and
+			// every one added later, still inherits the database default, so a rule looking
+			// for the pin anywhere in the statement passes a table that is half pinned.
+			name: "a pin on one column does not stand in for the table's",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MySQL, 50,
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
+						migrationMySQLCollation+";",
+					"  id bigint NOT NULL,\n  tag varchar(32) COLLATE "+migrationMySQLCollation+
+						" NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;")
+			},
+			wantRule: "mysql/collation",
+			wantSay:  "without spelling its collation in its table options",
+		},
+		{
+			// And the pin spelled inside a default VALUE pins nothing at all.
+			name: "the pin spelled inside a default value does not pin the table",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MySQL, 50,
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
+						migrationMySQLCollation+";",
+					"  id bigint NOT NULL,\n  tag varchar(32) NOT NULL DEFAULT 'COLLATE="+
+						migrationMySQLCollation+"'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;")
+			},
+			wantRule: "mysql/collation",
+			wantSay:  "without spelling its collation in its table options",
+		},
+		{
+			// The accepting twin of the case above: a folding collation NAMED in a value is a
+			// string, and refusing it would be a false alarm on a legitimate migration.
+			name: "a folding collation spelled inside a default value is not a violation",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MySQL, 50, "name varchar(64) NOT NULL",
+					"name varchar(64) NOT NULL DEFAULT 'COLLATE "+wrongMySQL+"'")
+			},
 		},
 
 		// engines with no content rule
