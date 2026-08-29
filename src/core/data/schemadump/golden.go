@@ -13,9 +13,9 @@ import (
 
 // The golden file is the checked record of what one engine's migration chain builds, and the
 // seam between the generator that writes it and the data tier that compares a freshly
-// migrated database against it. It replaces the hand-maintained schema.sql snapshot beside
-// it, which nothing could hold to being right and which was wrong on SQL Server by 27
-// objects when this was written (#284).
+// migrated database against it. It replaced the hand-maintained schema.sql snapshot that used
+// to sit beside it, which nothing could hold to being right and which was wrong on SQL Server
+// by 27 objects; that snapshot was deleted in the same change (#284).
 //
 // The format is one tab-separated record per column, index and foreign key. Records carry
 // their own table name rather than relying on the table line above them, so a diff hunk in a
@@ -444,8 +444,8 @@ func firstError(errs ...error) error {
 }
 
 // GoldenPath is where one engine's golden file lives: beside that engine's migrations, at
-// core/data/<engine>db/schema.golden, which is decision 3's placing and where the schema.sql
-// snapshot it supersedes sits today.
+// core/data/<engine>db/schema.golden, taking over the spot the hand-maintained schema.sql
+// snapshot held until it was deleted (#284).
 //
 // The source root is found by ascending from the working directory rather than by counting
 // "../" from a caller's package, because the two consumers sit at different depths and in
