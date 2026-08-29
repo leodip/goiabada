@@ -83,6 +83,20 @@ type ColumnShape struct {
 	Nullable bool
 	Default  string // the engine's own default expression, verbatim; "" when there is none
 
+	// HasDefault says the column has a default at all, which the expression above cannot
+	// say on its own: "" is both "no default" and what MySQL's catalog reports for
+	// DEFAULT ''. The other three engines spell an empty-string default '',
+	// ''::character varying and (''), so only MySQL was ambiguous, and four columns
+	// carrying DEFAULT '' on all four engines read as having none on MySQL alone until
+	// this was added (#284). It is read from every engine's catalog rather than inferred
+	// from Default on three of them, because a fact taken from one engine and guessed on
+	// the rest is how that gap arrived in the first place.
+	//
+	// DEFAULT NULL still reports true here, since the engine records a default; whether
+	// it means the same thing as having none is the comparison's question and not the
+	// dumper's.
+	HasDefault bool
+
 	// Collation is what the engine says decides `=` and ordering for this column, in the
 	// engine's own vocabulary: a utf8mb4_* name on MySQL, a pg_collation name on
 	// PostgreSQL (which is "default" for every column here, since none carries an

@@ -32,7 +32,11 @@ import (
 // failure that would otherwise produce is the worst kind available here: an older file
 // missing a field parses into a shape whose zero value is a legitimate reading, and the
 // comparison then passes against a record of something else.
-const goldenVersion = 1
+//
+// Version 2 added has_default to every column record. Version 1 carried the default
+// expression alone, which cannot say whether a column with an empty expression has a default
+// at all, and read four MySQL columns declaring DEFAULT ” as having none (#284).
+const goldenVersion = 2
 
 // EngineNamedPlaceholder stands in for a name the engine invented rather than a migration
 // choosing it.
@@ -117,6 +121,7 @@ func Encode(schema Schema, d Dialect) ([]byte, error) {
 				field("type", c.Type),
 				boolField("nullable", c.Nullable),
 				field("default", c.Default),
+				boolField("has_default", c.HasDefault),
 				field("collation", c.Collation),
 				field("default_name", maskedDefaultName(c)),
 				boolField("generated", c.Generated))
@@ -325,7 +330,8 @@ func parseRecord(text string, schema *Schema, byName map[string]int) error {
 	case "column":
 		nullable, err1 := fields.boolean("nullable")
 		generated, err2 := fields.boolean("generated")
-		if err := firstError(err1, err2); err != nil {
+		hasDefault, err3 := fields.boolean("has_default")
+		if err := firstError(err1, err2, err3); err != nil {
 			return err
 		}
 		defaultName, err := fields.text("default_name")
@@ -340,7 +346,8 @@ func parseRecord(text string, schema *Schema, byName map[string]int) error {
 		}
 		shape.Columns = append(shape.Columns, ColumnShape{
 			Name: names[1], Type: typ, Nullable: nullable, Default: def,
-			Collation: collation, DefaultName: defaultName,
+			HasDefault: hasDefault,
+			Collation:  collation, DefaultName: defaultName,
 			DefaultIsSystemNamed: defaultName == EngineNamedPlaceholder,
 			Generated:            generated,
 		})

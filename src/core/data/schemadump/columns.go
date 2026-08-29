@@ -5,10 +5,14 @@ import (
 	"fmt"
 )
 
-// dumpColumns reads one table's columns. Every branch returns the same eight values in the
+// dumpColumns reads one table's columns. Every branch returns the same nine values in the
 // same order, so the scan below is one loop: name, type, nullability, default expression,
-// collation, default constraint name, whether the engine invented that name, and whether the
-// engine numbers the column.
+// whether there is a default at all, collation, default constraint name, whether the engine
+// invented that name, and whether the engine numbers the column.
+//
+// The default expression and the has-a-default flag are two values because one cannot carry
+// both facts: MySQL's catalog reports DEFAULT ” as the empty string, which is also what a
+// column with no default reads as (#284).
 func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 	var q string
 	switch d {
@@ -18,11 +22,12 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 		// holds no string, which is the '' this reports.
 		//
 		// EXTRA is where MySQL records auto_increment, and it is the only place: two
-		// tables differing by nothing else report identical rows for the six values
+		// tables differing by nothing else report identical rows for every value
 		// above it.
 		q = fmt.Sprintf(`SELECT COLUMN_NAME, COLUMN_TYPE,
 			CASE WHEN IS_NULLABLE = 'YES' THEN '1' ELSE '0' END,
 			COALESCE(COLUMN_DEFAULT, ''),
+			CASE WHEN COLUMN_DEFAULT IS NULL THEN '0' ELSE '1' END,
 			COALESCE(COLLATION_NAME, ''), '', '0',
 			CASE WHEN LOCATE('auto_increment', EXTRA) > 0 THEN '1' ELSE '0' END
 			FROM information_schema.columns
@@ -36,7 +41,7 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 		// in this schema is the database's own: none declares an override. It resolves
 		// through pg_collation to the name "default", and 0 for a column that holds no
 		// string, which is the '' this reports. PostgreSQL names no default constraint,
-		// so the sixth and seventh values are literals.
+		// so the seventh and eighth values are literals.
 		//
 		// Generation is read in both spellings PostgreSQL has: attidentity is set for a
 		// declared GENERATED ... AS IDENTITY column, and a nextval() default is what
@@ -45,6 +50,7 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 		q = fmt.Sprintf(`SELECT a.attname, format_type(a.atttypid, a.atttypmod),
 			CASE WHEN a.attnotnull THEN '0' ELSE '1' END,
 			COALESCE(pg_get_expr(d.adbin, d.adrelid), ''),
+			CASE WHEN d.adbin IS NULL THEN '0' ELSE '1' END,
 			COALESCE((SELECT co.collname FROM pg_collation co WHERE co.oid = a.attcollation), ''), '', '0',
 			CASE WHEN a.attidentity <> '' OR COALESCE(pg_get_expr(d.adbin, d.adrelid), '') LIKE 'nextval(%%' THEN '1' ELSE '0' END
 			FROM pg_attribute a
@@ -74,6 +80,7 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 			  ELSE '' END,
 			CASE WHEN c.is_nullable = 1 THEN '1' ELSE '0' END,
 			COALESCE(dc.definition, ''),
+			CASE WHEN dc.object_id IS NULL THEN '0' ELSE '1' END,
 			COALESCE(c.collation_name, ''), COALESCE(dc.name, ''),
 			CASE WHEN dc.is_system_named = 1 THEN '1' ELSE '0' END,
 			CASE WHEN c.is_identity = 1 THEN '1' ELSE '0' END
@@ -91,11 +98,13 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 		// nothing else: a TEXT column and a TEXT COLLATE NOCASE column are
 		// indistinguishable through it, and so are an AUTOINCREMENT primary key and a
 		// plain one, both measured. So the collation and the generation flag are filled
-		// in below from the declaration in sqlite_schema, and the three literals here
-		// keep every branch returning the same eight values.
+		// in below from the declaration in sqlite_schema, and the four literals here
+		// keep every branch returning the same nine values.
 		q = fmt.Sprintf(`SELECT name, type,
 			CASE WHEN "notnull" = 0 THEN '1' ELSE '0' END,
-			COALESCE(dflt_value, ''), '', '', '0', '0'
+			COALESCE(dflt_value, ''),
+			CASE WHEN dflt_value IS NULL THEN '0' ELSE '1' END,
+			'', '', '0', '0'
 			FROM pragma_table_info('%s')`, table)
 	}
 
@@ -107,13 +116,14 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 
 	var cols []ColumnShape
 	for rows.Next() {
-		var name, typ, nullable, def, collation, defName, defSystemNamed, generated string
-		if err := rows.Scan(&name, &typ, &nullable, &def, &collation, &defName, &defSystemNamed, &generated); err != nil {
+		var name, typ, nullable, def, hasDefault, collation, defName, defSystemNamed, generated string
+		if err := rows.Scan(&name, &typ, &nullable, &def, &hasDefault, &collation, &defName, &defSystemNamed, &generated); err != nil {
 			return nil, fmt.Errorf("schemadump: scan column catalog row on %s.%s: %w", d, table, err)
 		}
 		cols = append(cols, ColumnShape{
 			Name: name, Type: typ, Nullable: nullable == "1", Default: def,
-			Collation: collation, DefaultName: defName,
+			HasDefault: hasDefault == "1",
+			Collation:  collation, DefaultName: defName,
 			DefaultIsSystemNamed: defSystemNamed == "1",
 			Generated:            generated == "1",
 		})
