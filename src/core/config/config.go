@@ -76,7 +76,6 @@ type AdminConsoleConfig struct {
 	KeyFile                  string
 	StaticDir                string
 	TemplateDir              string
-	OAuthClientID            string
 	OAuthClientSecret        string
 	SessionAuthenticationKey string
 	SessionEncryptionKey     string
@@ -163,7 +162,6 @@ func load() {
 			KeyFile:                  getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
 			StaticDir:                getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
 			TemplateDir:              getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
-			OAuthClientID:            getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID", "admin-console-client"),
 			OAuthClientSecret:        getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
 			SessionAuthenticationKey: getEnv("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", ""),
 			SessionEncryptionKey:     getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", ""),
@@ -219,7 +217,6 @@ func load() {
 	flag.StringVar(&cfg.AdminConsole.KeyFile, "adminconsole-keyfile", cfg.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
 	flag.StringVar(&cfg.AdminConsole.StaticDir, "adminconsole-staticdir", cfg.AdminConsole.StaticDir, "Static files directory for admin console")
 	flag.StringVar(&cfg.AdminConsole.TemplateDir, "adminconsole-templatedir", cfg.AdminConsole.TemplateDir, "Template files directory for admin console")
-	flag.StringVar(&cfg.AdminConsole.OAuthClientID, "adminconsole-oauth-client-id", cfg.AdminConsole.OAuthClientID, "OAuth client_id used by admin console")
 	flag.StringVar(&cfg.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", cfg.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 
 	// Database

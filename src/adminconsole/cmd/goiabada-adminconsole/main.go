@@ -41,7 +41,9 @@ func main() {
 
 	// Validate OAuth credentials EARLY - fail fast if missing
 	adminConsoleConfig := config.GetAdminConsole()
-	if adminConsoleConfig.OAuthClientID == "" {
+	// One block, keyed on the secret: the client id is no longer configuration, so the only
+	// half of the credential a deployment supplies is the secret (#285).
+	if adminConsoleConfig.OAuthClientSecret == "" {
 		slog.Error("================================================================================")
 		slog.Error("BOOTSTRAP CREDENTIALS NOT CONFIGURED")
 		slog.Error("================================================================================")
@@ -53,19 +55,9 @@ func main() {
 		slog.Error("3. Restart both auth server and admin console with the credentials set")
 		slog.Error("")
 		slog.Error("Required environment variables:")
-		slog.Error("  - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID")
 		slog.Error("  - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET")
 		slog.Error("  - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY")
 		slog.Error("  - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY")
-		slog.Error("================================================================================")
-		os.Exit(1)
-	}
-	if adminConsoleConfig.OAuthClientSecret == "" {
-		slog.Error("================================================================================")
-		slog.Error("BOOTSTRAP CREDENTIALS NOT CONFIGURED")
-		slog.Error("================================================================================")
-		slog.Error("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET is required but not set.")
-		slog.Error("Please copy the credentials from the bootstrap file generated during initial setup.")
 		slog.Error("================================================================================")
 		os.Exit(1)
 	}
@@ -122,7 +114,7 @@ func main() {
 	// and split the ciphertext across up to fifty of them (#266).
 	tokenSource := apiclient.NewSessionTokenSource(
 		config.GetAuthServer().GetEffectiveBaseURL(),
-		adminConsoleConfig.OAuthClientID,
+		constants.AdminConsoleClientIdentifier,
 		adminConsoleConfig.OAuthClientSecret,
 	)
 

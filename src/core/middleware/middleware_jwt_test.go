@@ -945,13 +945,18 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 	mockAuthHelper.AssertExpectations(t)
 }
 
+// TestRequiresScope_Unauthenticated, _NoJwtInfo and _RedirectError construct with
+// constants.AdminConsoleClientIdentifier rather than "" on purpose: RequiresScope used to
+// substitute that constant itself when the field was blank, so with "" these three asserted
+// the substitution and nothing about the caller. The middleware no longer names any module's
+// identity, and the argument here is what reaches RedirToAuthorize (#285).
 func TestRequiresScope_Unauthenticated(t *testing.T) {
 	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
 	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", constants.AdminConsoleClientIdentifier, "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -981,7 +986,7 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", constants.AdminConsoleClientIdentifier, "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -1006,7 +1011,7 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", constants.AdminConsoleClientIdentifier, "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
