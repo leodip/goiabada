@@ -278,6 +278,12 @@ against the file for the engine it is running on. A migration therefore has one 
 `cd src/core && go run ./cmd/schemadump` inside the dev container, which regenerates all four
 files at once, and commit them. Skip it and CI goes red on every database job.
 
+**Migration source rules**: the core tier runs `TestMigrationSource_TheFourCommittedDirectories`
+in `src/core/data`, which holds the four `migrations/` directories to the rules decidable from the
+text alone: naming, pairing, one number meaning one change, the collation pins on MySQL and SQL
+Server, and each `schema.golden`'s recorded version. A migration landing on fewer than four
+engines therefore owes a `-- parity: <engines> only. <why>` line in every up.sql carrying it.
+
 ## Important Patterns
 
 1. **Handler signature**: `HandleXxxGet/Post(dependencies...) http.HandlerFunc`

@@ -425,9 +425,51 @@ func readMigrationFiles(tree migrationTree) []migrationFile {
 // The rules
 // ---------------------------------------------------------------------------
 
+// migrationCutoffs is one grandfathering number per content rule, never a shared baseline
+// (decision 3). A rule applies to every number STRICTLY ABOVE its cutoff; everything at or below
+// is exempt, deliberately, because a shipped migration's DDL cannot be edited: golang-migrate
+// records only (version, dirty) and no checksum, so changing an old file would make a fresh
+// database differ from every existing one. Divergences are fixed by a NEW migration.
+//
+// One cutoff per rule rather than one for the tree. A shared number couples the rules: a rule
+// added later whose violations reach higher forces it up, and every rule already there silently
+// stops checking the migrations below. Per-rule, bare VARCHAR is checked from 000015 rather than
+// from 000040.
+//
+// A CUTOFF NEVER ADVANCES WITH THE TREE. It moves only when a new rule is added that already
+// shipped migrations would fail. Raising one to step over the migration being written right now
+// exempts exactly the file the rule exists to check, which is the one way to use this that is
+// worse than not running it, and TestMigrationCutoffs_AreTight is what refuses it: each number
+// below is asserted to be a migration that really does break its rule.
+type migrationCutoffs struct {
+	MSSQLNVarchar     int
+	MSSQLNamedDefault int
+	MSSQLCollate      int
+	MySQLCollation    int
+}
+
+// migrationCutoffsDefault is measured rather than chosen: the highest number each rule is
+// actually violated at today (probe/rule_facts.out, #288 decision 3).
+var migrationCutoffsDefault = migrationCutoffs{
+	MSSQLNVarchar:     14,
+	MSSQLNamedDefault: 18,
+	MSSQLCollate:      38,
+	MySQLCollation:    35,
+}
+
 // checkMigrationSource holds a migration tree to every rule decidable from its source text and
 // returns what it finds, in a stable order. An empty result is the whole of a pass.
+//
+// The golden-version rule is not here, because it is the one rule that reads something other
+// than the migrations: see checkGoldenVersion.
 func checkMigrationSource(tree migrationTree) []migrationFinding {
+	return checkMigrationSourceWith(tree, migrationCutoffsDefault)
+}
+
+// checkMigrationSourceWith is the same thing with the cutoffs supplied, which is what lets
+// TestMigrationCutoffs_AreTight lower one by a single number and require the migration it names
+// to break the rule.
+func checkMigrationSourceWith(tree migrationTree, cutoffs migrationCutoffs) []migrationFinding {
 	files := readMigrationFiles(tree)
 	var findings []migrationFinding
 
@@ -437,6 +479,8 @@ func checkMigrationSource(tree migrationTree) []migrationFinding {
 	findings = append(findings, checkNumberIdentity(files)...)
 	findings = append(findings, checkCoverage(files)...)
 	findings = append(findings, checkReversibility(files)...)
+	findings = append(findings, checkMSSQLContent(files, cutoffs)...)
+	findings = append(findings, checkMySQLContent(files, cutoffs)...)
 	return findings
 }
 
@@ -689,6 +733,239 @@ func checkReversibility(files []migrationFile) []migrationFinding {
 				"holds no statement and does not declare itself one; write "+
 					"`-- Migration %06d down: intentional no-op.` and say why the change is one-way",
 				f.Number)})
+		}
+	}
+	return out
+}
+
+// ---------------------------------------------------------------------------
+// The content rules
+// ---------------------------------------------------------------------------
+//
+// WHAT THE CONTENT RULES CANNOT SEE, stated the way lint/credential states its own boundary,
+// because it decides what a green run is worth. DDL inside a string literal is invisible: the
+// scanner treats a literal's interior as opaque, so a column type built up inside an EXEC('...')
+// is never read by any rule below. Measured, which is why the limit costs nothing today: all six
+// EXEC literals in the tree wrap a DROP CONSTRAINT or an UPDATE and not one carries a column
+// type. A migration that hides a column declaration in a literal defeats these rules, and the
+// answer to that is #284's golden files, which read the catalog the DDL actually produced.
+//
+// They read .up.sql ONLY, and that is not an oversight. A down migration restores the shape that
+// was there before, which is by definition the shape these rules reject: mssqldb/000038's down
+// puts five VARCHAR columns back, correctly. Holding a down to the forward rules would make
+// every reversible migration unwritable.
+
+// The two collation pins. Both are decisions with reasoning attached rather than preferences:
+// the MySQL one is #283 goal item 1, and the SQL Server one is its migration 000040, which
+// explains why the KS_WS variant rather than the plain CS_AS form.
+//
+// TestMigrationPins_AreTheParityVocabulary holds both to being members of parityCollations with
+// the value case-sensitive, so this lint and the cross-engine comparison in schema_parity_test.go
+// share one vocabulary in one package: a typo in either place fails rather than quietly excusing
+// a column.
+const (
+	migrationMySQLCollation = "utf8mb4_0900_as_cs"
+	migrationMSSQLCollation = "Latin1_General_100_CS_AS_KS_WS_SC_UTF8"
+)
+
+var (
+	// bareVarcharRe is VARCHAR( with no N in front of it. The leading class is what keeps
+	// NVARCHAR( and [varchar] out: an identifier character or an opening bracket before the
+	// word means it is not a bare declaration.
+	bareVarcharRe = regexp.MustCompile(`(?i)(?:^|[^A-Za-z0-9_@#\[])varchar\s*\(`)
+
+	// mssqlStringColumnRe is a string column being declared: a name, then a char type. The
+	// three openings are the three places a declaration starts, once a statement has been split
+	// into its top-level units: the head of a CREATE TABLE column, an ALTER COLUMN, and an ADD.
+	mssqlStringColumnRe = regexp.MustCompile(`(?i)(?:^|\balter\s+column\s+|\badd\s+)\[?\w+\]?\s+n?(?:var)?char\s*\(`)
+
+	// mssqlNotAColumnRe are the words that make a char( somewhere other than a declaration: a
+	// cast inside a CHECK constraint, a variable, a computed column's expression.
+	mssqlNotAColumnRe = regexp.MustCompile(`(?i)\b(declare|cast|convert|exec|sysname|select|where)\b`)
+
+	// collateClauseRe reads a spelled collation. The optional = is MySQL's table-level form,
+	// COLLATE=utf8mb4_0900_as_cs, which SQL Server never writes.
+	collateClauseRe = regexp.MustCompile(`(?i)\bcollate\s*=?\s*(\w+)`)
+
+	// addDefaultRe is a column or constraint being added with a default attached.
+	addDefaultRe = regexp.MustCompile(`(?is)\badd\b.*\bdefault\b`)
+
+	constraintWordRe = regexp.MustCompile(`(?i)\bconstraint\b`)
+	alterColumnRe    = regexp.MustCompile(`(?i)\balter\s+column\b`)
+	nullWordRe       = regexp.MustCompile(`(?i)\bnull\b`)
+)
+
+// contentFiles is the .up.sql files of one engine that the scanner could read, in filename
+// order. A file the scanner refused is already a finding of its own (checkScannable), so
+// skipping it here reports one problem rather than a cascade of nonsense from a mis-split file.
+func contentFiles(files []migrationFile, d schemadump.Dialect) []migrationFile {
+	var out []migrationFile
+	for _, f := range files {
+		if f.Dialect == d && f.Half == "up" && f.ScanErr == nil {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func at(f migrationFile, line int) string { return fmt.Sprintf("%s:%d", f.Where(), line) }
+
+// checkMSSQLContent is the four SQL Server rules, each bound to ONE DECLARATION rather than to
+// the statement or the file. That is the whole point of splitting a CREATE TABLE body: a rule
+// asking whether the pin appears anywhere in the statement passes a table whose second string
+// column spells no collation at all, because the first one did (decision 7).
+func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrationFinding {
+	var out []migrationFinding
+	for _, f := range contentFiles(files, schemadump.MSSQL) {
+		for _, s := range f.Statements {
+			for _, decl := range s.declarations() {
+				// Every string column on SQL Server is NVARCHAR. Under a non-UTF-8 server
+				// collation VARCHAR replaces anything outside the code page with '?', and
+				// that loss is irreversible (#282 D4).
+				if f.Number > cutoffs.MSSQLNVarchar && bareVarcharRe.MatchString(decl.Text) {
+					out = append(out, migrationFinding{"mssql/nvarchar", at(f, decl.Line),
+						"declares a bare VARCHAR, which loses anything outside the code page " +
+							"under a non-UTF-8 server collation; every string column here is NVARCHAR: " +
+							shorten(decl.Text)})
+				}
+
+				// NewMsSQLDatabase creates the database at the pinned collation, but creates
+				// it IF NOT EXISTS, so a database an operator pre-created keeps their own
+				// default and an unpinned column silently lands case-insensitive there. RFC
+				// 6749 section 1.9 makes every protocol parameter value case-sensitive (#283).
+				if f.Number > cutoffs.MSSQLCollate && isMSSQLStringColumn(decl.Text) {
+					if m := collateClauseRe.FindStringSubmatch(decl.Text); m == nil {
+						out = append(out, migrationFinding{"mssql/collate", at(f, decl.Line),
+							"declares a string column that spells no COLLATE, so it inherits " +
+								"whatever the database was created at; write COLLATE " +
+								migrationMSSQLCollation + ": " + shorten(decl.Text)})
+					} else if m[1] != migrationMSSQLCollation {
+						out = append(out, migrationFinding{"mssql/collate", at(f, decl.Line),
+							"declares COLLATE " + m[1] + ", but every string column here is " +
+								migrationMSSQLCollation})
+					}
+				}
+
+				// SQL Server generates a per-database name for an unnamed default, so a later
+				// ALTER COLUMN cannot drop it by name and has to go looking in
+				// sys.default_constraints, which is what mssqldb/000038 and 000040 both had to
+				// do (#282 D4).
+				if f.Number > cutoffs.MSSQLNamedDefault &&
+					addDefaultRe.MatchString(decl.Text) && !constraintWordRe.MatchString(decl.Text) {
+					out = append(out, migrationFinding{"mssql/named-default", at(f, decl.Line),
+						"adds a DEFAULT with no CONSTRAINT name, so SQL Server invents a " +
+							"per-database one that nothing can later drop by name; write " +
+							"CONSTRAINT [df_<table>_<column>] DEFAULT: " + shorten(decl.Text)})
+				}
+
+				// ALTER COLUMN c <type> with no NULL keyword makes the column NULLABLE
+				// whatever it was before, so a restated type silently drops NOT NULL. No
+				// cutoff: the tree has never done it, including all 92 in 000040.
+				if alterColumnRe.MatchString(decl.Text) && !nullWordRe.MatchString(decl.Text) {
+					out = append(out, migrationFinding{"mssql/nullability", at(f, decl.Line),
+						"restates a column's type without NULL or NOT NULL, which makes it " +
+							"nullable whatever it was before: " + shorten(decl.Text)})
+				}
+			}
+		}
+	}
+	return out
+}
+
+func isMSSQLStringColumn(text string) bool {
+	return mssqlStringColumnRe.MatchString(text) && !mssqlNotAColumnRe.MatchString(text)
+}
+
+// checkMySQLContent is the one MySQL rule in its two forms, and the second form is why it binds
+// to the statement rather than the file. MySQL runs at utf8mb4_0900_as_cs, case- and
+// accent-SENSITIVE; the _ci and _ai forms fold, which makes `=` over a client_id or a scope
+// answer the wrong question (RFC 6749 section 1.9). #283 found three tables at
+// utf8mb4_unicode_ci and one at utf8mb4_0900_ai_ci, the last added in the most recent migration.
+func checkMySQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrationFinding {
+	var out []migrationFinding
+	for _, f := range contentFiles(files, schemadump.MySQL) {
+		if f.Number <= cutoffs.MySQLCollation {
+			continue
+		}
+		for _, s := range f.Statements {
+			// Spelled, and spelled wrong. Read off the statement rather than the declaration
+			// because MySQL's table-level clause sits after the closing parenthesis, outside
+			// every declaration in the body.
+			for _, m := range collateClauseRe.FindAllStringSubmatchIndex(s.Text, -1) {
+				if name := s.Text[m[2]:m[3]]; name != migrationMySQLCollation {
+					out = append(out, migrationFinding{"mysql/collation",
+						at(f, lineAt(s.clean, s.start+m[0])),
+						"names COLLATE " + name + ", which folds where " + migrationMySQLCollation +
+							" does not; `=` over a client_id or a scope then answers the wrong question"})
+				}
+			}
+
+			// Not spelled at all. ONE STATEMENT, not one file: a rule asking whether the pin
+			// appears anywhere in the file passes a second CREATE TABLE that inherits the
+			// database default, which is right today and silently wrong on any deployment
+			// whose database was created before 000040 moved it.
+			if createTableRe.MatchString(s.Text) &&
+				!strings.Contains(strings.ToLower(s.Text), strings.ToLower(migrationMySQLCollation)) {
+				out = append(out, migrationFinding{"mysql/collation", at(f, s.Line),
+					"creates a table without spelling its collation, so it inherits the database " +
+						"default; write ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=" +
+						migrationMySQLCollation})
+			}
+		}
+	}
+	return out
+}
+
+// shorten keeps a finding's quoted fragment to one readable line. A declaration can span several
+// lines and the point of quoting it is recognition, not reproduction.
+func shorten(text string) string {
+	flat := strings.Join(strings.Fields(text), " ")
+	if len(flat) > 88 {
+		return flat[:88] + "..."
+	}
+	return flat
+}
+
+// ---------------------------------------------------------------------------
+// The golden file's migration version
+// ---------------------------------------------------------------------------
+
+// checkGoldenVersion holds each engine's committed schema.golden to the highest migration number
+// on disk for that engine, which is #288's replacement for the git-diff rule the issue proposed
+// (decision 2). It reads no git and no database, so it gives the same answer in CI, on the host,
+// in a tarball and in a worktree, where a merge-base against main gives no answer at all on a
+// shallow clone.
+//
+// It takes the recorded numbers rather than reading the files, so the rule is testable with no
+// golden file anywhere; migration_source_lint_test.go parses the four committed ones and hands
+// them over.
+//
+// ITS HONEST LIMIT: it catches a migration added without a regeneration, not a shipped migration
+// edited in place, which would leave the version unmoved. That edit is forbidden anyway, and
+// TestSchemaGolden_MatchesTheCommittedFile catches it on all four engines against a real database.
+func checkGoldenVersion(tree migrationTree, recorded map[schemadump.Dialect]int) []migrationFinding {
+	files := readMigrationFiles(tree)
+	highest := map[schemadump.Dialect]int{}
+	for _, f := range files {
+		if f.Half == "up" && f.Number > highest[f.Dialect] {
+			highest[f.Dialect] = f.Number
+		}
+	}
+
+	var out []migrationFinding
+	for _, d := range migrationDialects {
+		where := string(d) + "db/schema.golden"
+		got, ok := recorded[d]
+		if !ok {
+			out = append(out, migrationFinding{"golden version", where,
+				"records no migration version, so nothing says which chain it was dumped from"})
+			continue
+		}
+		if got != highest[d] {
+			out = append(out, migrationFinding{"golden version", where, fmt.Sprintf(
+				"was dumped at migration %d, but %sdb's highest migration is %06d; "+
+					"regenerate all four with `cd src/core && go run ./cmd/schemadump` in the dev container",
+				got, d, highest[d])})
 		}
 	}
 	return out
@@ -1294,4 +1571,381 @@ func TestMigrationDirectories_ComparedInBothDirections(t *testing.T) {
 			require.Contains(t, findings[0].Say, tt.wantSay)
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// The content rules' cases
+// ---------------------------------------------------------------------------
+
+// TestMigrationPins_AreTheParityVocabulary is the join between this lint and the cross-engine
+// comparison in schema_parity_test.go. They are one package on purpose: the lint says a column
+// must SPELL these two names, the comparison says what those names DECIDE, and a typo in either
+// place would otherwise pass, the lint excusing a column and the comparison never seeing it.
+func TestMigrationPins_AreTheParityVocabulary(t *testing.T) {
+	for _, pin := range []string{migrationMySQLCollation, migrationMSSQLCollation} {
+		decides, ok := parityCollations[pin]
+		require.Truef(t, ok, "the lint pins %q, which the parity vocabulary does not carry: "+
+			"one of the two has been changed without the other", pin)
+		require.Equalf(t, "case-sensitive", decides,
+			"the lint pins %q, but parity says it decides %q. RFC 6749 section 1.9 makes every "+
+				"protocol parameter value case-sensitive and OIDC Core section 2 says the same of "+
+				"sub, so a folding collation is the defect #283 fixed.", pin, decides)
+	}
+}
+
+// The green bodies every content case starts from. They are built out of the pin constants
+// rather than spelling the names again, so moving a pin moves the fixture with it instead of
+// turning every accepting case into a silent violation.
+func greenMSSQLGadgets() string {
+	return "CREATE TABLE [gadgets] (\n" +
+		"  [id] BIGINT NOT NULL,\n" +
+		"  [name] NVARCHAR(64) COLLATE " + migrationMSSQLCollation + " NOT NULL,\n" +
+		"  [label] NVARCHAR(32) COLLATE " + migrationMSSQLCollation + " NULL\n" +
+		");\n" +
+		"ALTER TABLE [widgets] ADD [note] NVARCHAR(16) COLLATE " + migrationMSSQLCollation +
+		" NOT NULL CONSTRAINT [df_widgets_note] DEFAULT '';\n" +
+		"ALTER TABLE [widgets] ALTER COLUMN [id] BIGINT NOT NULL;\n"
+}
+
+// Two tables, so a rule that reads the file rather than the statement can be caught: the mixed
+// case below leaves the first one spelling the pin and takes it off the second.
+func greenMySQLGadgets() string {
+	return "CREATE TABLE gadgets (\n" +
+		"  id bigint NOT NULL,\n" +
+		"  name varchar(64) NOT NULL\n" +
+		") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=" + migrationMySQLCollation + ";\n" +
+		"CREATE TABLE doodads (\n" +
+		"  id bigint NOT NULL\n" +
+		") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=" + migrationMySQLCollation + ";\n"
+}
+
+// migrationContentFixture is the green tree plus one migration at `num` on all four engines, so
+// the number is complete and coverage stays quiet whatever a content case does to the text.
+// PostgreSQL and SQLite carry no content rule and get the plain body.
+func migrationContentFixture(num int) migrationTree {
+	tree := migrationTreeFixture()
+	stem := fmt.Sprintf("%06d_add_gadgets", num)
+	for _, d := range migrationDialects {
+		body := "CREATE TABLE gadgets (\n  id bigint NOT NULL\n);\n"
+		switch d {
+		case schemadump.MSSQL:
+			body = greenMSSQLGadgets()
+		case schemadump.MySQL:
+			body = greenMySQLGadgets()
+		}
+		tree[d][stem+".up.sql"] = body
+		tree[d][stem+".down.sql"] = "DROP TABLE gadgets;\n"
+	}
+	return tree
+}
+
+// editUp rewrites one span of one up migration. It panics when the span is gone, because a case
+// whose anchor no longer matches would otherwise stop testing anything and keep passing: it
+// would be running the green fixture under a name that claims a violation.
+func editUp(tr migrationTree, d schemadump.Dialect, num int, from, to string) {
+	name := fmt.Sprintf("%06d_add_gadgets.up.sql", num)
+	body, ok := tr[d][name]
+	if !ok {
+		panic("migration content fixture has no " + string(d) + "db/" + name)
+	}
+	if !strings.Contains(body, from) {
+		panic("migration content fixture no longer holds " + strconv.Quote(from) + " in " +
+			string(d) + "db/" + name + "; the case that edits it is testing nothing")
+	}
+	tr[d][name] = strings.Replace(body, from, to, 1)
+}
+
+// TestMigrationContentRules_BindToOneColumnOrOneTable is seam 1's half of the content rules:
+// every rule against a synthetic tree that breaks it, and every case differing from the green
+// fixture in exactly the thing under test, so none of them can pass with its rule deleted.
+//
+// The two MIXED cases are the ones a wider check passes, and they are the reason the rules bind
+// to a declaration and a statement rather than to a file (decision 7): one leaves the first
+// string column of a CREATE TABLE spelling the pin and takes it off the second, and one leaves
+// the first of two CREATE TABLEs spelling it and takes it off the second.
+func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
+	const wrongMSSQL = "Latin1_General_CI_AS"
+	const wrongMySQL = "utf8mb4_0900_ai_ci"
+
+	tests := []struct {
+		name     string
+		breaks   func(migrationTree)
+		wantRule string
+		wantSay  string
+	}{
+		{
+			name: "the content fixture itself passes every rule",
+		},
+
+		// mssql/nvarchar
+		{
+			name: "a bare VARCHAR is refused",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50, "[name] NVARCHAR(64)", "[name] VARCHAR(64)")
+			},
+			wantRule: "mssql/nvarchar",
+			wantSay:  "declares a bare VARCHAR",
+		},
+		{
+			name: "NVARCHAR is not read as a bare VARCHAR",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50, "[name] NVARCHAR(64)", "[name] NVARCHAR(128)")
+			},
+		},
+
+		// mssql/collate
+		{
+			name: "the second string column of a table cannot ride on the first one's COLLATE",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] NVARCHAR(32) NULL")
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "spells no COLLATE",
+		},
+		{
+			name: "a string column pinned to a folding collation is refused",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation,
+					"[label] NVARCHAR(32) COLLATE "+wrongMSSQL)
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "declares COLLATE " + wrongMSSQL,
+		},
+		{
+			name: "a non-string column is not asked for a collation",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50, "[id] BIGINT NOT NULL,", "[id] INT NOT NULL,")
+			},
+		},
+
+		// mssql/named-default
+		{
+			name: "an unnamed default constraint is refused",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50, "CONSTRAINT [df_widgets_note] DEFAULT", "DEFAULT")
+			},
+			wantRule: "mssql/named-default",
+			wantSay:  "no CONSTRAINT name",
+		},
+
+		// mssql/nullability
+		{
+			name: "an ALTER COLUMN that restates the type and drops NOT NULL is refused",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"ALTER COLUMN [id] BIGINT NOT NULL", "ALTER COLUMN [id] BIGINT")
+			},
+			wantRule: "mssql/nullability",
+			wantSay:  "without NULL or NOT NULL",
+		},
+		{
+			name: "an ALTER COLUMN that says NULL out loud passes",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"ALTER COLUMN [id] BIGINT NOT NULL", "ALTER COLUMN [id] BIGINT NULL")
+			},
+		},
+
+		// mysql/collation
+		{
+			name: "the second CREATE TABLE in a file cannot ride on the first one's collation",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MySQL, 50,
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
+						migrationMySQLCollation+";",
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;")
+			},
+			wantRule: "mysql/collation",
+			wantSay:  "creates a table without spelling its collation",
+		},
+		{
+			name: "a column pinned to a folding collation is refused even where the table is right",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MySQL, 50, "name varchar(64) NOT NULL",
+					"name varchar(64) COLLATE "+wrongMySQL+" NOT NULL")
+			},
+			wantRule: "mysql/collation",
+			wantSay:  "names COLLATE " + wrongMySQL,
+		},
+
+		// engines with no content rule
+		{
+			name: "postgres and sqlite carry no content rule",
+			breaks: func(tr migrationTree) {
+				for _, d := range []schemadump.Dialect{schemadump.Postgres, schemadump.SQLite} {
+					editUp(tr, d, 50, "id bigint NOT NULL", "id bigint NOT NULL,\n  name varchar(64) NOT NULL")
+				}
+			},
+		},
+
+		// the down halves are never judged by a content rule
+		{
+			name: "a down migration restoring the rejected shape is not a violation",
+			breaks: func(tr migrationTree) {
+				tr[schemadump.MSSQL]["000050_add_gadgets.down.sql"] =
+					"ALTER TABLE [widgets] ALTER COLUMN [note] VARCHAR(16);\nDROP TABLE [gadgets];\n"
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tree := migrationContentFixture(50)
+			if tt.breaks != nil {
+				tt.breaks(tree)
+			}
+			findings := checkMigrationSource(tree)
+
+			if tt.wantRule == "" {
+				require.Emptyf(t, findings, "this tree is meant to pass every rule:\n%s",
+					joinMigrationFindings(findings))
+				return
+			}
+			require.NotEmpty(t, findings, "this tree breaks %s and nothing reported it", tt.wantRule)
+			for _, f := range findings {
+				require.Equalf(t, tt.wantRule, f.Rule,
+					"only %s should fire here, but:\n%s", tt.wantRule, joinMigrationFindings(findings))
+			}
+			require.Containsf(t, findings[0].Say, tt.wantSay,
+				"reported:\n%s", joinMigrationFindings(findings))
+		})
+	}
+}
+
+// TestMigrationContentRules_ApplyOnlyAboveTheirCutoff runs one broken migration at its rule's
+// cutoff and again one number above it. Both sides matter: below is the grandfathering that
+// makes the rules landable at all, since a shipped migration's DDL cannot be edited, and above
+// is the rule doing its job.
+//
+// TestMigrationCutoffs_AreTight is the other half, over the real tree: this says the cutoff is
+// obeyed, that one says the number is where the violations actually stop.
+func TestMigrationContentRules_ApplyOnlyAboveTheirCutoff(t *testing.T) {
+	tests := []struct {
+		rule   string
+		cutoff int
+		breaks func(migrationTree, int)
+	}{
+		{
+			rule:   "mssql/nvarchar",
+			cutoff: migrationCutoffsDefault.MSSQLNVarchar,
+			breaks: func(tr migrationTree, num int) {
+				editUp(tr, schemadump.MSSQL, num, "[name] NVARCHAR(64)", "[name] VARCHAR(64)")
+			},
+		},
+		{
+			rule:   "mssql/named-default",
+			cutoff: migrationCutoffsDefault.MSSQLNamedDefault,
+			breaks: func(tr migrationTree, num int) {
+				editUp(tr, schemadump.MSSQL, num, "CONSTRAINT [df_widgets_note] DEFAULT", "DEFAULT")
+			},
+		},
+		{
+			rule:   "mssql/collate",
+			cutoff: migrationCutoffsDefault.MSSQLCollate,
+			breaks: func(tr migrationTree, num int) {
+				editUp(tr, schemadump.MSSQL, num,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] NVARCHAR(32) NULL")
+			},
+		},
+		{
+			rule:   "mysql/collation",
+			cutoff: migrationCutoffsDefault.MySQLCollation,
+			breaks: func(tr migrationTree, num int) {
+				editUp(tr, schemadump.MySQL, num,
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
+						migrationMySQLCollation+";",
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.rule, func(t *testing.T) {
+			at := migrationContentFixture(tt.cutoff)
+			tt.breaks(at, tt.cutoff)
+			require.Emptyf(t, checkMigrationSource(at),
+				"%06d is the %s cutoff, so it is grandfathered: a shipped migration's DDL cannot "+
+					"be edited, which is the whole reason the content rules are not retroactive",
+				tt.cutoff, tt.rule)
+
+			above := migrationContentFixture(tt.cutoff + 1)
+			tt.breaks(above, tt.cutoff+1)
+			findings := checkMigrationSource(above)
+			require.NotEmptyf(t, findings, "%06d is one above the %s cutoff and nothing reported it",
+				tt.cutoff+1, tt.rule)
+			require.Equal(t, tt.rule, findings[0].Rule, joinMigrationFindings(findings))
+		})
+	}
+}
+
+// TestMigrationNullabilityRule_HasNoCutoff is the one content rule that reads every number,
+// including the oldest. It costs nothing: no ALTER COLUMN in the tree has ever omitted the
+// keyword, so pinning it now is free and pinning it later would mean another issue.
+func TestMigrationNullabilityRule_HasNoCutoff(t *testing.T) {
+	tree := migrationContentFixture(2)
+	editUp(tree, schemadump.MSSQL, 2, "ALTER COLUMN [id] BIGINT NOT NULL", "ALTER COLUMN [id] BIGINT")
+
+	findings := checkMigrationSource(tree)
+	require.NotEmpty(t, findings, "000002 is below every cutoff, but nullability has none")
+	require.Equal(t, "mssql/nullability", findings[0].Rule, joinMigrationFindings(findings))
+}
+
+// TestMigrationGoldenVersion_HoldsEachGoldenToItsOwnHighestNumber is decision 2's replacement
+// for the git-diff rule the issue proposed. Reading a recorded number rather than a diff is what
+// makes it fire in CI at all: check.yml checks out at depth 1, where `git merge-base HEAD main`
+// has no answer and the proposed rule was silently inert.
+//
+// The number is PER ENGINE and never compared across engines. They legitimately differ.
+func TestMigrationGoldenVersion_HoldsEachGoldenToItsOwnHighestNumber(t *testing.T) {
+	// A fresh tree and a fresh map per case: they are independent claims, and a case that
+	// mutated a shared one would silently change what the next case is testing.
+	fixture := func() (migrationTree, map[schemadump.Dialect]int) {
+		recorded := map[schemadump.Dialect]int{}
+		for _, d := range migrationDialects {
+			recorded[d] = 50
+		}
+		return migrationContentFixture(50), recorded
+	}
+
+	t.Run("four goldens at their engine's highest number", func(t *testing.T) {
+		tree, recorded := fixture()
+		require.Empty(t, checkGoldenVersion(tree, recorded))
+	})
+
+	t.Run("a golden left behind by a new migration is refused", func(t *testing.T) {
+		tree, stale := fixture()
+		stale[schemadump.MSSQL] = 49
+
+		findings := checkGoldenVersion(tree, stale)
+		require.Len(t, findings, 1, joinMigrationFindings(findings))
+		require.Equal(t, "mssqldb/schema.golden", findings[0].Where)
+		require.Contains(t, findings[0].Say, "was dumped at migration 49")
+	})
+
+	t.Run("engines that differ from one another are not compared", func(t *testing.T) {
+		// The real tree is like this: postgres 39, mssql 40, mysql 42, sqlite 43. Only sqlite
+		// carries 000051 here, so only sqlite's golden owes that number.
+		tree, moved := fixture()
+		tree[schemadump.SQLite]["000051_sqlite_only.up.sql"] =
+			"-- parity: sqlite only. The other three already carry the index.\n" +
+				"CREATE INDEX idx_gadgets_id ON gadgets (id);\n"
+		tree[schemadump.SQLite]["000051_sqlite_only.down.sql"] = "DROP INDEX idx_gadgets_id;\n"
+		moved[schemadump.SQLite] = 51
+
+		require.Empty(t, checkMigrationSource(tree), "the added migration is green on its own")
+		require.Empty(t, checkGoldenVersion(tree, moved))
+	})
+
+	t.Run("a golden recording no version at all is refused", func(t *testing.T) {
+		tree, none := fixture()
+		delete(none, schemadump.Postgres)
+
+		findings := checkGoldenVersion(tree, none)
+		require.Len(t, findings, 1, joinMigrationFindings(findings))
+		require.Contains(t, findings[0].Say, "records no migration version")
+	})
 }
