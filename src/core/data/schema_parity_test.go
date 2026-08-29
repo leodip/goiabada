@@ -146,10 +146,16 @@ const (
 // that way, and folding them together here would hide it.
 var parityTypes = map[schemadump.Dialect]map[string]parityTypeRule{
 	schemadump.SQLite: {
-		"text":     {family: parityString, bound: parityBoundUndeclared},
-		"longtext": {family: parityString, bound: parityBoundUndeclared},
-		"varchar":  {family: parityString, bound: parityBoundUndeclared, arg: parityArgLength},
-		"blob":     {family: parityBytes, bound: parityBoundUnbounded},
+		"text": {family: parityString, bound: parityBoundUndeclared},
+		// There is deliberately no "longtext" here, and adding one would undo a fix.
+		// SQLite has no such type: it accepts any type name and assigns affinity by
+		// substring, so a column declared longtext is a TEXT column with a MySQL name on
+		// it. browser_sessions.data was exactly that until 000043, and while both
+		// spellings mapped onto this same value the cross-engine check could not see it.
+		// Left out, an engine reporting longtext is refused by name, which is what the
+		// vocabulary is for (#284).
+		"varchar": {family: parityString, bound: parityBoundUndeclared, arg: parityArgLength},
+		"blob":    {family: parityBytes, bound: parityBoundUnbounded},
 		// SQLite treats INT and INTEGER identically, both 8 bytes wide. They are kept
 		// apart because the migrations chose between them per column and the other three
 		// engines make that choice mean something: an INT column here stands opposite an

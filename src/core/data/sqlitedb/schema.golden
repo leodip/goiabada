@@ -17,7 +17,7 @@ index	"audit_logs"	"idx_audit_logs_created_at"	columns="created_at"	unique=false
 
 table	"browser_sessions"
 column	"browser_sessions"	"created_at"	type="DATETIME"	nullable=true	default=""	has_default=false	collation="BINARY"	default_name=""	generated=false
-column	"browser_sessions"	"data"	type="longtext"	nullable=true	default=""	has_default=false	collation="BINARY"	default_name=""	generated=false
+column	"browser_sessions"	"data"	type="TEXT"	nullable=true	default=""	has_default=false	collation="BINARY"	default_name=""	generated=false
 column	"browser_sessions"	"expires_at"	type="DATETIME"	nullable=false	default=""	has_default=false	collation="BINARY"	default_name=""	generated=false
 column	"browser_sessions"	"id"	type="INTEGER"	nullable=true	default=""	has_default=false	collation="BINARY"	default_name=""	generated=true
 column	"browser_sessions"	"last_accessed"	type="DATETIME"	nullable=false	default=""	has_default=false	collation="BINARY"	default_name=""	generated=false
