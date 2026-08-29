@@ -119,6 +119,37 @@ var unrepresentableChecks = []unrepresentable{
 		},
 	},
 	{
+		// IndexShape.Columns is a list of column names, so an index key that is an
+		// expression rather than a column has nowhere to go. Each engine loses it
+		// differently and none of them loses it loudly: PostgreSQL's dumpIndexes joins
+		// indkey onto pg_attribute, and an expression's indkey entry is 0, which matches
+		// no attribute, so the row is dropped and a wholly expression-based index
+		// disappears from the dump entirely. MySQL and SQLite report a NULL key column
+		// name, which reaches dumpIndexes' scan as a driver type error naming neither the
+		// table nor the construct. Refusing here is what turns all three into one
+		// sentence a migration author can act on.
+		construct: "an expression (functional) index",
+		count: map[Dialect]string{
+			// indkey holds 0 at every position that is an expression rather than a
+			// column. Bounded by indnkeyatts for the same reason dumpIndexes bounds it:
+			// INCLUDE columns sit past the key ones and are a different construct.
+			Postgres: `SELECT COUNT(*) FROM pg_index ix
+				JOIN pg_class tb ON tb.oid = ix.indrelid
+				JOIN pg_namespace n ON n.oid = tb.relnamespace
+				JOIN unnest(ix.indkey::smallint[]) WITH ORDINALITY AS k(attnum, ord) ON k.ord <= ix.indnkeyatts
+				WHERE tb.relname = '%s' AND n.nspname = current_schema() AND k.attnum = 0`,
+			// A functional key part reports COLUMN_NAME NULL and carries the text in
+			// EXPRESSION, which is the only thing in this view that is ever NULL there.
+			MySQL: `SELECT COUNT(*) FROM information_schema.statistics
+				WHERE table_schema = DATABASE() AND table_name = '%s' AND COLUMN_NAME IS NULL`,
+			SQLite: `SELECT COUNT(*) FROM pragma_index_list('%s') AS il, pragma_index_info(il.name) AS ii
+				WHERE ii.name IS NULL`,
+			// SQL Server has no expression index. The nearest thing is an index over a
+			// computed column, and the column itself is refused by the generated-column
+			// check above before any index on it can matter.
+		},
+	},
+	{
 		// IndexShape.Columns holds key columns only, by design, so INCLUDE payload
 		// columns would vanish.
 		construct: "an index with INCLUDE columns",

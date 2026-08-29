@@ -118,16 +118,23 @@ func DumpTable(db *sql.DB, d Dialect, table string) (TableShape, error) {
 		return TableShape{}, fmt.Errorf("schemadump: %s read no columns for table %q", d, table)
 	}
 
+	// The guard runs before the index and foreign key projections, not after them. Some of
+	// what it refuses is something those projections cannot read either, and they fail
+	// worse: an expression index reports a NULL key column name on MySQL and SQLite, which
+	// surfaces as a driver type-conversion error naming neither the table nor the
+	// construct. Guarding first means one sentence a migration author can act on. It runs
+	// after the columns, so a table that does not exist is still answered by the
+	// read-no-columns error above rather than by a guard query returning zero of everything.
+	if err := guardTable(db, d, table); err != nil {
+		return TableShape{}, err
+	}
+
 	indexes, err := dumpIndexes(db, d, table)
 	if err != nil {
 		return TableShape{}, err
 	}
 	foreignKeys, err := dumpForeignKeys(db, d, table)
 	if err != nil {
-		return TableShape{}, err
-	}
-
-	if err := guardTable(db, d, table); err != nil {
 		return TableShape{}, err
 	}
 
