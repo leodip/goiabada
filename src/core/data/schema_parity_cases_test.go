@@ -117,6 +117,14 @@ func widgetColumnOn(dumps map[schemadump.Dialect]schemadump.Schema, d schemadump
 	panic("the parity fixture has no column " + name + " on " + string(d))
 }
 
+// engineNamesWidgetIndex rewrites the fixture's name index on one engine into the inline
+// UNIQUE the real client_logos and user_profile_pictures declare on three engines: the
+// engine chose the name, so the catalog reports origin u and the dump masks the name.
+func engineNamesWidgetIndex(dumps map[schemadump.Dialect]schemadump.Schema, d schemadump.Dialect) {
+	index := &widgetsOn(dumps, d).Indexes[1]
+	index.Name, index.Origin = schemadump.EngineNamedPlaceholder, schemadump.OriginUnique
+}
+
 // excusing builds a rule covering exactly the keys given, with the count and digest they
 // produce. Cases that mean to test a rule holding write it this way; cases that mean to test
 // a rule that has MOVED write the count and digest by hand.
@@ -245,10 +253,49 @@ func TestCheckParity_ReportsEveryDisagreementAndOnlyThose(t *testing.T) {
 			want: []string{"widgets.unique index(name):index-name  sqlite=idx_widgets_name"},
 		},
 		{
-			name: "and not when one engine invented its own",
+			name: "an engine that invented its own name drops out and the rest still agree",
 			arrange: func(dumps map[schemadump.Dialect]schemadump.Schema) {
-				index := &widgetsOn(dumps, schemadump.MSSQL).Indexes[1]
-				index.Name, index.Origin = schemadump.EngineNamedPlaceholder, schemadump.OriginUnique
+				engineNamesWidgetIndex(dumps, schemadump.MSSQL)
+			},
+		},
+		{
+			name: "but it does not switch the comparison off for the engines beside it",
+			arrange: func(dumps map[schemadump.Dialect]schemadump.Schema) {
+				engineNamesWidgetIndex(dumps, schemadump.MSSQL)
+				widgetsOn(dumps, schemadump.Postgres).Indexes[1].Name = "idx_widget_name"
+			},
+			want: []string{"widgets.unique index(name):index-name  " +
+				"sqlite=idx_widgets_name  mysql=idx_widgets_name  postgres=idx_widget_name  mssql=-"},
+		},
+		{
+			name: "nor when two engines invented theirs and two migrations disagree",
+			arrange: func(dumps map[schemadump.Dialect]schemadump.Schema) {
+				engineNamesWidgetIndex(dumps, schemadump.Postgres)
+				engineNamesWidgetIndex(dumps, schemadump.MSSQL)
+				widgetsOn(dumps, schemadump.MySQL).Indexes[1].Name = "idx_widget_name"
+			},
+			want: []string{"widgets.unique index(name):index-name  " +
+				"sqlite=idx_widgets_name  mysql=idx_widget_name  postgres=-  mssql=-"},
+		},
+		{
+			name: "and one migration-named engine alone is a singleton with nothing to compare",
+			arrange: func(dumps map[schemadump.Dialect]schemadump.Schema) {
+				for _, d := range []schemadump.Dialect{schemadump.MySQL, schemadump.Postgres, schemadump.MSSQL} {
+					engineNamesWidgetIndex(dumps, d)
+				}
+			},
+		},
+		{
+			// The four golden files never reach this shape today, because the one
+			// index every engine names for itself is the primary key and SQLite
+			// builds none at all, so presence disagrees before the name is reached.
+			// A table declaring an inline UNIQUE on all four would produce it, and
+			// no engine to compare has to mean no comparison.
+			name: "and no migration-named engine at all is no comparison",
+			arrange: func(dumps map[schemadump.Dialect]schemadump.Schema) {
+				for _, d := range parityDialects {
+					engineNamesWidgetIndex(dumps, d)
+				}
 			},
 		},
 		{
