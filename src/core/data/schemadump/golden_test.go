@@ -1,6 +1,7 @@
 package schemadump
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,15 +16,21 @@ import (
 // happens to fill in. The values are the awkward ones the four catalogs really report: a
 // default holding a space and a quote, a masked and an unmasked name of each kind, an index
 // on two columns, and a table whose columns are deliberately out of order on the way in.
+//
+// display_name is the case has_default exists for: a default whose expression is empty,
+// which is what MySQL's catalog reports for DEFAULT ”. It has to encode differently from
+// redirect_uri beside it, which has no default at all and the same empty expression.
 func sampleSchema() Schema {
 	return Schema{
 		{Name: "clients", Table: TableShape{
 			Columns: []ColumnShape{
 				{Name: "redirect_uri", Type: "varchar(256)", Nullable: true, Default: "", Collation: "utf8mb4_0900_as_cs"},
+				{Name: "display_name", Type: "varchar(100)", Nullable: false, Default: "", HasDefault: true,
+					Collation: "utf8mb4_0900_as_cs"},
 				{Name: "id", Type: "bigint unsigned", Nullable: false, Generated: true},
-				{Name: "created_at", Type: "datetime2(6)", Nullable: false, Default: "(getdate())",
+				{Name: "created_at", Type: "datetime2(6)", Nullable: false, Default: "(getdate())", HasDefault: true,
 					DefaultName: "DF__clients__created__38996AB5", DefaultIsSystemNamed: true},
-				{Name: "audit_details", Type: "json", Nullable: false, Default: `_utf8mb4'{}'`,
+				{Name: "audit_details", Type: "json", Nullable: false, Default: `_utf8mb4'{}'`, HasDefault: true,
 					DefaultName: "DF_clients_audit_details"},
 			},
 			Indexes: []IndexShape{
@@ -72,9 +79,11 @@ func maskedSampleSchema() Schema {
 		}},
 		{Name: "clients", Table: TableShape{
 			Columns: []ColumnShape{
-				{Name: "audit_details", Type: "json", Default: `_utf8mb4'{}'`, DefaultName: "DF_clients_audit_details"},
-				{Name: "created_at", Type: "datetime2(6)", Default: "(getdate())",
+				{Name: "audit_details", Type: "json", Default: `_utf8mb4'{}'`, HasDefault: true,
+					DefaultName: "DF_clients_audit_details"},
+				{Name: "created_at", Type: "datetime2(6)", Default: "(getdate())", HasDefault: true,
 					DefaultName: EngineNamedPlaceholder, DefaultIsSystemNamed: true},
+				{Name: "display_name", Type: "varchar(100)", HasDefault: true, Collation: "utf8mb4_0900_as_cs"},
 				{Name: "id", Type: "bigint unsigned", Generated: true},
 				{Name: "redirect_uri", Type: "varchar(256)", Nullable: true, Collation: "utf8mb4_0900_as_cs"},
 			},
@@ -211,8 +220,9 @@ func TestParseRefusesADamagedFile(t *testing.T) {
 		file     string
 		mentions string
 	}{
-		{"an unknown format version", strings.Replace(string(good), "version=1", "version=2", 1), ""},
-		{"no version at all", strings.Replace(string(good), "\tversion=1", "", 1), ""},
+		{"a format version from after this binary", replaceVersion(string(good), goldenVersion+1), ""},
+		{"a format version from before this binary", replaceVersion(string(good), goldenVersion-1), ""},
+		{"no version at all", strings.Replace(string(good), fmt.Sprintf("\tversion=%d", goldenVersion), "", 1), ""},
 		{"an engine that is not one of the four", strings.Replace(string(good), "engine=postgres", "engine=oracle", 1), ""},
 		{"no header", strings.Join(lines[1:], "\n"), ""},
 		{"nothing but a header", lines[0], ""},
@@ -223,6 +233,7 @@ func TestParseRefusesADamagedFile(t *testing.T) {
 		{"an unquoted field value", strings.Replace(string(good), `type="json"`, "type=json", 1), ""},
 		{"a missing string field", strings.Replace(string(good), "\tcollation=\"\"", "", 1), "no collation field"},
 		{"a missing boolean field", strings.Replace(string(good), "\tgenerated=false", "", 1), "no generated field"},
+		{"a missing has_default field", strings.Replace(string(good), "\thas_default=false", "", 1), "no has_default field"},
 		{"an unknown record kind", strings.Replace(string(good), "column\t", "colunm\t", 1), ""},
 		{"an index origin that is none of the three", strings.Replace(string(good), `origin="c"`, `origin="x"`, 1), "origin"},
 		{"an index with no key columns", strings.Replace(string(good), `columns="a,b"`, `columns=""`, 1), ""},
@@ -263,4 +274,15 @@ func TestGoldenPath(t *testing.T) {
 
 	_, err = GoldenPath(Dialect("oracle"))
 	assert.Error(t, err, "an unrecognised dialect names no golden file")
+}
+
+// replaceVersion rewrites the header's version, so the two format-version cases above are
+// written against whatever version this binary writes rather than against a literal that
+// goes stale the next time the format moves. It went stale once: version 2 added
+// has_default, and the case that had been asserting an unknown version began asserting the
+// current one and passing for no reason (#284).
+func replaceVersion(file string, version int) string {
+	return strings.Replace(file,
+		fmt.Sprintf("version=%d", goldenVersion),
+		fmt.Sprintf("version=%d", version), 1)
 }

@@ -10,6 +10,7 @@ package data
 // and no index behind a rowid primary key, are the subject of their own cases.
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/leodip/goiabada/core/data/schemadump"
@@ -402,32 +403,37 @@ func TestParityCanonicalDefault_StripsWrappingAndNothingElse(t *testing.T) {
 	tests := []struct {
 		dialect schemadump.Dialect
 		raw     string
+		has     bool
 		want    parityDefault
 	}{
-		{schemadump.SQLite, "", parityDefault{}},
-		{schemadump.MySQL, "", parityDefault{}},
-		{schemadump.SQLite, "NULL", parityDefault{}},
-		{schemadump.MSSQL, "(NULL)", parityDefault{}},
-		{schemadump.MSSQL, "((0))", parityDefault{Present: true, Value: "0"}},
-		{schemadump.SQLite, "0", parityDefault{Present: true, Value: "0"}},
-		{schemadump.Postgres, "false", parityDefault{Present: true, Value: "0"}},
-		{schemadump.Postgres, "true", parityDefault{Present: true, Value: "1"}},
-		{schemadump.MSSQL, "('')", parityDefault{Present: true, Value: ""}},
-		{schemadump.SQLite, "''", parityDefault{Present: true, Value: ""}},
-		{schemadump.Postgres, "''::character varying", parityDefault{Present: true, Value: ""}},
-		{schemadump.Postgres, "'default'::character varying", parityDefault{Present: true, Value: "default"}},
-		{schemadump.MySQL, "default", parityDefault{Present: true, Value: "default"}},
+		{schemadump.SQLite, "", false, parityDefault{}},
+		{schemadump.MySQL, "", false, parityDefault{}},
+		// The pair the has-a-default bit exists for: MySQL reports DEFAULT '' as the
+		// empty string, which is what a column with no default reports too, so the
+		// expression alone cannot tell these two rows apart.
+		{schemadump.MySQL, "", true, parityDefault{Present: true, Value: ""}},
+		{schemadump.SQLite, "NULL", true, parityDefault{}},
+		{schemadump.MSSQL, "(NULL)", true, parityDefault{}},
+		{schemadump.MSSQL, "((0))", true, parityDefault{Present: true, Value: "0"}},
+		{schemadump.SQLite, "0", true, parityDefault{Present: true, Value: "0"}},
+		{schemadump.Postgres, "false", true, parityDefault{Present: true, Value: "0"}},
+		{schemadump.Postgres, "true", true, parityDefault{Present: true, Value: "1"}},
+		{schemadump.MSSQL, "('')", true, parityDefault{Present: true, Value: ""}},
+		{schemadump.SQLite, "''", true, parityDefault{Present: true, Value: ""}},
+		{schemadump.Postgres, "''::character varying", true, parityDefault{Present: true, Value: ""}},
+		{schemadump.Postgres, "'default'::character varying", true, parityDefault{Present: true, Value: "default"}},
+		{schemadump.MySQL, "default", true, parityDefault{Present: true, Value: "default"}},
 		// The cast belongs to the argument, not to the expression, so it stays.
-		{schemadump.Postgres, "nextval('widgets_id_seq'::regclass)",
+		{schemadump.Postgres, "nextval('widgets_id_seq'::regclass)", true,
 			parityDefault{Present: true, Value: "nextval('widgets_id_seq'::regclass)"}},
 		// MySQL's character-set introducer is a fact about the default, not a wrapping.
-		{schemadump.MySQL, "_utf8mb4'{}'", parityDefault{Present: true, Value: "_utf8mb4'{}'"}},
-		{schemadump.MSSQL, "(getdate())", parityDefault{Present: true, Value: "getdate()"}},
+		{schemadump.MySQL, "_utf8mb4'{}'", true, parityDefault{Present: true, Value: "_utf8mb4'{}'"}},
+		{schemadump.MSSQL, "(getdate())", true, parityDefault{Present: true, Value: "getdate()"}},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.dialect)+" "+tt.raw, func(t *testing.T) {
-			assert.Equal(t, tt.want, canonicalDefault(tt.dialect, tt.raw))
+		t.Run(fmt.Sprintf("%s %q has=%t", tt.dialect, tt.raw, tt.has), func(t *testing.T) {
+			assert.Equal(t, tt.want, canonicalDefault(tt.dialect, tt.raw, tt.has))
 		})
 	}
 }

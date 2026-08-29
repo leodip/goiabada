@@ -320,6 +320,11 @@ func (d parityDefault) String() string {
 // canonicalDefault strips the wrapping each engine puts round a default expression and
 // leaves the expression itself alone.
 //
+// Whether there is a default at all is read from the shape rather than from the expression
+// being empty, because the two are different questions and only the dumper can answer the
+// first: MySQL's catalog reports DEFAULT ” as the empty string, exactly as it reports a
+// column with no default (#284).
+//
 // Four rules, each removing a spelling and none removing a fact:
 //
 //   - SQL Server parenthesises everything, so ((0)) is 0 and (”) is ”.
@@ -335,10 +340,13 @@ func (d parityDefault) String() string {
 //   - The boolean keywords become the digits the other three write, PostgreSQL being the
 //     only engine that renders a boolean default as false rather than 0. Only where the
 //     value was not quoted: 'false' is a five-character string and stays one.
-func canonicalDefault(d schemadump.Dialect, raw string) parityDefault {
+func canonicalDefault(d schemadump.Dialect, raw string, has bool) parityDefault {
+	if !has {
+		return parityDefault{}
+	}
 	v := strings.TrimSpace(raw)
 	if v == "" {
-		return parityDefault{}
+		return parityDefault{Present: true, Value: ""}
 	}
 	switch d {
 	case schemadump.MSSQL:
@@ -734,7 +742,7 @@ func compareColumns(table string, shapes map[schemadump.Dialect]schemadump.Table
 			return "not null"
 		})
 		out = appendIfDisagreed(out, table, name, parityAxisDefault, func(d schemadump.Dialect) string {
-			return canonicalDefault(d, columns[d].Default).String()
+			return canonicalDefault(d, columns[d].Default, columns[d].HasDefault).String()
 		})
 		out = appendIfDisagreed(out, table, name, parityAxisGenerated, func(d schemadump.Dialect) string {
 			if columns[d].Generated {

@@ -266,15 +266,16 @@ CREATE TABLE `client_logos` (
   CONSTRAINT `fk_client_logos_client_id` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
--- details' default is an EXPRESSION, which is the only form MySQL accepts on a TEXT
--- column, and MySQL stamps it with the DDL connection's charset. So its recorded text
--- differs from the plain '{}' the other three engines record, while the effect is the
--- same. See migration 000037.
+-- details' default is an EXPRESSION, which is the only form MySQL accepts on a TEXT or
+-- LONGTEXT column, and MySQL stamps it with the DDL connection's charset. So its recorded
+-- text differs from the plain '{}' the other three engines record, while the effect is the
+-- same. See migration 000037. It is LONGTEXT rather than TEXT so the column is unbounded
+-- here as it is on the other three engines; see migration 000042.
 CREATE TABLE `audit_logs` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `created_at` datetime(6) NOT NULL,
   `audit_event` varchar(128) NOT NULL,
-  `details` text NOT NULL DEFAULT (_utf8mb4'{}'),
+  `details` longtext NOT NULL DEFAULT (_utf8mb4'{}'),
   PRIMARY KEY (`id`),
   KEY `idx_audit_logs_created_at` (`created_at`),
   KEY `idx_audit_logs_audit_event` (`audit_event`)
@@ -299,7 +300,7 @@ CREATE TABLE `user_sessions` (
   `user_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_session_identifier` (`session_identifier`),
-  KEY `fk_user_sessions_user` (`user_id`),
+  KEY `idx_user_sessions_user_id` (`user_id`),
   CONSTRAINT `fk_user_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_cs;
 
@@ -368,7 +369,7 @@ CREATE TABLE `codes` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_code_hash` (`code_hash`),
   KEY `fk_codes_client` (`client_id`),
-  KEY `fk_codes_user` (`user_id`),
+  KEY `idx_codes_user_id` (`user_id`),
   CONSTRAINT `fk_codes_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   KEY `idx_codes_session_identifier` (`session_identifier`),
   CONSTRAINT `fk_codes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
@@ -452,7 +453,7 @@ CREATE TABLE `refresh_tokens` (
   `auth_state_generation` bigint NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_refresh_token_jti` (`refresh_token_jti`),
-  KEY `fk_refresh_tokens_code` (`code_id`),
+  KEY `idx_refresh_tokens_code_id` (`code_id`),
   KEY `idx_refresh_tokens_user_id` (`user_id`),
   KEY `idx_refresh_tokens_client_id` (`client_id`),
   KEY `idx_refresh_tokens_first_refresh_token_jti` (`first_refresh_token_jti`),
