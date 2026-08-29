@@ -123,6 +123,12 @@ func identifierQuotes(d schemadump.Dialect) (open, close byte) {
 // (decision 7). A gate whose failure mode is a false alarm on a legitimate migration is the
 // wrong shape.
 //
+// TWO COMMENT FORMS, AND ONE OF THEM IS MYSQL'S ALONE. `--` to end of line is a comment on all
+// four engines. `#` to end of line is one on MySQL and nothing of the kind on the other three,
+// where it opens a temporary table's name, so it is blanked on MySQL only. Leaving it unmodelled
+// let `# COLLATE=utf8mb4_0900_as_cs` written after a CREATE TABLE's closing parenthesis satisfy
+// the collation rule while MySQL read a comment and gave the table the database default.
+//
 // FOUR FORMS ARE REFUSED rather than guessed at, each with zero occurrences in the tree today:
 // a block comment, a '$' at the top level, which is how PostgreSQL opens a dollar-quoted body, a
 // '"' anywhere at the top level for the reason identifierQuotes gives, and unbalanced state at
@@ -145,6 +151,12 @@ func scanSQL(d schemadump.Dialect, text string) (string, string, []sqlMark, erro
 			line++
 			i++
 		case c == '-' && i+1 < len(text) && text[i+1] == '-':
+			for i < len(text) && text[i] != '\n' {
+				clean[i] = ' '
+				masked[i] = ' '
+				i++
+			}
+		case c == '#' && d == schemadump.MySQL:
 			for i < len(text) && text[i] != '\n' {
 				clean[i] = ' '
 				masked[i] = ' '
@@ -872,29 +884,9 @@ const (
 )
 
 var (
-	// bareVarcharRe is VARCHAR( with no N in front of it. The leading class is what keeps
-	// NVARCHAR( and [varchar] out: an identifier character or an opening bracket before the
-	// word means it is not a bare declaration.
-	bareVarcharRe = regexp.MustCompile(`(?i)(?:^|[^A-Za-z0-9_@#\[])varchar\s*\(`)
-
-	// mssqlStringColumnRe is a string column being declared: a name, then a char type. The
-	// three openings are the three places a declaration starts, once a statement has been split
-	// into its top-level units: the head of a CREATE TABLE column, an ALTER COLUMN, and an ADD.
-	//
-	// The length is OPTIONAL. `[x] NVARCHAR` is a legal declaration of a one-character column,
-	// and requiring the parenthesis would have let one through carrying no collation at all.
-	mssqlStringColumnRe = regexp.MustCompile(`(?i)(?:^|\balter\s+column\s+|\badd\s+)\[?\w+\]?\s+n?(?:var)?char\b`)
-
-	// mssqlUnpinnableStringRe is a string column declared with a type that CANNOT carry the
-	// pin. A UTF-8 collation is only valid on char, varchar, nchar and nvarchar, so TEXT and
-	// NTEXT cannot be written correctly under these rules at all and are refused by type rather
-	// than asked for a COLLATE clause they cannot legally take. Both are deprecated by
-	// Microsoft, both fold under the server default, and neither appears in the tree.
-	mssqlUnpinnableStringRe = regexp.MustCompile(`(?i)(?:^|\balter\s+column\s+|\badd\s+)\[?\w+\]?\s+n?text\b`)
-
-	// mssqlNotAColumnRe are the words that make a char( somewhere other than a declaration: a
-	// cast inside a CHECK constraint, a variable, a computed column's expression.
-	mssqlNotAColumnRe = regexp.MustCompile(`(?i)\b(declare|cast|convert|exec|sysname|select|where)\b`)
+	// createTypeRe is an alias type being declared. See checkMSSQLContent for why one is
+	// refused rather than followed.
+	createTypeRe = regexp.MustCompile(`(?is)^\s*create\s+type\b`)
 
 	// collateClauseRe reads a spelled collation. The optional = is MySQL's table-level form,
 	// COLLATE=utf8mb4_0900_as_cs, which SQL Server never writes.
@@ -931,34 +923,56 @@ func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 	var out []migrationFinding
 	for _, f := range contentFiles(files, schemadump.MSSQL) {
 		for _, s := range f.Statements {
+			// An alias type is the one way to put a string column's type outside the closed
+			// list mssqlStringTypes reads, and CREATE TYPE is the only way to make one. It is
+			// refused rather than followed: a column later declared `[c] [MyString] NOT NULL`
+			// is a string column that no rule here could recognise, so it would be asked for
+			// no COLLATE at all and would inherit whatever the database was created at. No
+			// cutoff, for the reason the nullability rule has none: the tree has never done it.
+			if createTypeRe.MatchString(s.Match) {
+				out = append(out, migrationFinding{"mssql/collate", at(f, s.Line),
+					"creates an alias type, whose underlying type the collation rule cannot " +
+						"follow, so a column declared with it would be asked for no COLLATE at " +
+						"all; declare the column's type directly: " + shorten(s.Text)})
+			}
+
 			for _, decl := range s.declarations() {
+				// What the declaration declares, read off the one position a type can occupy.
+				// Everything below asks about this rather than about the declaration's text.
+				typ, isColumn := mssqlDeclaredType(decl)
+				kind := mssqlNotAString
+				if isColumn {
+					kind = mssqlStringTypes[typ]
+				}
+
 				// Every string column on SQL Server is NVARCHAR. Under a non-UTF-8 server
 				// collation VARCHAR replaces anything outside the code page with '?', and
 				// that loss is irreversible (#282 D4).
-				if f.Number > cutoffs.MSSQLNVarchar && bareVarcharRe.MatchString(decl.Match) {
+				if f.Number > cutoffs.MSSQLNVarchar && kind == mssqlNarrowString {
 					out = append(out, migrationFinding{"mssql/nvarchar", at(f, decl.Line),
-						"declares a bare VARCHAR, which loses anything outside the code page " +
-							"under a non-UTF-8 server collation; every string column here is NVARCHAR: " +
-							shorten(decl.Text)})
+						"declares a bare " + strings.ToUpper(typ) + ", which loses anything " +
+							"outside the code page under a non-UTF-8 server collation; every " +
+							"string column here is NVARCHAR: " + shorten(decl.Text)})
 				}
 
 				// NewMsSQLDatabase creates the database at the pinned collation, but creates
 				// it IF NOT EXISTS, so a database an operator pre-created keeps their own
 				// default and an unpinned column silently lands case-insensitive there. RFC
 				// 6749 section 1.9 makes every protocol parameter value case-sensitive (#283).
-				if f.Number > cutoffs.MSSQLCollate && isMSSQLUnpinnableString(decl.Match) {
+				if f.Number > cutoffs.MSSQLCollate && kind == mssqlUnpinnableString {
 					out = append(out, migrationFinding{"mssql/collate", at(f, decl.Line),
-						"declares a TEXT or NTEXT column, which cannot carry COLLATE " +
-							migrationMSSQLCollation + " at all, since a UTF-8 collation is only " +
-							"valid on char, varchar, nchar and nvarchar; declare it NVARCHAR: " +
-							shorten(decl.Text)})
-				} else if f.Number > cutoffs.MSSQLCollate && isMSSQLStringColumn(decl.Match) {
+						"declares a " + strings.ToUpper(typ) + " column, which cannot carry " +
+							"COLLATE " + migrationMSSQLCollation + " at all: the engine refuses " +
+							"it with \"the legacy LOB types do not support UTF-8 or UTF-16 " +
+							"encodings\"; declare it NVARCHAR: " + shorten(decl.Text)})
+				} else if f.Number > cutoffs.MSSQLCollate &&
+					(kind == mssqlUnicodeString || kind == mssqlNarrowString) {
 					if m := collateClauseRe.FindStringSubmatch(decl.Match); m == nil {
 						out = append(out, migrationFinding{"mssql/collate", at(f, decl.Line),
 							"declares a string column that spells no COLLATE, so it inherits " +
 								"whatever the database was created at; write COLLATE " +
 								migrationMSSQLCollation + ": " + shorten(decl.Text)})
-					} else if m[1] != migrationMSSQLCollation {
+					} else if !strings.EqualFold(m[1], migrationMSSQLCollation) {
 						out = append(out, migrationFinding{"mssql/collate", at(f, decl.Line),
 							"declares COLLATE " + m[1] + ", but every string column here is " +
 								migrationMSSQLCollation})
@@ -991,12 +1005,164 @@ func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 	return out
 }
 
-func isMSSQLStringColumn(text string) bool {
-	return mssqlStringColumnRe.MatchString(text) && !mssqlNotAColumnRe.MatchString(text)
+// ---------------------------------------------------------------------------
+// What type a SQL Server declaration declares
+// ---------------------------------------------------------------------------
+
+// mssqlDeclKind is what a declaration's type is, as far as the collation rules care. Every value
+// here was measured against a live SQL Server rather than recalled, by
+// probe/mssql_string_type_forms.sh: each spelling was declared with no COLLATE and its resolved
+// type and collation read back out of sys.columns.
+type mssqlDeclKind int
+
+const (
+	// mssqlNotAString is every type that holds no text, so no collation reaches it. The probe
+	// reports BIGINT, VARBINARY(32) and DATETIME2(6) with a null collation.
+	mssqlNotAString mssqlDeclKind = iota
+
+	// mssqlUnicodeString holds every code point and can carry the pin. `[c] sysname COLLATE
+	// Latin1_General_100_CS_AS_KS_WS_SC_UTF8` is accepted, which is why sysname is here rather
+	// than among the unpinnable types.
+	mssqlUnicodeString
+
+	// mssqlNarrowString holds one code page, so it replaces anything outside it with '?'.
+	mssqlNarrowString
+
+	// mssqlUnpinnableString is a string type a UTF-8 collation is not valid on at all. The
+	// engine says so itself: "The legacy LOB types do not support UTF-8 or UTF-16 encodings."
+	mssqlUnpinnableString
+)
+
+// mssqlStringTypes is the whole of SQL Server's built-in character space, lowercased with its
+// words collapsed to one space: the six character types, every ANSI synonym the engine accepts
+// for them, and sysname, its one built-in alias type. The probe resolved each spelling and each
+// one landed on the type recorded here, unpinned, under the server's own
+// SQL_Latin1_General_CP1_CI_AS, which folds case.
+//
+// A CLOSED LIST IS THE WHOLE ANSWER, not a sample of one, because the only way a migration could
+// add to this space is CREATE TYPE and checkMSSQLContent refuses one.
+var mssqlStringTypes = map[string]mssqlDeclKind{
+	"nvarchar":                   mssqlUnicodeString,
+	"national character varying": mssqlUnicodeString,
+	"national char varying":      mssqlUnicodeString,
+	"nchar":                      mssqlUnicodeString,
+	"national character":         mssqlUnicodeString,
+	"national char":              mssqlUnicodeString,
+	"sysname":                    mssqlUnicodeString,
+
+	"varchar":           mssqlNarrowString,
+	"character varying": mssqlNarrowString,
+	"char varying":      mssqlNarrowString,
+	"char":              mssqlNarrowString,
+	"character":         mssqlNarrowString,
+
+	"text":  mssqlUnpinnableString,
+	"ntext": mssqlUnpinnableString,
 }
 
-func isMSSQLUnpinnableString(text string) bool {
-	return mssqlUnpinnableStringRe.MatchString(text) && !mssqlNotAColumnRe.MatchString(text)
+// mssqlDeclPrefixRe is what stands in front of a column's name. Both halves are optional:
+// declarations() hands over a CREATE TABLE column with neither, an ALTER TABLE's first
+// comma-separated piece with both, and every piece after it with neither. Matched on the masked
+// copy, where a bracketed identifier reads [xxx].
+var mssqlDeclPrefixRe = regexp.MustCompile(
+	`(?is)^(?:alter\s+table\s+(?:\[x*\]|\w+)(?:\s*\.\s*(?:\[x*\]|\w+))*\s+)?(?:(?:alter\s+column|add)\s+)?`)
+
+// mssqlNotAColumnNameRe are the reserved words that open something other than a column: a table
+// constraint, a DROP, a WITH CHECK. None of them can be a bare column name, since SQL Server
+// reserves all of them, so skipping a fragment that starts with one costs no real declaration.
+var mssqlNotAColumnNameRe = regexp.MustCompile(
+	`(?i)^(constraint|primary|foreign|unique|check|index|with|column|default|drop)$`)
+
+// mssqlDeclaredType is the type a fragment declares, lowercased with its words collapsed to one
+// space, and whether the fragment declares a column at all.
+//
+// BY POSITION, NOT BY SEARCHING THE DECLARATION. A rule that looks for a type name anywhere in a
+// declaration reads a cast inside a default as the column's own type, and the veto that used to
+// hold it back, refusing any declaration containing `convert`, `cast`, `select` or `sysname`,
+// answered the opposite way: `[c] NVARCHAR(64) CONSTRAINT [df] DEFAULT CONVERT(nvarchar(64), ”)`
+// declares a real string column and was asked for no COLLATE at all. The type is the token after
+// the column name, the column name is the token after an optional `ALTER TABLE <name>` and an
+// optional `ALTER COLUMN` or `ADD`, and everything else in the fragment is a value, a keyword or
+// a constraint, none of which can move it.
+//
+// UNMASKING, AND ONLY HERE. The boundary is found on the masked copy, so no literal can move it,
+// and the type's own bytes are then read off the unmasked one. A bracketed type is the one place
+// the mask has to be lifted: `[c] [NVARCHAR](32)` is what SQL Server Management Studio generates,
+// the mask turns it into `[x] [xxxxxxxx]`, which reads as a name followed by a name, and the
+// probe shows the engine resolving it to an nvarchar column under the folding server default.
+// Lifting the mask in type position alone is what still keeps a column CALLED [varchar] from
+// reading as the type it is spelled like, because a name is never in type position.
+//
+// ITS HONEST LIMIT: a computed column, `[c] AS <expression>`, declares no type here, so its
+// collation is not checked. Its collation comes from the expression rather than from the
+// declaration, the tree has none, and the alternative is evaluating SQL expressions.
+func mssqlDeclaredType(decl sqlFragment) (string, bool) {
+	i := mssqlDeclPrefixRe.FindStringIndex(decl.Match)[1]
+
+	name, next, bracketed, ok := mssqlToken(decl, i)
+	if !ok || (!bracketed && mssqlNotAColumnNameRe.MatchString(name)) {
+		return "", false
+	}
+	i = next
+
+	// A bracketed type is one token by construction; a bare one can be an ANSI phrase of up to
+	// three words, so read three and take the longest that names a type.
+	tok, next, bracketed, ok := mssqlToken(decl, i)
+	if !ok {
+		return "", false
+	}
+	if bracketed {
+		return strings.ToLower(tok), true
+	}
+	words := []string{strings.ToLower(tok)}
+	for i = next; len(words) < 3; {
+		w, after, wasBracketed, more := mssqlToken(decl, i)
+		if !more || wasBracketed {
+			break
+		}
+		words = append(words, strings.ToLower(w))
+		i = after
+	}
+	for n := len(words); n > 1; n-- {
+		phrase := strings.Join(words[:n], " ")
+		if _, known := mssqlStringTypes[phrase]; known {
+			return phrase, true
+		}
+	}
+	return words[0], true
+}
+
+// mssqlToken reads one identifier-shaped token at or after off: a bracketed one, whose bytes come
+// off the UNMASKED text because that is the only copy where a bracketed type name survives, or a
+// bare word. Anything else, a '(', a '@' variable, the end of the fragment, is not a token and
+// says so.
+func mssqlToken(decl sqlFragment, off int) (tok string, next int, bracketed bool, ok bool) {
+	i := off
+	for i < len(decl.Match) && isSQLSpace(decl.Match[i]) {
+		i++
+	}
+	if i >= len(decl.Match) {
+		return "", i, false, false
+	}
+	if decl.Match[i] == '[' {
+		j := strings.IndexByte(decl.Match[i:], ']')
+		if j < 0 {
+			return "", i, false, false
+		}
+		return decl.Text[i+1 : i+j], i + j + 1, true, true
+	}
+	if !isMSSQLWordByte(decl.Match[i]) || (decl.Match[i] >= '0' && decl.Match[i] <= '9') {
+		return "", i, false, false
+	}
+	j := i
+	for j < len(decl.Match) && isMSSQLWordByte(decl.Match[j]) {
+		j++
+	}
+	return decl.Match[i:j], j, false, true
+}
+
+func isMSSQLWordByte(c byte) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
 // checkMySQLContent is the one MySQL rule in its two forms, and the second form is why it binds
@@ -1015,7 +1181,7 @@ func checkMySQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 			// because MySQL's table-level clause sits after the closing parenthesis, outside
 			// every declaration in the body.
 			for _, m := range collateClauseRe.FindAllStringSubmatchIndex(s.Match, -1) {
-				if name := s.Match[m[2]:m[3]]; name != migrationMySQLCollation {
+				if name := s.Match[m[2]:m[3]]; !strings.EqualFold(name, migrationMySQLCollation) {
 					out = append(out, migrationFinding{"mysql/collation",
 						at(f, lineAt(s.clean, s.start+m[0])),
 						"names COLLATE " + name + ", which folds where " + migrationMySQLCollation +
@@ -1028,8 +1194,7 @@ func checkMySQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 			// that inherits the database default, and it also passes a table that spells the pin
 			// on one column while every other string column inherits. Only the clause after the
 			// column list sets what the table's own columns default to.
-			if opts, ok := s.tableOptions(); ok &&
-				!strings.Contains(strings.ToLower(opts), strings.ToLower(migrationMySQLCollation)) {
+			if opts, ok := s.tableOptions(); ok && !mysqlOptionsPinned(opts) {
 				out = append(out, migrationFinding{"mysql/collation", at(f, s.Line),
 					"creates a table without spelling its collation in its table options, so its " +
 						"columns inherit the database default; write ) ENGINE=InnoDB DEFAULT " +
@@ -1038,6 +1203,23 @@ func checkMySQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 		}
 	}
 	return out
+}
+
+// mysqlOptionsPinned is whether a CREATE TABLE's suffix carries an actual COLLATE clause naming
+// the pin.
+//
+// WHETHER THE PIN'S NAME APPEARS IN THE SUFFIX IS A DIFFERENT QUESTION, and it is the one this
+// used to ask. A partition key on a column called utf8mb4_0900_as_cs contains the name and
+// collates nothing; so, before scanSQL learned MySQL's # comment, did
+// `# COLLATE=utf8mb4_0900_as_cs`. Reading the clause rather than the substring means the table
+// has to be pinned by something MySQL would also read as a pin.
+func mysqlOptionsPinned(opts string) bool {
+	for _, m := range collateClauseRe.FindAllStringSubmatch(opts, -1) {
+		if strings.EqualFold(m[1], migrationMySQLCollation) {
+			return true
+		}
+	}
+	return false
 }
 
 // shorten keeps a finding's quoted fragment to one readable line. A declaration can span several
@@ -1252,6 +1434,24 @@ func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 			dialect: schemadump.Postgres,
 			text:    "-- a leading comment\nALTER TABLE t ADD a INT; -- trailing\nALTER TABLE t ADD b INT;",
 			want:    []string{"ALTER TABLE t ADD a INT", "ALTER TABLE t ADD b INT"},
+		},
+		{
+			// MySQL's OTHER line comment, and the one the scanner did not model. Everything a
+			// content rule reads sits in this line's shadow: the apostrophe and the open
+			// parenthesis here would open a literal and unbalance the depth if it were not
+			// blanked, and the collation pin written in one counted as a table option.
+			name:    "a hash comment is blanked on mysql and the statement around it survives",
+			dialect: schemadump.MySQL,
+			text:    "# a leading comment with a ' and a (\nALTER TABLE t ADD a INT; # trailing\nALTER TABLE t ADD b INT;",
+			want:    []string{"ALTER TABLE t ADD a INT", "ALTER TABLE t ADD b INT"},
+		},
+		{
+			// And on MySQL alone: on SQL Server a # opens a temporary table's name, so blanking
+			// the rest of the line there would swallow a real statement.
+			name:    "a hash is an ordinary character off mysql",
+			dialect: schemadump.MSSQL,
+			text:    "SELECT [a] INTO #tmp FROM [t];\nALTER TABLE [t] ADD [b] INT;",
+			want:    []string{"SELECT [a] INTO #tmp FROM [t]", "ALTER TABLE [t] ADD [b] INT"},
 		},
 		{
 			// mssqldb/000029 spells this over two lines.
@@ -1990,6 +2190,138 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			},
 		},
 
+		{
+			// A BRACKETED TYPE. SQL Server Management Studio generates exactly this shape, and
+			// probe/mssql_string_type_forms.sh shows the engine resolving it to an nvarchar
+			// column under the folding server default. The mask cannot tell [NVARCHAR] from a
+			// column name, so the type has to be read by position and unmasked there.
+			name: "a bracketed type is still a string column",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] [NVARCHAR](32) NULL")
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "spells no COLLATE",
+		},
+		{
+			name: "a bracketed type that spells the pin passes",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] [NVARCHAR](32) COLLATE "+migrationMSSQLCollation+" NULL")
+			},
+		},
+		{
+			name: "a bracketed VARCHAR is still a bare VARCHAR",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50, "[name] NVARCHAR(64)", "[name] [VARCHAR](64)")
+			},
+			wantRule: "mssql/nvarchar",
+			wantSay:  "declares a bare VARCHAR",
+		},
+		{
+			// The other direction, and the reason the mask is lifted in type position ONLY: a
+			// column CALLED nvarchar declares a bigint, and reading its name as a type would
+			// ask an integer column for a collation.
+			name: "a column named after a type is not read as one",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50, "[id] BIGINT NOT NULL,", "[nvarchar] BIGINT NOT NULL,")
+			},
+		},
+		{
+			// A CONVERT in a default used to veto the whole declaration, so a real string
+			// column carrying one was asked for no COLLATE at all. The type is in one place and
+			// an expression cannot reach it.
+			name: "a CONVERT in a default does not excuse the column from its collation",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] NVARCHAR(32) NULL CONSTRAINT [df_gadgets_label] "+
+						"DEFAULT CONVERT(NVARCHAR(32), '')")
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "spells no COLLATE",
+		},
+		{
+			// sysname is SQL Server's one built-in alias type, nvarchar(128) under another
+			// name. The probe shows it inheriting the folding server default unpinned and
+			// accepting the pin when it is written, so it is a string column like any other.
+			name: "a sysname column is a string column",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] sysname NULL")
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "spells no COLLATE",
+		},
+		{
+			name: "a sysname column that spells the pin passes",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] sysname COLLATE "+migrationMSSQLCollation+" NULL")
+			},
+		},
+		{
+			// The ANSI spellings the engine accepts for the same six types. The probe resolves
+			// this one to nvarchar, so a rule that only knows the short names reads a string
+			// column as an integer one and asks it for nothing.
+			name: "an ANSI spelling of NVARCHAR is still a string column",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] national character varying(32) NULL")
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "spells no COLLATE",
+		},
+		{
+			// And this one resolves to varchar, which is the narrow type rule's business.
+			name: "an ANSI spelling of VARCHAR is still a bare VARCHAR",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50, "[name] NVARCHAR(64)", "[name] character varying(64)")
+			},
+			wantRule: "mssql/nvarchar",
+			wantSay:  "declares a bare CHARACTER VARYING",
+		},
+		{
+			// TEXT is NTEXT's narrow twin and refuses the pin for the same reason.
+			name: "a TEXT column is refused by its type as well",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
+					"[label] TEXT NULL")
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "cannot carry COLLATE",
+		},
+		{
+			// A collation name is an identifier on SQL Server, so a different case is the same
+			// collation and refusing it would be a false alarm.
+			name: "the SQL Server pin spelled in a different case is the same pin",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation,
+					"[label] NVARCHAR(32) COLLATE "+strings.ToUpper(migrationMSSQLCollation))
+			},
+		},
+		{
+			// An alias type is the only way to put a string column's type outside the closed
+			// list the rules read, so it is refused rather than followed. Without this, a
+			// later `[c] [MyString] NOT NULL` is a string column nothing here can recognise.
+			name: "an alias type is refused rather than followed",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MSSQL, 50,
+					"ALTER TABLE [widgets] ALTER COLUMN [id] BIGINT NOT NULL;",
+					"CREATE TYPE [MyString] FROM NVARCHAR(64);\n"+
+						"ALTER TABLE [widgets] ALTER COLUMN [id] BIGINT NOT NULL;")
+			},
+			wantRule: "mssql/collate",
+			wantSay:  "creates an alias type",
+		},
+
 		// mssql/named-default
 		{
 			name: "an unnamed default constraint is refused",
@@ -2099,6 +2431,60 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			breaks: func(tr migrationTree) {
 				editUp(tr, schemadump.MySQL, 50, "name varchar(64) NOT NULL",
 					"name varchar(64) NOT NULL DEFAULT 'COLLATE "+wrongMySQL+"'")
+			},
+		},
+
+		{
+			// MySQL reads # to end of line as a comment, so a pin written in one pins nothing.
+			// The scanner blanks it for the same reason it blanks a --.
+			name: "the pin spelled in a hash comment does not pin the table",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MySQL, 50,
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
+						migrationMySQLCollation+";",
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 # COLLATE="+
+						migrationMySQLCollation+"\n;")
+			},
+			wantRule: "mysql/collation",
+			wantSay:  "without spelling its collation in its table options",
+		},
+		{
+			// The pin's NAME appearing in the table options is not a collation clause. A
+			// partition may be called anything, and this one collates nothing at all.
+			name: "the pin used as an identifier does not pin the table",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MySQL, 50,
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
+						migrationMySQLCollation+";",
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4\n"+
+						"  PARTITION BY RANGE (id) (PARTITION "+migrationMySQLCollation+
+						" VALUES LESS THAN (100));")
+			},
+			wantRule: "mysql/collation",
+			wantSay:  "without spelling its collation in its table options",
+		},
+		{
+			// The accepting twin, and the one that says blanking a # comment does not cost the
+			// scanner the statement around it: the apostrophe and the parentheses in here would
+			// open a literal and unbalance the depth if the line were read as SQL.
+			name: "a hash comment beside a pinned table is not a violation",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MySQL, 50,
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
+						migrationMySQLCollation+";",
+					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
+						migrationMySQLCollation+" # a doodad's tally (approximate)\n;")
+			},
+		},
+		{
+			// A collation name is case-insensitive to MySQL's parser, so a different case is
+			// the same collation on both arms of the rule: it neither fails to pin the table
+			// nor reports as a folding one.
+			name: "the MySQL pin spelled in a different case is the same pin",
+			breaks: func(tr migrationTree) {
+				editUp(tr, schemadump.MySQL, 50,
+					"COLLATE="+migrationMySQLCollation+";\nCREATE TABLE doodads",
+					"COLLATE="+strings.ToUpper(migrationMySQLCollation)+";\nCREATE TABLE doodads")
 			},
 		},
 
