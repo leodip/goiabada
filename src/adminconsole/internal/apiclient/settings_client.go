@@ -13,7 +13,8 @@ import (
 
 // SettingsClient fetches PUBLIC settings from the authserver's unauthenticated API.
 // This is used by the middleware to populate settings that need to be available on every request
-// (e.g., appName for page titles, uiTheme for styling, smtpEnabled for feature flags).
+// (e.g., appName for page titles, uiTheme for styling, smtpEnabled for feature flags, issuer
+// for validating the iss claim on the administrator's own tokens).
 //
 // IMPORTANT: This client calls /api/public/settings which does NOT require authentication.
 // It returns a minimal subset of settings that are safe to expose publicly.
@@ -36,7 +37,9 @@ func NewSettingsClient(authServerBaseURL string) *SettingsClient {
 
 // GetPublicSettings fetches public settings from the unauthenticated /api/public/settings endpoint.
 // No access token is required for this call.
-// Returns only safe-to-share settings: appName, uiTheme, smtpEnabled.
+// Returns only safe-to-share settings: appName, uiTheme, smtpEnabled, issuer. The issuer is
+// already served anonymously at /.well-known/openid-configuration, which OIDC Discovery
+// section 3 requires, so carrying it here discloses nothing new (#285).
 func (c *SettingsClient) GetPublicSettings() (*dtos.PublicSettingsResponse, error) {
 	url := fmt.Sprintf("%s/api/public/settings", c.authServerBaseURL)
 

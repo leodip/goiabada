@@ -48,7 +48,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		&http.Client{},
 		authBase,
 		config.GetAdminConsole().BaseURL,
-		config.GetAdminConsole().OAuthClientID,
+		constants.AdminConsoleClientIdentifier,
 		config.GetAdminConsole().OAuthClientSecret,
 	)
 	jwtSessionHandler := middlewareJwt.JwtSessionHandler()

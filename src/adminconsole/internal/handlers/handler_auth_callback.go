@@ -79,8 +79,9 @@ func HandleAuthCallbackPost(
 
 		slog.Info("Exchanging code for tokens. baseUrl: " + baseUrl)
 
-		// Use configured confidential client credentials
-		clientID := config.GetAdminConsole().OAuthClientID
+		// The admin console is always the client the seeder provisions, so the identifier
+		// is the constant and only the secret is per deployment (#285).
+		clientID := constants.AdminConsoleClientIdentifier
 		clientSecret := config.GetAdminConsole().OAuthClientSecret
 
 		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(code, redirectURI, clientID,

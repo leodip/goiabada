@@ -158,16 +158,15 @@ func (s *SessionTokenSource) fetch(ctx context.Context) (string, time.Time, erro
 // The reason it is worth more than a status code: a deployment this fails on cannot be
 // repaired through the admin console, because obtaining this token is what every admin
 // console page needs, so an administrator locked out by it has no page to fix it from. The
-// route back in is direct SQL or a temporary swap of the configured client id, and neither
-// is discoverable from "answered 400" (#266).
+// route back in is direct SQL, which is not discoverable from "answered 400" (#266).
 //
-// How a deployment reaches it: migration 000035 provisions the client-credentials switch and
-// the browser-sessions permission against the literal identifier `admin-console-client`,
-// while this source authenticates as whatever GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID names,
-// for which that literal is only the default. A deployment that pointed the variable at a
-// client of its own therefore upgrades into a token endpoint that refuses it, and the two
-// codes below are the two ways it says so: unauthorized_client when client credentials is off
-// on that client, invalid_scope when that client does not hold the permission.
+// How a deployment reaches it, now that the client this authenticates as is the constant the
+// seeder writes rather than configuration (#285): both things migration 000035 provisions on
+// that client are editable from the admin console afterwards. An administrator can turn the
+// client credentials flow off on `admin-console-client`, or take the browser-sessions
+// permission away from it, and the next token request is refused. The two codes below are the
+// two ways the endpoint says which one happened: unauthorized_client when client credentials
+// is off, invalid_scope when the permission is gone.
 //
 // The remedy sentence is attached to exactly those two codes rather than to every refusal,
 // because a server_error or a gateway's 502 is not a provisioning fault and telling an
@@ -189,8 +188,9 @@ func (s *SessionTokenSource) refusalMessage(statusCode int, body []byte) string 
 	if code != "" {
 		message += fmt.Sprintf(" (%s)", code)
 	}
-	// %q rather than %s: the client id comes from the deployment's own environment, and a
-	// stray control character in it must not forge a line in the log this lands in.
+	// %q rather than %s: the identifier is a constructor parameter, so it is only a compile
+	// time constant by convention, and a stray control character in it must not forge a line
+	// in the log this lands in.
 	message += fmt.Sprintf(" for client_id %q", s.clientId)
 
 	if code == "unauthorized_client" || code == "invalid_scope" {

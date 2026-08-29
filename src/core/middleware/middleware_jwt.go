@@ -288,11 +288,11 @@ func (m *MiddlewareJwt) RequiresScope(
 				} else {
 					// User is not authenticated
 					// Redirect to the authorize endpoint
-					clientID := constants.AdminConsoleClientIdentifier
-					if strings.TrimSpace(m.clientID) != "" {
-						clientID = m.clientID
-					}
-					err := m.authHelper.RedirToAuthorize(w, r, clientID,
+					// The caller supplies the client id; this package names no
+					// module's identity. The admin console, the only module whose
+					// routes reach here, passes the constant it is seeded as, so a
+					// default here could only ever hide a caller that forgot (#285).
+					err := m.authHelper.RedirToAuthorize(w, r, m.clientID,
 						m.buildScopeString(scopesAnyOf),
 						m.baseURL+r.RequestURI)
 					if err != nil {

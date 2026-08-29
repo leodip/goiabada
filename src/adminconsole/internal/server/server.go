@@ -60,9 +60,11 @@ func NewServer(router *chi.Mux, sessionStore sessions.Store, settingsCache *cach
 }
 
 func (s *Server) Start() {
-	// Validate required confidential client configuration
-	if strings.TrimSpace(config.GetAdminConsole().OAuthClientID) == "" || strings.TrimSpace(config.GetAdminConsole().OAuthClientSecret) == "" {
-		slog.Error("Missing admin console OAuth client configuration: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID and GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET must be set. If you're running the admin console for the first time, please look at the auth server logs for the generated credentials.")
+	// Validate required confidential client configuration. The client id is not part of it:
+	// the admin console always authenticates as the client the seeder provisions, so the
+	// secret is the only half of the credential a deployment supplies (#285).
+	if strings.TrimSpace(config.GetAdminConsole().OAuthClientSecret) == "" {
+		slog.Error("Missing admin console OAuth client configuration: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET must be set. If you're running the admin console for the first time, please look at the auth server logs for the generated credentials.")
 		os.Exit(1)
 	}
 	// The static branch and the application branch, in that order. Both are registered

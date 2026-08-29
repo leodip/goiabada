@@ -237,12 +237,13 @@ func TestSessionTokenSource_AFailureDoesNotLeaveAStaleTokenCached(t *testing.T) 
 
 // TestSessionTokenSource_ARefusalNamesTheClientAndTheRemedy pins decision 23.
 //
-// The deployment this protects is one that set GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID to a
-// client of its own. Migration 000035 provisions the switch and the permission against the
-// literal `admin-console-client`, so that deployment upgrades into a token endpoint that
-// refuses it, every admin console page fails, and the way back in does not go through the
-// admin console. The log line is the whole remedy an operator gets, so it is asserted rather
-// than left to whoever reads the source next.
+// The deployment this protects is one where the seeded client lost what migration 000035
+// provisions on it. The client id is no longer configurable (#285), but both halves stay
+// editable from the admin console: an administrator can turn the client credentials flow off
+// on `admin-console-client`, or take the browser-sessions permission away from it. Every
+// admin console page then fails, and the way back in does not go through the admin console.
+// The log line is the whole remedy an operator gets, so it is asserted rather than left to
+// whoever reads the source next.
 //
 // unauthorized_client is client credentials being off on that client and invalid_scope is
 // that client not holding the permission, which are the two refusals the token endpoint
@@ -273,8 +274,11 @@ func TestSessionTokenSource_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
 			message := err.Error()
 			assert.Contains(t, message, code,
 				"the endpoint's error field is the difference between a diagnosable failure and a bare status")
+			// The sentinel is deliberately not `admin-console-client`, which is what
+			// production passes: a message that hardcoded the identifier would satisfy
+			// an assertion on the real one while carrying nothing the caller gave it.
 			assert.Contains(t, message, "a-client-of-my-own",
-				"the configured client id is what an operator has to go and fix")
+				"the client the token was refused for is what an operator has to go and fix")
 			assert.Contains(t, message, permission,
 				"the permission to grant")
 			assert.Contains(t, message, "client credentials",
