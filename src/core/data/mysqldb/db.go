@@ -67,6 +67,15 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 
 		// create the database if it does not exist.
 		//
+		// No lock around this, unlike PostgreSQL and SQL Server, and that asymmetry is measured
+		// rather than assumed. MySQL serialises on the schema metadata lock and demotes the
+		// duplicate: 23 of every 24 concurrent racers receive Note 1007, "Can't create database
+		// 'x'; database exists", which is a NOTE the driver never raises as an error. 288 full
+		// constructor sequences at 24-way concurrency against an absent database produced zero
+		// failures and the target collation every round. So there is nothing here for a lock to
+		// fix, and adding one for symmetry would buy a startup round-trip and a stuck-holder
+		// failure mode for nothing (#293 decision 6).
+		//
 		// The collation is case- and accent-SENSITIVE, so a value that differs in case is a
 		// different value here exactly as it is on SQLite and PostgreSQL. RFC 6749 section 1.9
 		// requires that of client_id, section 3.3 of scope and OpenID Connect Core section 2 of

@@ -1,9 +1,11 @@
 package postgresdb
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"strings"
 
@@ -60,7 +62,14 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 	}
 
 	if dbConfig.Create {
-		// Create database if not exists
+		// Create database if not exists.
+		//
+		// Serialized, because PostgreSQL's CREATE DATABASE does NOT tolerate being raced. With
+		// the database absent, 7 of 8 concurrent creators fail with `duplicate key value
+		// violates unique constraint "pg_database_datname_index"` (SQLSTATE 23505), whose text
+		// does not contain "already exists" and so is not tolerated below: the loser returns
+		// "unable to create database" and the process exits. Two replicas starting together
+		// against a fresh server is an ordinary topology, not a hypothetical one (#293).
 		defaultDB, err := sql.Open("pgx", fmt.Sprintf("postgres://%v:%v@%v:%v/postgres",
 			dbConfig.Username,
 			dbConfig.Password,
@@ -71,9 +80,8 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		}
 		defer func() { _ = defaultDB.Close() }()
 
-		_, err = defaultDB.Exec(fmt.Sprintf("CREATE DATABASE %v;", dbConfig.Name))
-		if err != nil && !strings.Contains(err.Error(), "already exists") {
-			return nil, errors.Wrap(err, "unable to create database")
+		if err := createDatabaseUnderAdvisoryLock(defaultDB, dbConfig.Name); err != nil {
+			return nil, err
 		}
 	} else {
 		// The operator says the database is already there, so nothing is created and no
@@ -103,6 +111,83 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		dbConfig: dbConfig,
 	}
 	return &postgresDb, nil
+}
+
+// advisoryLockNamespace keeps this lock's keys away from any other advisory lock a session on
+// the maintenance database might take. Advisory locks share one 64-bit key space per database.
+const advisoryLockNamespace = "goiabada:create-database:"
+
+// advisoryLockKey derives the key createDatabaseUnderAdvisoryLock serializes on, from the name
+// of the database being created.
+//
+// FNV-1a computed in Go rather than through the server's own hashtextextended, so it needs no
+// minimum server version and is stable by construction: every Goiabada process racing for one
+// database name arrives at the same key without asking the server anything. The key is an opaque
+// identity, so the uint64 to int64 wrap that pg_advisory_lock's bigint argument forces is
+// deliberate and costs nothing.
+//
+// Keyed by NAME, unlike the SQL Server lock one file over, which is keyed by a constant. That
+// asymmetry is intentional and is not a thing to tidy: pg_database.datname is compared
+// byte-exact, so this key is exactly as precise as the catalog check it guards. SQL Server
+// compares sys.databases.name under master's collation, which folds case and more, and no
+// Go-side key can be made to agree with that (#293).
+func advisoryLockKey(name string) int64 {
+	h := fnv.New64a()
+	// hash.Hash documents that Write never returns an error.
+	_, _ = h.Write([]byte(advisoryLockNamespace + name))
+	return int64(h.Sum64())
+}
+
+// createDatabaseUnderAdvisoryLock creates the application database when it is not there, holding
+// an exclusive advisory lock across the check and the create so that at most one process ever
+// issues CREATE DATABASE.
+//
+// The lock, the check and the create all run on ONE connection pinned out of the maintenance
+// pool. A session-level advisory lock belongs to the session that took it, so a lock taken
+// through the pooled *sql.DB could be released on a different connection and stay held for the
+// life of the process, blocking every later start. Same hazard, same remedy, as the
+// sp_getapplock the SQL Server driver takes around its own version table (#284).
+//
+// Advisory locks live in a key space scoped to the database the session is connected to, and
+// every racer here is connected to `postgres`. That shared space is the whole reason this works.
+//
+// The lock is untimed, so a stuck holder blocks startup rather than failing it. Accepted in #293
+// decision 5, the same trade the migration lock one layer down already makes: what it spans is
+// one catalog read and one CREATE DATABASE.
+func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
+	ctx := context.Background()
+
+	conn, err := maintenanceDB.Conn(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to pin a connection for the database creation lock")
+	}
+	defer func() { _ = conn.Close() }()
+
+	key := advisoryLockKey(name)
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", key); err != nil {
+		return errors.Wrap(err, "unable to take the database creation lock")
+	}
+	defer func() {
+		_, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", key)
+	}()
+
+	var found int
+	if err := conn.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM pg_database WHERE datname = $1", name).Scan(&found); err != nil {
+		return errors.Wrap(err, "unable to check whether the database exists")
+	}
+	if found > 0 {
+		return nil
+	}
+
+	// The "already exists" tolerance stays. Under the lock it no longer covers another Goiabada
+	// process, which cannot be in here at the same time, but it still covers an operator running
+	// createdb by hand inside the window, and it costs one condition.
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %v;", name)); err != nil &&
+		!strings.Contains(err.Error(), "already exists") {
+		return errors.Wrap(err, "unable to create database")
+	}
+	return nil
 }
 
 func (d *PostgresDatabase) BeginTransaction() (*sql.Tx, error) {

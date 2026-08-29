@@ -2,10 +2,15 @@ package datatests
 
 import (
 	"database/sql"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data/mssqldb"
@@ -221,4 +226,236 @@ func serverDatabaseExists(t *testing.T, name string) bool {
 	var n int
 	require.NoError(t, sqlDB.QueryRow(query, name).Scan(&n), "count databases named %s", name)
 	return n > 0
+}
+
+// concurrentConstructors is how many constructors the race cases start at once. Eight is what
+// probe/mssql_concurrent_create.go and probe/pg_mysql_concurrent_create.go measured the defect
+// at, and it reproduced every round: 5 of 8 SQL Server racers and 7 of 8 PostgreSQL racers
+// failed against an absent database before #293.
+const concurrentConstructors = 8
+
+// TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase is goal 1, and it is
+// seam 1's first table.
+//
+// Two Goiabada instances starting at the same moment against a server where the application
+// database does not exist is an ordinary topology: two replicas, a rolling deploy, a compose file
+// bringing both modules up together. Before #293 the losers did not start. On SQL Server the
+// check-then-create is not atomic and most losers get no error number and no message, only
+// "Request failed but didn't provide reason"; on PostgreSQL the bare CREATE DATABASE fails with
+// SQLSTATE 23505 on pg_database_datname_index, whose text does not contain "already exists" and
+// so is not tolerated.
+//
+// What the constructors now do instead is serialise: an exclusive lock, held on one connection
+// pinned out of the maintenance pool, spans the existence check and the create, so at most one
+// process ever issues CREATE DATABASE (decision 5).
+//
+// Deliberately at the CONSTRUCTOR and not at data.NewDatabase, per §5: the factory also migrates,
+// and a race measured through it would be measuring migration concurrency too, against a lock the
+// migrator already takes for itself.
+func TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase(t *testing.T) {
+	switch dbType() {
+	case "mysql":
+		t.Skip("MySQL is immune structurally, not by luck: it serialises on the schema metadata lock and demotes the duplicate to Note 1007, which the driver never raises. 288 full sequences at 24-way concurrency, 0 failures (#293 decision 6)")
+	case "sqlite", "":
+		t.Skip("SQLite has no create statement to race: the driver creates the file")
+	case "postgres", "mssql":
+	default:
+		t.Fatalf("unsupported db type %q", dbType())
+	}
+
+	cfg := config.GetDatabase()
+	name := isolatedDBName()
+	require.False(t, serverDatabaseExists(t, name), "the race has to start against an ABSENT database, which is the only case that is not already serialised by the database being there")
+	t.Cleanup(func() { dropServerDatabase(t, cfg, name) })
+
+	handles, errs := raceConstructors(t, cfg, namesRepeated(name, concurrentConstructors))
+
+	for i, err := range errs {
+		require.NoErrorf(t, err, "constructor %d of %d started at the same instant against an absent database; every one of them must start, because two replicas coming up together is an ordinary topology and before #293 the losers did not (#293 goal 1)", i+1, concurrentConstructors)
+	}
+	for _, h := range handles {
+		if h != nil {
+			_ = h.Close()
+		}
+	}
+
+	require.True(t, serverDatabaseExists(t, name), "the winner must have created the database")
+
+	if dbType() == "mssql" {
+		// The lock must not have cost the collation: a database Goiabada creates is created at
+		// the collation #283 pinned, whichever racer created it.
+		db, err := sql.Open("sqlserver", msSQLDatabaseDSN(cfg.Username, cfg.Password, name, cfg))
+		require.NoError(t, err, "open the database the race created")
+		defer func() { _ = db.Close() }()
+		require.Equal(t, mssqlCollationAfter000040, readDatabaseDefaultCollation(t, db),
+			"the racing constructors must still create at the collation #283 pinned")
+	}
+}
+
+// TestNewMsSQLDatabase_CreateTrue_CaseVariantNamesRaceToOneDatabase is why the SQL Server lock
+// resource carries no database name.
+//
+// sp_getapplock compares its resource as binary. sys.databases.name is compared under master's
+// collation, which on a stock instance folds case. So a resource of
+// "goiabada:create-database:" + name gives two instances configured `goiabada` and `Goiabada`
+// two DIFFERENT locks, while the IF NOT EXISTS check they each run treats the two names as ONE
+// database: both pass the check and both run CREATE DATABASE, which is the original defect with
+// a lock bolted on. Partial normalization in Go cannot close that family, because the
+// equivalences are whatever the instance's collation says they are.
+//
+// The constant resource is strictly wider than the thing it guards, which is the safe direction,
+// and this case is what holds it in place: without it the file compiles, every other test passes,
+// and the narrower resource looks like an improvement.
+//
+// SQL Server only. PostgreSQL compares pg_database.datname byte-exact, so there is no fold for a
+// name-derived key to disagree with, which is exactly why it keeps one.
+func TestNewMsSQLDatabase_CreateTrue_CaseVariantNamesRaceToOneDatabase(t *testing.T) {
+	if dbType() != "mssql" {
+		t.Skipf("%s does not compare database names case-insensitively, so there are no case variants to collide", dbType())
+	}
+
+	cfg := config.GetDatabase()
+	lower := isolatedDBName()
+	upper := strings.ToUpper(lower)
+	require.NotEqual(t, lower, upper, "the two spellings have to actually differ for this to test anything")
+
+	require.False(t, serverDatabaseExists(t, lower), "the race has to start against an absent database")
+	t.Cleanup(func() {
+		dropServerDatabase(t, cfg, lower)
+		dropServerDatabase(t, cfg, upper)
+	})
+
+	// Alternating spellings rather than one of each: the broken form only fails when two racers
+	// are inside the unguarded window together, and eight give that far more chances than two.
+	names := make([]string, concurrentConstructors)
+	for i := range names {
+		if i%2 == 0 {
+			names[i] = lower
+		} else {
+			names[i] = upper
+		}
+	}
+
+	handles, errs := raceConstructors(t, cfg, names)
+	for i, err := range errs {
+		require.NoErrorf(t, err, "constructor %d configured %q raced against the other spelling; both spellings name ONE database on SQL Server, so both must start", i+1, names[i])
+	}
+	for _, h := range handles {
+		if h != nil {
+			_ = h.Close()
+		}
+	}
+
+	require.Equal(t, 1, countServerDatabases(t, lower),
+		"the two spellings must have produced exactly ONE database: master compares names case-insensitively, so a second CREATE DATABASE means the racers held different locks")
+}
+
+// namesRepeated is n copies of one database name, which is what the plain race case configures
+// every racer with.
+func namesRepeated(name string, n int) []string {
+	names := make([]string, n)
+	for i := range names {
+		names[i] = name
+	}
+	return names
+}
+
+// raceConstructors starts one constructor per name at the same instant on the configured engine,
+// with Create true, and returns each one's handle and error positionally.
+//
+// The handles come back rather than being closed here because a caller may want to read through
+// one, and the errors come back rather than being asserted here because which of them is allowed
+// to be non-nil is the caller's claim, not this helper's.
+//
+// The barrier is a closed channel rather than a WaitGroup countdown: every goroutine is already
+// parked on the receive when it opens, so they leave together instead of in creation order. The
+// pause before it is what the probes used, and it is there to let the runtime actually schedule
+// all of them onto the receive first.
+func raceConstructors(t *testing.T, cfg *config.DatabaseConfig, names []string) ([]io.Closer, []error) {
+	t.Helper()
+
+	start := make(chan struct{})
+	handles := make([]io.Closer, len(names))
+	errs := make([]error, len(names))
+
+	var wg sync.WaitGroup
+	for i, name := range names {
+		wg.Add(1)
+		go func(i int, name string) {
+			defer wg.Done()
+			<-start
+			switch dbType() {
+			case "postgres":
+				db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
+					Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
+				}, false)
+				errs[i] = err
+				if db != nil {
+					handles[i] = db.DB
+				}
+			case "mssql":
+				db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
+					Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
+				}, false)
+				errs[i] = err
+				if db != nil {
+					handles[i] = db.DB
+				}
+			default:
+				errs[i] = fmt.Errorf("raceConstructors does not run on %s", dbType())
+			}
+		}(i, name)
+	}
+
+	time.Sleep(300 * time.Millisecond)
+	close(start)
+	wg.Wait()
+
+	return handles, errs
+}
+
+// countServerDatabases is serverDatabaseExists with the number kept, which the case-variant case
+// needs: "exactly one" and "at least one" are the passing and failing answers there.
+func countServerDatabases(t *testing.T, name string) int {
+	t.Helper()
+	cfg := config.GetDatabase()
+
+	var dsn, driver, query string
+	switch dbType() {
+	case "mysql":
+		driver, dsn = "mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg)
+		query = "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?"
+	case "postgres":
+		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)
+		query = "SELECT COUNT(*) FROM pg_database WHERE datname = $1"
+	case "mssql":
+		driver, dsn = "sqlserver", msSQLMasterDSN(cfg)
+		query = "SELECT COUNT(*) FROM sys.databases WHERE name = @p1"
+	default:
+		t.Fatalf("%s has no server catalog of databases", dbType())
+	}
+
+	sqlDB, err := sql.Open(driver, dsn)
+	require.NoError(t, err, "open the server to read its catalog")
+	defer func() { _ = sqlDB.Close() }()
+
+	var n int
+	require.NoError(t, sqlDB.QueryRow(query, name).Scan(&n), "count databases named %s", name)
+	return n
+}
+
+// dropServerDatabase is the configured engine's drop, so a case that runs on more than one engine
+// registers one cleanup rather than switching on the dialect itself.
+func dropServerDatabase(t *testing.T, cfg *config.DatabaseConfig, name string) {
+	t.Helper()
+	switch dbType() {
+	case "mysql":
+		dropMySQL(t, cfg, name)
+	case "postgres":
+		dropPostgres(t, cfg, name)
+	case "mssql":
+		dropMsSQL(t, cfg, name)
+	}
 }

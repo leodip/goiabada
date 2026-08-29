@@ -74,35 +74,8 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 			return nil, errors.Wrap(err, "unable to connect to master database")
 		}
 
-		// Create database if it doesn't exist.
-		//
-		// The collation is case-, accent-, width- and kanatype-SENSITIVE, so a value that
-		// differs in case is a different value here exactly as it is on SQLite and PostgreSQL.
-		// RFC 6749 section 1.9 requires that of client_id, section 3.3 of scope and OpenID
-		// Connect Core section 2 of sub; the previous CI_AI collation folded all three, so
-		// client_id=myapp resolved a client registered as MyApp (#283). Migration 000040
-		// converts an existing database's 92 string columns to the same collation.
-		//
-		// IF NOT EXISTS, so a database an OPERATOR pre-created keeps their collation: the
-		// database default cannot be moved from a migration, because ALTER DATABASE ...
-		// COLLATE blocks until it times out with a second session attached, which is what a
-		// running application is. That is why every string column a future migration adds must
-		// spell its own COLLATE clause explicitly, naming the collation below, rather than
-		// relying on this line, and why a data test migrates the whole chain into a hostile
-		// database and asserts all 92 columns.
-		createDatabaseCommand := fmt.Sprintf(`
-        IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = N'%s')
-        BEGIN
-            CREATE DATABASE [%s]
-            COLLATE Latin1_General_100_CS_AS_KS_WS_SC_UTF8
-        END`,
-			dbConfig.Name,
-			dbConfig.Name,
-		)
-
-		_, err = masterDB.Exec(createDatabaseCommand)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to create database")
+		if err := createDatabaseUnderAppLock(masterDB, dbConfig.Name); err != nil {
+			return nil, err
 		}
 	} else {
 		// The operator says the database is already there, so nothing is created and master is
@@ -144,6 +117,104 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 		dbConfig: dbConfig,
 	}
 	return &mssqlDb, nil
+}
+
+// createDatabaseResource is the sp_getapplock resource createDatabaseUnderAppLock serializes on.
+// It carries NO database name, deliberately.
+//
+// A name-bearing resource looks tighter and is broken. sp_getapplock compares its resource as
+// binary, while sys.databases.name is compared under master's collation, which on a stock
+// instance folds case, trailing space, Unicode normalization form and character width. Two
+// Goiabada instances configured `goiabada` and `Goiabada` would take two DIFFERENT locks, both
+// see zero rows from the IF NOT EXISTS check, and both run CREATE DATABASE: exactly the defect
+// the lock exists to close, with a lock bolted on. Normalizing the name in Go cannot close it,
+// because the equivalences are whatever the instance's collation says they are and any instance
+// may be running a different one.
+//
+// So the lock is strictly wider than the thing it guards, which is the safe direction. The cost,
+// stated so nobody has to rediscover it: creating two DIFFERENT Goiabada databases on one
+// instance now serializes against each other, and with an untimed lock a stuck holder blocks
+// both rather than one. That is bounded, because the lock spans a catalog check and one
+// CREATE DATABASE and is taken once per database in the life of a deployment.
+//
+// Deliberately distinct from database.GenerateAdvisoryLockId, which ensureSchemaMigrationsTable
+// takes below: that guards the schema_migrations table INSIDE an existing database, a different
+// thing one layer down, and the two must not share a resource (#293).
+const createDatabaseResource = "goiabada:create-database"
+
+// createDatabaseUnderAppLock runs the check-then-create batch with an exclusive application lock
+// held across it, so that at most one process ever issues CREATE DATABASE.
+//
+// SQL Server has no atomic CREATE DATABASE IF NOT EXISTS, so the batch below is a check followed
+// by a create and racing processes can all pass the check. Measured: 5 of 8 concurrent starts
+// against an absent database failed. That is also why this serializes rather than tolerating the
+// error and re-checking, which is what the issue proposed: most losers carry no error number and
+// no message at all, only "Request failed but didn't provide reason", so there is frequently
+// nothing to recognise. Two replicas against one fresh server is an ordinary topology (#293).
+//
+// sp_getapplock at LockOwner = 'Session' is scoped to one session, so the lock has to be taken,
+// used and released on a single connection pinned out of the pool. Issued against the pooled
+// *sql.DB, the release could land on a different session and leave the lock held for the life of
+// the process, blocking every later start against this instance. Same hazard, same remedy, as
+// ensureSchemaMigrationsTable below.
+//
+// Application locks are scoped to the database the session is in, and every racer is in master,
+// so they do share one lock space. That is the whole reason this works.
+//
+// LockTimeout = -1 blocks until the lock is free rather than failing, which is what the migration
+// lock already does: the holder is another process's create, and it is short.
+func createDatabaseUnderAppLock(masterDB *sql.DB, name string) error {
+	ctx := context.Background()
+
+	// Create database if it doesn't exist.
+	//
+	// The collation is case-, accent-, width- and kanatype-SENSITIVE, so a value that differs
+	// in case is a different value here exactly as it is on SQLite and PostgreSQL. RFC 6749
+	// section 1.9 requires that of client_id, section 3.3 of scope and OpenID Connect Core
+	// section 2 of sub; the previous CI_AI collation folded all three, so client_id=myapp
+	// resolved a client registered as MyApp (#283). Migration 000040 converts an existing
+	// database's 92 string columns to the same collation.
+	//
+	// IF NOT EXISTS, so a database an OPERATOR pre-created keeps their collation: the database
+	// default cannot be moved from a migration, because ALTER DATABASE ... COLLATE blocks until
+	// it times out with a second session attached, which is what a running application is. That
+	// is why every string column a future migration adds must spell its own COLLATE clause
+	// explicitly, naming the collation below, rather than relying on this line, and why a data
+	// test migrates the whole chain into a hostile database and asserts all 92 columns.
+	createDatabaseCommand := fmt.Sprintf(`
+        IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = N'%s')
+        BEGIN
+            CREATE DATABASE [%s]
+            COLLATE Latin1_General_100_CS_AS_KS_WS_SC_UTF8
+        END`,
+		name,
+		name,
+	)
+
+	conn, err := masterDB.Conn(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to pin a connection for the database creation lock")
+	}
+	defer func() { _ = conn.Close() }()
+
+	const takeLock = `DECLARE @lockResult int;
+		EXEC @lockResult = sp_getapplock @Resource = @p1, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = -1;
+		SELECT @lockResult;`
+	var status int
+	if err := conn.QueryRowContext(ctx, takeLock, createDatabaseResource).Scan(&status); err != nil {
+		return errors.Wrap(err, "unable to take the database creation lock")
+	}
+	if status < 0 {
+		return errors.Errorf("unable to take the database creation lock: sp_getapplock returned %d", status)
+	}
+	defer func() {
+		_, _ = conn.ExecContext(ctx, `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`, createDatabaseResource)
+	}()
+
+	if _, err := conn.ExecContext(ctx, createDatabaseCommand); err != nil {
+		return errors.Wrap(err, "unable to create database")
+	}
+	return nil
 }
 
 func (d *MsSQLDatabase) BeginTransaction() (*sql.Tx, error) {
