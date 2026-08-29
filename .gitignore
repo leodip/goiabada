@@ -447,3 +447,19 @@ src/todo.txt
 # git does not descend into an excluded directory, so `!/docs/keep.md` has no
 # effect while the directory itself is excluded.
 /docs/
+
+# Build outputs of the setup wizard. cmd/goiabada-setup is a `main` package, so
+# a plain `go build ./...` inside it writes to
+# src/cmd/goiabada-setup/goiabada-setup, which was a tracked 11 MB file until
+# this rule existed: the most ordinary command in Go silently replaced the
+# committed artifact with one built on the developer's machine and staged a
+# multi-megabyte diff of a build output, with nothing warning. Releases are
+# built from source by build-binaries.sh, which writes into build/, and
+# release.yml uploads what that produces, so no committed copy is read by
+# anything.
+/src/cmd/goiabada-setup/goiabada-setup
+/src/cmd/goiabada-setup/build/
+
+# Release archives from src/build/build-binaries.sh, which writes them beside
+# the script itself rather than into a build directory of its own.
+/src/build/goiabada-*.zip
