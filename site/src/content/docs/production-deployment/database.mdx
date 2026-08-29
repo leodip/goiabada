@@ -21,6 +21,10 @@ CREATE DATABASE goiabada ENCODING 'UTF8';
 Make the login the owner, or grant it full rights in the database. It needs no `CREATEDB`
 attribute and no access to the `postgres` database.
 
+Quote the name if `GOIABADA_DB_NAME` is not all lower case. PostgreSQL folds an unquoted
+identifier, so `CREATE DATABASE Goiabada` makes a database called `goiabada`, which is not the one
+Goiabada connects to.
+
 ## MySQL
 
 ```sql

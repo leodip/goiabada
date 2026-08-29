@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"strings"
 
 	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -214,13 +215,13 @@ func createDatabaseUnderAppLock(masterDB *sql.DB, name string) error {
 	// explicitly, naming the collation below, rather than relying on this line, and why a data
 	// test migrates the whole chain into a hostile database and asserts all 92 columns.
 	createDatabaseCommand := fmt.Sprintf(`
-        IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = N'%s')
+        IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = N%s)
         BEGIN
-            CREATE DATABASE [%s]
+            CREATE DATABASE %s
             COLLATE Latin1_General_100_CS_AS_KS_WS_SC_UTF8
         END`,
-		name,
-		name,
+		quoteLiteral(name),
+		quoteIdentifier(name),
 	)
 
 	conn, err := masterDB.Conn(ctx)
@@ -398,4 +399,30 @@ func (d *MsSQLDatabase) Migrate() error {
 
 func (d *MsSQLDatabase) IsEmpty() (bool, error) {
 	return d.CommonDB.IsEmpty()
+}
+
+// quoteIdentifier wraps name in the brackets SQL Server spells an identifier with, doubling any
+// closing bracket inside it, and quoteLiteral wraps it in the single quotes of a string literal,
+// doubling any single quote inside it.
+//
+// The batch above needs both, because it names the database twice in two different syntaxes: as
+// an identifier in CREATE DATABASE and as an nvarchar value compared against sys.databases.name.
+// It was already bracketed, so SQL Server was never broken the way PostgreSQL was, where an
+// unquoted CREATE DATABASE folds the name and the connection string does not. What these close
+// is the rest of the class: a name carrying `]` used to escape the brackets and one carrying `'`
+// used to end the literal early, and the name reaches both places by interpolation because an
+// identifier cannot be a bind parameter and the literal sits inside a batch that is executed as
+// one statement. GOIABADA_DB_NAME is operator-supplied configuration rather than user input, so
+// this is hardening and not a live hole. Kept in the same shape on all three server engines
+// (#293).
+//
+// Neither of these makes the check any narrower than it was. sys.databases.name is still
+// compared under master's collation, which folds case and more, which is why CreateDatabaseResource
+// above carries no name.
+func quoteIdentifier(name string) string {
+	return "[" + strings.ReplaceAll(name, "]", "]]") + "]"
+}
+
+func quoteLiteral(name string) string {
+	return "'" + strings.ReplaceAll(name, "'", "''") + "'"
 }

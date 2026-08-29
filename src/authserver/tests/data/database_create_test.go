@@ -618,3 +618,136 @@ func dropServerDatabase(t *testing.T, cfg *config.DatabaseConfig, name string) {
 		dropMsSQL(t, cfg, name)
 	}
 }
+
+// TestNewDatabase_CreateTrue_TheNameItCreatesIsTheNameItConnectsTo is the case the identifier
+// quoting exists for.
+//
+// GOIABADA_DB_NAME reaches two places that have to agree: the create statement and the
+// connection string. On PostgreSQL they did not. CREATE DATABASE folds an unquoted identifier,
+// so GOIABADA_DB_NAME=Goiabada created `goiabada`, while the same string sits in the connection
+// URL's path as a literal connection parameter and is not folded, so the handle then asked for
+// `Goiabada`. The deployment could never start, it never self-corrected, and the database it did
+// create sat on the server next to the one the operator asked for.
+//
+// The constructor did NOT return an error for it, which is why the assertion has to go through
+// the handle. sql.Open only parses the URL, and the creating arm has no Ping (the create
+// statement is what forces first use there, and on this path the create succeeded, against the
+// wrong name). So NewPostgresDatabase returned a nil error and a handle that failed on its first
+// query with `database "Goiabada" does not exist (SQLSTATE 3D000)`, inside the migrator, as
+// somebody else's problem.
+//
+// Two names, because they fail differently and on different engines. A mixed-case name is the
+// reported defect and is PostgreSQL's alone: MySQL does not fold an unquoted identifier and SQL
+// Server was already bracketing. A hyphenated name was a plain syntax error on PostgreSQL and
+// MySQL both, so it is what makes MySQL's backticks load-bearing here rather than only in the
+// unit tier. SQL Server needed neither and is here to stay unbroken.
+//
+// What this tier cannot witness is the doubling inside the quoting, a name carrying a double
+// quote, a backtick or a `]`. Those live in each engine package's own unit test, because a
+// database named that way is not a deployment anybody has and building the fixture would be the
+// only thing the case proved.
+//
+// SQLite is skipped: it has no create statement and no name, only a path.
+func TestNewDatabase_CreateTrue_TheNameItCreatesIsTheNameItConnectsTo(t *testing.T) {
+	if dbType() == "sqlite" || dbType() == "" {
+		t.Skip("sqlite has no database name, only a DSN path, so there is no identifier to quote")
+	}
+
+	for _, tc := range []struct {
+		label string
+		name  string
+	}{
+		// Mixed case on purpose, and unmistakably so: isolatedDBName is all lower case, which is
+		// exactly the shape that hid this for as long as it was hidden.
+		{"mixed case", "Goiabada_MixedCase_" + strings.TrimPrefix(isolatedDBName(), "goiabada_mig_")},
+		{"a hyphen", "goiabada-hyphen-" + strings.TrimPrefix(isolatedDBName(), "goiabada_mig_")},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			cfg := config.GetDatabase()
+			name := tc.name
+
+			var sqlDB *sql.DB
+			var currentDatabase string
+			switch dbType() {
+			case "mysql":
+				db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
+					Type: "mysql", Username: cfg.Username, Password: cfg.Password,
+					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
+				}, false)
+				require.NoErrorf(t, err, "NewMySQLDatabase at %s", name)
+				t.Cleanup(func() { _ = db.DB.Close(); dropMySQL(t, cfg, name) })
+				sqlDB, currentDatabase = db.DB, "SELECT DATABASE()"
+			case "postgres":
+				db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
+					Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
+				}, false)
+				require.NoErrorf(t, err, "NewPostgresDatabase at %s", name)
+				t.Cleanup(func() { _ = db.DB.Close(); dropPostgres(t, cfg, name) })
+				sqlDB, currentDatabase = db.DB, "SELECT current_database()"
+			case "mssql":
+				db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
+					Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
+				}, false)
+				require.NoErrorf(t, err, "NewMsSQLDatabase at %s", name)
+				t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
+				sqlDB, currentDatabase = db.DB, "SELECT DB_NAME()"
+			default:
+				t.Fatalf("unsupported db type %q", dbType())
+			}
+
+			// The load-bearing assertion, and it has to be a query rather than the constructor's
+			// error, because on the broken path there was no error. This is the first use of the
+			// handle, which is where PostgreSQL used to answer `database "..." does not exist`.
+			var got string
+			require.NoError(t, sqlDB.QueryRow(currentDatabase).Scan(&got),
+				"first use of the handle the constructor returned: this is where an unquoted CREATE DATABASE surfaced, as the migrator's problem rather than the constructor's")
+			require.Equal(t, name, got,
+				"the handle must be connected to the database the constructor created, spelled the way the operator spelled it")
+
+			// And the other half of the symptom: the deployment must not be left with a database
+			// it did not ask for sitting next to the one it did. Counted case-insensitively,
+			// because that is the only comparison that can see both at once, and because on
+			// PostgreSQL, the one engine where the two are distinct rows, it is the only one that
+			// would have caught the pair.
+			require.Equal(t, 1, serverDatabasesMatchingFold(t, name),
+				"exactly one database on the server may answer to this name; two means the create statement and the connection string spelled it differently")
+		})
+	}
+}
+
+// serverDatabasesMatchingFold counts the databases whose name matches name ignoring case.
+//
+// serverDatabaseExists above cannot answer this. Its predicate is the engine's own comparison,
+// which folds case on MySQL and SQL Server and does not on PostgreSQL, so on those two it cannot
+// distinguish one database from a folded pair and on PostgreSQL it would only ever see one of
+// them. Folding explicitly on all three asks the same question everywhere: how many databases on
+// this server answer to this name (#293).
+func serverDatabasesMatchingFold(t *testing.T, name string) int {
+	t.Helper()
+	cfg := config.GetDatabase()
+
+	var dsn, driver, query string
+	switch dbType() {
+	case "mysql":
+		driver, dsn = "mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg)
+		query = "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE LOWER(SCHEMA_NAME) = LOWER(?)"
+	case "postgres":
+		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)
+		query = "SELECT COUNT(*) FROM pg_database WHERE LOWER(datname) = LOWER($1)"
+	case "mssql":
+		driver, dsn = "sqlserver", msSQLMasterDSN(cfg)
+		query = "SELECT COUNT(*) FROM sys.databases WHERE LOWER(name) = LOWER(@p1)"
+	default:
+		t.Fatalf("%s has no server catalog of databases", dbType())
+	}
+
+	sqlDB, err := sql.Open(driver, dsn)
+	require.NoError(t, err, "open the server to read its catalog")
+	defer func() { _ = sqlDB.Close() }()
+
+	var n int
+	require.NoError(t, sqlDB.QueryRow(query, name).Scan(&n), "count databases matching %s", name)
+	return n
+}
