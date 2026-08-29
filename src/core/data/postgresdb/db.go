@@ -231,11 +231,38 @@ func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 	// The "already exists" tolerance stays. Under the lock it no longer covers another Goiabada
 	// process, which cannot be in here at the same time, but it still covers an operator running
 	// createdb by hand inside the window, and it costs one condition.
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %v;", name)); err != nil &&
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %s;", QuoteIdentifier(name))); err != nil &&
 		!strings.Contains(err.Error(), "already exists") {
 		return errors.Wrap(err, "unable to create database")
 	}
 	return nil
+}
+
+// QuoteIdentifier wraps name in the double quotes PostgreSQL spells an identifier with, doubling
+// any double quote inside it.
+//
+// It is here because the name is used two ways that have to agree, and unquoted they do not.
+// PostgreSQL down-cases an unquoted identifier, so CREATE DATABASE Goiabada creates `goiabada`,
+// while the same string sits in the connection URL's path as a literal connection parameter and
+// is not folded. GOIABADA_DB_NAME=Goiabada therefore used to create one database and then
+// connect to another, failing with `database "Goiabada" does not exist (SQLSTATE 3D000)` on
+// every start, for the life of the deployment, with the database it did create sitting next to
+// the one it asked for. Quoting makes both halves spell the same thing, and settles the
+// neighbouring case of a name that needs quotes for some other reason, a hyphen or a space,
+// which was a syntax error.
+//
+// Nothing here changes for a lower-case name, which is what every existing deployment has: a
+// name PostgreSQL would not have folded quotes to itself.
+//
+// pg_database.datname is compared byte-exact, so databaseExists and AdvisoryLockKey stay as they
+// are and stay exactly as precise as this statement. That is the asymmetry with SQL Server, one
+// file over, where the catalog folds and the lock resource has to be wider than the name.
+//
+// The doubling is the injection answer too. GOIABADA_DB_NAME is operator-supplied configuration
+// rather than user input, so this is hardening and not a live hole, but an identifier cannot be
+// passed as a bind parameter and this is the only thing that can be done about it.
+func QuoteIdentifier(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
 func (d *PostgresDatabase) BeginTransaction() (*sql.Tx, error) {

@@ -301,7 +301,10 @@ func dropMySQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
 		return
 	}
 	defer func() { _ = sqlDB.Close() }()
-	if _, err := sqlDB.Exec("DROP DATABASE IF EXISTS " + name); err != nil {
+	// Backticked, like the constructor's own CREATE DATABASE: a fixture at a mixed-case or
+	// otherwise quote-needing name has to be droppable by the same spelling it was created at
+	// (#293).
+	if _, err := sqlDB.Exec("DROP DATABASE IF EXISTS `" + strings.ReplaceAll(name, "`", "``") + "`"); err != nil {
 		t.Logf("dropMySQL exec: %v", err)
 	}
 }
@@ -315,8 +318,11 @@ func dropPostgres(t *testing.T, cfg *config.DatabaseConfig, name string) {
 		return
 	}
 	defer func() { _ = sqlDB.Close() }()
-	// FORCE terminates lingering connections (PostgreSQL 13+).
-	if _, err := sqlDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", name)); err != nil {
+	// FORCE terminates lingering connections (PostgreSQL 13+). Quoted, like the constructor's
+	// own CREATE DATABASE: unquoted, this folds the name and would silently drop nothing for a
+	// mixed-case fixture, leaving it on the server for every later run (#293).
+	if _, err := sqlDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)",
+		postgresdb.QuoteIdentifier(name))); err != nil {
 		t.Logf("dropPostgres exec: %v", err)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	gomigrate "github.com/golang-migrate/migrate/v4"
@@ -82,7 +83,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		// sub; the previous _ai_ci collation folded all three, so client_id=myapp resolved a
 		// client registered as MyApp (#283). Migration 000040 converts an existing database,
 		// its default included, so a fresh install and a migrated one agree.
-		createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;", dbConfig.Name)
+		createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;", quoteIdentifier(dbConfig.Name))
 		_, err = tempDB.Exec(createDatabaseCommand)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to create database")
@@ -205,4 +206,18 @@ func (d *MySQLDatabase) Migrate() error {
 
 func (d *MySQLDatabase) IsEmpty() (bool, error) {
 	return d.CommonDB.IsEmpty()
+}
+
+// quoteIdentifier wraps name in the backticks MySQL spells an identifier with, doubling any
+// backtick inside it.
+//
+// MySQL was never broken the way PostgreSQL was: an unquoted identifier is not folded here, so
+// the name in this statement and the name in the DSN's path already agreed. What quoting buys is
+// the rest of the class. A name needing quotes for any other reason, a hyphen or a space, was a
+// syntax error, and the name reaches this statement by interpolation because an identifier
+// cannot be a bind parameter. GOIABADA_DB_NAME is operator-supplied configuration rather than
+// user input, so the doubling is hardening and not a live hole, but it is the only answer
+// available and it costs one line. Kept in the same shape on all three server engines (#293).
+func quoteIdentifier(name string) string {
+	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
