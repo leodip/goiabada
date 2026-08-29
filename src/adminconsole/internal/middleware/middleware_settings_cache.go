@@ -29,6 +29,11 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 			// route here is an auth server too old to serve the field: an absent settings
 			// row already answers 500 on its side, and the settings API refuses to store
 			// an issuer shorter than three characters.
+			//
+			// English regardless of the request's locale, like the settings-fetch failure
+			// above it and like a CSRF rejection: this middleware is mounted ahead of
+			// i18n.MiddlewareLocale, so no localizer exists yet when either branch answers.
+			// Server.initMiddleware records why the chain is ordered that way.
 			if publicSettings.Issuer == "" {
 				http.Error(w, "The authserver did not report an issuer; it may be running an older version", http.StatusInternalServerError)
 				return
