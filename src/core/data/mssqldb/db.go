@@ -119,7 +119,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	return &mssqlDb, nil
 }
 
-// createDatabaseResource is the sp_getapplock resource createDatabaseUnderAppLock serializes on.
+// CreateDatabaseResource is the sp_getapplock resource createDatabaseUnderAppLock serializes on.
 // It carries NO database name, deliberately.
 //
 // A name-bearing resource looks tighter and is broken. sp_getapplock compares its resource as
@@ -135,12 +135,19 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 // stated so nobody has to rediscover it: creating two DIFFERENT Goiabada databases on one
 // instance now serializes against each other, and with an untimed lock a stuck holder blocks
 // both rather than one. That is bounded, because the lock spans a catalog check and one
-// CREATE DATABASE and is taken once per database in the life of a deployment.
+// CREATE DATABASE and is taken once per database in the life of a deployment. That last clause
+// is true only because createDatabaseUnderAppLock checks the catalog BEFORE reaching for the
+// lock. See the note there.
 //
 // Deliberately distinct from database.GenerateAdvisoryLockId, which ensureSchemaMigrationsTable
 // takes below: that guards the schema_migrations table INSIDE an existing database, a different
 // thing one layer down, and the two must not share a resource (#293).
-const createDatabaseResource = "goiabada:create-database"
+//
+// Exported because the resource is an inter-process contract rather than an implementation
+// detail: anything that has to interoperate with a starting Goiabada, a test holding the lock
+// from outside included, needs the identity itself and cannot restate it without becoming a
+// second definition that is free to drift.
+const CreateDatabaseResource = "goiabada:create-database"
 
 // createDatabaseUnderAppLock runs the check-then-create batch with an exclusive application lock
 // held across it, so that at most one process ever issues CREATE DATABASE.
@@ -163,8 +170,33 @@ const createDatabaseResource = "goiabada:create-database"
 //
 // LockTimeout = -1 blocks until the lock is free rather than failing, which is what the migration
 // lock already does: the holder is another process's create, and it is short.
+//
+// That is affordable only because the lock is reached ONLY when the database is absent. An
+// application lock taken in master is shared with every session on the instance, so ANY login
+// that can reach master (ordinary public access is enough, and it needs no rights at all
+// inside Goiabada's database) can hold this resource indefinitely. Reaching for it
+// unconditionally would put that stranger on the path of every ordinary restart for the life of
+// the deployment, which is not the cost #293 decision 5 weighed. The unlocked pre-check below
+// keeps the exposure inside the window where the database really is absent, which is the one
+// start that has to create it.
+//
+// The pre-check cannot let a second creator through. It only returns early when the database is
+// already there, and what decides whether CREATE DATABASE runs is still the IF NOT EXISTS inside
+// the batch, under the lock. It is also no weaker than that check: both compare
+// sys.databases.name against an nvarchar value under master's collation, so both fold case,
+// trailing space, normalization form and width identically. Two instances configured `goiabada`
+// and `Goiabada` against an absent database therefore both find nothing here, both take the
+// constant resource, and the batch collapses them to one database exactly as before (#293).
 func createDatabaseUnderAppLock(masterDB *sql.DB, name string) error {
 	ctx := context.Background()
+
+	exists, err := databaseExists(ctx, masterDB, name)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
 
 	// Create database if it doesn't exist.
 	//
@@ -201,20 +233,35 @@ func createDatabaseUnderAppLock(masterDB *sql.DB, name string) error {
 		EXEC @lockResult = sp_getapplock @Resource = @p1, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = -1;
 		SELECT @lockResult;`
 	var status int
-	if err := conn.QueryRowContext(ctx, takeLock, createDatabaseResource).Scan(&status); err != nil {
+	if err := conn.QueryRowContext(ctx, takeLock, CreateDatabaseResource).Scan(&status); err != nil {
 		return errors.Wrap(err, "unable to take the database creation lock")
 	}
 	if status < 0 {
 		return errors.Errorf("unable to take the database creation lock: sp_getapplock returned %d", status)
 	}
 	defer func() {
-		_, _ = conn.ExecContext(ctx, `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`, createDatabaseResource)
+		_, _ = conn.ExecContext(ctx, `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`, CreateDatabaseResource)
 	}()
 
 	if _, err := conn.ExecContext(ctx, createDatabaseCommand); err != nil {
 		return errors.Wrap(err, "unable to create database")
 	}
 	return nil
+}
+
+// databaseExists asks sys.databases whether name is there, through master.
+//
+// The comparison is master's collation, which on a stock instance folds case and more. That is
+// the same comparison the IF NOT EXISTS inside createDatabaseUnderAppLock's batch makes, and it
+// has to be: this check stands in front of the lock, so anything it treats as present must be
+// something the batch would also treat as present (#293).
+func databaseExists(ctx context.Context, masterDB *sql.DB, name string) (bool, error) {
+	var found int
+	if err := masterDB.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM sys.databases WHERE name = @p1", name).Scan(&found); err != nil {
+		return false, errors.Wrap(err, "unable to check whether the database exists")
+	}
+	return found > 0, nil
 }
 
 func (d *MsSQLDatabase) BeginTransaction() (*sql.Tx, error) {

@@ -117,7 +117,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 // the maintenance database might take. Advisory locks share one 64-bit key space per database.
 const advisoryLockNamespace = "goiabada:create-database:"
 
-// advisoryLockKey derives the key createDatabaseUnderAdvisoryLock serializes on, from the name
+// AdvisoryLockKey derives the key createDatabaseUnderAdvisoryLock serializes on, from the name
 // of the database being created.
 //
 // FNV-1a computed in Go rather than through the server's own hashtextextended, so it needs no
@@ -131,11 +131,37 @@ const advisoryLockNamespace = "goiabada:create-database:"
 // byte-exact, so this key is exactly as precise as the catalog check it guards. SQL Server
 // compares sys.databases.name under master's collation, which folds case and more, and no
 // Go-side key can be made to agree with that (#293).
-func advisoryLockKey(name string) int64 {
+//
+// Exported because the key is an inter-process contract rather than an implementation detail:
+// anything that has to interoperate with a starting Goiabada, a test holding the lock from
+// outside included, needs the identity itself and cannot re-derive it without becoming a second
+// definition that is free to drift.
+func AdvisoryLockKey(name string) int64 {
 	h := fnv.New64a()
 	// hash.Hash documents that Write never returns an error.
 	_, _ = h.Write([]byte(advisoryLockNamespace + name))
 	return int64(h.Sum64())
+}
+
+// rowQuerier is the one method databaseExists needs, so that the same predicate can be asked of
+// the maintenance pool and of the single connection the lock is held on.
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// databaseExists asks pg_database whether name is there.
+//
+// datname is compared byte-exact, which is what lets AdvisoryLockKey be derived from the name:
+// the key is exactly as precise as this check. Called twice per creating start, once outside
+// the lock to decide whether the lock is needed at all and once inside it to decide whether to
+// create. One function, so the two can never disagree (#293).
+func databaseExists(ctx context.Context, q rowQuerier, name string) (bool, error) {
+	var found int
+	if err := q.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM pg_database WHERE datname = $1", name).Scan(&found); err != nil {
+		return false, errors.Wrap(err, "unable to check whether the database exists")
+	}
+	return found > 0, nil
 }
 
 // createDatabaseUnderAdvisoryLock creates the application database when it is not there, holding
@@ -154,8 +180,31 @@ func advisoryLockKey(name string) int64 {
 // The lock is untimed, so a stuck holder blocks startup rather than failing it. Accepted in #293
 // decision 5, the same trade the migration lock one layer down already makes: what it spans is
 // one catalog read and one CREATE DATABASE.
+//
+// That trade is only affordable because the lock is reached ONLY when the database is absent.
+// An advisory lock taken in the `postgres` maintenance database shares one key space with every
+// session on the server, so ANY role that can connect there can hold this key indefinitely,
+// including a role with no rights whatsoever inside Goiabada's own database. Taking it
+// unconditionally would put that stranger on the path of every ordinary restart for the life of
+// the deployment, which is not the cost decision 5 weighed. The unlocked pre-check below keeps
+// the exposure inside the window where the database really is absent, which is the one start
+// that has to create it (#293).
+//
+// The pre-check cannot let a second creator through. It only returns early when the database is
+// already there, and what decides whether CREATE DATABASE runs is still the check taken under
+// the lock. Both ask pg_database the same question through databaseExists, deliberately: two
+// spellings of the same predicate could drift apart, and the outer one is only sound while it
+// is no weaker than the inner one.
 func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 	ctx := context.Background()
+
+	exists, err := databaseExists(ctx, maintenanceDB, name)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
 
 	conn, err := maintenanceDB.Conn(ctx)
 	if err != nil {
@@ -163,7 +212,7 @@ func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 	}
 	defer func() { _ = conn.Close() }()
 
-	key := advisoryLockKey(name)
+	key := AdvisoryLockKey(name)
 	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", key); err != nil {
 		return errors.Wrap(err, "unable to take the database creation lock")
 	}
@@ -171,12 +220,11 @@ func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 		_, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", key)
 	}()
 
-	var found int
-	if err := conn.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM pg_database WHERE datname = $1", name).Scan(&found); err != nil {
-		return errors.Wrap(err, "unable to check whether the database exists")
+	exists, err = databaseExists(ctx, conn, name)
+	if err != nil {
+		return err
 	}
-	if found > 0 {
+	if exists {
 		return nil
 	}
 
