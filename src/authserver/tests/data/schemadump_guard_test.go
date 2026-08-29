@@ -168,6 +168,41 @@ func guardCasesFor(engine string) []guardCase {
 	// takes it bare. SQL Server is absent because it has no expression index at all: there
 	// the construct is an index over a computed column, and the computed column is refused
 	// by the generated-column case above.
+	// The index method each engine offers instead of a B-tree, one apiece: PostgreSQL's
+	// hash, MySQL's FULLTEXT and SQL Server's columnstore. SQLite has no second method.
+	// Any of them over one column is otherwise the same IndexShape as a plain index over
+	// that column.
+	method := guardCase{construct: "an index built with a non-default method"}
+	switch engine {
+	case "mysql":
+		method.ddl = []string{
+			"CREATE TABLE guard_probe (a TEXT NOT NULL)",
+			"CREATE FULLTEXT INDEX idx_guard_probe ON guard_probe (a)",
+		}
+	case "postgres":
+		method.ddl = []string{
+			"CREATE TABLE guard_probe (a bigint NOT NULL)",
+			"CREATE INDEX idx_guard_probe ON guard_probe USING hash (a)",
+		}
+	case "mssql":
+		method.ddl = []string{
+			"CREATE TABLE guard_probe (a BIGINT NOT NULL)",
+			"CREATE NONCLUSTERED COLUMNSTORE INDEX idx_guard_probe ON guard_probe (a)",
+		}
+	}
+
+	// PostgreSQL alone lets the null ordering be chosen apart from the direction, so it is
+	// the only engine with a key this can be asserted on. ASC and not DESC deliberately: a
+	// DESC key sets the same indoption bit and is refused by the descending case above, so
+	// spelling it DESC here would pass for the wrong reason.
+	nullOrder := guardCase{
+		construct: "an index key with a non-default null ordering",
+		ddl: []string{
+			"CREATE TABLE guard_probe (a bigint NOT NULL)",
+			"CREATE INDEX idx_guard_probe ON guard_probe (a ASC NULLS FIRST)",
+		},
+	}
+
 	expression := guardCase{construct: "an expression (functional) index"}
 	if engine == "sqlite" {
 		expression.ddl = []string{
@@ -195,14 +230,15 @@ func guardCasesFor(engine string) []guardCase {
 
 	switch engine {
 	case "mysql":
-		return []guardCase{composite, check, generated, onUpdate, descending, expression, {
+		return []guardCase{composite, check, generated, onUpdate, descending, expression, method, {
 			construct: "an index MySQL named for itself",
 			ddl:       []string{"CREATE TABLE guard_probe (a BIGINT NOT NULL, KEY (a))"},
 		}}
 	case "postgres":
-		return []guardCase{composite, check, generated, onUpdate, descending, partial, include, deferrable, expression}
+		return []guardCase{composite, check, generated, onUpdate, descending, partial, include,
+			deferrable, expression, method, nullOrder}
 	case "mssql":
-		return []guardCase{composite, check, generated, onUpdate, descending, partial, include}
+		return []guardCase{composite, check, generated, onUpdate, descending, partial, include, method}
 	default: // sqlite
 		return []guardCase{composite, check, generated, onUpdate, descending, partial, deferrable, expression}
 	}
