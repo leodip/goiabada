@@ -43,7 +43,6 @@ data:
   GOIABADA_DB_PORT: "5432"
   GOIABADA_DB_NAME: "mydb"
   GOIABADA_DB_USERNAME: "dbuser"
-  GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID: "admin-console-client"
 
 ---
 apiVersion: apps/v1

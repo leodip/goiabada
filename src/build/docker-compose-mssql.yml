@@ -42,7 +42,7 @@ services:
       - ./bootstrap:/bootstrap
     # =============================================================================
     # BOOTSTRAP: On first startup, auth server seeds DB, generates credentials
-    # in ./bootstrap/bootstrap.env (OAuth client ID/secret + session keys),
+    # in ./bootstrap/bootstrap.env (OAuth client secret + session keys),
     # then EXITS. Copy session keys from bootstrap file, uncomment them below,
     # and restart for normal operation.
     # =============================================================================
@@ -113,11 +113,10 @@ services:
     # =============================================================================
     # FIRST-TIME SETUP: Run `docker compose up`, wait for auth server to exit,
     # then copy all credentials from ./bootstrap/bootstrap.env and uncomment
-    # the 4 lines below. Restart to complete setup.
+    # the 3 lines below. Restart to complete setup.
     # =============================================================================
     environment:
       # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
-      # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=<copy from ./bootstrap/bootstrap.env>
       # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<copy from ./bootstrap/bootstrap.env>
       # - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
       # - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>

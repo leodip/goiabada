@@ -59,6 +59,31 @@ func (ds *DatabaseSeeder) WithOAuthClientSecret(secret string) *DatabaseSeeder {
 	return ds
 }
 
+// bootstrapEnvContent renders the legacy two-step bootstrap file. It carries no client id: the
+// admin console always authenticates as constants.AdminConsoleClientIdentifier, which the seeder
+// writes and the migrations grant against, so there is nothing for an operator to copy across
+// (#285). Kept a pure function so the file's contents can be tested without a database.
+func bootstrapEnvContent(clientSecret, authServerAuthKey, authServerEncKey,
+	adminConsoleAuthKey, adminConsoleEncKey string) string {
+	return fmt.Sprintf(`# Admin Console OAuth Client Secret
+GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s
+
+# Auth Server Session Keys
+GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=%s
+GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=%s
+
+# Admin Console Session Keys
+GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=%s
+GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
+`,
+		clientSecret,
+		authServerAuthKey,
+		authServerEncKey,
+		adminConsoleAuthKey,
+		adminConsoleEncKey,
+	)
+}
+
 func (ds *DatabaseSeeder) Seed() error {
 
 	// The data-encryption key comes from the environment (GOIABADA_AES_ENCRYPTION_KEY,
@@ -120,20 +145,8 @@ func (ds *DatabaseSeeder) Seed() error {
 		if err != nil {
 			return errors.Wrap(err, "unable to open bootstrap env file for writing")
 		}
-		// Write OAuth credentials AND session keys
-		content := fmt.Sprintf(`# Admin Console OAuth Credentials
-GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=%s
-GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s
-
-# Auth Server Session Keys
-GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=%s
-GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=%s
-
-# Admin Console Session Keys
-GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=%s
-GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
-`,
-			client1.ClientIdentifier,
+		// Write the OAuth client secret AND session keys
+		content := bootstrapEnvContent(
 			clientSecret,
 			hex.EncodeToString(authServerSessionAuthKey),
 			hex.EncodeToString(authServerSessionEncKey),
@@ -153,7 +166,7 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 		slog.Info("File permissions: 0600 (owner read/write only)")
 		slog.Info("")
 		slog.Info("The file contains:")
-		slog.Info("  - OAuth client ID and secret for admin console")
+		slog.Info("  - OAuth client secret for admin console")
 		slog.Info("  - Session authentication and encryption keys")
 		slog.Info("")
 		slog.Info("NEXT STEP: Open the file and copy credentials to your deployment configuration")
