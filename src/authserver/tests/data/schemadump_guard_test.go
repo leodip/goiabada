@@ -164,6 +164,22 @@ func guardCasesFor(engine string) []guardCase {
 		ddl: []string{`CREATE TABLE guard_probe (a BIGINT NOT NULL,
 			CONSTRAINT fk_guard_probe FOREIGN KEY (a) REFERENCES guard_parent1 (id) DEFERRABLE INITIALLY DEFERRED)`},
 	}
+	// PostgreSQL and MySQL both require the extra parentheses around the expression; SQLite
+	// takes it bare. SQL Server is absent because it has no expression index at all: there
+	// the construct is an index over a computed column, and the computed column is refused
+	// by the generated-column case above.
+	expression := guardCase{construct: "an expression (functional) index"}
+	if engine == "sqlite" {
+		expression.ddl = []string{
+			"CREATE TABLE guard_probe (a BIGINT NOT NULL)",
+			"CREATE INDEX idx_guard_probe ON guard_probe (a + 1)",
+		}
+	} else {
+		expression.ddl = []string{
+			"CREATE TABLE guard_probe (a BIGINT NOT NULL)",
+			"CREATE INDEX idx_guard_probe ON guard_probe ((a + 1))",
+		}
+	}
 
 	generated := guardCase{construct: "a generated (computed) column"}
 	switch engine {
@@ -179,15 +195,15 @@ func guardCasesFor(engine string) []guardCase {
 
 	switch engine {
 	case "mysql":
-		return []guardCase{composite, check, generated, onUpdate, descending, {
+		return []guardCase{composite, check, generated, onUpdate, descending, expression, {
 			construct: "an index MySQL named for itself",
 			ddl:       []string{"CREATE TABLE guard_probe (a BIGINT NOT NULL, KEY (a))"},
 		}}
 	case "postgres":
-		return []guardCase{composite, check, generated, onUpdate, descending, partial, include, deferrable}
+		return []guardCase{composite, check, generated, onUpdate, descending, partial, include, deferrable, expression}
 	case "mssql":
 		return []guardCase{composite, check, generated, onUpdate, descending, partial, include}
 	default: // sqlite
-		return []guardCase{composite, check, generated, onUpdate, descending, partial, deferrable}
+		return []guardCase{composite, check, generated, onUpdate, descending, partial, deferrable, expression}
 	}
 }
