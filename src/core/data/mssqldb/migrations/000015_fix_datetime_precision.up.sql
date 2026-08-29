@@ -1,3 +1,8 @@
+-- parity: mssql only. DATETIME2 and its precision argument are SQL Server's own, and the two
+-- tables were created here with the argument left off. MySQL's 000008 and 000014 already spell
+-- DATETIME(6); SQLite declares plain DATETIME and has no precision to give; PostgreSQL's own
+-- TIMESTAMP spelling for these two tables is #284's to compare, not this file's to change.
+--
 -- Fix datetime2 precision on user_profile_pictures and client_logos tables
 -- Migrations 000008 and 000014 used bare DATETIME2 (defaults to precision 7),
 -- while all other tables use DATETIME2(6). Standardize to DATETIME2(6).

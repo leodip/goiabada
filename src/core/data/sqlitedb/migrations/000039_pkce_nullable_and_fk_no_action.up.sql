@@ -1,3 +1,8 @@
+-- parity: mysql, postgres and sqlite only. SQL Server is the engine the other three are
+-- converging on and needs no file: fk_refresh_tokens_user and fk_refresh_tokens_client have been
+-- ON DELETE NO ACTION there since its 000011, and codes.code_challenge and code_challenge_method
+-- have been nullable since its own 000007.
+--
 -- Two of issue #282's divergences, in one file, because both need the same rebuild.
 --
 -- 1. codes.code_challenge and code_challenge_method are still NOT NULL on SQLite. 000007

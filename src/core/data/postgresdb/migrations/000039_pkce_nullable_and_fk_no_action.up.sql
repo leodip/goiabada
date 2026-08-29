@@ -1,3 +1,8 @@
+-- parity: mysql, postgres and sqlite only. SQL Server is the engine the other three are
+-- converging on and needs no file: fk_refresh_tokens_user and fk_refresh_tokens_client have been
+-- ON DELETE NO ACTION there since its 000011, and codes.code_challenge and code_challenge_method
+-- have been nullable since its own 000007.
+--
 -- Issue #282 divergence 5: refresh_tokens.user_id and client_id come down to
 -- ON DELETE NO ACTION to match SQL Server, which refuses the cascade outright
 -- (Msg 1785: users <- codes <- refresh_tokens(code_id) alongside
