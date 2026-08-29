@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -116,6 +117,57 @@ func TestGetEnvAsStringSlice(t *testing.T) {
 			t.Errorf("getEnvAsStringSlice = %#v, want %#v", got, want)
 		}
 	})
+}
+
+func TestGetEnvAsBoolDefault(t *testing.T) {
+	const key = "GOIABADA_TEST_DB_CREATE"
+
+	// Every case is run against both defaults, so the default is observed rather than assumed:
+	// a case that only ever ran with defaultVal=false could not tell the fallback apart from
+	// a parsed false.
+	tests := []struct {
+		name string
+		// set is false for the unset case, which is the one the helper exists for.
+		set          bool
+		value        string
+		wantTrueDef  bool
+		wantFalseDef bool
+	}{
+		{name: "unset returns the default", set: false, wantTrueDef: true, wantFalseDef: false},
+		{name: `"true"`, set: true, value: "true", wantTrueDef: true, wantFalseDef: true},
+		{name: `"1"`, set: true, value: "1", wantTrueDef: true, wantFalseDef: true},
+		{name: `"T"`, set: true, value: "T", wantTrueDef: true, wantFalseDef: true},
+		{name: `"TRUE"`, set: true, value: "TRUE", wantTrueDef: true, wantFalseDef: true},
+		{name: `"false"`, set: true, value: "false", wantTrueDef: false, wantFalseDef: false},
+		{name: `"0"`, set: true, value: "0", wantTrueDef: false, wantFalseDef: false},
+		{name: `"f"`, set: true, value: "f", wantTrueDef: false, wantFalseDef: false},
+		{name: "whitespace is trimmed", set: true, value: " false ", wantTrueDef: false, wantFalseDef: false},
+		// strconv.ParseBool rejects all four, so each falls back to the default. Keep the
+		// "no" case: it reads as false and is not, and against defaultVal=true it returns true.
+		{name: `"yes" is not parseable`, set: true, value: "yes", wantTrueDef: true, wantFalseDef: false},
+		{name: `"no" is not parseable`, set: true, value: "no", wantTrueDef: true, wantFalseDef: false},
+		{name: "empty is not parseable", set: true, value: "", wantTrueDef: true, wantFalseDef: false},
+		{name: `"maybe" is not parseable`, set: true, value: "maybe", wantTrueDef: true, wantFalseDef: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// t.Setenv cannot unset, but it registers the restore, so setting then
+			// unsetting leaves the variable absent for this subtest only.
+			t.Setenv(key, tt.value)
+			if !tt.set {
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
+				}
+			}
+			if got := getEnvAsBoolDefault(key, true); got != tt.wantTrueDef {
+				t.Errorf("getEnvAsBoolDefault(%s=%q, true) = %v, want %v", key, tt.value, got, tt.wantTrueDef)
+			}
+			if got := getEnvAsBoolDefault(key, false); got != tt.wantFalseDef {
+				t.Errorf("getEnvAsBoolDefault(%s=%q, false) = %v, want %v", key, tt.value, got, tt.wantFalseDef)
+			}
+		})
+	}
 }
 
 func TestIsCookieSecure(t *testing.T) {

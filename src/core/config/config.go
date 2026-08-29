@@ -91,6 +91,7 @@ type DatabaseConfig struct {
 	Port     int
 	Name     string
 	DSN      string
+	Create   bool
 }
 
 type Config struct {
@@ -177,6 +178,7 @@ func load() {
 			Port:     getEnvAsInt("GOIABADA_DB_PORT", 3306),
 			Name:     getEnv("GOIABADA_DB_NAME", "goiabada"),
 			DSN:      getEnv("GOIABADA_DB_DSN", "file::memory:?cache=shared"),
+			Create:   getEnvAsBoolDefault("GOIABADA_DB_CREATE", true),
 		},
 		AdminEmail:               getEnv("GOIABADA_ADMIN_EMAIL", "admin"),
 		AdminPassword:            getEnv("GOIABADA_ADMIN_PASSWORD", "changeme"),
@@ -231,6 +233,7 @@ func load() {
 	flag.IntVar(&cfg.Database.Port, "db-port", cfg.Database.Port, "Database port")
 	flag.StringVar(&cfg.Database.Name, "db-name", cfg.Database.Name, "Database name")
 	flag.StringVar(&cfg.Database.DSN, "db-dsn", cfg.Database.DSN, "Database DSN (only for sqlite)")
+	flag.BoolVar(&cfg.Database.Create, "db-create", cfg.Database.Create, "Create the database if it does not exist (only for mysql, postgres, mssql)")
 
 	// Initial setup
 	flag.StringVar(&cfg.AdminEmail, "admin-email", cfg.AdminEmail, "Default admin email")
@@ -366,6 +369,16 @@ func getEnvAsBool(key string) bool {
 		return value
 	}
 	return false
+}
+
+// getEnvAsBoolDefault is getEnvAsBool with a caller-supplied default, for a setting whose
+// default is true: getEnvAsBool can only ever express default-false (#293).
+func getEnvAsBoolDefault(key string, defaultVal bool) bool {
+	valueStr := getEnv(key, "")
+	if value, err := strconv.ParseBool(strings.TrimSpace(valueStr)); err == nil {
+		return value
+	}
+	return defaultVal
 }
 
 func getEnvAsStringSlice(key string) []string {

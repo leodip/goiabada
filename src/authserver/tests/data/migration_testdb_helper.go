@@ -82,7 +82,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		name := isolatedDBName()
 		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
 			Type: "mysql", Username: cfg.Username, Password: cfg.Password,
-			Host: cfg.Host, Port: cfg.Port, Name: name,
+			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
 		require.NoError(t, err, "NewMySQLDatabase")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMySQL(t, cfg, name) })
@@ -93,7 +93,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		name := isolatedDBName()
 		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
 			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
-			Host: cfg.Host, Port: cfg.Port, Name: name,
+			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
 		require.NoError(t, err, "NewPostgresDatabase")
 		t.Cleanup(func() { _ = db.DB.Close(); dropPostgres(t, cfg, name) })
@@ -103,7 +103,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		name := isolatedDBName()
 		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
-			Host: cfg.Host, Port: cfg.Port, Name: name,
+			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
 		require.NoError(t, err, "NewMsSQLDatabase")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
@@ -358,6 +358,9 @@ func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
 	db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 		Type: "mssql", Username: cfg.Username, Password: cfg.Password,
 		Host: cfg.Host, Port: cfg.Port, Name: name,
+		// The operator created this one, so the constructor must not: that is what the
+		// collation assertion below is checking (#293).
+		Create: false,
 	}, false)
 	require.NoError(t, err, "NewMsSQLDatabase over a pre-created database")
 	t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })

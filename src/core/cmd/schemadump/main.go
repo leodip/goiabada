@@ -196,7 +196,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 	case schemadump.MySQL:
 		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
 			Type: "mysql", Username: t.username, Password: t.password,
-			Host: t.host, Port: t.port, Name: name,
+			Host: t.host, Port: t.port, Name: name, Create: true,
 		}, false)
 		if err != nil {
 			return nil, nil, nil, err
@@ -211,7 +211,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 	case schemadump.Postgres:
 		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
 			Type: "postgres", Username: t.username, Password: t.password,
-			Host: t.host, Port: t.port, Name: name,
+			Host: t.host, Port: t.port, Name: name, Create: true,
 		}, false)
 		if err != nil {
 			return nil, nil, nil, err
@@ -227,7 +227,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 	case schemadump.MSSQL:
 		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 			Type: "mssql", Username: t.username, Password: t.password,
-			Host: t.host, Port: t.port, Name: name,
+			Host: t.host, Port: t.port, Name: name, Create: true,
 		}, false)
 		if err != nil {
 			return nil, nil, nil, err

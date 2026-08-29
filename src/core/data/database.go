@@ -520,6 +520,7 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 			Port:     dbConfig.Port,
 			Name:     dbConfig.Name,
 			DSN:      dbConfig.DSN,
+			Create:   dbConfig.Create,
 		}
 		database, err = mysqldb.NewMySQLDatabase(mysqlConfig, logSQL)
 	case "sqlite":
@@ -544,6 +545,7 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 			Port:     dbConfig.Port,
 			Name:     dbConfig.Name,
 			DSN:      dbConfig.DSN,
+			Create:   dbConfig.Create,
 		}
 		database, err = postgresdb.NewPostgresDatabase(postgresConfig, logSQL)
 	case "mssql":
@@ -556,6 +558,7 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 			Port:     dbConfig.Port,
 			Name:     dbConfig.Name,
 			DSN:      dbConfig.DSN,
+			Create:   dbConfig.Create,
 		}
 		database, err = mssqldb.NewMsSQLDatabase(mssqlConfig, logSQL)
 	default:
