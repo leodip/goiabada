@@ -59,20 +59,40 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		return nil, errors.Wrap(err, "unable to open database")
 	}
 
-	// Create database if not exists
-	defaultDB, err := sql.Open("pgx", fmt.Sprintf("postgres://%v:%v@%v:%v/postgres",
-		dbConfig.Username,
-		dbConfig.Password,
-		dbConfig.Host,
-		dbConfig.Port))
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to connect to default database")
-	}
-	defer func() { _ = defaultDB.Close() }()
+	if dbConfig.Create {
+		// Create database if not exists
+		defaultDB, err := sql.Open("pgx", fmt.Sprintf("postgres://%v:%v@%v:%v/postgres",
+			dbConfig.Username,
+			dbConfig.Password,
+			dbConfig.Host,
+			dbConfig.Port))
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to connect to default database")
+		}
+		defer func() { _ = defaultDB.Close() }()
 
-	_, err = defaultDB.Exec(fmt.Sprintf("CREATE DATABASE %v;", dbConfig.Name))
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
-		return nil, errors.Wrap(err, "unable to create database")
+		_, err = defaultDB.Exec(fmt.Sprintf("CREATE DATABASE %v;", dbConfig.Name))
+		if err != nil && !strings.Contains(err.Error(), "already exists") {
+			return nil, errors.Wrap(err, "unable to create database")
+		}
+	} else {
+		// The operator says the database is already there, so nothing is created and no
+		// connection is opened to the postgres maintenance database: a role owning the
+		// application database and holding no CREATEDB is enough to start, which is what the
+		// production checklist's "don't use root/admin accounts" asks for and what this
+		// engine refused to allow before (#293).
+		slog.Info("db create: disabled, the database must already exist (GOIABADA_DB_CREATE=false)")
+
+		// sql.Open only parses the URL, so without this an absent database would come back as
+		// a usable handle and a nil error, and the failure would surface inside the migrator
+		// as somebody else's problem. Ping forces first use here, so the caller gets
+		// PostgreSQL's own `database "x" does not exist (SQLSTATE 3D000)` from the
+		// constructor. Not on the creating arm, where the CREATE DATABASE above already forces
+		// the question.
+		if err := db.Ping(); err != nil {
+			_ = db.Close()
+			return nil, errors.Wrap(err, "unable to connect to database")
+		}
 	}
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.PostgreSQL, logSQL)

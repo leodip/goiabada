@@ -80,6 +80,7 @@ export default defineConfig({
 					label: 'Production deployment',
 					items: [
 						{ label: 'Overview', slug: 'production-deployment' },
+						{ label: 'Database setup', slug: 'production-deployment/database' },
 						{ label: 'Cloudflare Tunnel', slug: 'production-deployment/cloudflare-tunnel' },
 						{ label: 'Cloudflare + Nginx', slug: 'production-deployment/cloudflare-nginx' },
 						{ label: 'Reverse proxy (no Cloudflare)', slug: 'production-deployment/reverse-proxy' },

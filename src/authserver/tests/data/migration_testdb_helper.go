@@ -365,11 +365,16 @@ func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
 	require.NoError(t, err, "NewMsSQLDatabase over a pre-created database")
 	t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
 
-	// The point of the helper, asserted rather than assumed: if IF NOT EXISTS ever stopped
-	// being IF NOT EXISTS, every test built on this would go on passing for the wrong
-	// reason.
+	// Asserted rather than assumed: with Create false nothing in the constructor may touch
+	// the database at all, so one that started creating or altering one would be caught here
+	// rather than leaving every test built on this fixture passing for the wrong reason.
+	//
+	// That IF NOT EXISTS on the CREATING arm still leaves an operator's database alone is a
+	// different claim and it has its own case, in database_create_test.go: this fixture used
+	// to be what held it, and once it stopped issuing the statement it stopped being evidence
+	// about it (#293).
 	require.Equal(t, collation, readDatabaseDefaultCollation(t, db.DB),
-		"NewMsSQLDatabase must leave a database it did not create alone; its CREATE DATABASE is IF NOT EXISTS")
+		"NewMsSQLDatabase with Create false must leave the operator's database exactly as it found it")
 
 	return newIsolated(t, db, db.DB)
 }
@@ -402,4 +407,246 @@ func dropMsSQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
 	if _, err := sqlDB.Exec(stmt); err != nil {
 		t.Logf("dropMsSQL exec: %v", err)
 	}
+}
+
+// restrictedLoginDB is the deployment goals 2 and 3 of #293 are about: the database already
+// exists, and the credential Goiabada connects with holds only the rights it needs INSIDE it.
+// No CREATEDB on PostgreSQL, no server-wide CREATE on MySQL, no access to master on SQL Server.
+//
+// It is the load-bearing fixture for the skipping path, and the reason is that this tier
+// connects as root/sa/postgres. A test that merely pre-created the database and set
+// Create: false would pass with the maintenance connection still opened and the create
+// statement still issued, because a superuser can do both. A restricted login is what observes
+// their absence from outside the constructor, which is why §5 of the agreement rejects counting
+// connections and decision 8 chose this instead.
+//
+// MySQL is the one engine where that is not enough, and the shortfall is measured rather than
+// assumed: MySQL has no per-schema CONNECT privilege, so a login granted ALL PRIVILEGES ON
+// <db>.* connects with no database selected AND its CREATE DATABASE IF NOT EXISTS <db>
+// succeeds, the engine short-circuiting because the database is there. No credential can deny
+// the maintenance DSN while allowing the application one. connectionCount below is what covers
+// MySQL instead.
+type restrictedLoginDB struct {
+	// name is the pre-created application database.
+	name string
+	// username and password are the restricted credential. The account is created for one
+	// test and dropped with it, on a throwaway container, and on MySQL it is also the key
+	// the connection counter reads, so it must belong to no other test.
+	username string
+	password string
+	// admin is this tier's own privileged handle, kept open for the life of the test so
+	// assertions can read the server's catalogs from outside the restricted login.
+	admin *sql.DB
+}
+
+// restrictedLoginPassword satisfies SQL Server's password rules without CHECK_POLICY, which the
+// fixture turns off anyway. It authenticates nothing outside the test container.
+const restrictedLoginPassword = "goiabadaRestricted123!"
+
+// restrictedLoginName is a login name unique to this process and call: lowercase so PostgreSQL
+// takes it unquoted, and short enough for MySQL's 32-character limit.
+func restrictedLoginName() string {
+	return fmt.Sprintf("goiabada_lp_%d_%d", os.Getpid(), isolatedDBCounter.Add(1))
+}
+
+// mySQLServerDSN is a connection to the server with no database selected, which is both what
+// the fixture administers through and what NewMySQLDatabase's maintenance connection uses.
+func mySQLServerDSN(username, password string, cfg *config.DatabaseConfig) string {
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=UTC",
+		username, password, cfg.Host, cfg.Port)
+}
+
+// postgresMaintenanceDSN is a connection to the postgres database, which is both what the
+// fixture administers through and what NewPostgresDatabase's maintenance connection uses.
+func postgresMaintenanceDSN(username, password string, cfg *config.DatabaseConfig) string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/postgres", username, password, cfg.Host, cfg.Port)
+}
+
+// newRestrictedLoginDB pre-creates an isolated database and a credential that cannot create
+// one, registering the drop of both on t. Built from probe/least_privilege_startup.go, which
+// measured what each engine actually allows. SQL Server and MySQL get the database at the
+// collation their constructor would have used, so nothing downstream reads a different one.
+func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
+	t.Helper()
+	cfg := config.GetDatabase()
+	r := &restrictedLoginDB{
+		name:     isolatedDBName(),
+		username: restrictedLoginName(),
+		password: restrictedLoginPassword,
+	}
+
+	switch dbType() {
+	case "mysql":
+		admin, err := sql.Open("mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg))
+		require.NoError(t, err, "open mysql as the tier's own login")
+		r.admin = admin
+
+		mustExec(t, admin, fmt.Sprintf(
+			"CREATE DATABASE %s CHARACTER SET utf8mb4 COLLATE %s", r.name, mysqlCollationAfter000040))
+		mustExec(t, admin, fmt.Sprintf(
+			"CREATE USER '%s'@'%%' IDENTIFIED BY '%s'", r.username, r.password))
+		// Everything inside the one schema, including the DDL the migrations need, and
+		// nothing server-wide: no CREATE, so this account could not create a database it was
+		// not already granted on.
+		mustExec(t, admin, fmt.Sprintf(
+			"GRANT ALL PRIVILEGES ON %s.* TO '%s'@'%%'", r.name, r.username))
+		mustExec(t, admin, "FLUSH PRIVILEGES")
+
+		t.Cleanup(func() {
+			_, _ = admin.Exec("DROP DATABASE IF EXISTS " + r.name)
+			_, _ = admin.Exec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", r.username))
+			_ = admin.Close()
+		})
+
+	case "postgres":
+		admin, err := sql.Open("pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg))
+		require.NoError(t, err, "open postgres as the tier's own role")
+		r.admin = admin
+
+		// NOCREATEDB spelled out rather than left to the default, because it is the whole
+		// point of the fixture: this is exactly the attribute whose absence made startup fail
+		// on this engine (#293 defect 2).
+		mustExec(t, admin, fmt.Sprintf(
+			"CREATE ROLE %s LOGIN NOCREATEDB NOSUPERUSER PASSWORD '%s'", r.username, r.password))
+		mustExec(t, admin, fmt.Sprintf("CREATE DATABASE %s OWNER %s", r.name, r.username))
+
+		t.Cleanup(func() {
+			_, _ = admin.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", r.name))
+			_, _ = admin.Exec("DROP ROLE IF EXISTS " + r.username)
+			_ = admin.Close()
+		})
+
+	case "mssql":
+		admin, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
+		require.NoError(t, err, "open master as the tier's own login")
+		r.admin = admin
+
+		mustExec(t, admin, fmt.Sprintf("CREATE DATABASE [%s] COLLATE %s", r.name, mssqlCollationAfter000040))
+		mustExec(t, admin, fmt.Sprintf(
+			"CREATE LOGIN [%s] WITH PASSWORD = '%s', CHECK_POLICY = OFF, DEFAULT_DATABASE = [%s]",
+			r.username, r.password, r.name))
+
+		appAsAdmin, err := sql.Open("sqlserver", msSQLDatabaseDSN(cfg.Username, cfg.Password, r.name, cfg))
+		require.NoError(t, err, "open the pre-created database to map the login into it")
+		mustExec(t, appAsAdmin, fmt.Sprintf(
+			"CREATE USER [%s] FOR LOGIN [%s]; ALTER ROLE db_owner ADD MEMBER [%s];",
+			r.username, r.username, r.username))
+		_ = appAsAdmin.Close()
+
+		// The restriction that makes this fixture observe anything on SQL Server. A login
+		// mapped into the application database can reach master through guest AND sees the
+		// database in sys.databases from there, so the constructor's IF NOT EXISTS would find
+		// it, create nothing and succeed: §1 of the agreement measured exactly that, and a
+		// constructor that ignored Create would go undetected here.
+		//
+		// DENY VIEW ANY DATABASE takes the catalog away instead, and then the whole creating
+		// path fails the way a least-privilege deployment fails: the check reads 0 rows, the
+		// CREATE DATABASE inside the batch runs, and the server answers "CREATE DATABASE
+		// permission denied in database 'master'". Connecting to the application database is
+		// unaffected, which is the point.
+		//
+		// Not DENY CONNECT in master, which looks like the more direct statement of "no access
+		// to master" and is not usable: it denies the login every database, the application's
+		// own included, with "Login failed for user". Measured in
+		// probe/mssql_deny_connect_master.go.
+		mustExec(t, admin, fmt.Sprintf("DENY VIEW ANY DATABASE TO [%s]", r.username))
+
+		t.Cleanup(func() {
+			dropMsSQL(t, cfg, r.name)
+			_, _ = admin.Exec(fmt.Sprintf("IF SUSER_ID(N'%s') IS NOT NULL DROP LOGIN [%s]", r.username, r.username))
+			_ = admin.Close()
+		})
+
+	default:
+		t.Fatalf("newRestrictedLoginDB has nothing to restrict on %s", dbType())
+	}
+
+	return r
+}
+
+// constructRestricted runs the engine's own constructor as the restricted login with
+// Create false, and returns the dialect DB with its raw handle.
+//
+// Deliberately stops short of building a migrator, unlike newIsolatedDB: the MySQL case has to
+// read the server's connection counter at the exact instant the constructor returned, and
+// anything that opened a connection in between would make the number unreadable.
+func (r *restrictedLoginDB) constructRestricted(t *testing.T) (migratable, *sql.DB) {
+	t.Helper()
+	cfg := config.GetDatabase()
+
+	switch dbType() {
+	case "mysql":
+		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
+			Type: "mysql", Username: r.username, Password: r.password,
+			Host: cfg.Host, Port: cfg.Port, Name: r.name, Create: false,
+		}, false)
+		require.NoError(t, err, "NewMySQLDatabase as a login that cannot create a database")
+		t.Cleanup(func() { _ = db.DB.Close() })
+		return db, db.DB
+
+	case "postgres":
+		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
+			Type: "postgres", Username: r.username, Password: r.password,
+			Host: cfg.Host, Port: cfg.Port, Name: r.name, Create: false,
+		}, false)
+		require.NoError(t, err, "NewPostgresDatabase as a role holding no CREATEDB")
+		t.Cleanup(func() { _ = db.DB.Close() })
+		return db, db.DB
+
+	case "mssql":
+		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
+			Type: "mssql", Username: r.username, Password: r.password,
+			Host: cfg.Host, Port: cfg.Port, Name: r.name, Create: false,
+		}, false)
+		require.NoError(t, err, "NewMsSQLDatabase as a login that cannot create a database in master")
+		t.Cleanup(func() { _ = db.DB.Close() })
+		return db, db.DB
+
+	default:
+		t.Fatalf("constructRestricted has no restricted login on %s", dbType())
+		return nil, nil
+	}
+}
+
+// connectionCount is how many connections the fixture account has made to the server since it
+// was created, read from MySQL's own counter through the admin handle.
+//
+// This is the MySQL substitute for a privilege the engine does not have. The account is created
+// for one test and dropped with it, so every connection counted is one the constructor made:
+// the skipping path makes exactly one, to the application database, and a constructor that
+// still opened the maintenance DSN would make two.
+func (r *restrictedLoginDB) connectionCount(t *testing.T) int {
+	t.Helper()
+	require.Equal(t, "mysql", dbType(), "connectionCount reads MySQL's performance_schema")
+
+	var total sql.NullInt64
+	require.NoError(t, r.admin.QueryRow(
+		"SELECT SUM(TOTAL_CONNECTIONS) FROM performance_schema.accounts WHERE `USER` = ?",
+		r.username).Scan(&total),
+		"read performance_schema.accounts for the fixture account")
+	require.True(t, total.Valid,
+		"performance_schema.accounts has no row for %s, so the counter cannot say anything", r.username)
+	return int(total.Int64)
+}
+
+// msSQLDatabaseDSN is the connection string for a named database rather than master.
+func msSQLDatabaseDSN(username, password, name string, cfg *config.DatabaseConfig) string {
+	q := url.Values{}
+	q.Add("database", name)
+	q.Add("encrypt", "disable")
+	u := url.URL{
+		Scheme:   "sqlserver",
+		User:     url.UserPassword(username, password),
+		Host:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		RawQuery: q.Encode(),
+	}
+	return u.String()
+}
+
+// mustExec runs a fixture statement and fails the test with the statement in the message when
+// it does not work. Fixture setup only: a failure here is a broken fixture, not a finding.
+func mustExec(t *testing.T, sqlDB *sql.DB, stmt string) {
+	t.Helper()
+	_, err := sqlDB.Exec(stmt)
+	require.NoErrorf(t, err, "fixture statement failed: %s", stmt)
 }
