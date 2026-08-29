@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// TestAdvisoryLockKey pins what the comment on advisoryLockKey claims, because "stable by
+// TestAdvisoryLockKey pins what the comment on AdvisoryLockKey claims, because "stable by
 // construction" is only worth saying if something checks it.
 //
 // The lock is what makes concurrent starts against an absent database safe, and it only works
@@ -21,27 +21,27 @@ func TestAdvisoryLockKey(t *testing.T) {
 		want = int64(-3802063355692041455)
 	)
 
-	if got := advisoryLockKey(name); got != want {
-		t.Errorf("advisoryLockKey(%q) = %d, want %d: the key is the identity two Goiabada "+
+	if got := AdvisoryLockKey(name); got != want {
+		t.Errorf("AdvisoryLockKey(%q) = %d, want %d: the key is the identity two Goiabada "+
 			"processes serialise on, so changing it stops a new instance serialising against a "+
 			"running one (#293)", name, got, want)
 	}
 
-	if a, b := advisoryLockKey(name), advisoryLockKey(name); a != b {
-		t.Errorf("advisoryLockKey(%q) is not deterministic: %d then %d", name, a, b)
+	if a, b := AdvisoryLockKey(name), AdvisoryLockKey(name); a != b {
+		t.Errorf("AdvisoryLockKey(%q) is not deterministic: %d then %d", name, a, b)
 	}
 
 	// Different names take different locks, which is the point of keying by name at all:
 	// pg_database.datname is compared byte-exact, so two differently named databases have no
 	// reason to wait for each other.
-	if a, b := advisoryLockKey(name), advisoryLockKey(name+"_other"); a == b {
-		t.Errorf("advisoryLockKey collides for %q and %q, both %d", name, name+"_other", a)
+	if a, b := AdvisoryLockKey(name), AdvisoryLockKey(name+"_other"); a == b {
+		t.Errorf("AdvisoryLockKey collides for %q and %q, both %d", name, name+"_other", a)
 	}
 
 	// And case is a difference, not a fold. On PostgreSQL it genuinely is one, which is the
 	// whole reason this key carries the name while SQL Server's resource cannot.
-	if a, b := advisoryLockKey("goiabada"), advisoryLockKey("Goiabada"); a == b {
-		t.Errorf("advisoryLockKey folds case: %q and %q both give %d, but pg_database.datname "+
+	if a, b := AdvisoryLockKey("goiabada"), AdvisoryLockKey("Goiabada"); a == b {
+		t.Errorf("AdvisoryLockKey folds case: %q and %q both give %d, but pg_database.datname "+
 			"compares byte-exact (#293)", "goiabada", "Goiabada", a)
 	}
 }

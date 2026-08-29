@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -414,6 +415,164 @@ func raceConstructors(t *testing.T, cfg *config.DatabaseConfig, names []string) 
 	wg.Wait()
 
 	return handles, errs
+}
+
+// TestNewDatabase_CreateTrue_AnUnrelatedLockHolderDoesNotBlockAnOrdinaryRestart is what stands
+// between the creation lock and every restart of every default deployment.
+//
+// The lock lives in a database Goiabada does not own: `postgres` on PostgreSQL, `master` on SQL
+// Server. Both share one lock space with every session on the server, so the resource can be
+// held by a principal that has no rights inside Goiabada's database at all: a PostgreSQL role
+// with neither CREATEDB nor a grant on it, a SQL Server login holding nothing but public. Reach
+// for the lock before asking whether the database is there and that stranger can stall every
+// start, indefinitely, of a deployment whose database was created years ago. #293 decision 5
+// accepted that a stuck holder blocks startup rather than failing it; it did not accept putting
+// an unrelated principal on the ordinary restart path for the life of the deployment.
+//
+// So the catalog check comes first and the lock is reached only when there is something to
+// create. This holds the resource from another session and requires that a constructor with
+// Create true, against a database that already exists, still returns.
+//
+// The holder here is the tier's own privileged credential, because the constructor cannot tell
+// who holds the resource and so the holder's identity is not what this case pins. What makes it
+// a security fact rather than an operational one is the lock space being shared server-wide,
+// which is recorded on createDatabaseUnderAppLock and createDatabaseUnderAdvisoryLock.
+//
+// Not a test of the lock itself. TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAn-
+// AbsentDatabase owns that and must keep passing, because a pre-check that let a second creator
+// through would buy this case at the cost of goal 1.
+func TestNewDatabase_CreateTrue_AnUnrelatedLockHolderDoesNotBlockAnOrdinaryRestart(t *testing.T) {
+	switch dbType() {
+	case "mysql":
+		t.Skip("MySQL takes no database-creation lock: CREATE DATABASE IF NOT EXISTS is serialised by the engine itself (#293 decision 6)")
+	case "sqlite", "":
+		t.Skip("SQLite has no maintenance database, so there is no shared lock space and no lock")
+	case "postgres", "mssql":
+	default:
+		t.Fatalf("unsupported db type %q", dbType())
+	}
+
+	cfg := config.GetDatabase()
+	name := isolatedDBName()
+	t.Cleanup(func() { dropServerDatabase(t, cfg, name) })
+
+	// Put the deployment in the state every start after the first is in: the database is there.
+	first, err := constructCreating(cfg, name)
+	require.NoError(t, err, "the first construction is the one that creates the database")
+	if first != nil {
+		_ = first.Close()
+	}
+	require.True(t, serverDatabaseExists(t, name),
+		"the first construction must have created the database, or the restart below is not the case under test")
+
+	holdCreationLock(t, cfg, name)
+
+	// A constructor that reaches for the lock never returns, so this is a bounded wait rather
+	// than a plain call: the regression has to fail the test rather than hang the tier. The
+	// budget is far above what the path costs, which is one catalog read and one connection.
+	const restartBudget = 30 * time.Second
+
+	done := make(chan error, 1)
+	go func() {
+		h, err := constructCreating(cfg, name)
+		if h != nil {
+			_ = h.Close()
+		}
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err, "a restart against a database that already exists must construct, lock held or not")
+	case <-time.After(restartBudget):
+		t.Fatalf("the constructor did not return within %s while another session held the database-creation lock. It is reaching for the lock before checking whether the database exists, so any principal that can connect to the maintenance database can stall every default start (#293)", restartBudget)
+	}
+}
+
+// constructCreating builds one constructor on the configured engine with Create true, which is
+// the path an operator who sets nothing takes.
+//
+// Takes no *testing.T, deliberately: it is called from a goroutine that may be blocked when the
+// test fails, and t.Fatalf off the test goroutine is undefined.
+func constructCreating(cfg *config.DatabaseConfig, name string) (io.Closer, error) {
+	switch dbType() {
+	case "postgres":
+		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
+			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
+		}, false)
+		if db == nil {
+			return nil, err
+		}
+		return db.DB, err
+	case "mssql":
+		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
+			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
+		}, false)
+		if db == nil {
+			return nil, err
+		}
+		return db.DB, err
+	default:
+		return nil, fmt.Errorf("constructCreating does not run on %s", dbType())
+	}
+}
+
+// holdCreationLock takes the exact resource the creating path serialises on, from a session that
+// has nothing to do with any constructor, and releases it when the test ends.
+//
+// The identity comes from the production symbols, postgresdb.AdvisoryLockKey and
+// mssqldb.CreateDatabaseResource, rather than from literals restated here. A restated key would
+// be a second definition free to drift, and a test holding the WRONG lock passes no matter what
+// the constructor does.
+//
+// Both locks are session-scoped, so each is taken on one connection pinned out of the pool and
+// released on that same connection. Released through t.Cleanup rather than at the end of the
+// body, so a failing assertion still frees whatever the constructor under test is waiting on.
+func holdCreationLock(t *testing.T, cfg *config.DatabaseConfig, name string) {
+	t.Helper()
+	ctx := context.Background()
+
+	var driver, dsn string
+	switch dbType() {
+	case "postgres":
+		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)
+	case "mssql":
+		driver, dsn = "sqlserver", msSQLMasterDSN(cfg)
+	default:
+		t.Fatalf("%s has no database-creation lock to hold", dbType())
+	}
+
+	pool, err := sql.Open(driver, dsn)
+	require.NoError(t, err, "open the maintenance database to hold the creation lock")
+	conn, err := pool.Conn(ctx)
+	require.NoError(t, err, "pin a connection for the creation lock")
+
+	switch dbType() {
+	case "postgres":
+		_, err = conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", postgresdb.AdvisoryLockKey(name))
+		require.NoError(t, err, "take the advisory lock the creating path serialises on")
+	case "mssql":
+		const takeLock = `DECLARE @lockResult int;
+			EXEC @lockResult = sp_getapplock @Resource = @p1, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = -1;
+			SELECT @lockResult;`
+		var status int
+		require.NoError(t, conn.QueryRowContext(ctx, takeLock, mssqldb.CreateDatabaseResource).Scan(&status),
+			"take the application lock the creating path serialises on")
+		require.GreaterOrEqual(t, status, 0, "sp_getapplock refused the lock, so nothing below is held")
+	}
+
+	t.Cleanup(func() {
+		switch dbType() {
+		case "postgres":
+			_, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", postgresdb.AdvisoryLockKey(name))
+		case "mssql":
+			_, _ = conn.ExecContext(ctx, `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`, mssqldb.CreateDatabaseResource)
+		}
+		_ = conn.Close()
+		_ = pool.Close()
+	})
 }
 
 // countServerDatabases is serverDatabaseExists with the number kept, which the case-variant case
