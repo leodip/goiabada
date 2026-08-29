@@ -772,11 +772,28 @@ func vocabulary(table, object string, d schemadump.Dialect, err error) parityDiv
 // appendIfDisagreed records one divergence when the four engines do not all say the same
 // thing on one axis, and nothing when they do.
 func appendIfDisagreed(out []parityDivergence, table, object, axis string, say func(schemadump.Dialect) string) []parityDivergence {
+	return appendIfDisagreedAmong(out, table, object, axis, parityDialects, say)
+}
+
+// appendIfDisagreedAmong is the same over a subset of the engines, for an axis some engine
+// cannot answer at all. Only the index name is such an axis today: an engine that named its
+// own index has nothing to say about what a migration spelled.
+//
+// Says still carries a line per engine, with "-" for the ones outside the comparison,
+// because the reader's first question at a failure is which engine is the odd one out and a
+// report missing three of four columns cannot answer it.
+//
+// Fewer than two engines needs no guard of its own: one engine agrees with itself and none
+// agree vacuously, so both fall out of the loop reporting nothing, which is the answer.
+func appendIfDisagreedAmong(out []parityDivergence, table, object, axis string, among []schemadump.Dialect, say func(schemadump.Dialect) string) []parityDivergence {
 	says := map[schemadump.Dialect]string{}
-	agreed := true
 	for _, d := range parityDialects {
+		says[d] = "-"
+	}
+	agreed := true
+	for _, d := range among {
 		says[d] = say(d)
-		agreed = agreed && says[d] == says[parityDialects[0]]
+		agreed = agreed && says[d] == says[among[0]]
 	}
 	if agreed {
 		return out
@@ -790,11 +807,16 @@ func appendIfDisagreed(out []parityDivergence, table, object, axis string, say f
 // which differs between two databases built from identical DDL, so twenty-eight objects
 // there have no comparable name at all (#284, decision 2).
 //
-// The name is still compared where all four engines got theirs from a migration, which is
-// the roughly thirty explicit CREATE INDEX statements. That is worth doing because a name is
-// what a later migration says when it drops an index: idx_email misspelled on one engine
+// The name is still compared, across whichever engines got theirs from a migration, which
+// is the roughly thirty explicit CREATE INDEX statements. That is worth doing because a name
+// is what a later migration says when it drops an index: idx_email misspelled on one engine
 // breaks that migration on that engine alone, and nothing else in the repository would catch
 // it.
+//
+// Two or more migration-named engines are enough, rather than all four. Requiring all four
+// meant one engine-named index in the set switched the comparison off for the engines whose
+// names did come from a migration, so the misspelling it exists to catch shipped whenever it
+// landed on a key any engine happened to declare inline (#284).
 func compareIndexes(table string, shapes map[schemadump.Dialect]schemadump.TableShape) []parityDivergence {
 	byKey := map[schemadump.Dialect]map[string][]schemadump.IndexShape{}
 	keys := map[string]bool{}
@@ -823,20 +845,31 @@ func compareIndexes(table string, shapes map[schemadump.Dialect]schemadump.Table
 		if len(out) != before {
 			continue
 		}
-		// Names are only comparable when every engine's came from a migration. One
-		// engine-named index in the set and the comparison would be against a
-		// placeholder, which says nothing about whether a migration spelled a name
-		// consistently.
-		migrationNamed := true
+		// The name is compared across exactly the engines whose index for this key came
+		// from a migration, and an engine that named its own drops itself from that set
+		// rather than disabling the comparison. Its placeholder says nothing about what
+		// a migration spelled, but it says nothing about the engines beside it either,
+		// and those are the ones a later DROP INDEX breaks on.
+		//
+		// A key with one migration-named engine is then a singleton with nothing to
+		// compare, which is what client_logos and user_profile_pictures are today: MySQL
+		// names the unique index by hand where the other three declare it inline.
+		//
+		// The length test is what keeps an engine holding no index for this key out of
+		// the set, where the loop below would find nothing to disagree with and let it
+		// in. The presence comparison above has already returned for that case, so it
+		// costs nothing and stops the two coming apart.
+		migrationNamed := make([]schemadump.Dialect, 0, len(parityDialects))
 		for _, d := range parityDialects {
+			named := len(byKey[d][key]) > 0
 			for _, ix := range byKey[d][key] {
-				migrationNamed = migrationNamed && ix.Origin == schemadump.OriginCreated
+				named = named && ix.Origin == schemadump.OriginCreated
+			}
+			if named {
+				migrationNamed = append(migrationNamed, d)
 			}
 		}
-		if !migrationNamed {
-			continue
-		}
-		out = appendIfDisagreed(out, table, key, parityAxisIndexName, func(d schemadump.Dialect) string {
+		out = appendIfDisagreedAmong(out, table, key, parityAxisIndexName, migrationNamed, func(d schemadump.Dialect) string {
 			names := make([]string, 0, len(byKey[d][key]))
 			for _, ix := range byKey[d][key] {
 				names = append(names, ix.Name)
