@@ -150,6 +150,58 @@ var unrepresentableChecks = []unrepresentable{
 		},
 	},
 	{
+		// IndexShape records the key columns and whether the index is unique, and nothing
+		// about how it is built. A GIN, hash or full-text index over one column is
+		// therefore the same shape as a plain B-tree over that column, so replacing one
+		// with the other on a single engine compares equal on every axis this change has.
+		// The three engines below all default to a B-tree and say so in their catalogs;
+		// SQLite has no other method to offer.
+		construct: "an index built with a non-default method",
+		count: map[Dialect]string{
+			Postgres: `SELECT COUNT(*) FROM pg_index ix
+				JOIN pg_class i ON i.oid = ix.indexrelid
+				JOIN pg_am am ON am.oid = i.relam
+				JOIN pg_class tb ON tb.oid = ix.indrelid
+				JOIN pg_namespace n ON n.oid = tb.relnamespace
+				WHERE tb.relname = '%s' AND n.nspname = current_schema() AND am.amname <> 'btree'`,
+			// InnoDB reports BTREE for every ordinary index; FULLTEXT and SPATIAL are the
+			// two other values this schema could ever meet.
+			MySQL: `SELECT COUNT(*) FROM information_schema.statistics
+				WHERE table_schema = DATABASE() AND table_name = '%s' AND INDEX_TYPE <> 'BTREE'`,
+			// 1 is clustered and 2 is nonclustered, both B-trees. 0 is the heap, which
+			// carries no name and is not an index. 3 upwards are XML, spatial,
+			// columnstore and hash.
+			MSSQL: `SELECT COUNT(*) FROM sys.indexes
+				WHERE object_id = OBJECT_ID('dbo.%s') AND name IS NOT NULL AND type NOT IN (1, 2)`,
+		},
+	},
+	{
+		// The sibling of the descending check below, and invisible for the same reason:
+		// IndexShape.Columns records order but nothing about how the keys sort. Only
+		// PostgreSQL lets the null ordering be chosen independently of the direction.
+		//
+		// indoption bit 0 is DESC and bit 1 is NULLS FIRST, and the two are not
+		// independent in practice: NULLS FIRST is the DEFAULT for a descending key, so a
+		// plain `a DESC` sets both bits. Hence `& 1 = 0` here, restricting this to an
+		// ascending key that asked for NULLS FIRST on its own. Without it a plain DESC
+		// key would be reported as a null-ordering problem, which is true but is the less
+		// useful of the two sentences, and it would make the message depend on the order
+		// of this slice rather than on the index. The descending check covers both
+		// descending cases, so between them all four combinations are refused.
+		construct: "an index key with a non-default null ordering",
+		count: map[Dialect]string{
+			Postgres: `SELECT COUNT(*) FROM pg_index ix
+				JOIN pg_class tb ON tb.oid = ix.indrelid
+				JOIN pg_namespace n ON n.oid = tb.relnamespace
+				JOIN unnest(ix.indoption::smallint[]) WITH ORDINALITY AS o(opt, ord) ON o.ord <= ix.indnkeyatts
+				WHERE tb.relname = '%s' AND n.nspname = current_schema()
+				  AND (o.opt & 2) = 2 AND (o.opt & 1) = 0`,
+			// MySQL, SQL Server and SQLite each fix the null ordering to the direction of
+			// the key, so there is nothing to record that the direction does not already
+			// carry.
+		},
+	},
+	{
 		// IndexShape.Columns holds key columns only, by design, so INCLUDE payload
 		// columns would vanish.
 		construct: "an index with INCLUDE columns",
