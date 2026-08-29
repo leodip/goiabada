@@ -281,8 +281,11 @@ files at once, and commit them. Skip it and CI goes red on every database job.
 **Migration source rules**: the core tier runs `TestMigrationSource_TheFourCommittedDirectories`
 in `src/core/data`, which holds the four `migrations/` directories to the rules decidable from the
 text alone: naming, pairing, one number meaning one change, the collation pins on MySQL and SQL
-Server, and each `schema.golden`'s recorded version. A migration landing on fewer than four
-engines therefore owes a `-- parity: <engines> only. <why>` line in every up.sql carrying it.
+Server, a named `CONSTRAINT` on every added SQL Server `DEFAULT` and a spelled-out `NULL` or
+`NOT NULL` on every `ALTER COLUMN`, and each `schema.golden`'s recorded version. A migration
+landing on fewer than four engines therefore owes a `-- parity: <engines> only. <why>` line in
+every up.sql carrying it, and a `.down.sql` with no statement in it owes
+`-- Migration NNNNNN down: intentional no-op.`
 
 ## Important Patterns
 
