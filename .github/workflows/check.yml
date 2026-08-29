@@ -265,6 +265,39 @@ jobs:
             exit 1
           fi
 
+      # No compiled binary belongs in the tree, and until #187 two did:
+      # src/cmd/goiabada-setup/goiabada-setup and
+      # src/cmd/goiabada-setup/build/goiabada-setup-linux-amd64, both outputs of
+      # the same `main` package. The first was the trap: a `main` package's
+      # default build output path is the package directory itself, so a plain
+      # `go build ./...` in that module wrote to exactly the path of a tracked
+      # file, silently replacing an 11 MB committed artifact with one built on
+      # the developer's machine. Nothing warned.
+      #
+      # .gitignore now covers both paths, but an ignore rule stops the accident
+      # and nothing else: `git add -f` walks past it, and a `main` package added
+      # in some other directory would not be covered at all. This step is the
+      # part that fails.
+      #
+      # Every shipped binary is built here from source, by build-binaries.sh in
+      # src/build and src/cmd/goiabada-setup, and release.yml uploads what those
+      # produce. So a compiled file in the tree is always a stale artifact of
+      # unknown provenance and never something a build reads.
+      - name: No compiled binaries are tracked
+        run: |
+          set -euo pipefail
+          # `file` prints "path: mime", and a mime type carries no spaces, so
+          # $NF is the type whatever the path contains.
+          offenders=$(git ls-files -z | xargs -0 file --mime-type -- | awk '
+            $NF ~ /^application\/(x-(pie-)?executable|x-sharedlib|x-mach-binary|x-dosexec|vnd\.microsoft\.portable-executable)$/ {
+              sub(/: [^:]*$/, ""); print
+            }')
+          if [ -n "$offenders" ]; then
+            echo "::error::compiled binaries are tracked; they are build outputs and must not be committed:"
+            echo "$offenders"
+            exit 1
+          fi
+
   vulnerabilities:
     name: Vulnerabilities
     needs: versions
