@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/constants"
 )
 
 func TestValidateAESEncryptionKey(t *testing.T) {
@@ -434,6 +436,124 @@ func TestValidateAdminConsoleSessionKeys(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+// setEnvOrUnset sets key to value, or removes it from the environment when value is nil.
+// t.Setenv is what registers the restore, so the unset arm sets a placeholder first and then
+// removes it: without that call the original value would not come back after the test.
+func setEnvOrUnset(t *testing.T, key string, value *string) {
+	t.Helper()
+	t.Setenv(key, "placeholder-for-the-restore")
+	if value == nil {
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatalf("could not unset %s: %v", key, err)
+		}
+		return
+	}
+	t.Setenv(key, *value)
+}
+
+func strPtr(s string) *string { return &s }
+
+// The client id and the issuer stopped being admin console configuration in #285. A
+// deployment upgrading from a release that had them keeps whatever it set, and a value that
+// is silently ignored is the state the change exists to end: the wrong client id used to
+// surface as a token failure naming a client the operator never configured, and a stale
+// issuer locked the administrator out of the console entirely. Both are refusals at startup
+// instead, so every arm of the decision is pinned here.
+func TestValidateRemovedAdminConsoleVars(t *testing.T) {
+	tests := []struct {
+		name        string
+		clientID    *string
+		issuer      *string
+		wantErr     bool
+		wantErrPart string
+	}{
+		{
+			name: "neither set",
+		},
+		{
+			name:     "client id set to the constant",
+			clientID: strPtr("admin-console-client"),
+		},
+		{
+			name:     "client id set to the constant with surrounding whitespace",
+			clientID: strPtr("  admin-console-client  "),
+		},
+		{
+			name:        "client id set to another client",
+			clientID:    strPtr("my-own-client"),
+			wantErr:     true,
+			wantErrPart: `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID is set to "my-own-client"`,
+		},
+		{
+			name:        "client id set empty",
+			clientID:    strPtr(""),
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID is set to \"\"",
+		},
+		{
+			name:        "issuer set to a value",
+			issuer:      strPtr("https://auth.example.com"),
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_ISSUER is set",
+		},
+		{
+			name:        "issuer set empty",
+			issuer:      strPtr(""),
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_ISSUER is set",
+		},
+		{
+			// Both wrong at once reports the client id, which is the one that would
+			// otherwise fail as an unrecognised client rather than as a lockout.
+			name:        "both set wrongly reports the client id first",
+			clientID:    strPtr("my-own-client"),
+			issuer:      strPtr("https://auth.example.com"),
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setEnvOrUnset(t, "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID", tt.clientID)
+			setEnvOrUnset(t, "GOIABADA_ADMINCONSOLE_ISSUER", tt.issuer)
+
+			err := ValidateRemovedAdminConsoleVars()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected a refusal, got nil")
+				}
+				if !strings.Contains(err.Error(), tt.wantErrPart) {
+					t.Errorf("error %q does not contain %q", err.Error(), tt.wantErrPart)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected refusal: %v", err)
+			}
+		})
+	}
+}
+
+// The remedy is the whole point of the message: an operator meeting it has to know the value
+// the admin console actually uses, not merely that theirs is wrong.
+func TestValidateRemovedAdminConsoleVars_MessageCarriesTheRemedy(t *testing.T) {
+	setEnvOrUnset(t, "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID", strPtr("my-own-client"))
+	setEnvOrUnset(t, "GOIABADA_ADMINCONSOLE_ISSUER", nil)
+
+	err := ValidateRemovedAdminConsoleVars()
+	if err == nil {
+		t.Fatalf("expected a refusal, got nil")
+	}
+	if !strings.Contains(err.Error(), constants.AdminConsoleClientIdentifier) {
+		t.Errorf("the refusal %q does not name the client the admin console authenticates as", err.Error())
+	}
+	if !strings.Contains(err.Error(), "Remove") {
+		t.Errorf("the refusal %q does not say what to do about it", err.Error())
 	}
 }
 

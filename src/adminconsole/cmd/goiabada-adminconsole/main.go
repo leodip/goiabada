@@ -30,6 +30,15 @@ func main() {
 	config.Init()
 	slog.Info("config loaded")
 
+	// Refuse a configuration carried over from a release where the client id and the issuer
+	// were settings here. Both now come from the auth server that owns them, so a value left
+	// behind is either ignored or points this module at a client the auth server never
+	// provisioned (#285).
+	if err := config.ValidateRemovedAdminConsoleVars(); err != nil {
+		slog.Error("configuration validation failed: " + err.Error())
+		os.Exit(1)
+	}
+
 	// Validate session keys EARLY - fail fast if missing or invalid
 	if err := config.ValidateAdminConsoleSessionKeys(); err != nil {
 		slog.Error("session key validation failed: " + err.Error())

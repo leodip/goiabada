@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/leodip/goiabada/core/constants"
 )
 
 type AuthServerConfig struct {
@@ -435,6 +437,45 @@ func ValidateAuthServerSessionKeys() error {
 		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
 	}
 
+	return nil
+}
+
+// The two admin console settings that stopped being configuration: the client id the admin
+// console authenticates as, which is the constant the seeder writes and the migrations grant
+// against, and the issuer, which the auth server stamps into the tokens the admin console
+// validates (#285).
+const (
+	removedClientIDVar = "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID"
+	removedIssuerVar   = "GOIABADA_ADMINCONSOLE_ISSUER"
+)
+
+// ValidateRemovedAdminConsoleVars refuses startup when a deployment still carries either
+// removed variable at a value the admin console can no longer honour (#285). It reads the
+// raw environment because neither value is held in config any more.
+//
+// It refuses rather than warning, which is the deliberate difference from the removed-setting
+// loop in Init: an operator can miss a log line in a running deployment, and what they would
+// otherwise meet is a token failure naming a client they never configured. The client id is
+// checked first, so an operator carrying both wrong values is told about the client id first.
+//
+// A client id present and equal to the constant starts silently, because that is what every
+// deployment the setup wizard has ever produced sets. The issuer refuses whenever it is
+// present at all: nothing in the tree ever sets it, so any value is a hand-written line.
+func ValidateRemovedAdminConsoleVars() error {
+	for _, k := range deprecatedEnvVarsPresent(removedClientIDVar, removedIssuerVar) {
+		value := os.Getenv(k)
+		switch k {
+		case removedClientIDVar:
+			if strings.TrimSpace(value) == constants.AdminConsoleClientIdentifier {
+				continue
+			}
+			return fmt.Errorf("%s is set to %q but is no longer configuration: the admin console always authenticates as %q, the client the auth server seeds. Remove %s from the deployment's configuration",
+				removedClientIDVar, value, constants.AdminConsoleClientIdentifier, removedClientIDVar)
+		case removedIssuerVar:
+			return fmt.Errorf("%s is set to %q but is no longer configuration: the admin console takes the issuer from the auth server that stamps it into tokens, so this value is never read. Remove %s from the deployment's configuration",
+				removedIssuerVar, value, removedIssuerVar)
+		}
+	}
 	return nil
 }
 
