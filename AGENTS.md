@@ -43,7 +43,7 @@ src/
 Single `Database` interface (`src/core/data/database.go`) with per-DB implementations:
 - All methods accept `tx *sql.Tx` (nil = no transaction)
 - Uses `sqlbuilder` for query building with DB-specific flavors
-- Schema in `src/core/data/sqlitedb/schema.sql`
+- Schema in `src/core/data/sqlitedb/schema.golden` (generated; see **Schema golden files** below)
 
 **Supported**: SQLite, MySQL, PostgreSQL, SQL Server
 
@@ -54,7 +54,7 @@ For full documentation, see `site/` (Astro-based docs site).
 ### Authorization Code (with PKCE)
 Primary flow for web/mobile apps. User authenticates via browser, receives code, exchanges for tokens.
 - Endpoint: `GET /auth/authorize` → `POST /auth/token` (grant_type=authorization_code)
-- PKCE: Configurable globally (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
+- PKCE: always required for a public client; otherwise configurable globally (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
 - Supports `response_type=code` with optional `code_challenge` + `code_challenge_method`
 - Implementation: `handler_authorize.go`, `handler_token.go`, `oauth/code_issuer.go`
 
@@ -128,15 +128,31 @@ Defined in `src/core/oauth/auth_context.go`. States transition in this order:
 | `/auth/authorize` | `handler_authorize.go` | Entry point. Validates request, checks existing session, routes to level1 |
 | `/auth/level1` | `handler_auth_level1.go` | Selects level1 auth method (currently only password) |
 | `/auth/pwd` | `handler_auth_pwd.go` | Password login form. Validates credentials, creates session |
-| `/auth/level1completed` | `handler_auth_level1.go` | Decides if level2 needed based on ACR and session state |
+| `/auth/level1completed` | `handler_auth_level1.go` | Delivers a deferred authorization error if one is parked (see below), else decides if level2 needed based on ACR and session state |
 | `/auth/level2` | `handler_auth_level2.go` | Selects level2 auth method. If `level2_optional` + no OTP → skip to completed |
 | `/auth/otp` | `handler_auth_otp.go` | OTP verification (or enrollment if user doesn't have OTP yet) |
 | `/auth/completed` | `handler_auth_completed.go` | Final auth check, scope filtering, consent check, session bump/create |
 | `/auth/consent` | `handler_consent.go` | User consent screen (if required) |
 | `/auth/issue` | `handler_auth_issue.go` | Issues authorization code, redirects to client |
 
+### Deferred error redirects (#213)
+`/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
+request, per RFC 9700 4.11.2. A validation failure is answered at once when the request is silent
+(`prompt=none`, read from the raw parameter), when the browser holds a valid session and did not ask
+for `prompt=login`, or when no redirect would be emitted anyway (`redirectWillBeEmitted` false).
+Otherwise the error code and description are parked on `AuthContext.DeferredErrorCode` /
+`DeferredErrorDescription`, the visitor goes to `/auth/level1`, and the redirect is emitted from
+`/auth/level1completed` once the password is verified. That ceremony ends there and creates no
+session.
+
+One failure is answered before any of that and never redirects at all: a `response_mode` outside
+`query`, `fragment`, `form_post` renders the refusal page at 400 with no error parameters, per OIDC
+Core 3.1.2.6, since the server cannot encode a response in a mode it does not implement. The set has
+one definition, `validators.IsSupportedResponseMode`, shared by the handler and `ValidateRequest`.
+
 ### Key Logic in Level1Completed
 `handler_auth_level1.go:HandleAuthLevel1CompletedGet`:
+- If a deferred error is parked → answer the client and stop (see above)
 - If session ACR is `level1` and target is `level2_*` → redirect to level2
 - If session ACR is `level2_optional` and target is `level2_mandatory` → redirect to level2
 - If the session's `OtpConfigGeneration` differs from the user's → re-auth level2 (user changed OTP settings). This block writes nothing: the obligation is discharged at `/auth/completed`

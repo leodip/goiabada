@@ -39,7 +39,7 @@ func TestDumpTable_ReadsTheCatalog(t *testing.T) {
 	codes := dumpTable(t, h, "codes")
 
 	// The column projection reaches every column, on every engine. Both counts are the
-	// ones the four schema.sql snapshots record.
+	// ones the four schema.golden files record, unchanged from 000035 to head.
 	assert.Lenf(t, refreshTokens.Columns, 17,
 		"refresh_tokens has 17 columns at 000035 on every engine; got %d on %s",
 		len(refreshTokens.Columns), dbType())
@@ -140,9 +140,10 @@ func TestDumpTable_ReadsTheCatalog(t *testing.T) {
 
 // tablesAt000035 is how many tables a database migrated to 000035 holds: the 25 application
 // tables plus schema_migrations. Recounted from
-// grep -ci "^CREATE TABLE" src/core/data/<engine>db/schema.sql, which reports 26 on every
-// engine at head, and checked against 000036 to 000040, none of which adds or drops a table:
-// 000039 rebuilds two on SQLite and puts both back.
+// grep -c "^table" src/core/data/<engine>db/schema.golden, which reports 26 on every
+// engine at head, and checked against 000036 to 000042, none of which adds or drops a table:
+// 000039 rebuilds two on SQLite and 000041 rebuilds schema_migrations there, and all three
+// go back.
 //
 // A mismatch here is a finding rather than a number to adjust. It means enumeration reached
 // a different set of tables than the migrations build, which is the whole property.

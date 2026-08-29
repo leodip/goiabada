@@ -43,7 +43,7 @@ src/
 Single `Database` interface (`src/core/data/database.go`) with per-DB implementations:
 - All methods accept `tx *sql.Tx` (nil = no transaction)
 - Uses `sqlbuilder` for query building with DB-specific flavors
-- Schema in `src/core/data/sqlitedb/schema.sql`
+- Schema in `src/core/data/sqlitedb/schema.golden` (generated; see **Schema golden files** below)
 
 **Supported**: SQLite, MySQL, PostgreSQL, SQL Server
 
