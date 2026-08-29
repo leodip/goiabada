@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -22,14 +21,24 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 				return
 			}
 
-			// Get issuer from config (defaults to auth server base URL)
-			issuer := config.GetAdminConsole().Issuer
+			// The issuer has one writer, the auth server that stamps it into the iss
+			// claim, so refuse to serve a request rather than guess it. oauth.IsIssuerValid
+			// is plain string equality, so an expected issuer of "" rejects every token
+			// the auth server can mint and locks the administrator out of the console
+			// silently, which is the thing this check exists to end (#285). The only live
+			// route here is an auth server too old to serve the field: an absent settings
+			// row already answers 500 on its side, and the settings API refuses to store
+			// an issuer shorter than three characters.
+			if publicSettings.Issuer == "" {
+				http.Error(w, "The authserver did not report an issuer; it may be running an older version", http.StatusInternalServerError)
+				return
+			}
 
 			// Convert to models.Settings for compatibility with existing code
-			// Note: We populate fields from public API and issuer from config
+			// Note: every field here comes from the auth server's public API
 			settings := &models.Settings{
 				AppName:     publicSettings.AppName,
-				Issuer:      issuer,
+				Issuer:      publicSettings.Issuer,
 				UITheme:     publicSettings.UITheme,
 				SMTPEnabled: publicSettings.SMTPEnabled,
 			}

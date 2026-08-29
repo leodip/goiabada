@@ -43,10 +43,19 @@ func (h *HandlerPublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request
 	// between an anonymous caller and the 32 fields of models.Settings, which
 	// include the legacy AES encryption key and the encrypted SMTP password.
 	// handler_public_settings_test.go fails if that boundary widens.
+	//
+	// Issuer is here because the admin console needs the value this server
+	// stamps into the iss claim, and OIDC Core 1.0 section 3.1.3.7 requires a
+	// relying party to match it exactly. It discloses nothing new: the same
+	// value is already served to anonymous callers at
+	// /.well-known/openid-configuration, which OIDC Discovery 1.0 section 3
+	// requires ("REQUIRED. URL using the https scheme ... that the OP asserts
+	// as its Issuer Identifier").
 	response := dtos.PublicSettingsResponse{
 		AppName:     settings.AppName,
 		UITheme:     settings.UITheme,
 		SMTPEnabled: settings.SMTPEnabled,
+		Issuer:      settings.Issuer,
 	}
 
 	// Set content type and return JSON
