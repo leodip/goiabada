@@ -97,7 +97,7 @@ func newCountingSettingsServer(t *testing.T) *countingSettingsServer {
 	counter.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		counter.fetches.Add(1)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"appName":"Goiabada","uiTheme":"light","smtpEnabled":false}`))
+		_, _ = w.Write([]byte(`{"appName":"Goiabada","uiTheme":"light","smtpEnabled":false,"issuer":"https://issuer.example"}`))
 	}))
 	t.Cleanup(counter.Close)
 

@@ -38,6 +38,7 @@ func TestPublicSettings_Success(t *testing.T) {
 		AppName:     "Goiabada Test",
 		UITheme:     "dark",
 		SMTPEnabled: true,
+		Issuer:      "https://issuer.example",
 	}, nil).Once()
 
 	recorder := httptest.NewRecorder()
@@ -51,6 +52,7 @@ func TestPublicSettings_Success(t *testing.T) {
 	assert.Equal(t, "Goiabada Test", body.AppName)
 	assert.Equal(t, "dark", body.UITheme)
 	assert.True(t, body.SMTPEnabled)
+	assert.Equal(t, "https://issuer.example", body.Issuer)
 }
 
 func TestPublicSettings_OnlyGetIsAllowed(t *testing.T) {
@@ -147,6 +149,9 @@ var publicSettingsAllowedFields = map[string]string{
 	"AppName":     "appName",
 	"UITheme":     "uiTheme",
 	"SMTPEnabled": "smtpEnabled",
+	// Already world-readable: /.well-known/openid-configuration serves the same
+	// value to anonymous callers, as OIDC Discovery 1.0 section 3 requires.
+	"Issuer": "issuer",
 }
 
 // This fails if a field is added to PublicSettingsResponse without being added to
