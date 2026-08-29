@@ -362,6 +362,28 @@ jobs:
         working-directory: src/authserver
         run: ./run-tests.sh --type adminconsole --no-build
 
+  # The setup wizard is a module of its own with no run-tests.sh tier, so this
+  # calls go test directly. Lint and Vulnerabilities have always looped over it,
+  # but nothing ran its tests: it had none, and `go test ./...` answering
+  # `[no test files]` is indistinguishable from a pass. Its generators emit the
+  # compose file, env file and manifests an operator deploys from, so a line
+  # reintroduced there ships without anything in the repository reading it
+  # (#285).
+  #
+  # No setup-test-container: this module has four dependencies, no templates and
+  # no CSS, so it needs neither the Tailwind CLI nor the OS packages
+  # run-tests.sh does, and fetching them would cost more than the run.
+  unit-setup:
+    name: Unit / setup
+    needs: versions
+    runs-on: ubuntu-latest
+    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup wizard tests
+        working-directory: src/cmd/goiabada-setup
+        run: go test ./... -count=1
+
   # The four database jobs are written out rather than expressed as a matrix.
   # `matrix` IS available to `services`, so a matrix is possible -- this is a
   # readability choice. Each database needs its own env block, health command
