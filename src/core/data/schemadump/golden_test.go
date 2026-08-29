@@ -51,6 +51,19 @@ func sampleSchema() Schema {
 	}
 }
 
+// sampleMigrated is the migration version the fixtures encode at. A number rather than a
+// constant tied to the real chain: this file exercises the format, and pinning it to what
+// the repository happens to have migrated to would make a round-trip case fail the next time
+// a migration lands.
+const sampleMigrated = 43
+
+// sampleGolden is sampleSchema as one engine's whole golden record, which is what Encode now
+// takes. Written as a helper because every case below needs the same three fields and only
+// one of them varies per case.
+func sampleGolden(d Dialect) Golden {
+	return Golden{Dialect: d, Migrated: sampleMigrated, Schema: sampleSchema()}
+}
+
 // TestGoldenRoundTrip is the property the whole format rests on: Parse reads back exactly
 // what Encode wrote, for every field. A fact the encoding drops is dropped from the
 // committed record too, and because the same package writes the golden file and checks it,
@@ -60,13 +73,15 @@ func sampleSchema() Schema {
 // masked on purpose, so the expectation is the masked schema rather than the input.
 func TestGoldenRoundTrip(t *testing.T) {
 	for _, d := range []Dialect{SQLite, MySQL, Postgres, MSSQL} {
-		encoded, err := Encode(sampleSchema(), d)
+		encoded, err := Encode(sampleGolden(d))
 		require.NoErrorf(t, err, "Encode on %s", d)
 
-		gotDialect, got, err := Parse(encoded)
+		got, err := Parse(encoded)
 		require.NoErrorf(t, err, "Parse on %s", d)
-		assert.Equal(t, d, gotDialect, "the file names the engine that wrote it")
-		assert.Equal(t, maskedSampleSchema(), got, "the parsed schema on %s", d)
+		assert.Equal(t, d, got.Dialect, "the file names the engine that wrote it")
+		assert.Equalf(t, sampleMigrated, got.Migrated,
+			"the migration version survives the round trip on %s, which is what the version rule reads", d)
+		assert.Equal(t, maskedSampleSchema(), got.Schema, "the parsed schema on %s", d)
 	}
 }
 
@@ -117,12 +132,12 @@ func TestGoldenMasksOnlyEngineInventedNames(t *testing.T) {
 		},
 	}}}
 
-	encoded, err := Encode(schema, MSSQL)
+	encoded, err := Encode(Golden{Dialect: MSSQL, Migrated: sampleMigrated, Schema: schema})
 	require.NoError(t, err)
-	_, got, err := Parse(encoded)
+	got, err := Parse(encoded)
 	require.NoError(t, err)
 
-	shape, ok := got.Table("t")
+	shape, ok := got.Schema.Table("t")
 	require.True(t, ok)
 	names := map[string]string{}
 	for _, ix := range shape.Indexes {
@@ -147,12 +162,12 @@ func TestGoldenKeepsTwoMaskedIndexesApart(t *testing.T) {
 		},
 	}}}
 
-	encoded, err := Encode(schema, MSSQL)
+	encoded, err := Encode(Golden{Dialect: MSSQL, Migrated: sampleMigrated, Schema: schema})
 	require.NoError(t, err)
-	_, got, err := Parse(encoded)
+	got, err := Parse(encoded)
 	require.NoError(t, err)
 
-	shape, _ := got.Table("client_logos")
+	shape, _ := got.Schema.Table("client_logos")
 	require.Len(t, shape.Indexes, 2, "both masked indexes survive")
 	assert.Equal(t, []string{"client_id"}, shape.Indexes[0].Columns, "ordered by key columns, not by name")
 	assert.Equal(t, OriginUnique, shape.Indexes[0].Origin)
@@ -165,7 +180,7 @@ func TestGoldenKeepsTwoMaskedIndexesApart(t *testing.T) {
 // decided by the encoder. Reversing every slice on the way in must change nothing on the way
 // out.
 func TestGoldenIsDeterministic(t *testing.T) {
-	forward, err := Encode(sampleSchema(), MySQL)
+	forward, err := Encode(sampleGolden(MySQL))
 	require.NoError(t, err)
 
 	shuffled := sampleSchema()
@@ -175,7 +190,7 @@ func TestGoldenIsDeterministic(t *testing.T) {
 		reverse(shuffled[i].Table.Indexes)
 		reverse(shuffled[i].Table.ForeignKeys)
 	}
-	backward, err := Encode(shuffled, MySQL)
+	backward, err := Encode(Golden{Dialect: MySQL, Migrated: sampleMigrated, Schema: shuffled})
 	require.NoError(t, err)
 
 	assert.Equal(t, string(forward), string(backward), "the input order must not reach the file")
@@ -191,14 +206,31 @@ func reverse[T any](s []T) {
 // the encoder instead. An empty file compared against an empty file reads as "nothing
 // changed" and passes, which is the one outcome that would make the whole check worthless.
 func TestEncodeRefusesAnEmptyDump(t *testing.T) {
-	_, err := Encode(Schema{}, SQLite)
+	_, err := Encode(Golden{Dialect: SQLite, Migrated: sampleMigrated, Schema: Schema{}})
 	assert.Error(t, err, "an empty schema is a fault, not a result")
 
-	_, err = Encode(Schema{{Name: "t"}}, SQLite)
+	_, err = Encode(Golden{Dialect: SQLite, Migrated: sampleMigrated, Schema: Schema{{Name: "t"}}})
 	assert.Error(t, err, "a table with no columns is a fault, not a result")
 
-	_, err = Encode(sampleSchema(), Dialect("oracle"))
+	_, err = Encode(Golden{Dialect: Dialect("oracle"), Migrated: sampleMigrated, Schema: sampleSchema()})
 	assert.Error(t, err, "an unrecognised dialect must not be encoded")
+}
+
+// TestEncodeRefusesAnUnmigratedVersion is the header's half of the rule above. Version 0 is
+// what a database that has never been migrated reports and what a struct literal that forgot
+// the field carries, and both would encode into a file claiming to record a catalog at
+// migration 0. The version rule reads that number, so a zero written here is a false claim
+// the lint would then compare against the migrations on disk.
+//
+// Each case differs from the accepting twin above in the Migrated field alone.
+func TestEncodeRefusesAnUnmigratedVersion(t *testing.T) {
+	for _, migrated := range []int{0, -1} {
+		_, err := Encode(Golden{Dialect: SQLite, Migrated: migrated, Schema: sampleSchema()})
+		assert.Errorf(t, err, "migration version %d is not a migrated database", migrated)
+	}
+
+	_, err := Encode(Golden{Dialect: SQLite, Migrated: 1, Schema: sampleSchema()})
+	assert.NoError(t, err, "the twin differing only in the version is accepted, so the case above tests the version")
 }
 
 // TestParseRefusesADamagedFile covers what the per-engine assertion is protected from. Every
@@ -206,7 +238,7 @@ func TestEncodeRefusesAnEmptyDump(t *testing.T) {
 // write, a hand edit. Reading one leniently would turn a corrupted record into a smaller
 // schema that compares equal to another smaller schema.
 func TestParseRefusesADamagedFile(t *testing.T) {
-	good, err := Encode(sampleSchema(), Postgres)
+	good, err := Encode(sampleGolden(Postgres))
 	require.NoError(t, err)
 	lines := strings.Split(strings.TrimRight(string(good), "\n"), "\n")
 
@@ -224,6 +256,19 @@ func TestParseRefusesADamagedFile(t *testing.T) {
 		{"a format version from before this binary", replaceVersion(string(good), goldenVersion-1), ""},
 		{"no version at all", strings.Replace(string(good), fmt.Sprintf("\tversion=%d", goldenVersion), "", 1), ""},
 		{"an engine that is not one of the four", strings.Replace(string(good), "engine=postgres", "engine=oracle", 1), ""},
+		// migrated= is version 3's addition, and the field most costly to read leniently:
+		// its zero value is a number the version rule would happily compare. The two
+		// refusals are told apart in the words they use, because a field the writer never
+		// wrote is regenerated against a newer binary and a corrupt value is restored.
+		// Asserting only that Parse refused would let either branch cover both, which is
+		// exactly what strconv.Atoi("") does if nothing pins the difference.
+		{"no migrated field at all",
+			strings.Replace(string(good), fmt.Sprintf("\tmigrated=%d", sampleMigrated), "", 1),
+			"carries no migrated= field"},
+		{"a migrated version that is not a number",
+			replaceMigrated(string(good), "head"), `records migrated="head"`},
+		{"a migrated version of zero", replaceMigrated(string(good), "0"), `records migrated="0"`},
+		{"a negative migrated version", replaceMigrated(string(good), "-1"), `records migrated="-1"`},
 		{"no header", strings.Join(lines[1:], "\n"), ""},
 		{"nothing but a header", lines[0], ""},
 		{"a truncated last line", string(good[:len(good)-12]), ""},
@@ -244,7 +289,7 @@ func TestParseRefusesADamagedFile(t *testing.T) {
 		// file parses, so this would still fail. Saying so here names the fault instead
 		// of reporting it as a leniency the parser does not have.
 		require.NotEqualf(t, string(good), tc.file, "the fixture for %s must actually damage the file", tc.name)
-		_, _, err := Parse([]byte(tc.file))
+		_, err := Parse([]byte(tc.file))
 		if !assert.Errorf(t, err, "Parse must refuse %s", tc.name) {
 			continue
 		}
@@ -283,6 +328,16 @@ func TestGoldenPath(t *testing.T) {
 // current one and passing for no reason (#284).
 func replaceVersion(file string, version int) string {
 	return strings.Replace(file,
-		fmt.Sprintf("version=%d", goldenVersion),
-		fmt.Sprintf("version=%d", version), 1)
+		fmt.Sprintf("\tversion=%d", goldenVersion),
+		fmt.Sprintf("\tversion=%d", version), 1)
+}
+
+// replaceMigrated rewrites the header's migration version to an arbitrary string, so the
+// cases above can put a value there that no int would encode. Written against
+// sampleMigrated for the same reason replaceVersion is written against goldenVersion: a
+// literal here goes stale the moment the fixture's number moves.
+func replaceMigrated(file, migrated string) string {
+	return strings.Replace(file,
+		fmt.Sprintf("\tmigrated=%d", sampleMigrated),
+		"\tmigrated="+migrated, 1)
 }

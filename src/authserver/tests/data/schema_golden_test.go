@@ -27,7 +27,12 @@ func TestSchemaGolden_MatchesTheCommittedFile(t *testing.T) {
 	h := newIsolatedDB(t)
 	require.NoError(t, h.Migrator.Up(), "migrate the isolated database to head on %s", dbType())
 
-	encoded, err := schemadump.Encode(dumpSchema(t, h), dumpDialect(t))
+	migrated, err := schemadump.MigratedVersion(h.SQL, dumpDialect(t))
+	require.NoErrorf(t, err, "read the migration version of the freshly migrated %s database", dbType())
+
+	encoded, err := schemadump.Encode(schemadump.Golden{
+		Dialect: dumpDialect(t), Migrated: migrated, Schema: dumpSchema(t, h),
+	})
 	require.NoErrorf(t, err, "encode the %s dump", dbType())
 
 	path, err := schemadump.GoldenPath(dumpDialect(t))
@@ -59,13 +64,28 @@ func TestSchemaGolden_CommittedFileParses(t *testing.T) {
 	committed, err := os.ReadFile(path)
 	require.NoErrorf(t, err, "read the committed golden file at %s", path)
 
-	dialect, schema, err := schemadump.Parse(committed)
+	g, err := schemadump.Parse(committed)
 	require.NoErrorf(t, err, "parse the committed golden file at %s", path)
-	assert.Equal(t, dumpDialect(t), dialect, "%s names the engine it describes", path)
+	assert.Equal(t, dumpDialect(t), g.Dialect, "%s names the engine it describes", path)
 
-	_, ok := schema.Table("schema_migrations")
+	_, ok := g.Schema.Table("schema_migrations")
 	assert.Truef(t, ok, "%s records schema_migrations, which #284 decision 7 dumps like any other table", path)
-	assert.Greaterf(t, len(schema), 25, "%s records the whole schema, not a fragment of it", path)
+	assert.Greaterf(t, len(g.Schema), 25, "%s records the whole schema, not a fragment of it", path)
+
+	// The header's migration version, compared rather than merely carried. Encode writes it
+	// and Parse reads it back, and the round-trip test in schemadump says those two agree;
+	// what neither of them can say is that the number describes this engine's real chain. So
+	// it is read off a database migrated to head here, on the engine the file is committed
+	// for (#288). The four numbers legitimately differ between engines, which is why this is
+	// asserted per engine and never across them.
+	h := newIsolatedDB(t)
+	require.NoError(t, h.Migrator.Up(), "migrate the isolated database to head on %s", dbType())
+	migrated, err := schemadump.MigratedVersion(h.SQL, dumpDialect(t))
+	require.NoErrorf(t, err, "read the migration version of the freshly migrated %s database", dbType())
+	assert.Equalf(t, migrated, g.Migrated,
+		"%s records migration version %d, but %s migrates to %d. Regenerate all four with:\n"+
+			"  cd src/core && go run ./cmd/schemadump",
+		path, g.Migrated, dbType(), migrated)
 }
 
 // diffLines reports the lines each side has and the other does not. A line-by-line diff would
