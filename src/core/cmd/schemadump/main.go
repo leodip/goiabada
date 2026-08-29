@@ -151,11 +151,18 @@ func dumpOne(t target) ([]byte, error) {
 	if err := db.Migrate(); err != nil {
 		return nil, fmt.Errorf("migrate the scratch database to head: %w", err)
 	}
+	// Read off the database that was just migrated rather than counted from the files on
+	// disk, so the header records what the chain actually reached. The two agree unless a
+	// migration was skipped, and that disagreement is the one worth catching.
+	migrated, err := schemadump.MigratedVersion(sqlDB, t.dialect)
+	if err != nil {
+		return nil, err
+	}
 	schema, err := schemadump.Dump(sqlDB, t.dialect)
 	if err != nil {
 		return nil, err
 	}
-	return schemadump.Encode(schema, t.dialect)
+	return schemadump.Encode(schemadump.Golden{Dialect: t.dialect, Migrated: migrated, Schema: schema})
 }
 
 // migratable is what the four concrete database types have in common here. Declared over the

@@ -45,10 +45,15 @@ func TestSchemaParity_TheFourCommittedGoldenFiles(t *testing.T) {
 		committed, err := os.ReadFile(path)
 		require.NoErrorf(t, err, "read %s", path)
 
-		recorded, schema, err := schemadump.Parse(committed)
+		// g.Migrated is deliberately not read here. The four numbers legitimately differ,
+		// postgres 39, mssql 40, mysql 42, sqlite 43 at the time of writing, because a
+		// migration is free to land on fewer than four engines. checkParity takes
+		// map[Dialect]Schema, so the comparison cannot see it even by accident; holding the
+		// number to the migrations on disk is the source lint's job (#288).
+		g, err := schemadump.Parse(committed)
 		require.NoErrorf(t, err, "parse %s", path)
-		require.Equalf(t, d, recorded, "%s records the engine it is committed for", path)
-		dumps[d] = schema
+		require.Equalf(t, d, g.Dialect, "%s records the engine it is committed for", path)
+		dumps[d] = g.Schema
 	}
 
 	problems := checkParity(dumps, parityAllowlist())
