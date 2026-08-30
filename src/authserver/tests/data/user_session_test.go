@@ -915,3 +915,145 @@ func TestPromoteUserSessionGeneration(t *testing.T) {
 		t.Error("expected an error promoting the generation of an unknown user session id")
 	}
 }
+
+// TestAcquireUserSessionRow covers the semantics the ordering rests on: the acquisition
+// reports whether the session row is still there, and writing it costs the session
+// nothing a reader can observe.
+//
+// The report is the point. A ceremony that has just acquired the row acts on the answer
+// directly and never re-reads the session, so an acquisition that returned only an error
+// would leave "the session is gone" to be decided somewhere else, where it could disagree
+// (#139).
+func TestAcquireUserSessionRow(t *testing.T) {
+	user := createTestUser(t)
+	session := createTestUserSession(t, user.Id)
+
+	tx := beginTx(t)
+	live, err := database.AcquireUserSessionRow(tx, session.SessionIdentifier)
+	if err != nil {
+		t.Fatalf("AcquireUserSessionRow on a live session returned error: %v", err)
+	}
+	if !live {
+		t.Fatal("expected a live session to report true")
+	}
+	if err := database.CommitTransaction(tx); err != nil {
+		t.Fatalf("CommitTransaction: %v", err)
+	}
+
+	// Only updated_at moves. Session validity is measured from started and last_accessed,
+	// so a statement that touched either would make acquiring the row extend or shorten
+	// the session it was only meant to lock.
+	reloaded, err := database.GetUserSessionById(nil, session.Id)
+	if err != nil {
+		t.Fatalf("GetUserSessionById after acquiring: %v", err)
+	}
+	if reloaded == nil {
+		t.Fatal("acquiring a session row must not remove it")
+	}
+	if !reloaded.Started.Equal(session.Started) {
+		t.Errorf("Started moved: expected %v, got %v", session.Started, reloaded.Started)
+	}
+	if !reloaded.LastAccessed.Equal(session.LastAccessed) {
+		t.Errorf("LastAccessed moved: expected %v, got %v", session.LastAccessed, reloaded.LastAccessed)
+	}
+
+	// The row is gone. This is the answer the ceremony refuses on, and it is a report
+	// rather than an error: nothing went wrong, the session simply ended first.
+	if err := database.DeleteUserSession(nil, session.Id); err != nil {
+		t.Fatalf("DeleteUserSession: %v", err)
+	}
+	gone := beginTx(t)
+	live, err = database.AcquireUserSessionRow(gone, session.SessionIdentifier)
+	if err != nil {
+		t.Fatalf("AcquireUserSessionRow on a deleted session returned error: %v", err)
+	}
+	if live {
+		t.Error("expected a deleted session to report false")
+	}
+	if err := database.RollbackTransaction(gone); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+}
+
+// TestAcquireUserSessionRow_RefusedArguments pins the two arguments the method refuses,
+// each for a reason that would otherwise be silent.
+//
+// A nil transaction autocommits, which releases the row before the caller can use it, so
+// the caller would hold nothing while believing it held the session. An empty identifier
+// matches no row on any engine, so the method would report every session gone and every
+// ceremony would refuse.
+func TestAcquireUserSessionRow_RefusedArguments(t *testing.T) {
+	user := createTestUser(t)
+	session := createTestUserSession(t, user.Id)
+
+	live, err := database.AcquireUserSessionRow(nil, session.SessionIdentifier)
+	if err == nil {
+		t.Error("expected an error acquiring a user session row without a transaction")
+	}
+	if live {
+		t.Error("a refused acquisition must report false")
+	}
+
+	tx := beginTx(t)
+	live, err = database.AcquireUserSessionRow(tx, "")
+	if err == nil {
+		t.Error("expected an error acquiring a user session row with an empty session identifier")
+	}
+	if live {
+		t.Error("a refused acquisition must report false")
+	}
+}
+
+// TestAcquireUserSessionRow_TransactionAndFailurePath answers the two questions a mock
+// cannot: does the statement enlist in the caller's transaction rather than writing
+// through the pool, and does a statement that could not run return an error rather than a
+// benign false.
+//
+// Both matter more here than for an ordinary write. A method that escaped its caller's
+// transaction would take the row on another connection and release it immediately, so the
+// ordering the ceremony depends on would be gone while every test still passed. And a
+// fault collapsed into (false, nil) reads exactly like "the session ended", which would
+// send a legitimate sign-in back to the login page whenever the database hiccuped.
+func TestAcquireUserSessionRow_TransactionAndFailurePath(t *testing.T) {
+	user := createTestUser(t)
+	session := createTestUserSession(t, user.Id)
+
+	before, err := database.GetUserSessionById(nil, session.Id)
+	if err != nil {
+		t.Fatalf("GetUserSessionById before acquiring: %v", err)
+	}
+
+	tx := beginTx(t)
+	live, err := database.AcquireUserSessionRow(tx, session.SessionIdentifier)
+	if err != nil {
+		t.Fatalf("AcquireUserSessionRow in a transaction returned error: %v", err)
+	}
+	if !live {
+		t.Fatal("expected a live session to report true inside the transaction")
+	}
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+
+	// Had the statement gone through the pool it would have survived the rollback.
+	after, err := database.GetUserSessionById(nil, session.Id)
+	if err != nil {
+		t.Fatalf("GetUserSessionById after rollback: %v", err)
+	}
+	if after == nil {
+		t.Fatal("the session must survive a rolled-back acquisition")
+	}
+	if !after.UpdatedAt.Time.Equal(before.UpdatedAt.Time) {
+		t.Errorf("an acquisition rolled back must leave updated_at at %v, got %v",
+			before.UpdatedAt.Time, after.UpdatedAt.Time)
+	}
+
+	// The failure path, forced by the same finished transaction.
+	live, err = database.AcquireUserSessionRow(tx, session.SessionIdentifier)
+	if err == nil {
+		t.Error("a statement that cannot run must return an error, not a benign false")
+	}
+	if live {
+		t.Error("a failed acquisition must report false")
+	}
+}

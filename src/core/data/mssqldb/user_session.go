@@ -103,6 +103,10 @@ func (d *MsSQLDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error
 	return d.CommonDB.DeleteUserSession(tx, userSessionId)
 }
 
+func (d *MsSQLDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error) {
+	return d.CommonDB.AcquireUserSessionRow(tx, sessionIdentifier)
+}
+
 func (d *MsSQLDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
 	return d.CommonDB.DeleteIdleSessions(tx, idleTimeout)
 }
