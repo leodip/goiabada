@@ -90,6 +90,24 @@ func MiddlewareLocale(authHelper AuthContextReader) func(http.Handler) http.Hand
 	}
 }
 
+// ResolveRequestLocale attaches a tentative localizer to ctx from the request
+// alone: ?ui_locales, then Accept-Language, then English. It is exactly what
+// MiddlewareLocale does when authHelper is nil.
+//
+// It exists for a middleware that answers a request before MiddlewareLocale has
+// run and so has no localizer to reach for. MiddlewareCsrf is the case: it is
+// mounted on the root router, above the branch that carries the locale
+// middleware, so that a route registered outside that branch cannot escape the
+// origin check. Moving it down to gain a localizer would trade a fail-safe
+// default for a translated 403.
+//
+// This is not a substitute for the middleware. The context it returns reaches
+// the one response the caller is about to write, never the handlers below, so a
+// caller that has a localizer already must use that one.
+func ResolveRequestLocale(ctx context.Context, r *http.Request) context.Context {
+	return resolveLocale(ctx, r, nil)
+}
+
 func resolveLocale(ctx context.Context, r *http.Request, authHelper AuthContextReader) context.Context {
 	bundle := defaultBundle
 	if bundle == nil {

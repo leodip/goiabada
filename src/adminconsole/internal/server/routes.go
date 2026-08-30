@@ -45,6 +45,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		constants.AdminConsoleSessionName,
 		tokenParser,
 		authHelper,
+		httpHelper,
 		&http.Client{},
 		authBase,
 		config.GetAdminConsole().BaseURL,
@@ -54,7 +55,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManagePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
-	sessionIdentifierToContext := middleware.SessionIdentifierToContext()
+	sessionIdentifierToContext := middleware.SessionIdentifierToContext(httpHelper)
 	// User-locale refinement sits inside each authenticated chain immediately
 	// after JWT validation. It reads the locale claim from the validated JWT
 	// (requires the profile scope, see middleware_jwt.buildScopeString) and

@@ -229,10 +229,11 @@ func (s *Server) initMiddleware() chi.Router {
 	s.router.Use(middleware.StripSlashes)
 
 	// CSRF
-	// Note: CSRF runs before the locale middleware below, so no localizer exists yet when a
-	// request is rejected. CSRF rejection responses therefore render in English regardless of
-	// the user's preferred locale. This is acceptable for an infrequent, transient failure mode
-	// (typically a form left open across a deployment change, fixed by a page reload).
+	// Note: CSRF runs before the locale middleware below, so there is no localizer on the
+	// context when a request is rejected. MiddlewareCsrf resolves a tentative one of its own
+	// through i18n.ResolveRequestLocale, so the rejection is localized without moving the
+	// origin check down onto the application branch, where a route registered outside that
+	// branch would escape it.
 	//
 	// The pair takes no configuration: MiddlewareSkipCsrf marks the endpoints that are
 	// cross-origin by protocol, and MiddlewareCsrf refuses every other state-changing
@@ -243,20 +244,32 @@ func (s *Server) initMiddleware() chi.Router {
 	// Everything below is on the application branch, not the root.
 
 	app := s.router.With(
-		// Adds settings to the request context (fetched from cache, not database)
-		adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache),
-
-		// Clear the session cookie and redirect if unable to decode it, and delete
-		// whatever the chunked cookie store left in this browser
-		custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AdminConsoleSessionName),
-
 		// Global locale middleware: resolves a tentative localizer from
 		// ?ui_locales, Accept-Language, or English. Adminconsole has no
 		// AuthContext concept (identity comes from the JWT later in the chain),
 		// so authHelper is nil. Per-route user-locale refinement lives in
 		// routes.go inside baseAuth/accountAuth/adminAuth, immediately after
 		// JWT validation.
+		//
+		// It goes first so that everything below it can answer a request in the
+		// caller's language. It used to go last, which left both of
+		// MiddlewareSettingsCache's refusals unable to reach a localizer: an
+		// administrator whose browser asks for pt-BR was told in English that
+		// their auth server needs upgrading. Nothing here depends on that
+		// ordering being the other way round: i18n.resolveLocale reads
+		// ?ui_locales, the AuthContext (nil in this module) and Accept-Language,
+		// and touches no settings, no session and no database. The authserver's
+		// copy of this chain does resolve locale last, but for a reason that
+		// does not carry over: it passes a real AuthHelper, so its locale
+		// middleware has to run after the session is decoded.
 		i18n.MiddlewareLocale(nil),
+
+		// Adds settings to the request context (fetched from cache, not database)
+		adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache),
+
+		// Clear the session cookie and redirect if unable to decode it, and delete
+		// whatever the chunked cookie store left in this browser
+		custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AdminConsoleSessionName),
 	)
 
 	slog.Info("finished initializing middleware")

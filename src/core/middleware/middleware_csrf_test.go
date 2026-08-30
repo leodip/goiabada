@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 func TestMiddlewareSkipCsrf(t *testing.T) {
@@ -425,10 +427,21 @@ func TestMiddlewareCsrf_OriginDecisions(t *testing.T) {
 			if rr.Code != http.StatusForbidden {
 				t.Errorf("got status %d, want %d", rr.Code, http.StatusForbidden)
 			}
-			// The prefix is ours; the reason after it is the standard library's wording and is
-			// deliberately not asserted, since pinning it would pin the suite to a Go release.
-			if body := rr.Body.String(); !strings.HasPrefix(body, "Forbidden - ") {
-				t.Errorf("body = %q, want it to start with %q", body, "Forbidden - ")
+			// The body is this middleware's own message, which is what attributes the 403 to
+			// the origin check rather than to anything else that could answer 403. It is read
+			// from the catalog rather than written out here, so rewording the message in one
+			// place does not fail the suite; T on a bare context resolves the English entry.
+			//
+			// The refusal's reason is asserted absent. It used to be interpolated into the
+			// body, where it described the deployment's own origin handling to whoever was
+			// refused, an attacker included. TestExplainCsrfFailure covers it in the log,
+			// which is where it belongs.
+			wantBody := i18n.T(context.Background(), "error.csrf_refused")
+			if body := strings.TrimSpace(rr.Body.String()); body != wantBody {
+				t.Errorf("body = %q, want %q", body, wantBody)
+			}
+			if body := rr.Body.String(); strings.Contains(body, "Origin") || strings.Contains(body, "Sec-Fetch-Site") {
+				t.Errorf("body = %q, want the refusal reason kept out of the response", body)
 			}
 		})
 	}

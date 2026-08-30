@@ -168,6 +168,11 @@
 "error.title" = "Server error"
 "error.body" = "We're sorry, but an error has occurred. You can find further information in the server logs."
 "error.request_id_label" = "Request id:"
+# Written by MiddlewareCsrf, which answers on the root router before the locale
+# middleware runs and so resolves a tentative localizer of its own. The reason for
+# the refusal goes to the log, not to the browser: it names the deployment's own
+# origin handling and is of no use to the person reading the page.
+"error.csrf_refused" = "Your request was refused for security reasons. Please reload the page and try again."
 
 "not_found.page_title" = "Not found"
 "not_found.title" = "Not found (404)"
@@ -259,6 +264,11 @@
 "adminconsole.error.title" = "Server error"
 "adminconsole.error.body" = "We're sorry, but an error has occurred. You can find further information in the server logs."
 "adminconsole.error.request_id_label" = "Request id:"
+# The two MiddlewareSettingsCache refusals. Plain text rather than the error page
+# above: both mean the settings the page layout renders from are the thing that is
+# missing, so there is no page to render.
+"adminconsole.error.settings_unavailable" = "Unable to load the configuration from the auth server. You can find further information in the server logs."
+"adminconsole.error.issuer_missing" = "The auth server did not report an issuer. It may be running a version older than this admin console."
 
 "adminconsole.not_found.page_title" = "Not found"
 "adminconsole.not_found.title" = "Not found (404)"
