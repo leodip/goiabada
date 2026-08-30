@@ -1146,11 +1146,15 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 		{
 			// Discovery phase: nothing has been swept yet, but the generation HAS been
 			// advanced, so a commit here would lock the user out of every session while
-			// leaving refresh tokens unrevoked.
+			// leaving refresh tokens unrevoked. The session query runs first and finds
+			// nothing, which is what keeps "nothing has been swept yet" true now that the
+			// session block precedes the token sweep (#139).
 			label: "sweep fails during discovery",
 			arrange: func(database *mocks_data.Database) {
 				database.On("IncrementUserAuthStateGeneration", revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
+				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
+					Return([]models.UserSession{}, nil).Once()
 				database.On("GetRefreshTokensByUserId", revokeTx, int64(1)).
 					Return(nil, errors.New("discovery failed")).Once()
 			},
@@ -1164,6 +1168,8 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 				second := &models.RefreshToken{Id: 2, RefreshTokenJti: "rt-2"}
 				database.On("IncrementUserAuthStateGeneration", revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
+				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
+					Return([]models.UserSession{}, nil).Once()
 				database.On("GetRefreshTokensByUserId", revokeTx, int64(1)).
 					Return([]*models.RefreshToken{first, second}, nil).Once()
 				database.On("UpdateRefreshToken", revokeTx, first).Return(nil).Once()
@@ -1180,12 +1186,12 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			arrange: func(database *mocks_data.Database) {
 				database.On("IncrementUserAuthStateGeneration", revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
+				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
+					Return([]models.UserSession{}, nil).Once()
 				database.On("GetRefreshTokensByUserId", revokeTx, int64(1)).
 					Return([]*models.RefreshToken{}, nil).Once()
 				database.On("PromoteRefreshTokenGenerations", revokeTx, []int64{}, int64(4)).
 					Return(nil).Once()
-				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
-					Return([]models.UserSession{}, nil).Once()
 				database.On("CommitTransaction", revokeTx).
 					Return(errors.New("commit failed")).Once()
 			},

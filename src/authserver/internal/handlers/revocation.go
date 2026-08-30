@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"log/slog"
+	"sort"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -105,8 +106,54 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 	result.NewGeneration = newGeneration
 	result.OldGeneration = newGeneration - 1
 
+	// THE SESSION ROWS FIRST, ahead of every grant that hangs off them (#139). Every
+	// application transaction that writes a user_sessions row and that session's grants takes
+	// the user_sessions row first, so no two transactions of different shapes can each hold
+	// half of what the other needs. Without the hoist this one takes refresh_tokens and then
+	// user_sessions while an authorization ceremony takes user_sessions and then codes, and
+	// the two deadlock on PostgreSQL, MySQL and SQL Server.
+	//
+	// The two refresh-token reads below are unaffected by running after these deletes.
+	// GetRefreshTokensByUserId unions a codes join with refresh_tokens.user_id and
+	// GetRefreshTokensBySessionIdentifier joins refresh_tokens to codes; neither reads
+	// user_sessions, and codes carries no foreign key to it.
+	//
+	// IncrementUserAuthStateGeneration stays above this. It is the durable half of the
+	// operation and it takes the users row, which is above user_sessions on every path here.
+	sessions, err := db.GetUserSessionsByUserId(tx, userId)
+	if err != nil {
+		return result, err
+	}
+
+	// Ordered by id so several sessions are always taken in the same sequence. The query
+	// carries no ORDER BY of its own, so two transactions of this shape could otherwise take
+	// the same two rows in opposite orders, which is a cycle among sessions that no rule about
+	// the order of TABLES can reach (#139).
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+
+	preservedSessionFound := false
+	for i := range sessions {
+		session := sessions[i]
+		if exceptSid != "" && session.SessionIdentifier == exceptSid {
+			if err := db.PromoteUserSessionGeneration(tx, session.Id, newGeneration); err != nil {
+				return result, err
+			}
+			preservedSessionFound = true
+			continue
+		}
+		if err := db.DeleteUserSession(tx, session.Id); err != nil {
+			return result, err
+		}
+		result.TerminatedSessionIdentifiers = append(result.TerminatedSessionIdentifiers,
+			session.SessionIdentifier)
+	}
+
 	// User-scoped, so it covers both linkage shapes: auth-code tokens through codes.user_id
 	// and ROPC tokens through refresh_tokens.user_id.
+	//
+	// The session block above moved ahead of BOTH refresh-token reads for the lock order, and
+	// they moved together, so the reasoning that follows about their relative order is
+	// untouched by it (#139).
 	//
 	// Deliberately queried BEFORE the preserved set below, though the benefit is
 	// engine-dependent. Where each statement takes a fresh read view (PostgreSQL and SQL
@@ -166,27 +213,6 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 	// revoked, because PromoteRefreshTokenGenerations only touches unrevoked rows.
 	if err := db.PromoteRefreshTokenGenerations(tx, promoteIds, newGeneration); err != nil {
 		return result, err
-	}
-
-	sessions, err := db.GetUserSessionsByUserId(tx, userId)
-	if err != nil {
-		return result, err
-	}
-	preservedSessionFound := false
-	for i := range sessions {
-		session := sessions[i]
-		if exceptSid != "" && session.SessionIdentifier == exceptSid {
-			if err := db.PromoteUserSessionGeneration(tx, session.Id, newGeneration); err != nil {
-				return result, err
-			}
-			preservedSessionFound = true
-			continue
-		}
-		if err := db.DeleteUserSession(tx, session.Id); err != nil {
-			return result, err
-		}
-		result.TerminatedSessionIdentifiers = append(result.TerminatedSessionIdentifiers,
-			session.SessionIdentifier)
 	}
 
 	// exceptSid was asked for but no session row matched. Legitimate rather than an error: the
