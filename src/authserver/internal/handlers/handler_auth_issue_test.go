@@ -169,7 +169,7 @@ func TestHandleIssueGet(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext) &&
 				input.SessionIdentifier == liveSessionIdentifier
 		})).Return(mockCode, nil)
@@ -658,7 +658,7 @@ func TestHandleIssueGet(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything).Return(mockCode, nil)
+		codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything).Return(mockCode, nil)
 
 		// The code row exists and carries no marker at this point, so handing it over is
 		// exactly the fail-open decision 12 closes. Unredeemed it expires in 60 seconds.
@@ -775,7 +775,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "code=")
 			assert.NotContains(t, location, "access_token=")
 			assert.NotContains(t, location, "id_token=")
-			codeIssuer.AssertNotCalled(t, "CreateAuthCode")
+			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
 
 			assertWarnedForeignSession(t, logs, authContext.UserId)
@@ -856,7 +856,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "code=")
 			assert.NotContains(t, location, "access_token=")
 
-			codeIssuer.AssertNotCalled(t, "CreateAuthCode")
+			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
 
 			assertWarnedForeignSession(t, logs, authContext.UserId)
@@ -2957,7 +2957,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
@@ -3061,7 +3061,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"the auth context must be cleared before the client response is committed, or the browser keeps a ready_to_issue_code context to replay")
 
 		// Verify CreateAuthCode was NEVER called
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode")
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 
 		// Verify all other expectations
 		httpHelper.AssertExpectations(t)
@@ -3131,7 +3131,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.NotContains(t, location, "login_required")
 		assert.NotContains(t, location, "code=")
 
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode")
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -3323,7 +3323,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
@@ -3432,7 +3432,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.Equal(t, userASubject.String(), savedAuthContext.IdTokenHintSub, "IdTokenHintSub should persist from authorize request")
 		assert.Equal(t, int64(99), savedAuthContext.UserId, "UserId should be set to authenticated user (user B)")
 
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode")
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -3556,7 +3556,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
-				codeIssuer.On("CreateAuthCode", mock.Anything).
+				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything).
 					Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
 				database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
 				auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
@@ -3579,7 +3579,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			} else {
 				assert.Empty(t, location,
 					"a withheld redirect must never become a Location: %s", tc.why)
-				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 				tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 					mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			}
@@ -3749,7 +3749,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			assert.Equal(t, http.StatusFound, rr.Code)
 			location := rr.Header().Get("Location")
 			assert.NotContains(t, location, "code=", "no code may be minted on an expired session")
-			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 
 			if tc.silent {
 				assert.Contains(t, location, "https://example.com/callback")
@@ -3888,7 +3888,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
-				codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
+				codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
 					return input.AuthContext.Scope == tc.wantScope &&
 						input.AuthContext.ConsentedScope == tc.wantConsented
 				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
@@ -3915,7 +3915,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 				assert.Contains(t, location, "error=access_denied", tc.why)
 				assert.Contains(t, location, "not+authorized+to+access+any+of+the+requested+scopes")
 				assert.NotContains(t, location, "code=")
-				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 			}
 
 			// Whichever way it went, the field the issuer does NOT read is untouched.
@@ -4119,7 +4119,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// rather than passing as though the refusal had been shown.
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a withheld redirect must never become a Location, least of all because the clear failed")
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
@@ -4183,7 +4183,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a failure to render the refusal must not become a redirect to the deregistered host")
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -4285,7 +4285,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"the ordinary refusal's code must not stand in for one the server could not complete")
 		assert.NotContains(t, location, "code=")
 
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -4331,7 +4331,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -4374,7 +4374,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)

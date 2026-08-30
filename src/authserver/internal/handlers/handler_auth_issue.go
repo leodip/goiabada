@@ -506,7 +506,7 @@ func HandleIssueGet(
 			AuthContext:       *authContext,
 			SessionIdentifier: sessionIdentifier,
 		}
-		code, err := codeIssuer.CreateAuthCode(createCodeInput)
+		code, err := codeIssuer.CreateAuthCode(nil, createCodeInput)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

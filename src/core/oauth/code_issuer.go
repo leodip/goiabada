@@ -28,14 +28,19 @@ func NewCodeIssuer(database data.Database) *CodeIssuer {
 	}
 }
 
-func (ci *CodeIssuer) CreateAuthCode(input *CreateCodeInput) (*models.Code, error) {
+// CreateAuthCode inserts one authorization code. Both of its statements run on tx, which the
+// caller opens: the insert has to be ordered against a concurrent session termination, and the
+// client lookup has to join it because sqlitedb sets SetMaxOpenConns(1), so a nil-transaction read
+// issued while tx holds the single connection waits for a connection tx itself owns. That is a
+// hang rather than an error, so neither statement may be reverted to nil (#139).
+func (ci *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *CreateCodeInput) (*models.Code, error) {
 
 	responseMode := input.ResponseMode
 	if responseMode == "" {
 		responseMode = "query"
 	}
 
-	client, err := ci.database.GetClientByClientIdentifier(nil, input.ClientId)
+	client, err := ci.database.GetClientByClientIdentifier(tx, input.ClientId)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +98,7 @@ func (ci *CodeIssuer) CreateAuthCode(input *CreateCodeInput) (*models.Code, erro
 		AuthStateGeneration: input.AuthStateGeneration,
 	}
 
-	err = ci.database.CreateCode(nil, code)
+	err = ci.database.CreateCode(tx, code)
 	if err != nil {
 		return nil, err
 	}
