@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rsa"
+	"database/sql"
 	"net/http"
 
 	"github.com/leodip/goiabada/core/communication"
@@ -67,7 +68,7 @@ type AuthorizeValidator interface {
 }
 
 type CodeIssuer interface {
-	CreateAuthCode(input *oauth.CreateCodeInput) (*models.Code, error)
+	CreateAuthCode(tx *sql.Tx, input *oauth.CreateCodeInput) (*models.Code, error)
 }
 
 type UserSessionManager interface {

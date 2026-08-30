@@ -45,7 +45,7 @@ func TestCreateAuthCode(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(input)
+	code, err := codeIssuer.CreateAuthCode(nil, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, code)
@@ -92,7 +92,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(input)
+	code, err := codeIssuer.CreateAuthCode(nil, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, code)
@@ -151,7 +151,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 				SessionIdentifier: "session123",
 			}
 
-			code, err := codeIssuer.CreateAuthCode(input)
+			code, err := codeIssuer.CreateAuthCode(nil, input)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, code)
@@ -182,7 +182,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(input)
+	code, err := codeIssuer.CreateAuthCode(nil, input)
 
 	assert.Error(t, err)
 	assert.Nil(t, code)
