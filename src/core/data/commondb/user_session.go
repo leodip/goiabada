@@ -349,6 +349,59 @@ func (d *CommonDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) erro
 	return nil
 }
 
+// AcquireUserSessionRow takes the session's row and holds it for the rest of the caller's
+// transaction. It is one unconditional UPDATE that writes only updated_at, a column nothing
+// reads: session validity is measured from last_accessed and started, and neither moves.
+//
+// WHAT IT BUYS. An authorization ceremony inserting a code and an explicit termination sweeping
+// that session's grants touch no common row, so nothing makes one wait for the other and a code
+// can be inserted after the sweep ran and before it committed. That code escapes the sweep and
+// yields a refresh token outliving the session. With both sides writing this row before anything
+// else, one of them waits, and the one that waited reads its answer after the wait: either the
+// termination sweeps after the insert committed and marks the new code, or the acquisition here
+// matches no rows and the ceremony refuses without writing a code at all (#139).
+//
+// It keys on the session identifier rather than the id because that is what a ceremony holds. The
+// column is UNIQUE on all four engines, so the statement is a single-row lock everywhere, which is
+// what AcquireClientRow relies on for its own key (#245).
+func (d *CommonDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error) {
+
+	// The transaction is required for AcquireClientRow's stated reason: without one the statement
+	// autocommits and releases the row before the caller can use it, which is the whole of what
+	// this buys.
+	if tx == nil {
+		return false, errors.WithStack(errors.New("acquiring a user session row requires a transaction: an autocommitted statement releases the row before the caller can use it"))
+	}
+
+	// No row carries an empty session identifier, so the statement would match nothing and report
+	// the session gone for every session there is.
+	if sessionIdentifier == "" {
+		return false, errors.WithStack(errors.New("can't acquire a user session row with an empty session identifier"))
+	}
+
+	acquire := sqlbuilder.NewUpdateBuilder()
+	acquire.Update("user_sessions")
+	acquire.Set(acquire.Assign("updated_at", time.Now().UTC()))
+	acquire.Where(acquire.Equal("session_identifier", sessionIdentifier))
+
+	query, args := acquire.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to acquire user session row")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "unable to get the number of rows affected acquiring a user session row")
+	}
+
+	// Existence is reported rather than only errors, because "the row is gone" is the answer the
+	// caller acts on and no later read re-asks the question. A failure above returns the error
+	// instead of a benign false: a statement that did not run has not established that the session
+	// is absent.
+	return rowsAffected == 1, nil
+}
+
 // Deletes user sessions that have been idle longer than the specified timeout
 func (d *CommonDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()

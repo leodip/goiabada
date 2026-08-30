@@ -51,6 +51,10 @@ func (d *MySQLDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error
 	return d.CommonDB.DeleteUserSession(tx, userSessionId)
 }
 
+func (d *MySQLDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error) {
+	return d.CommonDB.AcquireUserSessionRow(tx, sessionIdentifier)
+}
+
 func (d *MySQLDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
 	return d.CommonDB.DeleteIdleSessions(tx, idleTimeout)
 }

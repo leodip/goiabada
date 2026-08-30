@@ -336,6 +336,28 @@ type Database interface {
 	GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error)
 	GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]models.UserSession, error)
 	DeleteUserSession(tx *sql.Tx, userSessionId int64) error
+	// AcquireUserSessionRow takes the session's row inside the caller's transaction and
+	// holds it until that transaction ends, the way AcquireClientRow does for a client
+	// (#245). It keys on the session identifier because that is what a ceremony holds,
+	// and that column is UNIQUE on all four engines, so the statement is a single-row
+	// lock everywhere.
+	//
+	// What it buys is an order between two transactions that would otherwise not have
+	// one: a ceremony inserting an authorization code and a termination sweeping that
+	// session's grants both write this row before touching anything else, so one waits
+	// for the other. Whichever waits then learns its answer after the wait rather than
+	// from a snapshot taken before it (#139).
+	//
+	// True means the row was still there, false means it is gone. The answer is
+	// reported rather than left to a later read, because "the session is gone" is the
+	// condition the caller acts on and asking it twice would let the two answers
+	// disagree.
+	//
+	// A transaction is required: without one the statement autocommits and the row is
+	// released before the caller can use it, which is the whole of what this buys. An
+	// empty session identifier is refused, because no row carries one and the statement
+	// would otherwise report "gone" for every session there is.
+	AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error)
 	// PromoteUserSessionGeneration moves one session to a new authentication
 	// generation. Narrow because BumpUserSession writes the whole row on every
 	// request and would otherwise undo the promotion (#106). Errors if no row matched:

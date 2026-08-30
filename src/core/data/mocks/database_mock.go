@@ -98,6 +98,72 @@ func (_c *Database_AcquireClientRow_Call) RunAndReturn(run func(tx *sql.Tx, clie
 	return _c
 }
 
+// AcquireUserSessionRow provides a mock function for the type Database
+func (_mock *Database) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error) {
+	ret := _mock.Called(tx, sessionIdentifier)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AcquireUserSessionRow")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (bool, error)); ok {
+		return returnFunc(tx, sessionIdentifier)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) bool); ok {
+		r0 = returnFunc(tx, sessionIdentifier)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
+		r1 = returnFunc(tx, sessionIdentifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_AcquireUserSessionRow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AcquireUserSessionRow'
+type Database_AcquireUserSessionRow_Call struct {
+	*mock.Call
+}
+
+// AcquireUserSessionRow is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - sessionIdentifier string
+func (_e *Database_Expecter) AcquireUserSessionRow(tx any, sessionIdentifier any) *Database_AcquireUserSessionRow_Call {
+	return &Database_AcquireUserSessionRow_Call{Call: _e.mock.On("AcquireUserSessionRow", tx, sessionIdentifier)}
+}
+
+func (_c *Database_AcquireUserSessionRow_Call) Run(run func(tx *sql.Tx, sessionIdentifier string)) *Database_AcquireUserSessionRow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_AcquireUserSessionRow_Call) Return(b bool, err error) *Database_AcquireUserSessionRow_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_AcquireUserSessionRow_Call) RunAndReturn(run func(tx *sql.Tx, sessionIdentifier string) (bool, error)) *Database_AcquireUserSessionRow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BackfillEncryptedOTPSecrets provides a mock function for the type Database
 func (_mock *Database) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
 	ret := _mock.Called(aesKey)
