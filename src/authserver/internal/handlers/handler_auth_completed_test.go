@@ -616,16 +616,17 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(true)
 
-		// The code sweep fails, which is the first write inside the transaction, so the deferred
+		// The deletion fails, which since #139 is the FIRST write inside the transaction: it is the
+		// statement that takes the session row, and the two sweeps follow it. So the deferred
 		// rollback runs and nothing was committed. Same failure point the two API callers use.
-		sweepError := errors.New("the code sweep failed")
+		deleteError := errors.New("the session delete failed")
 		database.On("BeginTransaction").Return(crossUserTerminateTx, nil).Once()
-		database.On("RevokeCodesBySessionIdentifier", crossUserTerminateTx, sessionIdentifier).
-			Return(int64(0), sweepError).Once()
+		database.On("DeleteUserSession", crossUserTerminateTx, foreignSession.Id).
+			Return(deleteError).Once()
 		database.On("RollbackTransaction", crossUserTerminateTx).Return(nil).Once()
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == sweepError.Error()
+			return err.Error() == deleteError.Error()
 		})).Return().Once()
 
 		handler.ServeHTTP(rr, req)
@@ -636,7 +637,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// Nothing committed, nothing deleted, and no replacement session. The browser is left
 		// cookied to the session that is still there, which is the fail-closed direction.
-		assertNotAttempted(t, database, "CommitTransaction", "DeleteUserSession",
+		assertNotAttempted(t, database, "CommitTransaction", "RevokeCodesBySessionIdentifier",
 			"GetRefreshTokensBySessionIdentifier", "UpdateRefreshToken", "UpdateUserSession")
 		userSessionManager.AssertNotCalled(t, "StartNewUserSession", mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)

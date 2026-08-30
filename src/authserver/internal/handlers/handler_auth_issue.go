@@ -287,118 +287,29 @@ func HandleIssueGet(
 		}
 
 		if !mayBind {
-			// Three shapes, three lines. "The session backing this ceremony is gone" would be
-			// the wrong sentence for a session that resolves but belongs to another user, and an
-			// operator reading that one needs to see the two user ids that failed to match (#133
-			// decision 7); it is equally wrong for a session that is present, owned and merely
-			// out of time, which is what an operator's idle timeout doing its job looks like.
-			sessionIsForeign := ambientSession != nil && !authContext.OwnsSession(ambientSession)
-			sessionIsExpired := ambientSession != nil && !sessionIsForeign && !sessionIsValid
-
-			// Only the expired shape audits. The foreign and gone shapes are #133's and #129's
-			// refusals, unchanged here and writing no audit row today; this event attests the
-			// check #241 added, which is the one an administrator can cause by configuring a
-			// timeout, and stretching it over two older conditions would make it useless for
-			// answering the question it exists for.
-			if sessionIsExpired {
-				auditLogger.Log(constants.AuditIssuanceRefusedSessionInvalid, map[string]interface{}{
-					"userId":            authContext.UserId,
-					"clientId":          authContext.ClientId,
-					"sessionIdentifier": sessionIdentifier,
-				})
-			}
-
-			// prompt=none is the one ceremony that cannot be restarted: /auth/level1 sends the
-			// browser to /auth/pwd, which renders a form, and this request forbids any UI at
-			// all (OIDC Core 3.1.2.1, and concepts/prompt-parameter.mdx says the same). Nothing
-			// between here and the form reads the prompt, so the client would be handed a login
-			// page and no error, and a silent-renewal iframe would wait for its own timeout
-			// instead. It gets login_required instead (#129 decision 16), which is what
-			// handlePromptNone itself returns when its session lookup finds no row: the
-			// condition really is the same one, arriving one redirect hop later, so the client
-			// cannot tell the two apart and does not need to. No code is minted on either
-			// branch, so the fail-open decision 6 closes stays closed.
-			if authContext.HasPromptValue("none") {
-				switch {
-				case sessionIsForeign:
-					slog.Warn("the session in this browser belongs to a different user, returning login_required instead of binding this silent ceremony to it",
-						"sessionIdentifier", sessionIdentifier,
-						"sessionUserId", ambientSession.UserId,
-						"ceremonyUserId", authContext.UserId)
-				case sessionIsExpired:
-					slog.Warn("the session backing this silent ceremony is no longer within its idle timeout or maximum lifetime, returning login_required instead of issuing a code",
-						"sessionIdentifier", sessionIdentifier,
-						"sessionUserId", ambientSession.UserId)
-				default:
-					slog.Warn("the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
-						"sessionIdentifier", sessionIdentifier)
-				}
-				// The clear goes FIRST, which is the order the code path below uses too.
-				// ClearAuthContext persists the deletion through a Set-Cookie on w, and
-				// redirToClientWithError commits the response in every response mode, so
-				// clearing afterwards leaves the header on a response already written and
-				// the browser keeps a ready_to_issue_code context it can replay.
-				//
-				// Provenance is resolved before the dispatch, for the same reason as at the
-				// id_token_hint refusal above (#108). The registration gate at the top of the
-				// handler loaded the client and refused a nil, so issuingClient is it.
-				err := authHelper.ClearAuthContext(w, r)
-				if err != nil {
-					// A failed clear leaves the auth context either wholly there or wholly
-					// gone, never half, so withholding the client's response buys nothing
-					// whichever way it failed. That was inherited from ChunkedCookieStore,
-					// whose every error return sat above its first http.SetCookie; against a
-					// server-side store it is re-derived rather than assumed, because the save
-					// now writes in two places. The row is written before the cookie, so a
-					// failure before the row leaves the context intact, exactly as before, and
-					// a failure after it leaves the context already gone server-side while the
-					// browser's identifier still names the same cleared row. Neither outcome
-					// lets the browser replay a ready_to_issue_code context (#266).
-					//
-					// The client is owed a response either way: its redirect URI was validated
-					// upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749
-					// 4.1.2.1 mints server_error for exactly this condition (#141).
-					slog.Error("failed to clear the auth context, answering the client with server_error",
-						"error", err)
-					err = redirToClientWithError(w, r, database, httpHelper, templateFS,
-						redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
-					if err != nil {
-						// Nowhere left to send the client, so the 500 is the last resort here.
-						httpHelper.InternalServerError(w, r, err)
-					}
-					return
-				}
-				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
-					redirectErrorFromAuthContext(authContext, issuingClient, constants.ErrorLoginRequired,
-						"User authentication is required"))
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-					return
-				}
-				return
-			}
-
+			// Three shapes, and each gets its own sentence rather than one covering all three.
+			// "The session backing this ceremony is gone" would be the wrong sentence for a session
+			// that resolves but belongs to another user, and an operator reading that one needs to
+			// see the two user ids that failed to match (#133 decision 7); it is equally wrong for a
+			// session that is present, owned and merely out of time, which is what an operator's idle
+			// timeout doing its job looks like.
+			//
+			// The answer itself lives in refuseIssuanceUnusableSession because this handler asks the
+			// same question twice: here, from the liveness read, and again below the dispatch, where
+			// the acquisition that orders the code insert against a session termination can find the
+			// row gone in the few statements between the two. One condition gets one answer wherever
+			// it is learned, and a single implementation is what makes that true rather than claimed
+			// (#139 decision 3).
+			shape := sessionGone
 			switch {
-			case sessionIsForeign:
-				slog.Warn("the session in this browser belongs to a different user, restarting level 1 instead of binding this ceremony to it",
-					"sessionIdentifier", sessionIdentifier,
-					"sessionUserId", ambientSession.UserId,
-					"ceremonyUserId", authContext.UserId)
-			case sessionIsExpired:
-				slog.Warn("the session backing this ceremony is no longer within its idle timeout or maximum lifetime, restarting level 1 instead of issuing a code",
-					"sessionIdentifier", sessionIdentifier,
-					"sessionUserId", ambientSession.UserId)
-			default:
-				slog.Warn("the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
-					"sessionIdentifier", sessionIdentifier)
+			case ambientSession != nil && !authContext.OwnsSession(ambientSession):
+				shape = sessionForeign
+			case ambientSession != nil && !sessionIsValid:
+				shape = sessionExpired
 			}
-			authContext.AuthState = oauth.AuthStateRequiresLevel1
-			err = authHelper.SaveAuthContext(w, r, authContext)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+
+			refuseIssuanceUnusableSession(w, r, shape, authContext, issuingClient, ambientSession,
+				sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger)
 			return
 		}
 
@@ -506,30 +417,84 @@ func HandleIssueGet(
 			AuthContext:       *authContext,
 			SessionIdentifier: sessionIdentifier,
 		}
-		code, err := codeIssuer.CreateAuthCode(nil, createCodeInput)
+
+		// The observation that the session is still there and the insert that binds a grant to it
+		// go in ONE transaction, and the acquisition is what orders this ceremony against a
+		// termination of that session (#139).
+		//
+		// The liveness read above cannot do this on its own, however recently it ran: it is a
+		// read on one connection followed by an insert on another, so a termination can commit in
+		// between, and worse, a code inserted after that termination's sweep and before its
+		// COMMIT is invisible to the sweep and the termination is invisible to any compensating
+		// read, which still sees the uncommitted-deleted session row. The termination now deletes
+		// the session row as its first statement, so both sides write the same row before
+		// touching anything else and one of them waits. Either this transaction waits and the
+		// acquisition then matches no rows, so nothing is issued, or the termination waits and
+		// its code sweep runs after this insert committed, so the code it hands the client is
+		// marked revoked and redemption answers invalid_grant. There is no third case: that row
+		// is the only object both sides touch and neither takes any other lock before it.
+		//
+		// Opened HERE rather than higher up so the row is held across as few statements as
+		// possible, and on the authorization code branch only: the implicit flow mints no code
+		// and no refresh token, so it has no durable grant for this to protect (#139 decision 6).
+		tx, err := database.BeginTransaction()
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		defer database.RollbackTransaction(tx) //nolint:errcheck
+
+		// Existence only, deliberately. Ownership and the two timeouts were asked a few statements
+		// ago and are not re-asked here: the only thing this narrower question misses is an idle
+		// timeout elapsing in the microseconds between the two, and buying that would cost a
+		// SELECT on every authorization code issued (#139 decision 7).
+		live, err := database.AcquireUserSessionRow(tx, sessionIdentifier)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		// The check above is a read followed by an insert, so a termination can commit
-		// between the two. This compensates for that (#129 decision 12): the two sweepers
-		// cover each other, since a code committing before the termination's UPDATE reads
-		// the codes table is marked by the termination, and a code committing after it is
-		// marked here. Only a code landing between that UPDATE and its COMMIT escapes both,
-		// which is recorded as a residual in the #129 agreement rather than closed here.
-		//
-		// A failure is a 500 rather than a code handed over: the row exists and carries no
-		// marker at this point, so returning it is exactly the fail-open this statement is
-		// for. Unredeemed it expires in 60 seconds.
-		codeRevoked, err := database.RevokeCodeIfSessionGone(nil, code.Id, sessionIdentifier)
+		if !live {
+			// Rolled back HERE, explicitly, before the refusal reaches anything. Every path out of
+			// refuseIssuanceUnusableSession touches the database on a nil transaction through the
+			// server-side session store: SaveAuthContext and ClearAuthContext write it and
+			// redirToClientWithError reads the client. On SQLite the whole process shares one
+			// connection, the one this transaction is holding, so leaving the rollback to the
+			// deferred call above would have the refusal wait on itself. The deferred call still
+			// runs and is a no-op against a finished transaction.
+			//
+			// A rollback that FAILS is a 500 rather than a refusal, because the connection is then
+			// still held and the refusal would be the statement that discovers it.
+			if err := database.RollbackTransaction(tx); err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			// The gone shape, and it is answered exactly as the liveness read above answers it:
+			// the browser restarts at level 1 and a prompt=none ceremony is told login_required.
+			// The acquisition cannot tell WHY the row is gone, which is #129's own finding, so an
+			// explicit termination, a logout in another tab and either background reaper all get
+			// this one answer (#139 decisions 3 and 9). No code row is written at all, so nothing
+			// is left behind to reap.
+			refuseIssuanceUnusableSession(w, r, sessionGone, authContext, issuingClient, ambientSession,
+				sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger)
+			return
+		}
+
+		code, err := codeIssuer.CreateAuthCode(tx, createCodeInput)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		if codeRevoked {
-			slog.Warn("the session backing this ceremony was ended while its code was being issued, so the code was revoked",
-				"codeId", code.Id, "sessionIdentifier", sessionIdentifier)
+
+		// Everything below this line attests to a write, so it waits for the commit, which is the
+		// rule TerminateUserSessionTx documents: never attest to a write that could still roll
+		// back. A commit that returns an error leaves the code row's fate indeterminate, which is
+		// the same contract that helper already carries, and the client is answered with a 500
+		// rather than a code.
+		if err := database.CommitTransaction(tx); err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
 		}
 
 		auditLogger.Log(constants.AuditCreatedAuthCode, map[string]interface{}{
@@ -548,6 +513,155 @@ func HandleIssueGet(
 			httpHelper.InternalServerError(w, r, err)
 		}
 	}
+}
+
+// sessionRefusalShape names which of the three conditions on the session backing a ceremony
+// refuseIssuanceUnusableSession is answering. They are mutually exclusive by construction: a row
+// that is absent cannot be foreign, and a foreign one is refused on ownership before its clock is
+// read.
+type sessionRefusalShape int
+
+const (
+	// sessionGone is a session identifier with no row behind it. What removed the row is not
+	// asked and cannot be told from here, which is #129's own finding: an explicit termination, a
+	// logout in another tab, the idle reaper and the max-lifetime reaper all look identical to
+	// the reader (#139 decision 9).
+	sessionGone sessionRefusalShape = iota
+	// sessionForeign is a row that resolves and belongs to a different user than the ceremony's
+	// (#133).
+	sessionForeign
+	// sessionExpired is a row that resolves, is owned, and is outside its idle timeout or its
+	// maximum lifetime (#241).
+	sessionExpired
+)
+
+// refuseIssuanceUnusableSession is /auth/issue's one answer to "this ceremony cannot bind a grant
+// to this session", and it exists as a function because the handler reaches that conclusion at two
+// different points: the liveness read above the response-type dispatch, and the acquisition that
+// orders the code insert against a session termination below it. Decision 3 of #139 is that one
+// condition gets one answer wherever it is learned, and a shared implementation is what makes that
+// checkable rather than a claim about two blocks that currently agree.
+//
+// Two outcomes, one predicate. An interactive ceremony is restarted at level 1, and a prompt=none
+// ceremony is answered login_required, because a request that forbids UI cannot be sent to a
+// password form. No code is minted on either branch.
+//
+// ambientSession is read only for the two shapes that have a row: the log lines for a foreign or
+// an expired session name the user the row belongs to, and the gone shape has nothing to name.
+func refuseIssuanceUnusableSession(
+	w http.ResponseWriter,
+	r *http.Request,
+	shape sessionRefusalShape,
+	authContext *oauth.AuthContext,
+	issuingClient *models.Client,
+	ambientSession *models.UserSession,
+	sessionIdentifier string,
+	httpHelper HttpHelper,
+	authHelper AuthHelper,
+	templateFS fs.FS,
+	database data.Database,
+	auditLogger AuditLogger,
+) {
+	// Only the expired shape audits. The foreign and gone shapes are #133's and #129's refusals,
+	// writing no audit row today; this event attests the check #241 added, which is the one an
+	// administrator can cause by configuring a timeout, and stretching it over two older
+	// conditions would make it useless for answering the question it exists for.
+	if shape == sessionExpired {
+		auditLogger.Log(constants.AuditIssuanceRefusedSessionInvalid, map[string]interface{}{
+			"userId":            authContext.UserId,
+			"clientId":          authContext.ClientId,
+			"sessionIdentifier": sessionIdentifier,
+		})
+	}
+
+	// prompt=none is the one ceremony that cannot be restarted: /auth/level1 sends the browser to
+	// /auth/pwd, which renders a form, and this request forbids any UI at all (OIDC Core 3.1.2.1,
+	// and concepts/prompt-parameter.mdx says the same). Nothing between here and the form reads
+	// the prompt, so the client would be handed a login page and no error, and a silent-renewal
+	// iframe would wait for its own timeout instead. It gets login_required instead (#129 decision
+	// 16), which is what handlePromptNone itself returns when its session lookup finds no row: the
+	// condition really is the same one, arriving one redirect hop later, so the client cannot tell
+	// the two apart and does not need to. No code is minted on either branch, so the fail-open
+	// decision 6 closes stays closed.
+	if authContext.HasPromptValue("none") {
+		switch shape {
+		case sessionForeign:
+			slog.Warn("the session in this browser belongs to a different user, returning login_required instead of binding this silent ceremony to it",
+				"sessionIdentifier", sessionIdentifier,
+				"sessionUserId", ambientSession.UserId,
+				"ceremonyUserId", authContext.UserId)
+		case sessionExpired:
+			slog.Warn("the session backing this silent ceremony is no longer within its idle timeout or maximum lifetime, returning login_required instead of issuing a code",
+				"sessionIdentifier", sessionIdentifier,
+				"sessionUserId", ambientSession.UserId)
+		default:
+			slog.Warn("the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
+				"sessionIdentifier", sessionIdentifier)
+		}
+		// The clear goes FIRST, which is the order the restart below uses too. ClearAuthContext
+		// persists the deletion through a Set-Cookie on w, and redirToClientWithError commits the
+		// response in every response mode, so clearing afterwards leaves the header on a response
+		// already written and the browser keeps a ready_to_issue_code context it can replay.
+		//
+		// Provenance is resolved before the dispatch, for the same reason as at the id_token_hint
+		// refusal (#108). The registration gate at the top of the handler loaded the client and
+		// refused a nil, so issuingClient is it.
+		err := authHelper.ClearAuthContext(w, r)
+		if err != nil {
+			// A failed clear leaves the auth context either wholly there or wholly gone, never
+			// half, so withholding the client's response buys nothing whichever way it failed.
+			// That was inherited from ChunkedCookieStore, whose every error return sat above its
+			// first http.SetCookie; against a server-side store it is re-derived rather than
+			// assumed, because the save now writes in two places. The row is written before the
+			// cookie, so a failure before the row leaves the context intact, exactly as before,
+			// and a failure after it leaves the context already gone server-side while the
+			// browser's identifier still names the same cleared row. Neither outcome lets the
+			// browser replay a ready_to_issue_code context (#266).
+			//
+			// The client is owed a response either way: its redirect URI was validated upstream,
+			// so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749 4.1.2.1 mints
+			// server_error for exactly this condition (#141).
+			slog.Error("failed to clear the auth context, answering the client with server_error",
+				"error", err)
+			err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+				redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
+			if err != nil {
+				// Nowhere left to send the client, so the 500 is the last resort here.
+				httpHelper.InternalServerError(w, r, err)
+			}
+			return
+		}
+		err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+			redirectErrorFromAuthContext(authContext, issuingClient, constants.ErrorLoginRequired,
+				"User authentication is required"))
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		return
+	}
+
+	switch shape {
+	case sessionForeign:
+		slog.Warn("the session in this browser belongs to a different user, restarting level 1 instead of binding this ceremony to it",
+			"sessionIdentifier", sessionIdentifier,
+			"sessionUserId", ambientSession.UserId,
+			"ceremonyUserId", authContext.UserId)
+	case sessionExpired:
+		slog.Warn("the session backing this ceremony is no longer within its idle timeout or maximum lifetime, restarting level 1 instead of issuing a code",
+			"sessionIdentifier", sessionIdentifier,
+			"sessionUserId", ambientSession.UserId)
+	default:
+		slog.Warn("the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
+			"sessionIdentifier", sessionIdentifier)
+	}
+	authContext.AuthState = oauth.AuthStateRequiresLevel1
+	err := authHelper.SaveAuthContext(w, r, authContext)
+	if err != nil {
+		httpHelper.InternalServerError(w, r, err)
+		return
+	}
+	http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
 }
 
 // handleImplicitFlow handles the implicit grant flow token issuance.

@@ -532,12 +532,12 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 	tokens := terminationFixture()
 
 	db.On("BeginTransaction").Return(revokeTx, nil).Once()
+	db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).Return(int64(2), nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).Return(tokens, nil).Once()
 	// The two live tokens only. rt-already-gone is not written again.
 	db.On("UpdateRefreshToken", revokeTx, tokens[0]).Return(nil).Once()
 	db.On("UpdateRefreshToken", revokeTx, tokens[1]).Return(nil).Once()
-	db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("CommitTransaction", revokeTx).Return(nil).Once()
 	// The deferred rollback runs on the success path too, where it is a no-op against a committed
 	// transaction. A test omitting this fails on the strict mock.
@@ -562,15 +562,21 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 	assert.True(t, tokens[1].Revoked, "the offline token of the terminated session must be revoked")
 	assert.True(t, tokens[0].Revoked)
 
-	// Decision 5's order: the durable marker first, then the tokens, then the row. Within one
-	// transaction this is not a safety boundary and neither sweep reads user_sessions, so the
-	// assertion pins the design's order rather than a correctness property, and is here so
-	// reordering has to be deliberate.
+	// The order, and unlike #129's it IS a correctness property now. DeleteUserSession leads
+	// because it is the statement that takes the user_sessions row, and that row is what makes an
+	// authorization ceremony minting a code wait for this transaction or this transaction wait for
+	// it (#139 decision 2). With the delete last, as #129 wrote it, the code sweep runs before this
+	// transaction has touched anything the ceremony touches, so a code inserted after the sweep and
+	// before the commit escapes it. This assertion is the unit half of that; the interleaving
+	// itself is at the data tier, where two real transactions can be ordered by hand.
+	//
+	// The two sweeps keep their relative order and #129's reason for it, which is about the join
+	// reaching an offline grant's tokens and says nothing about user_sessions.
+	deletion := callIndex(t, db, "DeleteUserSession")
 	codeSweep := callIndex(t, db, "RevokeCodesBySessionIdentifier")
 	tokenSweep := callIndex(t, db, "GetRefreshTokensBySessionIdentifier")
-	deletion := callIndex(t, db, "DeleteUserSession")
+	assert.Less(t, deletion, codeSweep, "the session row is taken first, by deleting it")
 	assert.Less(t, codeSweep, tokenSweep, "codes are marked before the tokens are swept")
-	assert.Less(t, tokenSweep, deletion, "the session row is deleted last")
 
 	// The negative control, and the reason this seam is worth having. Terminating one session
 	// must not advance the user's generation nor sweep user-scoped tokens: either would sign out
@@ -588,10 +594,10 @@ func TestTerminateUserSessionTx_NothingToRevoke(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
 	db.On("BeginTransaction").Return(revokeTx, nil).Once()
+	db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).Return(int64(0), nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
 		Return([]*models.RefreshToken{}, nil).Once()
-	db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("CommitTransaction", revokeTx).Return(nil).Once()
 	db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 
@@ -661,18 +667,32 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				db.On("BeginTransaction").Return(nil, boom).Once()
 			},
 			// Not even the rollback: there is no transaction to roll back.
-			notAttempted: []string{"RevokeCodesBySessionIdentifier", "RollbackTransaction"},
+			notAttempted: []string{"DeleteUserSession", "RollbackTransaction"},
+		},
+		{
+			// The FIRST write since #139, and the row it takes is what orders this transaction
+			// against a ceremony issuing a code. A failure here reaches none of the sweeps, which
+			// is what the notAttempted set below says: the delete is not a step the rest of the
+			// transaction can be reached past.
+			name: "the deletion fails",
+			setup: func(db *mocks_data.Database) {
+				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(boom).Once()
+				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+			},
+			notAttempted: []string{"RevokeCodesBySessionIdentifier",
+				"GetRefreshTokensBySessionIdentifier", "CommitTransaction"},
 		},
 		{
 			name: "the code sweep fails",
 			setup: func(db *mocks_data.Database) {
 				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).
 					Return(int64(0), boom).Once()
 				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
-			notAttempted: []string{"GetRefreshTokensBySessionIdentifier", "DeleteUserSession",
-				"CommitTransaction"},
+			notAttempted: []string{"GetRefreshTokensBySessionIdentifier", "CommitTransaction"},
 		},
 		{
 			// KEEP THIS ROW. It is the one that names the property: the sweep returned 2, the
@@ -685,13 +705,14 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			name: "the token query fails after the code sweep revoked two codes",
 			setup: func(db *mocks_data.Database) {
 				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).
 					Return(int64(2), nil).Once()
 				db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
 					Return(nil, boom).Once()
 				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
-			notAttempted: []string{"UpdateRefreshToken", "DeleteUserSession", "CommitTransaction"},
+			notAttempted: []string{"UpdateRefreshToken", "CommitTransaction"},
 			extraAssert: func(t *testing.T, result TerminationResult) {
 				assert.Equal(t, int64(0), result.RevokedCodeCount,
 					"the count must not survive a rolled-back transaction")
@@ -702,24 +723,12 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			setup: func(db *mocks_data.Database) {
 				tokens := terminationFixture()
 				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).
 					Return(int64(2), nil).Once()
 				db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
 					Return(tokens, nil).Once()
 				db.On("UpdateRefreshToken", revokeTx, tokens[0]).Return(boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
-			},
-			notAttempted: []string{"DeleteUserSession", "CommitTransaction"},
-		},
-		{
-			name: "the deletion fails",
-			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
-				db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).
-					Return(int64(1), nil).Once()
-				db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
-					Return([]*models.RefreshToken{}, nil).Once()
-				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(boom).Once()
 				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
 			notAttempted: []string{"CommitTransaction"},
@@ -731,11 +740,11 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			name: "the commit fails",
 			setup: func(db *mocks_data.Database) {
 				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).
 					Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
 					Return([]*models.RefreshToken{}, nil).Once()
-				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("CommitTransaction", revokeTx).Return(boom).Once()
 				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},

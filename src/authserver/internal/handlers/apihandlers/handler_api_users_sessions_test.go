@@ -135,9 +135,10 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
 	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+	// The deletion, which since #139 is the first write inside the termination transaction.
 	database.On("BeginTransaction").Return(apiTerminateTx, nil).Once()
-	database.On("RevokeCodesBySessionIdentifier", apiTerminateTx, "sid-terminated").
-		Return(int64(0), errors.New("the code sweep failed")).Once()
+	database.On("DeleteUserSession", apiTerminateTx, userSession.Id).
+		Return(errors.New("the session delete failed")).Once()
 	database.On("RollbackTransaction", apiTerminateTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()

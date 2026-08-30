@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/web"
@@ -169,14 +170,16 @@ func TestHandleIssueGet(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", issuanceTx, mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext) &&
 				input.SessionIdentifier == liveSessionIdentifier
 		})).Return(mockCode, nil)
 
-		// The compensating revoke, keyed on the code just inserted and the session it was
-		// bound to. It matches nothing here, since the session is live.
-		database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
+		// The transaction the insert runs on, with the acquisition reporting the session still
+		// there. The insert above is matched on issuanceTx rather than mock.Anything, which is
+		// what pins that the code is written on the transaction that holds the session row and
+		// not on the pool (#139).
+		stubIssuanceTransaction(database)
 
 		// Mock audit logging
 		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -194,6 +197,11 @@ func TestHandleIssueGet(t *testing.T) {
 		// Assertions
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state", rr.Header().Get("Location"))
+
+		// The compensating statement is gone with the window it compensated for (#139 decision
+		// 4). The strict mock already fails on an unexpected call, so this says which call is
+		// meant rather than adding a guarantee: it is the assertion that names the removal.
+		database.AssertNotCalled(t, "RevokeCodeIfSessionGone", mock.Anything, mock.Anything, mock.Anything)
 
 		// Verify that all expected actions were performed
 		httpHelper.AssertExpectations(t)
@@ -621,7 +629,7 @@ func TestHandleIssueGet(t *testing.T) {
 		authHelper.AssertNotCalled(t, "SaveAuthContext")
 	})
 
-	t.Run("The compensating revoke fails, so no code reaches the client", func(t *testing.T) {
+	t.Run("The commit fails, so no code reaches the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
@@ -658,15 +666,20 @@ func TestHandleIssueGet(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything).Return(mockCode, nil)
+		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).Return(mockCode, nil)
 
-		// The code row exists and carries no marker at this point, so handing it over is
-		// exactly the fail-open decision 12 closes. Unredeemed it expires in 60 seconds.
-		revokeError := errors.New("compensating revoke failed")
-		database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, revokeError)
+		// The commit is where the insert becomes durable, so a failure here leaves the code row's
+		// fate indeterminate and the client must be told nothing rather than handed a code that
+		// may not exist. Everything that attests to the write sits below the commit for this
+		// reason, which is why neither the audit nor the clear runs (#139).
+		commitError := errors.New("commit failed")
+		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
+		database.On("CommitTransaction", issuanceTx).Return(commitError).Once()
+		database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == revokeError
+			return err == commitError
 		})).Return()
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -680,6 +693,237 @@ func TestHandleIssueGet(t *testing.T) {
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log")
 		authHelper.AssertNotCalled(t, "ClearAuthContext")
+	})
+}
+
+// =============================================================================
+// #139: the acquisition that orders this ceremony against a session termination
+//
+// The liveness read a few statements above is a read on one connection followed by an insert on
+// another, so a termination can commit between the two, and a code inserted between that
+// termination's sweep and its COMMIT escapes the sweep and every compensating read. The code
+// branch therefore opens a transaction, writes the session row through AcquireUserSessionRow and
+// inserts on that same transaction, so one of the two parties waits for the other.
+//
+// These cases own the branch the acquisition adds. What they cannot show is the ordering itself:
+// a mock answers whatever it was told to, so "the row was gone" here is a stipulation rather than
+// an interleaving. The interleaving is at the data tier, where two real transactions can be
+// ordered by hand on all four engines.
+//
+// "No code created" is enforced rather than asserted in every refusal below: the strict
+// mocks_oauth.CodeIssuer carries no CreateAuthCode expectation, so reaching it fails the case on
+// its own, and so does an unexpected CommitTransaction.
+func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
+	// The ceremony every case here runs: a live, owned, valid session, so the liveness read
+	// above the dispatch passes and the acquisition is the only thing left that can refuse.
+	issuanceAuthContext := func(prompt string) *oauth.AuthContext {
+		return &oauth.AuthContext{
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "query",
+			ResponseType: "code",
+			RedirectURI:  "https://example.com/callback",
+			State:        "test-state",
+			Prompt:       prompt,
+		}
+	}
+
+	t.Run("The row is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+
+		authContext := issuanceAuthContext("")
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubLiveSession(database, 123)
+
+		// The order of these two is the assertion, not a detail. Every path out of the refusal
+		// reaches the database on a nil transaction through the server-side session store, and on
+		// SQLite the whole process shares one connection: the one this transaction holds. A
+		// refusal issued before the rollback would wait on itself (#139).
+		var order []string
+		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
+		// Twice: the explicit rollback, then the deferred one, which is a no-op against a
+		// transaction that has already finished.
+		database.On("RollbackTransaction", issuanceTx).Run(func(mock.Arguments) {
+			order = append(order, "rollback")
+		}).Return(nil).Twice()
+
+		var savedAuthContext *oauth.AuthContext
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Run(func(args mock.Arguments) {
+			order = append(order, "save")
+			savedAuthContext = args.Get(2).(*oauth.AuthContext)
+		}).Return(nil)
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
+		handler.ServeHTTP(rr, req)
+
+		// The same answer the liveness read gives for the same condition, which is what makes
+		// refuseIssuanceUnusableSession one implementation rather than two that agree today.
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
+		assert.NotContains(t, rr.Header().Get("Location"), "code=")
+		require.NotNil(t, savedAuthContext)
+		assert.Equal(t, oauth.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+
+		require.GreaterOrEqual(t, len(order), 2)
+		assert.Equal(t, "rollback", order[0],
+			"the transaction must be released before the refusal touches the session store, or on SQLite the refusal waits on the connection this transaction holds")
+		assert.Equal(t, "save", order[1])
+
+		// Nothing was written and nothing was attested to.
+		database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		authHelper.AssertNotCalled(t, "ClearAuthContext")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+	})
+
+	t.Run("The row is gone and the ceremony is silent, so the client is answered login_required", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com/callback")
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+
+		authContext := issuanceAuthContext("none")
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubClientProvenanceLookup(database)
+		stubLiveSession(database, 123)
+
+		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
+		database.On("RollbackTransaction", issuanceTx).Return(nil).Twice()
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
+		handler.ServeHTTP(rr, req)
+
+		// prompt=none forbids UI, so this ceremony cannot be restarted into a password form: it
+		// gets the same login_required the liveness read gives, one redirect hop earlier (#129
+		// decision 16).
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com/callback")
+		assert.Contains(t, location, "error=login_required")
+		assert.Contains(t, location, "state=test-state")
+		assert.NotContains(t, location, "code=")
+		assert.NotContains(t, location, "/auth/level1")
+
+		authHelper.AssertNotCalled(t, "SaveAuthContext")
+		database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+	})
+
+	// The two failures of the transaction itself. Both are a 500 and neither is a refusal: a
+	// statement that did not run has not established that the session is gone, so answering the
+	// browser as though it had would restart a ceremony whose session is in fact alive.
+	t.Run("The acquisition or the begin fails, so the ceremony answers 500 and nothing is inserted", func(t *testing.T) {
+		boom := errors.New("connection refused")
+
+		cases := []struct {
+			name  string
+			setup func(database *mocks_data.Database)
+		}{
+			{
+				name: "BeginTransaction fails",
+				setup: func(database *mocks_data.Database) {
+					database.On("BeginTransaction").Return(nil, boom).Once()
+					// Not even the rollback: there is no transaction to roll back, and rolling
+					// back a nil one would panic rather than answer.
+					database.AssertNotCalled(t, "RollbackTransaction", mock.Anything)
+				},
+			},
+			{
+				name: "the acquisition fails",
+				setup: func(database *mocks_data.Database) {
+					database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+					database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).
+						Return(false, boom).Once()
+					database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
+				},
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				templateFS := &mocks_test.TestFS{}
+				codeIssuer := mocks_oauth.NewCodeIssuer(t)
+				tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+				database := mocks_data.NewDatabase(t)
+				auditLogger := mocks_audit.NewAuditLogger(t)
+				userSessionManager := mocks_user.NewUserSessionManager(t)
+				permissionChecker := mocks_user.NewPermissionChecker(t)
+
+				handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+
+				req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+				rr := httptest.NewRecorder()
+
+				authContext := issuanceAuthContext("")
+				authHelper.On("GetAuthContext", req).Return(authContext, nil)
+				stubLiveSession(database, 123)
+				tc.setup(database)
+
+				httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+					return errors.Is(err, boom)
+				})).Return()
+
+				armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
+				handler.ServeHTTP(rr, req)
+
+				// Not a refusal, and not a code: the browser is neither restarted at level 1 nor
+				// sent to the client.
+				assert.NotContains(t, rr.Header().Get("Location"), "/auth/level1")
+				assert.NotContains(t, rr.Header().Get("Location"), "code=")
+				authHelper.AssertNotCalled(t, "SaveAuthContext")
+				authHelper.AssertNotCalled(t, "ClearAuthContext")
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+
+				httpHelper.AssertExpectations(t)
+				database.AssertExpectations(t)
+				codeIssuer.AssertExpectations(t)
+			})
+		}
 	})
 }
 
@@ -1099,6 +1343,26 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 func stubLiveSession(database *mocks_data.Database, ownerUserId int64) {
 	database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: ownerUserId}, nil)
+}
+
+// issuanceTx is the opaque non-nil transaction the code branch of /auth/issue opens. The mocks
+// never dereference it; it only has to be the same pointer the handler forwards, which is what
+// lets a case assert that CreateAuthCode was handed THIS transaction rather than nil or another
+// one, and so that the insert really does run on the connection holding the session row (#139).
+var issuanceTx = &sql.Tx{}
+
+// stubIssuanceTransaction arms the transaction the authorization code branch opens around the
+// acquisition and the insert: the begin, an acquisition reporting the session still there, the
+// commit, and the deferred rollback, which runs on the success path too and is a no-op against a
+// committed transaction. A case that omits it fails on the strict mock.
+//
+// Cases about the refusal arm these themselves, because the answer they need from the acquisition
+// is the opposite one.
+func stubIssuanceTransaction(database *mocks_data.Database) {
+	database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+	database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
+	database.On("CommitTransaction", issuanceTx).Return(nil).Once()
+	database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
 }
 
 // capturedLogs holds the slog records emitted while one subtest runs. Whole records rather than
@@ -2961,7 +3225,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
-		database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
+		stubIssuanceTransaction(database)
 
 		// Mock audit logging
 		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -3327,7 +3591,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
-		database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
+		stubIssuanceTransaction(database)
 
 		// Mock audit logging
 		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -3558,7 +3822,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			if tc.wantIssued {
 				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything).
 					Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
-				database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
+				stubIssuanceTransaction(database)
 				auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
 			} else {
 				auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -3893,7 +4157,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 						input.AuthContext.ConsentedScope == tc.wantConsented
 				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
 					RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
-				database.On("RevokeCodeIfSessionGone", (*sql.Tx)(nil), int64(1), liveSessionIdentifier).Return(false, nil)
+				stubIssuanceTransaction(database)
 				auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
 			} else {
 				auditLogger.On("Log", constants.AuditIssuanceRefusedScopeDenied, mock.MatchedBy(func(details map[string]interface{}) bool {
