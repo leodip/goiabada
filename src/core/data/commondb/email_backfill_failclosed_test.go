@@ -505,8 +505,11 @@ func TestBackfillLowercaseEmails_ARevocationFailureRollsBackTheDisable(t *testin
 			scanResult(scanRow(1, "Alice@x.com")),
 			groupResult(groupRow(1, "Alice@x.com", true), groupRow(2, "alice@x.com", true)),
 			generationReadBack(5),
-			modelRow(t, &models.RefreshToken{Id: 7}),
+			// Sessions before refresh tokens, which is the order disableAndRevoke issues
+			// them in: the session rows are taken ahead of the grants that hang off them
+			// (#139).
 			modelRow(t, &models.UserSession{Id: 9}),
+			modelRow(t, &models.RefreshToken{Id: 7}),
 		}}
 	}
 
@@ -523,28 +526,28 @@ func TestBackfillLowercaseEmails_ARevocationFailureRollsBackTheDisable(t *testin
 			why:     "the generation is what invalidates the authorization codes, which nothing deletes",
 		},
 		{
-			name:    "the refresh-token sweep is refused",
+			name:    "the session sweep is refused",
 			inject:  func(d *scriptedDriver) { d.rows[3] = &scriptedRows{openErr: boom} },
+			wantErr: "unable to query database",
+			why:     "no sessions read is not the same fact as no sessions held",
+		},
+		{
+			name:    "deleting a session fails",
+			inject:  func(d *scriptedDriver) { d.execs = []*scriptedExec{nil, nil, {err: boom}} },
+			wantErr: "unable to delete userSession",
+			why:     "a session that outlives the disable is usable again the moment the account is re-enabled",
+		},
+		{
+			name:    "the refresh-token sweep is refused",
+			inject:  func(d *scriptedDriver) { d.rows[4] = &scriptedRows{openErr: boom} },
 			wantErr: "unable to query database",
 			why:     "a sweep that cannot read the tokens must not be treated as a user with no tokens",
 		},
 		{
 			name:    "revoking a refresh token fails",
-			inject:  func(d *scriptedDriver) { d.execs = []*scriptedExec{nil, nil, {err: boom}} },
+			inject:  func(d *scriptedDriver) { d.execs = []*scriptedExec{nil, nil, nil, {err: boom}} },
 			wantErr: "unable to update refreshToken",
 			why:     "the disable is already written by now, so an unenlisted revocation would leave a live token on a disabled row",
-		},
-		{
-			name:    "the session sweep is refused",
-			inject:  func(d *scriptedDriver) { d.rows[4] = &scriptedRows{openErr: boom} },
-			wantErr: "unable to query database",
-			why:     "same as the token sweep: no sessions read is not the same fact as no sessions held",
-		},
-		{
-			name:    "deleting a session fails",
-			inject:  func(d *scriptedDriver) { d.execs = []*scriptedExec{nil, nil, nil, {err: boom}} },
-			wantErr: "unable to delete userSession",
-			why:     "a session that outlives the disable is usable again the moment the account is re-enabled",
 		},
 	}
 
@@ -784,8 +787,10 @@ func auditedGroup(t *testing.T, console bool, database bool) *scriptedDriver {
 		scanResult(scanRow(1, "Alice@x.com")),
 		groupResult(groupRow(1, "Alice@x.com", true), groupRow(2, "alice@x.com", true)),
 		generationReadBack(5),
-		modelRow(t, &models.RefreshToken{Id: 7}),
+		// Sessions before refresh tokens, which is the order disableAndRevoke issues them
+		// in: the session rows are taken ahead of the grants that hang off them (#139).
 		modelRow(t, &models.UserSession{Id: 9}),
+		modelRow(t, &models.RefreshToken{Id: 7}),
 		modelRow(t, &models.Settings{
 			Id:                         1,
 			AuditLogsInConsoleEnabled:  console,

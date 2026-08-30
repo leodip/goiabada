@@ -626,6 +626,10 @@ func revokeAndAuditAuthCodeReuse(database data.Database, auditLogger AuditLogger
 // transaction so any failure rolls the entire revocation back rather than
 // leaving partial state. The replay response itself must NOT look successful
 // when revocation fails, so callers should surface a 500 to the client.
+//
+// Its first statement takes the session row, ahead of every grant that hangs off
+// it, which is the lock order every transaction writing a session and its grants
+// keeps (#139). See the comment on that statement for what it prevents.
 func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string, error) {
 	if code == nil {
 		return nil, nil
@@ -636,6 +640,26 @@ func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string,
 		return nil, err
 	}
 	defer database.RollbackTransaction(tx) //nolint:errcheck
+
+	// THE SESSION ROW FIRST, before any grant that hangs off it (#139). Every application
+	// transaction that writes a user_sessions row and that session's grants takes the
+	// user_sessions row first, so no two transactions of different shapes can each hold half
+	// of what the other needs. Without this statement leading, this transaction takes
+	// refresh_tokens and then user_sessions while an authorization ceremony takes
+	// user_sessions and then codes, and the two deadlock on PostgreSQL, MySQL and SQL Server
+	// with this one the victim, so the reused code's session survives the very response meant
+	// to contain it.
+	//
+	// The result is deliberately NOT a branch. This response revokes whatever tokens it finds
+	// whether or not the session row is still there, because an offline grant's tokens outlive
+	// their session by design; the acquisition is here for the order it imposes, not for the
+	// answer it returns. A code with no session identifier acquires nothing: no row carries an
+	// empty identifier, and the code-id-scoped fallback below touches no session row either.
+	if code.SessionIdentifier != "" {
+		if _, err := database.AcquireUserSessionRow(tx, code.SessionIdentifier); err != nil {
+			return nil, err
+		}
+	}
 
 	var refreshTokens []*models.RefreshToken
 	if code.SessionIdentifier != "" {
@@ -660,11 +684,23 @@ func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string,
 
 	// Tear down the session only when we actually revoked tokens issued from the
 	// replayed code. If there were none to revoke, there is nothing to contain, and
-	// deleting the session would disrupt an unrelated/in-flight session. This is
-	// what makes concurrent redemption safe: a losing racer's cascade finds no
-	// committed tokens yet (revokedJtis is empty) and so leaves the winner's live
-	// session intact, instead of tearing it down out from under the winner's
-	// in-progress mint (which read that session for its refresh-token lifetime). (#77)
+	// deleting the session would disrupt an unrelated/in-flight session. That is what
+	// makes concurrent redemption safe: a losing racer finds no committed tokens yet
+	// (revokedJtis is empty), so it leaves the winner's live session row in place
+	// instead of tearing it down out from under the winner's in-progress mint, which
+	// read that session for its refresh-token lifetime. (#77)
+	//
+	// The guard's OUTCOME is what #77 needs and it is unchanged. What changed is the
+	// argument for it: since the acquisition above is unconditional, a losing racer now
+	// HOLDS the session row for the rest of this transaction even in the case where it
+	// goes on to write nothing, so the winner's own session read can be made to wait
+	// where it previously never did. Measured on all four engines: on SQLite, PostgreSQL
+	// and MySQL the winner's read is unaffected, because MVCC readers do not block and
+	// SQLite serializes the two transactions anyway. On SQL Server, whose READ COMMITTED
+	// takes shared locks, that read waits for this whole transaction. A bounded wait on
+	// a handful of statements, and not a deadlock: this transaction takes no lock any
+	// mint holds. Paying it is what buys the absence of the three-engine deadlock the
+	// acquisition's own comment describes. (#139)
 	if code.SessionIdentifier != "" && len(revokedJtis) > 0 {
 		session, err := database.GetUserSessionBySessionIdentifier(tx, code.SessionIdentifier)
 		if err != nil {

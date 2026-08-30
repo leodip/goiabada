@@ -2,6 +2,7 @@ package commondb
 
 import (
 	"database/sql"
+	"sort"
 	"strings"
 	"time"
 
@@ -580,9 +581,42 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 // DeleteUser removes the user and, by ON DELETE CASCADE, every row that
 // references it. Refresh tokens are cleared explicitly first because SQL Server
 // cannot cascade them: see deleteRefreshTokensByColumn.
+//
+// THE SESSION ROWS GO BEFORE BOTH OF THOSE, and the order is load bearing rather
+// than tidiness to be folded back into the cascade (#139). This is not a pure
+// cascade: Go chooses to delete refresh_tokens before users, so this transaction
+// takes refresh_tokens and then, through the cascade on the users row,
+// user_sessions and codes. An authorization ceremony takes user_sessions and then
+// codes, so with the two overlapping they deadlock on PostgreSQL, MySQL and SQL
+// Server, with the ceremony chosen as the victim. Deleting the user's session rows
+// explicitly first puts this transaction on the same lock order as every other one
+// that writes a session and that session's grants, and it is clean on all four
+// engines in both orderings. Same rows and same outcome either way: the cascade
+// would have removed these rows anyway, one statement later.
+//
+// DeleteClient deliberately does NOT do this, and needs no equivalent: its cascade
+// reaches codes and user_session_clients but never user_sessions, so it writes no
+// session row and the rule does not reach it.
 func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 
 	return d.inTransaction(tx, func(tx *sql.Tx) error {
+		sessions, err := d.GetUserSessionsByUserId(tx, userId)
+		if err != nil {
+			return err
+		}
+
+		// Ordered by id so several sessions are always taken in the same sequence.
+		// GetUserSessionsByUserId carries no ORDER BY of its own, so two transactions of
+		// this shape could otherwise take the same two rows in opposite orders, which is a
+		// cycle among sessions that no rule about the order of TABLES can reach (#139).
+		sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+
+		for i := range sessions {
+			if err := d.DeleteUserSession(tx, sessions[i].Id); err != nil {
+				return err
+			}
+		}
+
 		if err := d.deleteRefreshTokensByColumn(tx, "user_id", userId); err != nil {
 			return err
 		}
@@ -594,7 +628,7 @@ func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 		deleteBuilder.Where(deleteBuilder.Equal("id", userId))
 
 		sql, args := deleteBuilder.Build()
-		_, err := d.ExecSql(tx, sql, args...)
+		_, err = d.ExecSql(tx, sql, args...)
 		if err != nil {
 			return errors.Wrap(err, "unable to delete user")
 		}

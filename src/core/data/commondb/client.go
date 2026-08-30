@@ -396,6 +396,13 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 // DeleteClient removes the client and, by ON DELETE CASCADE, every row that
 // references it. Refresh tokens are cleared explicitly first because SQL Server
 // cannot cascade them: see deleteRefreshTokensByColumn.
+//
+// It takes no session row and deliberately does not mirror what DeleteUser does
+// about them (#139). The rule is that a transaction writing a user_sessions row
+// and that session's grants takes the session row first; this one writes no
+// session row at all, because the cascade on clients reaches codes and
+// user_session_clients but never user_sessions. Measured against an authorization
+// ceremony holding a session row: clean on all four engines in both orderings.
 func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 
 	return d.inTransaction(tx, func(tx *sql.Tx) error {

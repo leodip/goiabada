@@ -343,8 +343,12 @@ func (d *CommonDatabase) trySetUserEmail(userId int64, expected string, desired 
 
 // disableAndRevoke turns a collision loser off and, in the SAME transaction, invalidates
 // every credential that row had authenticated under: the user's authentication generation is
-// advanced, every refresh token belonging to them is revoked, and every session of theirs is
-// deleted. It reports whether THIS call performed the enabled-to-disabled transition.
+// advanced, every session of theirs is deleted, and every refresh token belonging to them is
+// revoked. It reports whether THIS call performed the enabled-to-disabled transition.
+//
+// The sessions go before the tokens for the lock order rather than for anything either write
+// sees: every transaction that writes a session row and that session's grants takes the
+// session row first (#139). See the comment on that read.
 //
 // The revocation is not decoration on the disable, it is what the disable means. #106
 // established that enabled going true-to-false is the moment a user's outstanding credentials
@@ -413,6 +417,34 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 		// construction the generation THIS increment invalidated.
 		swept.OldGeneration = newGeneration - 1
 
+		// THE SESSION ROWS FIRST, ahead of every grant that hangs off them (#139). Every
+		// application transaction that writes a user_sessions row and that session's grants
+		// takes the user_sessions row first, so no two transactions of different shapes can
+		// each hold half of what the other needs. Without the hoist this one takes
+		// refresh_tokens and then user_sessions while an authorization ceremony takes
+		// user_sessions and then codes, and the two deadlock on PostgreSQL, MySQL and SQL
+		// Server. The token sweep below is unaffected by running after these deletes:
+		// GetRefreshTokensByUserId unions a codes join with refresh_tokens.user_id and reads
+		// no session row, and codes carries no foreign key to user_sessions.
+		sessions, err := d.GetUserSessionsByUserId(tx, userId)
+		if err != nil {
+			return err
+		}
+
+		// Ordered by id so several sessions are always taken in the same sequence. The query
+		// carries no ORDER BY of its own, so two transactions of this shape could otherwise
+		// take the same two rows in opposite orders, which is a cycle among sessions that no
+		// rule about the order of TABLES can reach (#139).
+		sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+
+		for i := range sessions {
+			if err := d.DeleteUserSession(tx, sessions[i].Id); err != nil {
+				return err
+			}
+			swept.TerminatedSessionIdentifiers = append(
+				swept.TerminatedSessionIdentifiers, sessions[i].SessionIdentifier)
+		}
+
 		// User-scoped, so it covers both linkage shapes: auth-code tokens through the code's
 		// user and ROPC tokens through the token's own. Nothing is preserved here, unlike the
 		// administrative path's exceptSid: this account is not the one asking.
@@ -432,18 +464,6 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 			// than what the user held. A token already revoked is skipped above and stays
 			// absent, which is revokeRefreshTokens' rule at the four other sites.
 			swept.RevokedRefreshTokenJtis = append(swept.RevokedRefreshTokenJtis, rt.RefreshTokenJti)
-		}
-
-		sessions, err := d.GetUserSessionsByUserId(tx, userId)
-		if err != nil {
-			return err
-		}
-		for i := range sessions {
-			if err := d.DeleteUserSession(tx, sessions[i].Id); err != nil {
-				return err
-			}
-			swept.TerminatedSessionIdentifiers = append(
-				swept.TerminatedSessionIdentifiers, sessions[i].SessionIdentifier)
 		}
 
 		return nil

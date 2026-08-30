@@ -895,6 +895,11 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 
 	database.On("BeginTransaction").Return((*sql.Tx)(nil), nil).Once()
 
+	// The session row is taken first, ahead of the grants that hang off it (#139). Stubbed as
+	// succeeding so this case still fails where it means to, at the token read below.
+	database.On("AcquireUserSessionRow", (*sql.Tx)(nil), "sid-reused").
+		Return(true, nil).Once()
+
 	dbErr := errors.New("connection refused")
 	database.On("GetRefreshTokensBySessionIdentifier", (*sql.Tx)(nil), "sid-reused").
 		Return(nil, dbErr).Once()
