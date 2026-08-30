@@ -298,23 +298,36 @@ type TerminationResult struct {
 // the grants of that session are revoked, sweeps the tokens those grants issued, and deletes the
 // session row, in ONE transaction it owns and commits (#129 decision 5).
 //
-// The three writes, in the order decision 5 states:
+// The three writes, in the order this transaction issues them. #129 decision 5 put the code sweep
+// first; #139 moved the deletion ahead of it, and the reason is the whole of write 1 below.
 //
-//  1. RevokeCodesBySessionIdentifier marks every code issued through this session revoked. This
+//  1. DeleteUserSession, FIRST because it is the statement that TAKES THE SESSION ROW. An
+//     authorization ceremony about to mint a code writes that same row before it inserts, so one
+//     of the two transactions waits for the other: either this one waits and the code sweep below
+//     then runs after the insert committed, so the new code is marked, or the ceremony waits and
+//     its acquisition matches no rows, so it refuses and no code is written at all. Without this
+//     statement leading, the two transactions touch no common row and nothing makes either wait,
+//     and a code inserted after the sweep below and before this commit escapes both that sweep
+//     and any compensating read, because such a read still sees the uncommitted-deleted session
+//     (#139). The deletion is also what makes the effect immediate for session-bound tokens: they
+//     stop validating once the row is gone.
+//  2. RevokeCodesBySessionIdentifier marks every code issued through this session revoked. This
 //     is the write that SURVIVES, and the only one that is a boundary. A refresh token can only
 //     descend from a code and a rotated child inherits its parent's code_id, so marking the code
 //     rejects every present and future descendant of the grant: a child inserted after this
 //     commit is born already rejected, because the fact predates its existence.
-//  2. The sid-scoped refresh-token sweep. GetRefreshTokensBySessionIdentifier matches
+//  3. The sid-scoped refresh-token sweep. GetRefreshTokensBySessionIdentifier matches
 //     codes.session_identifier through a join, and that join is the ONLY thing that reaches an
 //     offline grant's tokens, because an offline refresh token's own session_identifier is empty
 //     and the sid its grant came from lives on the codes row. Filtering these rows by
 //     rt.SessionIdentifier would therefore drop exactly the offline tokens decision 2 exists to
 //     revoke.
-//  3. DeleteUserSession, which is what makes the effect immediate for session-bound tokens: they
-//     already stop validating once the row is gone.
 //
-// Steps 2 and 3 are cleanup. Absence of a session row is never read as termination anywhere,
+// Neither sweep is affected by running after the deletion: RevokeCodesBySessionIdentifier keys on
+// codes.session_identifier and the refresh sweep joins refresh_tokens to codes, so neither reads
+// user_sessions, and codes carries no foreign key to it.
+//
+// Writes 1 and 3 are cleanup. Absence of a session row is never read as termination anywhere,
 // because the background worker reaps idle and expired sessions routinely while an offline grant
 // is designed to outlive that, which is why the durable fact has to be written down positively
 // (decision 4).
@@ -359,6 +372,11 @@ func TerminateUserSessionTx(db data.Database, userSession *models.UserSession) (
 	}
 	defer db.RollbackTransaction(tx) //nolint:errcheck
 
+	// First, and the ordering the doc comment above explains rests on it being first (#139).
+	if err := db.DeleteUserSession(tx, userSession.Id); err != nil {
+		return TerminationResult{}, err
+	}
+
 	revokedCodeCount, err := db.RevokeCodesBySessionIdentifier(tx, userSession.SessionIdentifier)
 	if err != nil {
 		return TerminationResult{}, err
@@ -371,10 +389,6 @@ func TerminateUserSessionTx(db data.Database, userSession *models.UserSession) (
 
 	revokedJtis, err := revokeRefreshTokens(db, tx, tokens)
 	if err != nil {
-		return TerminationResult{}, err
-	}
-
-	if err := db.DeleteUserSession(tx, userSession.Id); err != nil {
 		return TerminationResult{}, err
 	}
 
