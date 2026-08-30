@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/pkg/errors"
 )
 
 type tokenParser interface {
@@ -33,11 +34,32 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// ServerErrorRenderer answers a request this middleware cannot complete with the
+// localized server-error page, logging the cause against the request id. Declared
+// here for the reason ErrorRenderer in middleware_ratelimiter.go is: the concrete
+// type lives in a module that depends on core, so core can only name the shape it
+// needs. *handlerhelpers.HttpHelper satisfies it.
+//
+// Every site below used to answer with http.Error and the Go error text, which put
+// an internal detail in front of the administrator in English while the log, which
+// is where that detail belongs and where an operator would look for it, got
+// nothing. The page these sites now render is localized and carries the request id
+// that ties it to the logged cause.
+//
+// The page reads the settings off the request context for its layout and the
+// localizer for its text, so this middleware belongs below whatever puts those
+// there. Both modules mount it on the branch that does. Mounted above them, a
+// failure here renders nothing and panics into Recoverer instead.
+type ServerErrorRenderer interface {
+	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
+}
+
 type MiddlewareJwt struct {
 	sessionStore      sessions.Store
 	sessionName       string
 	tokenParser       tokenParser
 	authHelper        authHelper
+	errorRenderer     ServerErrorRenderer
 	httpClient        HTTPClient
 	authServerBaseURL string
 	baseURL           string
@@ -52,6 +74,7 @@ func NewMiddlewareJwt(
 	sessionName string,
 	tokenParser tokenParser,
 	authHelper authHelper,
+	errorRenderer ServerErrorRenderer,
 	httpClient HTTPClient,
 	authServerBaseURL string,
 	baseURL string,
@@ -63,6 +86,7 @@ func NewMiddlewareJwt(
 		sessionName:       sessionName,
 		tokenParser:       tokenParser,
 		authHelper:        authHelper,
+		errorRenderer:     errorRenderer,
 		httpClient:        httpClient,
 		authServerBaseURL: authServerBaseURL,
 		baseURL:           baseURL,
@@ -122,14 +146,15 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 
 			sess, err := m.sessionStore.Get(r, m.sessionName)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("unable to get the session: %v", err.Error()), http.StatusInternalServerError)
+				m.errorRenderer.InternalServerError(w, r, errors.Wrap(err, "unable to get the session"))
 				return
 			}
 
 			if sess.Values[constants.SessionKeyJwt] != nil {
 				tokenResponse, ok := sess.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
 				if !ok {
-					http.Error(w, "unable to cast the session value to TokenResponse", http.StatusInternalServerError)
+					m.errorRenderer.InternalServerError(w, r,
+						errors.WithStack(errors.New("unable to cast the session value to TokenResponse")))
 					return
 				}
 
@@ -142,7 +167,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 						delete(sess.Values, constants.SessionKeyJwt)
 						err := m.sessionStore.Save(r, w, sess)
 						if err != nil {
-							http.Error(w, fmt.Sprintf("unable to save the session: %v", err.Error()), http.StatusInternalServerError)
+							m.errorRenderer.InternalServerError(w, r, errors.Wrap(err, "unable to save the session"))
 							return
 						}
 						next.ServeHTTP(w, r)
@@ -169,7 +194,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 						delete(sess.Values, constants.SessionKeyJwt)
 						err := m.sessionStore.Save(r, w, sess)
 						if err != nil {
-							http.Error(w, fmt.Sprintf("unable to save the session: %v", err.Error()), http.StatusInternalServerError)
+							m.errorRenderer.InternalServerError(w, r, errors.Wrap(err, "unable to save the session"))
 							return
 						}
 
@@ -274,7 +299,8 @@ func (m *MiddlewareJwt) RequiresScope(
 			if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
 				jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 				if !ok {
-					http.Error(w, "unable to cast the context value to JwtInfo in RequiresScope middleware", http.StatusInternalServerError)
+					m.errorRenderer.InternalServerError(w, r,
+						errors.WithStack(errors.New("unable to cast the context value to JwtInfo in RequiresScope middleware")))
 					return
 				}
 			}
@@ -296,7 +322,8 @@ func (m *MiddlewareJwt) RequiresScope(
 						m.buildScopeString(scopesAnyOf),
 						m.baseURL+r.RequestURI)
 					if err != nil {
-						http.Error(w, fmt.Sprintf("unable to redirect to authorize in RequiresScope middleware: %v", err.Error()), http.StatusInternalServerError)
+						m.errorRenderer.InternalServerError(w, r,
+							errors.Wrap(err, "unable to redirect to authorize in RequiresScope middleware"))
 					}
 				}
 				return

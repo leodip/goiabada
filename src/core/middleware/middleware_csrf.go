@@ -2,13 +2,13 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/core/handlerhelpers"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // csrfSkipContextKey marks a request that the exemption tables below have already cleared, so
@@ -238,9 +238,17 @@ func MiddlewareCsrf() func(next http.Handler) http.Handler {
 				"secFetchSite", headerOrPlaceholder(r, "Sec-Fetch-Site"),
 			)
 
-			http.Error(w, fmt.Sprintf("%s - %s",
-				http.StatusText(http.StatusForbidden), err),
-				http.StatusForbidden)
+			// The reason stays in the log. It describes the deployment's origin handling,
+			// which is of no use to whoever is looking at the page and, on a genuine
+			// attack, tells the attacker which check refused them.
+			//
+			// This middleware is mounted on the root router, above the branch that carries
+			// i18n.MiddlewareLocale, so there is no localizer on the context to reach for:
+			// mounting it below the branch would gain one at the cost of leaving any route
+			// registered outside that branch unprotected. ResolveRequestLocale is the same
+			// resolution the locale middleware performs, done here for this one response.
+			ctx := i18n.ResolveRequestLocale(r.Context(), r)
+			http.Error(w, i18n.T(ctx, "error.csrf_refused"), http.StatusForbidden)
 		})
 	}
 }

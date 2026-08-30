@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,12 +59,17 @@ func TestCsrf_MiddlewareIsRegistered(t *testing.T) {
 			"a cross-site POST to a cookie-authenticated form endpoint must be refused; "+
 				"if this is not a 403, MiddlewareCsrf is no longer registered on the auth server")
 
-		// The prefix is MiddlewareCsrf's own, written by its http.Error call, which is what
-		// attributes the 403 to the CSRF middleware rather than to any handler further down.
-		// The reason after it is the standard library's wording and is deliberately not asserted.
+		// The body is MiddlewareCsrf's own message, which is what attributes the 403 to the
+		// origin check rather than to any handler further down. It is read from the catalog
+		// rather than repeated here, and this request sends no Accept-Language, so the running
+		// server answers the English entry.
+		//
+		// The refusal's reason used to be interpolated after a "Forbidden - " prefix. It is
+		// asserted absent now: it describes the deployment's own origin handling and, to a
+		// genuine attacker, names the check that refused them. It goes to the server log.
 		raw, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
-		require.True(t, strings.HasPrefix(string(raw), "Forbidden - "),
+		require.Equal(t, i18n.T(context.Background(), "error.csrf_refused"), strings.TrimSpace(string(raw)),
 			"the 403 must be the CSRF middleware's, got body %q", string(raw))
 	})
 

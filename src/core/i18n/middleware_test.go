@@ -322,3 +322,50 @@ func TestIsMachineRequest(t *testing.T) {
 		})
 	}
 }
+
+// TestResolveRequestLocale covers the exported resolution a middleware answering
+// ahead of MiddlewareLocale uses for its own response. Same three signals as the
+// middleware, minus the AuthContext step, which has no reader to consult.
+//
+// The rows are the ones a rejection actually meets: an operator following a link
+// with ?ui_locales, a browser announcing a language, and a request that says
+// nothing.
+func TestResolveRequestLocale(t *testing.T) {
+	tests := []struct {
+		name           string
+		target         string
+		acceptLanguage string
+		want           string
+	}{
+		{"ui_locales wins over the header", "/auth/pwd?ui_locales=pt-BR", "fr-FR", "Entrar"},
+		{"Accept-Language is honoured", "/auth/pwd", "pt-BR,en;q=0.9", "Entrar"},
+		{"nothing to go on falls back to English", "/auth/pwd", "", "Login"},
+		{"an unsupported language falls back to English", "/auth/pwd", "fr-FR", "Login"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.target, nil)
+			if tt.acceptLanguage != "" {
+				req.Header.Set("Accept-Language", tt.acceptLanguage)
+			}
+
+			ctx := ResolveRequestLocale(req.Context(), req)
+
+			assert.Equal(t, tt.want, T(ctx, "auth.pwd.title"))
+		})
+	}
+}
+
+// The context it returns is the caller's own: it is for the one response being
+// written, and handing it to the next handler is not what it is for. This pins
+// that it does not mutate the request, so a caller that forgets to use the return
+// value gets English rather than a silently localized chain.
+func TestResolveRequestLocale_LeavesTheRequestUntouched(t *testing.T) {
+	req := httptest.NewRequest("GET", "/auth/pwd", nil)
+	req.Header.Set("Accept-Language", "pt-BR")
+
+	_ = ResolveRequestLocale(req.Context(), req)
+
+	assert.Equal(t, "Login", T(req.Context(), "auth.pwd.title"))
+}

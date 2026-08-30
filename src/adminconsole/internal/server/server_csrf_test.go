@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // TestInitMiddleware_CsrfIsRegistered makes the claim the CSRF unit tables in
@@ -74,11 +76,13 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 				"then MiddlewareCsrf is no longer registered on the admin console", rr.Code, http.StatusForbidden)
 		}
 
-		// The prefix is MiddlewareCsrf's own, written by its http.Error call, which is what
-		// attributes the 403 to the CSRF middleware rather than to any handler further down. The
-		// reason after it is the standard library's wording and is deliberately not asserted.
-		if body := rr.Body.String(); !strings.HasPrefix(body, "Forbidden - ") {
-			t.Errorf("body = %q, want the CSRF middleware's %q prefix", body, "Forbidden - ")
+		// The body is MiddlewareCsrf's own message, which is what attributes the 403 to the
+		// origin check rather than to any handler further down. Read from the catalog, so
+		// rewording the entry does not fail this test while a 403 from somewhere else still
+		// does. TestInitMiddleware_RefusalsAreLocalized covers it in the caller's language.
+		want := i18n.T(context.Background(), "error.csrf_refused")
+		if body := strings.TrimSpace(rr.Body.String()); body != want {
+			t.Errorf("body = %q, want the CSRF middleware's message %q", body, want)
 		}
 	})
 

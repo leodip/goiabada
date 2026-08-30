@@ -56,6 +56,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		constants.AuthServerSessionName,
 		tokenParser,
 		authHelper,
+		httpHelper,
 		&http.Client{},
 		s.baseURL,
 		s.adminConsoleBaseURL,

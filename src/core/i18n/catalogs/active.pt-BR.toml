@@ -163,6 +163,7 @@
 "error.title" = "Erro no servidor"
 "error.body" = "Pedimos desculpas, ocorreu um erro. Mais informações podem ser encontradas nos logs do servidor."
 "error.request_id_label" = "ID da requisição:"
+"error.csrf_refused" = "Sua requisição foi recusada por motivos de segurança. Recarregue a página e tente novamente."
 
 "not_found.page_title" = "Não encontrado"
 "not_found.title" = "Não encontrado (404)"
@@ -254,6 +255,8 @@
 "adminconsole.error.title" = "Erro no servidor"
 "adminconsole.error.body" = "Pedimos desculpas, ocorreu um erro. Mais informações podem ser encontradas nos logs do servidor."
 "adminconsole.error.request_id_label" = "ID da requisição:"
+"adminconsole.error.settings_unavailable" = "Não foi possível carregar a configuração do servidor de autenticação. Mais informações podem ser encontradas nos logs do servidor."
+"adminconsole.error.issuer_missing" = "O servidor de autenticação não informou um emissor (issuer). Ele pode estar executando uma versão mais antiga que este console de administração."
 
 "adminconsole.not_found.page_title" = "Não encontrado"
 "adminconsole.not_found.title" = "Não encontrado (404)"

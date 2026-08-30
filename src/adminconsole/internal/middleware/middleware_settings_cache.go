@@ -2,10 +2,12 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -16,8 +18,17 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 			// Fetch settings from cache (auto-refreshes if expired)
 			publicSettings, err := settingsCache.Get()
 			if err != nil {
-				// Return error to user as per requirement
-				http.Error(w, "Unable to fetch settings from authserver: "+err.Error(), http.StatusInternalServerError)
+				// The detail goes to the log rather than to the browser. It names the auth
+				// server's address and whatever the transport failed with, which the operator
+				// needs and the person looking at the page cannot act on, and until now it went
+				// only to the browser and was never logged at all.
+				//
+				// err.Error() rather than err: slog renders an error value with %+v, and this
+				// one carries a pkg/errors stack. The cache does not cache a failure, so an auth
+				// server that is down produces one of these per request, and the stack is the
+				// same three frames every time.
+				slog.Error("unable to fetch settings from the auth server", "error", err.Error())
+				http.Error(w, i18n.T(r.Context(), "adminconsole.error.settings_unavailable"), http.StatusInternalServerError)
 				return
 			}
 
@@ -30,12 +41,16 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 			// row already answers 500 on its side, and the settings API refuses to store
 			// an issuer shorter than three characters.
 			//
-			// English regardless of the request's locale, like the settings-fetch failure
-			// above it and like a CSRF rejection: this middleware is mounted ahead of
-			// i18n.MiddlewareLocale, so no localizer exists yet when either branch answers.
-			// Server.initMiddleware records why the chain is ordered that way.
+			// Both refusals answer in plain text rather than through the error page every
+			// other 500 in this module renders: that page reads settings off the context for
+			// its layout, and settings are the thing that is missing here.
+			//
+			// They are localized, which they could not be until i18n.MiddlewareLocale was
+			// moved ahead of this middleware on the application branch. Server.initMiddleware
+			// records why that reorder is safe.
 			if publicSettings.Issuer == "" {
-				http.Error(w, "The authserver did not report an issuer; it may be running an older version", http.StatusInternalServerError)
+				slog.Error("the auth server did not report an issuer; it may be running an older version")
+				http.Error(w, i18n.T(r.Context(), "adminconsole.error.issuer_missing"), http.StatusInternalServerError)
 				return
 			}
 
