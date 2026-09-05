@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -1081,13 +1082,19 @@ func TestDeleteClient(t *testing.T) {
 	}
 }
 
+// createTestClient seeds a client on the package's shared handle; createTestClientOn takes the
+// handle, for the reason createTestUserOn does.
 func createTestClient(t *testing.T) *models.Client {
+	return createTestClientOn(t, database)
+}
+
+func createTestClientOn(t *testing.T, db data.Database) *models.Client {
 	random := gofakeit.LetterN(6)
 	client := &models.Client{
 		ClientIdentifier: "test_client_" + random,
 		Description:      "Test Client",
 	}
-	err := database.CreateClient(nil, client)
+	err := db.CreateClient(nil, client)
 	if err != nil {
 		t.Fatalf("Failed to create test client: %v", err)
 	}

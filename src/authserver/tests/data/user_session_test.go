@@ -6,6 +6,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -315,7 +316,13 @@ func TestDeleteUserSession(t *testing.T) {
 	}
 }
 
+// createTestUserSession seeds a session on the package's shared handle; createTestUserSessionOn
+// takes the handle, for the reason createTestUserOn does.
 func createTestUserSession(t *testing.T, userId int64) *models.UserSession {
+	return createTestUserSessionOn(t, database, userId)
+}
+
+func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *models.UserSession {
 	userSession := &models.UserSession{
 		SessionIdentifier: gofakeit.UUID(),
 		Started:           time.Now().UTC().Truncate(time.Microsecond),
@@ -329,7 +336,7 @@ func createTestUserSession(t *testing.T, userId int64) *models.UserSession {
 		DeviceOS:          "Windows",
 		UserId:            userId,
 	}
-	err := database.CreateUserSession(nil, userSession)
+	err := db.CreateUserSession(nil, userSession)
 	if err != nil {
 		t.Fatalf("Failed to create test user session: %v", err)
 	}

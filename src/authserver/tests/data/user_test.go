@@ -12,6 +12,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
@@ -430,7 +431,13 @@ func TestDeleteUser(t *testing.T) {
 	}
 }
 
+// createTestUser seeds a user on the package's shared handle. createTestUserOn takes the handle,
+// which is what lets a test run against a fixture database of its own (#139 stage 8).
 func createTestUser(t *testing.T) *models.User {
+	return createTestUserOn(t, database)
+}
+
+func createTestUserOn(t *testing.T, db data.Database) *models.User {
 	user := &models.User{
 		Enabled:                              gofakeit.Bool(),
 		Subject:                              uuid.New(),
@@ -468,7 +475,7 @@ func createTestUser(t *testing.T) *models.User {
 		ForgotPasswordCodeIssuedAt:           sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 	}
 
-	err := database.CreateUser(nil, user)
+	err := db.CreateUser(nil, user)
 	if err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
 	}
