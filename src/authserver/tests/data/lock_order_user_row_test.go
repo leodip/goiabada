@@ -145,7 +145,7 @@ func TestLockOrder_IssuanceAgainstCredentialSweep(t *testing.T) {
 		require.True(t, live, "the session row is still there when the ceremony takes it")
 
 		// The real credential path, whole, on the other handle.
-		sweep := goBlocked(t, "the password change", func(reached func()) sweepOutcome {
+		sweep := goBlocked(t, "the password change", tx, func(reached func()) sweepOutcome {
 			reached()
 			result, err := handlers.RevokeUserAuthStateTx(other, user.Id, "", changePassword(user))
 			return sweepOutcome{result: result, err: err}
@@ -210,7 +210,7 @@ func TestLockOrder_IssuanceAgainstCredentialSweep(t *testing.T) {
 		_, err = handlers.RevokeUserAuthState(database, tx, user.Id, "")
 		require.NoError(t, err, "the sweep on a user nothing else has touched yet")
 
-		ceremony := goBlocked(t, "the ceremony", func(reached func()) issuanceOutcome {
+		ceremony := goBlocked(t, "the ceremony", tx, func(reached func()) issuanceOutcome {
 			otherTx, err := other.BeginTransaction()
 			if err != nil {
 				reached()
@@ -268,7 +268,7 @@ func TestLockOrder_DeleteUserAgainstCredentialSweep(t *testing.T) {
 		_, err = database.IncrementUserAuthStateGeneration(tx, user.Id)
 		require.NoError(t, err, "the generation advance, which is the sweep's own users write")
 
-		deletion := goBlocked(t, "DeleteUser", func(reached func()) error {
+		deletion := goBlocked(t, "DeleteUser", tx, func(reached func()) error {
 			reached()
 			return other.DeleteUser(nil, user.Id)
 		})
@@ -308,7 +308,7 @@ func TestLockOrder_DeleteUserAgainstCredentialSweep(t *testing.T) {
 
 		require.NoError(t, database.DeleteUser(tx, user.Id), "DeleteUser on the held transaction")
 
-		sweep := goBlocked(t, "the password change", func(reached func()) sweepOutcome {
+		sweep := goBlocked(t, "the password change", tx, func(reached func()) sweepOutcome {
 			reached()
 			result, err := handlers.RevokeUserAuthStateTx(other, user.Id, "", changePassword(user))
 			return sweepOutcome{result: result, err: err}

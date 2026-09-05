@@ -28,6 +28,12 @@ var (
 // chain and the startup data tasks, both idempotent and both no-ops against an already migrated
 // catalog, but neither is free and mssql in particular does not enjoy being asked repeatedly.
 //
+// CALL IT BEFORE OPENING ANY TRANSACTION. The startup tasks write users (the OTP secret backfill
+// is an UPDATE on that table), so a handle first built while the calling test holds a users row
+// queues behind that test's own lock, times out after InnoDB's 50 seconds, and the error is then
+// cached by the Once for every later test in the package. Every test here therefore takes the
+// handle on its first line, before it holds anything.
+//
 // What it does NOT give is more concurrency than production has. The authserver builds one
 // data.Database, so a SQLite deployment runs the whole process on a single connection and the
 // operations these tests interleave can never overlap there at all. Two handles is therefore the

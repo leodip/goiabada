@@ -1057,3 +1057,32 @@ func TestAcquireUserSessionRow_TransactionAndFailurePath(t *testing.T) {
 		t.Error("a failed acquisition must report false")
 	}
 }
+
+// TestUpdateUserSession_TheOwnerIsNotRewritten pins that user_id is outside the update set. A
+// session's owner never changes, and on SQL Server re-assigning a foreign key column to its own
+// value re-checks the constraint with a shared lock on the users row, which put the ordinary SSO
+// bump into a lock order it has no business being in (#139). A stale model carrying another
+// user's id must therefore leave the stored owner alone rather than move the session.
+func TestUpdateUserSession_TheOwnerIsNotRewritten(t *testing.T) {
+	owner := createTestUser(t)
+	other := createTestUser(t)
+	userSession := createTestUserSession(t, owner.Id)
+
+	userSession.UserId = other.Id
+	userSession.DeviceName = "moved-" + gofakeit.LetterN(6)
+	err := database.UpdateUserSession(nil, userSession)
+	if err != nil {
+		t.Fatalf("Failed to update user session: %v", err)
+	}
+
+	stored, err := database.GetUserSessionById(nil, userSession.Id)
+	if err != nil {
+		t.Fatalf("Failed to retrieve updated user session: %v", err)
+	}
+	if stored.UserId != owner.Id {
+		t.Errorf("Expected the session to still belong to user %d, got %d: user_id must not be in the update set", owner.Id, stored.UserId)
+	}
+	if stored.DeviceName != userSession.DeviceName {
+		t.Errorf("Expected the ordinary columns to have been written, DeviceName %q, got %q", userSession.DeviceName, stored.DeviceName)
+	}
+}
