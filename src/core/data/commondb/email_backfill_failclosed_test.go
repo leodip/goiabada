@@ -72,6 +72,12 @@ type scriptedDriver struct {
 	// execArgs is every statement's arguments, in order, which is how a test asserts which row
 	// a compare-and-set addressed without reading the query text.
 	execArgs [][]driver.Value
+	// statements is every statement's TEXT, queries and execs interleaved in the order they
+	// reached the connection. The tests above deliberately read arguments rather than text, so
+	// that a rewritten clause breaks nothing; a test about the ORDER of statements against
+	// different tables has no such option, since the table a statement addresses is in its text
+	// and nowhere else (#139).
+	statements []string
 
 	openTx    int
 	commits   int
@@ -160,6 +166,7 @@ func (s *scriptedStmt) Exec(args []driver.Value) (driver.Result, error) {
 	i := d.execCount
 	d.execCount++
 	d.execArgs = append(d.execArgs, args)
+	d.statements = append(d.statements, s.query)
 	var scripted *scriptedExec
 	if i < len(d.execs) {
 		scripted = d.execs[i]
@@ -182,6 +189,7 @@ func (s *scriptedStmt) Query([]driver.Value) (driver.Rows, error) {
 	d.mu.Lock()
 	i := d.queryCount
 	d.queryCount++
+	d.statements = append(d.statements, s.query)
 	var scripted *scriptedRows
 	if i < len(d.rows) {
 		scripted = d.rows[i]

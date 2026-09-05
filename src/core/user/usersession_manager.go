@@ -106,6 +106,26 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	}
 	defer u.database.RollbackTransaction(tx) //nolint:errcheck
 
+	// THE USER'S ROW FIRST, and it is not optional here even though nothing below names it.
+	// CreateUserSession's insert takes a shared lock on the parent users row through
+	// user_sessions.user_id without naming it, and the shared client acquisition on the next line
+	// must be taken by a transaction that ALREADY holds everything above clients. Lock queues are
+	// fair, so a shared holder that afterwards reaches upward can close a cycle with a queued
+	// exclusive request without upgrading anything: measured on MySQL as this transaction holding
+	// the client shared and waiting for the users row, an issuance holding the users row and
+	// waiting for the client, and a client deletion queued exclusively behind both (#139).
+	if err := u.database.AcquireUserRow(tx, userId); err != nil {
+		return nil, err
+	}
+
+	// The client's row, shared. commondb.DeleteClient takes it exclusively and then reads the
+	// sessions associated with the client so it can take their rows too, and that list is complete
+	// only because every transaction that writes an association row takes this lock first. This is
+	// one of the three that do (#139).
+	if err := u.database.AcquireClientRowShared(tx, clientId); err != nil {
+		return nil, err
+	}
+
 	err = u.database.CreateUserSession(tx, userSession)
 	if err != nil {
 		return nil, err
@@ -268,6 +288,23 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 			return nil, err
 		}
 		defer u.database.RollbackTransaction(tx) //nolint:errcheck
+
+		// The client's row, shared, above the session row this transaction is about to write.
+		// commondb.DeleteClient takes it exclusively and then reads the sessions associated with
+		// the client, and that list is closed by this lock rather than by a re-read (#139).
+		//
+		// Taken UNCONDITIONALLY rather than only when the association below is an insert. The
+		// insert-versus-update decision is made from userSession.Clients, which was read before
+		// this transaction opened and can be stale, so a bump that believes it is only updating
+		// can still be the one that inserts.
+		//
+		// No AcquireUserRow above it, and the absence is deliberate rather than an omission: this
+		// transaction takes no lock on the users row at all. UpdateUserSession is a full-row
+		// update, but UserSession.UserId is dont-update, so its foreign key is not in the SET list
+		// and SQL Server has nothing to re-check.
+		if err := u.database.AcquireClientRowShared(tx, clientId); err != nil {
+			return nil, err
+		}
 
 		err = u.database.UpdateUserSession(tx, userSession)
 		if err != nil {

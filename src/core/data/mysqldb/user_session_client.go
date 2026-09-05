@@ -22,6 +22,10 @@ func (d *MySQLDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSe
 	return d.CommonDB.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
 }
 
+func (d *MySQLDatabase) GetUserSessionClientsByClientId(tx *sql.Tx, clientId int64) ([]models.UserSessionClient, error) {
+	return d.CommonDB.GetUserSessionClientsByClientId(tx, clientId)
+}
+
 func (d *MySQLDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
 	return d.CommonDB.GetUserSessionClientsByUserSessionId(tx, userSessionId)
 }

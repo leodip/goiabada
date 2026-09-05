@@ -102,6 +102,10 @@ func (d *PostgresDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier s
 	return d.CommonDB.AcquireUserSessionRow(tx, sessionIdentifier)
 }
 
+func (d *PostgresDatabase) AcquireUserSessionRowById(tx *sql.Tx, userSessionId int64) error {
+	return d.CommonDB.AcquireUserSessionRowById(tx, userSessionId)
+}
+
 func (d *PostgresDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
 	return d.CommonDB.DeleteIdleSessions(tx, idleTimeout)
 }

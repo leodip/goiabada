@@ -44,7 +44,10 @@ func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.
 //
 // The users row leads because the insert below reaches it anyway through codes.user_id, and
 // taking it explicitly is what puts this ceremony on the same order the credential operations
-// already use (#139 decision 11).
+// already use (#139 decision 11). The shared client acquisition follows it and precedes the
+// session row: it is what closes DeleteClient's discovery window, and it has to come AFTER
+// everything above clients, because a shared holder that then reaches upward closes a cycle with
+// a deletion queued exclusively on that row.
 //
 // The handler itself cannot be driven from this tier: it owns its transaction and answers over
 // HTTP. The pairing is the one #139 uses throughout: the unit tests in the handlers package pin
@@ -52,6 +55,9 @@ func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.
 // a mock cannot, what two real transactions of these shapes do to each other on a real catalog.
 func issuanceStatements(db data.Database, tx *sql.Tx, client *models.Client, user *models.User, sessionIdentifier string) issuanceOutcome {
 	if err := db.AcquireUserRow(tx, user.Id); err != nil {
+		return issuanceOutcome{err: err}
+	}
+	if err := db.AcquireClientRowShared(tx, client.Id); err != nil {
 		return issuanceOutcome{err: err}
 	}
 	live, err := db.AcquireUserSessionRow(tx, sessionIdentifier)

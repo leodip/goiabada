@@ -55,6 +55,10 @@ func (d *SQLiteDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier str
 	return d.CommonDB.AcquireUserSessionRow(tx, sessionIdentifier)
 }
 
+func (d *SQLiteDatabase) AcquireUserSessionRowById(tx *sql.Tx, userSessionId int64) error {
+	return d.CommonDB.AcquireUserSessionRowById(tx, userSessionId)
+}
+
 func (d *SQLiteDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
 	return d.CommonDB.DeleteIdleSessions(tx, idleTimeout)
 }

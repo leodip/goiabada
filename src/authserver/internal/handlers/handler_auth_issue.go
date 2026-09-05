@@ -464,6 +464,28 @@ func HandleIssueGet(
 			return
 		}
 
+		// THE CLIENT'S ROW NEXT, SHARED, below the user and above the session (#139).
+		//
+		// This transaction is about to insert a code, which is a child of clients, and
+		// commondb.DeleteClient takes the client row exclusively and then reads the sessions
+		// associated with it in order to take their rows too. Without this acquisition that
+		// deletion's list is not closed: an association or a code can be inserted after it read,
+		// and on PostgreSQL the reference itself is no barrier, because FOR KEY SHARE and the
+		// FOR NO KEY UPDATE its acquisition takes do not conflict. Shared rather than exclusive
+		// so that two ceremonies for the same client never queue on each other; only a deletion
+		// of that client does, and it waits out a handful of statements.
+		//
+		// AFTER AcquireUserRow and not before it. Lock queues are fair, so a shared holder that
+		// afterwards reaches for a row ABOVE clients can be part of a cycle with a queued
+		// exclusive request even though nothing is upgraded: measured on MySQL as issuance
+		// holding the users row and waiting for the client, a fresh session holding the client
+		// shared and waiting for the users row through its insert's foreign key, and the
+		// deletion queued exclusively behind both.
+		if err := database.AcquireClientRowShared(tx, issuingClient.Id); err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
 		// Existence only, deliberately. Ownership and the two timeouts were asked a few statements
 		// ago and are not re-asked here: the only thing this narrower question misses is an idle
 		// timeout elapsing in the microseconds between the two, and buying that would cost a
@@ -503,6 +525,30 @@ func HandleIssueGet(
 
 		code, err := codeIssuer.CreateAuthCode(tx, createCodeInput)
 		if err != nil {
+			// The client's registration went away while this ceremony held its place in the queue
+			// behind the deletion, which the shared acquisition above turns from a narrow race
+			// into the reliable outcome of losing it. Answered as the session-gone shape rather
+			// than as a 500: nothing is wrong with this server, the application the browser was
+			// signing in to no longer exists, and the refusal path already knows how to say that
+			// once for an interactive ceremony and once for a silent one. redirectWillBeEmitted
+			// re-reads the registration on its way out and withholds the redirect, so a deleted
+			// client is told on an interstitial rather than by a redirect to an address nobody
+			// owns any more (#248 part 5).
+			if errors.Is(err, oauth.ErrIssuingClientGone) {
+				// Rolled back here explicitly, for the reason stated at the liveness refusal
+				// above: every path out of refuseIssuanceUnusableSession reaches the database on
+				// a nil transaction, and on SQLite the connection it would need is this one.
+				if rollbackErr := database.RollbackTransaction(tx); rollbackErr != nil {
+					httpHelper.InternalServerError(w, r, rollbackErr)
+					return
+				}
+				slog.Warn("the client this ceremony is issuing for no longer exists, refusing to issue a code",
+					"clientIdentifier", authContext.ClientId,
+					"sessionIdentifier", sessionIdentifier)
+				refuseIssuanceUnusableSession(w, r, sessionGone, authContext, issuingClient, ambientSession,
+					sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger)
+				return
+			}
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}

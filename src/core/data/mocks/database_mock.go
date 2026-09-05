@@ -98,6 +98,63 @@ func (_c *Database_AcquireClientRow_Call) RunAndReturn(run func(tx *sql.Tx, clie
 	return _c
 }
 
+// AcquireClientRowShared provides a mock function for the type Database
+func (_mock *Database) AcquireClientRowShared(tx *sql.Tx, clientId int64) error {
+	ret := _mock.Called(tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AcquireClientRowShared")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
+		r0 = returnFunc(tx, clientId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_AcquireClientRowShared_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AcquireClientRowShared'
+type Database_AcquireClientRowShared_Call struct {
+	*mock.Call
+}
+
+// AcquireClientRowShared is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) AcquireClientRowShared(tx any, clientId any) *Database_AcquireClientRowShared_Call {
+	return &Database_AcquireClientRowShared_Call{Call: _e.mock.On("AcquireClientRowShared", tx, clientId)}
+}
+
+func (_c *Database_AcquireClientRowShared_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_AcquireClientRowShared_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_AcquireClientRowShared_Call) Return(err error) *Database_AcquireClientRowShared_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_AcquireClientRowShared_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) error) *Database_AcquireClientRowShared_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // AcquireUserRow provides a mock function for the type Database
 func (_mock *Database) AcquireUserRow(tx *sql.Tx, userId int64) error {
 	ret := _mock.Called(tx, userId)
@@ -217,6 +274,63 @@ func (_c *Database_AcquireUserSessionRow_Call) Return(b bool, err error) *Databa
 }
 
 func (_c *Database_AcquireUserSessionRow_Call) RunAndReturn(run func(tx *sql.Tx, sessionIdentifier string) (bool, error)) *Database_AcquireUserSessionRow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// AcquireUserSessionRowById provides a mock function for the type Database
+func (_mock *Database) AcquireUserSessionRowById(tx *sql.Tx, userSessionId int64) error {
+	ret := _mock.Called(tx, userSessionId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AcquireUserSessionRowById")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
+		r0 = returnFunc(tx, userSessionId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_AcquireUserSessionRowById_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AcquireUserSessionRowById'
+type Database_AcquireUserSessionRowById_Call struct {
+	*mock.Call
+}
+
+// AcquireUserSessionRowById is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userSessionId int64
+func (_e *Database_Expecter) AcquireUserSessionRowById(tx any, userSessionId any) *Database_AcquireUserSessionRowById_Call {
+	return &Database_AcquireUserSessionRowById_Call{Call: _e.mock.On("AcquireUserSessionRowById", tx, userSessionId)}
+}
+
+func (_c *Database_AcquireUserSessionRowById_Call) Run(run func(tx *sql.Tx, userSessionId int64)) *Database_AcquireUserSessionRowById_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_AcquireUserSessionRowById_Call) Return(err error) *Database_AcquireUserSessionRowById_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_AcquireUserSessionRowById_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64) error) *Database_AcquireUserSessionRowById_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -8948,6 +9062,74 @@ func (_c *Database_GetUserSessionClientById_Call) Return(userSessionClient *mode
 }
 
 func (_c *Database_GetUserSessionClientById_Call) RunAndReturn(run func(tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error)) *Database_GetUserSessionClientById_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetUserSessionClientsByClientId provides a mock function for the type Database
+func (_mock *Database) GetUserSessionClientsByClientId(tx *sql.Tx, clientId int64) ([]models.UserSessionClient, error) {
+	ret := _mock.Called(tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserSessionClientsByClientId")
+	}
+
+	var r0 []models.UserSessionClient
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) ([]models.UserSessionClient, error)); ok {
+		return returnFunc(tx, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) []models.UserSessionClient); ok {
+		r0 = returnFunc(tx, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.UserSessionClient)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetUserSessionClientsByClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserSessionClientsByClientId'
+type Database_GetUserSessionClientsByClientId_Call struct {
+	*mock.Call
+}
+
+// GetUserSessionClientsByClientId is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) GetUserSessionClientsByClientId(tx any, clientId any) *Database_GetUserSessionClientsByClientId_Call {
+	return &Database_GetUserSessionClientsByClientId_Call{Call: _e.mock.On("GetUserSessionClientsByClientId", tx, clientId)}
+}
+
+func (_c *Database_GetUserSessionClientsByClientId_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_GetUserSessionClientsByClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetUserSessionClientsByClientId_Call) Return(userSessionClients []models.UserSessionClient, err error) *Database_GetUserSessionClientsByClientId_Call {
+	_c.Call.Return(userSessionClients, err)
+	return _c
+}
+
+func (_c *Database_GetUserSessionClientsByClientId_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) ([]models.UserSessionClient, error)) *Database_GetUserSessionClientsByClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }

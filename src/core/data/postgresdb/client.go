@@ -66,6 +66,15 @@ func (d *PostgresDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 	return d.CommonDB.AcquireClientRow(tx, clientId)
 }
 
+// AcquireClientRowShared takes FOR SHARE, and the strength matters. FOR KEY SHARE, which is what a
+// foreign key reference takes, does NOT conflict with the FOR NO KEY UPDATE that AcquireClientRow's
+// timestamp UPDATE takes, so a reference to this client is no barrier at all here. FOR SHARE does
+// conflict with it, which is why the acquisition is an explicit statement on this engine rather
+// than something the caller gets for free from its own insert.
+func (d *PostgresDatabase) AcquireClientRowShared(tx *sql.Tx, clientId int64) error {
+	return d.CommonDB.AcquireClientRowSharedWith(tx, clientId, "SELECT id FROM clients WHERE id = $1 FOR SHARE")
+}
+
 func (d *PostgresDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
 	return d.CommonDB.GetClientById(tx, clientId)
 }

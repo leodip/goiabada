@@ -1246,7 +1246,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 // refusal case still asserts the redirect it was written to assert (#108).
 func stubClientProvenanceLookup(database *mocks_data.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything).
-		Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 }
 
 // testRegisteredDatabase gives the emitter's registration gate a client whose current

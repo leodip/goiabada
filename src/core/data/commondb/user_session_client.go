@@ -195,6 +195,47 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSe
 	return userSessionClients, nil
 }
 
+// GetUserSessionClientsByClientId returns every association row naming one client, reading
+// user_session_clients ALONE.
+//
+// The absence of a join is the point rather than an economy. DeleteClient calls this while holding
+// the clients row exclusively and before it takes the session rows, so a shape that reached into
+// user_sessions would hold association-row locks while waiting for a session row, which is the
+// opposite of the order this branch imposes and deadlocks against the auth-code replay response on
+// SQL Server. The caller wants the session ids and nothing else, and the ids are on this table.
+func (d *CommonDatabase) GetUserSessionClientsByClientId(tx *sql.Tx, clientId int64) ([]models.UserSessionClient, error) {
+
+	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+		For(d.Flavor)
+
+	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var userSessionClients []models.UserSessionClient
+	for rows.Next() {
+		var userSessionClient models.UserSessionClient
+		addr := userSessionClientStruct.Addr(&userSessionClient)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userSessionClient")
+		}
+		userSessionClients = append(userSessionClients, userSessionClient)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "unable to read query results")
+	}
+
+	return userSessionClients, nil
+}
+
 func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error) {
 
 	if len(userSessionClientIds) == 0 {

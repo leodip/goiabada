@@ -22,6 +22,13 @@ func (d *MySQLDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 	return d.CommonDB.AcquireClientRow(tx, clientId)
 }
 
+// AcquireClientRowShared takes a shared record lock on the client's row with FOR SHARE, which
+// InnoDB holds to the end of the transaction and which conflicts with the exclusive lock
+// AcquireClientRow's UPDATE takes.
+func (d *MySQLDatabase) AcquireClientRowShared(tx *sql.Tx, clientId int64) error {
+	return d.CommonDB.AcquireClientRowSharedWith(tx, clientId, "SELECT id FROM clients WHERE id = ? FOR SHARE")
+}
+
 func (d *MySQLDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
 	return d.CommonDB.GetClientById(tx, clientId)
 }

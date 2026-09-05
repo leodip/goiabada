@@ -402,6 +402,47 @@ func (d *CommonDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier str
 	return rowsAffected == 1, nil
 }
 
+// AcquireUserSessionRowById takes the session's row and holds it for the rest of the caller's
+// transaction, exactly as AcquireUserSessionRow does and for the same reason. The only difference
+// is the key.
+//
+// It exists because DeleteClient reaches its sessions through user_session_clients, which carries
+// the session's id and not its identifier. Resolving the identifier first would mean reading
+// user_sessions while holding association-row locks, which is the join shape measured to deadlock
+// against the auth-code replay response on SQL Server, so the acquisition keys on what the caller
+// already has.
+//
+// Existence is NOT reported, which is where this parts company with its sibling. That one answers
+// a ceremony asking "may I still bind a grant to this session", and the answer decides what the
+// ceremony does next. This one is taken by a transaction that is about to delete a client and does
+// not care whether a particular session survived the moment: a session reaped between the read and
+// the acquisition simply has nothing left to order against.
+//
+// A transaction is required for the reason AcquireClientRow states: without one the statement
+// autocommits and releases the row before the caller reaches anything below it.
+func (d *CommonDatabase) AcquireUserSessionRowById(tx *sql.Tx, userSessionId int64) error {
+
+	if tx == nil {
+		return errors.WithStack(errors.New("acquiring a user session row requires a transaction: an autocommitted statement releases the row before the caller can use it"))
+	}
+
+	if userSessionId == 0 {
+		return errors.WithStack(errors.New("can't acquire a user session row with an id of 0"))
+	}
+
+	acquire := sqlbuilder.NewUpdateBuilder()
+	acquire.Update("user_sessions")
+	acquire.Set(acquire.Assign("updated_at", time.Now().UTC()))
+	acquire.Where(acquire.Equal("id", userSessionId))
+
+	query, args := acquire.BuildWithFlavor(d.Flavor)
+	if _, err := d.ExecSql(tx, query, args...); err != nil {
+		return errors.Wrap(err, "unable to acquire user session row by id")
+	}
+
+	return nil
+}
+
 // Deletes user sessions that have been idle longer than the specified timeout
 func (d *CommonDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()

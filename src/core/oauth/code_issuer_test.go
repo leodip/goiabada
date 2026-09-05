@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateAuthCode(t *testing.T) {
@@ -188,5 +189,41 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 	assert.Nil(t, code)
 	assert.Contains(t, err.Error(), "database error")
 
+	mockDB.AssertExpectations(t)
+}
+
+// TestCreateAuthCode_RefusesAMissingClient is #248 part 5, folded into #139 because that branch
+// changed its reachability.
+//
+// The client this ceremony started against can be deleted while the ceremony is in flight, and
+// the lookup here then returns nil, which the line building the code dereferenced for client.Id.
+// That was a narrow race before; since #139 issuance takes a SHARED lock on the client row, so a
+// deletion that got there first makes this transaction WAIT and then proceed into this lookup,
+// and the panic becomes the reliable outcome of losing that race rather than an unlucky one.
+//
+// A sentinel rather than a wrapped message, because /auth/issue branches on it: a deleted client
+// is answered the way a vanished session is, by restarting the browser at level 1 or telling a
+// silent request login_required, and not by a 500 that reads as a fault in this server.
+func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	codeIssuer := NewCodeIssuer(mockDB)
+
+	// nil, nil is the shape GetClientByClientIdentifier reports for a client that is not there:
+	// an absence rather than a failure.
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "deleted-client").
+		Return((*models.Client)(nil), nil)
+
+	code, err := codeIssuer.CreateAuthCode(nil, &CreateCodeInput{
+		AuthContext:       AuthContext{ClientId: "deleted-client", UserId: 123},
+		SessionIdentifier: "session123",
+	})
+
+	require.ErrorIs(t, err, ErrIssuingClientGone,
+		"the caller branches on this error, so it has to be identifiable rather than merely non-nil")
+	assert.Nil(t, code, "no code is built for a client that no longer exists")
+
+	// And nothing was written. The insert is what would bind a grant to a registration that is
+	// gone, and its foreign key would refuse it anyway, with an error nobody could branch on.
+	mockDB.AssertNotCalled(t, "CreateCode", mock.Anything, mock.Anything)
 	mockDB.AssertExpectations(t)
 }

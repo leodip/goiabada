@@ -71,6 +71,15 @@ func (d *MsSQLDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 	return d.CommonDB.AcquireClientRow(tx, clientId)
 }
 
+// AcquireClientRowShared takes a shared row lock and holds it to the end of the transaction.
+// HOLDLOCK is what makes it outlive the statement: SQL Server's READ COMMITTED releases a shared
+// lock as soon as the row has been read, and a lock released before the caller reaches the rows it
+// was meant to cover orders nothing. ROWLOCK keeps the engine from escalating to a page or table
+// lock on a single-row read.
+func (d *MsSQLDatabase) AcquireClientRowShared(tx *sql.Tx, clientId int64) error {
+	return d.CommonDB.AcquireClientRowSharedWith(tx, clientId, "SELECT id FROM clients WITH (HOLDLOCK, ROWLOCK) WHERE id = @p1")
+}
+
 func (d *MsSQLDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
 	return d.CommonDB.GetClientById(tx, clientId)
 }

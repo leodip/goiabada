@@ -80,12 +80,16 @@ func TestUpdateUserSessionClient(t *testing.T) {
 		t.Fatalf("Failed to retrieve updated user session client: %v", err)
 	}
 
-	// Verify all updated properties
-	if retrievedUserSessionClient.UserSessionId != updatedUserSessionClient.UserSessionId {
-		t.Errorf("Expected UserSessionId %d, got %d", updatedUserSessionClient.UserSessionId, retrievedUserSessionClient.UserSessionId)
+	// The two keys are NOT among the updated properties: both are dont-update, so this statement
+	// leaves the association pointing where it always did. That is
+	// TestUpdateUserSessionClient_TheKeysAreNotRewritten's subject, and the reason is a SQL Server
+	// foreign key re-check that put a shared clients lock under a session bump (#139). Asserted
+	// here too because this test writes them, so it would otherwise pass silently either way.
+	if retrievedUserSessionClient.UserSessionId != originalUserSessionClient.UserSessionId {
+		t.Errorf("Expected UserSessionId to stay %d, got %d", originalUserSessionClient.UserSessionId, retrievedUserSessionClient.UserSessionId)
 	}
-	if retrievedUserSessionClient.ClientId != updatedUserSessionClient.ClientId {
-		t.Errorf("Expected ClientId %d, got %d", updatedUserSessionClient.ClientId, retrievedUserSessionClient.ClientId)
+	if retrievedUserSessionClient.ClientId != originalUserSessionClient.ClientId {
+		t.Errorf("Expected ClientId to stay %d, got %d", originalUserSessionClient.ClientId, retrievedUserSessionClient.ClientId)
 	}
 	if !retrievedUserSessionClient.Started.Equal(updatedUserSessionClient.Started) {
 		t.Errorf("Expected Started %v, got %v", updatedUserSessionClient.Started, retrievedUserSessionClient.Started)
