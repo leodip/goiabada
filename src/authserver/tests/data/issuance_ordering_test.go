@@ -104,7 +104,7 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 			result handlers.TerminationResult
 			err    error
 		}
-		termination := goBlocked(t, "the termination", func(reached func()) terminationOutcome {
+		termination := goBlocked(t, "the termination", tx, func(reached func()) terminationOutcome {
 			reached()
 			result, err := handlers.TerminateUserSessionTx(other, session)
 			return terminationOutcome{result: result, err: err}
@@ -149,7 +149,7 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 		require.NoError(t, terminationStatements(database, tx, session),
 			"the termination's statements on a session nothing else has touched yet")
 
-		ceremony := goBlocked(t, "the ceremony", func(reached func()) issuanceOutcome {
+		ceremony := goBlocked(t, "the ceremony", tx, func(reached func()) issuanceOutcome {
 			otherTx, err := other.BeginTransaction()
 			if err != nil {
 				reached()

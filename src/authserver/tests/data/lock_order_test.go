@@ -121,7 +121,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 
 		// The real termination, on the other handle, arriving while the replay holds the row.
 		// Its first statement is the delete, which is what makes it wait.
-		termination := goBlocked(t, "the termination", func(reached func()) error {
+		termination := goBlocked(t, "the termination", tx, func(reached func()) error {
 			reached()
 			_, err := handlers.TerminateUserSessionTx(other, session)
 			return err
@@ -159,7 +159,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 			live bool
 			err  error
 		}
-		replay := goBlocked(t, "the replay response", func(reached func()) replayOutcome {
+		replay := goBlocked(t, "the replay response", tx, func(reached func()) replayOutcome {
 			otherTx, err := other.BeginTransaction()
 			if err != nil {
 				reached()
@@ -227,7 +227,7 @@ func TestLockOrder_DeleteUserAgainstIssuance(t *testing.T) {
 		require.NoError(t, err, "the ceremony takes the session row")
 		require.True(t, live, "the session row is still there when the ceremony takes it")
 
-		deletion := goBlocked(t, "DeleteUser", func(reached func()) error {
+		deletion := goBlocked(t, "DeleteUser", tx, func(reached func()) error {
 			reached()
 			return other.DeleteUser(nil, user.Id)
 		})
@@ -292,7 +292,7 @@ func TestLockOrder_DeleteUserAgainstIssuance(t *testing.T) {
 			live bool
 			err  error
 		}
-		ceremony := goBlocked(t, "the ceremony's acquisition", func(reached func()) acquireOutcome {
+		ceremony := goBlocked(t, "the ceremony's acquisition", tx, func(reached func()) acquireOutcome {
 			otherTx, err := other.BeginTransaction()
 			if err != nil {
 				reached()

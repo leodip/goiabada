@@ -36,10 +36,24 @@ type UserSession struct {
 	// request, so leaving it in the ordinary update set would let a stale model regress
 	// it. It is written on insert and afterwards only by
 	// PromoteUserSessionOtpConfigGeneration.
-	OtpConfigGeneration int64               `db:"otp_config_generation" fieldtag:"dont-update"`
-	UserId              int64               `db:"user_id"`
-	User                User                `db:"-"`
-	Clients             []UserSessionClient `db:"-"`
+	OtpConfigGeneration int64 `db:"otp_config_generation" fieldtag:"dont-update"`
+	// UserId is the session's owner, written on insert and never changed: no code path
+	// reassigns a session to another user, and the cross-user handover at /auth/completed
+	// ends the old session and starts a new one rather than moving it.
+	//
+	// Tagged dont-update for a different reason from the two generations above. user_id is a
+	// foreign key to users.id, and SQL Server re-checks a foreign key whenever the column is
+	// in an UPDATE's SET list, unchanged value or not, by taking a shared lock on the parent
+	// row. So a full-row UpdateUserSession took the session row and then the users row, which
+	// is the reverse of the order every transaction writing a session and its grants agrees
+	// to: users, then user_sessions, then the grants. Measured on SQL Server: BumpUserSession
+	// racing an authorization ceremony that already holds the users row deadlocks with the
+	// ceremony as the victim. Leaving the column out of the update set is what removes that
+	// edge; PostgreSQL and MySQL skip the re-check on an unchanged value and were never
+	// affected (#139).
+	UserId  int64               `db:"user_id" fieldtag:"dont-update"`
+	User    User                `db:"-"`
+	Clients []UserSessionClient `db:"-"`
 }
 
 func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) bool {
