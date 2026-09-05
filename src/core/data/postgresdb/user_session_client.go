@@ -66,6 +66,10 @@ func (d *PostgresDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, use
 	return d.CommonDB.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
 }
 
+func (d *PostgresDatabase) GetUserSessionClientsByClientId(tx *sql.Tx, clientId int64) ([]models.UserSessionClient, error) {
+	return d.CommonDB.GetUserSessionClientsByClientId(tx, clientId)
+}
+
 func (d *PostgresDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
 	return d.CommonDB.GetUserSessionClientsByUserSessionId(tx, userSessionId)
 }

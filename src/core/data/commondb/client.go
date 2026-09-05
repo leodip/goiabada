@@ -2,6 +2,7 @@ package commondb
 
 import (
 	"database/sql"
+	"sort"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -116,6 +117,82 @@ func (d *CommonDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 	// hold, and every caller reads the row immediately afterwards, which is the one place that
 	// decides whether the client still exists. Answering it twice would put the same sentence in
 	// two places and let them disagree.
+	return nil
+}
+
+// AcquireClientRowSharedWith is the body three of the four dialects' AcquireClientRowShared share:
+// the two refusals, and the execution of the locking read each of them passes in. The statement
+// itself is the one part with no portable spelling, so it lives in the dialect packages and this
+// holds everything else, including the reason the whole thing exists. SQLite is the exception and
+// delegates to AcquireClientRow instead, for the reason stated there.
+//
+// WHAT IT IS FOR. DeleteClient takes the clients row exclusively and then reads the sessions
+// associated with it, so that list is complete only if no association can be inserted while it is
+// held. Nothing made that true: user_session_clients rows are created outside the deletion, by
+// StartNewUserSession and by BumpUserSession, each in its own transaction, and a foreign key
+// reference is not a barrier against the exclusive acquisition on PostgreSQL, where an UPDATE
+// touching no key column takes FOR NO KEY UPDATE and a foreign key check takes FOR KEY SHARE and
+// the two do not conflict. So every transaction that writes an association row, or a code, takes
+// this lock first, and the deletion's list is then closed by the lock rather than by a re-read
+// (#139).
+//
+// WHY SHARED RATHER THAN THE EXCLUSIVE ACQUISITION. AcquireClientRow serializes its callers, and a
+// clients row is shared by everybody using that application: every authorization code issued and
+// every session bump for a popular client would queue on one row. Two shared holders do not
+// conflict, so concurrent sign-ins are unaffected; a shared holder and the deletion do, which is
+// the whole of what is wanted.
+//
+// THE OBLIGATION THIS PUTS ON ITS CALLERS, and it is not optional. Lock queues are fair: once the
+// deletion's exclusive request is queued behind a shared holder, a later shared request queues
+// behind the DELETION rather than joining the holder. So a caller that takes this lock and only
+// afterwards reaches for something ABOVE clients in the branch's order can be part of a cycle even
+// though nothing is ever upgraded and no two shared holders ever conflict. A caller must already
+// hold everything above clients, INCLUDING locks it takes only through a foreign key, before it
+// calls this. That is why StartNewUserSession calls AcquireUserRow first: its session insert takes
+// a shared users lock through user_sessions.user_id without naming it, and without the leading
+// acquisition the three-party schedule (issuance holding users and waiting for the client, a fresh
+// session holding the client and waiting for users, the deletion queued exclusively on the client)
+// deadlocks on MySQL.
+//
+// No caller ever upgrades this to the exclusive acquisition, which is the classic way a shared
+// scheme deadlocks. DeleteClient and the admin client-update handlers take the exclusive lock as
+// their first statement rather than promoting a shared one.
+//
+// The transaction is required for AcquireClientRow's stated reason: without one the statement
+// autocommits and the lock is gone before the caller reaches anything it was meant to cover.
+func (d *CommonDatabase) AcquireClientRowSharedWith(tx *sql.Tx, clientId int64, lockingRead string) error {
+
+	if tx == nil {
+		return errors.WithStack(errors.New("acquiring a client row shared requires a transaction: an autocommitted statement releases the lock before the caller can use it"))
+	}
+
+	if clientId == 0 {
+		return errors.WithStack(errors.New("can't acquire a client row with an id of 0"))
+	}
+
+	// Run as a query rather than an exec, and drained, because it IS a SELECT: go-mssqldb leaves
+	// the connection busy until the result set is consumed, and a lock taken by a statement whose
+	// rows were never read is a connection this transaction cannot use afterwards.
+	rows, err := d.QuerySql(tx, lockingRead, clientId)
+	if err != nil {
+		return errors.Wrap(err, "unable to acquire client row shared")
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return errors.Wrap(err, "unable to scan the acquired client row")
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return errors.Wrap(err, "unable to read the acquired client row")
+	}
+
+	// A client that is not there locks nothing and is not reported, which is AcquireClientRow's own
+	// answer to the same question: every caller either reads the row immediately afterwards or is
+	// about to fail its own foreign key, and answering existence twice would let the two disagree.
 	return nil
 }
 
@@ -397,15 +474,57 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 // references it. Refresh tokens are cleared explicitly first because SQL Server
 // cannot cascade them: see deleteRefreshTokensByColumn.
 //
-// It takes no session row and deliberately does not mirror what DeleteUser does
-// about them (#139). The rule is that a transaction writing a user_sessions row
-// and that session's grants takes the session row first; this one writes no
-// session row at all, because the cascade on clients reaches codes and
-// user_session_clients but never user_sessions. Measured against an authorization
-// ceremony holding a session row: clean on all four engines in both orderings.
+// IT JOINS THE LOCK ORDER, AND AN EARLIER MEASUREMENT SAID IT NEED NOT. That
+// measurement was honest and is now stale: this transaction was clean against the
+// session-side transactions AS THEY STOOD, and #139 then made every one of them take
+// the user_sessions row first, which puts that session's user_session_clients rows in
+// their hands from their first statement. This transaction's cascade wants exactly
+// those rows, and by the time it asks for one it is already holding that session's
+// codes, which the other side is about to sweep. Each holds half of what the other
+// wants: a deadlock on PostgreSQL, MySQL and SQL Server, with the session-side
+// transaction chosen as the victim on the last two.
+//
+// The explicit refresh-token delete is what makes it a cycle rather than a race, and
+// it is not redundant with the cascade: refresh_tokens.client_id is NO ACTION on all
+// four engines and only refresh_tokens.code_id is CASCADE, so that statement really
+// does take a client's ROPC-issued tokens before the cascade runs.
+//
+// SO THE ORDER IS TAKEN EXPLICITLY, AND IN THIS ORDER, WHICH IS THE BRANCH'S:
+// clients, then user_sessions, then the grants.
+//
+//  1. The clients row, EXCLUSIVELY, because this transaction is removing it and must
+//     exclude everything. Taking it first is also what makes the list below complete:
+//     no association naming this client can be inserted while it is held, because
+//     every inserter now takes the same row shared before it writes one
+//     (AcquireClientRowShared). A fixed-point loop over re-reads could not close that
+//     gap, since InnoDB fixes the consistent-read snapshot at the transaction's first
+//     plain SELECT and a later one never sees an association committed in between.
+//  2. The session rows, so that the cascade is not the first statement to want a row a
+//     session-first transaction is already holding.
+//  3. The two deletes it has always run.
+//
+// The sort is not decoration. GetUserSessionClientsByClientId carries no ORDER BY, and
+// two overlapping deletions of different clients sharing a session would otherwise take
+// the session rows in an order the engine chose, which is a cycle among sessions that no
+// rule about the order of TABLES can reach.
 func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 
 	return d.inTransaction(tx, func(tx *sql.Tx) error {
+		if err := d.AcquireClientRow(tx, clientId); err != nil {
+			return err
+		}
+
+		associations, err := d.GetUserSessionClientsByClientId(tx, clientId)
+		if err != nil {
+			return err
+		}
+
+		for _, userSessionId := range sortedDistinctSessionIds(associations) {
+			if err := d.AcquireUserSessionRowById(tx, userSessionId); err != nil {
+				return err
+			}
+		}
+
 		if err := d.deleteRefreshTokensByColumn(tx, "client_id", clientId); err != nil {
 			return err
 		}
@@ -417,11 +536,29 @@ func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 		deleteBuilder.Where(deleteBuilder.Equal("id", clientId))
 
 		sql, args := deleteBuilder.Build()
-		_, err := d.ExecSql(tx, sql, args...)
+		_, err = d.ExecSql(tx, sql, args...)
 		if err != nil {
 			return errors.Wrap(err, "unable to delete client")
 		}
 
 		return nil
 	})
+}
+
+// sortedDistinctSessionIds is the order DeleteClient takes its session rows in: ascending,
+// each id once. One client can appear on a session only once in practice, but nothing in the
+// schema says so today (#249 is the constraint that would), so the deduplication is here
+// rather than assumed.
+func sortedDistinctSessionIds(associations []models.UserSessionClient) []int64 {
+	seen := make(map[int64]struct{}, len(associations))
+	ids := make([]int64, 0, len(associations))
+	for _, association := range associations {
+		if _, already := seen[association.UserSessionId]; already {
+			continue
+		}
+		seen[association.UserSessionId] = struct{}{}
+		ids = append(ids, association.UserSessionId)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
 }

@@ -670,6 +670,7 @@ func TestHandleIssueGet(t *testing.T) {
 		commitError := errors.New("commit failed")
 		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
 		database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
+		database.On("AcquireClientRowShared", issuanceTx, issuanceClientId).Return(nil).Once()
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 		database.On("CommitTransaction", issuanceTx).Return(commitError).Once()
 		database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
@@ -753,6 +754,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		var order []string
 		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
 		database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
+		database.On("AcquireClientRowShared", issuanceTx, issuanceClientId).Return(nil).Once()
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
 		// Twice: the explicit rollback, then the deferred one, which is a no-op against a
 		// transaction that has already finished.
@@ -796,6 +798,122 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		codeIssuer.AssertExpectations(t)
 	})
 
+	// #248 PART 5, FOLDED IN HERE BECAUSE THIS BRANCH CHANGED ITS REACHABILITY.
+	//
+	// The shared client acquisition means a ceremony racing a deletion of its own client WAITS for
+	// that deletion and then proceeds into CreateAuthCode's client lookup, which now finds nothing.
+	// So the nil that used to be a narrow race is the reliable outcome of losing this race, and the
+	// answer has to be an answer rather than a panic. It is the session-gone answer: nothing is
+	// wrong with this server, the application the browser was signing in to no longer exists.
+	t.Run("The client is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+
+		authContext := issuanceAuthContext("")
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubLiveSession(database, 123)
+
+		// The session is alive here, which is the point: this ceremony is refused for a reason
+		// that is not the session's, and the rollback still has to precede the refusal for the
+		// SQLite reason the sibling subtest states.
+		var order []string
+		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+		database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
+		database.On("AcquireClientRowShared", issuanceTx, issuanceClientId).Return(nil).Once()
+		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
+		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).
+			Return(nil, errors.WithStack(oauth.ErrIssuingClientGone)).Once()
+		database.On("RollbackTransaction", issuanceTx).Run(func(mock.Arguments) {
+			order = append(order, "rollback")
+		}).Return(nil).Twice()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Run(func(mock.Arguments) { order = append(order, "save") }).Return(nil)
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
+		assert.NotContains(t, rr.Header().Get("Location"), "code=")
+
+		require.GreaterOrEqual(t, len(order), 2)
+		assert.Equal(t, "rollback", order[0],
+			"the transaction must be released before the refusal touches the session store")
+		assert.Equal(t, "save", order[1])
+
+		// Not a 500, which is the whole of the difference from an ordinary CreateAuthCode failure.
+		httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+	})
+
+	// And any OTHER failure from the insert is still a 500, so the branch above is a branch on
+	// this one condition rather than a blanket softening of the insert's errors.
+	t.Run("An ordinary insert failure is still a 500", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+
+		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+		rr := httptest.NewRecorder()
+
+		authContext := issuanceAuthContext("")
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		stubLiveSession(database, 123)
+
+		boom := errors.New("the insert failed")
+		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+		database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
+		database.On("AcquireClientRowShared", issuanceTx, issuanceClientId).Return(nil).Once()
+		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
+		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).Return(nil, boom).Once()
+		database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return errors.Is(err, boom)
+		})).Return()
+
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.NotContains(t, rr.Header().Get("Location"), "/auth/level1")
+		assert.NotContains(t, rr.Header().Get("Location"), "code=")
+		authHelper.AssertNotCalled(t, "SaveAuthContext")
+		database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+	})
+
 	t.Run("The row is gone and the ceremony is silent, so the client is answered login_required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -820,6 +938,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 
 		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
 		database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
+		database.On("AcquireClientRowShared", issuanceTx, issuanceClientId).Return(nil).Once()
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
 		database.On("RollbackTransaction", issuanceTx).Return(nil).Twice()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
@@ -873,9 +992,21 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 					database.On("BeginTransaction").Return(issuanceTx, nil).Once()
 					database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(boom).Once()
 					database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
-					// The session row is never reached: a transaction that failed to take the
-					// top of the lock order has no business taking the next row down (#139
-					// decision 11).
+					// Neither row below is reached: a transaction that failed to take the top of
+					// the lock order has no business taking the next one down (#139 decision 11).
+					database.AssertNotCalled(t, "AcquireClientRowShared", mock.Anything, mock.Anything)
+					database.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything)
+				},
+			},
+			{
+				name: "the client row acquisition fails",
+				setup: func(database *mocks_data.Database) {
+					database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+					database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
+					database.On("AcquireClientRowShared", issuanceTx, issuanceClientId).Return(boom).Once()
+					database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
+					// Same reasoning one row down: the session row is below clients in the order,
+					// so a transaction refused the client row does not go on to take it (#139).
 					database.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything)
 				},
 			},
@@ -884,6 +1015,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				setup: func(database *mocks_data.Database) {
 					database.On("BeginTransaction").Return(issuanceTx, nil).Once()
 					database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
+					database.On("AcquireClientRowShared", issuanceTx, issuanceClientId).Return(nil).Once()
 					database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).
 						Return(false, boom).Once()
 					database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
@@ -994,6 +1126,8 @@ func TestHandleIssueGet_TheUserRowIsTakenBeforeTheSessionRow(t *testing.T) {
 
 	database.On("BeginTransaction").Return(issuanceTx, nil).Run(note("begin")).Once()
 	database.On("AcquireUserRow", issuanceTx, issuanceUserId).Run(note("user row")).Return(nil).Once()
+	database.On("AcquireClientRowShared", issuanceTx, issuanceClientId).
+		Run(note("client row")).Return(nil).Once()
 	database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).
 		Run(note("session row")).Return(true, nil).Once()
 	codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).Run(note("insert")).
@@ -1009,9 +1143,11 @@ func TestHandleIssueGet_TheUserRowIsTakenBeforeTheSessionRow(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, []string{"begin", "user row", "session row", "insert", "commit"}, order,
-		"the users row is the top of the lock order, so it is taken before the session row and both "+
-			"before the insert that reaches users again through the foreign key")
+	assert.Equal(t, []string{"begin", "user row", "client row", "session row", "insert", "commit"}, order,
+		"the lock order is users, then clients, then user_sessions, then the grants: the users row is "+
+			"the top because the insert reaches it again through the foreign key, and the shared "+
+			"client acquisition sits below it because a shared holder that afterwards reaches ABOVE "+
+			"clients closes a cycle with a client deletion queued exclusively on that row")
 
 	// And the ordering is only worth anything if all of it is on ONE transaction: a row taken on
 	// a different connection is released the moment that statement autocommits.
@@ -1429,6 +1565,12 @@ const liveSessionIdentifier = "session-identifier-abc"
 // stubIssuanceTransactionFor.
 const issuanceUserId int64 = 1
 
+// issuanceClientId is the id armIssueGate's GetClientByClientIdentifier hands back, and so the id
+// the ceremony's shared client acquisition names. Written out for the reason issuanceUserId is:
+// the acquisition exists to take the row of the client this code is being minted for, and a stub
+// matching any id would pass with the wrong one (#139).
+const issuanceClientId int64 = 1
+
 // requestWithSessionIdentifier builds the /auth/issue request the way
 // MiddlewareSessionIdentifier leaves it when the session row exists: the identifier is in the
 // request context. Its absence is the terminated case, which is why the subtests that expect
@@ -1473,6 +1615,7 @@ func stubIssuanceTransaction(database *mocks_data.Database) {
 func stubIssuanceTransactionFor(database *mocks_data.Database, userId int64) {
 	database.On("BeginTransaction").Return(issuanceTx, nil).Once()
 	database.On("AcquireUserRow", issuanceTx, userId).Return(nil).Once()
+	database.On("AcquireClientRowShared", issuanceTx, issuanceClientId).Return(nil).Once()
 	database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 	database.On("CommitTransaction", issuanceTx).Return(nil).Once()
 	database.On("RollbackTransaction", issuanceTx).Return(nil).Once()

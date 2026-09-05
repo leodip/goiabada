@@ -11,7 +11,14 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/pkg/errors"
 )
+
+// ErrIssuingClientGone is returned by CreateAuthCode when the client the ceremony is issuing for
+// no longer has a row. It is a sentinel rather than a wrapped message because /auth/issue branches
+// on it: the condition is the client's registration disappearing mid-ceremony, which is answered
+// by restarting the browser at level 1 (or login_required for a silent request), not by a 500.
+var ErrIssuingClientGone = errors.New("the client this ceremony is issuing for no longer exists")
 
 type CodeIssuer struct {
 	database data.Database
@@ -43,6 +50,16 @@ func (ci *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *CreateCodeInput) (*model
 	client, err := ci.database.GetClientByClientIdentifier(tx, input.ClientId)
 	if err != nil {
 		return nil, err
+	}
+
+	// A client the ceremony started against can be gone by the time this runs, and since #139 that
+	// is a reliable schedule rather than a narrow race: issuance takes a shared lock on the client
+	// row, so a deletion that got there first makes this transaction WAIT and then proceed into
+	// this lookup, which now finds nothing. Dereferencing it for client.Id below was a panic, so
+	// the condition is answered as an error and the caller answers it the way it answers a session
+	// that has gone (#248 part 5).
+	if client == nil {
+		return nil, errors.WithStack(ErrIssuingClientGone)
 	}
 
 	space := regexp.MustCompile(`\s+`)

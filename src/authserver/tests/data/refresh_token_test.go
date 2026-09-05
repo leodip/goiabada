@@ -37,6 +37,7 @@ func TestUpdateRefreshToken(t *testing.T) {
 	user := createTestUser(t)
 	updatedCode := createTestCode(t, client.Id, user.Id)
 
+	originalCodeId := refreshToken.CodeId
 	refreshToken.CodeId = sql.NullInt64{Int64: updatedCode.Id, Valid: true}
 	refreshToken.RefreshTokenJti = "updated_jti"
 	refreshToken.PreviousRefreshTokenJti = "previous_jti"
@@ -61,9 +62,12 @@ func TestUpdateRefreshToken(t *testing.T) {
 		t.Fatalf("Failed to retrieve updated refresh token: %v", err)
 	}
 
-	// Compare all properties
-	if updatedRefreshToken.CodeId != refreshToken.CodeId {
-		t.Errorf("Expected CodeId %v, got %v", refreshToken.CodeId, updatedRefreshToken.CodeId)
+	// Compare all properties. code_id is NOT among them: it is dont-update, along with user_id and
+	// client_id, so this statement leaves the token pointing at the code it descended from. That is
+	// TestUpdateRefreshToken_TheKeysAreNotRewritten's subject, and the reason is a SQL Server
+	// foreign key re-check that put a shared clients lock under every grant sweep (#139).
+	if updatedRefreshToken.CodeId != originalCodeId {
+		t.Errorf("Expected CodeId to stay %v, got %v", originalCodeId, updatedRefreshToken.CodeId)
 	}
 	if updatedRefreshToken.RefreshTokenJti != refreshToken.RefreshTokenJti {
 		t.Errorf("Expected RefreshTokenJti %s, got %s", refreshToken.RefreshTokenJti, updatedRefreshToken.RefreshTokenJti)

@@ -1,0 +1,1 @@
+DROP INDEX [idx_user_session_clients_client_id] ON [user_session_clients];

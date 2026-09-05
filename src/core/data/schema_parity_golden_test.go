@@ -181,9 +181,13 @@ func parityAllowlist() []parityRule {
 			Why: "InnoDB requires an index over a foreign key's columns and creates one when the " +
 				"migration does not, so MySQL carries an index the other three were never asked " +
 				"for. Adding the same indexes elsewhere is a performance change with its own " +
-				"risk and its own measurement, which #282 deferred and #284 keeps out of scope.",
-			Count:  18,
-			Digest: "6ef70bd585bf03c4",
+				"risk and its own measurement, which #282 deferred and #284 keeps out of scope. " +
+				"One place left this rule rather than being added to it: #139 needed " +
+				"user_session_clients(client_id) indexed on the other three, for a read " +
+				"DeleteClient now makes, so 000044 creates it there and renames MySQL's " +
+				"fk_user_session_clients_client to match.",
+			Count:  17,
+			Digest: "49bf86090a71d4ad",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisIndex && oddOneOut(d, schemadump.MySQL) &&
 					d.Says[schemadump.MySQL] == "present" && d.Says[schemadump.SQLite] == "absent"

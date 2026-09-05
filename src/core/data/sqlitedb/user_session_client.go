@@ -22,6 +22,10 @@ func (d *SQLiteDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userS
 	return d.CommonDB.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
 }
 
+func (d *SQLiteDatabase) GetUserSessionClientsByClientId(tx *sql.Tx, clientId int64) ([]models.UserSessionClient, error) {
+	return d.CommonDB.GetUserSessionClientsByClientId(tx, clientId)
+}
+
 func (d *SQLiteDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
 	return d.CommonDB.GetUserSessionClientsByUserSessionId(tx, userSessionId)
 }
