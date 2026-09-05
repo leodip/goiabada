@@ -353,14 +353,18 @@ func createTestUserSessions(t *testing.T, userId int64, count int) []models.User
 }
 
 func createTestUserSessionWithClient(t *testing.T, userId, clientId int64) *models.UserSession {
-	userSession := createTestUserSession(t, userId)
+	return createTestUserSessionWithClientOn(t, database, userId, clientId)
+}
+
+func createTestUserSessionWithClientOn(t *testing.T, db data.Database, userId, clientId int64) *models.UserSession {
+	userSession := createTestUserSessionOn(t, db, userId)
 	userSessionClient := &models.UserSessionClient{
 		UserSessionId: userSession.Id,
 		ClientId:      clientId,
 		Started:       time.Now().UTC().Truncate(time.Microsecond),
 		LastAccessed:  time.Now().UTC().Truncate(time.Microsecond),
 	}
-	err := database.CreateUserSessionClient(nil, userSessionClient)
+	err := db.CreateUserSessionClient(nil, userSessionClient)
 	if err != nil {
 		t.Fatalf("Failed to create test user session client: %v", err)
 	}

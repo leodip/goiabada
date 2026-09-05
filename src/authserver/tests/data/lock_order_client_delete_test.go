@@ -55,6 +55,13 @@ import (
 // DeleteClient's explicit token delete is the statement that really does take a client's tokens
 // before its cascade runs, and that is the half of the original cycle the session side waits on.
 type clientDeleteFixture struct {
+	// db is the handle every row of this fixture was seeded on, and the one its assertions read
+	// back through. It is a field rather than the package global because the RCSI pairs build
+	// the same fixture on a different database, where a reload on the package handle would find
+	// a different row of the same shape under the same identity value and pass for the wrong
+	// reason (see TestRCSI_TheFixtureIsTheDatabaseUnderTest).
+	db data.Database
+
 	user     *models.User
 	session  *models.UserSession
 	doomed   *models.Client
@@ -74,25 +81,30 @@ type clientDeleteFixture struct {
 }
 
 func newClientDeleteFixture(t *testing.T) *clientDeleteFixture {
+	return newClientDeleteFixtureOn(t, database)
+}
+
+func newClientDeleteFixtureOn(t *testing.T, db data.Database) *clientDeleteFixture {
 	t.Helper()
 
 	f := &clientDeleteFixture{
-		user:     createTestUser(t),
-		doomed:   createTestClient(t),
-		survivor: createTestClient(t),
+		db:       db,
+		user:     createTestUserOn(t, db),
+		doomed:   createTestClientOn(t, db),
+		survivor: createTestClientOn(t, db),
 	}
-	f.session = createTestUserSessionWithClient(t, f.user.Id, f.doomed.Id)
-	require.NoError(t, database.CreateUserSessionClient(nil, &models.UserSessionClient{
+	f.session = createTestUserSessionWithClientOn(t, db, f.user.Id, f.doomed.Id)
+	require.NoError(t, db.CreateUserSessionClient(nil, &models.UserSessionClient{
 		UserSessionId: f.session.Id,
 		ClientId:      f.survivor.Id,
 		Started:       time.Now().UTC().Truncate(time.Microsecond),
 		LastAccessed:  time.Now().UTC().Truncate(time.Microsecond),
 	}), "associating the survivor with the session")
 
-	f.doomedCode = createTestCodeInSession(t, f.doomed.Id, f.user.Id, f.session.SessionIdentifier)
-	f.survivorCode = createTestCodeInSession(t, f.survivor.Id, f.user.Id, f.session.SessionIdentifier)
-	f.doomedToken = createTokenOfCode(t, f.doomed.Id, f.user.Id, f.doomedCode.Id, f.session.SessionIdentifier)
-	f.survivorToken = createTokenOfCode(t, f.survivor.Id, f.user.Id, f.survivorCode.Id, f.session.SessionIdentifier)
+	f.doomedCode = createTestCodeInSessionOn(t, db, f.doomed.Id, f.user.Id, f.session.SessionIdentifier)
+	f.survivorCode = createTestCodeInSessionOn(t, db, f.survivor.Id, f.user.Id, f.session.SessionIdentifier)
+	f.doomedToken = createTokenOfCodeOn(t, db, f.doomed.Id, f.user.Id, f.doomedCode.Id, f.session.SessionIdentifier)
+	f.survivorToken = createTokenOfCodeOn(t, db, f.survivor.Id, f.user.Id, f.survivorCode.Id, f.session.SessionIdentifier)
 
 	f.ropcToken = &models.RefreshToken{
 		UserId:            sql.NullInt64{Int64: f.user.Id, Valid: true},
@@ -105,7 +117,7 @@ func newClientDeleteFixture(t *testing.T) *clientDeleteFixture {
 		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	require.NoError(t, database.CreateRefreshToken(nil, f.ropcToken), "the ROPC token of the doomed client")
+	require.NoError(t, db.CreateRefreshToken(nil, f.ropcToken), "the ROPC token of the doomed client")
 
 	return f
 }
@@ -115,11 +127,11 @@ func newClientDeleteFixture(t *testing.T) *clientDeleteFixture {
 func (f *clientDeleteFixture) assertDoomedClientGone(t *testing.T) {
 	t.Helper()
 
-	client, err := database.GetClientById(nil, f.doomed.Id)
+	client, err := f.db.GetClientById(nil, f.doomed.Id)
 	require.NoError(t, err, "reloading the deleted client")
 	assert.Nil(t, client, "the deleted client must be gone")
 
-	code, err := database.GetCodeById(nil, f.doomedCode.Id)
+	code, err := f.db.GetCodeById(nil, f.doomedCode.Id)
 	require.NoError(t, err, "reloading the deleted client's code")
 	assert.Nil(t, code, "the deleted client's code goes with it by cascade")
 
@@ -130,19 +142,23 @@ func (f *clientDeleteFixture) assertDoomedClientGone(t *testing.T) {
 		{f.doomedToken.Id, "the deleted client's offline token"},
 		{f.ropcToken.Id, "the deleted client's ROPC token"},
 	} {
-		token, err := database.GetRefreshTokenById(nil, tc.id)
+		token, err := f.db.GetRefreshTokenById(nil, tc.id)
 		require.NoErrorf(t, err, "reloading %s", tc.what)
 		assert.Nilf(t, token, "%s must be gone once its client is", tc.what)
 	}
 
-	assert.Empty(t, associationsOf(t, f.doomed.Id),
+	assert.Empty(t, associationsOfOn(t, f.db, f.doomed.Id),
 		"the deleted client's association row goes with it by cascade")
 }
 
 // associationsOf reads one client's association rows through the method DeleteClient itself uses.
 func associationsOf(t *testing.T, clientId int64) []models.UserSessionClient {
+	return associationsOfOn(t, database, clientId)
+}
+
+func associationsOfOn(t *testing.T, db data.Database, clientId int64) []models.UserSessionClient {
 	t.Helper()
-	rows, err := database.GetUserSessionClientsByClientId(nil, clientId)
+	rows, err := db.GetUserSessionClientsByClientId(nil, clientId)
 	require.NoError(t, err, "reading the client's association rows")
 	return rows
 }
@@ -177,23 +193,38 @@ func insertAssociation(db data.Database, tx *sql.Tx, sessionId, clientId int64, 
 // =============================================================================
 
 func TestClientDelete_TheDiscoveryBarrierHolds(t *testing.T) {
-	other := secondDatabase(t)
+	runClientDeleteDiscoveryBarrier(t, database, secondDatabase(t))
+}
 
-	f := newClientDeleteFixture(t)
-	joiner := createTestUserSession(t, f.user.Id)
+// TestClientDelete_TheDiscoveryBarrierHolds_RCSI is the same gate against a SQL Server database
+// with READ_COMMITTED_SNAPSHOT on (#139 stage 8). RCSI is the setting that stops READ COMMITTED
+// statements from taking shared read locks, so what this measures is that neither of the two
+// things that queue the insert on SQL Server is served from the row version store instead: the
+// inserter's own HOLDLOCK acquisition, and the shared lock its foreign key check takes on the
+// parent. The mutation control for the acquisition specifically lives on PostgreSQL, which is
+// the engine where the FK check does not conflict and the acquisition is therefore the whole
+// barrier: see the gate header above.
+func TestClientDelete_TheDiscoveryBarrierHolds_RCSI(t *testing.T) {
+	f := rcsiDatabase(t)
+	runClientDeleteDiscoveryBarrier(t, f.primary, f.secondary)
+}
+
+func runClientDeleteDiscoveryBarrier(t *testing.T, db data.Database, other data.Database) {
+	f := newClientDeleteFixtureOn(t, db)
+	joiner := createTestUserSessionOn(t, db, f.user.Id)
 
 	// Read BEFORE the transaction opens, and it has to be. sqlitedb calls SetMaxOpenConns(1), so
 	// a nil-transaction read issued while tx is held asks the pool for the one connection tx owns
 	// and waits for it forever: database/sql puts no deadline on that acquisition, so it is a hang
 	// rather than an error. It is the same constraint CreateAuthCode's doc comment states about
 	// its own client lookup.
-	before := len(associationsOf(t, f.doomed.Id))
+	before := len(associationsOfOn(t, db, f.doomed.Id))
 
-	tx, err := database.BeginTransaction()
+	tx, err := db.BeginTransaction()
 	require.NoError(t, err, "opening the deletion's transaction")
-	defer func() { _ = database.RollbackTransaction(tx) }()
+	defer func() { _ = db.RollbackTransaction(tx) }()
 
-	require.NoError(t, database.AcquireClientRow(tx, f.doomed.Id),
+	require.NoError(t, db.AcquireClientRow(tx, f.doomed.Id),
 		"the deletion takes the clients row exclusively, which is its first statement")
 
 	insert := goBlocked(t, "a session joining the client", tx, func(reached func()) error {
@@ -218,10 +249,10 @@ func TestClientDelete_TheDiscoveryBarrierHolds(t *testing.T) {
 
 	// And what the barrier is for: the set the deletion read while holding the row could not grow
 	// underneath it, and the held-back insert lands only once the row is released.
-	require.NoError(t, database.CommitTransaction(tx), "releasing the deletion's transaction")
+	require.NoError(t, db.CommitTransaction(tx), "releasing the deletion's transaction")
 	require.NoError(t, insert.await(t), "the insert proceeds once the row is released")
 
-	assert.Equal(t, before+1, len(associationsOf(t, f.doomed.Id)),
+	assert.Equal(t, before+1, len(associationsOfOn(t, db, f.doomed.Id)),
 		"the association the barrier held back lands afterwards, which is what makes it a wait rather than a refusal")
 }
 
@@ -230,20 +261,37 @@ func TestClientDelete_TheDiscoveryBarrierHolds(t *testing.T) {
 // =============================================================================
 
 func TestLockOrder_ClientDeleteAgainstIssuance(t *testing.T) {
+	runClientDeleteAgainstIssuance(t, database, secondDatabase(t))
+}
+
+// TestLockOrder_ClientDeleteAgainstIssuance_RCSI is the pair stage 7 exists for, run against a
+// SQL Server database with READ_COMMITTED_SNAPSHOT on (#139 stage 8).
+//
+// It is here because the argument for not running it was not sound. "RCSI can only remove lock
+// conflicts, so a cycle that does not form with it off cannot appear with it on" does not
+// follow: removing a conflict changes which interleavings are REACHABLE, and a transaction that
+// no longer stops at a read can go on to ask for a lock it never previously reached. DeleteClient
+// contains exactly that shape, a plain read of the association rows between its exclusive client
+// acquisition and the session rows it takes next, so the deletion's own progress is one of the
+// things RCSI changes. That has to be measured rather than reasoned about.
+func TestLockOrder_ClientDeleteAgainstIssuance_RCSI(t *testing.T) {
+	f := rcsiDatabase(t)
+	runClientDeleteAgainstIssuance(t, f.primary, f.secondary)
+}
+
+func runClientDeleteAgainstIssuance(t *testing.T, db data.Database, other data.Database) {
 	t.Run("the ceremony goes first and the deletion waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the ceremony's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
 		// The ceremony's own order, production's, stopped between its acquisitions and its insert.
-		require.NoError(t, database.AcquireUserRow(tx, f.user.Id), "the ceremony takes the users row")
-		require.NoError(t, database.AcquireClientRowShared(tx, f.doomed.Id),
+		require.NoError(t, db.AcquireUserRow(tx, f.user.Id), "the ceremony takes the users row")
+		require.NoError(t, db.AcquireClientRowShared(tx, f.doomed.Id),
 			"the ceremony takes the clients row, shared")
-		live, err := database.AcquireUserSessionRow(tx, f.session.SessionIdentifier)
+		live, err := db.AcquireUserSessionRow(tx, f.session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony takes the session row")
 		require.True(t, live)
 
@@ -261,36 +309,34 @@ func TestLockOrder_ClientDeleteAgainstIssuance(t *testing.T) {
 		// THE INSERT COMES AFTER THE DELETION HAS ARRIVED. Inserting before it proves nothing: the
 		// ceremony would hold every lock it will ever want before the other party asked for
 		// anything, and the case would pass against an unordered deletion too.
-		code, err := mintCode(database, tx, f.doomed, f.user, f.session.SessionIdentifier)
+		code, err := mintCode(db, tx, f.doomed, f.user, f.session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony's insert must not be chosen as a deadlock victim")
 
 		deletion.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the ceremony")
+		require.NoError(t, db.CommitTransaction(tx), "committing the ceremony")
 		require.NoError(t, deletion.await(t),
 			"the deletion must wait for the ceremony and then commit, not deadlock with it")
 
 		// The ceremony won legitimately, so its code existed; the deletion then removed it by
 		// cascade, along with everything else of that client's.
-		stored, err := database.GetCodeById(nil, code.Id)
+		stored, err := db.GetCodeById(nil, code.Id)
 		require.NoError(t, err, "reloading the code the ceremony minted")
 		assert.Nil(t, stored, "a code of a client that has just been deleted goes with it")
 		f.assertDoomedClientGone(t)
 
 		// The survivor is untouched, which is what stops "everything is gone" reading as success.
-		assertTokenRevoked(t, f.survivorToken.Id, false, "the surviving client's token")
-		assertCodeRevoked(t, f.survivorCode.Id, false, "the surviving client's code")
+		assertTokenRevokedOn(t, db, f.survivorToken.Id, false, "the surviving client's token")
+		assertCodeRevokedOn(t, db, f.survivorCode.Id, false, "the surviving client's code")
 	})
 
 	t.Run("the deletion goes first and the ceremony waits, then refuses", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the deletion's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		require.NoError(t, database.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
+		require.NoError(t, db.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
 
 		ceremony := goBlocked(t, "the ceremony", tx, func(reached func()) issuanceOutcome {
 			otherTx, err := other.BeginTransaction()
@@ -305,7 +351,7 @@ func TestLockOrder_ClientDeleteAgainstIssuance(t *testing.T) {
 
 		ceremony.requireBlocked(t)
 		ceremony.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the deletion")
+		require.NoError(t, db.CommitTransaction(tx), "committing the deletion")
 
 		outcome := ceremony.await(t)
 
