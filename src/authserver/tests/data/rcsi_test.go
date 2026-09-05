@@ -3,13 +3,14 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/stretchr/testify/require"
 )
@@ -67,10 +68,11 @@ const (
 )
 
 type rcsiFixture struct {
-	// primary and secondary are two data.Database handles over the SAME database, because the
-	// interleavings need two connections and secondDatabase points at the shared one.
-	primary   data.Database
-	secondary data.Database
+	// primary and secondary are two handles over the SAME database, because the interleavings
+	// need two connections and secondDatabase points at the shared one. Concrete rather than
+	// data.Database so the pools can be closed: the interface declares no Close.
+	primary   *mssqldb.MsSQLDatabase
+	secondary *mssqldb.MsSQLDatabase
 	name      string
 }
 
@@ -101,12 +103,9 @@ func rcsiDatabase(t *testing.T) *rcsiFixture {
 	return rcsiBuilt
 }
 
-// buildRCSIFixture creates a database, turns RCSI on, CONFIRMS it is on, and only then opens the
-// handles that migrate it. The order is the whole of this function and none of it is inherited
-// from newIsolatedDB, which cannot be reused unchanged: that helper calls NewMigrator, whose
-// sqlserver.WithInstance reserves a connection for the life of the migrator and releases it only
-// at cleanup, so an ALTER DATABASE afterwards would be a second connection waiting on the
-// fixture's own reserved one.
+// buildRCSIFixture creates a database, turns RCSI on, CONFIRMS it is on, migrates it on a handle
+// it then throws away, and only then opens the handles the tests run on. The order is the whole of
+// this function: every step is where it is because of what the step before it holds.
 func buildRCSIFixture() (*rcsiFixture, error) {
 	cfg := config.GetDatabase()
 	name := isolatedDBName()
@@ -121,15 +120,9 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	//    this function's own connections. The concrete constructor creates the database and
 	//    nothing else, and it exposes the *sql.DB, so "let go of it completely" is a statement
 	//    that actually runs and is checked.
-	created, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-		Type:     "mssql",
-		Username: cfg.Username,
-		Password: cfg.Password,
-		Host:     cfg.Host,
-		Port:     cfg.Port,
-		Name:     name,
-		Create:   true,
-	}, false)
+	creating := rcsiConfig(cfg, name)
+	creating.Create = true
+	created, err := mssqldb.NewMsSQLDatabase(creating, false)
 	if err != nil {
 		return nil, fmt.Errorf("creating the RCSI database %s: %w", name, err)
 	}
@@ -168,29 +161,80 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 		return nil, fmt.Errorf("sys.databases reports READ_COMMITTED_SNAPSHOT still off for %s after the ALTER succeeded", name)
 	}
 
-	// 4. Only now the two handles, each of which migrates the chain and runs the startup tasks.
-	//    Both are closed from the package teardown, registered AFTER the drop so it runs last:
-	//    a DROP DATABASE behind two live pools would have to evict them, and this way there is
-	//    nothing left to evict.
-	primary, err := data.NewDatabase(rcsiConfig(cfg, name), false)
+	// 4. Migrate ONCE, on a handle whose only job is that, and close the migrator.
+	//
+	//    THE MIGRATOR HAS TO BE CLOSED AND THE HANDLE HAS TO BE DEDICATED, and the two go
+	//    together. golang-migrate's sqlserver.WithInstance checks a *sql.Conn out of the pool it
+	//    is given and holds it for the migrator's life, so a pool whose migrator is never closed
+	//    keeps one connection checked out and *sql.DB.Close() does not take it back: Close
+	//    disposes of idle connections and leaves a busy one to its owner. Measured on this
+	//    fixture before the repair, one connection still open after the close. And the driver's
+	//    Close closes the *sql.DB it was handed as well as the connection, so the handle that
+	//    migrates cannot be a handle anything goes on to use. Hence: one handle for the
+	//    migration, closed here, and the test handles opened afterwards without migrating.
+	//
+	//    data.NewDatabase cannot be used for either job. It always migrates, so every handle
+	//    opened through it leaks one connection, which is the whole of what this step avoids.
+	migrating, err := mssqldb.NewMsSQLDatabase(rcsiConfig(cfg, name), false)
+	if err != nil {
+		return nil, fmt.Errorf("opening the handle that migrates %s: %w", name, err)
+	}
+	if err := migrateRCSIDatabase(migrating); err != nil {
+		return nil, err
+	}
+	if open := migrating.DB.Stats().OpenConnections; open != 0 {
+		return nil, fmt.Errorf("the migrating handle for %s still holds %d connection(s) after its migrator was closed", name, open)
+	}
+
+	// 5. Only now the two handles the tests run on. They do NOT run data.NewDatabase's startup
+	//    data tasks, and on this database every one of them is a no-op: the key migration and the
+	//    rotation both key off a settings row that a database nobody has seeded does not have,
+	//    and the OTP and email passes walk a users table with nothing in it.
+	//
+	//    Both are closed from the package teardown, registered AFTER the drop so they run before
+	//    it: a DROP DATABASE behind two live pools would have to evict them, and this way there
+	//    is nothing left to evict.
+	primary, err := mssqldb.NewMsSQLDatabase(rcsiConfig(cfg, name), false)
 	if err != nil {
 		return nil, fmt.Errorf("opening the RCSI fixture's first handle: %w", err)
 	}
-	deferPackageTeardown(func() { closeRCSIHandle(primary) })
+	deferPackageTeardown(func() { _ = primary.DB.Close() })
 
-	secondary, err := data.NewDatabase(rcsiConfig(cfg, name), false)
+	secondary, err := mssqldb.NewMsSQLDatabase(rcsiConfig(cfg, name), false)
 	if err != nil {
 		return nil, fmt.Errorf("opening the RCSI fixture's second handle: %w", err)
 	}
-	deferPackageTeardown(func() { closeRCSIHandle(secondary) })
+	deferPackageTeardown(func() { _ = secondary.DB.Close() })
 
 	return &rcsiFixture{primary: primary, secondary: secondary, name: name}, nil
 }
 
-// rcsiConfig is the fixture's database, never created by the handle that opens it: creation is
+// migrateRCSIDatabase runs the chain on the handle it is given and closes the migrator, which
+// also closes that handle's pool: see step 4 for why those are the same act here.
+func migrateRCSIDatabase(db *mssqldb.MsSQLDatabase) error {
+	migrator, err := db.NewMigrator()
+	if err != nil {
+		return fmt.Errorf("creating the RCSI fixture's migrator: %w", err)
+	}
+
+	upErr := migrator.Up()
+	if upErr != nil && !errors.Is(upErr, gomigrate.ErrNoChange) {
+		// Closed even on the failure path, so a fixture that cannot migrate still does not leave
+		// a connection behind for the drop to evict.
+		_, _ = migrator.Close()
+		return fmt.Errorf("migrating the RCSI fixture: %w", upErr)
+	}
+
+	if srcErr, dbErr := migrator.Close(); srcErr != nil || dbErr != nil {
+		return fmt.Errorf("closing the RCSI fixture's migrator: source %v, database %v", srcErr, dbErr)
+	}
+	return nil
+}
+
+// rcsiConfig is the fixture's database, never created by the handles that open it: creation is
 // step 1's job and has to be finished, and read back, before anything migrates it.
-func rcsiConfig(cfg *config.DatabaseConfig, name string) *config.DatabaseConfig {
-	return &config.DatabaseConfig{
+func rcsiConfig(cfg *config.DatabaseConfig, name string) *mssqldb.DatabaseConfig {
+	return &mssqldb.DatabaseConfig{
 		Type:     "mssql",
 		Username: cfg.Username,
 		Password: cfg.Password,
@@ -198,14 +242,6 @@ func rcsiConfig(cfg *config.DatabaseConfig, name string) *config.DatabaseConfig 
 		Port:     cfg.Port,
 		Name:     name,
 		Create:   false,
-	}
-}
-
-// closeRCSIHandle releases one fixture pool. data.Database declares no Close, so the pool is
-// reached through the concrete type, which is known here: this fixture is SQL Server only.
-func closeRCSIHandle(db data.Database) {
-	if concrete, ok := db.(*mssqldb.MsSQLDatabase); ok {
-		_ = concrete.DB.Close()
 	}
 }
 
