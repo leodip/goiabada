@@ -88,19 +88,41 @@ func issuanceStatements(db data.Database, tx *sql.Tx, client *models.Client, use
 // A test of this shape against that code fails in the first subtest, on RevokedCodeCount and on
 // the code's marker.
 func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
+	runIssuanceOrderingAgainstTermination(t, database, secondDatabase(t))
+}
+
+// TestIssuanceOrdering_AgainstTermination_RCSI is the same pair against a SQL Server database with
+// READ_COMMITTED_SNAPSHOT on, which is the configuration nothing on this branch had ever measured
+// (#139 stage 8). It skips on the other three engines: RCSI is a SQL Server setting, PostgreSQL
+// and MySQL are MVCC already, and SQLite has one writer.
+//
+// This pair is the load-bearing one to run there, and it is the only one that runs there. It is
+// the only test on the branch whose assertions are about the OUTCOME the ordering produces, either
+// the code carries the revocation marker or no code is issued at all, rather than about the
+// absence of a cycle. The lock-order pairs assert the absence of a cycle, and RCSI can only remove
+// lock conflicts, never add one, so a cycle that does not form with it off cannot appear with it
+// on; running them here would cost the fixture's whole helper surface for no reachable finding.
+func TestIssuanceOrdering_AgainstTermination_RCSI(t *testing.T) {
+	f := rcsiDatabase(t)
+	runIssuanceOrderingAgainstTermination(t, f.primary, f.secondary)
+}
+
+// runIssuanceOrderingAgainstTermination is the pair, over two handles it is given rather than the
+// package's. Both handles must point at the SAME database and be two distinct pools: the
+// interleaving needs two connections, and sqlitedb caps a pool at one.
+func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other data.Database) {
 	t.Run("issuance goes first and the termination waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		client := createTestClientOn(t, db)
+		user := createTestUserOn(t, db)
+		session := createTestUserSessionOn(t, db, user.Id)
 
-		client := createTestClient(t)
-		user := createTestUser(t)
-		session := createTestUserSession(t, user.Id)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the ceremony's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		require.NoError(t, database.AcquireUserRow(tx, user.Id), "the ceremony takes the user row")
-		live, err := database.AcquireUserSessionRow(tx, session.SessionIdentifier)
+		require.NoError(t, db.AcquireUserRow(tx, user.Id), "the ceremony takes the user row")
+		require.NoError(t, db.AcquireClientRowShared(tx, client.Id), "the ceremony takes the client row, shared")
+		live, err := db.AcquireUserSessionRow(tx, session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony takes the session row")
 		require.True(t, live, "the session row is still there when the ceremony takes it")
 
@@ -120,10 +142,10 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 		// about: the termination is in flight, and the code does not exist yet.
 		termination.requireBlocked(t)
 
-		code, err := mintCode(database, tx, client, user, session.SessionIdentifier)
+		code, err := mintCode(db, tx, client, user, session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony's insert on the transaction holding the row")
 		termination.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the ceremony")
+		require.NoError(t, db.CommitTransaction(tx), "committing the ceremony")
 
 		outcome := termination.await(t)
 		require.NoError(t, outcome.err,
@@ -131,28 +153,27 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 
 		// The whole value of the termination waiting: its sweep ran after the insert committed,
 		// so it found the code this ceremony minted. Before #139 this count was 0, the sweep
-		// having run before the row existed.
+		// having run before the row existed. Under RCSI this is the assertion that would move if
+		// the sweep read a snapshot taken before the insert rather than the committed row.
 		assert.Equal(t, int64(1), outcome.result.RevokedCodeCount,
 			"the termination's code sweep must mark the code inserted while it was waiting")
-		assertCodeRevoked(t, code.Id, true, "the code the client received")
-		assertSessionGone(t, session.Id, "the terminated session")
+		assertCodeRevokedOn(t, db, code.Id, true, "the code the client received")
+		assertSessionGoneOn(t, db, session.Id, "the terminated session")
 	})
 
 	t.Run("the termination goes first and issuance waits", func(t *testing.T) {
-		other := secondDatabase(t)
-
-		client := createTestClient(t)
-		user := createTestUser(t)
-		session := createTestUserSession(t, user.Id)
+		client := createTestClientOn(t, db)
+		user := createTestUserOn(t, db)
+		session := createTestUserSessionOn(t, db, user.Id)
 
 		// TerminateUserSessionTx owns and commits its own transaction, so an ordering that needs
 		// the termination HELD OPEN across the ceremony's arrival replays its statements by hand;
 		// the other subtest drives the real function.
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the termination's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		require.NoError(t, terminationStatements(database, tx, session),
+		require.NoError(t, terminationStatements(db, tx, session),
 			"the termination's statements on a session nothing else has touched yet")
 
 		ceremony := goBlocked(t, "the ceremony", tx, func(reached func()) issuanceOutcome {
@@ -174,14 +195,16 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 
 		ceremony.requireBlocked(t)
 		ceremony.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the termination")
+		require.NoError(t, db.CommitTransaction(tx), "committing the termination")
 
 		outcome := ceremony.await(t)
 		require.NoError(t, outcome.err,
 			"the ceremony must wait for the termination and then read its answer, not deadlock with it or be refused")
 
 		// The whole value of the ceremony waiting: its acquisition reads its answer AFTER the
-		// wait, so it sees the row the termination removed and refuses.
+		// wait, so it sees the row the termination removed and refuses. This is the other
+		// assertion RCSI could move: a writer released from the queue must re-read the current
+		// committed row rather than the snapshot it opened with.
 		assert.False(t, outcome.live,
 			"the acquisition must report the session gone, which is what waiting for the termination buys")
 		assert.Nil(t, outcome.code, "a ceremony whose session is gone writes no code at all")
@@ -189,9 +212,9 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 		// And the catalog agrees: nothing of this session is left for a sweep to mark. A ceremony
 		// that inserted after the termination committed would leave exactly one unrevoked code
 		// here, on a session whose termination has already run.
-		leftBehind, err := database.RevokeCodesBySessionIdentifier(nil, session.SessionIdentifier)
+		leftBehind, err := db.RevokeCodesBySessionIdentifier(nil, session.SessionIdentifier)
 		require.NoError(t, err, "sweeping the terminated session once more")
 		assert.Zero(t, leftBehind, "no code of the terminated session may exist unrevoked")
-		assertSessionGone(t, session.Id, "the terminated session")
+		assertSessionGoneOn(t, db, session.Id, "the terminated session")
 	})
 }

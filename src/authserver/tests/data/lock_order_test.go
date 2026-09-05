@@ -323,7 +323,14 @@ func TestLockOrder_DeleteUserAgainstIssuance(t *testing.T) {
 // assertSessionGone reloads a session row and requires it to be absent.
 func assertSessionGone(t *testing.T, sessionId int64, what string) {
 	t.Helper()
-	session, err := database.GetUserSessionById(nil, sessionId)
+	assertSessionGoneOn(t, database, sessionId, what)
+}
+
+// assertSessionGoneOn reloads through the handle it is given, for the reason assertCodeRevokedOn
+// does.
+func assertSessionGoneOn(t *testing.T, db data.Database, sessionId int64, what string) {
+	t.Helper()
+	session, err := db.GetUserSessionById(nil, sessionId)
 	require.NoErrorf(t, err, "reloading %s", what)
 	assert.Nilf(t, session, "%s must be gone", what)
 }

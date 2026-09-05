@@ -7,6 +7,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -91,6 +92,11 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 // token's OWN column, which an offline token leaves empty: the sid its grant came from lives on
 // the codes row, and the sid-scoped sweep reaches it through that join alone.
 func createTokenOfCode(t *testing.T, clientId, userId, codeId int64, sessionIdentifier string) *models.RefreshToken {
+	return createTokenOfCodeOn(t, database, clientId, userId, codeId, sessionIdentifier)
+}
+
+// createTokenOfCodeOn takes the handle, for the reason createTestUserOn does.
+func createTokenOfCodeOn(t *testing.T, db data.Database, clientId, userId, codeId int64, sessionIdentifier string) *models.RefreshToken {
 	t.Helper()
 	tokenType := "Refresh"
 	if sessionIdentifier == "" {
@@ -108,7 +114,7 @@ func createTokenOfCode(t *testing.T, clientId, userId, codeId int64, sessionIden
 		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	if err := database.CreateRefreshToken(nil, token); err != nil {
+	if err := db.CreateRefreshToken(nil, token); err != nil {
 		t.Fatalf("Failed to create test refresh token: %v", err)
 	}
 	return token
@@ -119,7 +125,14 @@ func createTokenOfCode(t *testing.T, clientId, userId, codeId int64, sessionIden
 // writing it.
 func assertTokenRevoked(t *testing.T, tokenId int64, want bool, what string) {
 	t.Helper()
-	token, err := database.GetRefreshTokenById(nil, tokenId)
+	assertTokenRevokedOn(t, database, tokenId, want, what)
+}
+
+// assertTokenRevokedOn reloads through the handle it is given, for the reason assertCodeRevokedOn
+// does.
+func assertTokenRevokedOn(t *testing.T, db data.Database, tokenId int64, want bool, what string) {
+	t.Helper()
+	token, err := db.GetRefreshTokenById(nil, tokenId)
 	if err != nil {
 		t.Fatalf("Failed to reload refresh token %d: %v", tokenId, err)
 	}

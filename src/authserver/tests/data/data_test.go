@@ -64,5 +64,26 @@ func TestMain(m *testing.M) {
 
 	// Run tests
 	code := m.Run()
+
+	// Fixtures built once for the whole package rather than per test cannot register their
+	// teardown on a *testing.T, because the T that happened to build one has finished long before
+	// the last test using it. The RCSI fixture is the only one, and dropping its database here is
+	// what keeps a SQL Server run from leaving one behind on every invocation (#139 stage 8).
+	runPackageTeardown()
+
 	os.Exit(code)
+}
+
+// packageTeardown holds the cleanups of fixtures that outlive any single test. Append through
+// deferPackageTeardown; runPackageTeardown calls them in reverse, the way t.Cleanup would.
+var packageTeardown []func()
+
+func deferPackageTeardown(f func()) {
+	packageTeardown = append(packageTeardown, f)
+}
+
+func runPackageTeardown() {
+	for i := len(packageTeardown) - 1; i >= 0; i-- {
+		packageTeardown[i]()
+	}
 }

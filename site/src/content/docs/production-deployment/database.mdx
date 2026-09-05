@@ -48,6 +48,9 @@ On SQL Server, spell the `COLLATE` clause. A database default cannot be changed 
 future Goiabada migration adds inherits it.
 </Aside>
 
+`READ_COMMITTED_SNAPSHOT` is supported, on or off, and both settings are tested. Goiabada never
+requests `SNAPSHOT` isolation, so `ALLOW_SNAPSHOT_ISOLATION` has no effect on it either way.
+
 ## SQLite
 
 There is nothing to pre-create, and `GOIABADA_DB_CREATE` does not apply: the driver creates the file.

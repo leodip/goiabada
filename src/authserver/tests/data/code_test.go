@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -507,7 +508,13 @@ func TestDeleteCode(t *testing.T) {
 	}
 }
 
+// createTestCode seeds a code on the package's shared handle; createTestCodeOn takes the handle,
+// for the reason createTestUserOn does.
 func createTestCode(t *testing.T, clientId, userId int64) *models.Code {
+	return createTestCodeOn(t, database, clientId, userId)
+}
+
+func createTestCodeOn(t *testing.T, db data.Database, clientId, userId int64) *models.Code {
 	random := gofakeit.LetterN(6)
 	code := &models.Code{
 		ClientId:            clientId,
@@ -529,7 +536,7 @@ func createTestCode(t *testing.T, clientId, userId int64) *models.Code {
 		AuthMethods:         "password",
 		Used:                false,
 	}
-	err := database.CreateCode(nil, code)
+	err := db.CreateCode(nil, code)
 	if err != nil {
 		t.Fatalf("Failed to create test code: %v", err)
 	}
@@ -936,10 +943,17 @@ func TestUpdateCode_DoesNotClobberAuthStateGeneration(t *testing.T) {
 // which the session-scoped revocation sweep is keyed on. createTestCode randomises
 // the identifier, so a caller needing two codes on ONE session cannot use it.
 func createTestCodeInSession(t *testing.T, clientId, userId int64, sessionIdentifier string) *models.Code {
+	return createTestCodeInSessionOn(t, database, clientId, userId, sessionIdentifier)
+}
+
+// createTestCodeInSessionOn takes the handle, for the reason createTestUserOn does. Both statements
+// move with it: seeding half a fixture on one database and half on another produces ids that
+// collide across identity columns and assertions that pass for the wrong reason (#139 stage 8).
+func createTestCodeInSessionOn(t *testing.T, db data.Database, clientId, userId int64, sessionIdentifier string) *models.Code {
 	t.Helper()
-	code := createTestCode(t, clientId, userId)
+	code := createTestCodeOn(t, db, clientId, userId)
 	code.SessionIdentifier = sessionIdentifier
-	if err := database.UpdateCode(nil, code); err != nil {
+	if err := db.UpdateCode(nil, code); err != nil {
 		t.Fatalf("Failed to bind test code to session %q: %v", sessionIdentifier, err)
 	}
 	return code
@@ -949,7 +963,15 @@ func createTestCodeInSession(t *testing.T, clientId, userId int64, sessionIdenti
 // the column is what a later read of it says.
 func assertCodeRevoked(t *testing.T, codeId int64, want bool, what string) {
 	t.Helper()
-	code, err := database.GetCodeById(nil, codeId)
+	assertCodeRevokedOn(t, database, codeId, want, what)
+}
+
+// assertCodeRevokedOn reloads through the handle it is given. A reload left on the package handle
+// while the rest of a test ran against a fixture database is the mistake the RCSI fixture's own
+// visibility check exists to catch (#139 stage 8).
+func assertCodeRevokedOn(t *testing.T, db data.Database, codeId int64, want bool, what string) {
+	t.Helper()
+	code, err := db.GetCodeById(nil, codeId)
 	if err != nil {
 		t.Fatalf("Failed to reload code %d: %v", codeId, err)
 	}
