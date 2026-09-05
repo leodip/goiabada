@@ -3,7 +3,6 @@ package datatests
 import (
 	"database/sql"
 	"testing"
-	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/data"
@@ -39,34 +38,28 @@ func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.
 }
 
 // issuanceStatements issues, on the caller's transaction, what /auth/issue issues on the
-// authorization code branch: the session row first, then the code. When the acquisition reports
-// the row gone it inserts nothing, which is the refusal (#139 decision 3), and the caller decides
-// whether to commit.
+// authorization code branch: the users row, then the session row, then the code. When the
+// acquisition reports the session row gone it inserts nothing, which is the refusal (#139
+// decision 3), and the caller decides whether to commit.
+//
+// The users row leads because the insert below reaches it anyway through codes.user_id, and
+// taking it explicitly is what puts this ceremony on the same order the credential operations
+// already use (#139 decision 11).
 //
 // The handler itself cannot be driven from this tier: it owns its transaction and answers over
 // HTTP. The pairing is the one #139 uses throughout: the unit tests in the handlers package pin
 // that production issues exactly this sequence in exactly this order, and this tier answers what
 // a mock cannot, what two real transactions of these shapes do to each other on a real catalog.
 func issuanceStatements(db data.Database, tx *sql.Tx, client *models.Client, user *models.User, sessionIdentifier string) issuanceOutcome {
+	if err := db.AcquireUserRow(tx, user.Id); err != nil {
+		return issuanceOutcome{err: err}
+	}
 	live, err := db.AcquireUserSessionRow(tx, sessionIdentifier)
 	if err != nil || !live {
 		return issuanceOutcome{live: live, err: err}
 	}
 	code, err := mintCode(db, tx, client, user, sessionIdentifier)
 	return issuanceOutcome{live: true, code: code, err: err}
-}
-
-// requireStillWaiting is the assertion that makes these tests worth running: the second party
-// must NOT have returned while the first still holds the session row. Without it the test passes
-// whether or not the two transactions ever overlapped, and a race test that cannot tell "waited
-// for the other side" from "ran after it" proves nothing about the window it claims to close.
-func requireStillWaiting[T any](t *testing.T, done <-chan T, what string) {
-	t.Helper()
-	select {
-	case <-done:
-		t.Fatalf("%s returned while the other party still held the session row: the two never overlapped, so nothing here was measured", what)
-	default:
-	}
 }
 
 // TestIssuanceOrdering_AgainstTermination is #139 itself, measured where it has to hold: on a real
@@ -100,6 +93,7 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 		require.NoError(t, err, "opening the ceremony's transaction")
 		defer func() { _ = database.RollbackTransaction(tx) }()
 
+		require.NoError(t, database.AcquireUserRow(tx, user.Id), "the ceremony takes the user row")
 		live, err := database.AcquireUserSessionRow(tx, session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony takes the session row")
 		require.True(t, live, "the session row is still there when the ceremony takes it")
@@ -110,22 +104,22 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 			result handlers.TerminationResult
 			err    error
 		}
-		terminated := make(chan terminationOutcome, 1)
-		go func() {
+		termination := goBlocked(t, "the termination", func(reached func()) terminationOutcome {
+			reached()
 			result, err := handlers.TerminateUserSessionTx(other, session)
-			terminated <- terminationOutcome{result: result, err: err}
-		}()
+			return terminationOutcome{result: result, err: err}
+		})
 
 		// THE INSERT COMES AFTER THE TERMINATION HAS ARRIVED. This is the window the issue is
 		// about: the termination is in flight, and the code does not exist yet.
-		time.Sleep(blockedFor)
-		requireStillWaiting(t, terminated, "the termination")
+		termination.requireBlocked(t)
 
 		code, err := mintCode(database, tx, client, user, session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony's insert on the transaction holding the row")
+		termination.requireStillWaiting(t)
 		require.NoError(t, database.CommitTransaction(tx), "committing the ceremony")
 
-		outcome := awaitParty(t, terminated, "the termination")
+		outcome := termination.await(t)
 		require.NoError(t, outcome.err,
 			"the termination must wait for the ceremony and then commit, not deadlock with it or be refused")
 
@@ -155,28 +149,28 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 		require.NoError(t, terminationStatements(database, tx, session),
 			"the termination's statements on a session nothing else has touched yet")
 
-		issued := make(chan issuanceOutcome, 1)
-		go func() {
+		ceremony := goBlocked(t, "the ceremony", func(reached func()) issuanceOutcome {
 			otherTx, err := other.BeginTransaction()
 			if err != nil {
-				issued <- issuanceOutcome{err: err}
-				return
+				reached()
+				return issuanceOutcome{err: err}
 			}
 			defer func() { _ = other.RollbackTransaction(otherTx) }()
 
+			reached()
 			outcome := issuanceStatements(other, otherTx, client, user, session.SessionIdentifier)
 			if outcome.err == nil && outcome.code != nil {
 				// Production commits only what it minted; a refusal rolls back.
 				outcome.err = other.CommitTransaction(otherTx)
 			}
-			issued <- outcome
-		}()
+			return outcome
+		})
 
-		time.Sleep(blockedFor)
-		requireStillWaiting(t, issued, "the ceremony")
+		ceremony.requireBlocked(t)
+		ceremony.requireStillWaiting(t)
 		require.NoError(t, database.CommitTransaction(tx), "committing the termination")
 
-		outcome := awaitParty(t, issued, "the ceremony")
+		outcome := ceremony.await(t)
 		require.NoError(t, outcome.err,
 			"the ceremony must wait for the termination and then read its answer, not deadlock with it or be refused")
 

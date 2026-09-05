@@ -70,6 +70,25 @@ type Database interface {
 	ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) error
 	ClientLoadPermissions(tx *sql.Tx, client *models.Client) error
 
+	// AcquireUserRow takes the user's row inside the caller's transaction and holds it
+	// until that transaction ends, the way AcquireClientRow does for a client. It is the
+	// top of the lock order every transaction that touches a user's sessions and grants
+	// agrees to: the users row, then the user_sessions rows, then the grants that hang
+	// off them (#139).
+	//
+	// It exists because codes.user_id and refresh_tokens.user_id are foreign keys, so a
+	// transaction inserting either takes a lock on the parent users row WITHOUT naming
+	// it, while every credential operation (a password change, a reset, an administrator
+	// setting a password, disabling or deleting an account) writes that row first and
+	// reaches the sessions afterwards. Those two orders are a cycle, and it deadlocks on
+	// MySQL and SQL Server with the credential operation chosen as the victim, which is
+	// the worst of the two to lose: the password does not change and the session it was
+	// trying to end survives.
+	//
+	// A transaction is required: without one the statement autocommits and the row is
+	// released before the caller takes anything below it, which is the whole of what
+	// this buys.
+	AcquireUserRow(tx *sql.Tx, userId int64) error
 	CreateUser(tx *sql.Tx, user *models.User) error
 	UpdateUser(tx *sql.Tx, user *models.User) error
 	GetUserById(tx *sql.Tx, userId int64) (*models.User, error)

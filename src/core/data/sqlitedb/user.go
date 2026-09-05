@@ -7,6 +7,10 @@ import (
 	"github.com/leodip/goiabada/core/models"
 )
 
+func (d *SQLiteDatabase) AcquireUserRow(tx *sql.Tx, userId int64) error {
+	return d.CommonDB.AcquireUserRow(tx, userId)
+}
+
 func (d *SQLiteDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 	return d.CommonDB.CreateUser(tx, user)
 }
