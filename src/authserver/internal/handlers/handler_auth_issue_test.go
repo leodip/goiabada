@@ -198,11 +198,6 @@ func TestHandleIssueGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state", rr.Header().Get("Location"))
 
-		// The compensating statement is gone with the window it compensated for (#139 decision
-		// 4). The strict mock already fails on an unexpected call, so this says which call is
-		// meant rather than adding a guarantee: it is the assertion that names the removal.
-		database.AssertNotCalled(t, "RevokeCodeIfSessionGone", mock.Anything, mock.Anything, mock.Anything)
-
 		// Verify that all expected actions were performed
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)

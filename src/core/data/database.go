@@ -187,12 +187,6 @@ type Database interface {
 	// already rejected. The count is what this call transitioned and not what the
 	// client has, so a second flip reports 0 (see #245).
 	RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error)
-	// RevokeCodeIfSessionGone marks one code revoked only if the session it was issued
-	// through no longer has a row, reporting whether it made the transition. It runs
-	// immediately after a code is inserted, so a code that lands after a termination
-	// swept the codes table is still marked (see #129). An empty session identifier is
-	// rejected: no session row carries one, so NOT EXISTS over it is trivially true.
-	RevokeCodeIfSessionGone(tx *sql.Tx, codeId int64, sessionIdentifier string) (bool, error)
 	GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error)
 	GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error)
 	DeleteCode(tx *sql.Tx, codeId int64) error

@@ -14,7 +14,7 @@ import (
 // from a cookie and the name of the application asking (#266).
 //
 // Both key parts are rejected when empty rather than used as a filter, the rule
-// RevokeCodeIfSessionGone states. No row carries an empty owner or an empty hash, so an
+// AcquireUserSessionRow states. No row carries an empty owner or an empty hash, so an
 // empty value can only be a caller bug, and matching on one would either return
 // somebody else's row or sweep rows the caller never named.
 
