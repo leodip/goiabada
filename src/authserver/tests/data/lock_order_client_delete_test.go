@@ -443,19 +443,35 @@ func TestClientDelete_TwoBumpsWithStaleListsDoNotCycle(t *testing.T) {
 // =============================================================================
 
 func TestLockOrder_ClientDeleteAgainstCredentialSweep(t *testing.T) {
+	runClientDeleteAgainstCredentialSweep(t, database, secondDatabase(t))
+}
+
+// TestLockOrder_ClientDeleteAgainstCredentialSweep_RCSI is the credential pair against a SQL
+// Server database with READ_COMMITTED_SNAPSHOT on (#139 stage 8).
+//
+// This is one of the four pairs where the deletion's ASSOCIATION READ is what meets the other
+// party, rather than its first statement. In "the password change goes first" the deletion
+// acquires the client row unopposed and then reads user_session_clients while the credential
+// transaction holds those rows, which is precisely the read RCSI stops from blocking. Where the
+// deletion comes to rest therefore differs between the two configurations, and only a passing
+// schedule says the order still holds when it rests later.
+func TestLockOrder_ClientDeleteAgainstCredentialSweep_RCSI(t *testing.T) {
+	f := rcsiDatabase(t)
+	runClientDeleteAgainstCredentialSweep(t, f.primary, f.secondary)
+}
+
+func runClientDeleteAgainstCredentialSweep(t *testing.T, db data.Database, other data.Database) {
 	t.Run("the password change goes first and the deletion waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the password change's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
 		// Stopped after the users write and the session delete, holding the association rows by
 		// cascade, and BEFORE the grant sweep. That is the interleaving the cycle needs.
 		require.NoError(t, changePassword(f.user)(tx), "the password write")
-		_, err = database.IncrementUserAuthStateGeneration(tx, f.user.Id)
+		_, err = db.IncrementUserAuthStateGeneration(tx, f.user.Id)
 		require.NoError(t, err, "the generation advance")
 		require.NoError(t, sweepSessionBlock(database, tx, f.user.Id), "the sweep's session block")
 
@@ -475,32 +491,30 @@ func TestLockOrder_ClientDeleteAgainstCredentialSweep(t *testing.T) {
 				"losing this one means the password does not change and the session survives")
 
 		deletion.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the password change")
+		require.NoError(t, db.CommitTransaction(tx), "committing the password change")
 		require.NoError(t, deletion.await(t),
 			"the deletion must wait for the password change and then commit, not deadlock with it")
 
 		// The credential operation did all of its work, which is the point of it not being the
 		// victim.
-		reloaded, err := database.GetUserById(nil, f.user.Id)
+		reloaded, err := db.GetUserById(nil, f.user.Id)
 		require.NoError(t, err, "reloading the user")
 		require.NotNil(t, reloaded)
 		assert.Equal(t, f.user.PasswordHash, reloaded.PasswordHash, "the password change committed")
-		assertSessionGone(t, f.session.Id, "the session the password change ended")
-		assertTokenRevoked(t, f.survivorToken.Id, true, "the surviving client's token the sweep revoked")
+		assertSessionGoneOn(t, db, f.session.Id, "the session the password change ended")
+		assertTokenRevokedOn(t, db, f.survivorToken.Id, true, "the surviving client's token the sweep revoked")
 
 		f.assertDoomedClientGone(t)
 	})
 
 	t.Run("the deletion goes first and the password change waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the deletion's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		require.NoError(t, database.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
+		require.NoError(t, db.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
 
 		sweep := goBlocked(t, "the password change", tx, func(reached func()) sweepOutcome {
 			reached()
@@ -510,7 +524,7 @@ func TestLockOrder_ClientDeleteAgainstCredentialSweep(t *testing.T) {
 
 		sweep.requireBlocked(t)
 		sweep.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the deletion")
+		require.NoError(t, db.CommitTransaction(tx), "committing the deletion")
 
 		outcome := sweep.await(t)
 		require.NoError(t, outcome.err,
@@ -518,8 +532,8 @@ func TestLockOrder_ClientDeleteAgainstCredentialSweep(t *testing.T) {
 
 		assert.Contains(t, outcome.result.TerminatedSessionIdentifiers, f.session.SessionIdentifier,
 			"the sweep still ends the session it was there to end")
-		assertSessionGone(t, f.session.Id, "the session the password change ended")
-		assertTokenRevoked(t, f.survivorToken.Id, true, "the surviving client's token")
+		assertSessionGoneOn(t, db, f.session.Id, "the session the password change ended")
+		assertTokenRevokedOn(t, db, f.survivorToken.Id, true, "the surviving client's token")
 		f.assertDoomedClientGone(t)
 	})
 }
@@ -738,19 +752,28 @@ func assertNoOrphanSessionFor(t *testing.T, userId int64) {
 // =============================================================================
 
 func TestLockOrder_ClientDeleteAgainstTermination(t *testing.T) {
+	runClientDeleteAgainstTermination(t, database, secondDatabase(t))
+}
+
+// TestLockOrder_ClientDeleteAgainstTermination_RCSI is the termination pair under RCSI, for the
+// reason the credential pair above states: the deletion meets this party at its association read.
+func TestLockOrder_ClientDeleteAgainstTermination_RCSI(t *testing.T) {
+	f := rcsiDatabase(t)
+	runClientDeleteAgainstTermination(t, f.primary, f.secondary)
+}
+
+func runClientDeleteAgainstTermination(t *testing.T, db data.Database, other data.Database) {
 	t.Run("the termination goes first and the deletion waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the termination's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
 		// Stopped after the session delete, so it holds the association rows by cascade, and
 		// before the grant sweep, which is the statement that used to reach the clients row.
-		require.NoError(t, database.DeleteUserSession(tx, f.session.Id), "the termination's first statement")
-		_, err = database.RevokeCodesBySessionIdentifier(tx, f.session.SessionIdentifier)
+		require.NoError(t, db.DeleteUserSession(tx, f.session.Id), "the termination's first statement")
+		_, err = db.RevokeCodesBySessionIdentifier(tx, f.session.SessionIdentifier)
 		require.NoError(t, err, "the termination's code sweep")
 
 		deletion := goBlocked(t, "the client deletion", tx, func(reached func()) error {
@@ -763,26 +786,24 @@ func TestLockOrder_ClientDeleteAgainstTermination(t *testing.T) {
 			"the termination's grant sweep must not be chosen as a deadlock victim")
 
 		deletion.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the termination")
+		require.NoError(t, db.CommitTransaction(tx), "committing the termination")
 		require.NoError(t, deletion.await(t),
 			"the deletion must wait for the termination and then commit, not deadlock with it")
 
-		assertSessionGone(t, f.session.Id, "the terminated session")
-		assertCodeRevoked(t, f.survivorCode.Id, true, "the surviving client's code the termination revoked")
-		assertTokenRevoked(t, f.survivorToken.Id, true, "the surviving client's token the termination revoked")
+		assertSessionGoneOn(t, db, f.session.Id, "the terminated session")
+		assertCodeRevokedOn(t, db, f.survivorCode.Id, true, "the surviving client's code the termination revoked")
+		assertTokenRevokedOn(t, db, f.survivorToken.Id, true, "the surviving client's token the termination revoked")
 		f.assertDoomedClientGone(t)
 	})
 
 	t.Run("the deletion goes first and the termination waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the deletion's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		require.NoError(t, database.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
+		require.NoError(t, db.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
 
 		termination := goBlocked(t, "the termination", tx, func(reached func()) error {
 			reached()
@@ -792,28 +813,38 @@ func TestLockOrder_ClientDeleteAgainstTermination(t *testing.T) {
 
 		termination.requireBlocked(t)
 		termination.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the deletion")
+		require.NoError(t, db.CommitTransaction(tx), "committing the deletion")
 		require.NoError(t, termination.await(t),
 			"the termination must wait for the deletion and then commit, not deadlock with it")
 
-		assertSessionGone(t, f.session.Id, "the terminated session")
-		assertCodeRevoked(t, f.survivorCode.Id, true, "the surviving client's code")
-		assertTokenRevoked(t, f.survivorToken.Id, true, "the surviving client's token")
+		assertSessionGoneOn(t, db, f.session.Id, "the terminated session")
+		assertCodeRevokedOn(t, db, f.survivorCode.Id, true, "the surviving client's code")
+		assertTokenRevokedOn(t, db, f.survivorToken.Id, true, "the surviving client's token")
 		f.assertDoomedClientGone(t)
 	})
 }
 
 func TestLockOrder_ClientDeleteAgainstDeleteUser(t *testing.T) {
+	runClientDeleteAgainstDeleteUser(t, database, secondDatabase(t))
+}
+
+// TestLockOrder_ClientDeleteAgainstDeleteUser_RCSI is the user-delete pair under RCSI. Same
+// reason, and one more: DeleteUser is the other transaction on the branch that discovers rows and
+// then acquires them, so both parties here have a read RCSI changes.
+func TestLockOrder_ClientDeleteAgainstDeleteUser_RCSI(t *testing.T) {
+	f := rcsiDatabase(t)
+	runClientDeleteAgainstDeleteUser(t, f.primary, f.secondary)
+}
+
+func runClientDeleteAgainstDeleteUser(t *testing.T, db data.Database, other data.Database) {
 	t.Run("the user delete goes first and the client delete waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the user delete's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		require.NoError(t, database.DeleteUser(tx, f.user.Id), "DeleteUser on the held transaction")
+		require.NoError(t, db.DeleteUser(tx, f.user.Id), "DeleteUser on the held transaction")
 
 		deletion := goBlocked(t, "the client deletion", tx, func(reached func()) error {
 			reached()
@@ -822,32 +853,30 @@ func TestLockOrder_ClientDeleteAgainstDeleteUser(t *testing.T) {
 
 		deletion.requireBlocked(t)
 		deletion.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the user delete")
+		require.NoError(t, db.CommitTransaction(tx), "committing the user delete")
 		require.NoError(t, deletion.await(t),
 			"the client delete must wait for the user delete and then commit, not deadlock with it")
 
-		gone, err := database.GetUserById(nil, f.user.Id)
+		gone, err := db.GetUserById(nil, f.user.Id)
 		require.NoError(t, err, "reloading the deleted user")
 		assert.Nil(t, gone, "the user is gone")
 
 		// The surviving client's grants were DELETED rather than revoked, which is what deleting a
 		// user means and what distinguishes this pair's outcome from the sweep's.
-		token, err := database.GetRefreshTokenById(nil, f.survivorToken.Id)
+		token, err := db.GetRefreshTokenById(nil, f.survivorToken.Id)
 		require.NoError(t, err, "reloading the surviving client's token")
 		assert.Nil(t, token, "deleting a user removes its grants rather than revoking them")
 		f.assertDoomedClientGone(t)
 	})
 
 	t.Run("the client delete goes first and the user delete waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the client delete's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		require.NoError(t, database.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
+		require.NoError(t, db.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
 
 		deletion := goBlocked(t, "DeleteUser", tx, func(reached func()) error {
 			reached()
@@ -856,11 +885,11 @@ func TestLockOrder_ClientDeleteAgainstDeleteUser(t *testing.T) {
 
 		deletion.requireBlocked(t)
 		deletion.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the client delete")
+		require.NoError(t, db.CommitTransaction(tx), "committing the client delete")
 		require.NoError(t, deletion.await(t),
 			"the user delete must wait for the client delete and then commit, not deadlock with it")
 
-		gone, err := database.GetUserById(nil, f.user.Id)
+		gone, err := db.GetUserById(nil, f.user.Id)
 		require.NoError(t, err, "reloading the deleted user")
 		assert.Nil(t, gone, "the user is gone")
 		f.assertDoomedClientGone(t)
@@ -868,16 +897,25 @@ func TestLockOrder_ClientDeleteAgainstDeleteUser(t *testing.T) {
 }
 
 func TestLockOrder_ClientDeleteAgainstReplayResponse(t *testing.T) {
+	runClientDeleteAgainstReplayResponse(t, database, secondDatabase(t))
+}
+
+// TestLockOrder_ClientDeleteAgainstReplayResponse_RCSI is the replay pair under RCSI, for the
+// reason the credential pair above states.
+func TestLockOrder_ClientDeleteAgainstReplayResponse_RCSI(t *testing.T) {
+	f := rcsiDatabase(t)
+	runClientDeleteAgainstReplayResponse(t, f.primary, f.secondary)
+}
+
+func runClientDeleteAgainstReplayResponse(t *testing.T, db data.Database, other data.Database) {
 	t.Run("the replay goes first and the deletion waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the replay's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		live, err := database.AcquireUserSessionRow(tx, f.session.SessionIdentifier)
+		live, err := db.AcquireUserSessionRow(tx, f.session.SessionIdentifier)
 		require.NoError(t, err, "the replay takes the session row, which is its first statement")
 		require.True(t, live)
 
@@ -891,29 +929,27 @@ func TestLockOrder_ClientDeleteAgainstReplayResponse(t *testing.T) {
 		// conditional teardown.
 		require.NoError(t, revokeSessionGrants(database, tx, f.session.SessionIdentifier),
 			"the replay's grant sweep must not be chosen as a deadlock victim")
-		require.NoError(t, database.DeleteUserSession(tx, f.session.Id),
+		require.NoError(t, db.DeleteUserSession(tx, f.session.Id),
 			"#77's teardown, which runs because the sweep revoked something")
 
 		deletion.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the replay")
+		require.NoError(t, db.CommitTransaction(tx), "committing the replay")
 		require.NoError(t, deletion.await(t),
 			"the deletion must wait for the replay and then commit, not deadlock with it")
 
-		assertSessionGone(t, f.session.Id, "the session the replay tore down")
-		assertTokenRevoked(t, f.survivorToken.Id, true, "the surviving client's token the replay revoked")
+		assertSessionGoneOn(t, db, f.session.Id, "the session the replay tore down")
+		assertTokenRevokedOn(t, db, f.survivorToken.Id, true, "the surviving client's token the replay revoked")
 		f.assertDoomedClientGone(t)
 	})
 
 	t.Run("the deletion goes first and the replay waits", func(t *testing.T) {
-		other := secondDatabase(t)
+		f := newClientDeleteFixtureOn(t, db)
 
-		f := newClientDeleteFixture(t)
-
-		tx, err := database.BeginTransaction()
+		tx, err := db.BeginTransaction()
 		require.NoError(t, err, "opening the deletion's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		require.NoError(t, database.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
+		require.NoError(t, db.DeleteClient(tx, f.doomed.Id), "DeleteClient on the held transaction")
 
 		type replayOutcome struct {
 			live bool
@@ -936,15 +972,15 @@ func TestLockOrder_ClientDeleteAgainstReplayResponse(t *testing.T) {
 
 		replay.requireBlocked(t)
 		replay.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the deletion")
+		require.NoError(t, db.CommitTransaction(tx), "committing the deletion")
 
 		outcome := replay.await(t)
 		require.NoError(t, outcome.err,
 			"the replay must wait for the deletion and then commit, not deadlock with it")
 		assert.True(t, outcome.live, "the session outlives a deletion of one of its clients")
 
-		assertSessionGone(t, f.session.Id, "the session the replay tore down after waiting")
-		assertTokenRevoked(t, f.survivorToken.Id, true, "the surviving client's token")
+		assertSessionGoneOn(t, db, f.session.Id, "the session the replay tore down after waiting")
+		assertTokenRevokedOn(t, db, f.survivorToken.Id, true, "the surviving client's token")
 		f.assertDoomedClientGone(t)
 	})
 }
