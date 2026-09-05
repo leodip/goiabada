@@ -10,6 +10,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+func (d *MsSQLDatabase) AcquireUserRow(tx *sql.Tx, userId int64) error {
+	return d.CommonDB.AcquireUserRow(tx, userId)
+}
+
 func (d *MsSQLDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 	now := time.Now().UTC()
 

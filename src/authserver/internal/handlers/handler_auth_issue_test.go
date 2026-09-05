@@ -669,6 +669,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// reason, which is why neither the audit nor the clear runs (#139).
 		commitError := errors.New("commit failed")
 		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+		database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 		database.On("CommitTransaction", issuanceTx).Return(commitError).Once()
 		database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
@@ -751,6 +752,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		// refusal issued before the rollback would wait on itself (#139).
 		var order []string
 		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+		database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
 		// Twice: the explicit rollback, then the deferred one, which is a no-op against a
 		// transaction that has already finished.
@@ -817,6 +819,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		stubLiveSession(database, 123)
 
 		database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+		database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
 		database.On("RollbackTransaction", issuanceTx).Return(nil).Twice()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
@@ -865,9 +868,22 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				},
 			},
 			{
-				name: "the acquisition fails",
+				name: "the user row acquisition fails",
 				setup: func(database *mocks_data.Database) {
 					database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+					database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(boom).Once()
+					database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
+					// The session row is never reached: a transaction that failed to take the
+					// top of the lock order has no business taking the next row down (#139
+					// decision 11).
+					database.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything)
+				},
+			},
+			{
+				name: "the session row acquisition fails",
+				setup: func(database *mocks_data.Database) {
+					database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+					database.On("AcquireUserRow", issuanceTx, issuanceUserId).Return(nil).Once()
 					database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).
 						Return(false, boom).Once()
 					database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
@@ -920,6 +936,92 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 			})
 		}
 	})
+}
+
+// =============================================================================
+// #139 decision 11: the users row is taken before the user_sessions row
+//
+// codes.user_id is a foreign key, so the insert this transaction is about to make takes a lock on
+// the parent users row without ever naming it. Every credential operation, a password change, a
+// reset, an administrator setting a password, disabling or deleting an account, writes that row
+// first and reaches the sessions afterwards. Two orders, one cycle: measured on the branch that
+// introduced it, an authorization ceremony racing a password change deadlocks on MySQL and SQL
+// Server with the CREDENTIAL OPERATION as the victim, so the password does not change and the
+// session it was ending survives.
+//
+// The order is the whole of the remedy, so the order is what this pins. It cannot be seen at the
+// data tier, which measures the consequence on a real catalog but drives the statements by hand,
+// and it cannot be seen from the outside at all: both acquisitions are single-row UPDATEs that
+// leave nothing behind for an integration test to read. A mock recording the sequence is the only
+// place the handler's own choice is observable.
+// =============================================================================
+func TestHandleIssueGet_TheUserRowIsTakenBeforeTheSessionRow(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	templateFS := &mocks_test.TestFS{}
+	codeIssuer := mocks_oauth.NewCodeIssuer(t)
+	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	userSessionManager := mocks_user.NewUserSessionManager(t)
+	permissionChecker := mocks_user.NewPermissionChecker(t)
+
+	handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database,
+		auditLogger, userSessionManager, permissionChecker)
+
+	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+	rr := httptest.NewRecorder()
+
+	authContext := &oauth.AuthContext{
+		AuthState:    oauth.AuthStateReadyToIssueCode,
+		Scope:        "openid profile",
+		ClientId:     "test-client",
+		UserId:       123,
+		ResponseMode: "query",
+		ResponseType: "code",
+		RedirectURI:  "https://example.com/callback",
+		State:        "test-state",
+	}
+	authHelper.On("GetAuthContext", req).Return(authContext, nil)
+	stubLiveSession(database, 123)
+
+	// Every statement on the transaction records itself, so the assertion below is about the
+	// sequence rather than about each call having happened somewhere.
+	var order []string
+	note := func(what string) func(mock.Arguments) {
+		return func(mock.Arguments) { order = append(order, what) }
+	}
+
+	database.On("BeginTransaction").Return(issuanceTx, nil).Run(note("begin")).Once()
+	database.On("AcquireUserRow", issuanceTx, issuanceUserId).Run(note("user row")).Return(nil).Once()
+	database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).
+		Run(note("session row")).Return(true, nil).Once()
+	codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).Run(note("insert")).
+		Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
+			RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
+	database.On("CommitTransaction", issuanceTx).Run(note("commit")).Return(nil).Once()
+	database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
+
+	auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
+	authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, []string{"begin", "user row", "session row", "insert", "commit"}, order,
+		"the users row is the top of the lock order, so it is taken before the session row and both "+
+			"before the insert that reaches users again through the foreign key")
+
+	// And the ordering is only worth anything if all of it is on ONE transaction: a row taken on
+	// a different connection is released the moment that statement autocommits.
+	assert.Equal(t, http.StatusFound, rr.Code)
+	assert.Contains(t, rr.Header().Get("Location"), "code=test-code")
+
+	httpHelper.AssertExpectations(t)
+	authHelper.AssertExpectations(t)
+	database.AssertExpectations(t)
+	codeIssuer.AssertExpectations(t)
 }
 
 // =============================================================================
@@ -1319,6 +1421,14 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 // parsing it.
 const liveSessionIdentifier = "session-identifier-abc"
 
+// issuanceUserId is the id armIssueGate's GetUserById hands back, and so the id the ceremony's
+// user-row acquisition names in every case that leaves that stub in place. Written out rather
+// than matched with mock.Anything: the point of the acquisition is that it takes the row of the
+// user this code is being minted for, and a stub matching any id would pass with the wrong one
+// (#139 decision 11). Cases that load a different user pass its id to
+// stubIssuanceTransactionFor.
+const issuanceUserId int64 = 1
+
 // requestWithSessionIdentifier builds the /auth/issue request the way
 // MiddlewareSessionIdentifier leaves it when the session row exists: the identifier is in the
 // request context. Its absence is the terminated case, which is why the subtests that expect
@@ -1354,7 +1464,15 @@ var issuanceTx = &sql.Tx{}
 // Cases about the refusal arm these themselves, because the answer they need from the acquisition
 // is the opposite one.
 func stubIssuanceTransaction(database *mocks_data.Database) {
+	stubIssuanceTransactionFor(database, issuanceUserId)
+}
+
+// stubIssuanceTransactionFor is the same, for a case whose ceremony loads a user other than the
+// one armIssueGate hands back. The id is a parameter rather than mock.Anything so that each case
+// states which row its ceremony takes (#139 decision 11).
+func stubIssuanceTransactionFor(database *mocks_data.Database, userId int64) {
 	database.On("BeginTransaction").Return(issuanceTx, nil).Once()
+	database.On("AcquireUserRow", issuanceTx, userId).Return(nil).Once()
 	database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 	database.On("CommitTransaction", issuanceTx).Return(nil).Once()
 	database.On("RollbackTransaction", issuanceTx).Return(nil).Once()
@@ -3817,7 +3935,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			if tc.wantIssued {
 				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything).
 					Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
-				stubIssuanceTransaction(database)
+				stubIssuanceTransactionFor(database, 123)
 				auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
 			} else {
 				auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -4152,7 +4270,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 						input.AuthContext.ConsentedScope == tc.wantConsented
 				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
 					RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
-				stubIssuanceTransaction(database)
+				stubIssuanceTransactionFor(database, 123)
 				auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
 			} else {
 				auditLogger.On("Log", constants.AuditIssuanceRefusedScopeDenied, mock.MatchedBy(func(details map[string]interface{}) bool {

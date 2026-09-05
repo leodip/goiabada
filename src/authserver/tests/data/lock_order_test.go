@@ -13,32 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// blockedFor is how long the second party is given to reach the lock the first one is holding
-// before the first commits. It only has to exceed the time one BeginTransaction and one
-// statement take to reach the engine, and the failure it guards against is a false PASS: if the
-// second party has not blocked yet, the two never overlap and the test proves nothing about a
-// cycle. Overshooting costs wall clock and nothing else.
-const blockedFor = 300 * time.Millisecond
-
-// lockWaitCeiling is longer than any engine's own lock timeout here (SQLite's busy_timeout is
-// 5s, InnoDB's lock wait 50s), so a party that reaches this has not been refused by the engine,
-// it is genuinely stuck. Failing beats hanging the tier on a lock nobody will release.
-const lockWaitCeiling = 90 * time.Second
-
-// awaitParty collects a backgrounded transaction's outcome. A deadlock arrives as an error and
-// fails the caller; a live hang arrives as the ceiling above.
-func awaitParty[T any](t *testing.T, done <-chan T, what string) T {
-	t.Helper()
-	select {
-	case out := <-done:
-		return out
-	case <-time.After(lockWaitCeiling):
-		t.Fatalf("%s never returned: it is still waiting on a lock that nothing is going to release", what)
-		var zero T
-		return zero
-	}
-}
-
 // replayResponse issues, on the caller's transaction, the statements revokeOnAuthCodeReuse
 // issues for a replayed code that carries a session identifier: the session row first, then the
 // grants that hang off it. It reports whether the acquisition found the row.
@@ -147,16 +121,17 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 
 		// The real termination, on the other handle, arriving while the replay holds the row.
 		// Its first statement is the delete, which is what makes it wait.
-		terminated := make(chan error, 1)
-		go func() {
+		termination := goBlocked(t, "the termination", func(reached func()) error {
+			reached()
 			_, err := handlers.TerminateUserSessionTx(other, session)
-			terminated <- err
-		}()
+			return err
+		})
 
-		time.Sleep(blockedFor)
+		termination.requireBlocked(t)
+		termination.requireStillWaiting(t)
 		require.NoError(t, database.CommitTransaction(tx), "committing the replay")
 
-		require.NoError(t, awaitParty(t, terminated, "the termination"),
+		require.NoError(t, termination.await(t),
 			"the termination must wait for the replay and then commit, not deadlock with it")
 
 		assertCodeRevoked(t, code.Id, true, "the code of the terminated session")
@@ -184,27 +159,27 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 			live bool
 			err  error
 		}
-		replayed := make(chan replayOutcome, 1)
-		go func() {
+		replay := goBlocked(t, "the replay response", func(reached func()) replayOutcome {
 			otherTx, err := other.BeginTransaction()
 			if err != nil {
-				replayed <- replayOutcome{err: err}
-				return
+				reached()
+				return replayOutcome{err: err}
 			}
 			defer func() { _ = other.RollbackTransaction(otherTx) }()
 
+			reached()
 			live, err := replayResponse(other, otherTx, session.SessionIdentifier)
 			if err != nil {
-				replayed <- replayOutcome{live: live, err: err}
-				return
+				return replayOutcome{live: live, err: err}
 			}
-			replayed <- replayOutcome{live: live, err: other.CommitTransaction(otherTx)}
-		}()
+			return replayOutcome{live: live, err: other.CommitTransaction(otherTx)}
+		})
 
-		time.Sleep(blockedFor)
+		replay.requireBlocked(t)
+		replay.requireStillWaiting(t)
 		require.NoError(t, database.CommitTransaction(tx), "committing the termination")
 
-		outcome := awaitParty(t, replayed, "the replay response")
+		outcome := replay.await(t)
 		require.NoError(t, outcome.err,
 			"the replay must wait for the termination and then commit, not deadlock with it")
 
@@ -226,33 +201,14 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 // DELETE FROM users, whose cascade removes codes and user_sessions. So it took refresh_tokens
 // before user_sessions while an authorization ceremony takes user_sessions before codes, and the
 // two deadlocked on PostgreSQL, MySQL and SQL Server with the CEREMONY as the victim. It now
-// deletes the user's session rows explicitly first, which is the same rows and the same outcome
-// one statement earlier, and puts it on the one lock order.
+// takes the user row, then deletes the user's session rows explicitly, which is the same rows and
+// the same outcome one statement earlier, and puts it on the one lock order: users, then
+// user_sessions, then the grants (#139 decisions 10 and 11).
 //
 // What removing the rows achieves is TestDeleteUser_RemovesAllDependentRows' subject and is not
 // restated here. This test is about the absence of a cycle, in both orderings.
 func TestLockOrder_DeleteUserAgainstIssuance(t *testing.T) {
 	t.Run("issuance goes first and the user delete waits", func(t *testing.T) {
-		// SQLite refuses this overlap rather than waiting through it, and the refusal is the
-		// engine's rather than a cycle. DeleteUser's first statement is a read, so its
-		// transaction begins as a reader, and SQLite answers a reader that then asks to
-		// become a writer while another connection holds the write lock with SQLITE_BUSY at
-		// once, without consulting the busy handler that would otherwise wait. The probe
-		// behind decision 10 measured exactly this and recorded S7 on SQLite as safe, because
-		// fail-closed is what it is: no cycle, no partial write, and the pre-existing
-		// lock-refusal mode the agreement puts out of scope.
-		//
-		// There is also nothing here for a SQLite deployment to be protected from. Each
-		// process builds one data.Database and sqlitedb calls SetMaxOpenConns(1), so a
-		// process cannot hold these two transactions at the same time at all; the second
-		// handle this test opens is concurrency SQLite does not have in production. The other
-		// three subtests in this file do run on SQLite, because in those the waiting party
-		// opens with a write and the busy handler applies.
-		if dbType() == "sqlite" || dbType() == "" {
-			t.Skip("sqlite refuses a reader's upgrade with SQLITE_BUSY instead of waiting, and a " +
-				"SQLite process has one connection, so these two transactions never overlap in production")
-		}
-
 		other := secondDatabase(t)
 
 		client := createTestClient(t)
@@ -263,25 +219,33 @@ func TestLockOrder_DeleteUserAgainstIssuance(t *testing.T) {
 		require.NoError(t, err, "opening the ceremony's transaction")
 		defer func() { _ = database.RollbackTransaction(tx) }()
 
+		// The ceremony's own order, production's: the users row, then the session row. Replayed
+		// rather than called for the reason issuanceStatements states, and it matters here that
+		// the users row is taken FIRST, because that is the row DeleteUser now blocks on.
+		require.NoError(t, database.AcquireUserRow(tx, user.Id), "the ceremony takes the user row")
 		live, err := database.AcquireUserSessionRow(tx, session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony takes the session row")
 		require.True(t, live, "the session row is still there when the ceremony takes it")
 
-		deleted := make(chan error, 1)
-		go func() { deleted <- other.DeleteUser(nil, user.Id) }()
+		deletion := goBlocked(t, "DeleteUser", func(reached func()) error {
+			reached()
+			return other.DeleteUser(nil, user.Id)
+		})
 
-		// THE INSERT COMES AFTER THE DELETE HAS ARRIVED, and the order of these three
-		// statements is the whole test. Inserting before the goroutine starts proves nothing:
-		// the ceremony would then hold every lock it will ever want, so nothing it does can
-		// close a cycle and the test passes against the unordered DeleteUser too. Measured
-		// that way, as a surviving mutation, before it was written this way.
+		// THE INSERT COMES AFTER THE DELETE HAS ARRIVED, and the order of these two is the whole
+		// test. Inserting before the delete has reached its first lock proves nothing: the
+		// ceremony would then hold every lock it will ever want before the other party asked for
+		// anything, so nothing it does can close a cycle and the test passes against the
+		// unordered DeleteUser too. Measured that way, as a surviving mutation, before it was
+		// written this way; requireBlocked is what makes "has arrived" a fact rather than the
+		// hope a fixed sleep used to express.
 		//
 		// Interleaved like this the insert needs a foreign-key lock on the users row, which is
-		// exactly the row an unordered DeleteUser is holding while its cascade waits on the
-		// session row the ceremony holds. That is the cycle, and it is why both this insert
-		// and the delete are required to succeed: PostgreSQL, MySQL and SQL Server all abort
-		// one of the two, and either error fails this test.
-		time.Sleep(blockedFor)
+		// exactly the row an unordered DeleteUser reaches through DELETE FROM users while its
+		// cascade waits on the session row the ceremony holds. That is the cycle, and it is why
+		// both this insert and the delete are required to succeed: PostgreSQL, MySQL and SQL
+		// Server all abort one of the two, and either error fails this test.
+		deletion.requireBlocked(t)
 
 		code := &models.Code{
 			ClientId:          client.Id,
@@ -299,9 +263,10 @@ func TestLockOrder_DeleteUserAgainstIssuance(t *testing.T) {
 		require.NoError(t, database.CreateCode(tx, code),
 			"the ceremony's insert must not be chosen as a deadlock victim")
 
+		deletion.requireStillWaiting(t)
 		require.NoError(t, database.CommitTransaction(tx), "committing the ceremony")
 
-		require.NoError(t, awaitParty(t, deleted, "DeleteUser"),
+		require.NoError(t, deletion.await(t),
 			"DeleteUser must wait for the ceremony and then commit, not deadlock with it")
 
 		gone, err := database.GetUserById(nil, user.Id)
@@ -327,23 +292,27 @@ func TestLockOrder_DeleteUserAgainstIssuance(t *testing.T) {
 			live bool
 			err  error
 		}
-		acquired := make(chan acquireOutcome, 1)
-		go func() {
+		ceremony := goBlocked(t, "the ceremony's acquisition", func(reached func()) acquireOutcome {
 			otherTx, err := other.BeginTransaction()
 			if err != nil {
-				acquired <- acquireOutcome{err: err}
-				return
+				reached()
+				return acquireOutcome{err: err}
 			}
 			defer func() { _ = other.RollbackTransaction(otherTx) }()
 
+			reached()
+			if err := other.AcquireUserRow(otherTx, user.Id); err != nil {
+				return acquireOutcome{err: err}
+			}
 			live, err := other.AcquireUserSessionRow(otherTx, session.SessionIdentifier)
-			acquired <- acquireOutcome{live: live, err: err}
-		}()
+			return acquireOutcome{live: live, err: err}
+		})
 
-		time.Sleep(blockedFor)
+		ceremony.requireBlocked(t)
+		ceremony.requireStillWaiting(t)
 		require.NoError(t, database.CommitTransaction(tx), "committing the delete")
 
-		outcome := awaitParty(t, acquired, "the ceremony's acquisition")
+		outcome := ceremony.await(t)
 		require.NoError(t, outcome.err,
 			"the ceremony must wait for the delete and then read its answer, not deadlock with it")
 		assert.False(t, outcome.live,

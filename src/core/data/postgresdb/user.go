@@ -9,6 +9,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+func (d *PostgresDatabase) AcquireUserRow(tx *sql.Tx, userId int64) error {
+	return d.CommonDB.AcquireUserRow(tx, userId)
+}
+
 func (d *PostgresDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 	now := time.Now().UTC()
 

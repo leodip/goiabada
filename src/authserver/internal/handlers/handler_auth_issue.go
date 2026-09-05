@@ -444,6 +444,26 @@ func HandleIssueGet(
 		}
 		defer database.RollbackTransaction(tx) //nolint:errcheck
 
+		// THE USER'S ROW FIRST, above the session row this ceremony is about to take (#139).
+		//
+		// codes.user_id is a foreign key, so the insert below takes a lock on the parent users row
+		// without naming it, and it does so while this transaction is already holding the session
+		// row. Every credential operation goes the other way: a password change, a reset, an
+		// administrator setting a password and disabling or deleting an account all write the
+		// users row and only then reach the sessions and the grants hanging off them. Those two
+		// orders are a cycle. Measured on MySQL and SQL Server it deadlocks with the CREDENTIAL
+		// OPERATION as the victim, which is the worse one to lose: the account owner changing a
+		// password because a session was stolen gets a 500, the session survives, and the racing
+		// ceremony gets its code. Taking the row here puts this ceremony on the same order
+		// everything else already uses, so one of the two simply waits.
+		//
+		// It costs one small UPDATE per authorization code issued, which is the price of the
+		// ordering rather than an incidental write: nothing reads the updated_at it moves.
+		if err := database.AcquireUserRow(tx, user.Id); err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
 		// Existence only, deliberately. Ownership and the two timeouts were asked a few statements
 		// ago and are not re-asked here: the only thing this narrower question misses is an idle
 		// timeout elapsing in the microseconds between the two, and buying that would cost a

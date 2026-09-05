@@ -98,6 +98,63 @@ func (_c *Database_AcquireClientRow_Call) RunAndReturn(run func(tx *sql.Tx, clie
 	return _c
 }
 
+// AcquireUserRow provides a mock function for the type Database
+func (_mock *Database) AcquireUserRow(tx *sql.Tx, userId int64) error {
+	ret := _mock.Called(tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AcquireUserRow")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
+		r0 = returnFunc(tx, userId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_AcquireUserRow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AcquireUserRow'
+type Database_AcquireUserRow_Call struct {
+	*mock.Call
+}
+
+// AcquireUserRow is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) AcquireUserRow(tx any, userId any) *Database_AcquireUserRow_Call {
+	return &Database_AcquireUserRow_Call{Call: _e.mock.On("AcquireUserRow", tx, userId)}
+}
+
+func (_c *Database_AcquireUserRow_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_AcquireUserRow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_AcquireUserRow_Call) Return(err error) *Database_AcquireUserRow_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_AcquireUserRow_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) error) *Database_AcquireUserRow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // AcquireUserSessionRow provides a mock function for the type Database
 func (_mock *Database) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error) {
 	ret := _mock.Called(tx, sessionIdentifier)

@@ -395,6 +395,15 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 
 	err := d.inTransaction(nil, func(tx *sql.Tx) error {
 		var err error
+		// THE USER'S ROW FIRST, and this statement is what takes it, so no AcquireUserRow is
+		// added here (#139). It is the same shape as TerminateUserSessionTx's leading delete:
+		// where the transaction already opens with a write to the row the lock order puts at
+		// the top, a separate acquisition would only issue the same UPDATE twice.
+		//
+		// The conditional WHERE does not weaken that. On the branch where it matches, the users
+		// row is held from here to the commit, above the session rows and the token sweep below.
+		// On the branch where it matches nothing the function returns immediately and touches no
+		// session and no grant at all, so there is no order left for it to get wrong.
 		transitioned, err = d.tryDisableUserWithEmail(tx, userId, expectedEmail)
 		if err != nil {
 			return err
