@@ -646,9 +646,13 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 // engines in both orderings. Same rows and same outcome either way: the cascade
 // would have removed these rows anyway, one statement later.
 //
-// DeleteClient deliberately does NOT do this, and needs no equivalent: its cascade
-// reaches codes and user_session_clients but never user_sessions, so it writes no
-// session row and the rule does not reach it.
+// DeleteClient reaches the same rule from the other side (#139 stage 7). Its
+// cascade never touches user_sessions, so it writes no session row of its own,
+// but it does write that session's user_session_clients rows and codes, which
+// every session-side transaction already holds by cascade from the session row it
+// took first. It therefore takes the clients row exclusively, reads the sessions
+// associated with it and takes those rows before deleting anything: users, then
+// clients, then user_sessions, then the grants, the same order as here.
 func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 
 	return d.inTransaction(tx, func(tx *sql.Tx) error {

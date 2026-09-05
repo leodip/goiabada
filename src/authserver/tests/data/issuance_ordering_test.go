@@ -96,12 +96,19 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 // (#139 stage 8). It skips on the other three engines: RCSI is a SQL Server setting, PostgreSQL
 // and MySQL are MVCC already, and SQLite has one writer.
 //
-// This pair is the load-bearing one to run there, and it is the only one that runs there. It is
-// the only test on the branch whose assertions are about the OUTCOME the ordering produces, either
-// the code carries the revocation marker or no code is issued at all, rather than about the
-// absence of a cycle. The lock-order pairs assert the absence of a cycle, and RCSI can only remove
-// lock conflicts, never add one, so a cycle that does not form with it off cannot appear with it
-// on; running them here would cost the fixture's whole helper surface for no reachable finding.
+// This pair is the load-bearing one to run there: it is the only test on the branch whose
+// assertions are about the OUTCOME the ordering produces, either the code carries the revocation
+// marker or no code is issued at all, rather than about the absence of a cycle.
+//
+// It is not the only one that runs there. An earlier draft of this comment argued that the
+// lock-order pairs need not run under RCSI because RCSI can only remove lock conflicts, never add
+// one, so a cycle that does not form with it off cannot appear with it on. That does not follow.
+// Removing a conflict changes which interleavings are REACHABLE: a transaction that no longer
+// stops at a read runs on and asks for locks it previously never reached, and a cycle can close
+// there. DeleteClient has exactly that shape, a plain association read sitting between its
+// exclusive client acquisition and the session rows it takes next. So the two client-deletion
+// gates run under RCSI too, in lock_order_client_delete_test.go, and the reasoning above is
+// recorded as an expectation rather than as a reason to skip the measurement.
 func TestIssuanceOrdering_AgainstTermination_RCSI(t *testing.T) {
 	f := rcsiDatabase(t)
 	runIssuanceOrderingAgainstTermination(t, f.primary, f.secondary)

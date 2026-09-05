@@ -10,6 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,12 +27,18 @@ import (
 // writers: two writes to one row still queue behind each other, and a writer released from that
 // queue re-reads the current committed row rather than its snapshot. AcquireUserSessionRow is an
 // UPDATE and the termination's DELETE is a write, so the mechanism is untouched. Two further
-// reasons for the same expectation: PostgreSQL's READ COMMITTED is already the snapshot-reads
-// configuration, with no shared read locks at all, and this branch is green there; and RCSI can
-// only remove lock conflicts, never add one, so a cycle that does not form with it off cannot
-// appear with it on.
+// reason for the same expectation: PostgreSQL's READ COMMITTED is already the snapshot-reads
+// configuration, with no shared read locks at all, and this branch is green there.
 //
-// None of that is a measurement, which is why this file exists.
+// WHAT DOES NOT FOLLOW, and is why the client-deletion gates run here as well rather than only
+// the issuance pair. It is tempting to argue that RCSI can only remove lock conflicts, never add
+// one, so a cycle that does not form with it off cannot appear with it on. Removing a conflict
+// changes which interleavings are REACHABLE: a transaction that no longer stops at a read goes on
+// to ask for locks it never previously reached, and a cycle can close there. DeleteClient holds
+// that shape, a plain association read between its exclusive client acquisition and the session
+// rows it takes next.
+//
+// None of the above is a measurement, which is why this file exists.
 //
 // WHAT THE FOLLOW-UP DRAFT ALSO RAISED, AND WHY IT IS NOT REACHABLE. SNAPSHOT isolation reports a
 // write-write conflict as error 3960, an abort rather than a wait, and nothing in the repository
@@ -104,21 +111,39 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	cfg := config.GetDatabase()
 	name := isolatedDBName()
 
-	// 1. Create the database through the ordinary path, so it lands at the collation #283 pins,
-	//    and then let go of it completely.
-	created, err := data.NewDatabase(rcsiConfig(cfg, name, true), false)
+	// 1. Create the database through the constructor the migration fixtures use, so it lands at
+	//    the collation #283 pins, and then let go of it completely.
+	//
+	//    NOT data.NewDatabase, and the difference is not cosmetic. That entry point runs the
+	//    migration chain and the startup data tasks, neither of which this step wants, and it
+	//    returns the data.Database interface, which declares no Close: the pool it opened would
+	//    stay open for the life of the process and step 2 would be an ALTER DATABASE evicting
+	//    this function's own connections. The concrete constructor creates the database and
+	//    nothing else, and it exposes the *sql.DB, so "let go of it completely" is a statement
+	//    that actually runs and is checked.
+	created, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
+		Type:     "mssql",
+		Username: cfg.Username,
+		Password: cfg.Password,
+		Host:     cfg.Host,
+		Port:     cfg.Port,
+		Name:     name,
+		Create:   true,
+	}, false)
 	if err != nil {
 		return nil, fmt.Errorf("creating the RCSI database %s: %w", name, err)
-	}
-	if closer, ok := created.(interface{ Close() error }); ok {
-		_ = closer.Close()
 	}
 
 	deferPackageTeardown(func() { dropRCSIDatabase(cfg, name) })
 
+	if err := created.DB.Close(); err != nil {
+		return nil, fmt.Errorf("releasing the pool that created %s: %w", name, err)
+	}
+
 	// 2. Turn RCSI on from master, with a deadline, so a fixture that cannot get exclusive access
-	//    fails instead of hanging. WITH ROLLBACK IMMEDIATE is there because step 1's pool may not
-	//    have fully released: it evicts whatever is left rather than queueing behind it.
+	//    fails instead of hanging. WITH ROLLBACK IMMEDIATE stays even though step 1 now closes
+	//    its pool: Close returns once the driver has begun tearing the connections down, and a
+	//    stray session from a previous run of this fixture would otherwise make the ALTER wait.
 	master, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
 	if err != nil {
 		return nil, fmt.Errorf("connecting to master: %w", err)
@@ -144,19 +169,27 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	}
 
 	// 4. Only now the two handles, each of which migrates the chain and runs the startup tasks.
-	primary, err := data.NewDatabase(rcsiConfig(cfg, name, false), false)
+	//    Both are closed from the package teardown, registered AFTER the drop so it runs last:
+	//    a DROP DATABASE behind two live pools would have to evict them, and this way there is
+	//    nothing left to evict.
+	primary, err := data.NewDatabase(rcsiConfig(cfg, name), false)
 	if err != nil {
 		return nil, fmt.Errorf("opening the RCSI fixture's first handle: %w", err)
 	}
-	secondary, err := data.NewDatabase(rcsiConfig(cfg, name, false), false)
+	deferPackageTeardown(func() { closeRCSIHandle(primary) })
+
+	secondary, err := data.NewDatabase(rcsiConfig(cfg, name), false)
 	if err != nil {
 		return nil, fmt.Errorf("opening the RCSI fixture's second handle: %w", err)
 	}
+	deferPackageTeardown(func() { closeRCSIHandle(secondary) })
 
 	return &rcsiFixture{primary: primary, secondary: secondary, name: name}, nil
 }
 
-func rcsiConfig(cfg *config.DatabaseConfig, name string, create bool) *config.DatabaseConfig {
+// rcsiConfig is the fixture's database, never created by the handle that opens it: creation is
+// step 1's job and has to be finished, and read back, before anything migrates it.
+func rcsiConfig(cfg *config.DatabaseConfig, name string) *config.DatabaseConfig {
 	return &config.DatabaseConfig{
 		Type:     "mssql",
 		Username: cfg.Username,
@@ -164,7 +197,15 @@ func rcsiConfig(cfg *config.DatabaseConfig, name string, create bool) *config.Da
 		Host:     cfg.Host,
 		Port:     cfg.Port,
 		Name:     name,
-		Create:   create,
+		Create:   false,
+	}
+}
+
+// closeRCSIHandle releases one fixture pool. data.Database declares no Close, so the pool is
+// reached through the concrete type, which is known here: this fixture is SQL Server only.
+func closeRCSIHandle(db data.Database) {
+	if concrete, ok := db.(*mssqldb.MsSQLDatabase); ok {
+		_ = concrete.DB.Close()
 	}
 }
 
