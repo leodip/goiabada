@@ -1,4 +1,21 @@
 IF OBJECT_ID('audit_logs', 'U') IS NOT NULL DROP TABLE audit_logs;
+
+-- The DEFAULT constraints go before the columns they sit on. SQL Server refuses to drop a
+-- column while a default constraint depends on it, and the up migration created these UNNAMED,
+-- so each one carries a per-database generated name and can only be found through
+-- sys.default_constraints. Without this the rollback fails at the first column and leaves the
+-- schema half stepped down. The rule that every added default be named arrived with 000040;
+-- these files predate it, and the fix belongs in the down rather than in a new migration
+-- because a new migration would run at a different version (#268 decision 12).
+DECLARE @drop NVARCHAR(MAX) = N'';
+SELECT @drop = @drop + N'ALTER TABLE ' + QUOTENAME(SCHEMA_NAME(t.schema_id)) + N'.' + QUOTENAME(t.name)
+                     + N' DROP CONSTRAINT ' + QUOTENAME(dc.name) + N';'
+FROM sys.default_constraints dc
+JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+JOIN sys.tables t ON t.object_id = dc.parent_object_id
+WHERE (t.name = N'settings' AND c.name IN (N'audit_logs_in_console_enabled', N'audit_logs_in_database_enabled', N'audit_log_retention_days'));
+EXEC sp_executesql @drop;
+
 ALTER TABLE settings DROP COLUMN audit_logs_in_console_enabled;
 ALTER TABLE settings DROP COLUMN audit_logs_in_database_enabled;
 ALTER TABLE settings DROP COLUMN audit_log_retention_days;

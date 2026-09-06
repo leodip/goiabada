@@ -24,10 +24,12 @@ EXEC('UPDATE [user_sessions] SET [otp_config_generation] = -1
 
 -- 000001 declares level2_auth_config_has_changed inline as BIT NOT NULL with no named default, so on
 -- a database migrated forward from there this guard finds nothing and the drop proceeds. It exists
--- for the other arrival: the down migration below has to give the restored column a default, since
--- existing rows need a value, and without this guard the second up of a down-then-up round trip
--- would fail on the constraint it created. IF OBJECT_ID(...) IS NOT NULL is the idiom 000018 and
--- 000023 already use.
+-- for the other arrival: a database rolled back to 000030 by a release whose 000031 down LEFT the
+-- default constraint it had to create in order to add a NOT NULL column. Every release up to and
+-- including the one before #268 did exactly that; the down beside this file now drops it again, so
+-- a rollback performed from here leaves nothing for this guard to find either. It stays because a
+-- database rolled back by an older binary is still a database this one has to migrate forward.
+-- IF OBJECT_ID(...) IS NOT NULL is the idiom 000018 and 000023 already use.
 IF OBJECT_ID('df_user_sessions_level2_auth_config_has_changed', 'D') IS NOT NULL
     ALTER TABLE [user_sessions] DROP CONSTRAINT [df_user_sessions_level2_auth_config_has_changed];
 
