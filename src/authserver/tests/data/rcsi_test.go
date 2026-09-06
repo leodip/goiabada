@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/stretchr/testify/require"
 )
@@ -161,20 +161,22 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 		return nil, fmt.Errorf("sys.databases reports READ_COMMITTED_SNAPSHOT still off for %s after the ALTER succeeded", name)
 	}
 
-	// 4. Migrate ONCE, on a handle whose only job is that, and close the migrator.
+	// 4. Migrate ONCE, on a handle whose only job is that, and close the handle.
 	//
-	//    THE MIGRATOR HAS TO BE CLOSED AND THE HANDLE HAS TO BE DEDICATED, and the two go
-	//    together. golang-migrate's sqlserver.WithInstance checks a *sql.Conn out of the pool it
-	//    is given and holds it for the migrator's life, so a pool whose migrator is never closed
-	//    keeps one connection checked out and *sql.DB.Close() does not take it back: Close
-	//    disposes of idle connections and leaves a busy one to its owner. Measured on this
-	//    fixture before the repair, one connection still open after the close. And the driver's
-	//    Close closes the *sql.DB it was handed as well as the connection, so the handle that
-	//    migrates cannot be a handle anything goes on to use. Hence: one handle for the
-	//    migration, closed here, and the test handles opened afterwards without migrating.
+	//    THE HANDLE HAS TO BE DEDICATED AND IT HAS TO BE CLOSED, and the reading below is what
+	//    makes that worth doing. golang-migrate's sqlserver.WithInstance checked a *sql.Conn out
+	//    of the pool it was given and held it for the migrator's life, so a pool whose migrator
+	//    was never closed kept one connection checked out and *sql.DB.Close() did not take it
+	//    back: Close disposes of idle connections and leaves a busy one to its owner. Measured on
+	//    this fixture before the repair, one connection still open after the close.
 	//
-	//    data.NewDatabase cannot be used for either job. It always migrates, so every handle
-	//    opened through it leaks one connection, which is the whole of what this step avoids.
+	//    The runner has no Close and pins nothing (#268 decision 8): it takes a connection for
+	//    the duration of one operation and gives it back. So the zero below is now a reading of
+	//    THAT, and it is goal 5's test. A runner that held its connection would leave it busy,
+	//    Close would leave it alone, and this would report one.
+	//
+	//    data.NewDatabase cannot be used for either job. It always migrates and it runs the
+	//    startup data tasks, and step 5 wants neither on the handles the tests run on.
 	migrating, err := mssqldb.NewMsSQLDatabase(rcsiConfig(cfg, name), false)
 	if err != nil {
 		return nil, fmt.Errorf("opening the handle that migrates %s: %w", name, err)
@@ -183,7 +185,7 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 		return nil, err
 	}
 	if open := migrating.DB.Stats().OpenConnections; open != 0 {
-		return nil, fmt.Errorf("the migrating handle for %s still holds %d connection(s) after its migrator was closed", name, open)
+		return nil, fmt.Errorf("the migrating handle for %s still holds %d connection(s) after it was closed, so the runner did not give its connection back", name, open)
 	}
 
 	// 5. Only now the two handles the tests run on. They do NOT run data.NewDatabase's startup
@@ -209,24 +211,26 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	return &rcsiFixture{primary: primary, secondary: secondary, name: name}, nil
 }
 
-// migrateRCSIDatabase runs the chain on the handle it is given and closes the migrator, which
-// also closes that handle's pool: see step 4 for why those are the same act here.
+// migrateRCSIDatabase runs the chain on the handle it is given and then closes that handle: see
+// step 4 for why the migration gets a pool of its own.
+//
+// The pool is closed on the failure path too, so a fixture that cannot migrate still does not
+// leave a connection behind for the drop to evict.
 func migrateRCSIDatabase(db *mssqldb.MsSQLDatabase) error {
-	migrator, err := db.NewMigrator()
+	m, err := db.NewMigrator()
 	if err != nil {
+		_ = db.DB.Close()
 		return fmt.Errorf("creating the RCSI fixture's migrator: %w", err)
 	}
 
-	upErr := migrator.Up()
-	if upErr != nil && !errors.Is(upErr, gomigrate.ErrNoChange) {
-		// Closed even on the failure path, so a fixture that cannot migrate still does not leave
-		// a connection behind for the drop to evict.
-		_, _ = migrator.Close()
+	upErr := m.Up()
+	if upErr != nil && !errors.Is(upErr, migrator.ErrNoChange) {
+		_ = db.DB.Close()
 		return fmt.Errorf("migrating the RCSI fixture: %w", upErr)
 	}
 
-	if srcErr, dbErr := migrator.Close(); srcErr != nil || dbErr != nil {
-		return fmt.Errorf("closing the RCSI fixture's migrator: source %v, database %v", srcErr, dbErr)
+	if err := db.DB.Close(); err != nil {
+		return fmt.Errorf("closing the RCSI fixture's migrating handle: %w", err)
 	}
 	return nil
 }

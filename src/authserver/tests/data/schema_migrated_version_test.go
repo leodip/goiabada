@@ -40,17 +40,17 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	require.NoErrorf(t, err, "read the version at %d on %s", migratedVersionKnownNumber, dbType())
 	assert.Equal(t, migratedVersionKnownNumber, got, "the reader answers the version recorded on %s", dbType())
 
-	// At head, held to golang-migrate's own reader rather than to a number written here.
+	// At head, held to the runner's own reader rather than to a number written here.
 	// The four heads legitimately differ, so an expectation spelled out per engine would be
 	// a second copy of that list to keep current, and the useful claim is that this reader
 	// and the migrator agree about the database in front of them.
 	require.NoErrorf(t, h.Migrator.Up(), "migrate to head on %s", dbType())
 	head, dirty, err := h.Migrator.Version()
-	require.NoErrorf(t, err, "golang-migrate reports the head version on %s", dbType())
+	require.NoErrorf(t, err, "the runner reports the head version on %s", dbType())
 	require.Falsef(t, dirty, "the chain applied cleanly on %s", dbType())
 	got, err = schemadump.MigratedVersion(h.SQL, d)
 	require.NoErrorf(t, err, "read the head version on %s", dbType())
-	assert.Equalf(t, int(head), got, "the reader agrees with golang-migrate about the head on %s", dbType())
+	assert.Equalf(t, head, got, "the reader agrees with the runner about the head on %s", dbType())
 	require.Greaterf(t, got, migratedVersionKnownNumber,
 		"the head is above %d, so the two reads above are not the same assertion twice on %s",
 		migratedVersionKnownNumber, dbType())
@@ -64,7 +64,7 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	assert.Zerof(t, got, "a refusal answers 0 alongside the error and never a usable version on %s", dbType())
 	setSchemaMigrationsDirty(t, h, false)
 
-	// Empty: an unmigrated database. golang-migrate reports NilVersion for this and a reader
+	// Empty: an unmigrated database. The runner reports ErrNilVersion for this and a reader
 	// that mapped it to 0 would let a golden file be generated from a database with no
 	// tables in it.
 	//
@@ -81,7 +81,7 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	assert.Zerof(t, got, "a refusal answers 0 alongside the error on %s", dbType())
 
 	// A row recording version 0, which is the table populated but naming no migration. It
-	// is not a version golang-migrate writes, and it is precisely the value a lenient
+	// is not a version the runner writes, and it is precisely the value a lenient
 	// reader would have invented, so a file encoded from it would claim migration 0.
 	_, err = h.SQL.Exec("INSERT INTO schema_migrations (version, dirty) VALUES (0, " + boolLiteral(false) + ")")
 	require.NoErrorf(t, err, "record version 0 on %s", dbType())

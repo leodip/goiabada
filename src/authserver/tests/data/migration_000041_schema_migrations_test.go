@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// schemaMigrationsDriverDDL000041 is the shape golang-migrate v4.19.1's SQLite driver builds
+// schemaMigrationsDriverDDL000041 is the shape golang-migrate v4.19.1's SQLite driver built
 // for its own version table, and the shape a Goiabada install created before #284 therefore
 // has. Written out here because it is the fixture the migration has to convert, and there is
 // no other way to reach it: NewMigrator now pre-creates the pinned shape, so a database this
@@ -27,7 +27,7 @@ const sqliteVersionBefore000041 = 39
 
 // TestSchemaMigrations_PinnedShapeAfterConstruction is seam 4 of #284: after NewMigrator has
 // run and before any migration, schema_migrations has Goiabada's shape rather than whichever
-// one the pinned golang-migrate happens to build.
+// one the golang-migrate release Goiabada used to pin happened to build.
 //
 // It runs on all four engines and asserts the same three things on each, which is the point:
 // the parity check reads schema_migrations like any other table (decision 7), so it is only
@@ -69,7 +69,7 @@ func assertSchemaMigrationsPinnedShape(t *testing.T, h *isolatedDB, phase string
 
 	dirty := shape.column(t, "dirty")
 	assert.Falsef(t, dirty.Nullable,
-		"[%s] dirty is NOT NULL on all four engines, and it is the one genuinely enforced on SQLite: a NULL here breaks Version()'s scan, which golang-migrate swallows and reports as NilVersion",
+		"[%s] dirty is NOT NULL on all four engines, and it is the one genuinely enforced on SQLite: a NULL here breaks the version read's scan, which golang-migrate swallowed and reported as NilVersion",
 		phase)
 	assert.Falsef(t, dirty.Generated, "[%s] dirty is numbered by no engine", phase)
 
@@ -125,7 +125,7 @@ func TestMigration000041_SchemaMigrationsShape(t *testing.T) {
 		"the driver carries uniqueness in a separate CREATE UNIQUE INDEX, not in a primary key")
 
 	// Decision 7's "it is not cosmetic", stated in the direction that is actually true.
-	// The driver's shape stores a NULL in either column, and golang-migrate's Version()
+	// The driver's shape stored a NULL in either column, and golang-migrate's Version()
 	// scans both into Go values and SWALLOWS the scan error, reporting NilVersion: the
 	// value that makes it run the whole chain from 000001 against a populated database.
 	_, err := h.SQL.Exec("INSERT INTO schema_migrations (version, dirty) VALUES (NULL, NULL)")
@@ -143,7 +143,7 @@ func TestMigration000041_SchemaMigrationsShape(t *testing.T) {
 	var dirty bool
 	require.NoError(t, h.SQL.QueryRow("SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty),
 		"the version row survived the rebuild")
-	assert.Equal(t, 41, version, "the row copied forward is the one golang-migrate wrote before Run()")
+	assert.Equal(t, 41, version, "the row copied forward is the one the migration found before Run()")
 	assert.False(t, dirty, "000041 completed, so the dirty marker is cleared")
 
 	// dirty is the column whose NOT NULL is genuinely enforced, and it is the one that

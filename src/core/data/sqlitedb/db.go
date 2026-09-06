@@ -8,11 +8,10 @@ import (
 	"log/slog"
 	"strings"
 
-	gomigrate "github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data/commondb"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/pkg/errors"
 	sqlitedriver "modernc.org/sqlite"
 )
@@ -148,78 +147,86 @@ func (d *SQLiteDatabase) RollbackTransaction(tx *sql.Tx) error {
 	return d.CommonDB.RollbackTransaction(tx)
 }
 
-// NewMigrator builds a golang-migrate instance bound to this database and the
-// embedded migration files. Migrate delegates to it; tests use it to step to a
-// specific version (e.g. seed at 000020, then apply 000021 in isolation).
-// schemaMigrationsTableDDL pins the shape of golang-migrate's own version table, which
-// Goiabada creates before handing the database over rather than leaving to the driver
-// (#284 decision 7).
+// schemaMigrationsTableDDL pins the shape of the version table the runner keeps, which
+// Goiabada creates before anything migrates rather than leaving to whatever applies the
+// files (#284 decision 7).
 //
-// SQLite is the one engine whose driver is out of line. golang-migrate v4.19.1 builds
-// `(version uint64, dirty bool)` here: both columns nullable, no primary key, and a
-// separate version_unique index. The MySQL, PostgreSQL and SQL Server drivers all build
-// `version bigint not null primary key, dirty boolean not null`. A nullable version is not
-// cosmetic: the driver's own shape accepts a NULL row that Version() then cannot read back,
-// and the four engines have to agree on this table's shape because the parity check reads
-// it like any other.
-//
-// Every driver creates the table only if it is absent, so issuing this first makes the
-// driver's statement a no-op and the shape Goiabada's on a new install; a dependency bump
-// that changed the driver's DDL cannot silently change what Goiabada builds. Migration
-// 000041 does the same for a database created before this existed.
+// SQLite is the one engine where this changed anything. golang-migrate v4.19.1's SQLite
+// driver built `(version uint64, dirty bool)` here: both columns nullable, no primary key,
+// and a separate version_unique index. Its MySQL, PostgreSQL and SQL Server drivers all
+// built `version bigint not null primary key, dirty boolean not null`. A nullable version
+// is not cosmetic: that shape accepts a NULL row Version() then cannot read back, and the
+// four engines have to agree on this table's shape because the parity check reads it like
+// any other. Migration 000041 does the same for a database created before this existed.
 //
 // INTEGER and not BIGINT. Only `INTEGER PRIMARY KEY` is a rowid alias; spelled BIGINT,
-// SQLite builds sqlite_autoindex_schema_migrations_1 to enforce the key and the driver's
-// unconditional `CREATE UNIQUE INDEX IF NOT EXISTS version_unique` lands on top of it,
-// leaving two unique indexes on one column where the other three engines have one.
+// SQLite builds sqlite_autoindex_schema_migrations_1 to enforce the key and
+// schemaMigrationsIndexDDL below lands on top of it, leaving two unique indexes on one
+// column where the other three engines have one.
 const schemaMigrationsTableDDL = `CREATE TABLE IF NOT EXISTS schema_migrations (
 	version INTEGER NOT NULL PRIMARY KEY,
 	dirty BOOLEAN NOT NULL
 )`
 
-// ensureSchemaMigrationsTable creates the version table at Goiabada's shape when it is not
-// there yet. The driver's own ensureVersionTable then runs on every migrator construction
-// and, on this engine, adds only its version_unique index on top.
+// schemaMigrationsIndexDDL is the statement golang-migrate's SQLite driver used to issue on
+// every construction, and it is Goiabada's now that nothing else issues it (#268 decision 6).
+//
+// It has to survive the library leaving. Every SQLite database Goiabada has deployed carries
+// this index and the golden file records it, so a fresh install without it would differ from
+// a migrated one on a table the parity check reads like any other. Dropping it with a
+// migration instead would move a golden and two tests for an index nobody queries by; this
+// one statement leaves every one of them true.
+//
+// SQLite only. On the other three engines the version table has a real primary key, whose
+// index is the only unique one on it.
+const schemaMigrationsIndexDDL = `CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON schema_migrations (version)`
+
+// ensureSchemaMigrationsTable creates the version table at Goiabada's shape, and its index,
+// when they are not there yet. Both statements are idempotent, so two processes starting
+// against one empty database cannot make each other fail.
 func (d *SQLiteDatabase) ensureSchemaMigrationsTable() error {
 	if _, err := d.DB.Exec(schemaMigrationsTableDDL); err != nil {
 		return errors.Wrap(err, "unable to create the schema_migrations table")
 	}
+	if _, err := d.DB.Exec(schemaMigrationsIndexDDL); err != nil {
+		return errors.Wrap(err, "unable to create the schema_migrations version index")
+	}
 	return nil
 }
 
-func (d *SQLiteDatabase) NewMigrator() (*gomigrate.Migrate, error) {
+// NewMigrator builds a runner bound to this database and the embedded migration files.
+// Migrate delegates to it; tests use it to step to a specific version (e.g. seed at
+// 000020, then apply 000021 in isolation).
+//
+// There is nothing to close. The runner takes a connection out of the pool for the duration
+// of one operation and gives it back before returning (#268 decision 8).
+func (d *SQLiteDatabase) NewMigrator() (*migrator.Migrator, error) {
 	if err := d.ensureSchemaMigrationsTable(); err != nil {
 		return nil, err
 	}
 
-	driver, err := sqlite.WithInstance(d.DB, &sqlite.Config{})
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to create migration driver")
-	}
-
-	iofs, err := iofs.New(sqliteMigrationsFs, "migrations")
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to create migration filesystem")
-	}
-
-	migrator, err := gomigrate.NewWithInstance("iofs", iofs, "sqlite", driver)
+	m, err := migrator.New(d.DB, sqliteMigrationsFs, "migrations", migrator.SQLite())
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create migration instance")
 	}
-	return migrator, nil
+	return m, nil
 }
 
 func (d *SQLiteDatabase) Migrate() error {
-	migrator, err := d.NewMigrator()
+	m, err := d.NewMigrator()
 	if err != nil {
 		return err
 	}
 
-	err = migrator.Up()
-	if err != nil && err != gomigrate.ErrNoChange {
-		return errors.Wrap(err, "unable to migrate the database")
-	} else if err != nil && err == gomigrate.ErrNoChange {
+	err = m.Up()
+	if errors.Is(err, migrator.ErrNoChange) {
 		slog.Info("no need to migrate the database")
+		return nil
+	}
+	if err != nil {
+		// StartupRefusal explains the one failure a starting server can be talked out of: a
+		// database a newer release already migrated. Everything else passes through.
+		return errors.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
 	}
 
 	return nil

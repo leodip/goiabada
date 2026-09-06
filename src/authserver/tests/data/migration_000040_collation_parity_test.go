@@ -19,7 +19,7 @@ var mysqlUnicodeTables000040 = map[string]bool{
 }
 
 // tables000040 is every table migration 000040 converts: all 25 Goiabada tables.
-// schema_migrations is deliberately absent, being golang-migrate's own bookkeeping, and its
+// schema_migrations is deliberately absent, being the migration runner's own bookkeeping, and its
 // absence is asserted rather than assumed (see TestMigration000040_CollationParity).
 var tables000040 = []string{
 	"audit_logs", "browser_sessions", "client_logos", "clients", "clients_permissions",
@@ -48,7 +48,7 @@ var renamedDefaults000040 = map[string]string{
 // Core section 2 of sub.
 //
 // SQLite and PostgreSQL are skipped because they have no 000040 file: neither engine moves,
-// and golang-migrate refuses a target version its source does not carry.
+// and the runner refuses a target version its source does not carry.
 //
 // THE FIXTURE IS THE FIRST THING THIS TEST HAS TO GET RIGHT, and on SQL Server it is not
 // newIsolatedDB. That helper builds the database through NewMsSQLDatabase, which this change
@@ -168,7 +168,7 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 
 	// A refusal that dismantles the schema is not a refusal, it is a wreck. SQL Server's down
 	// file drops 6 defaults and 23 indexes and alters 92 columns BEFORE it reaches the
-	// CREATE UNIQUE INDEX that fails, and golang-migrate's driver submits the file as one
+	// CREATE UNIQUE INDEX that fails, and the runner submits the file as one
 	// batch with no transaction of its own, so without the SET XACT_ABORT ON and explicit
 	// transaction in that file every one of those statements would have autocommitted. The
 	// operator would be holding a database with no UNIQUE index on client_identifier, email,
@@ -213,8 +213,8 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 // going from a folding collation to a non-folding one only ever relaxes uniqueness. That is
 // exactly why it needs this test rather than exempting it. A lock timeout, a full transaction
 // log, a dropped connection or a dependency the migration does not manage all stop it part way,
-// and golang-migrate's SQL Server driver submits the file as ONE batch and opens no transaction
-// of its own, so every statement before the failure would autocommit. The operator would then be
+// and the runner submits the file as ONE batch on this engine and opens no transaction of its
+// own, so every statement before the failure would autocommit. The operator would then be
 // holding a database with no UNIQUE index on client_identifier, email, subject, code_hash or
 // refresh_token_jti, 90 of 92 columns converted, and no way forward: the retry dies at the first
 // DROP INDEX with Msg 3701 on an index that no longer exists.
@@ -284,7 +284,7 @@ func TestMigration000040_UpRollsBackALateFailure(t *testing.T) {
 	_, err = h.SQL.Exec(fmt.Sprintf("DROP INDEX [%s] ON [users]", unmanagedIndex))
 	require.NoError(t, err, "resolve the dependency by hand")
 
-	require.NoError(t, h.Migrator.Force(int(prior)),
+	require.NoError(t, h.Migrator.Force(prior),
 		"clear the dirty version the deliberate failure left, which is the operator's own step")
 	require.NoError(t, h.Migrator.Migrate(40),
 		"the retry must reach 40; if it does not, the first attempt destroyed something it cannot rebuild")
@@ -328,9 +328,9 @@ func mssqlSchemaShape000040(t *testing.T, h *isolatedDB) []string {
 func engineMoves000040() bool { return dbType() == "mysql" || dbType() == "mssql" }
 
 // priorVersion000040 is the version immediately before 000040 on this engine. It is not the
-// same number on both: mssql has no 000036, 000037 or 000039, and golang-migrate refuses a
+// same number on both: mssql has no 000036, 000037 or 000039, and the runner refuses a
 // target version its source does not carry.
-func priorVersion000040() uint {
+func priorVersion000040() int {
 	if dbType() == "mssql" {
 		return 38
 	}

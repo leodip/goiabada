@@ -62,7 +62,7 @@ func TestNewDatabase_CreateFalse_StartsUnderALeastPrivilegeLogin(t *testing.T) {
 
 	// Migrating the full chain and then reading through the handle is the rest of the claim:
 	// the restricted login does not merely connect, it can do everything Goiabada needs.
-	h := newIsolated(t, db, sqlDB)
+	h := newIsolated(t, db, sqlDB, r.name)
 	require.NoError(t, h.Migrator.Up(), "migrate the full chain as the restricted login")
 
 	var clients int

@@ -24,7 +24,7 @@ import (
 //     issue #282 changes. Read off a moving head, this control would start failing the
 //     moment that change lands, which is the wrong signal from a control.
 //   - Migrate(N) for an N the engine does not have fails outright rather than migrating
-//     to the nearest: golang-migrate's read() calls versionExists(to) first. 000035 is
+//     to the nearest: the runner refuses a target its source does not carry. 000035 is
 //     the last version all four engines share.
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
@@ -236,7 +236,7 @@ func assertOriginProjectionIsNotAConstant(t *testing.T, h *isolatedDB) {
 // Both polarities on the same table, so a branch returning either constant fails one of them.
 // Then the claim the four golden files are expected to agree on with no allowlist rule: every
 // application table's id is auto-numbered on every engine. schema_migrations is the one table
-// with no id at all, which is golang-migrate's shape and not Goiabada's.
+// with no id at all, which was golang-migrate's shape and is not Goiabada's.
 func assertGenerationProjection(t *testing.T, h *isolatedDB, refreshTokens tableShape) {
 	t.Helper()
 

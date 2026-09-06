@@ -281,9 +281,9 @@ type sqlFragment struct {
 // splitStatements cuts the blanked text at every ';' that sits at parenthesis depth 0 outside a
 // literal, an identifier and a comment.
 //
-// A trailing statement with no ';' is emitted rather than refused. golang-migrate sends the file
-// to the driver as one batch and does not require the terminator, so refusing would be a false
-// alarm on a legitimate migration; every file in the tree happens to end with one today.
+// A trailing statement with no ';' is emitted rather than refused. The runner sends the whole
+// file to the engine as one batch and does not require the terminator, so refusing would be a
+// false alarm on a legitimate migration; every file in the tree happens to end with one today.
 func splitStatements(clean, masked string, marks []sqlMark) []sqlStatement {
 	var out []sqlStatement
 	start, from := 0, 0
@@ -448,9 +448,9 @@ var (
 )
 
 // migrationNameExempt is the one pair of files the naming rule excuses. SQLite's initial
-// migration is five digits where every other engine's is six; golang-migrate parses the leading
-// integer so it has always worked, and renaming it now would change a version already recorded
-// in every deployment. Naming it here rather than relaxing the rule is what stops a new
+// migration is five digits where every other engine's is six; the runner parses the leading
+// integer, as golang-migrate did before it, so it has always worked, and renaming it now would
+// change a version already recorded in every deployment. Naming it here rather than relaxing the rule is what stops a new
 // five-digit file landing beside it.
 func migrationNameExempt(d schemadump.Dialect, name string) bool {
 	return d == schemadump.SQLite &&
@@ -516,7 +516,7 @@ func readMigrationFiles(tree migrationTree) []migrationFile {
 
 // migrationCutoffs is one grandfathering number per content rule, never a shared baseline
 // (decision 3). A rule applies to every number STRICTLY ABOVE its cutoff; everything at or below
-// is exempt, deliberately, because a shipped migration's DDL cannot be edited: golang-migrate
+// is exempt, deliberately, because a shipped migration's DDL cannot be edited: schema_migrations
 // records only (version, dirty) and no checksum, so changing an old file would make a fresh
 // database differ from every existing one. Divergences are fixed by a NEW migration.
 //
@@ -637,7 +637,7 @@ func checkPairing(tree migrationTree) []migrationFinding {
 // number is itself a violation, and an index storing one slug per engine cannot report it: the
 // two files overwrite each other and whichever sorts last is the only one any rule ever sees. A
 // duplicate whose slug sorts first then disappears completely, and a tree naming one version
-// twice passes every rule in this file while golang-migrate's own source loader refuses to open
+// twice passes every rule in this file while the runner's own source parser refuses to load
 // it. Uniqueness has to be decided before the index is flattened, so the index cannot be the
 // thing that flattens it.
 func migrationNumbers(files []migrationFile) map[int]map[schemadump.Dialect][]string {
@@ -665,10 +665,10 @@ func checkNumberIdentity(files []migrationFile) []migrationFinding {
 	numbers := migrationNumbers(files)
 	var out []migrationFinding
 	for _, num := range sortedNumbers(numbers) {
-		// Two up migrations at one number on one engine. golang-migrate's own source loader
-		// refuses this tree with ErrDuplicateMigration, so it is a build that never starts
-		// rather than a divergence, but the four directories are written by hand and nothing
-		// else reads them before a database job does.
+		// Two up migrations at one number on one engine. The runner's own source parser
+		// refuses this tree at construction, so it is a build that never starts rather than a
+		// divergence, but the four directories are written by hand and nothing else reads them
+		// before a database job does.
 		duplicated := false
 		for _, d := range indexDialects(numbers[num]) {
 			slugs := numbers[num][d]
@@ -1792,8 +1792,8 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			// The added slug sorts BEFORE initial_create, which is the shape an index keeping
 			// one slug per engine loses completely: the ordinary file overwrites the duplicate
-			// and there is nothing left for any rule to disagree with. golang-migrate's source
-			// loader refuses this tree outright, so nothing here would ever have run.
+			// and there is nothing left for any rule to disagree with. The runner's source parser
+			// refuses this tree outright, so nothing here would ever have run.
 			name: "two up migrations at one number on one engine are refused",
 			breaks: func(tr migrationTree) {
 				addMigration(tr, schemadump.MySQL, "000001_a_second_change",

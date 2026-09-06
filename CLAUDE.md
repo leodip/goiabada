@@ -44,6 +44,7 @@ Single `Database` interface (`src/core/data/database.go`) with per-DB implementa
 - All methods accept `tx *sql.Tx` (nil = no transaction)
 - Uses `sqlbuilder` for query building with DB-specific flavors
 - Schema in `src/core/data/sqlitedb/schema.golden` (generated; see **Schema golden files** below)
+- Migrations are applied by Goiabada's own runner in `src/core/data/migrator/`, built per engine by each `NewMigrator()`
 
 **Supported**: SQLite, MySQL, PostgreSQL, SQL Server
 

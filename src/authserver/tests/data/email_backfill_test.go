@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
@@ -65,7 +65,7 @@ type emailBackfillCase struct {
 //	--run TestBackfillLowercaseEmails
 func TestBackfillLowercaseEmails(t *testing.T) {
 	h := newIsolatedDB(t)
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, gomigrate.ErrNoChange) {
+	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding")
 	}
 
@@ -201,7 +201,7 @@ func TestBackfillLowercaseEmails(t *testing.T) {
 //	--run TestBackfillLowercaseEmails_DisablingALoserRevokesItsAuthState
 func TestBackfillLowercaseEmails_DisablingALoserRevokesItsAuthState(t *testing.T) {
 	h := newIsolatedDB(t)
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, gomigrate.ErrNoChange) {
+	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding")
 	}
 
@@ -431,7 +431,7 @@ func TestBackfillLowercaseEmails_DisablingALoserIsAudited(t *testing.T) {
 	seedAuditFixture := func(t *testing.T, auditToDatabase bool) (*isolatedDB, *models.User, *models.User, *models.UserSession, *models.RefreshToken) {
 		t.Helper()
 		h := newIsolatedDB(t)
-		if err := h.Migrator.Up(); err != nil && !errors.Is(err, gomigrate.ErrNoChange) {
+		if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 			require.NoError(t, err, "migrate to head before seeding")
 		}
 

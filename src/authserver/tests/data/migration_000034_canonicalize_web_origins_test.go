@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	gomigrate "github.com/golang-migrate/migrate/v4"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/stretchr/testify/assert"
@@ -93,7 +93,7 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	// what keeps this test working when later migrations add a column, since the
 	// ORM writes every column the Go models carry. ErrNoChange is tolerated
 	// because 000034 is currently head.
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, gomigrate.ErrNoChange) {
+	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
 	require.NoError(t, h.Migrator.Migrate(33), "roll back to 000033")

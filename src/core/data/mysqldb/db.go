@@ -8,11 +8,10 @@ import (
 	"strings"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
-	gomigrate "github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/mysql"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data/commondb"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/pkg/errors"
 )
 
@@ -149,22 +148,18 @@ func (d *MySQLDatabase) RollbackTransaction(tx *sql.Tx) error {
 	return d.CommonDB.RollbackTransaction(tx)
 }
 
-// NewMigrator builds a golang-migrate instance bound to this database and the
-// embedded migration files. Migrate delegates to it; tests use it to step to a
-// specific version (e.g. seed at 000020, then apply 000021 in isolation).
-// schemaMigrationsTableDDL pins the shape of golang-migrate's own version table, which
-// Goiabada creates before handing the database over rather than leaving to the driver
-// (#284 decision 7). It is the statement golang-migrate v4.19.1's MySQL driver would issue
-// itself, verbatim, behind IF NOT EXISTS instead of the driver's SHOW TABLES LIKE check.
+// schemaMigrationsTableDDL pins the shape of the version table the runner keeps, which
+// Goiabada creates before anything migrates rather than leaving to whatever applies the files
+// (#284 decision 7). It is the statement golang-migrate v4.19.1's MySQL driver would have
+// issued itself, verbatim, behind IF NOT EXISTS instead of that driver's SHOW TABLES LIKE
+// check.
 //
-// Issuing it first makes the driver's own statement a no-op and the shape Goiabada's, so
-// this table has one shape on all four engines and a dependency bump that changed the
-// driver's DDL cannot silently change what Goiabada builds. SQLite is the engine where this
-// actually differs today; here it pins what is already true.
+// So a database created under the library and one created under the runner have the same
+// shape, and this table reads the same on all four engines. SQLite is the engine where the
+// library's shape actually differed; here it pins what was already true.
 //
-// Unqualified, so it lands in the schema the connection is bound to, which is the same one
-// mysql.WithInstance resolves through DATABASE(). No column holds a string, so there is no
-// collation to spell (#283).
+// Unqualified, so it lands in the schema the connection is bound to. No column holds a
+// string, so there is no collation to spell (#283).
 const schemaMigrationsTableDDL = "CREATE TABLE IF NOT EXISTS schema_migrations " +
 	"(version bigint not null primary key, dirty boolean not null)"
 
@@ -178,41 +173,39 @@ func (d *MySQLDatabase) ensureSchemaMigrationsTable() error {
 	return nil
 }
 
-func (d *MySQLDatabase) NewMigrator() (*gomigrate.Migrate, error) {
+// NewMigrator builds a runner bound to this database and the embedded migration files.
+// Migrate delegates to it; tests use it to step to a specific version (e.g. seed at
+// 000020, then apply 000021 in isolation).
+//
+// There is nothing to close. The runner takes a connection out of the pool for the duration
+// of one operation and gives it back before returning (#268 decision 8).
+func (d *MySQLDatabase) NewMigrator() (*migrator.Migrator, error) {
 	if err := d.ensureSchemaMigrationsTable(); err != nil {
 		return nil, err
 	}
 
-	driver, err := mysql.WithInstance(d.DB, &mysql.Config{
-		DatabaseName: d.dbConfig.Name,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to create migration driver")
-	}
-
-	iofs, err := iofs.New(mysqlMigrationsFs, "migrations")
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to create migration filesystem")
-	}
-
-	migrator, err := gomigrate.NewWithInstance("iofs", iofs, "mysql", driver)
+	m, err := migrator.New(d.DB, mysqlMigrationsFs, "migrations", migrator.MySQL(d.dbConfig.Name))
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create migration instance")
 	}
-	return migrator, nil
+	return m, nil
 }
 
 func (d *MySQLDatabase) Migrate() error {
-	migrator, err := d.NewMigrator()
+	m, err := d.NewMigrator()
 	if err != nil {
 		return err
 	}
 
-	err = migrator.Up()
-	if err != nil && err != gomigrate.ErrNoChange {
-		return errors.Wrap(err, "unable to migrate the database")
-	} else if err != nil && err == gomigrate.ErrNoChange {
+	err = m.Up()
+	if errors.Is(err, migrator.ErrNoChange) {
 		slog.Info("no need to migrate the database")
+		return nil
+	}
+	if err != nil {
+		// StartupRefusal explains the one failure a starting server can be talked out of: a
+		// database a newer release already migrated. Everything else passes through.
+		return errors.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
 	}
 
 	return nil
