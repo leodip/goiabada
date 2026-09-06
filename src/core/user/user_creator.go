@@ -1,6 +1,8 @@
 package user
 
 import (
+	"database/sql"
+
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -64,28 +66,26 @@ func (uc *UserCreator) CreateUser(input *CreateUserInput) (*models.User, error) 
 
 	user.Permissions = []models.Permission{*accountPermission}
 
-	tx, err := uc.database.BeginTransaction()
-	if err != nil {
-		return nil, err
-	}
-	defer uc.database.RollbackTransaction(tx) //nolint:errcheck
-
-	err = uc.database.CreateUser(tx, user)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, permission := range user.Permissions {
-		err = uc.database.CreateUserPermission(tx, &models.UserPermission{
-			UserId:       user.Id,
-			PermissionId: permission.Id,
-		})
-		if err != nil {
-			return nil, err
+	// The user row and its account permission land in one transaction, opened through
+	// RunInTransaction so a deadlock reruns the body (#301). The body is safe to rerun: the id
+	// CreateUser assigns onto user is reassigned by the next attempt before the permission
+	// insert reads it.
+	err = uc.database.RunInTransaction(func(tx *sql.Tx) error {
+		if err := uc.database.CreateUser(tx, user); err != nil {
+			return err
 		}
-	}
 
-	err = uc.database.CommitTransaction(tx)
+		for _, permission := range user.Permissions {
+			err := uc.database.CreateUserPermission(tx, &models.UserPermission{
+				UserId:       user.Id,
+				PermissionId: permission.Id,
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}

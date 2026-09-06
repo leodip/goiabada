@@ -31,8 +31,8 @@ import (
 // That costs one real 4096-bit key generation per case, about 300ms, since the rotator generates the
 // replacement before opening the transaction and so on every path including the refusals.
 
-// rotateTx is an opaque non-nil transaction. Letting BeginTransaction return nil would exercise a
-// shape production never runs.
+// rotateTx is an opaque non-nil transaction. Handing the rotator a nil one would exercise a shape
+// production never runs.
 var rotateTx = &sql.Tx{}
 
 // signingKey builds a key_pairs row in the given state. Only Id and State matter here: nothing in
@@ -41,13 +41,14 @@ func signingKey(id int64, state enums.KeyState) models.KeyPair {
 	return models.KeyPair{Id: id, State: state.String(), Type: "RSA", Algorithm: "RS256"}
 }
 
-// stubRotateRead registers the transaction open, the classify read and the rollback the rotator
-// always defers. The rollback is registered for every case, including the successful one, because
-// the deferred call runs after the commit and the mock would otherwise fail the test.
-func stubRotateRead(database *mocks_data.Database, keys []models.KeyPair) {
-	database.On("BeginTransaction").Return(rotateTx, nil).Once()
+// stubRotateRead registers the transaction the rotator opens through RunInTransaction and the
+// classify read inside it. The commit and the rollback are the helper's and never reach the mock;
+// the returned stub records what the body handed the helper, which is how the refusal cases below
+// assert that nothing was committed.
+func stubRotateRead(database *mocks_data.Database, keys []models.KeyPair) *runInTransactionStub {
+	stub := expectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", rotateTx).Return(keys, nil).Once()
-	database.On("RollbackTransaction", rotateTx).Return(nil).Once()
+	return stub
 }
 
 func rotateRequest() *http.Request {
@@ -64,7 +65,7 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 
 	const subject = "the-admin"
 
-	stubRotateRead(database, []models.KeyPair{
+	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(1, enums.KeyStatePrevious),
 		signingKey(2, enums.KeyStateCurrent),
 		signingKey(3, enums.KeyStateNext),
@@ -77,7 +78,6 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 	database.On("CreateKeyPair", rotateTx, mock.MatchedBy(func(kp *models.KeyPair) bool {
 		return kp.State == enums.KeyStateNext.String()
 	})).Return(nil).Once()
-	database.On("CommitTransaction", rotateTx).Return(nil).Once()
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return(subject)
 	var payload map[string]interface{}
@@ -93,6 +93,7 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 	require.NotNil(t, payload)
 	assert.Equal(t, subject, payload["loggedInUser"])
+	assert.NoError(t, stub.bodyErr, "the body asked the helper to commit")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -105,7 +106,7 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 
-	stubRotateRead(database, []models.KeyPair{
+	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(2, enums.KeyStateCurrent),
 		signingKey(3, enums.KeyStateNext),
 	})
@@ -120,9 +121,11 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	body := decodeErrorBody(t, rr)
 	assert.Equal(t, "ROTATION_IN_PROGRESS", body.ErrorCode)
 	assert.Equal(t, "Another key rotation is in progress", body.ErrorDescription)
-	// No CommitTransaction and no CreateKeyPair were registered, so the mock fails the test if the
-	// handler committed anything. auditLogger has no expectation at all, which NewAuditLogger's
-	// cleanup turns into a failure on any Log call.
+	// No CreateKeyPair was registered, so the mock fails the test if the rotator went on past the
+	// refusal, and the body handed the refusal to the helper, which is what rolls it back rather
+	// than committing. auditLogger has no expectation at all, which NewAuditLogger's cleanup turns
+	// into a failure on any Log call.
+	assert.Error(t, stub.bodyErr)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -136,7 +139,7 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 
-	stubRotateRead(database, []models.KeyPair{
+	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(1, enums.KeyStatePrevious),
 		signingKey(2, enums.KeyStateCurrent),
 	})
@@ -148,6 +151,7 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	body := decodeErrorBody(t, rr)
 	assert.Equal(t, "KEY_SET_INCOMPLETE", body.ErrorCode)
 	assert.Equal(t, "Expected current and next keys to exist", body.ErrorDescription)
+	assert.Error(t, stub.bodyErr, "the refusal reached the helper, which rolls back")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -160,10 +164,9 @@ func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 
-	database.On("BeginTransaction").Return(rotateTx, nil).Once()
+	expectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", rotateTx).
 		Return([]models.KeyPair(nil), assert.AnError).Once()
-	database.On("RollbackTransaction", rotateTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())

@@ -1,6 +1,7 @@
 package user
 
 import (
+	"database/sql"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -54,6 +55,24 @@ func (s *sequenceRecorder) note(what string) func(mock.Arguments) {
 	return func(mock.Arguments) { s.calls = append(s.calls, what) }
 }
 
+// expectRunInTransactionNoting is the package stub with the transaction's two edges recorded:
+// "begin" as the helper hands the body its transaction and "commit" as the body returns nil,
+// which is when the real helper commits. Everything the body does lands between the two, so the
+// sequence still shows the acquisitions inside the transaction rather than around it.
+func expectRunInTransactionNoting(db *mocks_data.Database, seq *sequenceRecorder) *runInTransactionStub {
+	stub := &runInTransactionStub{}
+	db.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
+		seq.calls = append(seq.calls, "begin")
+		stub.bodyRan = true
+		stub.bodyErr = fn(nil)
+		if stub.bodyErr == nil {
+			seq.calls = append(seq.calls, "commit")
+		}
+		return stub.bodyErr
+	}).Once()
+	return stub
+}
+
 func TestStartNewUserSession_TakesItsLocksInOrder(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	store := mocks_sessionstore.NewStore(t)
@@ -63,7 +82,7 @@ func TestStartNewUserSession_TakesItsLocksInOrder(t *testing.T) {
 	const userId, clientId = int64(123), int64(7)
 
 	var seq sequenceRecorder
-	db.On("BeginTransaction").Return(nil, nil).Run(seq.note("begin")).Once()
+	expectRunInTransactionNoting(db, &seq)
 	db.On("AcquireUserRow", mock.Anything, userId).Return(nil).Run(seq.note("users row")).Once()
 	db.On("AcquireClientRowShared", mock.Anything, clientId).Return(nil).
 		Run(seq.note("client row, shared")).Once()
@@ -74,8 +93,6 @@ func TestStartNewUserSession_TakesItsLocksInOrder(t *testing.T) {
 		}).Once()
 	db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).
 		Run(seq.note("association row")).Once()
-	db.On("CommitTransaction", mock.Anything).Return(nil).Run(seq.note("commit")).Once()
-	db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 	db.On("GetUserSessionsByUserId", mock.Anything, userId).Return(nil, nil).Once()
 	store.On("Get", mock.Anything, testSessionName).Return(session, nil).Once()
 	store.On("Save", mock.Anything, mock.Anything, session).Return(nil).Once()
@@ -120,14 +137,12 @@ func TestBumpUserSession_TakesTheClientRowAndNoUserRow(t *testing.T) {
 	var seq sequenceRecorder
 	db.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").Return(userSession, nil)
 	db.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
-	db.On("BeginTransaction").Return(nil, nil).Run(seq.note("begin")).Once()
+	expectRunInTransactionNoting(db, &seq)
 	db.On("AcquireClientRowShared", mock.Anything, clientId).Return(nil).
 		Run(seq.note("client row, shared")).Once()
 	db.On("UpdateUserSession", mock.Anything, mock.Anything).Return(nil).Run(seq.note("session row")).Once()
 	db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).
 		Run(seq.note("association row")).Once()
-	db.On("CommitTransaction", mock.Anything).Return(nil).Run(seq.note("commit")).Once()
-	db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 
 	req := httptest.NewRequest("GET", "/auth/completed", nil)
 	req.RemoteAddr = "192.168.1.1:12345"
@@ -168,12 +183,10 @@ func TestBumpUserSession_TakesTheClientRowEvenWhenItOnlyUpdatesTheAssociation(t 
 
 	db.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").Return(userSession, nil)
 	db.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
-	db.On("BeginTransaction").Return(nil, nil).Once()
+	expectRunInTransaction(db, nil)
 	db.On("AcquireClientRowShared", mock.Anything, clientId).Return(nil).Once()
 	db.On("UpdateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
 	db.On("UpdateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-	db.On("CommitTransaction", mock.Anything).Return(nil).Once()
-	db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 
 	req := httptest.NewRequest("GET", "/auth/completed", nil)
 	req.RemoteAddr = "192.168.1.1:12345"
@@ -204,9 +217,8 @@ func TestBumpUserSession_AFailedClientAcquisitionStops(t *testing.T) {
 	boom := errors.New("the engine refused the shared client acquisition")
 	db.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").Return(userSession, nil)
 	db.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
-	db.On("BeginTransaction").Return(nil, nil).Once()
+	stub := expectRunInTransaction(db, nil)
 	db.On("AcquireClientRowShared", mock.Anything, int64(456)).Return(boom).Once()
-	db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 
 	req := httptest.NewRequest("GET", "/auth/completed", nil)
 	req.RemoteAddr = "192.168.1.1:12345"
@@ -216,6 +228,8 @@ func TestBumpUserSession_AFailedClientAcquisitionStops(t *testing.T) {
 	assert.Nil(t, result, "a bump that could not take its lock returns no session alongside its error")
 	db.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "CreateUserSessionClient", mock.Anything, mock.Anything)
-	db.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+	// The body handed the refusal to the helper, which is what makes the helper roll back
+	// rather than commit.
+	assert.ErrorIs(t, stub.bodyErr, boom)
 	db.AssertExpectations(t)
 }
