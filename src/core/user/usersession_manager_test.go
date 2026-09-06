@@ -181,7 +181,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// Verify the session was updated with new ACR and AuthMethods
@@ -189,8 +189,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		// Step-up to level2_optional with pwd+otp
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
@@ -215,15 +213,13 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			return s.AcrLevel == enums.AcrLevel2Mandatory.String() &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
 			"pwd otp", enums.AcrLevel2Mandatory.String())
@@ -248,7 +244,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// ACR should upgrade, AuthMethods should stay the same
@@ -256,8 +252,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
 			"pwd otp", enums.AcrLevel2Mandatory.String())
@@ -281,15 +275,13 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// ACR should NOT be downgraded, should remain level2_mandatory
 			return s.AcrLevel == enums.AcrLevel2Mandatory.String()
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		// Request level1, but session should stay at level2_mandatory
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
@@ -314,14 +306,12 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			return s.AcrLevel == enums.AcrLevel2Optional.String()
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
 			"pwd otp", enums.AcrLevel1.String())
@@ -345,15 +335,13 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			return s.AcrLevel == enums.AcrLevel2Optional.String() &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
 			"pwd otp", enums.AcrLevel2Optional.String())
@@ -376,15 +364,13 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// AuthMethods should remain "pwd" when empty string passed
 			return s.AuthMethods == "pwd"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		// Pass empty authMethods - should preserve existing
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
@@ -409,15 +395,13 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// AcrLevel should remain level2_optional when empty string passed
 			return s.AcrLevel == enums.AcrLevel2Optional.String()
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		// Pass empty acrLevel - should preserve existing
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
@@ -442,7 +426,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// Both should be preserved
@@ -450,8 +434,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		// This is the refresh token scenario - both empty
 		result, err := manager.BumpUserSession(req, "test-session-id", 456, "", "")
@@ -477,15 +459,13 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// AuthMethods should be updated
 			return s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
 			"pwd otp", enums.AcrLevel2Optional.String())
@@ -549,15 +529,13 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, userSession).Return(nil)
 		database.On("UpdateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.MatchedBy(func(c *models.UserSessionClient) bool {
 			return c.ClientId == 200
 		})).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		// Add new client 200
 		result, err := manager.BumpUserSession(req, "test-session-id", 200, "", "")
@@ -592,15 +570,13 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, userSession).Return(nil)
 		database.On("UpdateUserSessionClient", mock.Anything, mock.MatchedBy(func(c *models.UserSessionClient) bool {
 			// LastAccessed should be updated to a newer time
 			return c.ClientId == 100 && c.LastAccessed.After(oldTime)
 		})).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		// Same client 100 again
 		result, err := manager.BumpUserSession(req, "test-session-id", 100, "", "")
@@ -632,15 +608,13 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// IP should be concatenated
 			return s.IpAddress == "192.168.1.1,10.0.0.1"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 100, "", "")
 
@@ -671,15 +645,13 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, userSession).
 			Return(nil)
-		database.On("BeginTransaction").Return(nil, nil)
+		expectRunInTransaction(database, nil)
 		database.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// IP should NOT be duplicated
 			return s.IpAddress == "192.168.1.1"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
-		database.On("CommitTransaction", mock.Anything).Return(nil)
-		database.On("RollbackTransaction", mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 100, "", "")
 

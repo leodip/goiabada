@@ -34,20 +34,11 @@ func (d *CommonDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
 		return errors.WithStack(errors.New("re-encryption requires 32-byte old and new keys"))
 	}
 
-	tx, err := d.BeginTransaction()
-	if err != nil {
-		return errors.Wrap(err, "unable to begin re-encryption transaction")
-	}
-
-	if err := d.reencryptAll(tx, oldKey, newKey); err != nil {
-		_ = d.RollbackTransaction(tx)
-		return err
-	}
-
-	if err := d.CommitTransaction(tx); err != nil {
-		return errors.Wrap(err, "unable to commit re-encryption transaction")
-	}
-	return nil
+	// Opened through RunInTransaction, so a deadlock reruns the body (#301); every read and
+	// write is inside it, so a rerun starts from the data as it was under oldKey.
+	return d.RunInTransaction(func(tx *sql.Tx) error {
+		return d.reencryptAll(tx, oldKey, newKey)
+	})
 }
 
 // RotateEncryptionKeyIfNeeded supports env-to-env rotation of the data key

@@ -73,7 +73,7 @@ func newSessionRequest(remoteAddr string, userAgent string) *http.Request {
 func (m *startSessionMocks) expectSuccessfulPersist(userId int64, existingSessions []models.UserSession) **models.UserSession {
 	captured := new(*models.UserSession)
 
-	m.db.On("BeginTransaction").Return(nil, nil).Once()
+	expectRunInTransaction(m.db, nil)
 	// The two acquisitions that put this transaction on the branch's lock order, users then
 	// clients, above every write below (#139). TestStartNewUserSession_TakesItsLocksInOrder is
 	// what pins the ORDER; these expectations only let the happy path run.
@@ -85,9 +85,6 @@ func (m *startSessionMocks) expectSuccessfulPersist(userId int64, existingSessio
 		*captured = created
 	}).Return(nil).Once()
 	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-	m.db.On("CommitTransaction", mock.Anything).Return(nil).Once()
-	// The deferred rollback runs even after a successful commit.
-	m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 	m.db.On("GetUserSessionsByUserId", mock.Anything, userId).Return(existingSessions, nil).Once()
 	m.store.On("Get", mock.Anything, testSessionName).Return(m.session, nil).Once()
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
@@ -150,7 +147,7 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 	req := newSessionRequest("10.0.0.1:1234", chromeUserAgent)
 
 	var capturedClient *models.UserSessionClient
-	m.db.On("BeginTransaction").Return(nil, nil).Once()
+	expectRunInTransaction(m.db, nil)
 	m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 	m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 	m.db.On("CreateUserSession", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -159,8 +156,6 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		capturedClient = args.Get(1).(*models.UserSessionClient)
 	}).Return(nil).Once()
-	m.db.On("CommitTransaction", mock.Anything).Return(nil).Once()
-	m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 	m.db.On("GetUserSessionsByUserId", mock.Anything, int64(123)).Return(nil, nil).Once()
 	m.store.On("Get", mock.Anything, testSessionName).Return(m.session, nil).Once()
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
@@ -321,7 +316,7 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 	req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
 
 	var newIdentifier string
-	m.db.On("BeginTransaction").Return(nil, nil).Once()
+	expectRunInTransaction(m.db, nil)
 	m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 	m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 	m.db.On("CreateUserSession", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -330,8 +325,6 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 		newIdentifier = created.SessionIdentifier
 	}).Return(nil).Once()
 	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-	m.db.On("CommitTransaction", mock.Anything).Return(nil).Once()
-	m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 	// Return the freshly created session as if it were already persisted. The
 	// identifier is only known once CreateUserSession has run, so this is
 	// resolved lazily at call time.
@@ -369,9 +362,9 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		setup func(m *startSessionMocks)
 	}{
 		{
-			name: "BeginTransaction fails",
+			name: "the transaction cannot be opened",
 			setup: func(m *startSessionMocks) {
-				m.db.On("BeginTransaction").Return(nil, dbErr).Once()
+				expectRunInTransactionRefused(m.db, dbErr)
 			},
 		},
 		{
@@ -380,63 +373,55 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			// lock it was refused would be writing out of order rather than in it (#139).
 			name: "AcquireUserRow fails",
 			setup: func(m *startSessionMocks) {
-				m.db.On("BeginTransaction").Return(nil, nil).Once()
+				expectRunInTransaction(m.db, nil)
 				m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(dbErr).Once()
-				m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 			},
 		},
 		{
 			name: "AcquireClientRowShared fails",
 			setup: func(m *startSessionMocks) {
-				m.db.On("BeginTransaction").Return(nil, nil).Once()
+				expectRunInTransaction(m.db, nil)
 				m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(dbErr).Once()
-				m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 			},
 		},
 		{
 			name: "CreateUserSession fails",
 			setup: func(m *startSessionMocks) {
-				m.db.On("BeginTransaction").Return(nil, nil).Once()
+				expectRunInTransaction(m.db, nil)
 				m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(dbErr).Once()
-				m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 			},
 		},
 		{
 			name: "CreateUserSessionClient fails",
 			setup: func(m *startSessionMocks) {
-				m.db.On("BeginTransaction").Return(nil, nil).Once()
+				expectRunInTransaction(m.db, nil)
 				m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(dbErr).Once()
-				m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 			},
 		},
 		{
-			name: "CommitTransaction fails",
+			name: "the commit fails",
 			setup: func(m *startSessionMocks) {
-				m.db.On("BeginTransaction").Return(nil, nil).Once()
+				expectRunInTransactionThenFail(m.db, nil, dbErr)
 				m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("CommitTransaction", mock.Anything).Return(dbErr).Once()
-				m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 			},
 		},
 		{
 			name: "GetUserSessionsByUserId fails",
 			setup: func(m *startSessionMocks) {
-				m.db.On("BeginTransaction").Return(nil, nil).Once()
+				expectRunInTransaction(m.db, nil)
 				m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("CommitTransaction", mock.Anything).Return(nil).Once()
-				m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 				m.db.On("GetUserSessionsByUserId", mock.Anything, int64(123)).Return(nil, dbErr).Once()
 			},
 		},
@@ -444,13 +429,11 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			name: "DeleteUserSession fails",
 			setup: func(m *startSessionMocks) {
 				req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
-				m.db.On("BeginTransaction").Return(nil, nil).Once()
+				expectRunInTransaction(m.db, nil)
 				m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("CommitTransaction", mock.Anything).Return(nil).Once()
-				m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 				m.db.On("GetUserSessionsByUserId", mock.Anything, int64(123)).Return([]models.UserSession{{
 					Id:                42,
 					SessionIdentifier: "an-older-session",
@@ -465,13 +448,11 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		{
 			name: "the session store cannot be read",
 			setup: func(m *startSessionMocks) {
-				m.db.On("BeginTransaction").Return(nil, nil).Once()
+				expectRunInTransaction(m.db, nil)
 				m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("CommitTransaction", mock.Anything).Return(nil).Once()
-				m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 				m.db.On("GetUserSessionsByUserId", mock.Anything, int64(123)).Return(nil, nil).Once()
 				m.store.On("Get", mock.Anything, testSessionName).Return(nil, errors.New("cookie is corrupt")).Once()
 			},
@@ -479,13 +460,11 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		{
 			name: "the session store cannot be saved",
 			setup: func(m *startSessionMocks) {
-				m.db.On("BeginTransaction").Return(nil, nil).Once()
+				expectRunInTransaction(m.db, nil)
 				m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("CommitTransaction", mock.Anything).Return(nil).Once()
-				m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 				m.db.On("GetUserSessionsByUserId", mock.Anything, int64(123)).Return(nil, nil).Once()
 				m.store.On("Get", mock.Anything, testSessionName).Return(m.session, nil).Once()
 				m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(errors.New("cannot write cookie")).Once()
@@ -513,13 +492,11 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 	m := newStartSessionMocks(t)
 
-	m.db.On("BeginTransaction").Return(nil, nil).Once()
+	expectRunInTransaction(m.db, nil)
 	m.db.On("AcquireUserRow", mock.Anything, mock.Anything).Return(nil).Once()
 	m.db.On("AcquireClientRowShared", mock.Anything, mock.Anything).Return(nil).Once()
 	m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
 	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-	m.db.On("CommitTransaction", mock.Anything).Return(nil).Once()
-	m.db.On("RollbackTransaction", mock.Anything).Return(nil).Once()
 	m.db.On("GetUserSessionsByUserId", mock.Anything, int64(123)).Return(nil, nil).Once()
 	m.store.On("Get", mock.Anything, testSessionName).Return(nil, errors.New("cookie is corrupt")).Once()
 

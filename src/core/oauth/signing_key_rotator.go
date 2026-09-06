@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"crypto/x509"
+	"database/sql"
 	"encoding/pem"
 
 	"github.com/google/uuid"
@@ -36,6 +37,10 @@ var ErrKeySetIncomplete = errors.New("expected current and next signing keys to 
 // Undoing either half reopens it. Without the transaction, the loser's delete is already
 // committed by the time it discovers it lost; without the compare-and-set, it never
 // discovers it lost at all and writes over the winner's transition.
+//
+// The transaction is opened through RunInTransaction, so a rotation the engine aborts as a
+// deadlock victim is rerun; the rerun reads the key set afresh, and if it lost the race
+// meanwhile its own compare-and-set refuses it (#301).
 type SigningKeyRotator struct {
 	database data.Database
 	// keySizeBits is unexported and has no setter, so no production caller can lower it.
@@ -67,74 +72,72 @@ func (r *SigningKeyRotator) Rotate() error {
 		return err
 	}
 
-	tx, err := r.database.BeginTransaction()
-	if err != nil {
-		return err
-	}
-	defer r.database.RollbackTransaction(tx) //nolint:errcheck
-
-	allSigningKeys, err := r.database.GetAllSigningKeys(tx)
-	if err != nil {
-		return err
-	}
-
-	var currentKey *models.KeyPair
-	var nextKey *models.KeyPair
-	var previousKey *models.KeyPair
-	for i := range allSigningKeys {
-		kp := &allSigningKeys[i]
-		keyState, err := enums.KeyStateFromString(kp.State)
+	// Opened through RunInTransaction, so a deadlock reruns the body (#301). A rerun reads the
+	// key set again inside its own transaction, so one that lost the race in the meantime is
+	// refused by its own compare-and-set exactly as a first run would be; the two sentinels are
+	// not deadlocks, so they roll back once and surface unchanged. The replacement key is the
+	// one value the body captures, and the id CreateKeyPair assigns onto it is reassigned by
+	// the next attempt.
+	return r.database.RunInTransaction(func(tx *sql.Tx) error {
+		allSigningKeys, err := r.database.GetAllSigningKeys(tx)
 		if err != nil {
 			return err
 		}
-		switch keyState {
-		case enums.KeyStateCurrent:
-			currentKey = kp
-		case enums.KeyStateNext:
-			nextKey = kp
-		case enums.KeyStatePrevious:
-			previousKey = kp
+
+		var currentKey *models.KeyPair
+		var nextKey *models.KeyPair
+		var previousKey *models.KeyPair
+		for i := range allSigningKeys {
+			kp := &allSigningKeys[i]
+			keyState, err := enums.KeyStateFromString(kp.State)
+			if err != nil {
+				return err
+			}
+			switch keyState {
+			case enums.KeyStateCurrent:
+				currentKey = kp
+			case enums.KeyStateNext:
+				nextKey = kp
+			case enums.KeyStatePrevious:
+				previousKey = kp
+			}
 		}
-	}
 
-	// The guard runs before any write. It used to run after the delete below, so a
-	// deployment with no next key lost its previous key and was then refused (#251).
-	if currentKey == nil || nextKey == nil {
-		return errors.WithStack(ErrKeySetIncomplete)
-	}
+		// The guard runs before any write. It used to run after the delete below, so a
+		// deployment with no next key lost its previous key and was then refused (#251).
+		if currentKey == nil || nextKey == nil {
+			return errors.WithStack(ErrKeySetIncomplete)
+		}
 
-	// The delete stays ahead of the demotion. Demoting while the old previous row is still
-	// there would put two rows in the previous state within one statement, which the unique
-	// index on key_pairs (state) refuses on every engine.
-	if previousKey != nil {
-		if err := r.database.DeleteKeyPair(tx, previousKey.Id); err != nil {
+		// The delete stays ahead of the demotion. Demoting while the old previous row is
+		// still there would put two rows in the previous state within one statement, which
+		// the unique index on key_pairs (state) refuses on every engine.
+		if previousKey != nil {
+			if err := r.database.DeleteKeyPair(tx, previousKey.Id); err != nil {
+				return err
+			}
+		}
+
+		moved, err := r.database.UpdateKeyPairState(tx, currentKey.Id,
+			enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String())
+		if err != nil {
 			return err
 		}
-	}
+		if !moved {
+			return errors.WithStack(ErrRotationInProgress)
+		}
 
-	moved, err := r.database.UpdateKeyPairState(tx, currentKey.Id,
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String())
-	if err != nil {
-		return err
-	}
-	if !moved {
-		return errors.WithStack(ErrRotationInProgress)
-	}
+		moved, err = r.database.UpdateKeyPairState(tx, nextKey.Id,
+			enums.KeyStateNext.String(), enums.KeyStateCurrent.String())
+		if err != nil {
+			return err
+		}
+		if !moved {
+			return errors.WithStack(ErrRotationInProgress)
+		}
 
-	moved, err = r.database.UpdateKeyPairState(tx, nextKey.Id,
-		enums.KeyStateNext.String(), enums.KeyStateCurrent.String())
-	if err != nil {
-		return err
-	}
-	if !moved {
-		return errors.WithStack(ErrRotationInProgress)
-	}
-
-	if err := r.database.CreateKeyPair(tx, newNextKey); err != nil {
-		return err
-	}
-
-	return r.database.CommitTransaction(tx)
+		return r.database.CreateKeyPair(tx, newNextKey)
+	})
 }
 
 // generateNextKey builds the replacement key, already in the next state. It writes nothing.
