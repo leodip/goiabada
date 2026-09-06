@@ -83,30 +83,30 @@ func migrateCommand(args []string) int {
 // command exists for would go untested.
 func runMigrate(args []string, m *migrator.Migrator, floor int, out io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(out, migrateUsage)
+		outf(out, "%s\n", migrateUsage)
 		return migrateExitUsage
 	}
 
 	switch args[0] {
 	case "version":
 		if len(args) != 1 {
-			fmt.Fprintf(out, "migrate version takes no arguments\n\n%s\n", migrateUsage)
+			outf(out, "migrate version takes no arguments\n\n%s\n", migrateUsage)
 			return migrateExitUsage
 		}
 		return migrateVersion(m, out)
 	case "to":
 		if len(args) != 2 {
-			fmt.Fprintf(out, "migrate to takes exactly one version\n\n%s\n", migrateUsage)
+			outf(out, "migrate to takes exactly one version\n\n%s\n", migrateUsage)
 			return migrateExitUsage
 		}
 		target, err := parseTargetVersion(args[1])
 		if err != nil {
-			fmt.Fprintf(out, "%s\n\n%s\n", err, migrateUsage)
+			outf(out, "%s\n\n%s\n", err, migrateUsage)
 			return migrateExitUsage
 		}
 		return migrateTo(m, target, floor, out)
 	default:
-		fmt.Fprintf(out, "unknown migrate subcommand %q\n\n%s\n", args[0], migrateUsage)
+		outf(out, "unknown migrate subcommand %q\n\n%s\n", args[0], migrateUsage)
 		return migrateExitUsage
 	}
 }
@@ -131,20 +131,20 @@ func parseTargetVersion(arg string) (int, error) {
 // binary carries and what the database is actually at. It reads and never writes, so it answers on
 // a dirty database too, where it is the first thing to run.
 func migrateVersion(m *migrator.Migrator, out io.Writer) int {
-	fmt.Fprintf(out, "engine: %s\n", m.Engine())
-	fmt.Fprintf(out, "this binary expects schema version %06d\n", m.Head())
+	outf(out, "engine: %s\n", m.Engine())
+	outf(out, "this binary expects schema version %06d\n", m.Head())
 
 	version, dirty, err := m.Version()
 	switch {
 	case errors.Is(err, migrator.ErrNilVersion):
-		fmt.Fprintln(out, "the database records no version: it has never been migrated")
+		outf(out, "the database records no version: it has never been migrated\n")
 	case err != nil:
-		fmt.Fprintf(out, "unable to read the database's schema version: %s\n", err)
+		outf(out, "unable to read the database's schema version: %s\n", err)
 		return migrateExitError
 	case dirty:
-		fmt.Fprintf(out, "the database records schema version %06d, DIRTY: a migration did not finish\n", version)
+		outf(out, "the database records schema version %06d, DIRTY: a migration did not finish\n", version)
 	default:
-		fmt.Fprintf(out, "the database records schema version %06d\n", version)
+		outf(out, "the database records schema version %06d\n", version)
 	}
 	return migrateExitOK
 }
@@ -160,7 +160,7 @@ func migrateTo(m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	if target < floor {
 		// Neutral about direction on purpose: the floor refuses any target below it, and a
 		// database still at an old version can ask for one on the way UP as easily as down.
-		fmt.Fprintf(out, "refusing to migrate to %06d: rollback is supported between releases from "+
+		outf(out, "refusing to migrate to %06d: rollback is supported between releases from "+
 			"Goiabada %s onwards, whose schema version is %06d, and no lower target is safe because "+
 			"earlier releases changed data in ways no migration reverses. Start this server normally "+
 			"to migrate up instead.\n",
@@ -168,7 +168,7 @@ func migrateTo(m *migrator.Migrator, target int, floor int, out io.Writer) int {
 		return migrateExitError
 	}
 	if target > m.Head() {
-		fmt.Fprintf(out, "refusing to step the schema up to %06d: this binary carries no migration "+
+		outf(out, "refusing to step the schema up to %06d: this binary carries no migration "+
 			"above %06d. A newer release of Goiabada carries it.\n", target, m.Head())
 		return migrateExitError
 	}
@@ -177,34 +177,50 @@ func migrateTo(m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	// unknown version is reported before anything is written rather than half way up the chain.
 	plan, err := m.Plan(target)
 	if errors.Is(err, migrator.ErrNoChange) {
-		fmt.Fprintf(out, "the database is already at schema version %06d; nothing to do\n", target)
+		outf(out, "the database is already at schema version %06d; nothing to do\n", target)
 		return migrateExitOK
 	}
 	if err != nil {
-		fmt.Fprintf(out, "%s\n", err)
+		outf(out, "%s\n", err)
 		return migrateExitError
 	}
 
 	current, _, versionErr := m.Version()
 	if errors.Is(versionErr, migrator.ErrNilVersion) {
-		fmt.Fprintln(out, "current schema version: none (never migrated)")
+		outf(out, "current schema version: none (never migrated)\n")
 	} else if versionErr == nil {
-		fmt.Fprintf(out, "current schema version: %06d\n", current)
+		outf(out, "current schema version: %06d\n", current)
 	}
-	fmt.Fprintf(out, "target schema version: %06d\n", target)
-	fmt.Fprintf(out, "migrations to run, in order: %s\n", formatPlan(plan))
+	outf(out, "target schema version: %06d\n", target)
+	outf(out, "migrations to run, in order: %s\n", formatPlan(plan))
 
 	if err := m.Migrate(target); err != nil {
 		if errors.Is(err, migrator.ErrNoChange) {
-			fmt.Fprintf(out, "the database is already at schema version %06d; nothing to do\n", target)
+			outf(out, "the database is already at schema version %06d; nothing to do\n", target)
 			return migrateExitOK
 		}
-		fmt.Fprintf(out, "migration failed: %s\n", err)
+		outf(out, "migration failed: %s\n", err)
 		return migrateExitError
 	}
 
-	fmt.Fprintf(out, "done: the database is now at schema version %06d\n", target)
+	outf(out, "done: the database is now at schema version %06d\n", target)
 	return migrateExitOK
+}
+
+// outf writes one line of the command's own output, discarding the error the write returns.
+//
+// The discard is the point of the function. The destination is the process's stdout, and a
+// command that cannot describe what it did has no second channel to say so on: reporting a
+// failed write means writing again, to the thing that just failed. What the command actually
+// did is decided by the migrator and reported by the exit code, neither of which depends on
+// the description reaching anyone.
+//
+// It exists rather than a `_, _ =` on each of the twenty-two call sites above, which is the
+// same discard spelled once per line. errcheck flags an unchecked write to an io.Writer and
+// does not flag one to os.Stderr, which is why the three failures in migrateCommand still
+// call fmt.Fprintf directly: they go somewhere else, for a different reason.
+func outf(out io.Writer, format string, a ...any) {
+	_, _ = fmt.Fprintf(out, format, a...)
 }
 
 // formatPlan prints the versions in the order they will run, which reads highest first on the way
