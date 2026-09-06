@@ -55,3 +55,28 @@ requests `SNAPSHOT` isolation, so `ALLOW_SNAPSHOT_ISOLATION` has no effect on it
 
 There is nothing to pre-create, and `GOIABADA_DB_CREATE` does not apply: the driver creates the file.
 To refuse an absent file instead of creating one, put `mode=rw` in `GOIABADA_DB_DSN`.
+
+## Schema migrations and rollback
+
+Goiabada migrates its own schema. Each server applies whatever migrations its release carries when
+it starts, so an upgrade needs nothing beyond installing the new version and restarting. A server
+refuses to start on a database that is half migrated, and on one a newer release has already
+migrated, since it cannot know what that release changed.
+
+The commands below run against the database in `GOIABADA_DB_*` and do not start the server.
+
+| Command | What it does |
+|---|---|
+| `goiabada-authserver migrate version` | Prints the schema version this binary expects and the one the database records |
+| `goiabada-authserver migrate to <version>` | Steps the schema to that version, up or down |
+
+To roll a deployment back to an earlier release, back the database up first, then run
+`goiabada-authserver migrate to <version>` on the **current** binary, naming the schema version the
+target release expects, which its release notes state. Install the target release afterwards. The
+current binary is the one that must run the step down, because it is the only one carrying the
+migrations being rolled back.
+
+A rollback discards whatever the newer release wrote into columns and tables the older one does not
+have. Rollback is supported between releases from this one onwards: `migrate to` refuses any version
+below the schema version this release ships with, because earlier releases changed stored data in
+ways no migration reverses. `migrate version` prints that number.

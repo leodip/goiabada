@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/leodip/goiabada/core/data/mysqldb"
 	"github.com/leodip/goiabada/core/data/postgresdb"
@@ -525,7 +526,25 @@ type Database interface {
 	UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error
 }
 
-func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error) {
+// MigratorProvider is the one thing a caller needs beyond Database to step a schema by hand: a
+// migrator built over this engine's embedded migration set. All four concrete engine types have
+// the method already, and it stays off the Database interface deliberately, so the generated
+// mock and every application path keep seeing a database that migrates itself on open.
+//
+// The authserver's `migrate` subcommand is the only user: it opens through OpenDatabase and
+// type-asserts to this, because it must be able to step DOWN, and anything that went through
+// NewDatabase would have migrated up before it got the chance (#268).
+type MigratorProvider interface {
+	NewMigrator() (*migrator.Migrator, error)
+}
+
+// OpenDatabase constructs the concrete database for the configured engine and returns it having
+// migrated nothing and run no startup task. It is NewDatabase's engine switch and nothing else.
+//
+// It exists so that the `migrate` subcommand can reach an engine's migrator without the schema
+// being brought to head first, which is what NewDatabase does and what makes NewDatabase useless
+// for a rollback. Every other caller wants NewDatabase (#268).
+func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error) {
 	var database Database
 	var err error
 
@@ -591,6 +610,15 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 		return nil, errors.WithStack(errors.New(msg))
 	}
 
+	if err != nil {
+		return nil, err
+	}
+
+	return database, nil
+}
+
+func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error) {
+	database, err := OpenDatabase(dbConfig, logSQL)
 	if err != nil {
 		return nil, err
 	}

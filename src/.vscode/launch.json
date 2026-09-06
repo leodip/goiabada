@@ -10,7 +10,8 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceRoot}/authserver/cmd/goiabada-authserver/main.go",
+            "program": "${workspaceRoot}/authserver/cmd/goiabada-authserver",
+            "buildFlags": "-buildvcs=false",
             "cwd": "${workspaceFolder}"            
         },
         {
@@ -18,7 +19,8 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceRoot}/adminconsole/cmd/goiabada-adminconsole/main.go",
+            "program": "${workspaceRoot}/adminconsole/cmd/goiabada-adminconsole",
+            "buildFlags": "-buildvcs=false",
             "cwd": "${workspaceFolder}"            
         }
     ]
