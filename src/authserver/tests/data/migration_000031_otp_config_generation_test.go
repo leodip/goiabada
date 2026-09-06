@@ -119,12 +119,22 @@ func TestMigration000031_OTPConfigGeneration(t *testing.T) {
 	exists, notNull, def := columnShape000031(t, h, "user_sessions", "level2_auth_config_has_changed")
 	require.True(t, exists, "the down migration must restore level2_auth_config_has_changed")
 	assert.True(t, notNull, "the restored column must be NOT NULL, as it was")
-	// The literal the engine reports back, not "0" everywhere: postgres declares the column
-	// boolean and reports its default as `false`, where the other three declare it numeric,
-	// tinyint(1) and BIT and report `0`. Same reason the migration itself is four files.
-	restoredDefault, _ := boolLiterals000031()
-	assert.Equal(t, restoredDefault, def,
-		"the restored column needs a default the original did not have, because existing rows need a value")
+	// Whether the restored column carries a default is decided by the column being restored,
+	// and the four engines do not agree on it. SQLite's 000002 adds it with DEFAULT 0, so its
+	// down restores one; MySQL's 000002 and PostgreSQL's and SQL Server's 000001 declare it NOT
+	// NULL with none, so their downs add a default only because those engines will not add a
+	// NOT NULL column to a populated table without one, and drop it again immediately. Leaving
+	// it behind would restore a column a fresh install of 000030 does not have, which the
+	// chain-wide round trip reads as a broken down (#268 decision 12).
+	if dbType() == "sqlite" {
+		restoredDefault, _ := boolLiterals000031()
+		assert.Equal(t, restoredDefault, def,
+			"SQLite's 000002 declares this column DEFAULT 0, so rolling 000031 back must restore it with one")
+	} else {
+		assert.Empty(t, def,
+			"%s declares this column NOT NULL with no default, so rolling 000031 back must not leave one behind",
+			dbType())
+	}
 
 	require.NoError(t, h.Migrator.Migrate(31), "re-apply 000031")
 
