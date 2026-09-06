@@ -430,10 +430,16 @@ func lineAt(s string, off int) int {
 // ---------------------------------------------------------------------------
 
 var (
-	// migrationFileRe reads a filename the way golang-migrate's file source reads it. The
-	// number is the LEADING INTEGER, not six digits, which is what keeps
-	// sqlitedb/00001_initial_create counted as number 1. Dropping it instead makes number 1
-	// read as absent on sqlite and appear as a phantom partial migration.
+	// migrationFileRe reads a filename the way the runner reads it. The number is the LEADING
+	// INTEGER, not six digits, which is what keeps sqlitedb/00001_initial_create counted as
+	// number 1. Dropping it instead makes number 1 read as absent on sqlite and appear as a
+	// phantom partial migration.
+	//
+	// migrator.migrationFileRe is the same reading, and the two are twins by intent rather than
+	// one importing the other: this lint is a check ON the migration directories, so it has to
+	// keep reporting the truth about them even if the runner's parser drifts. Importing the
+	// parser under test would make a parser that stopped seeing 00001 look like a clean tree
+	// (#268).
 	migrationFileRe = regexp.MustCompile(`^(\d+)_(.+)\.(up|down)\.sql$`)
 
 	// migrationNameRe is what a NEW file has to look like, which is stricter: six digits and a
