@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/data"
@@ -46,23 +47,67 @@ import (
 // engine aborts this transaction as a deadlock victim, passes straight through, because a rerun
 // that parked again would wait for a release that has already happened and hang the tier.
 type barrier struct {
-	once    sync.Once
-	reached chan *sql.Tx
-	release chan struct{}
+	arrived  sync.Once
+	released sync.Once
+	reached  chan *sql.Tx
+	release  chan struct{}
+	what     string
 }
 
-func newBarrier() *barrier {
-	return &barrier{reached: make(chan *sql.Tx, 1), release: make(chan struct{})}
+// newBarrier registers the release as a cleanup, which is what keeps a failure between the park
+// and the release from taking the rest of the tier down with it. Every check in these tests
+// between those two points fails through t.Fatal, and a Fatal unwinds the test goroutine without
+// running the rest of the function: the parked worker would then wait forever for a release
+// nobody sends, holding its transaction and every row it has taken, and each later test on this
+// engine that wanted one of those rows would block until the package timeout. What a reader
+// would see is a hang in an unrelated test rather than the assertion that actually failed.
+func newBarrier(t *testing.T, what string) *barrier {
+	t.Helper()
+	b := &barrier{reached: make(chan *sql.Tx, 1), release: make(chan struct{}), what: what}
+	t.Cleanup(b.releaseParked)
+	return b
 }
 
 func (b *barrier) arriveBefore(tx *sql.Tx) {
-	b.once.Do(func() {
+	b.arrived.Do(func() {
 		b.reached <- tx
 		<-b.release
 	})
 }
 
-func (b *barrier) releaseParked() { close(b.release) }
+// awaitParked waits for the worker to reach its barrier, bounded. Unbounded, a worker that fails
+// before it gets there parks the test itself on a channel nothing will ever send to, and the
+// tier dies on its own timeout naming no test and no reason.
+func (b *barrier) awaitParked(t *testing.T) *sql.Tx {
+	t.Helper()
+	select {
+	case tx := <-b.reached:
+		return tx
+	case <-time.After(lockWaitCeiling):
+		t.Fatalf("%s never reached its barrier within %s, so it never took the rows the other "+
+			"party has to contend with and nothing here was measured", b.what, lockWaitCeiling)
+		return nil
+	}
+}
+
+// releaseParked is idempotent because the cleanup above also runs on the success path, after the
+// test has already released; closing a closed channel panics.
+func (b *barrier) releaseParked() { b.released.Do(func() { close(b.release) }) }
+
+// awaitWorker collects a barrier-driven worker's result, bounded for the reason awaitParked is.
+// blockedParty.await already does this for the other party; these workers are not blockedParty,
+// because they are the ones that park rather than the ones that block.
+func awaitWorker[T any](t *testing.T, what string, ch <-chan T) T {
+	t.Helper()
+	select {
+	case out := <-ch:
+		return out
+	case <-time.After(lockWaitCeiling):
+		var zero T
+		t.Fatalf("%s never returned within %s", what, lockWaitCeiling)
+		return zero
+	}
+}
 
 // pausedBeforeSessionDelete parks the credential sweep after it has taken the users row (the
 // password write and the generation increment both precede DeleteUserSession) and before it takes
@@ -122,7 +167,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 
 	const newHash = "deadlock-pair-1-new-hash"
 
-	b := newBarrier()
+	b := newBarrier(t, "the credential sweep")
 	pDB := pausedBeforeSessionDelete{Database: database, b: b}
 
 	sweepDone := make(chan error, 1)
@@ -133,7 +178,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 		sweepDone <- err
 	}()
 
-	sweepTx := <-b.reached // the sweep holds the users row and is parked before its session deletes
+	sweepTx := b.awaitParked(t) // the sweep holds the users row and is parked before its session deletes
 
 	type issuanceOut struct {
 		live bool
@@ -143,6 +188,12 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 	issuance := goBlocked(t, "issuance", sweepTx, func(reached func()) issuanceOut {
 		var out issuanceOut
 		out.err = other.RunInTransaction(func(tx *sql.Tx) error {
+			// Each attempt starts clean. out lives outside the closure, so a rerun would
+			// otherwise inherit the aborted attempt's code and could report a gone session
+			// holding a code that was never committed, which is the impossible shape the
+			// assertions below refuse. RunInTransaction's doc comment names this hazard.
+			out = issuanceOut{}
+
 			live, err := other.AcquireUserSessionRow(tx, session.SessionIdentifier)
 			if err != nil {
 				return err
@@ -170,19 +221,46 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 	b.releaseParked()
 
 	out := issuance.await(t)
-	sweepErr := <-sweepDone
+	sweepErr := awaitWorker(t, "the credential sweep", sweepDone)
 
 	require.NoError(t, sweepErr, "the credential sweep must finish, whether it was the victim or the survivor")
 	require.NoError(t, out.err, "issuance must finish; a gone session is a refusal, not an error")
 
 	// End state, deterministic on every engine: the password is the sweep's, and the session the
-	// sweep swept is gone. Whether issuance minted a code depends on which party won, so it is not
-	// asserted; the retained ordering test owns the session-gone refusal shape.
+	// sweep swept is gone.
 	reloaded, err := database.GetUserById(nil, user.Id)
 	require.NoError(t, err)
 	require.NotNil(t, reloaded, "the credential sweep does not delete the user")
 	assert.Equal(t, newHash, reloaded.PasswordHash, "the password hash is the one the sweep wrote")
 	assertSessionGoneOn(t, database, session.Id, "the session the credential sweep terminated")
+
+	// ISSUANCE HAS TWO VALID SHAPES AND THE THIRD IS IMPOSSIBLE. It either found the session
+	// live and minted a code, or found it gone and minted nothing. Which of the two depends on
+	// the party the engine aborted, so neither is required; that they are the only two is. Left
+	// unasserted, a mintCode that quietly returns no code at all satisfies this test, and then
+	// the pair proves the two transactions finished without proving the ceremony did anything.
+	if out.live {
+		require.NotNil(t, out.code, "a ceremony that found the session live minted a code")
+
+		minted, err := database.GetCodeById(nil, out.code.Id)
+		require.NoError(t, err)
+		require.NotNil(t, minted, "the code issuance committed is in the catalog")
+		assert.Equal(t, session.SessionIdentifier, minted.SessionIdentifier,
+			"the code carries the session it was issued through")
+		assert.Equal(t, user.Id, minted.UserId)
+		assert.Equal(t, client.Id, minted.ClientId)
+		assert.False(t, minted.Used, "the code was minted, not redeemed")
+
+		// The code outlives the session it was issued through, and what stops it being spent is
+		// the generation the sweep advanced rather than any write to this row: RevokeUserAuthState
+		// increments the user's auth_state_generation, deletes the session rows and sweeps the
+		// refresh tokens, and touches no code (#106). Pinning that here is what says the winner's
+		// code is refused at redemption for the reason the design claims, not by luck.
+		assert.False(t, minted.Revoked,
+			"this sweep invalidates codes by advancing the generation, it does not mark them revoked")
+	} else {
+		assert.Nil(t, out.code, "a session-gone refusal mints nothing")
+	}
 }
 
 // TestDeadlockRetry_DeleteUserAgainstCredentialSweep is the pair whose victim legitimately refuses.
@@ -206,7 +284,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 
 	const newHash = "deadlock-pair-2-new-hash"
 
-	b := newBarrier()
+	b := newBarrier(t, "the credential sweep")
 	pDB := pausedBeforeSessionDelete{Database: database, b: b}
 
 	type sweepResult struct {
@@ -221,7 +299,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 		sweepDone <- sweepResult{result: result, err: err}
 	}()
 
-	sweepTx := <-b.reached // the sweep holds the users row and is parked before its session deletes
+	sweepTx := b.awaitParked(t) // the sweep holds the users row and is parked before its session deletes
 
 	deleteUser := goBlocked(t, "DeleteUser", sweepTx, func(reached func()) error {
 		reached()
@@ -234,7 +312,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 	b.releaseParked()
 
 	deleteErr := deleteUser.await(t)
-	sweep := <-sweepDone
+	sweep := awaitWorker(t, "the credential sweep", sweepDone)
 
 	require.NoError(t, deleteErr, "DeleteUser must finish, whether it was the victim or the survivor")
 
@@ -277,7 +355,7 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 	code := createTestCodeInSession(t, client.Id, user.Id, session.SessionIdentifier)
 	token := createTokenOfCode(t, client.Id, user.Id, code.Id, session.SessionIdentifier)
 
-	b := newBarrier()
+	b := newBarrier(t, "the termination")
 	pDB := pausedBeforeTokenUpdate{Database: database, b: b}
 
 	terminationDone := make(chan error, 1)
@@ -286,7 +364,7 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 		terminationDone <- err
 	}()
 
-	terminationTx := <-b.reached // the termination holds the codes rows and is parked before the token sweep
+	terminationTx := b.awaitParked(t) // the termination holds the codes rows and is parked before the token sweep
 
 	deleteClient := goBlocked(t, "DeleteClient", terminationTx, func(reached func()) error {
 		reached()
@@ -299,7 +377,7 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 	b.releaseParked()
 
 	deleteErr := deleteClient.await(t)
-	terminationErr := <-terminationDone
+	terminationErr := awaitWorker(t, "the termination", terminationDone)
 
 	require.NoError(t, deleteErr, "DeleteClient must finish, whether it was the victim or the survivor")
 	require.NoError(t, terminationErr, "the termination must finish; it refuses on no vanished precondition here")
