@@ -11160,6 +11160,57 @@ func (_c *Database_RotateEncryptionKeyIfNeeded_Call) RunAndReturn(run func(curre
 	return _c
 }
 
+// RunInTransaction provides a mock function for the type Database
+func (_mock *Database) RunInTransaction(fn func(tx *sql.Tx) error) error {
+	ret := _mock.Called(fn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RunInTransaction")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(func(tx *sql.Tx) error) error); ok {
+		r0 = returnFunc(fn)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_RunInTransaction_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunInTransaction'
+type Database_RunInTransaction_Call struct {
+	*mock.Call
+}
+
+// RunInTransaction is a helper method to define mock.On call
+//   - fn func(tx *sql.Tx) error
+func (_e *Database_Expecter) RunInTransaction(fn any) *Database_RunInTransaction_Call {
+	return &Database_RunInTransaction_Call{Call: _e.mock.On("RunInTransaction", fn)}
+}
+
+func (_c *Database_RunInTransaction_Call) Run(run func(fn func(tx *sql.Tx) error)) *Database_RunInTransaction_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 func(tx *sql.Tx) error
+		if args[0] != nil {
+			arg0 = args[0].(func(tx *sql.Tx) error)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RunInTransaction_Call) Return(err error) *Database_RunInTransaction_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_RunInTransaction_Call) RunAndReturn(run func(fn func(tx *sql.Tx) error) error) *Database_RunInTransaction_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SearchUsersPaginated provides a mock function for the type Database
 func (_mock *Database) SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error) {
 	ret := _mock.Called(tx, query, page, pageSize)

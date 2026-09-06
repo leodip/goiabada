@@ -15,7 +15,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/core/data/commondb"
-	_ "github.com/microsoft/go-mssqldb"
+	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/pkg/errors"
 )
 
@@ -111,6 +111,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	}
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLServer, logSQL)
+	commonDb.IsDeadlock = isDeadlock
 
 	mssqlDb := MsSQLDatabase{
 		DB:       db,
@@ -267,6 +268,24 @@ func databaseExists(ctx context.Context, masterDB *sql.DB, name string) (bool, e
 
 func (d *MsSQLDatabase) BeginTransaction() (*sql.Tx, error) {
 	return d.CommonDB.BeginTransaction()
+}
+
+func (d *MsSQLDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
+	return d.CommonDB.RunInTransaction(fn)
+}
+
+// isDeadlock is SQL Server's half of RunInTransaction's classifier: error 1205, raised on the
+// session the server chose as the deadlock victim after rolling its transaction back. Both
+// shapes of the driver's error are checked because mssql.Error has value receivers and the
+// driver hands it out by value from one path and by pointer from another, and errors.As
+// matches only the shape it was asked for (#301).
+func isDeadlock(err error) bool {
+	var byValue mssql.Error
+	if errors.As(err, &byValue) {
+		return byValue.Number == 1205
+	}
+	var byPointer *mssql.Error
+	return errors.As(err, &byPointer) && byPointer.Number == 1205
 }
 
 func (d *MsSQLDatabase) CommitTransaction(tx *sql.Tx) error {

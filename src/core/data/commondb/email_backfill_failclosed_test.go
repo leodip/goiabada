@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -79,9 +80,21 @@ type scriptedDriver struct {
 	// and nowhere else (#139).
 	statements []string
 
-	openTx    int
+	openTx int
+	// commits counts every Commit the driver was asked for, including the ones commitErrs
+	// scripted to fail; rollbacks likewise. A commit that fails is still a commit that was
+	// attempted, and RunInTransaction's contract is about how many times it asked.
 	commits   int
 	rollbacks int
+	// commitErrs is consumed one entry per Commit, in order, and running past the end commits
+	// cleanly. It exists for RunInTransaction's commit branch: every callback failure leaves
+	// the commit untested, and a helper that returned each commit error immediately would pass
+	// every callback case while never retrying the one deadlock that surfaces at COMMIT (#301).
+	commitErrs []error
+	// rollbackErrs is consumed one entry per Rollback, in order. It is how a test plays MySQL's
+	// already-rolled-back deadlock victim, whose ROLLBACK the server answers with an error
+	// because it has nothing left to roll back.
+	rollbackErrs []error
 	// escaped counts statements that arrived on a connection with no transaction open on it
 	// while a transaction was open on another. That is precisely what passing nil instead of
 	// tx looks like from down here: database/sql cannot reuse the connection the transaction
@@ -128,7 +141,7 @@ func (t *scriptedTx) Commit() error {
 	t.c.inTx = false
 	t.c.d.openTx--
 	t.c.d.commits++
-	return nil
+	return popScriptedErr(&t.c.d.commitErrs)
 }
 
 func (t *scriptedTx) Rollback() error {
@@ -137,7 +150,18 @@ func (t *scriptedTx) Rollback() error {
 	t.c.inTx = false
 	t.c.d.openTx--
 	t.c.d.rollbacks++
-	return nil
+	return popScriptedErr(&t.c.d.rollbackErrs)
+}
+
+// popScriptedErr takes the next scripted outcome off a queue, nil once it is empty. Caller
+// holds the driver's mutex.
+func popScriptedErr(queue *[]error) error {
+	if len(*queue) == 0 {
+		return nil
+	}
+	err := (*queue)[0]
+	*queue = (*queue)[1:]
+	return err
 }
 
 type scriptedStmt struct {
@@ -974,4 +998,229 @@ func TestBackfillLowercaseEmails_TheUsersRowIsTakenFirst(t *testing.T) {
 		"the guarded disable of the users row must be the FIRST statement the transaction writes, "+
 			"because it is what takes the row every other statement below it sits under; found %v",
 		d.execArgs[0])
+}
+
+// auditDetails returns the decoded details of the one AuditRevokedUserAuthState row the pass
+// wrote, read off the recorded INSERT arguments like everything else in this file.
+func auditDetails(t *testing.T, d *scriptedDriver) map[string]interface{} {
+	t.Helper()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	for _, args := range d.execArgs {
+		isAudit := false
+		for _, arg := range args {
+			if s, ok := arg.(string); ok && s == constants.AuditRevokedUserAuthState {
+				isAudit = true
+			}
+		}
+		if !isAudit {
+			continue
+		}
+		for _, arg := range args {
+			s, ok := arg.(string)
+			if !ok || !strings.Contains(s, "terminatedSessionIdentifiers") {
+				continue
+			}
+			var details map[string]interface{}
+			require.NoError(t, json.Unmarshal([]byte(s), &details), "the audit details must be JSON")
+			return details
+		}
+	}
+	require.Fail(t, "no AuditRevokedUserAuthState row was written")
+	return nil
+}
+
+// TestBackfillLowercaseEmails_ARetriedRevocationAuditsOnlyTheAttemptThatCommitted pins
+// disableAndRevoke's sweep as attempt-local.
+//
+// inTransaction reruns the body when the engine aborts it as a deadlock victim (#301), and the
+// body used to append every session it deleted and every token it revoked to a sweep declared
+// OUTSIDE it. A rerun then audited the rolled-back attempt's rows on top of its own, and
+// AuditRevokedUserAuthState is a durable security record: it would name sessions this call did
+// not terminate and tokens it did not revoke. The engine's rollback undoes the rows; nothing
+// undoes what Go remembered about them.
+//
+// The "different rows" shapes are what separate a sweep rebuilt at attempt entry from an
+// accumulator that is merely reset before being appended to: a hoisted accumulator fails both
+// on LENGTH, an accumulator reset at entry passes both, and only the content of the audit tells
+// them apart when the two attempts saw different rows, which they do whenever a concurrent
+// termination or rotation is what caused the deadlock in the first place.
+func TestBackfillLowercaseEmails_ARetriedRevocationAuditsOnlyTheAttemptThatCommitted(t *testing.T) {
+	// The group, then attempt one of the loser's disable up to the statement the engine
+	// aborts, then attempt two in full, then the settings row the audit reads after the commit.
+	// Two sessions rows and two token rows are scripted so each attempt reads its own.
+	// A nil result set means that read is never reached on that attempt, which is the token read
+	// on a first attempt aborted while deleting sessions.
+	script := func(deadlockAt int, firstSessions, secondSessions, firstTokens, secondTokens *scriptedRows) *scriptedDriver {
+		rows := []*scriptedRows{
+			scanResult(scanRow(1, "Alice@x.com")),
+			groupResult(groupRow(1, "Alice@x.com", true), groupRow(2, "alice@x.com", true)),
+			generationReadBack(5),
+		}
+		for _, r := range []*scriptedRows{firstSessions, firstTokens, generationReadBack(6), secondSessions, secondTokens} {
+			if r != nil {
+				rows = append(rows, r)
+			}
+		}
+		rows = append(rows, modelRow(t, &models.Settings{Id: 1, AuditLogsInDatabaseEnabled: true}))
+
+		execs := make([]*scriptedExec, deadlockAt+1)
+		execs[deadlockAt] = &scriptedExec{err: errDeadlock}
+		return &scriptedDriver{rows: rows, execs: execs}
+	}
+	// sessions and tokens are ONE result set each, with one row per identifier, because each is
+	// answered by one query.
+	sessions := func(ids ...string) *scriptedRows {
+		var out *scriptedRows
+		for i, id := range ids {
+			row := modelRow(t, &models.UserSession{Id: int64(9 + i), SessionIdentifier: id})
+			if out == nil {
+				out = row
+			} else {
+				out.values = append(out.values, row.values...)
+			}
+		}
+		return out
+	}
+	tokens := func(jtis ...string) *scriptedRows {
+		var out *scriptedRows
+		for i, jti := range jtis {
+			row := modelRow(t, &models.RefreshToken{Id: int64(7 + i), RefreshTokenJti: jti})
+			if out == nil {
+				out = row
+			} else {
+				out.values = append(out.values, row.values...)
+			}
+		}
+		return out
+	}
+	// Statement indexes within one attempt: 0 the guarded disable, 1 the generation advance,
+	// then one delete per session, then one update per token. The deadlock has to land AFTER
+	// the first attempt recorded something, or a hoisted accumulator has nothing to carry over
+	// and the case proves nothing: the session cases therefore give the first attempt two
+	// sessions and abort the second delete, and the token cases one session and abort the one
+	// token revocation.
+	const atSecondSessionDelete, atTokenRevocationAfterOneSession = 3, 3
+
+	tests := []struct {
+		name         string
+		d            *scriptedDriver
+		wantSessions []interface{}
+		wantJtis     []interface{}
+	}{
+		{
+			name: "the same sessions, deleted by both attempts, are named once each",
+			d: script(atSecondSessionDelete,
+				sessions("sess-9", "sess-10"), sessions("sess-9", "sess-10"),
+				nil, tokens("jti-7")),
+			wantSessions: []interface{}{"sess-9", "sess-10"},
+			wantJtis:     []interface{}{"jti-7"},
+		},
+		{
+			name: "a session the rolled-back attempt deleted and the committed one did not see is absent",
+			d: script(atSecondSessionDelete,
+				sessions("sess-rolled-back", "sess-rolled-back-too"), sessions("sess-committed"),
+				nil, tokens("jti-7")),
+			wantSessions: []interface{}{"sess-committed"},
+			wantJtis:     []interface{}{"jti-7"},
+		},
+		{
+			name: "the same token, revoked by both attempts, is named once",
+			d: script(atTokenRevocationAfterOneSession,
+				sessions("sess-9"), sessions("sess-9"),
+				tokens("jti-7"), tokens("jti-7")),
+			wantSessions: []interface{}{"sess-9"},
+			wantJtis:     []interface{}{"jti-7"},
+		},
+		{
+			name: "a token the rolled-back attempt revoked and the committed one did not see is absent",
+			d: script(atTokenRevocationAfterOneSession,
+				sessions("sess-9"), sessions("sess-9"),
+				tokens("jti-rolled-back"), tokens("jti-committed")),
+			wantSessions: []interface{}{"sess-9"},
+			wantJtis:     []interface{}{"jti-committed"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			recordBackoff(t)
+			db := retryingDB(t, tc.d)
+
+			_, disabled, err := db.BackfillLowercaseEmails()
+
+			require.NoError(t, err, "the rerun succeeded, so the pass does")
+			require.Equal(t, 1, disabled, "the loser was disabled exactly once, by the attempt that committed")
+			require.Equal(t, 1, tc.d.rollbacks, "the fixture only says anything if the first attempt was really rolled back")
+			require.Equal(t, 1, tc.d.commits)
+
+			details := auditDetails(t, tc.d)
+			assert.Equal(t, tc.wantSessions, details["terminatedSessionIdentifiers"],
+				"the audit names the sessions the COMMITTED attempt terminated, each once, and nothing the rolled-back attempt touched")
+			assert.Equal(t, tc.wantJtis, details["revokedRefreshTokenJtis"],
+				"and the tokens the committed attempt revoked, each once, and nothing the rolled-back attempt touched")
+			assert.EqualValues(t, 6, details["newGeneration"], "the generation is the one the committed attempt landed")
+			assert.EqualValues(t, 5, details["oldGeneration"])
+		})
+	}
+}
+
+// TestBackfillLowercaseEmails_ARetryThatRevokesNothingAuditsNothing holds today's two silent
+// exits across a rerun: a rerun whose guarded disable matches nothing is not a transition, and
+// a body that exhausts its attempts committed nothing. Neither may emit the event, because the
+// event attests to a revocation that happened.
+func TestBackfillLowercaseEmails_ARetryThatRevokesNothingAuditsNothing(t *testing.T) {
+	t.Run("the rerun finds the row already disabled", func(t *testing.T) {
+		recordBackoff(t)
+		d := &scriptedDriver{
+			rows: []*scriptedRows{
+				scanResult(scanRow(1, "Alice@x.com")),
+				groupResult(groupRow(1, "Alice@x.com", true), groupRow(2, "alice@x.com", true)),
+				generationReadBack(5),
+				modelRow(t, &models.UserSession{Id: 9, SessionIdentifier: "sess-9"}),
+				// Attempt two: the guarded disable matches nothing, so the body returns before
+				// reading anything else; the group is then re-read and found empty.
+			},
+			// Attempt one deadlocks deleting the session; attempt two's disable affects no row.
+			execs: []*scriptedExec{nil, nil, {err: errDeadlock}, {rowsAffected: 0}},
+		}
+		db := retryingDB(t, d)
+
+		_, disabled, err := db.BackfillLowercaseEmails()
+
+		require.NoError(t, err)
+		assert.Zero(t, disabled, "a rerun that transitioned nothing disabled nothing")
+		assert.Equal(t, 1, d.rollbacks)
+		assert.Equal(t, 1, d.commits, "the empty second attempt still commits, as a no-op transaction")
+		assert.Zero(t, auditRowsWritten(d), "and nothing is audited, because nothing was taken away")
+	})
+
+	t.Run("the attempts are exhausted", func(t *testing.T) {
+		recordBackoff(t)
+		d := &scriptedDriver{
+			rows: []*scriptedRows{
+				scanResult(scanRow(1, "Alice@x.com")),
+				groupResult(groupRow(1, "Alice@x.com", true), groupRow(2, "alice@x.com", true)),
+				generationReadBack(5), modelRow(t, &models.UserSession{Id: 9, SessionIdentifier: "sess-9"}),
+				generationReadBack(5), modelRow(t, &models.UserSession{Id: 9, SessionIdentifier: "sess-9"}),
+				generationReadBack(5), modelRow(t, &models.UserSession{Id: 9, SessionIdentifier: "sess-9"}),
+			},
+			execs: []*scriptedExec{
+				nil, nil, {err: errDeadlock},
+				nil, nil, {err: errDeadlock},
+				nil, nil, {err: errDeadlock},
+			},
+		}
+		db := retryingDB(t, d)
+
+		_, disabled, err := db.BackfillLowercaseEmails()
+
+		require.Error(t, err, "three deadlocks are the pass's failure, not something it hides")
+		assert.ErrorIs(t, err, errDeadlock)
+		assert.Zero(t, disabled)
+		assert.Equal(t, 3, d.rollbacks)
+		assert.Zero(t, d.commits)
+		assert.Zero(t, auditRowsWritten(d), "nothing committed, so nothing is attested to")
+	})
 }

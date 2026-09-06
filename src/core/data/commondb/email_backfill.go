@@ -388,13 +388,22 @@ func (d *CommonDatabase) trySetUserEmail(userId int64, expected string, desired 
 // to explain it afterwards. See auditRevokedUserAuthState.
 func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (bool, error) {
 	transitioned := false
-	swept := revocationSweep{
-		TerminatedSessionIdentifiers: []string{},
-		RevokedRefreshTokenJtis:      []string{},
-	}
+	var swept revocationSweep
 
 	err := d.inTransaction(nil, func(tx *sql.Tx) error {
 		var err error
+
+		// ATTEMPT-LOCAL, and published to swept only on the way out. inTransaction reruns this
+		// body when the engine aborts it as a deadlock victim, so anything declared outside it
+		// and appended to inside it accumulates across attempts: the audit below would then name
+		// sessions the rolled-back attempt deleted and tokens it revoked, none of which this
+		// call took away, in a durable security record (#301). transitioned and the two
+		// generations are assigned rather than appended and correct themselves on a rerun; the
+		// two slices do not, which is why the whole sweep is rebuilt here.
+		attempt := revocationSweep{
+			TerminatedSessionIdentifiers: []string{},
+			RevokedRefreshTokenJtis:      []string{},
+		}
 		// THE USER'S ROW FIRST, and this statement is what takes it, so no AcquireUserRow is
 		// added here (#139). It is the same shape as TerminateUserSessionTx's leading delete:
 		// where the transaction already opens with a write to the row the lock order puts at
@@ -419,12 +428,12 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 		if err != nil {
 			return err
 		}
-		swept.NewGeneration = newGeneration
+		attempt.NewGeneration = newGeneration
 		// Derived rather than read beforehand, which is RevokeUserAuthState's own reasoning
 		// (#106): an ordinary SELECT is not a locking read, so a value read before the
 		// increment can be one another writer has already moved away from, while new-1 is by
 		// construction the generation THIS increment invalidated.
-		swept.OldGeneration = newGeneration - 1
+		attempt.OldGeneration = newGeneration - 1
 
 		// THE SESSION ROWS FIRST, ahead of every grant that hangs off them (#139). Every
 		// application transaction that writes a user_sessions row and that session's grants
@@ -450,8 +459,8 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 			if err := d.DeleteUserSession(tx, sessions[i].Id); err != nil {
 				return err
 			}
-			swept.TerminatedSessionIdentifiers = append(
-				swept.TerminatedSessionIdentifiers, sessions[i].SessionIdentifier)
+			attempt.TerminatedSessionIdentifiers = append(
+				attempt.TerminatedSessionIdentifiers, sessions[i].SessionIdentifier)
 		}
 
 		// User-scoped, so it covers both linkage shapes: auth-code tokens through the code's
@@ -472,9 +481,11 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 			// Recorded after the write, so the list names what this call TRANSITIONED rather
 			// than what the user held. A token already revoked is skipped above and stays
 			// absent, which is revokeRefreshTokens' rule at the four other sites.
-			swept.RevokedRefreshTokenJtis = append(swept.RevokedRefreshTokenJtis, rt.RefreshTokenJti)
+			attempt.RevokedRefreshTokenJtis = append(attempt.RevokedRefreshTokenJtis, rt.RefreshTokenJti)
 		}
 
+		// This attempt is the one that commits, so it is the one the audit describes.
+		swept = attempt
 		return nil
 	})
 	if err != nil {

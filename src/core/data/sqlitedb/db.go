@@ -116,6 +116,7 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 
 	slog.Info("connected to sqlite database with required PRAGMA settings")
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLite, logSQL)
+	commonDb.IsDeadlock = isDeadlock
 	sqliteDb := SQLiteDatabase{
 		DB:       db,
 		CommonDB: commonDb,
@@ -126,6 +127,17 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 
 func (d *SQLiteDatabase) BeginTransaction() (*sql.Tx, error) {
 	return d.CommonDB.BeginTransaction()
+}
+
+func (d *SQLiteDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
+	return d.CommonDB.RunInTransaction(fn)
+}
+
+// isDeadlock is SQLite's half of RunInTransaction's classifier, and it is always false: the
+// pool has one connection (SetMaxOpenConns(1) above), so no two transactions of this process
+// ever overlap and there is no cycle for the engine to break (#301).
+func isDeadlock(error) bool {
+	return false
 }
 
 func (d *SQLiteDatabase) CommitTransaction(tx *sql.Tx) error {
