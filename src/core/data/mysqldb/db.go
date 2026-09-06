@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
+	mysqldriver "github.com/go-sql-driver/mysql"
 	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -114,6 +114,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 	}
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.MySQL, logSQL)
+	commonDb.IsDeadlock = isDeadlock
 
 	mysqlDb := MySQLDatabase{
 		DB:       db,
@@ -125,6 +126,19 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 
 func (d *MySQLDatabase) BeginTransaction() (*sql.Tx, error) {
 	return d.CommonDB.BeginTransaction()
+}
+
+func (d *MySQLDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
+	return d.CommonDB.RunInTransaction(fn)
+}
+
+// isDeadlock is MySQL's half of RunInTransaction's classifier: error 1213, ER_LOCK_DEADLOCK,
+// which InnoDB raises on the transaction it rolled back to break the cycle. 1205,
+// ER_LOCK_WAIT_TIMEOUT, is deliberately not here: the row is still held by somebody who has
+// not deadlocked, so rerunning would wait the same timeout again (#301).
+func isDeadlock(err error) bool {
+	var mysqlErr *mysqldriver.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1213
 }
 
 func (d *MySQLDatabase) CommitTransaction(tx *sql.Tx) error {

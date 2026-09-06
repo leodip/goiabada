@@ -13,6 +13,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/pkg/errors"
@@ -104,6 +105,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 	}
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.PostgreSQL, logSQL)
+	commonDb.IsDeadlock = isDeadlock
 
 	postgresDb := PostgresDatabase{
 		DB:       db,
@@ -267,6 +269,19 @@ func QuoteIdentifier(name string) string {
 
 func (d *PostgresDatabase) BeginTransaction() (*sql.Tx, error) {
 	return d.CommonDB.BeginTransaction()
+}
+
+func (d *PostgresDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
+	return d.CommonDB.RunInTransaction(fn)
+}
+
+// isDeadlock is PostgreSQL's half of RunInTransaction's classifier: SQLSTATE 40P01,
+// deadlock_detected, which the server raises on the transaction it chose as the victim after
+// rolling it back. 55P03, lock_not_available, is a lock wait that ran out and is deliberately
+// not here: the row is still held, so rerunning would only wait again (#301).
+func isDeadlock(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "40P01"
 }
 
 func (d *PostgresDatabase) CommitTransaction(tx *sql.Tx) error {
