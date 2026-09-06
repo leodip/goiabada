@@ -1071,8 +1071,8 @@ func TestAcquireUserSessionRow_TransactionAndFailurePath(t *testing.T) {
 
 // TestUpdateUserSession_TheOwnerIsNotRewritten pins that user_id is outside the update set. A
 // session's owner never changes, and on SQL Server re-assigning a foreign key column to its own
-// value re-checks the constraint with a shared lock on the users row, which put the ordinary SSO
-// bump into a lock order it has no business being in (#139). A stale model carrying another
+// value re-checks the constraint with a shared lock on the users row, a lock the ordinary SSO
+// bump has no business taking (#139). A stale model carrying another
 // user's id must therefore leave the stored owner alone rather than move the session.
 func TestUpdateUserSession_TheOwnerIsNotRewritten(t *testing.T) {
 	owner := createTestUser(t)

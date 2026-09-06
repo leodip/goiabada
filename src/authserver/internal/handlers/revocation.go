@@ -106,20 +106,21 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 	result.NewGeneration = newGeneration
 	result.OldGeneration = newGeneration - 1
 
-	// THE SESSION ROWS FIRST, ahead of every grant that hangs off them (#139). Every
-	// application transaction that writes a user_sessions row and that session's grants takes
-	// the user_sessions row first, so no two transactions of different shapes can each hold
-	// half of what the other needs. Without the hoist this one takes refresh_tokens and then
-	// user_sessions while an authorization ceremony takes user_sessions and then codes, and
-	// the two deadlock on PostgreSQL, MySQL and SQL Server.
+	// THE SESSION ROWS BEFORE THE TOKEN SWEEP, so that this transaction and a termination of
+	// one of these sessions, which deletes the session row as its first statement, serialize
+	// on that row rather than each holding half of what the other wants and reaching the retry
+	// (#139). The same holds against the replay response and against an authorization ceremony,
+	// which both take the session row before any grant.
 	//
 	// The two refresh-token reads below are unaffected by running after these deletes.
 	// GetRefreshTokensByUserId unions a codes join with refresh_tokens.user_id and
 	// GetRefreshTokensBySessionIdentifier joins refresh_tokens to codes; neither reads
 	// user_sessions, and codes carries no foreign key to it.
 	//
-	// IncrementUserAuthStateGeneration stays above this. It is the durable half of the
-	// operation and it takes the users row, which is above user_sessions on every path here.
+	// IncrementUserAuthStateGeneration stays above this because it is the durable half of the
+	// operation: the codes carry auth_state_generation, so advancing it is what invalidates
+	// them, and a sweep that ran first would leave a gap in which a code issued under the old
+	// generation is still valid.
 	sessions, err := db.GetUserSessionsByUserId(tx, userId)
 	if err != nil {
 		return result, err
@@ -127,8 +128,8 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 
 	// Ordered by id so several sessions are always taken in the same sequence. The query
 	// carries no ORDER BY of its own, so two transactions of this shape could otherwise take
-	// the same two rows in opposite orders, which is a cycle among sessions that no rule about
-	// the order of TABLES can reach (#139).
+	// the same two rows in opposite orders and deadlock on nothing but the order the engine
+	// returned them in (#139).
 	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
 
 	preservedSessionFound := false
@@ -151,9 +152,8 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 	// User-scoped, so it covers both linkage shapes: auth-code tokens through codes.user_id
 	// and ROPC tokens through refresh_tokens.user_id.
 	//
-	// The session block above moved ahead of BOTH refresh-token reads for the lock order, and
-	// they moved together, so the reasoning that follows about their relative order is
-	// untouched by it (#139).
+	// The session block sits above BOTH refresh-token reads, and the two reads sit together, so
+	// the reasoning that follows about their relative order is untouched by it (#139).
 	//
 	// Deliberately queried BEFORE the preserved set below, though the benefit is
 	// engine-dependent. Where each statement takes a fresh read view (PostgreSQL and SQL
@@ -396,7 +396,9 @@ func TerminateUserSessionTx(db data.Database, userSession *models.UserSession) (
 	// was handed, and the counts it reports are the committing attempt's.
 	var result TerminationResult
 	err := db.RunInTransaction(func(tx *sql.Tx) error {
-		// First, and the ordering the doc comment above explains rests on it being first (#139).
+		// First, and write 1 of the doc comment above is why: it is the statement that takes the
+		// session row, which is what orders this transaction against a ceremony minting a code
+		// for the session it is ending (#139).
 		if err := db.DeleteUserSession(tx, userSession.Id); err != nil {
 			return err
 		}

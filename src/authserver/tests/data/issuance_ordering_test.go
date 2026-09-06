@@ -38,28 +38,15 @@ func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.
 }
 
 // issuanceStatements issues, on the caller's transaction, what /auth/issue issues on the
-// authorization code branch: the users row, then the session row, then the code. When the
-// acquisition reports the session row gone it inserts nothing, which is the refusal (#139
-// decision 3), and the caller decides whether to commit.
-//
-// The users row leads because the insert below reaches it anyway through codes.user_id, and
-// taking it explicitly is what puts this ceremony on the same order the credential operations
-// already use (#139 decision 11). The shared client acquisition follows it and precedes the
-// session row: it is what closes DeleteClient's discovery window, and it has to come AFTER
-// everything above clients, because a shared holder that then reaches upward closes a cycle with
-// a deletion queued exclusively on that row.
+// authorization code branch: the session row, then the code. When the acquisition reports the
+// session row gone it inserts nothing, which is the refusal (#139 decision 3), and the caller
+// decides whether to commit.
 //
 // The handler itself cannot be driven from this tier: it owns its transaction and answers over
 // HTTP. The pairing is the one #139 uses throughout: the unit tests in the handlers package pin
 // that production issues exactly this sequence in exactly this order, and this tier answers what
 // a mock cannot, what two real transactions of these shapes do to each other on a real catalog.
 func issuanceStatements(db data.Database, tx *sql.Tx, client *models.Client, user *models.User, sessionIdentifier string) issuanceOutcome {
-	if err := db.AcquireUserRow(tx, user.Id); err != nil {
-		return issuanceOutcome{err: err}
-	}
-	if err := db.AcquireClientRowShared(tx, client.Id); err != nil {
-		return issuanceOutcome{err: err}
-	}
 	live, err := db.AcquireUserSessionRow(tx, sessionIdentifier)
 	if err != nil || !live {
 		return issuanceOutcome{live: live, err: err}
@@ -100,15 +87,10 @@ func TestIssuanceOrdering_AgainstTermination(t *testing.T) {
 // assertions are about the OUTCOME the ordering produces, either the code carries the revocation
 // marker or no code is issued at all, rather than about the absence of a cycle.
 //
-// It is not the only one that runs there. An earlier draft of this comment argued that the
-// lock-order pairs need not run under RCSI because RCSI can only remove lock conflicts, never add
-// one, so a cycle that does not form with it off cannot appear with it on. That does not follow.
-// Removing a conflict changes which interleavings are REACHABLE: a transaction that no longer
-// stops at a read runs on and asks for locks it previously never reached, and a cycle can close
-// there. DeleteClient has exactly that shape, a plain association read sitting between its
-// exclusive client acquisition and the session rows it takes next. So the two client-deletion
-// gates run under RCSI too, in lock_order_client_delete_test.go, and the reasoning above is
-// recorded as an expectation rather than as a reason to skip the measurement.
+// One expectation is recorded here rather than relied on: RCSI can only remove lock conflicts,
+// never add one, but removing a conflict changes which interleavings are REACHABLE. A transaction
+// that no longer stops at a read runs on and asks for locks it previously never reached, and a
+// cycle can close there. So a pair measured clean with RCSI off has not been measured with it on.
 func TestIssuanceOrdering_AgainstTermination_RCSI(t *testing.T) {
 	f := rcsiDatabase(t)
 	runIssuanceOrderingAgainstTermination(t, f.primary, f.secondary)
@@ -127,8 +109,6 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		require.NoError(t, err, "opening the ceremony's transaction")
 		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		require.NoError(t, db.AcquireUserRow(tx, user.Id), "the ceremony takes the user row")
-		require.NoError(t, db.AcquireClientRowShared(tx, client.Id), "the ceremony takes the client row, shared")
 		live, err := db.AcquireUserSessionRow(tx, session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony takes the session row")
 		require.True(t, live, "the session row is still there when the ceremony takes it")
@@ -224,4 +204,40 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		assert.Zero(t, leftBehind, "no code of the terminated session may exist unrevoked")
 		assertSessionGoneOn(t, db, session.Id, "the terminated session")
 	})
+}
+
+// terminationStatements issues, on the caller's transaction, what TerminateUserSessionTx issues
+// in the order it issues them. The real function owns and commits its own transaction, so an
+// ordering that needs the termination HELD OPEN across the other party's arrival cannot call it;
+// the ordering that does not is driven through the real function.
+func terminationStatements(db data.Database, tx *sql.Tx, session *models.UserSession) error {
+	if err := db.DeleteUserSession(tx, session.Id); err != nil {
+		return err
+	}
+	if _, err := db.RevokeCodesBySessionIdentifier(tx, session.SessionIdentifier); err != nil {
+		return err
+	}
+	tokens, err := db.GetRefreshTokensBySessionIdentifier(tx, session.SessionIdentifier)
+	if err != nil {
+		return err
+	}
+	for _, rt := range tokens {
+		if rt.Revoked {
+			continue
+		}
+		rt.Revoked = true
+		if err := db.UpdateRefreshToken(tx, rt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// assertSessionGoneOn reloads through the handle it is given, for the reason assertCodeRevokedOn
+// does.
+func assertSessionGoneOn(t *testing.T, db data.Database, sessionId int64, what string) {
+	t.Helper()
+	session, err := db.GetUserSessionById(nil, sessionId)
+	require.NoErrorf(t, err, "reloading %s", what)
+	assert.Nilf(t, session, "%s must be gone", what)
 }

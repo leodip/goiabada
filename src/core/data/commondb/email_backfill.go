@@ -346,9 +346,9 @@ func (d *CommonDatabase) trySetUserEmail(userId int64, expected string, desired 
 // advanced, every session of theirs is deleted, and every refresh token belonging to them is
 // revoked. It reports whether THIS call performed the enabled-to-disabled transition.
 //
-// The sessions go before the tokens for the lock order rather than for anything either write
-// sees: every transaction that writes a session row and that session's grants takes the
-// session row first (#139). See the comment on that read.
+// The sessions go before the tokens for the order it gives this transaction against a
+// termination of one of those sessions, not for anything either write sees: see the comment
+// on that read.
 //
 // The revocation is not decoration on the disable, it is what the disable means. #106
 // established that enabled going true-to-false is the moment a user's outstanding credentials
@@ -404,15 +404,11 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 			TerminatedSessionIdentifiers: []string{},
 			RevokedRefreshTokenJtis:      []string{},
 		}
-		// THE USER'S ROW FIRST, and this statement is what takes it, so no AcquireUserRow is
-		// added here (#139). It is the same shape as TerminateUserSessionTx's leading delete:
-		// where the transaction already opens with a write to the row the lock order puts at
-		// the top, a separate acquisition would only issue the same UPDATE twice.
-		//
-		// The conditional WHERE does not weaken that. On the branch where it matches, the users
-		// row is held from here to the commit, above the session rows and the token sweep below.
-		// On the branch where it matches nothing the function returns immediately and touches no
-		// session and no grant at all, so there is no order left for it to get wrong.
+		// The guarded disable is the first statement, and it is the classification: the row it
+		// affects is the transition, and affecting none means there was nothing to change. On the
+		// branch where it matches nothing the function returns immediately and touches no session
+		// and no grant at all, which is what keeps a loser somebody else already disabled from
+		// being swept twice.
 		transitioned, err = d.tryDisableUserWithEmail(tx, userId, expectedEmail)
 		if err != nil {
 			return err
@@ -435,15 +431,12 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 		// construction the generation THIS increment invalidated.
 		attempt.OldGeneration = newGeneration - 1
 
-		// THE SESSION ROWS FIRST, ahead of every grant that hangs off them (#139). Every
-		// application transaction that writes a user_sessions row and that session's grants
-		// takes the user_sessions row first, so no two transactions of different shapes can
-		// each hold half of what the other needs. Without the hoist this one takes
-		// refresh_tokens and then user_sessions while an authorization ceremony takes
-		// user_sessions and then codes, and the two deadlock on PostgreSQL, MySQL and SQL
-		// Server. The token sweep below is unaffected by running after these deletes:
-		// GetRefreshTokensByUserId unions a codes join with refresh_tokens.user_id and reads
-		// no session row, and codes carries no foreign key to user_sessions.
+		// THE SESSION ROWS BEFORE THE TOKEN SWEEP, so that this transaction and a termination
+		// of one of these sessions, which deletes the session row as its first statement,
+		// serialize on that row rather than each holding half of what the other wants and
+		// reaching the retry (#139). The token sweep below is unaffected by running after these
+		// deletes: GetRefreshTokensByUserId unions a codes join with refresh_tokens.user_id and
+		// reads no session row, and codes carries no foreign key to user_sessions.
 		sessions, err := d.GetUserSessionsByUserId(tx, userId)
 		if err != nil {
 			return err
@@ -451,8 +444,8 @@ func (d *CommonDatabase) disableAndRevoke(userId int64, expectedEmail string) (b
 
 		// Ordered by id so several sessions are always taken in the same sequence. The query
 		// carries no ORDER BY of its own, so two transactions of this shape could otherwise
-		// take the same two rows in opposite orders, which is a cycle among sessions that no
-		// rule about the order of TABLES can reach (#139).
+		// take the same two rows in opposite orders and deadlock on nothing but the order the
+		// engine returned them in (#139).
 		sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
 
 		for i := range sessions {

@@ -427,7 +427,7 @@ func HandleIssueGet(
 		// read on one connection followed by an insert on another, so a termination can commit in
 		// between, and worse, a code inserted after that termination's sweep and before its
 		// COMMIT is invisible to the sweep and the termination is invisible to any compensating
-		// read, which still sees the uncommitted-deleted session row. The termination now deletes
+		// read, which still sees the uncommitted-deleted session row. The termination deletes
 		// the session row as its first statement, so both sides write the same row before
 		// touching anything else and one of them waits. Either this transaction waits and the
 		// acquisition then matches no rows, so nothing is issued, or the termination waits and
@@ -439,52 +439,19 @@ func HandleIssueGet(
 		// possible, and on the authorization code branch only: the implicit flow mints no code
 		// and no refresh token, so it has no durable grant for this to protect (#139 decision 6).
 		//
-		// Opened through RunInTransaction, so a deadlock reruns the body (#301). It is safe to
-		// rerun: createCodeInput is only read, code is whatever the attempt that committed minted,
-		// and the audit event, the context clear and the redirect all wait below for the helper
-		// to return.
+		// This is the one ordering the repository keeps on purpose, and it is an integrity rule
+		// rather than a deadlock rule: it exists so a code can never slip between a termination's
+		// sweep and its commit. No other order is imposed. Concurrent transactions on the same
+		// account can still deadlock on MySQL, PostgreSQL or SQL Server; the loser is rolled back
+		// with nothing half applied and rerun by RunInTransaction, bounded, before the error
+		// surfaces. SQLite has one connection and cannot deadlock. Do not add ordering here to
+		// prevent a deadlock; add a test that forces it and shows the retry resolves it (#301).
+		//
+		// The body is safe to rerun: createCodeInput is only read, code is whatever the attempt
+		// that committed minted, and the audit event, the context clear and the redirect all wait
+		// below for the helper to return.
 		var code *models.Code
 		err = database.RunInTransaction(func(tx *sql.Tx) error {
-			// THE USER'S ROW FIRST, above the session row this ceremony is about to take (#139).
-			//
-			// codes.user_id is a foreign key, so the insert below takes a lock on the parent users row
-			// without naming it, and it does so while this transaction is already holding the session
-			// row. Every credential operation goes the other way: a password change, a reset, an
-			// administrator setting a password and disabling or deleting an account all write the
-			// users row and only then reach the sessions and the grants hanging off them. Those two
-			// orders are a cycle. Measured on MySQL and SQL Server it deadlocks with the CREDENTIAL
-			// OPERATION as the victim, which is the worse one to lose: the account owner changing a
-			// password because a session was stolen gets a 500, the session survives, and the racing
-			// ceremony gets its code. Taking the row here puts this ceremony on the same order
-			// everything else already uses, so one of the two simply waits.
-			//
-			// It costs one small UPDATE per authorization code issued, which is the price of the
-			// ordering rather than an incidental write: nothing reads the updated_at it moves.
-			if err := database.AcquireUserRow(tx, user.Id); err != nil {
-				return err
-			}
-
-			// THE CLIENT'S ROW NEXT, SHARED, below the user and above the session (#139).
-			//
-			// This transaction is about to insert a code, which is a child of clients, and
-			// commondb.DeleteClient takes the client row exclusively and then reads the sessions
-			// associated with it in order to take their rows too. Without this acquisition that
-			// deletion's list is not closed: an association or a code can be inserted after it read,
-			// and on PostgreSQL the reference itself is no barrier, because FOR KEY SHARE and the
-			// FOR NO KEY UPDATE its acquisition takes do not conflict. Shared rather than exclusive
-			// so that two ceremonies for the same client never queue on each other; only a deletion
-			// of that client does, and it waits out a handful of statements.
-			//
-			// AFTER AcquireUserRow and not before it. Lock queues are fair, so a shared holder that
-			// afterwards reaches for a row ABOVE clients can be part of a cycle with a queued
-			// exclusive request even though nothing is upgraded: measured on MySQL as issuance
-			// holding the users row and waiting for the client, a fresh session holding the client
-			// shared and waiting for the users row through its insert's foreign key, and the
-			// deletion queued exclusively behind both.
-			if err := database.AcquireClientRowShared(tx, issuingClient.Id); err != nil {
-				return err
-			}
-
 			// Existence only, deliberately. Ownership and the two timeouts were asked a few statements
 			// ago and are not re-asked here: the only thing this narrower question misses is an idle
 			// timeout elapsing in the microseconds between the two, and buying that would cost a
@@ -507,9 +474,8 @@ func HandleIssueGet(
 
 			code, err = codeIssuer.CreateAuthCode(tx, createCodeInput)
 			if err != nil {
-				// The client's registration went away while this ceremony held its place in the queue
-				// behind the deletion, which the shared acquisition above turns from a narrow race
-				// into the reliable outcome of losing it. Answered as the session-gone shape rather
+				// The client's registration went away under this ceremony, between the liveness
+				// read above the dispatch and the insert. Answered as the session-gone shape rather
 				// than as a 500: nothing is wrong with this server, the application the browser was
 				// signing in to no longer exists, and the refusal path already knows how to say that
 				// once for an interactive ceremony and once for a silent one. redirectWillBeEmitted

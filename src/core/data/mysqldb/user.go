@@ -7,10 +7,6 @@ import (
 	"github.com/leodip/goiabada/core/models"
 )
 
-func (d *MySQLDatabase) AcquireUserRow(tx *sql.Tx, userId int64) error {
-	return d.CommonDB.AcquireUserRow(tx, userId)
-}
-
 func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 	return d.CommonDB.CreateUser(tx, user)
 }

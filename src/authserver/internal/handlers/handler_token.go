@@ -629,8 +629,8 @@ func revokeAndAuditAuthCodeReuse(database data.Database, auditLogger AuditLogger
 // when revocation fails, so callers should surface a 500 to the client.
 //
 // Its first statement takes the session row, ahead of every grant that hangs off
-// it, which is the lock order every transaction writing a session and its grants
-// keeps (#139). See the comment on that statement for what it prevents.
+// it, so that this response and a termination of the same session serialize on
+// that row (#139). See the comment on that statement for what it prevents.
 func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string, error) {
 	if code == nil {
 		return nil, nil
@@ -641,14 +641,15 @@ func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string,
 	// attempt revoked, and the reuse audit event is the caller's, written after this returns.
 	var revokedJtis []string
 	err := database.RunInTransaction(func(tx *sql.Tx) error {
-		// THE SESSION ROW FIRST, before any grant that hangs off it (#139). Every application
-		// transaction that writes a user_sessions row and that session's grants takes the
-		// user_sessions row first, so no two transactions of different shapes can each hold half
-		// of what the other needs. Without this statement leading, this transaction takes
-		// refresh_tokens and then user_sessions while an authorization ceremony takes
-		// user_sessions and then codes, and the two deadlock on PostgreSQL, MySQL and SQL Server
-		// with this one the victim, so the reused code's session survives the very response meant
-		// to contain it.
+		// THE SESSION ROW FIRST, before any grant that hangs off it (#139). A termination of this
+		// session deletes that row as its first statement, so with this leading the two
+		// transactions serialize on the row and one simply waits. Without it this one takes
+		// refresh_tokens and then user_sessions while the termination takes user_sessions and
+		// then refresh_tokens, and the two deadlock on MySQL and SQL Server with this one the
+		// victim, which the retry would answer by rerunning it, at the cost of a rerun on every
+		// such race. The same statement also orders this response against an authorization
+		// ceremony for the same session, which takes the row before it inserts. This is a
+		// local reason for this transaction's first statement and obliges no other site (#301).
 		//
 		// The result is deliberately NOT a branch. This response revokes whatever tokens it finds
 		// whether or not the session row is still there, because an offline grant's tokens outlive
@@ -700,8 +701,8 @@ func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string,
 		// SQLite serializes the two transactions anyway. On SQL Server, whose READ COMMITTED
 		// takes shared locks, that read waits for this whole transaction. A bounded wait on
 		// a handful of statements, and not a deadlock: this transaction takes no lock any
-		// mint holds. Paying it is what buys the absence of the three-engine deadlock the
-		// acquisition's own comment describes. (#139)
+		// mint holds. Paying it is what buys the absence of the deadlock the acquisition's own
+		// comment describes. (#139)
 		if code.SessionIdentifier != "" && len(revokedJtis) > 0 {
 			session, err := database.GetUserSessionBySessionIdentifier(tx, code.SessionIdentifier)
 			if err != nil {
