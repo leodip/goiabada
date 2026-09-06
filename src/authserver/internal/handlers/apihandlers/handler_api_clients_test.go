@@ -68,15 +68,13 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	database := mocks_data.NewDatabase(t)
 
 	secret := []byte("the-secret-another-request-just-set")
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
 	var written *models.Client
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { written = args.Get(1).(*models.Client) }).Return(nil).Once()
-	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
 	stale := &models.Client{Id: 7, IsPublic: true, ClientSecretEncrypted: nil, Description: "edited"}
 	require.NoError(t, updateClientNotOwningAuthenticationMode(database, stale))
@@ -88,9 +86,10 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	// discarding the request.
 	assert.Equal(t, "edited", written.Description)
 
-	// The read is inside the transaction that writes. Reading it before BeginTransaction would
-	// leave exactly the gap this helper exists to close.
-	assert.Less(t, callIndex(t, database, "BeginTransaction"), callIndex(t, database, "GetClientById"))
+	// The read is inside the transaction that writes. Reading it before RunInTransaction, which
+	// the mock records at entry before the body runs, would leave exactly the gap this helper
+	// exists to close.
+	assert.Less(t, callIndex(t, database, "RunInTransaction"), callIndex(t, database, "GetClientById"))
 	assert.Less(t, callIndex(t, database, "GetClientById"), callIndex(t, database, "UpdateClient"))
 
 	// And the row is taken BEFORE it is read, which is what makes the read atomic with the write
@@ -113,7 +112,7 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAgainstTheRefreshedMode(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	// The row is public; the caller below thinks it is confidential.
 	database.On("GetClientById", clientUpdateTx, int64(7)).
@@ -121,8 +120,6 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 	var written *models.Client
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { written = args.Get(1).(*models.Client) }).Return(nil).Once()
-	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
 	// A confidential client's legitimate settings, carried by a request that loaded it before it
 	// became public.
@@ -153,15 +150,13 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlowsAlone(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false}, nil).Once()
 	var written *models.Client
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { written = args.Get(1).(*models.Client) }).Return(nil).Once()
-	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
 	pkceOff := false
 	client := &models.Client{
@@ -185,14 +180,14 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotAnInsert(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	stub := expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", clientUpdateTx, int64(7)).Return(nil, nil).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
 	err := updateClientNotOwningAuthenticationMode(database, &models.Client{Id: 7})
 	require.Error(t, err)
-	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient", "CommitTransaction")
+	assert.Equal(t, err, stub.bodyErr, "the body hands its error to the helper, which rolls back")
+	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient")
 }
 
 // TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite covers the
@@ -203,14 +198,14 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	stub := expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).
 		Return(errors.New("deadlock found when trying to get lock")).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
 	err := updateClientNotOwningAuthenticationMode(database, &models.Client{Id: 7, IsPublic: true})
 	require.Error(t, err)
-	assertNotAttemptedOnClientDatabase(t, database, "GetClientById", "UpdateClient", "CommitTransaction")
+	assert.Equal(t, err, stub.bodyErr, "the body hands its error to the helper unchanged, which is what lets a real deadlock be rerun")
+	assertNotAttemptedOnClientDatabase(t, database, "GetClientById", "UpdateClient")
 }
 
 // =============================================================================
@@ -238,14 +233,12 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	// What the write reports when it runs: it really did make the client public, because another
 	// request got there first with confidential mode and the grants it issued are the ones at
 	// stake. The handler must believe this over its own snapshot.
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	expectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", clientUpdateTx, int64(7)).Return(true, nil).Once()
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("RevokeCodesByClientId", clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
 	database.On("GetRefreshTokensByClientId", clientUpdateTx, int64(7)).
 		Return([]*models.RefreshToken{}, nil).Once()
-	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 	stubClientResponseLoads(database)
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
@@ -288,19 +281,19 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	stub := expectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", clientUpdateTx, int64(7)).
 		Return(false, errors.New("no client with that id")).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientAuthenticationPut(httpHelper, authHelper, database, auditLogger)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	// Neither the client write nor the commit is registered on the strict mock, so reaching
-	// either fails on its own. Naming them says which property broke.
-	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient", "CommitTransaction",
+	// The client write is not registered on the strict mock, so reaching it fails on its own.
+	// Naming it says which property broke; bodyErr says the helper was asked to roll back.
+	assert.EqualError(t, stub.bodyErr, "no client with that id")
+	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient",
 		"RevokeCodesByClientId", "GetRefreshTokensByClientId")
 	auditLogger.AssertNotCalled(t, "Log", constants.AuditRevokedClientGrants, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", constants.AuditUpdatedClientAuthentication, mock.Anything)
@@ -319,11 +312,9 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	expectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", clientUpdateTx, int64(7)).Return(false, nil).Once()
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).Return(nil).Once()
-	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 	stubClientResponseLoads(database)
 
 	auditLogger.On("Log", constants.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
@@ -395,7 +386,7 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 	client := &models.Client{Id: 7, AuthorizationCodeEnabled: false}
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
 
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -408,8 +399,6 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { created = args.Get(1).(*models.WebOrigin).Origin }).Return(nil).Once()
 	database.On("DeleteWebOrigin", clientUpdateTx, int64(11)).Return(nil).Once()
-	database.On("CommitTransaction", clientUpdateTx).Return(nil).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
 	stubClientResponseLoads(database)
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
@@ -436,7 +425,9 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 // and the administrator's list was neither what they sent nor what it was before. Removing a
 // compromised origin and adding its replacement in one save is exactly when that matters.
 //
-// CommitTransaction is deliberately absent from the strict mock: reaching it fails the test.
+// The body hands the failure to RunInTransaction, which is when the helper rolls back; the driver's
+// error stays in the chain it hands over, so a real deadlock would be recognised and rerun rather
+// than answered.
 func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
@@ -445,23 +436,138 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
-	database.On("BeginTransaction").Return(clientUpdateTx, nil).Once()
+	diskFull := errors.New("the disk is full")
+	stub := expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).Return(nil).Once()
-	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).
-		Return(errors.New("the disk is full")).Once()
-	database.On("RollbackTransaction", clientUpdateTx).Return(nil).Once()
+	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).Return(diskFull).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(httpHelper, authHelper, database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Failed to update web origins")
 	database.AssertExpectations(t)
-	database.AssertNotCalled(t, "CommitTransaction", clientUpdateTx)
+	// The driver's error is reachable through what the body returned, and the failure names the
+	// origin it was writing, which is what the handler's log line carries.
+	assert.ErrorIs(t, stub.bodyErr, diskFull)
+	var failure *webOriginsWriteFailure
+	require.ErrorAs(t, stub.bodyErr, &failure)
+	assert.Equal(t, "https://a.example.com", failure.origin)
 	// Nothing was audited either: an audit entry for a save that did not happen is a false
 	// record of an administrator's action.
 	auditLogger.AssertNotCalled(t, "Log", constants.AuditUpdatedWebOrigins, mock.Anything)
+}
+
+// The load failing inside the transaction is answered under its own message, as it was before
+// the response moved out of the transaction body; the step is carried on the error rather than
+// written from inside an attempt that might be rerun.
+func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+	loadErr := errors.New("the read failed")
+	stub := expectRunInTransaction(database, clientUpdateTx)
+	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).Return(loadErr).Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleAPIClientWebOriginsPut(httpHelper, authHelper, database, auditLogger)
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Failed to load client web origins")
+	assert.ErrorIs(t, stub.bodyErr, loadErr)
+	database.AssertExpectations(t)
+	assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
+	auditLogger.AssertNotCalled(t, "Log", constants.AuditUpdatedWebOrigins, mock.Anything)
+}
+
+// A body aborted as a deadlock victim on its first attempt and rerun by the helper answers ONCE:
+// one 200, one audit event, and no error response for the attempt that was thrown away. This is
+// why every writeJSONError sits below RunInTransaction rather than inside the closure: an attempt
+// that has already written a 500 cannot be rerun into a 200 (#301).
+//
+// The helper's loop is scripted here: the stub runs the body, checks the driver's error is still
+// reachable through what the body returned, which is what the real classifier needs, and runs it
+// again. The real loop, with a real deadlock, is the data tier's.
+func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	client := &models.Client{Id: 7, AuthorizationCodeEnabled: true}
+	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
+
+	deadlock := errors.New("Error 1213: Deadlock found when trying to get lock")
+	attempts := 0
+	database.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
+		for {
+			attempts++
+			err := fn(clientUpdateTx)
+			if err == nil {
+				return nil
+			}
+			require.ErrorIs(t, err, deadlock,
+				"the body must hand the driver's error back in the chain, or the helper cannot tell a deadlock from a fault")
+			require.Less(t, attempts, 3, "the second attempt was scripted to succeed")
+		}
+	}).Once()
+
+	// Both attempts take the row and read the list afresh.
+	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Twice()
+	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).Return(nil).Twice()
+	// The first insert is the deadlock victim; the second lands.
+	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).Return(deadlock).Once()
+	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).Return(nil).Once()
+	stubClientResponseLoads(database)
+
+	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
+	auditLogger.On("Log", constants.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleAPIClientWebOriginsPut(httpHelper, authHelper, database, auditLogger)
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
+
+	assert.Equal(t, 2, attempts)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	// One answer. A 500 written by the first attempt would sit in the body ahead of the 200's
+	// JSON, and the recorder would show it.
+	assert.NotContains(t, rr.Body.String(), "INTERNAL_ERROR")
+	database.AssertExpectations(t)
+	auditLogger.AssertExpectations(t)
+	httpHelper.AssertExpectations(t)
+}
+
+// The helper giving up, a deadlock on every attempt, is one 500 under the update message and no
+// audit event: the exhausted error carries no step of its own and is reported as the helper's.
+func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+	exhausted := errors.New("transaction aborted as a deadlock victim on all 3 attempts")
+	expectRunInTransactionRefused(database, exhausted)
+
+	rr := httptest.NewRecorder()
+	handler := HandleAPIClientWebOriginsPut(httpHelper, authHelper, database, auditLogger)
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Failed to update web origins")
+	assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_ERROR"), "exactly one error response")
+	database.AssertExpectations(t)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }
 
 // A canonical origin longer than the column is refused rather than stored. web_origins.origin is
@@ -470,7 +576,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 // (#250 decision 14b). The value here canonicalizes cleanly and is refused purely on length, which
 // is what separates this from the invalid-origin path.
 //
-// The strict mock carries GetClientById and nothing else: reaching BeginTransaction fails the test,
+// The strict mock carries GetClientById and nothing else: reaching RunInTransaction fails the test,
 // so the refusal is proved to happen before any write is attempted.
 func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
@@ -494,5 +600,5 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Contains(t, rr.Body.String(), "too long")
 	database.AssertExpectations(t)
-	database.AssertNotCalled(t, "BeginTransaction")
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
 }

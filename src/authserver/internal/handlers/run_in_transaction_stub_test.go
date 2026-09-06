@@ -1,4 +1,4 @@
-package apihandlers
+package handlers
 
 import (
 	"database/sql"
@@ -8,13 +8,15 @@ import (
 )
 
 // runInTransactionStub is what the mock database answers RunInTransaction with in this package.
-// It hands the body tx and returns what the body returned, which is the helper's behaviour on a
-// body that does not deadlock. The commit on nil and the rollback on an error are the real
-// helper's and never reach the mock, so a test that used to assert "nothing committed" asserts
-// instead that the body handed its error to the helper, through bodyErr, which is exactly when
-// the helper rolls back.
+// It hands the body the transaction and returns what the body returned, which is the helper's
+// behaviour on a body that does not deadlock. The commit on nil and the rollback on an error are
+// the real helper's and never reach the mock, so a test that used to assert "nothing committed"
+// asserts instead that the body handed its error to the helper, through bodyErr: that is the
+// same property observed one layer up, since the helper rolls back exactly when the body errs.
 type runInTransactionStub struct {
+	// bodyErr is what the body returned, nil when it asked to commit.
 	bodyErr error
+	// bodyRan reports whether the body was invoked at all.
 	bodyRan bool
 }
 
@@ -22,16 +24,16 @@ type runInTransactionStub struct {
 // returns its error. An optional note is called with "begin" at entry and then with "commit" or
 // "rollback" as the helper would, so an ordering test can still show where the transaction's
 // edges fall relative to the statements inside it and to what the caller does afterwards.
-func expectRunInTransaction(database *mocks_data.Database, tx *sql.Tx, note ...func(string)) *runInTransactionStub {
-	return expectRunInTransactionThenFail(database, tx, nil, note...)
+func expectRunInTransaction(db *mocks_data.Database, tx *sql.Tx, note ...func(string)) *runInTransactionStub {
+	return expectRunInTransactionThenFail(db, tx, nil, note...)
 }
 
 // expectRunInTransactionThenFail is the commit-failure shape: the body runs and returns nil,
 // and the helper then reports commitErr, as it does when the engine refuses the commit. With a
 // nil commitErr it is expectRunInTransaction.
-func expectRunInTransactionThenFail(database *mocks_data.Database, tx *sql.Tx, commitErr error, note ...func(string)) *runInTransactionStub {
+func expectRunInTransactionThenFail(db *mocks_data.Database, tx *sql.Tx, commitErr error, note ...func(string)) *runInTransactionStub {
 	stub := &runInTransactionStub{}
-	database.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
+	db.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
 		for _, n := range note {
 			n("begin")
 		}
@@ -53,6 +55,6 @@ func expectRunInTransactionThenFail(database *mocks_data.Database, tx *sql.Tx, c
 
 // expectRunInTransactionRefused is the shape where the helper cannot open a transaction at all:
 // the body never runs and the helper's error is what the caller sees.
-func expectRunInTransactionRefused(database *mocks_data.Database, err error) {
-	database.EXPECT().RunInTransaction(mock.Anything).Return(err).Once()
+func expectRunInTransactionRefused(db *mocks_data.Database, err error) {
+	db.EXPECT().RunInTransaction(mock.Anything).Return(err).Once()
 }

@@ -37,7 +37,7 @@ var apiTerminateTx = &sql.Tx{}
 func stubTermination(database *mocks_data.Database, userSession *models.UserSession,
 	revokedCodeCount int64, tokens []*models.RefreshToken) {
 
-	database.On("BeginTransaction").Return(apiTerminateTx, nil).Once()
+	expectRunInTransaction(database, apiTerminateTx)
 	database.On("RevokeCodesBySessionIdentifier", apiTerminateTx, userSession.SessionIdentifier).
 		Return(revokedCodeCount, nil).Once()
 	database.On("GetRefreshTokensBySessionIdentifier", apiTerminateTx, userSession.SessionIdentifier).
@@ -52,8 +52,6 @@ func stubTermination(database *mocks_data.Database, userSession *models.UserSess
 		})).Return(nil).Once()
 	}
 	database.On("DeleteUserSession", apiTerminateTx, userSession.Id).Return(nil).Once()
-	database.On("CommitTransaction", apiTerminateTx).Return(nil).Once()
-	database.On("RollbackTransaction", apiTerminateTx).Return(nil).Once()
 }
 
 // adminSessionDeleteRequest builds the DELETE with the chi URL parameter the handler reads.
@@ -136,10 +134,9 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
-	database.On("BeginTransaction").Return(apiTerminateTx, nil).Once()
+	stub := expectRunInTransaction(database, apiTerminateTx)
 	database.On("DeleteUserSession", apiTerminateTx, userSession.Id).
 		Return(errors.New("the session delete failed")).Once()
-	database.On("RollbackTransaction", apiTerminateTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIUserSessionDelete(database, authHelper, auditLogger)
@@ -147,7 +144,7 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+	assert.EqualError(t, stub.bodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
 	// NEITHER event. deleted_user_session would otherwise claim a deletion that rolled back, and
 	// the two emitters are adjacent in the handler, so it is easy to leave the first one outside the
 	// error check.
@@ -171,6 +168,6 @@ func TestHandleAPIUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rr.Code)
 	database.AssertExpectations(t)
 	// No transaction is opened for a session that does not exist.
-	database.AssertNotCalled(t, "BeginTransaction")
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }

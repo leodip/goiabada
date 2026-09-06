@@ -93,6 +93,8 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 			database.On("GetUserById", (*sql.Tx)(nil), userId).
 				Return(&models.User{Id: userId}, nil).Once()
 
+			// Set on the disabling rows, which are the ones that open a transaction.
+			var stub *runInTransactionStub
 			if tc.requestedEnabled {
 				// Enabling: the compare-and-set runs outside a transaction, since there is no
 				// sweep to be atomic with. Both directions go through it, so neither stays on
@@ -100,10 +102,9 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 				database.On("TrySetUserEnabled", (*sql.Tx)(nil), userId, false, true).
 					Return(tc.transitioned, nil).Once()
 			} else {
-				database.On("BeginTransaction").Return(apiRevokeTx, nil).Once()
+				stub = expectRunInTransaction(database, apiRevokeTx)
 				database.On("TrySetUserEnabled", apiRevokeTx, userId, true, false).
 					Return(tc.transitioned, nil).Once()
-				database.On("RollbackTransaction", apiRevokeTx).Return(nil).Once()
 				if tc.transitioned {
 					database.On("IncrementUserAuthStateGeneration", apiRevokeTx, userId).
 						Return(int64(4), nil).Once()
@@ -113,7 +114,6 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 						Return(nil).Once()
 					database.On("GetUserSessionsByUserId", apiRevokeTx, userId).
 						Return([]models.UserSession{}, nil).Once()
-					database.On("CommitTransaction", apiRevokeTx).Return(nil).Once()
 				}
 			}
 
@@ -136,6 +136,14 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 			handler.ServeHTTP(rr, enabledRequest(t, "42", tc.requestedEnabled))
 
 			assert.Equal(t, http.StatusOK, rr.Code)
+			if stub != nil && !tc.transitioned {
+				// Already disabled: the body leaves the helper on the sentinel, so the empty
+				// transaction rolls back rather than commits, and the caller still answers 200.
+				assert.ErrorIs(t, stub.bodyErr, errUserAlreadyDisabled)
+			}
+			if stub != nil && tc.transitioned {
+				assert.NoError(t, stub.bodyErr)
+			}
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
 
@@ -171,11 +179,10 @@ func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	database.On("GetUserById", (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
-	database.On("BeginTransaction").Return(apiRevokeTx, nil).Once()
+	stub := expectRunInTransaction(database, apiRevokeTx)
 	database.On("TrySetUserEnabled", apiRevokeTx, userId, true, false).Return(true, nil).Once()
 	database.On("IncrementUserAuthStateGeneration", apiRevokeTx, userId).
 		Return(int64(0), assert.AnError).Once()
-	database.On("RollbackTransaction", apiRevokeTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIUserEnabledPut(database, auditLogger)
@@ -183,7 +190,7 @@ func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+	assert.ErrorIs(t, stub.bodyErr, assert.AnError, "the body hands its error to the helper, which rolls back")
 	// Not even the pre-existing event: the disable did not happen, so recording it as a user
 	// detail update would be false.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
@@ -267,8 +274,7 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	database.On("GetUserById", (*sql.Tx)(nil), userId).Return(user, nil).Once()
 
 	var calls []string
-	database.On("BeginTransaction").Return(otpDisableTx, nil).
-		Run(func(mock.Arguments) { calls = append(calls, "begin") }).Once()
+	expectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
 	database.On("UpdateUser", otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("ResetUserOTPStep", otpDisableTx, userId).Return(nil).
@@ -279,9 +285,6 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	// kept every live session asserting amr ["pwd","otp"] for it.
 	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, userId).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
-	database.On("CommitTransaction", otpDisableTx).Return(nil).
-		Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
-	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
 
 	auditLogger.On("Log", constants.AuditDisabledOTP, mock.Anything).Return().Once()
 	database.On("GetUserById", (*sql.Tx)(nil), userId).

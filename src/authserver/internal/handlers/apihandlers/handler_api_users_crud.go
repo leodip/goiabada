@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
+	"github.com/pkg/errors"
 )
 
 // HandleAPIUserGet - GET /api/v1/admin/users/{id}
@@ -480,6 +481,12 @@ func HandleAPIUserCreatePost(
 	}
 }
 
+// errUserAlreadyDisabled is what HandleAPIUserEnabledPut's disabling transaction returns when
+// the compare-and-set found the account already disabled. It exists so the body can leave
+// RunInTransaction without committing: a nil return would commit an empty transaction, and
+// any other error would be reported as a fault, when the honest answer is "nothing to do".
+var errUserAlreadyDisabled = errors.New("the user is already disabled")
+
 // HandleAPIUserEnabledPut - PUT /api/v1/admin/users/{id}/enabled
 func HandleAPIUserEnabledPut(
 	database data.Database,
@@ -541,28 +548,31 @@ func HandleAPIUserEnabledPut(
 		// contract is "write then always sweep". Threading a skip through it would put a
 		// behaviour switch in a primitive three other sites share, which is what decision 8
 		// rejected.
+		//
+		// Opened through RunInTransaction, so a deadlock reruns the compare-and-set and the
+		// sweep together (#301). Safe to rerun: the compare-and-set asks the row again on every
+		// attempt, and the sweep reads the sessions and tokens afresh.
 		disableWithRevocation := func() (handlers.RevocationResult, bool, error) {
-			tx, err := database.BeginTransaction()
-			if err != nil {
-				return handlers.RevocationResult{}, false, err
-			}
-			defer database.RollbackTransaction(tx) //nolint:errcheck
+			var result handlers.RevocationResult
+			err := database.RunInTransaction(func(tx *sql.Tx) error {
+				transitioned, err := database.TrySetUserEnabled(tx, userId, true, false)
+				if err != nil {
+					return err
+				}
+				if !transitioned {
+					// Already disabled. Nothing was written, so there is nothing to commit and
+					// nothing to sweep. The sentinel is not a deadlock, so the helper rolls the
+					// empty transaction back once and hands it straight back.
+					return errUserAlreadyDisabled
+				}
 
-			transitioned, err := database.TrySetUserEnabled(tx, userId, true, false)
-			if err != nil {
-				return handlers.RevocationResult{}, false, err
-			}
-			if !transitioned {
-				// Already disabled. Nothing was written, so there is nothing to commit and
-				// nothing to sweep; the deferred rollback discards the empty transaction.
+				result, err = handlers.RevokeUserAuthState(database, tx, userId, "")
+				return err
+			})
+			if errors.Is(err, errUserAlreadyDisabled) {
 				return handlers.RevocationResult{}, false, nil
 			}
-
-			result, err := handlers.RevokeUserAuthState(database, tx, userId, "")
 			if err != nil {
-				return handlers.RevocationResult{}, false, err
-			}
-			if err := database.CommitTransaction(tx); err != nil {
 				return handlers.RevocationResult{}, false, err
 			}
 			return result, true, nil

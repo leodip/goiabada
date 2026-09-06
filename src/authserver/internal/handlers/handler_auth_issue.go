@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -437,128 +438,106 @@ func HandleIssueGet(
 		// Opened HERE rather than higher up so the row is held across as few statements as
 		// possible, and on the authorization code branch only: the implicit flow mints no code
 		// and no refresh token, so it has no durable grant for this to protect (#139 decision 6).
-		tx, err := database.BeginTransaction()
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		defer database.RollbackTransaction(tx) //nolint:errcheck
-
-		// THE USER'S ROW FIRST, above the session row this ceremony is about to take (#139).
 		//
-		// codes.user_id is a foreign key, so the insert below takes a lock on the parent users row
-		// without naming it, and it does so while this transaction is already holding the session
-		// row. Every credential operation goes the other way: a password change, a reset, an
-		// administrator setting a password and disabling or deleting an account all write the
-		// users row and only then reach the sessions and the grants hanging off them. Those two
-		// orders are a cycle. Measured on MySQL and SQL Server it deadlocks with the CREDENTIAL
-		// OPERATION as the victim, which is the worse one to lose: the account owner changing a
-		// password because a session was stolen gets a 500, the session survives, and the racing
-		// ceremony gets its code. Taking the row here puts this ceremony on the same order
-		// everything else already uses, so one of the two simply waits.
-		//
-		// It costs one small UPDATE per authorization code issued, which is the price of the
-		// ordering rather than an incidental write: nothing reads the updated_at it moves.
-		if err := database.AcquireUserRow(tx, user.Id); err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		// THE CLIENT'S ROW NEXT, SHARED, below the user and above the session (#139).
-		//
-		// This transaction is about to insert a code, which is a child of clients, and
-		// commondb.DeleteClient takes the client row exclusively and then reads the sessions
-		// associated with it in order to take their rows too. Without this acquisition that
-		// deletion's list is not closed: an association or a code can be inserted after it read,
-		// and on PostgreSQL the reference itself is no barrier, because FOR KEY SHARE and the
-		// FOR NO KEY UPDATE its acquisition takes do not conflict. Shared rather than exclusive
-		// so that two ceremonies for the same client never queue on each other; only a deletion
-		// of that client does, and it waits out a handful of statements.
-		//
-		// AFTER AcquireUserRow and not before it. Lock queues are fair, so a shared holder that
-		// afterwards reaches for a row ABOVE clients can be part of a cycle with a queued
-		// exclusive request even though nothing is upgraded: measured on MySQL as issuance
-		// holding the users row and waiting for the client, a fresh session holding the client
-		// shared and waiting for the users row through its insert's foreign key, and the
-		// deletion queued exclusively behind both.
-		if err := database.AcquireClientRowShared(tx, issuingClient.Id); err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		// Existence only, deliberately. Ownership and the two timeouts were asked a few statements
-		// ago and are not re-asked here: the only thing this narrower question misses is an idle
-		// timeout elapsing in the microseconds between the two, and buying that would cost a
-		// SELECT on every authorization code issued (#139 decision 7).
-		live, err := database.AcquireUserSessionRow(tx, sessionIdentifier)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		if !live {
-			// Rolled back HERE, explicitly, before the refusal reaches anything. Every path out of
-			// refuseIssuanceUnusableSession touches the database on a nil transaction through the
-			// server-side session store: SaveAuthContext and ClearAuthContext write it and
-			// redirToClientWithError reads the client. On SQLite the whole process shares one
-			// connection, the one this transaction is holding, so leaving the rollback to the
-			// deferred call above would have the refusal wait on itself. The deferred call still
-			// runs and is a no-op against a finished transaction.
+		// Opened through RunInTransaction, so a deadlock reruns the body (#301). It is safe to
+		// rerun: createCodeInput is only read, code is whatever the attempt that committed minted,
+		// and the audit event, the context clear and the redirect all wait below for the helper
+		// to return.
+		var code *models.Code
+		err = database.RunInTransaction(func(tx *sql.Tx) error {
+			// THE USER'S ROW FIRST, above the session row this ceremony is about to take (#139).
 			//
-			// A rollback that FAILS is a 500 rather than a refusal, because the connection is then
-			// still held and the refusal would be the statement that discovers it.
-			if err := database.RollbackTransaction(tx); err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
+			// codes.user_id is a foreign key, so the insert below takes a lock on the parent users row
+			// without naming it, and it does so while this transaction is already holding the session
+			// row. Every credential operation goes the other way: a password change, a reset, an
+			// administrator setting a password and disabling or deleting an account all write the
+			// users row and only then reach the sessions and the grants hanging off them. Those two
+			// orders are a cycle. Measured on MySQL and SQL Server it deadlocks with the CREDENTIAL
+			// OPERATION as the victim, which is the worse one to lose: the account owner changing a
+			// password because a session was stolen gets a 500, the session survives, and the racing
+			// ceremony gets its code. Taking the row here puts this ceremony on the same order
+			// everything else already uses, so one of the two simply waits.
+			//
+			// It costs one small UPDATE per authorization code issued, which is the price of the
+			// ordering rather than an incidental write: nothing reads the updated_at it moves.
+			if err := database.AcquireUserRow(tx, user.Id); err != nil {
+				return err
 			}
 
-			// The gone shape, and it is answered exactly as the liveness read above answers it:
-			// the browser restarts at level 1 and a prompt=none ceremony is told login_required.
-			// The acquisition cannot tell WHY the row is gone, which is #129's own finding, so an
-			// explicit termination, a logout in another tab and either background reaper all get
-			// this one answer (#139 decisions 3 and 9). No code row is written at all, so nothing
-			// is left behind to reap.
+			// THE CLIENT'S ROW NEXT, SHARED, below the user and above the session (#139).
+			//
+			// This transaction is about to insert a code, which is a child of clients, and
+			// commondb.DeleteClient takes the client row exclusively and then reads the sessions
+			// associated with it in order to take their rows too. Without this acquisition that
+			// deletion's list is not closed: an association or a code can be inserted after it read,
+			// and on PostgreSQL the reference itself is no barrier, because FOR KEY SHARE and the
+			// FOR NO KEY UPDATE its acquisition takes do not conflict. Shared rather than exclusive
+			// so that two ceremonies for the same client never queue on each other; only a deletion
+			// of that client does, and it waits out a handful of statements.
+			//
+			// AFTER AcquireUserRow and not before it. Lock queues are fair, so a shared holder that
+			// afterwards reaches for a row ABOVE clients can be part of a cycle with a queued
+			// exclusive request even though nothing is upgraded: measured on MySQL as issuance
+			// holding the users row and waiting for the client, a fresh session holding the client
+			// shared and waiting for the users row through its insert's foreign key, and the
+			// deletion queued exclusively behind both.
+			if err := database.AcquireClientRowShared(tx, issuingClient.Id); err != nil {
+				return err
+			}
+
+			// Existence only, deliberately. Ownership and the two timeouts were asked a few statements
+			// ago and are not re-asked here: the only thing this narrower question misses is an idle
+			// timeout elapsing in the microseconds between the two, and buying that would cost a
+			// SELECT on every authorization code issued (#139 decision 7).
+			live, err := database.AcquireUserSessionRow(tx, sessionIdentifier)
+			if err != nil {
+				return err
+			}
+
+			if !live {
+				// The gone shape, and it is answered exactly as the liveness read above answers it:
+				// the browser restarts at level 1 and a prompt=none ceremony is told login_required.
+				// The acquisition cannot tell WHY the row is gone, which is #129's own finding, so an
+				// explicit termination, a logout in another tab and either background reaper all get
+				// this one answer (#139 decisions 3 and 9). No code row is written at all, so nothing
+				// is left behind to reap. Answered below, once the helper has rolled back: the
+				// sentinel's comment says why that order is not optional.
+				return errIssuanceRefused
+			}
+
+			code, err = codeIssuer.CreateAuthCode(tx, createCodeInput)
+			if err != nil {
+				// The client's registration went away while this ceremony held its place in the queue
+				// behind the deletion, which the shared acquisition above turns from a narrow race
+				// into the reliable outcome of losing it. Answered as the session-gone shape rather
+				// than as a 500: nothing is wrong with this server, the application the browser was
+				// signing in to no longer exists, and the refusal path already knows how to say that
+				// once for an interactive ceremony and once for a silent one. redirectWillBeEmitted
+				// re-reads the registration on its way out and withholds the redirect, so a deleted
+				// client is told on an interstitial rather than by a redirect to an address nobody
+				// owns any more (#248 part 5).
+				if errors.Is(err, oauth.ErrIssuingClientGone) {
+					slog.Warn("the client this ceremony is issuing for no longer exists, refusing to issue a code",
+						"clientIdentifier", authContext.ClientId,
+						"sessionIdentifier", sessionIdentifier)
+					return errIssuanceRefused
+				}
+				return err
+			}
+			return nil
+		})
+		if errors.Is(err, errIssuanceRefused) {
 			refuseIssuanceUnusableSession(w, r, sessionGone, authContext, issuingClient, ambientSession,
 				sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger)
 			return
 		}
 
-		code, err := codeIssuer.CreateAuthCode(tx, createCodeInput)
+		// Everything below this line attests to a write, so it waits for the helper to return,
+		// which is after the commit: the rule TerminateUserSessionTx documents, never attest to a
+		// write that could still roll back. A commit that returns an error leaves the code row's
+		// fate indeterminate, which is the same contract that helper already carries, and the
+		// client is answered with a 500 rather than a code.
 		if err != nil {
-			// The client's registration went away while this ceremony held its place in the queue
-			// behind the deletion, which the shared acquisition above turns from a narrow race
-			// into the reliable outcome of losing it. Answered as the session-gone shape rather
-			// than as a 500: nothing is wrong with this server, the application the browser was
-			// signing in to no longer exists, and the refusal path already knows how to say that
-			// once for an interactive ceremony and once for a silent one. redirectWillBeEmitted
-			// re-reads the registration on its way out and withholds the redirect, so a deleted
-			// client is told on an interstitial rather than by a redirect to an address nobody
-			// owns any more (#248 part 5).
-			if errors.Is(err, oauth.ErrIssuingClientGone) {
-				// Rolled back here explicitly, for the reason stated at the liveness refusal
-				// above: every path out of refuseIssuanceUnusableSession reaches the database on
-				// a nil transaction, and on SQLite the connection it would need is this one.
-				if rollbackErr := database.RollbackTransaction(tx); rollbackErr != nil {
-					httpHelper.InternalServerError(w, r, rollbackErr)
-					return
-				}
-				slog.Warn("the client this ceremony is issuing for no longer exists, refusing to issue a code",
-					"clientIdentifier", authContext.ClientId,
-					"sessionIdentifier", sessionIdentifier)
-				refuseIssuanceUnusableSession(w, r, sessionGone, authContext, issuingClient, ambientSession,
-					sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger)
-				return
-			}
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		// Everything below this line attests to a write, so it waits for the commit, which is the
-		// rule TerminateUserSessionTx documents: never attest to a write that could still roll
-		// back. A commit that returns an error leaves the code row's fate indeterminate, which is
-		// the same contract that helper already carries, and the client is answered with a 500
-		// rather than a code.
-		if err := database.CommitTransaction(tx); err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
@@ -580,6 +559,19 @@ func HandleIssueGet(
 		}
 	}
 }
+
+// errIssuanceRefused is what the issuance transaction returns when the ceremony is to be refused
+// rather than failed: the session row is gone, or the client's registration went away under it.
+// It leaves RunInTransaction without committing and without a fault, and is not a deadlock, so
+// the helper rolls back once and hands it straight back.
+//
+// The refusal runs only AFTER the helper has returned, and that order is not optional (#139).
+// Every path out of refuseIssuanceUnusableSession touches the database on a nil transaction
+// through the server-side session store: SaveAuthContext and ClearAuthContext write it and
+// redirToClientWithError reads the client. On SQLite the whole process shares one connection,
+// the one the transaction was holding, so a refusal issued while it was open would wait on
+// itself. Returning this from inside the closure is what guarantees the rollback comes first.
+var errIssuanceRefused = errors.New("the issuance was refused")
 
 // sessionRefusalShape names which of the three conditions on the session backing a ceremony
 // refuseIssuanceUnusableSession is answering. They are mutually exclusive by construction: a row

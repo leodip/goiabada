@@ -33,7 +33,7 @@ import (
 func AssertGofmted(t *testing.T) {
 	t.Helper()
 
-	root := sourceRoot(t)
+	root := SourceRoot(t)
 
 	var unformatted []string
 	files := 0
@@ -92,14 +92,16 @@ func AssertGofmted(t *testing.T) {
 // that quietly skips it.
 var modules = []string{"core", "authserver", "adminconsole", filepath.Join("cmd", "goiabada-setup")}
 
-// sourceRoot returns the directory holding every module in the repository, found
-// by ascending from the test's working directory.
+// SourceRoot returns the directory holding every module in the repository, found
+// by ascending from the test's working directory. It is what every tree-wide
+// guard walks from: AssertGofmted here, and the bare-BeginTransaction lint in
+// core/data (#301).
 //
 // Ascending rather than accepting a relative path keeps each caller from having
 // to encode how deep its own package sits. That matters because a wrong root is
 // not a loud failure: it walks a directory that exists and holds nothing, and
 // the guard passes.
-func sourceRoot(t *testing.T) string {
+func SourceRoot(t *testing.T) string {
 	t.Helper()
 
 	dir, err := os.Getwd()

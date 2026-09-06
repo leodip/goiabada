@@ -531,17 +531,13 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	tokens := terminationFixture()
 
-	db.On("BeginTransaction").Return(revokeTx, nil).Once()
+	expectRunInTransaction(db, revokeTx)
 	db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).Return(int64(2), nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).Return(tokens, nil).Once()
 	// The two live tokens only. rt-already-gone is not written again.
 	db.On("UpdateRefreshToken", revokeTx, tokens[0]).Return(nil).Once()
 	db.On("UpdateRefreshToken", revokeTx, tokens[1]).Return(nil).Once()
-	db.On("CommitTransaction", revokeTx).Return(nil).Once()
-	// The deferred rollback runs on the success path too, where it is a no-op against a committed
-	// transaction. A test omitting this fails on the strict mock.
-	db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 
 	result, err := TerminateUserSessionTx(db, terminatedSession())
 	require.NoError(t, err)
@@ -593,13 +589,11 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 func TestTerminateUserSessionTx_NothingToRevoke(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	db.On("BeginTransaction").Return(revokeTx, nil).Once()
+	expectRunInTransaction(db, revokeTx)
 	db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).Return(int64(0), nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
 		Return([]*models.RefreshToken{}, nil).Once()
-	db.On("CommitTransaction", revokeTx).Return(nil).Once()
-	db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 
 	result, err := TerminateUserSessionTx(db, terminatedSession())
 	require.NoError(t, err)
@@ -625,7 +619,7 @@ func TestTerminateUserSessionTx_RejectsAnUnusableSession(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires the session to terminate")
 		assert.Equal(t, TerminationResult{}, result)
-		assertNotAttempted(t, db, "BeginTransaction")
+		assertNotAttempted(t, db, "RunInTransaction")
 	})
 
 	t.Run("empty session identifier", func(t *testing.T) {
@@ -641,7 +635,7 @@ func TestTerminateUserSessionTx_RejectsAnUnusableSession(t *testing.T) {
 		// RevokeCodesBySessionIdentifier refuses an empty identifier itself, so the outcome would
 		// be the same three statements later. What this pins is that no transaction was opened
 		// and no write attempted, so a bad argument does not read as a database fault.
-		assertNotAttempted(t, db, "BeginTransaction")
+		assertNotAttempted(t, db, "RunInTransaction")
 	})
 }
 
@@ -662,12 +656,12 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 		extraAssert  func(t *testing.T, result TerminationResult)
 	}{
 		{
-			name: "BeginTransaction fails",
+			// The helper could not open a transaction, so the body never runs.
+			name: "the transaction cannot be opened",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(nil, boom).Once()
+				expectRunInTransactionRefused(db, boom)
 			},
-			// Not even the rollback: there is no transaction to roll back.
-			notAttempted: []string{"DeleteUserSession", "RollbackTransaction"},
+			notAttempted: []string{"DeleteUserSession"},
 		},
 		{
 			// The FIRST write since #139, and the row it takes is what orders this transaction
@@ -676,23 +670,21 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// transaction can be reached past.
 			name: "the deletion fails",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				expectRunInTransaction(db, revokeTx)
 				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
 			notAttempted: []string{"RevokeCodesBySessionIdentifier",
-				"GetRefreshTokensBySessionIdentifier", "CommitTransaction"},
+				"GetRefreshTokensBySessionIdentifier"},
 		},
 		{
 			name: "the code sweep fails",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				expectRunInTransaction(db, revokeTx)
 				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).
 					Return(int64(0), boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
-			notAttempted: []string{"GetRefreshTokensBySessionIdentifier", "CommitTransaction"},
+			notAttempted: []string{"GetRefreshTokensBySessionIdentifier"},
 		},
 		{
 			// KEEP THIS ROW. It is the one that names the property: the sweep returned 2, the
@@ -704,15 +696,14 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// itself, so the failure reads as a contract violation rather than a struct mismatch.
 			name: "the token query fails after the code sweep revoked two codes",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				expectRunInTransaction(db, revokeTx)
 				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).
 					Return(int64(2), nil).Once()
 				db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
 					Return(nil, boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
-			notAttempted: []string{"UpdateRefreshToken", "CommitTransaction"},
+			notAttempted: []string{"UpdateRefreshToken"},
 			extraAssert: func(t *testing.T, result TerminationResult) {
 				assert.Equal(t, int64(0), result.RevokedCodeCount,
 					"the count must not survive a rolled-back transaction")
@@ -722,16 +713,14 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			name: "a token write fails",
 			setup: func(db *mocks_data.Database) {
 				tokens := terminationFixture()
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				expectRunInTransaction(db, revokeTx)
 				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).
 					Return(int64(2), nil).Once()
 				db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
 					Return(tokens, nil).Once()
 				db.On("UpdateRefreshToken", revokeTx, tokens[0]).Return(boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
-			notAttempted: []string{"CommitTransaction"},
 		},
 		{
 			// The one failure whose durable outcome is unknowable, per the helper's comment. The
@@ -739,14 +728,12 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// error may in fact have applied.
 			name: "the commit fails",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				expectRunInTransactionThenFail(db, revokeTx, boom)
 				db.On("DeleteUserSession", revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", revokeTx, terminateSid).
 					Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
 					Return([]*models.RefreshToken{}, nil).Once()
-				db.On("CommitTransaction", revokeTx).Return(boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
 		},
 	}
@@ -794,7 +781,7 @@ func assertNotAttempted(t *testing.T, db *mocks_data.Database, methods ...string
 // nested call is asserted to receive that exact pointer. A nil one would be rejected by
 // RevokeUserAuthState's precondition.
 func stubRevocationSweepTx(database *mocks_data.Database, userId int64, newGeneration int64) {
-	database.On("BeginTransaction").Return(revokeTx, nil).Once()
+	expectRunInTransaction(database, revokeTx)
 	database.On("IncrementUserAuthStateGeneration", revokeTx, userId).
 		Return(newGeneration, nil).Once()
 	database.On("GetRefreshTokensByUserId", revokeTx, userId).
@@ -803,8 +790,6 @@ func stubRevocationSweepTx(database *mocks_data.Database, userId int64, newGener
 		Return(nil).Once()
 	database.On("GetUserSessionsByUserId", revokeTx, userId).
 		Return([]models.UserSession{}, nil).Once()
-	database.On("CommitTransaction", revokeTx).Return(nil).Once()
-	database.On("RollbackTransaction", revokeTx).Return(nil).Once()
 }
 
 // The client whose grants are revoked (#245 stage 4). A different id from every fixture above,
@@ -949,14 +934,10 @@ func TestRevokeClientGrants_RequiresATransaction(t *testing.T) {
 func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	db.On("BeginTransaction").Return(revokeTx, nil).Once()
+	expectRunInTransaction(db, revokeTx)
 	db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(1), nil).Once()
 	db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).
 		Return([]*models.RefreshToken{}, nil).Once()
-	db.On("CommitTransaction", revokeTx).Return(nil).Once()
-	// The deferred rollback runs on the success path too, where it is a no-op against a committed
-	// transaction. A test omitting this fails on the strict mock.
-	db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 
 	var wroteWith *sql.Tx
 	result, err := RevokeClientGrantsTx(db, revokeClientId, func(tx *sql.Tx) (bool, error) {
@@ -971,8 +952,9 @@ func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 
 	// The write happens BEFORE the revocation, so the marker and the sweep observe the client as
 	// it will be after the commit rather than as it was.
-	assert.Less(t, callIndex(t, db, "BeginTransaction"), callIndex(t, db, "RevokeCodesByClientId"))
-	assert.Less(t, callIndex(t, db, "GetRefreshTokensByClientId"), callIndex(t, db, "CommitTransaction"))
+	// RunInTransaction is recorded at entry, before the body runs, so it stands for the opening;
+	// the commit is the helper's and never reaches the mock.
+	assert.Less(t, callIndex(t, db, "RunInTransaction"), callIndex(t, db, "RevokeCodesByClientId"))
 }
 
 // TestRevokeClientGrantsTx_AWriteThatIsNotATransitionCommitsAndRevokesNothing is the other half of
@@ -990,9 +972,7 @@ func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 func TestRevokeClientGrantsTx_AWriteThatIsNotATransitionCommitsAndRevokesNothing(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	db.On("BeginTransaction").Return(revokeTx, nil).Once()
-	db.On("CommitTransaction", revokeTx).Return(nil).Once()
-	db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+	expectRunInTransaction(db, revokeTx)
 
 	wrote := false
 	result, err := RevokeClientGrantsTx(db, revokeClientId, func(tx *sql.Tx) (bool, error) {
@@ -1029,12 +1009,12 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 		extraAssert  func(t *testing.T, result ClientGrantRevocationResult)
 	}{
 		{
-			name: "BeginTransaction fails",
+			// The helper could not open a transaction, so the body never runs.
+			name: "the transaction cannot be opened",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(nil, boom).Once()
+				expectRunInTransactionRefused(db, boom)
 			},
-			// Not even the rollback: there is no transaction to roll back.
-			notAttempted: []string{"RevokeCodesByClientId", "RollbackTransaction"},
+			notAttempted: []string{"RevokeCodesByClientId"},
 		},
 		{
 			// The client write itself failing, which is the case that must not revoke: refusing
@@ -1042,20 +1022,18 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// still confidential.
 			name: "the client write fails",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
+				expectRunInTransaction(db, revokeTx)
 			},
 			write:        func(tx *sql.Tx) (bool, error) { return false, boom },
-			notAttempted: []string{"RevokeCodesByClientId", "GetRefreshTokensByClientId", "CommitTransaction"},
+			notAttempted: []string{"RevokeCodesByClientId", "GetRefreshTokensByClientId"},
 		},
 		{
 			name: "the code marker fails",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				expectRunInTransaction(db, revokeTx)
 				db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(0), boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
-			notAttempted: []string{"GetRefreshTokensByClientId", "CommitTransaction"},
+			notAttempted: []string{"GetRefreshTokensByClientId"},
 		},
 		{
 			// KEEP THIS ROW. It is the one that names the property: the marker returned 2, the
@@ -1064,12 +1042,11 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// reads as a contract violation rather than a struct mismatch.
 			name: "the token query fails after the marker revoked two codes",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				expectRunInTransaction(db, revokeTx)
 				db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(2), nil).Once()
 				db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).Return(nil, boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
-			notAttempted: []string{"UpdateRefreshToken", "CommitTransaction"},
+			notAttempted: []string{"UpdateRefreshToken"},
 			extraAssert: func(t *testing.T, result ClientGrantRevocationResult) {
 				assert.Equal(t, int64(0), result.RevokedCodeCount,
 					"the count must not survive a rolled-back transaction")
@@ -1079,23 +1056,19 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			name: "a token write fails",
 			setup: func(db *mocks_data.Database) {
 				tokens := clientGrantFixture()
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				expectRunInTransaction(db, revokeTx)
 				db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).Return(tokens, nil).Once()
 				db.On("UpdateRefreshToken", revokeTx, tokens[0]).Return(boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
-			notAttempted: []string{"CommitTransaction"},
 		},
 		{
 			name: "the commit fails",
 			setup: func(db *mocks_data.Database) {
-				db.On("BeginTransaction").Return(revokeTx, nil).Once()
+				expectRunInTransactionThenFail(db, revokeTx, boom)
 				db.On("RevokeCodesByClientId", revokeTx, revokeClientId).Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByClientId", revokeTx, revokeClientId).
 					Return([]*models.RefreshToken{}, nil).Once()
-				db.On("CommitTransaction", revokeTx).Return(boom).Once()
-				db.On("RollbackTransaction", revokeTx).Return(nil).Once()
 			},
 			extraAssert: func(t *testing.T, result ClientGrantRevocationResult) {
 				// The honest contract, documented on the helper: a reported commit failure means

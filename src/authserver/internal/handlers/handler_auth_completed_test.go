@@ -149,7 +149,11 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	stubCrossUserTermination := func(database *mocks_data.Database, userSession *models.UserSession,
 		revokedCodeCount int64, tokens []*models.RefreshToken, record func(string)) {
 
-		database.On("BeginTransaction").Return(crossUserTerminateTx, nil).Once()
+		expectRunInTransaction(database, crossUserTerminateTx, func(edge string) {
+			if record != nil && edge == "commit" {
+				record("commit")
+			}
+		})
 		database.On("RevokeCodesBySessionIdentifier", crossUserTerminateTx, userSession.SessionIdentifier).
 			Return(revokedCodeCount, nil).Once()
 		database.On("GetRefreshTokensBySessionIdentifier", crossUserTerminateTx, userSession.SessionIdentifier).
@@ -161,13 +165,6 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			})).Return(nil).Once()
 		}
 		database.On("DeleteUserSession", crossUserTerminateTx, userSession.Id).Return(nil).Once()
-		database.On("CommitTransaction", crossUserTerminateTx).Return(nil).
-			Run(func(mock.Arguments) {
-				if record != nil {
-					record("commit")
-				}
-			}).Once()
-		database.On("RollbackTransaction", crossUserTerminateTx).Return(nil).Once()
 	}
 
 	t.Run("Valid session belonging to another user is terminated and replaced", func(t *testing.T) {
@@ -541,7 +538,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
 
-		assertNotAttempted(t, database, "BeginTransaction", "RevokeCodesBySessionIdentifier",
+		assertNotAttempted(t, database, "RunInTransaction", "RevokeCodesBySessionIdentifier",
 			"GetRefreshTokensBySessionIdentifier", "DeleteUserSession")
 
 		httpHelper.AssertExpectations(t)
@@ -620,10 +617,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// statement that takes the session row, and the two sweeps follow it. So the deferred
 		// rollback runs and nothing was committed. Same failure point the two API callers use.
 		deleteError := errors.New("the session delete failed")
-		database.On("BeginTransaction").Return(crossUserTerminateTx, nil).Once()
+		stub := expectRunInTransaction(database, crossUserTerminateTx)
 		database.On("DeleteUserSession", crossUserTerminateTx, foreignSession.Id).
 			Return(deleteError).Once()
-		database.On("RollbackTransaction", crossUserTerminateTx).Return(nil).Once()
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == deleteError.Error()
@@ -637,7 +633,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// Nothing committed, nothing deleted, and no replacement session. The browser is left
 		// cookied to the session that is still there, which is the fail-closed direction.
-		assertNotAttempted(t, database, "CommitTransaction", "RevokeCodesBySessionIdentifier",
+		assert.ErrorIs(t, stub.bodyErr, deleteError, "the body hands its error to the helper, which rolls back")
+		assertNotAttempted(t, database, "RevokeCodesBySessionIdentifier",
 			"GetRefreshTokensBySessionIdentifier", "UpdateRefreshToken", "UpdateUserSession")
 		userSessionManager.AssertNotCalled(t, "StartNewUserSession", mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)

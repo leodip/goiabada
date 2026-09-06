@@ -35,7 +35,7 @@ var apiRevokeTx = &sql.Tx{}
 // purpose: the sweep table is owned exhaustively by revocation_test.go in the handlers package,
 // and restating it here would mean two places to update.
 func stubSweep(database *mocks_data.Database, userId int64, newGeneration int64) {
-	database.On("BeginTransaction").Return(apiRevokeTx, nil).Once()
+	expectRunInTransaction(database, apiRevokeTx)
 	database.On("IncrementUserAuthStateGeneration", apiRevokeTx, userId).
 		Return(newGeneration, nil).Once()
 	database.On("GetRefreshTokensByUserId", apiRevokeTx, userId).
@@ -44,8 +44,6 @@ func stubSweep(database *mocks_data.Database, userId int64, newGeneration int64)
 		Return(nil).Once()
 	database.On("GetUserSessionsByUserId", apiRevokeTx, userId).
 		Return([]models.UserSession{}, nil).Once()
-	database.On("CommitTransaction", apiRevokeTx).Return(nil).Once()
-	database.On("RollbackTransaction", apiRevokeTx).Return(nil).Once()
 }
 
 func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current, next string) *http.Request {
@@ -93,7 +91,7 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	// The sweep, with the caller's session preserved. Registering the sid-scoped query is what
 	// proves exceptSid was threaded through: with an empty exceptSid the helper never calls it,
 	// and the strict mock would report the expectation unmet.
-	database.On("BeginTransaction").Return(apiRevokeTx, nil).Once()
+	expectRunInTransaction(database, apiRevokeTx)
 	database.On("IncrementUserAuthStateGeneration", apiRevokeTx, int64(42)).
 		Return(int64(8), nil).Once()
 	database.On("GetRefreshTokensByUserId", apiRevokeTx, int64(42)).
@@ -114,8 +112,6 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 		}, nil).Once()
 	database.On("PromoteUserSessionGeneration", apiRevokeTx, int64(100), int64(8)).Return(nil).Once()
 	database.On("DeleteUserSession", apiRevokeTx, int64(200)).Return(nil).Once()
-	database.On("CommitTransaction", apiRevokeTx).Return(nil).Once()
-	database.On("RollbackTransaction", apiRevokeTx).Return(nil).Once()
 
 	auditLogger.On("Log", constants.AuditChangedPassword, mock.Anything).Return().Once()
 	var payload map[string]interface{}
@@ -222,11 +218,10 @@ func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 
 	database.On("GetUserBySubject", (*sql.Tx)(nil), "the-subject").
 		Return(&models.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
-	database.On("BeginTransaction").Return(apiRevokeTx, nil).Once()
+	stub := expectRunInTransaction(database, apiRevokeTx)
 	database.On("SetUserPasswordHash", apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	database.On("IncrementUserAuthStateGeneration", apiRevokeTx, int64(42)).
 		Return(int64(0), errors.New("increment failed")).Once()
-	database.On("RollbackTransaction", apiRevokeTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
@@ -236,7 +231,7 @@ func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+	assert.EqualError(t, stub.bodyErr, "increment failed", "the body hands its error to the helper, which rolls back")
 	// NEITHER event. changed_password would otherwise claim a password change that rolled back.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }

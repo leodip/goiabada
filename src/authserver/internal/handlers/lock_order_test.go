@@ -44,7 +44,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		tx := &sql.Tx{}
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
-		db.On("BeginTransaction").Return(tx, nil).Once()
+		expectRunInTransaction(db, tx)
 		db.On("AcquireUserSessionRow", tx, sid).Return(true, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", tx, sid).
 			Return([]*models.RefreshToken{token}, nil).Once()
@@ -52,22 +52,21 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		db.On("GetUserSessionBySessionIdentifier", tx, sid).
 			Return(&models.UserSession{Id: 9, SessionIdentifier: sid}, nil).Once()
 		db.On("DeleteUserSession", tx, int64(9)).Return(nil).Once()
-		db.On("CommitTransaction", tx).Return(nil).Once()
-		db.On("RollbackTransaction", tx).Return(nil).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, jtis)
+		// RunInTransaction is recorded at entry, before the body runs, so it stands for the
+		// transaction's opening; the commit and the rollback are the helper's and never reach
+		// the mock.
 		assert.Equal(t, []string{
-			"BeginTransaction",
+			"RunInTransaction",
 			"AcquireUserSessionRow",
 			"GetRefreshTokensBySessionIdentifier",
 			"UpdateRefreshToken",
 			"GetUserSessionBySessionIdentifier",
 			"DeleteUserSession",
-			"CommitTransaction",
-			"RollbackTransaction",
 		}, methodOrder(db), "the acquisition must be the transaction's first statement")
 	})
 
@@ -76,7 +75,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		tx := &sql.Tx{}
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
-		db.On("BeginTransaction").Return(tx, nil).Once()
+		expectRunInTransaction(db, tx)
 		// The row is already gone, which is ordinary: an offline grant's tokens are designed
 		// to outlive their session, and the background reapers remove idle sessions routinely.
 		db.On("AcquireUserSessionRow", tx, sid).Return(false, nil).Once()
@@ -84,8 +83,6 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 			Return([]*models.RefreshToken{token}, nil).Once()
 		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", tx, sid).Return(nil, nil).Once()
-		db.On("CommitTransaction", tx).Return(nil).Once()
-		db.On("RollbackTransaction", tx).Return(nil).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
 
@@ -100,9 +97,8 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		tx := &sql.Tx{}
 		boom := errors.New("connection refused")
 
-		db.On("BeginTransaction").Return(tx, nil).Once()
+		stub := expectRunInTransaction(db, tx)
 		db.On("AcquireUserSessionRow", tx, sid).Return(false, boom).Once()
-		db.On("RollbackTransaction", tx).Return(nil).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
 
@@ -110,7 +106,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 			"a statement that did not run has not established anything, so the caller gets a 500")
 		assert.Nil(t, jtis)
 		db.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything)
-		db.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+		assert.ErrorIs(t, stub.bodyErr, boom, "the body hands its error to the helper, which rolls back")
 	})
 
 	t.Run("a code with no session identifier acquires nothing", func(t *testing.T) {
@@ -118,12 +114,10 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		tx := &sql.Tx{}
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
-		db.On("BeginTransaction").Return(tx, nil).Once()
+		expectRunInTransaction(db, tx)
 		db.On("GetRefreshTokensByCodeId", tx, int64(42)).
 			Return([]*models.RefreshToken{token}, nil).Once()
 		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
-		db.On("CommitTransaction", tx).Return(nil).Once()
-		db.On("RollbackTransaction", tx).Return(nil).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42})
 
@@ -138,12 +132,10 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 		tx := &sql.Tx{}
 
-		db.On("BeginTransaction").Return(tx, nil).Once()
+		expectRunInTransaction(db, tx)
 		db.On("AcquireUserSessionRow", tx, sid).Return(true, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", tx, sid).
 			Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", Revoked: true}}, nil).Once()
-		db.On("CommitTransaction", tx).Return(nil).Once()
-		db.On("RollbackTransaction", tx).Return(nil).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
 
