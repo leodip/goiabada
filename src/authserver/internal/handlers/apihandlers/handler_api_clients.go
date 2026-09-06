@@ -66,32 +66,28 @@ import (
 // of the same section still last-write-wins, which is how every entity in this codebase behaves
 // and is a separate, wider question.
 func updateClientNotOwningAuthenticationMode(database data.Database, client *models.Client) error {
-	tx, err := database.BeginTransaction()
-	if err != nil {
-		return err
-	}
-	defer database.RollbackTransaction(tx) //nolint:errcheck
+	// Opened through RunInTransaction, so a deadlock reruns the acquisition, the re-read and the
+	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
+	// this attempt's own lock, and applyPublicClientInvariants is idempotent on the result.
+	return database.RunInTransaction(func(tx *sql.Tx) error {
+		if err := database.AcquireClientRow(tx, client.Id); err != nil {
+			return err
+		}
 
-	if err := database.AcquireClientRow(tx, client.Id); err != nil {
-		return err
-	}
+		current, err := database.GetClientById(tx, client.Id)
+		if err != nil {
+			return err
+		}
+		if current == nil {
+			return errors.WithStack(errors.New("client no longer exists"))
+		}
+		client.IsPublic = current.IsPublic
+		client.ClientSecretEncrypted = current.ClientSecretEncrypted
 
-	current, err := database.GetClientById(tx, client.Id)
-	if err != nil {
-		return err
-	}
-	if current == nil {
-		return errors.WithStack(errors.New("client no longer exists"))
-	}
-	client.IsPublic = current.IsPublic
-	client.ClientSecretEncrypted = current.ClientSecretEncrypted
+		applyPublicClientInvariants(client)
 
-	applyPublicClientInvariants(client)
-
-	if err := database.UpdateClient(tx, client); err != nil {
-		return err
-	}
-	return database.CommitTransaction(tx)
+		return database.UpdateClient(tx, client)
+	})
 }
 
 // applyPublicClientInvariants forces the two columns a public client is not allowed to
@@ -1110,62 +1106,76 @@ func HandleAPIClientWebOriginsPut(
 		// And two administrators saving different lists at once each read the same current list
 		// and each write their own diff of it, producing the union of the two rather than one of
 		// them. AcquireClientRow before the read is what serializes the second case (#250).
-		tx, err := database.BeginTransaction()
+		//
+		// Opened through RunInTransaction, so a deadlock reruns the whole replacement (#301). The
+		// body is safe to rerun: the current list is loaded afresh inside the closure and the
+		// diff is computed from it on every attempt. Each failure is returned wrapped in a
+		// webOriginsWriteFailure that keeps the database's own error in the chain, so the helper's
+		// classifier still sees a deadlock, and nothing is logged or written to the response until
+		// the helper has returned: an attempt that is about to be rerun must not answer.
+		err = database.RunInTransaction(func(tx *sql.Tx) error {
+			if err := database.AcquireClientRow(tx, client.Id); err != nil {
+				return &webOriginsWriteFailure{
+					logMessage: "AuthServer API: Database error acquiring client row for web origins update",
+					response:   "Failed to update web origins", err: err}
+			}
+
+			// Load existing web origins
+			if err := database.ClientLoadWebOrigins(tx, client); err != nil {
+				return &webOriginsWriteFailure{
+					logMessage: "AuthServer API: Database error loading client web origins before update",
+					response:   "Failed to load client web origins", err: err}
+			}
+
+			// The stored value is already canonical, migration 000034 having repaired the rows
+			// written before this endpoint canonicalized, so it is keyed as it stands rather than
+			// lowercased again on the way past.
+			existingSet := make(map[string]int64)
+			for _, wo := range client.WebOrigins {
+				existingSet[wo.Origin] = wo.Id
+			}
+
+			desiredSet := seen
+
+			// Add new origins
+			for _, origin := range normalized {
+				if _, ok := existingSet[origin]; !ok {
+					if err := database.CreateWebOrigin(tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); err != nil {
+						return &webOriginsWriteFailure{
+							logMessage: "AuthServer API: Database error creating web origin",
+							response:   "Failed to update web origins", origin: origin, err: err}
+					}
+				}
+			}
+
+			// Delete removed origins
+			for origin, wid := range existingSet {
+				if _, ok := desiredSet[origin]; !ok {
+					if err := database.DeleteWebOrigin(tx, wid); err != nil {
+						return &webOriginsWriteFailure{
+							logMessage: "AuthServer API: Database error deleting web origin",
+							response:   "Failed to update web origins", origin: origin, err: err}
+					}
+				}
+			}
+			return nil
+		})
 		if err != nil {
-			slog.Error("AuthServer API: Database error beginning transaction for web origins update", "error", err, "clientId", client.Id)
-			writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
-			return
-		}
-		defer database.RollbackTransaction(tx) //nolint:errcheck
-
-		if err := database.AcquireClientRow(tx, client.Id); err != nil {
-			slog.Error("AuthServer API: Database error acquiring client row for web origins update", "error", err, "clientId", client.Id)
-			writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
-			return
-		}
-
-		// Load existing web origins
-		if err := database.ClientLoadWebOrigins(tx, client); err != nil {
-			slog.Error("AuthServer API: Database error loading client web origins before update", "error", err, "clientId", client.Id)
-			writeJSONError(w, "Failed to load client web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
-			return
-		}
-
-		// The stored value is already canonical, migration 000034 having repaired the rows
-		// written before this endpoint canonicalized, so it is keyed as it stands rather than
-		// lowercased again on the way past.
-		existingSet := make(map[string]int64)
-		for _, wo := range client.WebOrigins {
-			existingSet[wo.Origin] = wo.Id
-		}
-
-		desiredSet := seen
-
-		// Add new origins
-		for _, origin := range normalized {
-			if _, ok := existingSet[origin]; !ok {
-				if err := database.CreateWebOrigin(tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); err != nil {
-					slog.Error("AuthServer API: Database error creating web origin", "error", err, "clientId", client.Id, "origin", origin)
-					writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
-					return
-				}
+			// The helper's own failures, a transaction that could not open, a commit that failed
+			// or a deadlock on every attempt, carry no step of their own.
+			failure := &webOriginsWriteFailure{
+				logMessage: "AuthServer API: Database error in the web origins update transaction",
+				response:   "Failed to update web origins", err: err}
+			var stepFailure *webOriginsWriteFailure
+			if errors.As(err, &stepFailure) {
+				failure = stepFailure
 			}
-		}
-
-		// Delete removed origins
-		for origin, wid := range existingSet {
-			if _, ok := desiredSet[origin]; !ok {
-				if err := database.DeleteWebOrigin(tx, wid); err != nil {
-					slog.Error("AuthServer API: Database error deleting web origin", "error", err, "clientId", client.Id, "origin", origin)
-					writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
-					return
-				}
+			attrs := []any{"error", err, "clientId", client.Id}
+			if failure.origin != "" {
+				attrs = append(attrs, "origin", failure.origin)
 			}
-		}
-
-		if err := database.CommitTransaction(tx); err != nil {
-			slog.Error("AuthServer API: Database error committing web origins update", "error", err, "clientId", client.Id)
-			writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
+			slog.Error(failure.logMessage, attrs...)
+			writeJSONError(w, failure.response, "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
 
@@ -1193,6 +1203,25 @@ func HandleAPIClientWebOriginsPut(
 		httpHelper.EncodeJson(w, r, resp)
 	}
 }
+
+// webOriginsWriteFailure names which statement of the web-origins replacement failed, so the
+// handler can log and answer it once RunInTransaction has returned. It wraps the database's own
+// error unchanged, which is what lets the helper's classifier recognise a deadlock through it
+// and rerun the body: a sentinel that hid the driver error would exempt this one transaction
+// from the retry every other owner gets (#301).
+type webOriginsWriteFailure struct {
+	// logMessage is the slog line the handler emits, one per statement.
+	logMessage string
+	// response is the message the client is answered with.
+	response string
+	// origin is the web origin the failed statement was writing; empty for the two statements
+	// that do not name one.
+	origin string
+	err    error
+}
+
+func (f *webOriginsWriteFailure) Error() string { return f.logMessage + ": " + f.err.Error() }
+func (f *webOriginsWriteFailure) Unwrap() error { return f.err }
 
 // HandleAPIClientTokensPut - PUT /api/v1/admin/clients/{id}/tokens
 // Updates token-related settings for a client.

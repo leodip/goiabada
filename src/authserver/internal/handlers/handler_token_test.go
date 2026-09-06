@@ -893,7 +893,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
 		Return(nil, reuseErr)
 
-	database.On("BeginTransaction").Return((*sql.Tx)(nil), nil).Once()
+	stub := expectRunInTransaction(database, nil)
 
 	// The session row is taken first, ahead of the grants that hang off it (#139). Stubbed as
 	// succeeding so this case still fails where it means to, at the token read below.
@@ -904,13 +904,13 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	database.On("GetRefreshTokensBySessionIdentifier", (*sql.Tx)(nil), "sid-reused").
 		Return(nil, dbErr).Once()
 
-	database.On("RollbackTransaction", (*sql.Tx)(nil)).Return(nil).Once()
-
 	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "connection refused")
 	})).Return().Once()
 
 	handler.ServeHTTP(rr, req)
+
+	assert.ErrorIs(t, stub.bodyErr, dbErr, "the body hands its error to the helper, which rolls back")
 
 	httpHelper.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
@@ -953,7 +953,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 		Return(nil, reuseErr)
 
 	beginErr := errors.New("tx begin failed")
-	database.On("BeginTransaction").Return((*sql.Tx)(nil), beginErr).Once()
+	expectRunInTransactionRefused(database, beginErr)
 
 	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "tx begin failed")
@@ -1020,7 +1020,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	// The loser must not mint tokens, and must not run the reuse cascade: no
 	// transaction, no session teardown, no reuse audit.
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "BeginTransaction")
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
 	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }

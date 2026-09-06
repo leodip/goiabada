@@ -110,7 +110,7 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, rr.Code)
 	database.AssertExpectations(t)
-	database.AssertNotCalled(t, "BeginTransaction")
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
 	database.AssertNotCalled(t, "RevokeCodesBySessionIdentifier", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
@@ -130,10 +130,9 @@ func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).
 		Return(&models.User{Id: 42, Enabled: true}, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
-	database.On("BeginTransaction").Return(apiTerminateTx, nil).Once()
+	stub := expectRunInTransaction(database, apiTerminateTx)
 	database.On("DeleteUserSession", apiTerminateTx, int64(100)).
 		Return(errors.New("the session delete failed")).Once()
-	database.On("RollbackTransaction", apiTerminateTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIAccountSessionDelete(database, authHelper, auditLogger)
@@ -141,6 +140,6 @@ func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+	assert.EqualError(t, stub.bodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }

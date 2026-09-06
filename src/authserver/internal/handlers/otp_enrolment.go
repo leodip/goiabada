@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -32,33 +34,35 @@ import (
 // /auth/level2, and promoting that at /auth/completed would leave a session that just
 // enrolled and verified owing another second-factor prompt at once.
 func EnableUserOTPTx(database data.Database, user *models.User) (int64, error) {
-	tx, err := database.BeginTransaction()
+	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
+	// Safe to rerun: the user model was set by the caller before this opened and is written
+	// unchanged on every attempt, and generation is the committing attempt's.
+	var generation int64
+	err := database.RunInTransaction(func(tx *sql.Tx) error {
+		if err := database.UpdateUser(tx, user); err != nil {
+			return err
+		}
+		var err error
+		generation, err = database.IncrementUserOtpConfigGeneration(tx, user.Id)
+		if err != nil {
+			return err
+		}
+		// The pending enrollment this user may have staged is discarded in the same transaction that
+		// establishes the authenticator, so no committed state has OTP enabled with a live seed still
+		// installed. Its error is returned rather than surfaced and ignored, for decision 2's reason
+		// above: a commit that leaves the pending seed alive leaves a credential the server issued
+		// standing on an account that no longer needs one, waiting for the authenticator to be removed.
+		//
+		// Unconditional, so it also covers the browser ceremony, which never installs a pending
+		// enrollment and whose clear is therefore a no-op. Putting it here rather than at the account
+		// API's own enable branch is what makes "an enabled authenticator has no pending seed behind
+		// it" a property of the transaction rather than of one caller (#247).
+		if err := database.ClearPendingOTPEnrollment(tx, user.Id); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		return 0, err
-	}
-	defer database.RollbackTransaction(tx) //nolint:errcheck
-
-	if err := database.UpdateUser(tx, user); err != nil {
-		return 0, err
-	}
-	generation, err := database.IncrementUserOtpConfigGeneration(tx, user.Id)
-	if err != nil {
-		return 0, err
-	}
-	// The pending enrollment this user may have staged is discarded in the same transaction that
-	// establishes the authenticator, so no committed state has OTP enabled with a live seed still
-	// installed. Its error is returned rather than surfaced and ignored, for decision 2's reason
-	// above: a commit that leaves the pending seed alive leaves a credential the server issued
-	// standing on an account that no longer needs one, waiting for the authenticator to be removed.
-	//
-	// Unconditional, so it also covers the browser ceremony, which never installs a pending
-	// enrollment and whose clear is therefore a no-op. Putting it here rather than at the account
-	// API's own enable branch is what makes "an enabled authenticator has no pending seed behind
-	// it" a property of the transaction rather than of one caller (#247).
-	if err := database.ClearPendingOTPEnrollment(tx, user.Id); err != nil {
-		return 0, err
-	}
-	if err := database.CommitTransaction(tx); err != nil {
 		return 0, err
 	}
 	return generation, nil

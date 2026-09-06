@@ -251,17 +251,13 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 		Return(true, nil).Once()
 
 	var calls []string
-	database.On("BeginTransaction").Return(otpDisableTx, nil).
-		Run(func(mock.Arguments) { calls = append(calls, "begin") }).Once()
+	expectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
 	database.On("UpdateUser", otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, user.Id).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 	database.On("ClearPendingOTPEnrollment", otpDisableTx, user.Id).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
-	database.On("CommitTransaction", otpDisableTx).Return(nil).
-		Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
-	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
 
 	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return().Once()
@@ -302,11 +298,10 @@ func TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 	database.On("TryConsumeUserOTPStep", (*sql.Tx)(nil), user.Id, mock.Anything, false).
 		Return(true, nil).Once()
 
-	database.On("BeginTransaction").Return(otpDisableTx, nil).Once()
+	stub := expectRunInTransaction(database, otpDisableTx)
 	database.On("UpdateUser", otpDisableTx, user).Return(nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, user.Id).
 		Return(int64(0), errors.New("the database is unwell")).Once()
-	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
@@ -314,10 +309,9 @@ func TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
-	// Neither is registered on the mock, so reaching either would already fail the test. Saying so
-	// explicitly is the point: nothing commits, and an enable that did not happen is not audited
-	// as one.
-	database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+	// The body handed its error to the helper, which is when the helper rolls back, and an
+	// enable that did not happen is not audited as one.
+	assert.EqualError(t, stub.bodyErr, "the database is unwell")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }
 
@@ -366,8 +360,7 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	var calls []string
-	database.On("BeginTransaction").Return(otpDisableTx, nil).
-		Run(func(mock.Arguments) { calls = append(calls, "begin") }).Once()
+	expectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
 	database.On("UpdateUser", otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("ResetUserOTPStep", otpDisableTx, user.Id).Return(nil).
@@ -378,11 +371,6 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 	// that is gone.
 	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, user.Id).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
-	database.On("CommitTransaction", otpDisableTx).Return(nil).
-		Run(func(mock.Arguments) { calls = append(calls, "commit") }).Once()
-	// Deferred, so it runs after the commit and is a no-op there. Registered rather than asserted:
-	// its absence would mean a failing write left the transaction open.
-	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
 
 	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", constants.AuditDisabledOTP, mock.Anything).Return().Once()
@@ -413,11 +401,10 @@ func TestHandleAPIAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 	user.OTPEnabled = true
 
 	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
-	database.On("BeginTransaction").Return(otpDisableTx, nil).Once()
+	stub := expectRunInTransaction(database, otpDisableTx)
 	database.On("UpdateUser", otpDisableTx, user).Return(nil).Once()
 	database.On("ResetUserOTPStep", otpDisableTx, user.Id).
 		Return(errors.New("the database is unwell")).Once()
-	database.On("RollbackTransaction", otpDisableTx).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
@@ -425,10 +412,9 @@ func TestHandleAPIAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
-	// Neither is registered on the mock, so reaching either would already fail the test. Saying so
-	// explicitly is the point rather than an accident: nothing commits, and a disable that did not
-	// happen is not audited as one.
-	database.AssertNotCalled(t, "CommitTransaction", mock.Anything)
+	// The body handed its error to the helper, which is when the helper rolls back, and a
+	// disable that did not happen is not audited as one.
+	assert.EqualError(t, stub.bodyErr, "the database is unwell")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }
 
@@ -842,14 +828,12 @@ func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 		Return(true, nil).Once()
 
 	tx := &sql.Tx{}
-	database.On("BeginTransaction").Return(tx, nil).Once()
-	database.On("RollbackTransaction", tx).Return(nil).Once()
+	expectRunInTransaction(database, tx)
 	database.On("UpdateUser", tx, user).Return(nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", tx, user.Id).Return(int64(4), nil).Once()
 	// The clear rides in the enable's own transaction, so no committed state has OTP on with a
 	// live seed still installed behind it.
 	database.On("ClearPendingOTPEnrollment", tx, user.Id).Return(nil).Once()
-	database.On("CommitTransaction", tx).Return(nil).Once()
 	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return().Once()
 

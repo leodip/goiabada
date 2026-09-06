@@ -257,7 +257,7 @@ const (
 //   - the credential write and the sweep are in the same transaction, so a user can never end
 //     up with a new password while their old sessions survive, nor a bumped generation with an
 //     unchanged password;
-//   - any failure BEFORE the commit is rolled back atomically, via the deferred rollback;
+//   - any failure BEFORE the commit is rolled back atomically, via the helper's rollback;
 //   - the audit event is the CALLER's job and happens after this returns successfully, because
 //     AuditLogger.Log takes no transaction and a logged revocation that then rolled back would
 //     be a false record (decision 5).
@@ -265,7 +265,7 @@ const (
 // On any error the returned result is the zero value rather than a partially populated one, so
 // a caller that mistakenly audits on the error path cannot emit half-truthful lists.
 //
-// WHAT A COMMIT FAILURE DOES AND DOES NOT GUARANTEE. The deferred rollback covers failures
+// WHAT A COMMIT FAILURE DOES AND DOES NOT GUARANTEE. The helper's rollback covers failures
 // before the commit only. `database/sql` gives no guarantee about a Commit that returns an
 // error: the transaction is finished either way, and the error can mean the server committed
 // and the client never learned of it, for instance a connection lost after the server's commit
@@ -282,22 +282,21 @@ const (
 func RevokeUserAuthStateTx(db data.Database, userId int64, exceptSid string,
 	write func(tx *sql.Tx) error) (RevocationResult, error) {
 
-	tx, err := db.BeginTransaction()
+	// The write and the sweep in one transaction opened through RunInTransaction, so a deadlock
+	// reruns both together (#301). The body is safe to rerun: every write callback is a
+	// compare-and-set or an idempotent column write, the sweep reads the sessions and tokens
+	// afresh on each attempt, and result is whatever the attempt that committed produced.
+	var result RevocationResult
+	err := db.RunInTransaction(func(tx *sql.Tx) error {
+		if err := write(tx); err != nil {
+			return err
+		}
+
+		var err error
+		result, err = RevokeUserAuthState(db, tx, userId, exceptSid)
+		return err
+	})
 	if err != nil {
-		return RevocationResult{}, err
-	}
-	defer db.RollbackTransaction(tx) //nolint:errcheck
-
-	if err := write(tx); err != nil {
-		return RevocationResult{}, err
-	}
-
-	result, err := RevokeUserAuthState(db, tx, userId, exceptSid)
-	if err != nil {
-		return RevocationResult{}, err
-	}
-
-	if err := db.CommitTransaction(tx); err != nil {
 		return RevocationResult{}, err
 	}
 	return result, nil
@@ -372,7 +371,7 @@ type TerminationResult struct {
 // (decision 9, following RevokeUserAuthStateTx).
 //
 // WHAT A COMMIT FAILURE DOES AND DOES NOT GUARANTEE is the contract RevokeUserAuthStateTx
-// documents at length and this shares: the deferred rollback covers failures before the commit
+// documents at length and this shares: the helper's rollback covers failures before the commit
 // only, and `database/sql` promises nothing about a Commit that returns an error. So a 500 from a
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a termination with no audit record of
@@ -392,40 +391,41 @@ func TerminateUserSessionTx(db data.Database, userSession *models.UserSession) (
 		return TerminationResult{}, errors.WithStack(errors.New("terminating a user session requires a session identifier"))
 	}
 
-	tx, err := db.BeginTransaction()
+	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
+	// The body is safe to rerun: it reads nothing from outside the closure but the session it
+	// was handed, and the counts it reports are the committing attempt's.
+	var result TerminationResult
+	err := db.RunInTransaction(func(tx *sql.Tx) error {
+		// First, and the ordering the doc comment above explains rests on it being first (#139).
+		if err := db.DeleteUserSession(tx, userSession.Id); err != nil {
+			return err
+		}
+
+		revokedCodeCount, err := db.RevokeCodesBySessionIdentifier(tx, userSession.SessionIdentifier)
+		if err != nil {
+			return err
+		}
+
+		tokens, err := db.GetRefreshTokensBySessionIdentifier(tx, userSession.SessionIdentifier)
+		if err != nil {
+			return err
+		}
+
+		revokedJtis, err := revokeRefreshTokens(db, tx, tokens)
+		if err != nil {
+			return err
+		}
+
+		result = TerminationResult{
+			RevokedCodeCount:        revokedCodeCount,
+			RevokedRefreshTokenJtis: revokedJtis,
+		}
+		return nil
+	})
 	if err != nil {
 		return TerminationResult{}, err
 	}
-	defer db.RollbackTransaction(tx) //nolint:errcheck
-
-	// First, and the ordering the doc comment above explains rests on it being first (#139).
-	if err := db.DeleteUserSession(tx, userSession.Id); err != nil {
-		return TerminationResult{}, err
-	}
-
-	revokedCodeCount, err := db.RevokeCodesBySessionIdentifier(tx, userSession.SessionIdentifier)
-	if err != nil {
-		return TerminationResult{}, err
-	}
-
-	tokens, err := db.GetRefreshTokensBySessionIdentifier(tx, userSession.SessionIdentifier)
-	if err != nil {
-		return TerminationResult{}, err
-	}
-
-	revokedJtis, err := revokeRefreshTokens(db, tx, tokens)
-	if err != nil {
-		return TerminationResult{}, err
-	}
-
-	if err := db.CommitTransaction(tx); err != nil {
-		return TerminationResult{}, err
-	}
-
-	return TerminationResult{
-		RevokedCodeCount:        revokedCodeCount,
-		RevokedRefreshTokenJtis: revokedJtis,
-	}, nil
+	return result, nil
 }
 
 // ClientGrantRevocationResult reports what revoking one client's grants actually did. It is
@@ -536,7 +536,7 @@ const RevocationReasonClientBecamePublic = "client_became_public"
 //     authentication requirement would then commit with the grants left alive (#245, final review
 //     finding 1). Nothing else may decide this, which is why the signal is a return value here
 //     rather than an argument the caller computes;
-//   - any failure BEFORE the commit is rolled back atomically, via the deferred rollback;
+//   - any failure BEFORE the commit is rolled back atomically, via the helper's rollback;
 //   - the audit event is the CALLER's job and happens after this returns successfully, because
 //     AuditLogger.Log takes no transaction and a logged revocation that then rolled back would be
 //     a false record (#106 decision 5).
@@ -549,7 +549,7 @@ const RevocationReasonClientBecamePublic = "client_became_public"
 // caller that mistakenly audits on the error path cannot emit half-truthful lists.
 //
 // WHAT A COMMIT FAILURE DOES AND DOES NOT GUARANTEE is the contract RevokeUserAuthStateTx
-// documents at length and this shares: the deferred rollback covers failures before the commit
+// documents at length and this shares: the helper's rollback covers failures before the commit
 // only, and `database/sql` promises nothing about a Commit that returns an error. So a 500 from a
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a client left flipped and revoked with
@@ -557,26 +557,27 @@ const RevocationReasonClientBecamePublic = "client_became_public"
 func RevokeClientGrantsTx(db data.Database, clientId int64,
 	write func(tx *sql.Tx) (bool, error)) (ClientGrantRevocationResult, error) {
 
-	tx, err := db.BeginTransaction()
-	if err != nil {
-		return ClientGrantRevocationResult{}, err
-	}
-	defer db.RollbackTransaction(tx) //nolint:errcheck
-
-	revoke, err := write(tx)
-	if err != nil {
-		return ClientGrantRevocationResult{}, err
-	}
-
-	result := ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
-	if revoke {
-		result, err = RevokeClientGrants(db, tx, clientId)
+	// The write and the conditional sweep in one transaction opened through RunInTransaction, so
+	// a deadlock reruns both together (#301). Safe to rerun: the write is the compare-and-set
+	// SetClientPublic followed by an idempotent UpdateClient, its answer is asked again on every
+	// attempt, and result is the committing attempt's.
+	var result ClientGrantRevocationResult
+	err := db.RunInTransaction(func(tx *sql.Tx) error {
+		revoke, err := write(tx)
 		if err != nil {
-			return ClientGrantRevocationResult{}, err
+			return err
 		}
-	}
 
-	if err := db.CommitTransaction(tx); err != nil {
+		result = ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
+		if revoke {
+			result, err = RevokeClientGrants(db, tx, clientId)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		return ClientGrantRevocationResult{}, err
 	}
 	return result, nil

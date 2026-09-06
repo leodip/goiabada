@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -481,30 +482,29 @@ func disableUserOTP(database data.Database, user *models.User) error {
 	user.ClearOTPSecret()
 	user.OTPEnabled = false
 
-	tx, err := database.BeginTransaction()
-	if err != nil {
-		return err
-	}
-	defer database.RollbackTransaction(tx) //nolint:errcheck
-
-	if err := database.UpdateUser(tx, user); err != nil {
-		return err
-	}
-	if err := database.ResetUserOTPStep(tx, user.Id); err != nil {
-		return err
-	}
-	// The counter that tells every one of this user's sessions they owe a second factor
-	// again, advanced inside the same transaction as the removal itself. Being per user is
-	// what makes "every session" one statement: the boolean this replaced was per session
-	// and written only for the caller's own sid, so a user disabling their authenticator
-	// from one device left every other session asserting amr ["pwd","otp"] for an
-	// authenticator that no longer existed (#242 decisions 1 and 2).
-	//
-	// Its error is returned rather than discarded, and that is the other half of decision 2:
-	// a removal that commits without the counter moving is precisely the state the re-prompt
-	// exists to prevent.
-	if _, err := database.IncrementUserOtpConfigGeneration(tx, user.Id); err != nil {
-		return err
-	}
-	return database.CommitTransaction(tx)
+	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
+	// Safe to rerun: the model was cleared above, before the helper opened, and is written
+	// unchanged on every attempt; the reset and the increment carry no state between attempts.
+	return database.RunInTransaction(func(tx *sql.Tx) error {
+		if err := database.UpdateUser(tx, user); err != nil {
+			return err
+		}
+		if err := database.ResetUserOTPStep(tx, user.Id); err != nil {
+			return err
+		}
+		// The counter that tells every one of this user's sessions they owe a second factor
+		// again, advanced inside the same transaction as the removal itself. Being per user is
+		// what makes "every session" one statement: the boolean this replaced was per session
+		// and written only for the caller's own sid, so a user disabling their authenticator
+		// from one device left every other session asserting amr ["pwd","otp"] for an
+		// authenticator that no longer existed (#242 decisions 1 and 2).
+		//
+		// Its error is returned rather than discarded, and that is the other half of decision 2:
+		// a removal that commits without the counter moving is precisely the state the re-prompt
+		// exists to prevent.
+		if _, err := database.IncrementUserOtpConfigGeneration(tx, user.Id); err != nil {
+			return err
+		}
+		return nil
+	})
 }
