@@ -49,16 +49,16 @@ build_platform() {
     echo "Building for $os $arch..."
 
     echo "Building authserver..."
-    ( cd "$SRC_DIR/authserver" && GOOS=$os GOARCH=$arch go build -v -tags=production \
+    ( cd "$SRC_DIR/authserver" && GOOS=$os GOARCH=$arch go build -v -buildvcs=false -tags=production \
         -ldflags "$LDFLAGS" \
         -o "$BUILD_DIR/goiabada-authserver${extension}" \
-        ./cmd/goiabada-authserver/main.go )
+        ./cmd/goiabada-authserver )
 
     echo "Building adminconsole..."
-    ( cd "$SRC_DIR/adminconsole" && GOOS=$os GOARCH=$arch go build -v -tags=production \
+    ( cd "$SRC_DIR/adminconsole" && GOOS=$os GOARCH=$arch go build -v -buildvcs=false -tags=production \
         -ldflags "$LDFLAGS" \
         -o "$BUILD_DIR/goiabada-adminconsole${extension}" \
-        ./cmd/goiabada-adminconsole/main.go )
+        ./cmd/goiabada-adminconsole )
 
     echo "Creating ZIP package for $os $arch..."
     ( cd "$BUILD_DIR" && zip -v "goiabada-${VERSION}-${os}-${arch}.zip" \

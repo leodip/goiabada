@@ -36,6 +36,14 @@ func main() {
 	config.Init()
 	slog.Info("config loaded")
 
+	// The `migrate` subcommand is dispatched here: after the configuration is loaded, because it
+	// needs GOIABADA_DB_*, and before the data-encryption key is validated, because a schema
+	// migration touches no encrypted value and the key would otherwise be a precondition for
+	// repairing a database on a deployment that has not set one (#268).
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		os.Exit(migrateCommand(os.Args[2:]))
+	}
+
 	// Validate the data-encryption key EARLY and initialize the process cipher
 	// before the database is opened: NewDatabase runs the at-rest re-encryption
 	// migration, which needs the key. The key is supplied from the environment

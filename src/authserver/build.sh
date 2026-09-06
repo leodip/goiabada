@@ -16,7 +16,7 @@ rm -f ./tmp/goiabada-authserver
 
 # Build Go binary
 echo "Building Go binary..."
-go build -o ./tmp/goiabada-authserver ./cmd/goiabada-authserver/main.go
+go build -buildvcs=false -o ./tmp/goiabada-authserver ./cmd/goiabada-authserver
 if [ $? -ne 0 ]; then
     echo "Failed to build Go binary"
     exit 1
