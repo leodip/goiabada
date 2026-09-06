@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +29,7 @@ import (
 //	--run TestSeederLowercasesAdminEmail
 func TestSeederLowercasesAdminEmail(t *testing.T) {
 	h := newIsolatedDB(t)
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, gomigrate.ErrNoChange) {
+	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding")
 	}
 

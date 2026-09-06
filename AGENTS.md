@@ -44,6 +44,7 @@ Single `Database` interface (`src/core/data/database.go`) with per-DB implementa
 - All methods accept `tx *sql.Tx` (nil = no transaction)
 - Uses `sqlbuilder` for query building with DB-specific flavors
 - Schema in `src/core/data/sqlitedb/schema.golden` (generated; see **Schema golden files** below)
+- Migrations are applied by Goiabada's own runner in `src/core/data/migrator/`, built per engine by each `NewMigrator()`
 
 **Supported**: SQLite, MySQL, PostgreSQL, SQL Server
 
@@ -294,6 +295,7 @@ every up.sql carrying it, and a `.down.sql` with no statement in it owes
 3. **Rate limiting**: Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, account password and OTP changes, email verification, forgot/reset password, self-registration, activation, DCR). Credential checks count failures only, so a successful attempt spends nothing
 4. **Permissions model**: Resources contain Permissions; Users/Groups/Clients can have Permissions
 5. **Credential form fields**: A handler reads a credential-bearing field (`password`, `passwordConfirmation`, `currentPassword`, `newPassword`, `newPasswordConfirmation`, `otp`, `secretKey`, `base64Image`, `verificationCode`, `clientSecret`) and a form-binding marker (`ceremonyId`, `continuationId`) with `r.PostFormValue`, never `r.FormValue`. `r.FormValue` merges the URL query behind the request body, so the value would be accepted from the request target, where it reaches the browser's history, the `Referer` of anything the page loads, and the access log of every proxy, gateway and CDN in front of the deployment. Every such form is POST-only with a separate GET handler that renders it, so the query is never a submission. Enforced per module by `credential_read_lint_test.go` in each `internal/handlers` package; `handler_authorize.go` is exempt for `state` and `code`, which OIDC Core 3.1.2.1 requires the authorization endpoint to accept over GET as well as POST (#202)
+6. **Transactions**: exist for atomicity, and every one is opened through `RunInTransaction`, which reruns the body when the engine aborts it as a deadlock victim (bounded, then the error surfaces); `begin_transaction_lint_test.go` in `src/core/data` refuses a bare `BeginTransaction` in production code. No lock order is imposed. One property is kept on purpose (#139): a termination deletes the session row first, and issuance takes that row before inserting its code, in one transaction, so a code can never slip between a termination's sweep and its commit. Concurrent transactions on the same account can still deadlock on MySQL, PostgreSQL or SQL Server; the loser is rolled back with nothing half applied and rerun. SQLite has one connection and cannot deadlock. Do not add ordering to prevent a deadlock; add a test that forces it and shows the retry resolves it (#301)
 
 ## API Routes
 

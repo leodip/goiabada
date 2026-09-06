@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
-	gomigrate "github.com/golang-migrate/migrate/v4"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,7 +76,7 @@ func TestMigration000029_CreatedViaDCR(t *testing.T) {
 	// the ORM writes every column the Go models carry, so seeding at 000029 would break
 	// the moment a migration adds one, exactly as it broke the 000026 test when #111
 	// landed users.last_otp_step at 000027.
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, gomigrate.ErrNoChange) {
+	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
 

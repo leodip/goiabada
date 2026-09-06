@@ -111,7 +111,7 @@ func isMySQL000044() bool {
 // previousVersion000044 is the highest migration each engine carries below 000044. Written out
 // rather than derived, so that adding a file to one engine and forgetting this list fails here
 // with a version mismatch rather than silently testing the wrong starting point.
-func previousVersion000044() uint {
+func previousVersion000044() int {
 	switch dbType() {
 	case "mysql":
 		return 42

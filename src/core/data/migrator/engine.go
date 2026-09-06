@@ -79,6 +79,34 @@ type Engine struct {
 // Name is the engine's name, as it appears in a refusal.
 func (e Engine) Name() string { return e.name }
 
+// Lock takes this engine's cross-process migration lock on conn, and Unlock releases it. They
+// are the same statements on the same resource the runner itself uses, exported for the one
+// caller outside this package that has to hold that exact resource: SQL Server's
+// schema_migrations pre-create, which is a check followed by a create and is safe only while the
+// migration lock is held (#293).
+//
+// Both are no-ops on SQLite, which has no session-scoped lock statement at all; the runner
+// excludes itself there with sqliteMigrationMu, which run takes and this pair cannot, since a
+// mutex has to be released by the goroutine that took it and these are two calls.
+//
+// The lock is scoped to the SESSION, so both must be issued on one *sql.Conn pinned out of the
+// pool. Against a pooled *sql.DB the release can land on a different session and leave the lock
+// held for the life of the process, blocking every later migrator on the database.
+func (e Engine) Lock(ctx context.Context, conn *sql.Conn) error {
+	if e.lock == nil {
+		return nil
+	}
+	return e.lock(ctx, conn)
+}
+
+// Unlock releases what Lock took, on the same connection. See Lock.
+func (e Engine) Unlock(ctx context.Context, conn *sql.Conn) error {
+	if e.unlock == nil {
+		return nil
+	}
+	return e.unlock(ctx, conn)
+}
+
 func questionMark(int) string { return "?" }
 
 // SQLite has no lock statement and no transaction to sit inside, since the runner opens one

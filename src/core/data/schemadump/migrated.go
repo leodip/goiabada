@@ -9,9 +9,9 @@ import (
 // schema_migrations, which is the number the golden file's header records (#288).
 //
 // The query is the same on all four engines, unlike everything else this package reads,
-// because schema_migrations is not a catalog view: it is a table golang-migrate created and
+// because schema_migrations is not a catalog view: it is a table Goiabada creates and
 // #284 pinned to one shape on all four, so `SELECT version, dirty FROM schema_migrations` is
-// literally golang-migrate's own Version() query.
+// literally the query the runner reads it with.
 //
 // Every failure is an error and never a zero. A reader that answered 0 when the table was
 // missing, empty or unreadable would make the version rule compare 0 against 0 and pass on a

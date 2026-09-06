@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
-	gomigrate "github.com/golang-migrate/migrate/v4"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,7 +70,7 @@ func TestMigration000033_PublicClientsRequirePKCE(t *testing.T) {
 	// do. Calling it anyway is what keeps the seed at head once later migrations land: the ORM
 	// writes every column the Go models carry, so seeding at 000033 would break the moment a
 	// migration adds one.
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, gomigrate.ErrNoChange) {
+	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
 

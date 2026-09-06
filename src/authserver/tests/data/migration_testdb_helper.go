@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/leodip/goiabada/core/data/mysqldb"
 	"github.com/leodip/goiabada/core/data/postgresdb"
@@ -47,7 +47,11 @@ const (
 type isolatedDB struct {
 	DB       data.Database      // concrete dialect DB (implements the interface)
 	SQL      *sql.DB            // raw handle for seeding / asserting
-	Migrator *gomigrate.Migrate // bound to DB, starts at version 0
+	Migrator *migrator.Migrator // bound to DB, starts at version 0
+	// Name is the database on the server, which is what the migration lock's resource name
+	// is computed over. SQLite has no server-side name and leaves it empty; nothing there
+	// contends, since that engine has no session-scoped lock statement (#268).
+	Name string
 }
 
 var isolatedDBCounter atomic.Int64
@@ -76,7 +80,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: dsn}, false)
 		require.NoError(t, err, "NewSQLiteDatabase")
 		t.Cleanup(func() { _ = db.DB.Close() }) // temp dir is removed by t.TempDir
-		return newIsolated(t, db, db.DB)
+		return newIsolated(t, db, db.DB, "")
 
 	case "mysql":
 		name := isolatedDBName()
@@ -87,7 +91,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		require.NoError(t, err, "NewMySQLDatabase")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMySQL(t, cfg, name) })
 		assertCreatedDatabaseCollation(t, db.DB)
-		return newIsolated(t, db, db.DB)
+		return newIsolated(t, db, db.DB, name)
 
 	case "postgres":
 		name := isolatedDBName()
@@ -97,7 +101,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		}, false)
 		require.NoError(t, err, "NewPostgresDatabase")
 		t.Cleanup(func() { _ = db.DB.Close(); dropPostgres(t, cfg, name) })
-		return newIsolated(t, db, db.DB)
+		return newIsolated(t, db, db.DB, name)
 
 	case "mssql":
 		name := isolatedDBName()
@@ -108,7 +112,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		require.NoError(t, err, "NewMsSQLDatabase")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
 		assertCreatedDatabaseCollation(t, db.DB)
-		return newIsolated(t, db, db.DB)
+		return newIsolated(t, db, db.DB, name)
 
 	default:
 		t.Fatalf("unsupported db type %q", dbType())
@@ -182,17 +186,19 @@ func readDatabaseDefaultCollation(t *testing.T, sqlDB *sql.DB) string {
 // NewMigrator via the seam added in chunk 3).
 type migratable interface {
 	data.Database
-	NewMigrator() (*gomigrate.Migrate, error)
+	NewMigrator() (*migrator.Migrator, error)
 }
 
-func newIsolated(t *testing.T, db migratable, sqlDB *sql.DB) *isolatedDB {
+// newIsolated binds a migrator to the database and registers no cleanup for it. There is
+// nothing to release: the runner takes a connection out of the pool for one operation and
+// gives it back before returning, where golang-migrate's drivers pinned one for the life of
+// the instance and had to be closed (#268 decision 8). The per-dialect close and drop are
+// still registered by the caller, and they are now the whole of it.
+func newIsolated(t *testing.T, db migratable, sqlDB *sql.DB, name string) *isolatedDB {
 	t.Helper()
 	m, err := db.NewMigrator()
 	require.NoError(t, err, "NewMigrator")
-	// Release the migrator's source + database resources. Registered after the
-	// per-dialect close/drop cleanup, so (LIFO) it runs first, before the drop.
-	t.Cleanup(func() { _, _ = m.Close() })
-	return &isolatedDB{DB: db, SQL: sqlDB, Migrator: m}
+	return &isolatedDB{DB: db, SQL: sqlDB, Migrator: m, Name: name}
 }
 
 // The shapes and the dumper live in the core module now, at data/schemadump, because the
@@ -382,7 +388,7 @@ func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
 	require.Equal(t, collation, readDatabaseDefaultCollation(t, db.DB),
 		"NewMsSQLDatabase with Create false must leave the operator's database exactly as it found it")
 
-	return newIsolated(t, db, db.DB)
+	return newIsolated(t, db, db.DB, name)
 }
 
 // msSQLMasterDSN is the connection string for the master database, which is where a

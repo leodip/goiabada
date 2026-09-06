@@ -19,10 +19,10 @@ import (
 // the final state on both counts since its own 000007 and 000011, so it gets no file.
 //
 // predecessor000039 is the version this migration follows ON THIS ENGINE. The histories
-// are sparse and golang-migrate's read() calls versionExists(to) before doing anything,
-// so Migrate(38) fails outright on sqlite, mysql and postgres rather than migrating to
-// the nearest version they do have.
-func predecessor000039() uint {
+// are sparse and the runner refuses a target its source does not carry, so Migrate(38)
+// fails outright on sqlite, mysql and postgres rather than migrating to the nearest
+// version they do have.
+func predecessor000039() int {
 	switch dbType() {
 	case "mysql":
 		return 37 // 000037 is MySQL's own, the audit_logs default
