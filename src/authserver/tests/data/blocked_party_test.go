@@ -16,8 +16,9 @@ import (
 
 // A CONCURRENCY TEST THAT CANNOT SEE THE OTHER PARTY BLOCK MEASURES NOTHING.
 //
-// Every test in this package that claims a lock order works does so by holding one transaction
-// open, sending a second one at the same rows, and requiring that neither is aborted. That claim
+// Every test in this package that claims two transactions wait for each other does so by holding
+// one transaction open, sending a second one at the same rows, and requiring that neither is
+// aborted. That claim
 // is only worth anything if the second transaction genuinely reached the lock and waited. Sleeping
 // for a fixed interval and then asserting on the outcome does not establish that: a goroutine the
 // scheduler has not run yet satisfies a sleep exactly as well as a goroutine stuck on a row lock,

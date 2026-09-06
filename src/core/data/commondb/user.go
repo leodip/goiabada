@@ -11,58 +11,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// AcquireUserRow takes the user's row and holds it for the rest of the caller's transaction. It
-// is one unconditional UPDATE that writes only updated_at, which nothing here reads.
-//
-// WHAT IT BUYS. codes.user_id and refresh_tokens.user_id are foreign keys to users.id on all four
-// engines, so a transaction that inserts a code or a token takes a lock on the parent users row
-// without ever naming it. Meanwhile every credential operation writes users first, through the
-// caller's own credential write and IncrementUserAuthStateGeneration, and only then deletes the
-// user's sessions and sweeps their grants. So one family takes user_sessions then users and the
-// other takes users then user_sessions, and two transactions that each hold half of what the
-// other wants deadlock. Calling this first puts both families on one order: users, then
-// user_sessions, then the grants.
-//
-// Measured rather than assumed, on the branch that introduced the cycle: an authorization
-// ceremony racing a password change deadlocks on MySQL and SQL Server with the CREDENTIAL
-// OPERATION chosen as the victim, so the password does not change, the session it was ending
-// survives and the refresh token it was revoking stays valid. PostgreSQL escapes it only by
-// accident, because IncrementUserAuthStateGeneration updates a non-key column and so takes FOR
-// NO KEY UPDATE, which does not conflict with the FOR KEY SHARE an insert takes on its parent;
-// that is a property of which columns the statement happens to touch rather than a rule anyone
-// stated, so it is not something to rely on. SQLite is safe because a process runs one
-// connection (#139).
-//
-// A user that is not there affects no rows and is not reported, which is AcquireClientRow's own
-// reasoning: there is nothing to hold, and every caller either loaded the row already or has a
-// statement below that decides existence. Answering it twice would put the same sentence in two
-// places and let them disagree.
-//
-// The transaction is required rather than optional. Without one the statement autocommits and
-// drops the row before the caller takes anything below it.
-func (d *CommonDatabase) AcquireUserRow(tx *sql.Tx, userId int64) error {
-
-	if tx == nil {
-		return errors.WithStack(errors.New("acquiring a user row requires a transaction: an autocommitted statement releases the row before the caller can use it"))
-	}
-
-	if userId == 0 {
-		return errors.WithStack(errors.New("can't acquire a user row with an id of 0"))
-	}
-
-	acquire := sqlbuilder.NewUpdateBuilder()
-	acquire.Update("users")
-	acquire.Set(acquire.Assign("updated_at", time.Now().UTC()))
-	acquire.Where(acquire.Equal("id", userId))
-
-	query, args := acquire.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSql(tx, query, args...); err != nil {
-		return errors.Wrap(err, "unable to acquire user row")
-	}
-
-	return nil
-}
-
 func (d *CommonDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 
 	now := time.Now().UTC()
@@ -630,42 +578,27 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	return users, count, nil
 }
 
-// DeleteUser removes the user and, by ON DELETE CASCADE, every row that
-// references it. Refresh tokens are cleared explicitly first because SQL Server
-// cannot cascade them: see deleteRefreshTokensByColumn.
+// DeleteUser removes the user and, by ON DELETE CASCADE, every row that references it.
+// Refresh tokens are cleared explicitly first because SQL Server cannot cascade them: see
+// deleteRefreshTokensByColumn.
 //
-// THE SESSION ROWS GO BEFORE BOTH OF THOSE, and the order is load bearing rather
-// than tidiness to be folded back into the cascade (#139). This is not a pure
-// cascade: Go chooses to delete refresh_tokens before users, so this transaction
-// takes refresh_tokens and then, through the cascade on the users row,
-// user_sessions and codes. An authorization ceremony takes user_sessions and then
-// codes, so with the two overlapping they deadlock on PostgreSQL, MySQL and SQL
-// Server, with the ceremony chosen as the victim. Deleting the user's session rows
-// explicitly first puts this transaction on the same lock order as every other one
-// that writes a session and that session's grants, and it is clean on all four
-// engines in both orderings. Same rows and same outcome either way: the cascade
-// would have removed these rows anyway, one statement later.
+// THE SESSION ROWS GO BEFORE BOTH OF THOSE, and the order is load bearing rather than
+// tidiness to be folded back into the cascade. The cascade would remove the same rows one
+// statement later, so nothing about the outcome changes; what changes is which row this
+// transaction writes first. A termination of one of these sessions, the replay response to a
+// reused code and an authorization ceremony all write the session row before anything that
+// hangs off it, so a delete that starts on the same row waits behind them, or they behind it,
+// instead of each holding half of what the other wants and reaching the retry (#139, #301).
+// Measured clean against a ceremony holding the session row, in both orderings, on all four
+// engines.
 //
-// DeleteClient reaches the same rule from the other side (#139 stage 7). Its
-// cascade never touches user_sessions, so it writes no session row of its own,
-// but it does write that session's user_session_clients rows and codes, which
-// every session-side transaction already holds by cascade from the session row it
-// took first. It therefore takes the clients row exclusively, reads the sessions
-// associated with it and takes those rows before deleting anything: users, then
-// clients, then user_sessions, then the grants, the same order as here.
+// No users row is acquired ahead of the loop. The final DELETE takes that row itself, and a
+// credential change for the same user, which writes the users row first, is the one pair this
+// shape can still deadlock with; that pair is answered by RunInTransaction rerunning the
+// victim rather than by an ordering here.
 func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 
 	return d.inTransaction(tx, func(tx *sql.Tx) error {
-		// THE USER'S ROW FIRST, above the session rows below it (#139). Before the session
-		// hoist this transaction reached users through DELETE FROM users and so agreed with
-		// the credential operations, which write that row before they touch a session. The
-		// hoist inverted it, and a user delete racing a password change for the same user
-		// then deadlocks on PostgreSQL, MySQL and SQL Server. This restores the order the
-		// hoist took away without giving the session rows back their old position.
-		if err := d.AcquireUserRow(tx, userId); err != nil {
-			return err
-		}
-
 		sessions, err := d.GetUserSessionsByUserId(tx, userId)
 		if err != nil {
 			return err
@@ -673,8 +606,8 @@ func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 
 		// Ordered by id so several sessions are always taken in the same sequence.
 		// GetUserSessionsByUserId carries no ORDER BY of its own, so two transactions of
-		// this shape could otherwise take the same two rows in opposite orders, which is a
-		// cycle among sessions that no rule about the order of TABLES can reach (#139).
+		// this shape could otherwise take the same two rows in opposite orders and deadlock
+		// on nothing but the order the engine returned them in (#139).
 		sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
 
 		for i := range sessions {

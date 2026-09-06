@@ -950,20 +950,16 @@ func TestInsertAuditLogWithoutId_SurvivesADriverThatRefusesLastInsertId(t *testi
 		"and the failure is the id read rather than the insert")
 }
 
-// TestBackfillLowercaseEmails_TheUsersRowIsTakenFirst pins the top of the lock order for the one
-// site in #139 that reaches it without an explicit acquisition.
+// TestBackfillLowercaseEmails_TheUsersRowIsTakenFirst pins that the guarded disable is the first
+// statement disableAndRevoke writes.
 //
-// Every application transaction that writes a user_sessions row and that session's grants takes
-// the users row first, then the sessions, then the grants (#139 decisions 10 and 11). The
-// authorization ceremony and commondb.DeleteUser say so out loud, with AcquireUserRow. This one
-// does not, and the reason it does not is that its first statement, the guarded disable, IS a
-// write to that row: adding an acquisition above it would issue the same UPDATE twice.
-//
-// That reasoning is only true while the guarded disable is genuinely first. Nothing about the
-// function's shape enforces it, and reading a generation before disabling, or hoisting the session
-// read for tidiness, would silently invert the order against every credential path and against the
-// ceremony, which is the cycle that deadlocks on MySQL and SQL Server with the credential
-// operation as the victim. A test is the only thing holding it.
+// The reason is local to that transaction. The guarded disable is its classification: the row
+// it affects is the transition, and affecting none means somebody else already disabled this
+// loser, so the function returns having touched no session and no grant. A statement hoisted
+// above it, a generation read or the session read moved up for tidiness, would run on the
+// branch that is supposed to touch nothing, and would take rows that a termination or a
+// ceremony for the same account is about to want, for no outcome at all. Nothing about the
+// function's shape enforces the order, so a test is what holds it.
 //
 // The statement is identified by its arguments rather than by its query text, which is this
 // file's convention: the guarded disable is the only statement in the sequence that carries the
@@ -996,7 +992,7 @@ func TestBackfillLowercaseEmails_TheUsersRowIsTakenFirst(t *testing.T) {
 
 	assert.True(t, carriesTheGuard(d.execArgs[0]),
 		"the guarded disable of the users row must be the FIRST statement the transaction writes, "+
-			"because it is what takes the row every other statement below it sits under; found %v",
+			"because it is what decides whether anything below it runs at all; found %v",
 		d.execArgs[0])
 }
 

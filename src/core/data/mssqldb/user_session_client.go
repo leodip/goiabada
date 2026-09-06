@@ -70,10 +70,6 @@ func (d *MsSQLDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSe
 	return d.CommonDB.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
 }
 
-func (d *MsSQLDatabase) GetUserSessionClientsByClientId(tx *sql.Tx, clientId int64) ([]models.UserSessionClient, error) {
-	return d.CommonDB.GetUserSessionClientsByClientId(tx, clientId)
-}
-
 func (d *MsSQLDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
 	return d.CommonDB.GetUserSessionClientsByUserSessionId(tx, userSessionId)
 }

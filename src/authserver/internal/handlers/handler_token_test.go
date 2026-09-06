@@ -2344,3 +2344,131 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 	})
 }
+
+// TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst pins the one order the replay response keeps
+// on purpose: the session row is taken before any grant that hangs off it.
+//
+// The reason is local to this transaction and obliges no other site. A termination of the same
+// session deletes that row as its first statement, so with the acquisition leading the two
+// serialize on the row and one waits; written the other way round this transaction takes
+// refresh_tokens and then user_sessions while the termination takes them in the opposite order,
+// and the pair deadlocks on MySQL and SQL Server with the replay the victim. The retry would
+// answer that by rerunning it, at the cost of a rerun and a second audit-free pass on every such
+// race, and the replayed request would answer 500 once the retries were spent (#139, #301).
+//
+// Order is the only thing a mock can answer here, and it is the thing that matters: what two real
+// transactions of these shapes do to each other is the data tier's, in
+// TestLockOrder_ReplayResponseAgainstTermination.
+func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
+	const sid = "sid-reused"
+
+	t.Run("the session row is taken before any grant is read", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		tx := &sql.Tx{}
+		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+
+		expectRunInTransaction(db, tx)
+		db.On("AcquireUserSessionRow", tx, sid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", tx, sid).
+			Return([]*models.RefreshToken{token}, nil).Once()
+		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", tx, sid).
+			Return(&models.UserSession{Id: 9, SessionIdentifier: sid}, nil).Once()
+		db.On("DeleteUserSession", tx, int64(9)).Return(nil).Once()
+
+		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"rt-1"}, jtis)
+		// RunInTransaction is recorded at entry, before the body runs, so it stands for the
+		// transaction's opening; the commit and the rollback are the helper's and never reach
+		// the mock.
+		assert.Equal(t, []string{
+			"RunInTransaction",
+			"AcquireUserSessionRow",
+			"GetRefreshTokensBySessionIdentifier",
+			"UpdateRefreshToken",
+			"GetUserSessionBySessionIdentifier",
+			"DeleteUserSession",
+		}, methodOrder(db), "the acquisition must be the transaction's first statement")
+	})
+
+	t.Run("the acquisition's answer is not a branch", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		tx := &sql.Tx{}
+		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+
+		expectRunInTransaction(db, tx)
+		// The row is already gone, which is ordinary: an offline grant's tokens are designed
+		// to outlive their session, and the background reapers remove idle sessions routinely.
+		db.On("AcquireUserSessionRow", tx, sid).Return(false, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", tx, sid).
+			Return([]*models.RefreshToken{token}, nil).Once()
+		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", tx, sid).Return(nil, nil).Once()
+
+		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"rt-1"}, jtis,
+			"the replay must still revoke the grant's tokens when the session row has gone")
+		assert.True(t, token.Revoked)
+	})
+
+	t.Run("an acquisition that errors stops before any grant is read", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		tx := &sql.Tx{}
+		boom := errors.New("connection refused")
+
+		stub := expectRunInTransaction(db, tx)
+		db.On("AcquireUserSessionRow", tx, sid).Return(false, boom).Once()
+
+		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
+
+		require.ErrorIs(t, err, boom,
+			"a statement that did not run has not established anything, so the caller gets a 500")
+		assert.Nil(t, jtis)
+		db.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything)
+		assert.ErrorIs(t, stub.bodyErr, boom, "the body hands its error to the helper, which rolls back")
+	})
+
+	t.Run("a code with no session identifier acquires nothing", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		tx := &sql.Tx{}
+		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+
+		expectRunInTransaction(db, tx)
+		db.On("GetRefreshTokensByCodeId", tx, int64(42)).
+			Return([]*models.RefreshToken{token}, nil).Once()
+		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
+
+		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42})
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"rt-1"}, jtis)
+		// No row carries an empty session identifier, so the statement would refuse the
+		// argument, and the code-id-scoped fallback writes no session row to order against.
+		db.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything)
+	})
+
+	t.Run("#77's guard survives the acquisition", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		tx := &sql.Tx{}
+
+		expectRunInTransaction(db, tx)
+		db.On("AcquireUserSessionRow", tx, sid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", tx, sid).
+			Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", Revoked: true}}, nil).Once()
+
+		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
+
+		require.NoError(t, err)
+		assert.Empty(t, jtis)
+		// The losing racer of a concurrent redemption finds nothing to revoke and must leave
+		// the winner's session row in place. It HOLDS that row for the rest of the
+		// transaction, which is what the acquisition's comment is about, but it still must
+		// not delete it.
+		db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything)
+	})
+}

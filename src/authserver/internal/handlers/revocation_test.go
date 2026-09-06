@@ -1101,3 +1101,107 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 		})
 	}
 }
+
+// methodOrder is the sequence of database methods a call issued. Every other assertion in this
+// file is about WHAT a function wrote; the two tests below are about WHEN, so the order is what
+// has to be pinned, and testify records it whether or not the expectations were registered in
+// that order.
+func methodOrder(db *mocks_data.Database) []string {
+	order := make([]string, 0, len(db.Calls))
+	for _, call := range db.Calls {
+		order = append(order, call.Method)
+	}
+	return order
+}
+
+// TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep pins the one order this
+// transaction keeps on purpose: the session rows are written before the token sweep, under the
+// generation increment.
+//
+// The reason is local to this transaction and obliges no other site. A termination of one of
+// these sessions deletes the session row as its first statement, so with the session block
+// leading the two serialize on that row and one waits; written the other way round this one
+// takes refresh_tokens and then user_sessions while the termination takes them in the opposite
+// order, and the pair deadlocks on MySQL and SQL Server. The retry would answer that by rerunning
+// the victim, so what the order buys is a wait instead of a rerun on every such race (#139, #301).
+//
+// Order is the only thing a mock can answer here, and it is the thing that matters: what two real
+// transactions of these shapes do to each other is the data tier's.
+func TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep(t *testing.T) {
+	t.Run("the session block precedes both refresh-token reads", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+
+		db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
+			Return(revokeNewGeneration, nil).Once()
+		db.On("GetUserSessionsByUserId", revokeTx, revokeUserId).Return([]models.UserSession{
+			{Id: 10, SessionIdentifier: revokeKeepSid},
+			{Id: 20, SessionIdentifier: revokeOtherSid},
+		}, nil).Once()
+		db.On("PromoteUserSessionGeneration", revokeTx, int64(10), revokeNewGeneration).
+			Return(nil).Once()
+		db.On("DeleteUserSession", revokeTx, int64(20)).Return(nil).Once()
+		db.On("GetRefreshTokensByUserId", revokeTx, revokeUserId).
+			Return([]*models.RefreshToken{token}, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", revokeTx, revokeKeepSid).
+			Return([]*models.RefreshToken{}, nil).Once()
+		db.On("UpdateRefreshToken", revokeTx, token).Return(nil).Once()
+		db.On("PromoteRefreshTokenGenerations", revokeTx, []int64{}, revokeNewGeneration).
+			Return(nil).Once()
+
+		result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, revokeKeepSid)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{revokeOtherSid}, result.TerminatedSessionIdentifiers)
+		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
+		assert.Equal(t, []string{
+			"IncrementUserAuthStateGeneration",
+			"GetUserSessionsByUserId",
+			"PromoteUserSessionGeneration",
+			"DeleteUserSession",
+			"GetRefreshTokensByUserId",
+			"GetRefreshTokensBySessionIdentifier",
+			"UpdateRefreshToken",
+			"PromoteRefreshTokenGenerations",
+		}, methodOrder(db),
+			"the session writes must precede both refresh-token reads, under the increment")
+	})
+
+	t.Run("several sessions are taken in ascending id order", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+
+		db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
+			Return(revokeNewGeneration, nil).Once()
+		// The order the engine chose to return them in. GetUserSessionsByUserId carries no
+		// ORDER BY, so this is a shape it really can produce.
+		db.On("GetUserSessionsByUserId", revokeTx, revokeUserId).Return([]models.UserSession{
+			{Id: 30, SessionIdentifier: "sid-c"},
+			{Id: 10, SessionIdentifier: "sid-a"},
+			{Id: 20, SessionIdentifier: "sid-b"},
+		}, nil).Once()
+		db.On("DeleteUserSession", revokeTx, mock.AnythingOfType("int64")).Return(nil).Times(3)
+		db.On("GetRefreshTokensByUserId", revokeTx, revokeUserId).
+			Return([]*models.RefreshToken{}, nil).Once()
+		db.On("PromoteRefreshTokenGenerations", revokeTx, []int64{}, revokeNewGeneration).
+			Return(nil).Once()
+
+		result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, "")
+
+		require.NoError(t, err)
+
+		// Two transactions of this shape taking the same two rows in opposite orders deadlock
+		// on nothing but the order the engine returned them in, which is why the loop sorts
+		// rather than trusting the query (#139).
+		var deleted []int64
+		for _, call := range db.Calls {
+			if call.Method == "DeleteUserSession" {
+				deleted = append(deleted, call.Arguments.Get(1).(int64))
+			}
+		}
+		assert.Equal(t, []int64{10, 20, 30}, deleted,
+			"the session rows must be taken in a fixed order, whatever order the query returned them in")
+
+		// And the reported list follows the same order, which is what an auditor reads.
+		assert.Equal(t, []string{"sid-a", "sid-b", "sid-c"}, result.TerminatedSessionIdentifiers)
+	})
+}

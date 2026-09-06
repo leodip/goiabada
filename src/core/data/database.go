@@ -25,9 +25,9 @@ type Database interface {
 	// back when it does not, returning fn's error unchanged. When the engine aborts the
 	// transaction as a deadlock victim, inside fn or at the commit, the whole body is rerun,
 	// bounded, and only the last such error surfaces. It is how every transaction owner opens
-	// its transaction: the repository imposes no lock order, so a deadlock between two
-	// transactions on the same account is answered here, by rerunning the victim, rather than
-	// prevented by a rule every site has to remember (#301). fn must keep its effects inside the
+	// its transaction: the repository imposes no order in which transactions take their rows,
+	// so a deadlock between two transactions on the same account is answered here, by rerunning
+	// the victim, rather than prevented by a rule every site has to remember (#301). fn must keep its effects inside the
 	// transaction and write any audit event after this returns, so a rerun is a first run.
 	RunInTransaction(fn func(tx *sql.Tx) error) error
 	Migrate() error
@@ -70,32 +70,6 @@ type Database interface {
 	// A transaction is required: without one the statement autocommits and the row is
 	// released before the read even runs.
 	AcquireClientRow(tx *sql.Tx, clientId int64) error
-	// AcquireClientRowShared takes a SHARED lock on the client's row inside the caller's
-	// transaction and holds it until that transaction ends. It is what orders every
-	// transaction that writes an association row, or a code, against a client deletion
-	// (#139).
-	//
-	// DeleteClient takes the row exclusively and then reads the sessions associated with
-	// the client, so that list is complete only if no association can be inserted while it
-	// is held. A foreign key reference does not give that on PostgreSQL, where FOR KEY
-	// SHARE and FOR NO KEY UPDATE do not conflict, so the barrier has to be an acquisition
-	// the inserter also takes.
-	//
-	// Shared rather than exclusive because a clients row is shared by everybody using that
-	// application: the exclusive acquisition would queue every authorization code issued
-	// and every session bump for a popular client on one row. Two shared holders do not
-	// conflict; a shared holder and the deletion do, which is all that is wanted.
-	//
-	// CALLERS MUST ALREADY HOLD EVERYTHING ABOVE clients, including locks they take only
-	// through a foreign key. Lock queues are fair, so once the deletion's exclusive request
-	// is queued behind a shared holder, a later shared request queues behind the deletion
-	// rather than joining the holder, and a caller that reaches upward afterwards closes a
-	// cycle without upgrading anything. That is why StartNewUserSession calls
-	// AcquireUserRow first.
-	//
-	// A transaction is required, for AcquireClientRow's reason: an autocommitted statement
-	// releases the lock before the caller reaches what it was meant to cover.
-	AcquireClientRowShared(tx *sql.Tx, clientId int64) error
 	GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error)
 	GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error)
@@ -105,25 +79,6 @@ type Database interface {
 	ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) error
 	ClientLoadPermissions(tx *sql.Tx, client *models.Client) error
 
-	// AcquireUserRow takes the user's row inside the caller's transaction and holds it
-	// until that transaction ends, the way AcquireClientRow does for a client. It is the
-	// top of the lock order every transaction that touches a user's sessions and grants
-	// agrees to: the users row, then the user_sessions rows, then the grants that hang
-	// off them (#139).
-	//
-	// It exists because codes.user_id and refresh_tokens.user_id are foreign keys, so a
-	// transaction inserting either takes a lock on the parent users row WITHOUT naming
-	// it, while every credential operation (a password change, a reset, an administrator
-	// setting a password, disabling or deleting an account) writes that row first and
-	// reaches the sessions afterwards. Those two orders are a cycle, and it deadlocks on
-	// MySQL and SQL Server with the credential operation chosen as the victim, which is
-	// the worst of the two to lose: the password does not change and the session it was
-	// trying to end survives.
-	//
-	// A transaction is required: without one the statement autocommits and the row is
-	// released before the caller takes anything below it, which is the whole of what
-	// this buys.
-	AcquireUserRow(tx *sql.Tx, userId int64) error
 	CreateUser(tx *sql.Tx, user *models.User) error
 	UpdateUser(tx *sql.Tx, user *models.User) error
 	GetUserById(tx *sql.Tx, userId int64) (*models.User, error)
@@ -406,16 +361,6 @@ type Database interface {
 	// empty session identifier is refused, because no row carries one and the statement
 	// would otherwise report "gone" for every session there is.
 	AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error)
-	// AcquireUserSessionRowById takes the session's row the way AcquireUserSessionRow does,
-	// keyed by id rather than by session identifier and reporting no existence.
-	//
-	// It exists for DeleteClient, which reaches its sessions through user_session_clients
-	// and so holds ids rather than identifiers. Resolving an identifier first would mean
-	// reading user_sessions while holding association-row locks, which is the shape that
-	// deadlocks against the auth-code replay response on SQL Server. Existence is not
-	// reported because this caller does not act on it: a session reaped in the meantime has
-	// nothing left to order against (#139).
-	AcquireUserSessionRowById(tx *sql.Tx, userSessionId int64) error
 	// PromoteUserSessionGeneration moves one session to a new authentication
 	// generation. Narrow because BumpUserSession writes the whole row on every
 	// request and would otherwise undo the promotion (#106). Errors if no row matched:
@@ -576,12 +521,6 @@ type Database interface {
 	GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error)
 	GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error)
 	GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error)
-	// GetUserSessionClientsByClientId returns every association row naming one client,
-	// reading user_session_clients alone. The absence of a join is load-bearing: DeleteClient
-	// calls this while holding the clients row and before it takes the session rows, and a
-	// shape that reached into user_sessions would hold association-row locks while waiting
-	// for a session row, inverting the order this branch imposes (#139).
-	GetUserSessionClientsByClientId(tx *sql.Tx, clientId int64) ([]models.UserSessionClient, error)
 	DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error
 	UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error
 }

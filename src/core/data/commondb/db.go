@@ -91,8 +91,9 @@ var sleep = time.Sleep
 // since the server may have committed before the failure reached it, and replaying it would
 // apply the body twice.
 //
-// WHY IT HOLDS. No lock order is imposed anywhere in the repository, so two transactions on the
-// same account can take the same rows in opposite orders and one of them is aborted. The engine
+// WHY IT HOLDS. No order in which transactions take their rows is imposed anywhere in the
+// repository, so two transactions on the same account can take the same rows in opposite orders
+// and one of them is aborted. The engine
 // rolls the victim back with nothing half applied, and every body written for this helper keeps
 // its effects inside the transaction and writes its audit event after the commit, so running it
 // again is running it for the first time. Lock-wait timeouts are not deadlocks: MySQL 1205 and
