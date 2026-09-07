@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/gob"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -104,9 +103,31 @@ func main() {
 
 	slog.Info("cookie secure (derived from base URL): " + fmt.Sprintf("%t", config.GetAdminConsole().IsCookieSecure()))
 
-	// Decode session keys from config (already validated at startup)
-	authKey, _ := hex.DecodeString(config.GetAdminConsole().SessionAuthenticationKey)
-	encKey, _ := hex.DecodeString(config.GetAdminConsole().SessionEncryptionKey)
+	// Decode the session keys from config, which validated them at startup. The decode
+	// errors are still checked: what they would otherwise become is a store keyed with two
+	// empty byte slices, which is a key anyone can recompute rather than a failure (#269).
+	currentKeys, err := sessionstore.DecodeKeyPair(
+		config.GetAdminConsole().SessionAuthenticationKey,
+		config.GetAdminConsole().SessionEncryptionKey)
+	if err != nil {
+		slog.Error("unable to decode the session keys", "error", err)
+		os.Exit(1)
+	}
+
+	// The previous pair, nil unless an operator is rotating the session keys. The store
+	// seals with the current pair and opens with the current pair and then this one, so a
+	// rotation signs nobody out; the operator removes the two _PREVIOUS variables once the
+	// maximum session lifetime has passed (#269, #270).
+	previousKeys, err := sessionstore.DecodePreviousKeyPair(
+		config.GetAdminConsole().SessionAuthenticationKeyPrevious,
+		config.GetAdminConsole().SessionEncryptionKeyPrevious)
+	if err != nil {
+		slog.Error("unable to decode the previous session keys", "error", err)
+		os.Exit(1)
+	}
+	if previousKeys != nil {
+		slog.Info("previous session keys configured: a session sealed under them still opens")
+	}
 
 	// The session lives in a row on the auth server's side of the wire and the browser
 	// carries nothing but a signed, opaque identifier. This module keeps no database
@@ -127,14 +148,12 @@ func main() {
 		adminConsoleConfig.OAuthClientSecret,
 	)
 
-	// No previous key pair yet: the store accepts one so a rotation can be made without
-	// signing anybody out, and the configuration that supplies it is the next change.
 	sessionStore, err := sessionstore.NewServerSideStore(
 		sessionstore.NewHTTPBackend(config.GetAuthServer().GetEffectiveBaseURL(), tokenSource),
 		constants.SessionKeyJwt,
 		config.GetAdminConsole().IsCookieSecure(),
-		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey},
-		nil,
+		currentKeys,
+		previousKeys,
 	)
 	if err != nil {
 		slog.Error("unable to initialize the session store", "error", err)
