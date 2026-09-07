@@ -9,7 +9,23 @@ services:
         USER_GID: ${USER_GID:-1000}
     volumes:
       - ../..:/workspaces/goiabada
-      - ~/.config/gh/hosts.yml:/root/.config/gh/hosts.yml
+    # gh reaches the container through the environment, not through a mounted file.
+    #
+    # There used to be a `~/.config/gh/hosts.yml:/root/.config/gh/hosts.yml` bind here. It
+    # never worked on any platform: this container runs as `vscode` (see remoteUser), so gh
+    # reads /home/vscode/.config/gh and never looked at /root's. On Windows it was worse
+    # than dead -- ~/.config/gh does not exist there, so docker created a directory by that
+    # name on the host and mounted it over the file, and gh keeps its token in the
+    # Credential Manager rather than in hosts.yml anyway.
+    #
+    # The bare name passes the host's GH_TOKEN through when it is set and leaves it unset
+    # otherwise, which is the one form that behaves the same on Windows, macOS and Linux.
+    # Nothing in the image requires it; export it only if you want gh inside the container:
+    #
+    #   macOS/Linux   export GH_TOKEN=$(gh auth token)
+    #   PowerShell    $env:GH_TOKEN = (gh auth token)
+    environment:
+      - GH_TOKEN
     command: sleep infinity
     networks: 
       - goiabada-network
