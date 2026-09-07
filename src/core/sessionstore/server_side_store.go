@@ -177,6 +177,14 @@ type ServerSideStore struct {
 	// so a session touched after the restart moves onto the new pair by itself and the
 	// operator removes the previous pair once the maximum session lifetime has passed
 	// (decision 10, #270).
+	//
+	// That wait retires every *signed-in* session and not quite everything: an
+	// unauthenticated one gets a flat PreAuthLifetime that ExpiresAt renews on each
+	// touch, so a sign-in someone keeps returning to has no bound in the configured
+	// maximum at all. Removing the previous pair can therefore still restart a ceremony
+	// in progress, which costs that person the form they were filling in and nothing
+	// more. Waiting longer does not fix it, because the window slides; that is why the
+	// documented guarantee is scoped to signed-in sessions (#269).
 	previous *sealer
 
 	// Options are the cookie defaults. MaxAge is not read from here: it is decided per

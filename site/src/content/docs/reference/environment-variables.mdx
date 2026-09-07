@@ -575,7 +575,7 @@ Never use plain text passwords or example keys. Always generate fresh cryptograp
 
 ### Rotating the session keys
 
-To change the session keys, set the four `_PREVIOUS` variables to the pair each application is using now, set `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY`, `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY` and the `ADMINCONSOLE` twins to freshly generated keys, then restart both applications. Each seals new sessions with the new pair and still opens sessions sealed under the previous one, so nobody is signed out. Remove the `_PREVIOUS` variables once the maximum session lifetime has passed, after which nothing sealed under the old pair is still alive. Set the new pair without the previous one and everybody signs in again once.
+To change the session keys, move each application's current pair into the four `_PREVIOUS` variables, set the four current variables to freshly generated keys, then restart both applications. Each seals new sessions with the new pair and still opens sessions sealed under the previous one, so nobody is signed out. Remove the `_PREVIOUS` variables once the maximum session lifetime has passed, after which every signed-in session is sealed under the new pair. A sign-in in progress is not, so removing them may restart one. Skip them entirely and everybody signs in again once.
 
 ---
 
