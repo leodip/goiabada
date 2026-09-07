@@ -147,10 +147,8 @@ func seedCompanionSchema(t *testing.T, h *isolatedDB) {
 // defaultLiteral is a value of the right type for the column, since what the default IS does not
 // matter here, only that one exists and carries a generated name.
 func defaultLiteral(sqlDef string) string {
-	switch {
-	case sqlDef == "BIT NOT NULL":
-		return "0"
-	case sqlDef == "INT NOT NULL":
+	switch sqlDef {
+	case "BIT NOT NULL", "INT NOT NULL":
 		return "0"
 	default:
 		return "N''"
