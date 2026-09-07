@@ -12,9 +12,31 @@ import (
 // for it around an Up() that legitimately has nothing to do (#268).
 var ErrNoChange = errors.New("no change")
 
+// IsNoChange reports whether err is the ErrNoChange sentinel and nothing else, and it is the test
+// every caller that treats "nothing to do" as success owes.
+//
+// errors.Is is the wrong one here, and the difference is not academic. run joins a failed unlock
+// onto whatever the operation returned, so an Up() with nothing to do on a database whose
+// migration lock did not come back answers errors.Join(ErrNoChange, unlockErr). errors.Is finds
+// the sentinel inside that and reports the start as successful, discarding the one error saying
+// every other migrator on this database is now blocked, on PostgreSQL and SQL Server for as long
+// as the process lives. The runner returns the sentinel bare when it means it, so identity is the
+// whole test (#268).
+func IsNoChange(err error) bool {
+	return err == ErrNoChange
+}
+
 // ErrNilVersion is answered by Version() when schema_migrations holds no row, which is what a
 // database that has never been migrated looks like.
 var ErrNilVersion = errors.New("no migration has been applied to this database")
+
+// IsNilVersion reports whether err is the ErrNilVersion sentinel and nothing else. Identity for
+// the same reason IsNoChange uses it: withConn joins a failed connection close onto whatever the
+// read returned, and errors.Is would report an unmigrated database while dropping the failure
+// that says the read could not be completed cleanly (#268).
+func IsNilVersion(err error) bool {
+	return err == ErrNilVersion
+}
 
 // ErrLocked is answered when another process holds the migration lock and this one gave up
 // waiting. Only MySQL can produce it: GET_LOCK is the one lock statement with a timeout, ten
@@ -41,12 +63,21 @@ const AppliedUnknown = math.MinInt
 // step from N to its predecessor runs N.down.sql and marks the predecessor. The two legal end
 // states are therefore always "Applied's statements did not apply" and "they did", and which of
 // those sits above the marker depends on the direction. Deriving them from the marker alone sends
-// an operator recovering a failed down to a version the schema was never at (#268).
+// an operator recovering a failed down to a version the schema was never at, and deriving the
+// lower one by subtracting sends them to a version no engine's set carries (#268).
 type ErrDirty struct {
 	// Version is the version recorded in schema_migrations, dirty.
 	Version int
 	// Applied is the version whose file the interrupted step was running, or AppliedUnknown.
 	Applied int
+	// Below is the highest version the SOURCE carries beneath Version, or NilVersion when there
+	// is none. It is carried rather than derived because Version minus one is not a version: the
+	// four migration sets have gaps (PostgreSQL has no 000002, three engines have no 000015,
+	// 000036 to 000043 are each on one or two engines), so an up to 000005 interrupted on a
+	// database last at 000002 would name 000004, which this binary carries no file for and
+	// refuses on the next start. Beneath the first migration there is nothing, which is the
+	// unmigrated database rather than version 000000.
+	Below int
 	// Above is the next version the source carries after Version, or NilVersion when there is
 	// none. It is read only when Applied is AppliedUnknown, where it names the down step that
 	// could have left this marker.
@@ -58,35 +89,46 @@ func (e ErrDirty) Error() string {
 	fmt.Fprintf(&b, "the database records version %s and is marked dirty, so a migration did not finish. ",
 		formatVersion(e.Version))
 	b.WriteString("Goiabada will not migrate a dirty database, because it cannot tell how much of that migration applied. ")
-	b.WriteString("Inspect the schema by hand, repair it to one of the states below, and record that version in schema_migrations with dirty set to false. ")
+	b.WriteString("Inspect the schema by hand, repair it to one of the states below, and record that state in schema_migrations: ")
+	b.WriteString("one row carrying that version with dirty set to false, or no row at all where the state is that the database was never migrated. ")
 
 	if e.Applied != AppliedUnknown {
 		// The direction is known, so there are exactly two candidates. On an up step the marker
-		// is the applied version, so "did not apply" is the version below it; on a down step the
-		// marker is already below the applied version, so "did not apply" is the applied version
-		// itself.
+		// is the applied version, so "did not apply" is the version the source carries below it,
+		// which is Below rather than the marker minus one; on a down step the marker is already
+		// below the applied version, so "did not apply" is the applied version itself.
 		notApplied := e.Applied
 		if e.Version == e.Applied {
-			notApplied = e.Version - 1
+			notApplied = e.Below
 		}
 		fmt.Fprintf(&b, "Migration %s was running: version %s if its statements did not apply, version %s if they did.",
 			formatVersion(e.Applied), formatVersion(notApplied), formatVersion(e.Version))
 		return b.String()
 	}
 
-	// The direction was not recorded, so the marker is consistent with two interrupted steps and
-	// the message names both rather than guessing one.
+	// A nil marker is the one case the direction does not have to be guessed at. An up step
+	// always marks the version it applies, which is never nil, so only a rolled-back first
+	// migration can have written this row.
+	if e.Version == NilVersion {
+		fmt.Fprintf(&b, "The row records no version, which only an interrupted rollback of migration %s can leave: "+
+			"version %s if its statements did not apply, or never migrated, with the row deleted, if they did.",
+			formatVersion(e.Above), formatVersion(e.Above))
+		return b.String()
+	}
+
+	// Otherwise the direction was not recorded, so the marker is consistent with two interrupted
+	// steps and the message names both rather than guessing one.
 	fmt.Fprintf(&b, "The row does not record a direction, so either migration %s was being applied, ",
 		formatVersion(e.Version))
 	if e.Above == NilVersion {
 		fmt.Fprintf(&b, "leaving version %s if its statements did not apply and version %s if they did, "+
 			"or a migration above %s was being rolled back by a newer release, leaving that version if its statements did not apply.",
-			formatVersion(e.Version-1), formatVersion(e.Version), formatVersion(e.Version))
+			formatVersion(e.Below), formatVersion(e.Version), formatVersion(e.Version))
 		return b.String()
 	}
 	fmt.Fprintf(&b, "leaving version %s if its statements did not apply, or migration %s was being rolled back, "+
 		"leaving version %s if its statements did not apply. Version %s is the end state if either one did apply.",
-		formatVersion(e.Version-1), formatVersion(e.Above), formatVersion(e.Above), formatVersion(e.Version))
+		formatVersion(e.Below), formatVersion(e.Above), formatVersion(e.Above), formatVersion(e.Version))
 	return b.String()
 }
 

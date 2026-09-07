@@ -3,7 +3,9 @@ package mssqldb
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
+	goerrors "errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -331,7 +333,7 @@ const schemaMigrationsTableDDL = `IF OBJECT_ID(N'schema_migrations', N'U') IS NU
 // taken, used and released on a single connection pinned out of the pool. Issued against
 // the pooled *sql.DB, the release could land on a different session and leave the lock held
 // for the life of the process, blocking every later migrator.
-func (d *MsSQLDatabase) ensureSchemaMigrationsTable() error {
+func (d *MsSQLDatabase) ensureSchemaMigrationsTable() (err error) {
 	ctx := context.Background()
 	eng := migrator.SQLServer(d.dbConfig.Name)
 
@@ -339,14 +341,31 @@ func (d *MsSQLDatabase) ensureSchemaMigrationsTable() error {
 	if err != nil {
 		return errors.Wrap(err, "unable to pin a connection for the migration lock")
 	}
-	defer func() { _ = conn.Close() }()
+	defer func() {
+		// ErrConnDone is what Close answers for a connection the deferred unlock below already
+		// disposed of, which is a deliberate outcome rather than a failure.
+		if cerr := conn.Close(); cerr != nil && !goerrors.Is(cerr, sql.ErrConnDone) {
+			err = goerrors.Join(err, cerr)
+		}
+	}()
 
 	// The lock waits indefinitely, which is what the library did too: the holder is another
 	// process's pre-create or migration, and both are short.
 	if err := eng.Lock(ctx, conn); err != nil {
 		return errors.Wrap(err, "unable to take the migration lock")
 	}
-	defer func() { _ = eng.Unlock(ctx, conn) }()
+	defer func() {
+		// The same two obligations Migrator.run carries, for the same reasons, because this is
+		// the same resource on the same instance. A lock that did not come back blocks every
+		// later migrator on this database indefinitely, so reporting the start as successful is
+		// the answer nobody investigates; and the session that still holds it must not go back
+		// to the pool, where the next borrower would carry a migration lock for the life of the
+		// process. driver.ErrBadConn is how database/sql is told to discard it (#268).
+		if unlockErr := eng.Unlock(ctx, conn); unlockErr != nil {
+			err = goerrors.Join(err, errors.Wrap(unlockErr, "unable to release the migration lock"))
+			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		}
+	}()
 
 	if _, err := conn.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
 		return errors.Wrap(err, "unable to create the schema_migrations table")
@@ -379,7 +398,10 @@ func (d *MsSQLDatabase) Migrate() error {
 	}
 
 	err = m.Up()
-	if errors.Is(err, migrator.ErrNoChange) {
+	// IsNoChange rather than errors.Is: a run whose unlock failed answers the sentinel JOINED
+	// with that failure, and errors.Is would report this start as successful while the migration
+	// lock stays held against every other process on the database (#268).
+	if migrator.IsNoChange(err) {
 		slog.Info("no need to migrate the database")
 		return nil
 	}

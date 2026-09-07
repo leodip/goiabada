@@ -120,6 +120,38 @@ func TestMigrationLock_AFailedMigrationStillGivesTheResourceBack(t *testing.T) {
 	requireMigrationLockIsFree(t, h, eng, "after a migration whose file failed")
 }
 
+// TestMigrationLock_ThePreCreateGivesTheResourceBack covers the one place outside the runner
+// that takes the migration lock: SQL Server's schema_migrations pre-create, which is a catalog
+// check followed by a CREATE and is safe only while the lock is held (#293).
+//
+// It holds the same resource on the same instance, so it owes the same two things Migrator.run
+// owes and for the same reasons: the lock has to come back, and a session that failed to give it
+// back must not return to the pool. NewMigrator is where that happens, and newIsolatedDB already
+// called it, so this asks a SECOND construction against the same database and then takes the
+// resource from a pool of its own.
+//
+// SQL Server only. It is the only engine whose pre-create reaches for the lock at all: the other
+// three create the table with a plain IF NOT EXISTS, which their engines make atomic.
+//
+// Run via: ./run-tests.sh --type data --db mssql --run TestMigrationLock
+func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
+	if dbType() != "mssql" {
+		t.Skipf("%s pre-creates schema_migrations without a lock: only SQL Server has no atomic form of that check-then-create", dbType())
+	}
+
+	h := newIsolatedDB(t)
+	eng := migrationLockEngine(t, h.Name)
+
+	// The pre-create runs inside NewMigrator, so this is what puts the lock ceremony under test
+	// rather than the runner's own.
+	source, ok := h.DB.(migratable)
+	require.Truef(t, ok, "the %s database must expose NewMigrator", dbType())
+	_, err := source.NewMigrator()
+	require.NoErrorf(t, err, "construct a second migrator, which pre-creates schema_migrations again on %s", dbType())
+
+	requireMigrationLockIsFree(t, h, eng, "after the schema_migrations pre-create")
+}
+
 // hasSessionMigrationLock is the three engines whose migration lock is a statement rather than a
 // process-wide mutex.
 func hasSessionMigrationLock() bool {
