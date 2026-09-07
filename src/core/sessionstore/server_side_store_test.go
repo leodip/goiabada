@@ -546,8 +546,8 @@ func TestServerSideStore_RotationOpensBothGenerations(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.False(t, session.IsNew,
-			"everything is sealed with the current pair, so removing the previous "+
-				"variables after the maximum session lifetime costs nothing")
+			"everything is sealed with the current pair, so a session that has been "+
+				"saved once since the restart no longer needs the previous one")
 		assert.Equal(t, "hello", session.Values["greeting"])
 	})
 
@@ -566,6 +566,151 @@ func TestServerSideStore_RotationOpensBothGenerations(t *testing.T) {
 		assert.True(t, session.IsNew)
 		assert.Zero(t, backend.loads, "a cookie that fails its tag never reaches storage")
 	})
+}
+
+// --- what each configured key contributes, and nonce freshness --------------------
+
+// TestServerSideStore_BothConfiguredKeysSealTheValue pins the half of decision 9 that
+// says both configured secrets keep a job.
+//
+// The pair is fed to HKDF as a secret and a salt, and dropping either input still yields a
+// perfectly valid 32 byte key, so a derivation that quietly stopped reading one of them
+// would seal and open exactly as it does today. The existing wrong-key case cannot see
+// that: it varies both halves at once, so the derived keys differ whichever input is
+// actually consulted. Varying one half at a time is what makes each input observable, and
+// it is the difference between the authentication key having a job and being a variable
+// three documentation pages call required while nothing reads it.
+func TestServerSideStore_BothConfiguredKeysSealTheValue(t *testing.T) {
+	t.Run("only the authentication key differs", func(t *testing.T) {
+		requireNeitherHalfOpens(t, KeyPair{
+			AuthenticationKey: []byte(storeTestAuthKey2),
+			EncryptionKey:     []byte(storeTestEncKey), // the very same encryption key
+		})
+	})
+
+	t.Run("only the encryption key differs", func(t *testing.T) {
+		requireNeitherHalfOpens(t, KeyPair{
+			AuthenticationKey: []byte(storeTestAuthKey), // the very same authentication key
+			EncryptionKey:     []byte(storeTestEncKey2),
+		})
+	})
+}
+
+// requireNeitherHalfOpens saves a session through a store keyed with varied, and requires
+// that the store under test opens neither the cookie nor the blob.
+//
+// Both halves are checked, and separately, because they are sealed under two derived keys
+// and a derivation could lose an input on one path only. The blob is checked by
+// transplanting it behind a cookie this store did write, which is the only way to reach
+// the blob path at all: presenting the foreign cookie stops at the cookie, and a store
+// that opened the blob but not the cookie would otherwise read as a pass.
+func requireNeitherHalfOpens(t *testing.T, varied KeyPair) {
+	t.Helper()
+
+	foreignBackend := newFakeBackend()
+	foreign := newTestStoreWithKeys(foreignBackend, false, varied, nil)
+	foreignCookie := saveNew(t, foreign, map[string]any{"greeting": "hello"})
+
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	session, err := store.New(requestWith(foreignCookie), storeTestName)
+	require.NoError(t, err, "an unopenable cookie is a fresh session, not an error")
+	assert.True(t, session.IsNew, "a cookie sealed under a different pair must not open")
+	assert.Zero(t, backend.loads, "a cookie that fails its tag never reaches storage")
+
+	ownCookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+	id := decodeCookieId(t, store, ownCookie)
+	foreignId := decodeCookieId(t, foreign, foreignCookie)
+	backend.rows[id].Data = foreignBackend.rows[foreignId].Data
+
+	session, err = store.New(requestWith(ownCookie), storeTestName)
+	require.NoError(t, err, "an unopenable blob is a fresh session, not an error")
+	assert.True(t, session.IsNew, "a blob sealed under a different pair must not open")
+	assert.Empty(t, session.Values, "and none of its contents may reach the caller")
+}
+
+// TestServerSideStore_EverySealUsesAFreshNonce pins the property decision 8 was chosen
+// for: the nonce is read from the CSPRNG on every seal, never derived and never reused.
+//
+// XChaCha20-Poly1305's 24 byte nonce is the whole reason that variant was picked over
+// AES-GCM, and it buys nothing if a nonce is repeated: under a fixed nonce two plaintexts
+// sealed with one key leak their difference, and the existing CSPRNG-failure case says
+// only that a *failed* read is reported, not that a successful one is used. Saving twice
+// with nothing changed is what makes freshness observable from outside, because Save
+// re-seals both halves every time, so identical inputs must still produce different
+// ciphertexts.
+func TestServerSideStore_EverySealUsesAFreshNonce(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	first := saveNew(t, store, map[string]any{"greeting": "hello"})
+	id := decodeCookieId(t, store, first)
+	firstBlob := string(backend.rows[id].Data)
+
+	// The same session, saved again with nothing about it changed.
+	req := requestWith(first)
+	w := httptest.NewRecorder()
+	session, err := store.New(req, storeTestName)
+	require.NoError(t, err)
+	require.False(t, session.IsNew)
+	require.NoError(t, store.Save(req, w, session))
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+	second := cookies[0]
+	secondBlob := string(backend.rows[id].Data)
+
+	assert.NotEqual(t, first.Value, second.Value,
+		"two seals of one identifier must not produce one ciphertext")
+	assert.NotEqual(t, firstBlob, secondBlob,
+		"two seals of one set of values must not produce one ciphertext")
+
+	// And the difference is the nonce rather than the contents: both still open, to the
+	// same identifier and the same values.
+	assert.Equal(t, id, decodeCookieId(t, store, second),
+		"the identifier is unchanged, so only the sealing may differ")
+
+	reloaded, err := store.New(requestWith(second), storeTestName)
+	require.NoError(t, err)
+	assert.False(t, reloaded.IsNew)
+	assert.Equal(t, "hello", reloaded.Values["greeting"])
+}
+
+// TestServerSideStore_ABlobDoesNotOpenUnderAnotherSessionName is the blob's half of the
+// name binding, and the cookie's half is above at ACookieSealedUnderAnotherNameDoesNotOpen.
+//
+// The two halves are separate assertions because they are sealed under two derived keys
+// with the name passed as associated data at each site, so a call that stopped binding the
+// name on the blob path alone changes nothing the cookie cases can see. What it would
+// change is real: the auth server holds the admin console's rows, and the admin console
+// reaches them through an endpoint keyed by owner, so a blob accepted under a name it was
+// not sealed under is one module's session contents opening as the other's.
+func TestServerSideStore_ABlobDoesNotOpenUnderAnotherSessionName(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	// One store, one key, two logical names: the name is the only thing that differs.
+	otherName := constants.AdminConsoleSessionName
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	otherSession, err := store.New(req, otherName)
+	require.NoError(t, err)
+	otherSession.Values["greeting"] = "hello"
+	require.NoError(t, store.Save(req, w, otherSession))
+	otherId := otherSession.ID
+	require.Contains(t, backend.rows, otherId)
+
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+	id := decodeCookieId(t, store, cookie)
+	backend.rows[id].Data = backend.rows[otherId].Data
+
+	session, err := store.New(requestWith(cookie), storeTestName)
+
+	require.NoError(t, err, "an unopenable blob is a fresh session, not an error")
+	assert.True(t, session.IsNew,
+		"a blob sealed under another session name must not open under this one")
+	assert.Empty(t, session.Values, "and none of its contents may reach the caller")
 }
 
 // flipLastByte changes one byte of the envelope a sealed value carries, and returns it
