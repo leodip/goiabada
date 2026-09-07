@@ -10,12 +10,12 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
-	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -322,9 +322,13 @@ func requireSessionCookie(t *testing.T, httpClient *http.Client) *http.Cookie {
 // decodeSessionIdentifier reads the identifier out of the cookie with the deployment's own
 // session keys.
 //
-// Comparing raw cookie values would prove nothing: securecookie stamps every encoding with
-// a timestamp, so the value changes on every save whether the identifier did or not, and a
-// test asserting the value moved would pass with rotation deleted entirely.
+// Comparing raw cookie values would prove nothing: every seal draws a fresh nonce, so the
+// value changes on every save whether the identifier did or not, and a test asserting the
+// value moved would pass with rotation deleted entirely.
+//
+// The store is built here rather than reached for, over a nil backend, because opening a
+// cookie is the only thing asked of it and that touches no storage. Only the store can do
+// it at all: the keys are the deployment's and the derivation is the store's own (#270).
 func decodeSessionIdentifier(t *testing.T, cookie *http.Cookie) string {
 	t.Helper()
 
@@ -333,9 +337,12 @@ func decodeSessionIdentifier(t *testing.T, cookie *http.Cookie) string {
 	encKey, err := hex.DecodeString(config.GetAuthServer().SessionEncryptionKey)
 	require.NoError(t, err)
 
-	var id string
-	require.NoError(t, securecookie.DecodeMulti(constants.AuthServerSessionName, cookie.Value,
-		&id, securecookie.CodecsFromPairs(authKey, encKey)...))
+	opener, err := sessionstore.NewServerSideStore(nil, constants.SessionKeySessionIdentifier, false,
+		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
+	require.NoError(t, err)
+
+	id, err := opener.OpenCookie(constants.AuthServerSessionName, cookie.Value)
+	require.NoError(t, err)
 	assert.Len(t, id, 64, "the identifier is 32 bytes of CSPRNG output, hex encoded")
 	return id
 }

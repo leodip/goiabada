@@ -2,13 +2,14 @@ package sessionstore
 
 import (
 	"context"
+	"encoding/base64"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,27 @@ const (
 	storeTestName    = "authserver"
 	storeTestAuthKey = "12345678901234567890123456789012" // exactly 32 bytes
 	storeTestEncKey  = "abcdefghijklmnopqrstuvwxyz123456" // exactly 32 bytes
+
+	// The second pair, for the rotation table. Both differ from the pair above in every
+	// byte, so a value that opens under one of them says nothing about the other.
+	storeTestAuthKey2 = "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+	storeTestEncKey2  = "9876543210zyxwvutsrqponmlkjihgfe"
 )
+
+// storeTestPair and storeTestPair2 are those literals as the store takes them.
+func storeTestPair() KeyPair {
+	return KeyPair{
+		AuthenticationKey: []byte(storeTestAuthKey),
+		EncryptionKey:     []byte(storeTestEncKey),
+	}
+}
+
+func storeTestPair2() KeyPair {
+	return KeyPair{
+		AuthenticationKey: []byte(storeTestAuthKey2),
+		EncryptionKey:     []byte(storeTestEncKey2),
+	}
+}
 
 // fakeBackend is a Backend at its own boundary, not a mock standing in for the thing
 // under test. The store is what is under test here; the real database backend is covered
@@ -119,8 +140,21 @@ func (f *fakeBackend) Delete(ctx context.Context, id string) error {
 }
 
 func newTestStore(backend Backend, secure bool) *ServerSideStore {
-	return NewServerSideStore(backend, "SessionIdentifier", secure,
-		[]byte(storeTestAuthKey), []byte(storeTestEncKey))
+	return newTestStoreWithKeys(backend, secure, storeTestPair(), nil)
+}
+
+// newTestStoreWithKeys is newTestStore for the rotation table, which is the only thing
+// that needs a store keyed with something other than the one pair above.
+//
+// The error is asserted rather than swallowed even though the derivation cannot fail on
+// these literals: a helper that drops it would hide a real failure at every one of its
+// call sites at once.
+func newTestStoreWithKeys(backend Backend, secure bool, current KeyPair, previous *KeyPair) *ServerSideStore {
+	store, err := NewServerSideStore(backend, "SessionIdentifier", secure, current, previous)
+	if err != nil {
+		panic(err)
+	}
+	return store
 }
 
 // saveNew runs the ordinary create path: a request carrying no cookie, one save.
@@ -145,8 +179,8 @@ func saveNew(t *testing.T, store *ServerSideStore, values map[string]any) *http.
 func decodeCookieId(t *testing.T, store *ServerSideStore, cookie *http.Cookie) string {
 	t.Helper()
 
-	var id string
-	require.NoError(t, securecookie.DecodeMulti(storeTestName, cookie.Value, &id, store.Codecs...))
+	id, err := store.OpenCookie(storeTestName, cookie.Value)
+	require.NoError(t, err)
 	return id
 }
 
@@ -196,26 +230,67 @@ type failingReader struct{}
 
 func (failingReader) Read(p []byte) (int, error) { return 0, errors.New("no entropy") }
 
+// TestServerSideStore_CSPRNGFailureFailsTheSave drives both reads a save makes from the
+// CSPRNG, separately, because a save that fails at the first one proves nothing about the
+// second.
+//
+// The order is seal then identifier, so a reader that always fails only ever exercises the
+// nonce. The second case lets the nonce read succeed and fails the one after it, which is
+// the identifier's, and it is the case that would survive if newSessionId went back to
+// returning the empty string on failure (#211, #266, #270).
 func TestServerSideStore_CSPRNGFailureFailsTheSave(t *testing.T) {
-	original := randReader
-	randReader = failingReader{}
-	defer func() { randReader = original }()
+	cases := []struct {
+		label  string
+		reader io.Reader
+	}{
+		{"the nonce read fails", failingReader{}},
+		{"the identifier read fails", &failAfterReader{ok: 1}},
+	}
 
-	backend := newFakeBackend()
-	store := newTestStore(backend, false)
+	for _, c := range cases {
+		t.Run(c.label, func(t *testing.T) {
+			original := randReader
+			randReader = c.reader
+			defer func() { randReader = original }()
 
-	req := httptest.NewRequest("GET", "/", nil)
-	w := httptest.NewRecorder()
-	session, err := store.New(req, storeTestName)
-	require.NoError(t, err)
+			backend := newFakeBackend()
+			store := newTestStore(backend, false)
 
-	err = store.Save(req, w, session)
+			req := httptest.NewRequest("GET", "/", nil)
+			w := httptest.NewRecorder()
+			session, err := store.New(req, storeTestName)
+			require.NoError(t, err)
 
-	// The alternative, which stringutil.GenerateSecurityRandomString takes, is to return
-	// the empty string. Every session would then share one identifier (#211, #266).
-	require.Error(t, err)
-	assert.Empty(t, w.Result().Cookies(), "no cookie may be issued without an identifier")
-	assert.Equal(t, 0, backend.creates)
+			err = store.Save(req, w, session)
+
+			// The alternative, which stringutil.GenerateSecurityRandomString takes, is to
+			// return the empty string. Every session would then share one identifier, or
+			// every seal one nonce.
+			require.Error(t, err)
+			assert.Empty(t, w.Result().Cookies(), "no cookie may be issued without an identifier")
+			assert.Equal(t, 0, backend.creates)
+		})
+	}
+}
+
+// failAfterReader serves ok successful reads from a fixed pattern and fails every read
+// after them, which is how a single read in a sequence is singled out.
+//
+// The bytes it does serve are constant rather than random, which is fine and is why this
+// is a test double: nothing in the case that uses it looks at what was sealed.
+type failAfterReader struct {
+	ok int
+}
+
+func (r *failAfterReader) Read(p []byte) (int, error) {
+	if r.ok <= 0 {
+		return 0, errors.New("the CSPRNG is unavailable")
+	}
+	r.ok--
+	for i := range p {
+		p[i] = byte(i)
+	}
+	return len(p), nil
 }
 
 func TestServerSideStore_BackendNeverSeesPlaintext(t *testing.T) {
@@ -264,8 +339,10 @@ func TestServerSideStore_TamperedCookieGivesAFreshSession(t *testing.T) {
 func TestServerSideStore_CookieFromOtherKeysGivesAFreshSession(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
-	other := NewServerSideStore(newFakeBackend(), "SessionIdentifier", false,
-		[]byte("00000000000000000000000000000000"), []byte("11111111111111111111111111111111"))
+	other := newTestStoreWithKeys(newFakeBackend(), false, KeyPair{
+		AuthenticationKey: []byte("00000000000000000000000000000000"),
+		EncryptionKey:     []byte("11111111111111111111111111111111"),
+	}, nil)
 
 	cookie := saveNew(t, other, map[string]any{"greeting": "hello"})
 
@@ -274,6 +351,240 @@ func TestServerSideStore_CookieFromOtherKeysGivesAFreshSession(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, session.IsNew)
 	assert.Equal(t, 0, backend.loads)
+}
+
+// --- the envelope and the sealing keys --------------------------------------------
+
+// TestServerSideStore_TamperedBlobGivesAFreshSession is the cookie case's twin on the
+// other side of the store. The row is what an untrusted backend holds -- on the admin
+// console it is literally another application's database -- so a blob that has been
+// altered by one byte has to be refused, and the AEAD tag over the whole envelope is what
+// refuses it.
+func TestServerSideStore_TamperedBlobGivesAFreshSession(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+	id := decodeCookieId(t, store, cookie)
+
+	record := backend.rows[id]
+	record.Data = flipLastByte(t, record.Data)
+
+	session, err := store.New(requestWith(cookie), storeTestName)
+
+	require.NoError(t, err, "a blob that will not open is a fresh session, not an error")
+	assert.True(t, session.IsNew)
+	assert.Empty(t, session.Values)
+	assert.Equal(t, 1, backend.loads, "and it is refused after the read, not before it")
+}
+
+// TestServerSideStore_AStoredBlobDoesNotOpenAsACookie is the case that fails if decision
+// 9's per-purpose key derivation is collapsed to one key.
+//
+// **Keep this, and keep it here.** The obvious place to assert it is downstream, through
+// the fresh session New answers with, and that assertion passes with the derivation
+// collapsed: a blob presented as a cookie would then decrypt successfully to a gob stream,
+// which is not a 64 character identifier, so the load finds no row and the visitor still
+// gets a fresh session. The rejection has to be observed at the opener, where the only
+// thing that can produce it is the key being a different key (decision 9, #270).
+func TestServerSideStore_AStoredBlobDoesNotOpenAsACookie(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	saveNew(t, store, map[string]any{"greeting": "hello"})
+	require.NotEmpty(t, backend.lastData, "the save has to have written a blob to present")
+
+	_, err := store.OpenCookie(storeTestName, string(backend.lastData))
+
+	require.Error(t, err,
+		"a value sealed for the backend must not open as a cookie, which is what two "+
+			"derived keys buy and one key does not")
+}
+
+// TestServerSideStore_ACookieValueStoredAsABlobGivesAFreshSession is the other direction,
+// and it claims less on purpose: it says the visitor ends up with a fresh session, which is
+// a public outcome, and not that the key separation is what produced it. The blob opener is
+// private and asserting through it would mean either reaching inside or exporting an API
+// for one test; the case above already pins the separation itself.
+func TestServerSideStore_ACookieValueStoredAsABlobGivesAFreshSession(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+	id := decodeCookieId(t, store, cookie)
+	backend.rows[id].Data = []byte(cookie.Value)
+
+	session, err := store.New(requestWith(cookie), storeTestName)
+
+	require.NoError(t, err)
+	assert.True(t, session.IsNew)
+	assert.Empty(t, session.Values)
+	assert.Equal(t, 1, backend.loads)
+}
+
+// TestServerSideStore_AnUnknownEnvelopeVersionIsRefused. The version byte is what gives the
+// next format change a discriminator instead of a guess, and it is only worth having if an
+// unrecognised value is refused rather than parsed hopefully.
+func TestServerSideStore_AnUnknownEnvelopeVersionIsRefused(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+
+	envelope, err := base64.RawURLEncoding.DecodeString(cookie.Value)
+	require.NoError(t, err)
+	require.Equal(t, byte(envelopeVersion), envelope[0], "version 1 is what this store writes")
+	envelope[0] = envelopeVersion + 1
+	restamped := base64.RawURLEncoding.EncodeToString(envelope)
+
+	_, err = store.OpenCookie(storeTestName, restamped)
+	require.Error(t, err, "rejected by the version check, before any key is used")
+
+	// And the visitor's outcome, which is the same fresh session every unopenable cookie
+	// produces. The backend is never reached, because there is no identifier to look up.
+	session, newErr := store.New(requestWith(&http.Cookie{Name: cookie.Name, Value: restamped}), storeTestName)
+	require.NoError(t, newErr)
+	assert.True(t, session.IsNew)
+	assert.Zero(t, backend.loads)
+}
+
+// TestServerSideStore_AMalformedEnvelopeIsRefused covers the ways a value fails before
+// there is anything to decrypt.
+//
+// What the length check buys is precisely that these are errors rather than panics: with
+// it removed, an empty value is indexed at [0] and a value shorter than the nonce is
+// sliced past its end, and a session store that panics on a cookie anyone can send is a
+// denial of service rather than a refusal. So the mechanism named for each of the last
+// three is the length check, and the way it fails without it is a panic, not a wrong
+// answer.
+//
+// Every case below carries a valid version byte where it is long enough to have one, so
+// nothing here is rejected by the version check instead and passes for the wrong reason.
+func TestServerSideStore_AMalformedEnvelopeIsRefused(t *testing.T) {
+	store := newTestStore(newFakeBackend(), false)
+
+	// Two lengths that would be sliced out of bounds, and one that would reach the AEAD
+	// with a ciphertext shorter than a tag.
+	shortOfNonce := append([]byte{envelopeVersion}, make([]byte, 9)...)
+	shortOfTag := append([]byte{envelopeVersion}, make([]byte, envelopeMinBytes-2)...)
+
+	cases := []struct {
+		label string
+		value string
+	}{
+		{"not base64 at all", "!!! not base64 !!!"},
+		{"empty", ""},
+		{"shorter than the nonce", base64.RawURLEncoding.EncodeToString(shortOfNonce)},
+		{"one byte short of a whole envelope", base64.RawURLEncoding.EncodeToString(shortOfTag)},
+	}
+
+	for _, c := range cases {
+		t.Run(c.label, func(t *testing.T) {
+			_, err := store.OpenCookie(storeTestName, c.value)
+			assert.Error(t, err)
+		})
+	}
+}
+
+// TestServerSideStore_ACookieSealedUnderAnotherNameDoesNotOpen is what binding the session
+// name as associated data is for.
+//
+// The two applications keep different sessions under different logical names, and one of
+// the two backends is the other application's server. Without the binding a value would
+// be openable wherever the same keys are held, whatever it was sealed as; with it, the
+// name is part of what the tag covers, so presenting an auth server cookie as an admin
+// console one fails in exactly the way a forged one does.
+//
+// Asserted at the opener rather than through New, for the reason the blob case states: a
+// value presented under the wrong name would fail downstream anyway, on the identifier it
+// did not decrypt to, and that assertion cannot tell the binding from its absence.
+func TestServerSideStore_ACookieSealedUnderAnotherNameDoesNotOpen(t *testing.T) {
+	store := newTestStore(newFakeBackend(), false)
+
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+
+	_, err := store.OpenCookie(storeTestName, cookie.Value)
+	require.NoError(t, err, "the name it was sealed under opens it")
+
+	_, err = store.OpenCookie(constants.AdminConsoleSessionName, cookie.Value)
+	require.Error(t, err, "and no other name does, because the name is associated data")
+}
+
+// --- rotation with a previous key pair (decision 10) ------------------------------
+
+// TestServerSideStore_RotationOpensBothGenerations is the whole of what the previous pair
+// buys: an operator swaps the keys, restarts, and nobody is signed out.
+//
+// Both halves of a session are exercised by the first case rather than only the cookie: New
+// opens the cookie and then the blob, so a store that tried the previous pair on one and not
+// the other would answer a fresh session and the assertion on Values would fail.
+func TestServerSideStore_RotationOpensBothGenerations(t *testing.T) {
+	first := storeTestPair()
+	second := storeTestPair2()
+
+	t.Run("a value sealed under the previous pair still opens", func(t *testing.T) {
+		backend := newFakeBackend()
+		before := newTestStoreWithKeys(backend, false, first, nil)
+		cookie := saveNew(t, before, map[string]any{"greeting": "hello"})
+
+		rotating := newTestStoreWithKeys(backend, false, second, &first)
+		session, err := rotating.New(requestWith(cookie), storeTestName)
+
+		require.NoError(t, err)
+		assert.False(t, session.IsNew, "the session survives the key change")
+		assert.Equal(t, "hello", session.Values["greeting"],
+			"the blob is opened with the previous pair too, not only the cookie")
+	})
+
+	t.Run("what the rotating store writes opens under the new pair alone", func(t *testing.T) {
+		backend := newFakeBackend()
+		rotating := newTestStoreWithKeys(backend, false, second, &first)
+		cookie := saveNew(t, rotating, map[string]any{"greeting": "hello"})
+
+		after := newTestStoreWithKeys(backend, false, second, nil)
+		session, err := after.New(requestWith(cookie), storeTestName)
+
+		require.NoError(t, err)
+		assert.False(t, session.IsNew,
+			"everything is sealed with the current pair, so removing the previous "+
+				"variables after the maximum session lifetime costs nothing")
+		assert.Equal(t, "hello", session.Values["greeting"])
+	})
+
+	// The negative case, and the reason the previous pair has to be configured rather than
+	// inferred: without it the old generation is simply not openable. Rejected by the AEAD
+	// tag on the cookie, which is why the backend is never reached.
+	t.Run("without the previous pair the old generation does not open", func(t *testing.T) {
+		backend := newFakeBackend()
+		before := newTestStoreWithKeys(backend, false, first, nil)
+		cookie := saveNew(t, before, map[string]any{"greeting": "hello"})
+
+		after := newTestStoreWithKeys(backend, false, second, nil)
+		session, err := after.New(requestWith(cookie), storeTestName)
+
+		require.NoError(t, err, "an unopenable cookie is a fresh session, not an error")
+		assert.True(t, session.IsNew)
+		assert.Zero(t, backend.loads, "a cookie that fails its tag never reaches storage")
+	})
+}
+
+// flipLastByte changes one byte of the envelope a sealed value carries, and returns it
+// re-encoded.
+//
+// It goes through the base64 rather than editing the text in place, which matters: the
+// final character of a base64 group carries unused bits, so two different characters there
+// can decode to the very same bytes and the alteration would be a no-op. Decoding first
+// makes the change land in the tag or the ciphertext, which is what the cases using this
+// claim to have altered.
+func flipLastByte(t *testing.T, encoded []byte) []byte {
+	t.Helper()
+
+	envelope, err := base64.RawURLEncoding.DecodeString(string(encoded))
+	require.NoError(t, err)
+	require.NotEmpty(t, envelope)
+
+	envelope[len(envelope)-1] ^= 0xff
+	return []byte(base64.RawURLEncoding.EncodeToString(envelope))
 }
 
 func TestServerSideStore_NotFoundGivesAFreshSession(t *testing.T) {
@@ -415,8 +726,6 @@ func TestServerSideStore_GetSurvivesAStorageFailure(t *testing.T) {
 
 		require.Error(t, err, "a lookup that could not be performed is a refused request")
 		require.NotNil(t, session)
-		assert.False(t, isDecodeError(err),
-			"a storage failure read as a decode error would clear the cookie instead of refusing")
 
 		// Get memoises the pair, so the next middleware in the same request is answered
 		// identically rather than being handed a fresh empty session. Identically means
@@ -486,8 +795,8 @@ func TestServerSideStore_RegenerateRotatesAnAdminConsoleSession(t *testing.T) {
 func decodeCookieId2(t *testing.T, store *ServerSideStore, owner matrixOwner, cookie *http.Cookie) string {
 	t.Helper()
 
-	var id string
-	require.NoError(t, securecookie.DecodeMulti(owner.sessionName, cookie.Value, &id, store.Codecs...))
+	id, err := store.OpenCookie(owner.sessionName, cookie.Value)
+	require.NoError(t, err)
 	return id
 }
 
@@ -656,10 +965,11 @@ func TestServerSideStore_CodecNameDoesNotFollowThePrefix(t *testing.T) {
 	// Both decode under the logical name. Deriving the codec name from the cookie name
 	// would make every live session unreadable the moment a deployment moved between
 	// http and https, and would make the owner column's value depend on the scheme.
-	var id string
-	require.NoError(t, securecookie.DecodeMulti(storeTestName, secureCookie.Value, &id, plainStore.Codecs...))
+	id, err := plainStore.OpenCookie(storeTestName, secureCookie.Value)
+	require.NoError(t, err)
 	assert.Len(t, id, 64)
-	require.NoError(t, securecookie.DecodeMulti(storeTestName, plainCookie.Value, &id, secureStore.Codecs...))
+	id, err = secureStore.OpenCookie(storeTestName, plainCookie.Value)
+	require.NoError(t, err)
 	assert.Len(t, id, 64)
 }
 
@@ -1052,8 +1362,10 @@ var matrixOwners = []matrixOwner{
 }
 
 func newMatrixStore(owner matrixOwner, backend Backend, secure bool) *ServerSideStore {
-	store := NewServerSideStore(backend, owner.authenticatedKey, secure,
-		[]byte(storeTestAuthKey), []byte(storeTestEncKey))
+	store, err := NewServerSideStore(backend, owner.authenticatedKey, secure, storeTestPair(), nil)
+	if err != nil {
+		panic(err)
+	}
 	store.PersistentCookie = owner.persistent
 	return store
 }
@@ -1087,14 +1399,6 @@ func loadWith(t *testing.T, store *ServerSideStore, owner matrixOwner, cookies .
 		req.AddCookie(c)
 	}
 	return store.New(req, owner.sessionName)
-}
-
-// isDecodeError is the branch MiddlewareCookieReset takes: a decode failure clears the cookie
-// and redirects, and anything else falls through to be answered as a server error. Which of
-// the two a storage failure produces is the single most consequential cell in this matrix.
-func isDecodeError(err error) bool {
-	multiErr, ok := err.(securecookie.MultiError)
-	return ok && multiErr.IsDecode()
 }
 
 func TestServerSideStore_CutoverMatrix(t *testing.T) {
@@ -1180,11 +1484,9 @@ func TestServerSideStore_CutoverMatrix(t *testing.T) {
 				session, err := loadWith(t, store, owner, cookie)
 				require.Error(t, err, "a lookup that could not be performed is not a fresh session")
 				require.NotNil(t, session,
-					"gorilla's registry dereferences whatever New returns, so a nil session "+
-						"here is a panic rather than the 500 this cell exists to pin")
-				assert.False(t, isDecodeError(err),
-					"a storage failure answered as a decode error would clear the cookie and "+
-						"sign everyone out for the duration of the outage")
+					"Get memoises whatever New returns and hands it to every middleware that "+
+						"asks, so a nil session here is a panic rather than the 500 this cell "+
+						"exists to pin")
 			})
 
 			t.Run(label+"/the old bare master cookie", func(t *testing.T) {
@@ -1241,13 +1543,14 @@ func TestServerSideStore_CutoverMatrix(t *testing.T) {
 // TestServerSideStore_ASessionLargerThanACookieRoundTrips is the regression for a ceiling
 // that used to bind where nothing said it did.
 //
-// securecookie caps an encoded value at 4096 bytes by default, and the store encodes two
-// very different things: a 64 character identifier for the cookie and the entire session for
-// the backend. Sharing one codec set left the second capped at the first's limit, so any
-// session over about 4 KB failed its save with "the value is too long". The auth server never
-// reached it, because its ceremony session is a couple of kilobytes; an admin console session
-// holds a whole token set, about 13 KB, so every save it made would have failed. Two codec
-// sets, each bounded by what it actually carries (#266).
+// The codec this replaced capped an encoded value at 4096 bytes by default, and the store
+// encodes two very different things: a 64 character identifier for the cookie and the entire
+// session for the backend. Sharing one codec set left the second capped at the first's limit,
+// so any session over about 4 KB failed its save with "the value is too long". The auth server
+// never reached it, because its ceremony session is a couple of kilobytes; an admin console
+// session holds a whole token set, about 13 KB, so every save it made would have failed. The
+// blob is now bounded by MaxSessionDataBytes and the cookie by nothing but its contents, which
+// are a fixed 64 characters (#266, #270).
 func TestServerSideStore_ASessionLargerThanACookieRoundTrips(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
@@ -1271,7 +1574,9 @@ func TestServerSideStore_ASessionLargerThanACookieRoundTrips(t *testing.T) {
 
 // TestServerSideStore_ASessionPastTheStoresOwnCeilingIsRefused. The ceiling now binds, which
 // is the difference from the store this replaces: that one advertised fifty chunks, disabled
-// securecookie's length check, and encoded whatever it was given.
+// its codec's length check, and encoded whatever it was given. The check is the store's own
+// now, applied to the sealed length in sealSessionData, which is what both write paths go
+// through (#270).
 func TestServerSideStore_ASessionPastTheStoresOwnCeilingIsRefused(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)

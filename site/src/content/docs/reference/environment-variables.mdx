@@ -188,12 +188,12 @@ These variables are read by **both applications**: the auth server uses them for
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY</code></td>
       <td><em>(empty)</em></td>
-      <td>64-byte hex HMAC key (see <a href="#session-keys">Session keys</a>)</td>
+      <td>64-byte hex key (see <a href="#session-keys">Session keys</a>)</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY</code></td>
       <td><em>(empty)</em></td>
-      <td>32-byte hex AES key (see <a href="#session-keys">Session keys</a>)</td>
+      <td>32-byte hex key (see <a href="#session-keys">Session keys</a>)</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AES_ENCRYPTION_KEY</code></td>
@@ -468,12 +468,12 @@ The admin console needs to know where the auth server is located. See [Network c
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY</code></td>
       <td><em>(empty)</em></td>
-      <td>64-byte hex HMAC key (see <a href="#session-keys">Session keys</a>)</td>
+      <td>64-byte hex key (see <a href="#session-keys">Session keys</a>)</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY</code></td>
       <td><em>(empty)</em></td>
-      <td>32-byte hex AES key (see <a href="#session-keys">Session keys</a>)</td>
+      <td>32-byte hex key (see <a href="#session-keys">Session keys</a>)</td>
     </tr>
   </tbody>
 </table>
@@ -546,8 +546,8 @@ openssl rand -hex 32
 
 ### Key purposes
 
-- **Authentication key** (64 bytes): HMAC signatures to verify cookie integrity
-- **Encryption key** (32 bytes): AES encryption of cookie data
+- **Authentication key** (64 bytes): seals the cookie and stored session
+- **Encryption key** (32 bytes): the same; both are needed
 
 <Aside type="caution">
 Never use plain text passwords or example keys. Always generate fresh cryptographic keys for each deployment.

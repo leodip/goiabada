@@ -229,8 +229,15 @@ func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ServerSide
 	t.Helper()
 	authKey := []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	encKey := []byte("0123456789abcdef0123456789abcdef")
-	store := sessionstore.NewServerSideStore(sessionstore.NewMemoryBackend(),
-		constants.SessionKeySessionIdentifier, false, authKey, encKey)
+	store, err := sessionstore.NewServerSideStore(sessionstore.NewMemoryBackend(),
+		constants.SessionKeySessionIdentifier, false,
+		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
+	if err != nil {
+		// The keys are literals above and the derivation cannot fail on them, so this is
+		// unreachable. Panicking rather than dropping it keeps it that way.
+		panic(err)
+	}
+
 	return NewAuthHelper(store, realStoreSessionName, realStoreBaseURL, realStoreBaseURL), store
 }
 

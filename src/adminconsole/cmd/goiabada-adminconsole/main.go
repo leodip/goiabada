@@ -127,12 +127,19 @@ func main() {
 		adminConsoleConfig.OAuthClientSecret,
 	)
 
-	sessionStore := sessionstore.NewServerSideStore(
+	// No previous key pair yet: the store accepts one so a rotation can be made without
+	// signing anybody out, and the configuration that supplies it is the next change.
+	sessionStore, err := sessionstore.NewServerSideStore(
 		sessionstore.NewHTTPBackend(config.GetAuthServer().GetEffectiveBaseURL(), tokenSource),
 		constants.SessionKeyJwt,
 		config.GetAdminConsole().IsCookieSecure(),
-		authKey, encKey,
+		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey},
+		nil,
 	)
+	if err != nil {
+		slog.Error("unable to initialize the session store", "error", err)
+		os.Exit(1)
+	}
 
 	// PersistentCookie is left false, which is the half of the split the auth server does
 	// not take: its cookie carries an expiry so single sign-on survives a browser restart,

@@ -3,7 +3,6 @@ package sessionstore
 import (
 	"net/http"
 
-	"github.com/gorilla/securecookie"
 	"github.com/pkg/errors"
 )
 
@@ -37,9 +36,9 @@ type Regenerator interface {
 // and emits no header at all, so the failing direction is a user who loses a session
 // rather than an attacker who keeps one.
 func (s *ServerSideStore) Regenerate(w http.ResponseWriter, r *http.Request, session *Session) error {
-	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, s.DataCodecs...)
+	encoded, err := s.sealSessionData(session)
 	if err != nil {
-		return errors.Wrap(err, "unable to encode the browser session")
+		return err
 	}
 
 	newId, err := newSessionId()

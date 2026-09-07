@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/core/sessionstore"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMiddlewareCookieReset(t *testing.T) {
@@ -34,37 +34,19 @@ func TestMiddlewareCookieReset(t *testing.T) {
 		mockStore.AssertExpectations(t)
 	})
 
-	t.Run("Decode error", func(t *testing.T) {
+	// A store error reaches the handler rather than the browser. There is no decode-error
+	// case any more: the store answers an undecodable cookie with a fresh session and a
+	// nil error, so the only error this middleware can see is a storage failure, and
+	// clearing the cookie for one would sign every visitor out for the duration of a
+	// database interruption. The middlewares downstream answer it as 500 with the cause
+	// logged, and they are answered from the same memoised pair this Get installed
+	// (decision 11, #270).
+	t.Run("A storage error is passed along, with no cookie and no redirect", func(t *testing.T) {
 		mockStore := new(mocks_sessionstore.Store)
-		decodeErr := securecookie.MultiError{securecookie.ErrMacInvalid}
-		mockStore.On("Get", mock.Anything, testSessionName).Return(nil, decodeErr)
+		mockStore.On("Get", mock.Anything, testSessionName).Return(nil, errors.New("the database is unreachable"))
 
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-		middleware := MiddlewareCookieReset(mockStore, testSessionName)
-
-		req := httptest.NewRequest("GET", "/test", nil)
-		rr := httptest.NewRecorder()
-
-		middleware(handler).ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, "/test", rr.Header().Get("Location"))
-
-		cookies := rr.Result().Cookies()
-		assert.Len(t, cookies, 1)
-		assert.Equal(t, testSessionName, cookies[0].Name)
-		assert.True(t, cookies[0].Expires.Before(time.Now()))
-		assert.Equal(t, -1, cookies[0].MaxAge)
-		assert.Equal(t, "/", cookies[0].Path)
-
-		mockStore.AssertExpectations(t)
-	})
-
-	t.Run("Non-decode error", func(t *testing.T) {
-		mockStore := new(mocks_sessionstore.Store)
-		mockStore.On("Get", mock.Anything, testSessionName).Return(nil, errors.New("non-decode error"))
-
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		reached := false
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { reached = true })
 		middleware := MiddlewareCookieReset(mockStore, testSessionName)
 
 		req := httptest.NewRequest("GET", "/", nil)
@@ -72,8 +54,9 @@ func TestMiddlewareCookieReset(t *testing.T) {
 
 		middleware(handler).ServeHTTP(rr, req)
 
+		assert.True(t, reached, "the request continues down the chain")
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Len(t, rr.Result().Cookies(), 0)
+		assert.Empty(t, rr.Result().Cookies())
 
 		mockStore.AssertExpectations(t)
 	})
@@ -90,10 +73,15 @@ func TestMiddlewareCookieReset_StaleCookies(t *testing.T) {
 	const sessionName = "authserver"
 
 	newStore := func(secure bool) *sessionstore.ServerSideStore {
-		return sessionstore.NewServerSideStore(
+		store, err := sessionstore.NewServerSideStore(
 			newNoRowsBackend(), "SessionIdentifier", secure,
-			[]byte("12345678901234567890123456789012"),
-			[]byte("abcdefghijklmnopqrstuvwxyz123456"))
+			sessionstore.KeyPair{
+				AuthenticationKey: []byte("12345678901234567890123456789012"),
+				EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
+			},
+			nil)
+		require.NoError(t, err)
+		return store
 	}
 
 	run := func(t *testing.T, store *sessionstore.ServerSideStore, cookies ...*http.Cookie) *httptest.ResponseRecorder {
@@ -159,33 +147,6 @@ func TestMiddlewareCookieReset_StaleCookies(t *testing.T) {
 	})
 }
 
-// TestMiddlewareCookieReset_DecodeErrorNamesThePhysicalCookie pins the other defect #266
-// introduced here. The deletion used to be built from the logical session name with no
-// Secure attribute, which on https names a cookie the browser does not have and would be
-// refused even with the right name.
-func TestMiddlewareCookieReset_DecodeErrorNamesThePhysicalCookie(t *testing.T) {
-	const sessionName = "authserver"
-
-	store := &decodeFailingStore{ServerSideStore: sessionstore.NewServerSideStore(
-		newNoRowsBackend(), "SessionIdentifier", true,
-		[]byte("12345678901234567890123456789012"),
-		[]byte("abcdefghijklmnopqrstuvwxyz123456"))}
-
-	req := httptest.NewRequest("GET", "/auth/authorize", nil)
-	rr := httptest.NewRecorder()
-	MiddlewareCookieReset(store, sessionName)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		t.Fatal("a request whose cookie cannot be decoded must be answered here")
-	})).ServeHTTP(rr, req)
-
-	assert.Equal(t, http.StatusFound, rr.Code)
-
-	cookies := rr.Result().Cookies()
-	assert.Len(t, cookies, 1)
-	assert.Equal(t, "__Host-"+sessionName, cookies[0].Name)
-	assert.True(t, cookies[0].Secure, "a browser refuses a __Host- cookie that is not Secure")
-	assert.Equal(t, -1, cookies[0].MaxAge)
-}
-
 // deletedCookieNames reads through Result(), never the live header map: a middleware that
 // commits its status with WriteHeader is exactly where the two disagree.
 func deletedCookieNames(t *testing.T, rr *httptest.ResponseRecorder) []string {
@@ -195,19 +156,6 @@ func deletedCookieNames(t *testing.T, rr *httptest.ResponseRecorder) []string {
 		names = append(names, c.Name)
 	}
 	return names
-}
-
-// decodeFailingStore is a ServerSideStore whose Get answers the way a store answers a
-// cookie it cannot decode. ServerSideStore itself never does, by design: it answers an
-// undecodable cookie with a fresh session. The branch is still reachable, because this
-// middleware takes sessionstore.Store and any store may report a decode failure, and what it
-// must get right when it fires is naming the physical cookie, which on https is prefixed.
-type decodeFailingStore struct {
-	*sessionstore.ServerSideStore
-}
-
-func (s *decodeFailingStore) Get(*http.Request, string) (*sessionstore.Session, error) {
-	return nil, securecookie.MultiError{securecookie.ErrMacInvalid}
 }
 
 // noRowsBackend answers "there is no such session" to everything, which is all these cases

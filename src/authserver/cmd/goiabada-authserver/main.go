@@ -236,20 +236,30 @@ func main() {
 	authKey, _ := hex.DecodeString(config.GetAuthServer().SessionAuthenticationKey)
 	encKey, _ := hex.DecodeString(config.GetAuthServer().SessionEncryptionKey)
 
-	// The session lives in the database and the browser carries nothing but a signed,
-	// opaque identifier, about 220 bytes in one cookie whatever a deployment configures
-	// and whatever claims it mints. What it replaces put the whole session in the cookie
-	// and split the ciphertext across up to fifty of them, which is why this deployment's
-	// documentation had to tell operators to enlarge their proxy buffers (#266).
+	// The session lives in the database and the browser carries nothing but a sealed,
+	// opaque identifier, about 140 characters in one cookie whatever a deployment
+	// configures and whatever claims it mints: one version byte, a 24 byte nonce, 64
+	// characters of identifier and a 16 byte tag, base64 encoded once. What it replaces
+	// put the whole session in the cookie and split the ciphertext across up to fifty of
+	// them, which is why this deployment's documentation had to tell operators to enlarge
+	// their proxy buffers (#266, #270).
 	//
 	// The backend is scoped to this application's own rows at construction, so no code
 	// path here can name an admin console session however it is composed.
-	sessionStore := sessionstore.NewServerSideStore(
+	//
+	// No previous key pair yet: the store accepts one so a rotation can be made without
+	// signing anybody out, and the configuration that supplies it is the next change.
+	sessionStore, err := sessionstore.NewServerSideStore(
 		sessionstore.NewDatabaseBackend(database, constants.AuthServerSessionName),
 		constants.SessionKeySessionIdentifier,
 		config.GetAuthServer().IsCookieSecure(),
-		authKey, encKey,
+		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey},
+		nil,
 	)
+	if err != nil {
+		slog.Error("unable to initialize the session store", "error", err)
+		os.Exit(1)
+	}
 
 	// The end user's cookie keeps an expiry, so single sign-on survives a browser
 	// restart. It is set per save from the row's own expires_at, which the operator's
