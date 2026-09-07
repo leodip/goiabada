@@ -82,6 +82,17 @@ type ErrDirty struct {
 	// none. It is read only when Applied is AppliedUnknown, where it names the down step that
 	// could have left this marker.
 	Above int
+	// Carried says this binary has a migration numbered Version for this engine, which is what
+	// makes Below and Above endpoints rather than guesses. When it is false a NEWER release wrote
+	// the marker, and Below is merely the nearest version this binary happens to know: a set
+	// carrying 1, 2, 4, 5 that dies at 5 leaves a marker an older binary carrying 1, 2 reads as
+	// preceded by 000002, when 000004 applied and committed. Recording 000002 clean would then
+	// re-run 000003 and 000004 against a schema that already has them on the next upgrade, so the
+	// message must not name it (#268).
+	//
+	// A nil marker sets it true: only a rolled-back first migration writes that row, and every
+	// engine's first migration is one every release carries.
+	Carried bool
 }
 
 func (e ErrDirty) Error() string {
@@ -113,6 +124,17 @@ func (e ErrDirty) Error() string {
 		fmt.Fprintf(&b, "The row records no version, which only an interrupted rollback of migration %s can leave: "+
 			"version %s if its statements did not apply, or never migrated, with the row deleted, if they did.",
 			formatVersion(e.Above), formatVersion(e.Above))
+		return b.String()
+	}
+
+	// A version this binary has no file for was written by a newer release, so the versions its
+	// step sat between are in that release's migration set and not in this one. Naming the
+	// nearest version this binary does carry would be arithmetic on someone else's set.
+	if !e.Carried {
+		fmt.Fprintf(&b, "This binary carries no migration %s, so a newer release migrated this database "+
+			"and only that release knows which versions the interrupted step sat between. "+
+			"Run its binary against this database to be told, and recover there before installing this one.",
+			formatVersion(e.Version))
 		return b.String()
 	}
 

@@ -52,7 +52,7 @@ func TestStartupRefusal_DatabaseAheadOfTheBinaryNamesEveryFactAnOperatorNeeds(t 
 func TestStartupRefusal_LeavesEverythingElseExactlyAsItWas(t *testing.T) {
 	assert.NoError(t, StartupRefusal(nil, "v1.6.0"), "nil is not a refusal")
 
-	dirty := ErrDirty{Version: 40, Applied: 40, Below: 39, Above: 41}
+	dirty := ErrDirty{Version: 40, Applied: 40, Below: 39, Above: 41, Carried: true}
 	assert.Equal(t, error(dirty), StartupRefusal(dirty, "v1.6.0"),
 		"ErrDirty already carries decision 7's dirty message, composed where the direction is known")
 

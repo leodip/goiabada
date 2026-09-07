@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -53,6 +54,12 @@ type errorsIsOnBenignSentinel struct {
 
 // findErrorsIsOnBenignSentinels walks root for non-test Go files and reports every errors.Is call
 // whose second argument names one of the sentinels above.
+//
+// The receiver is resolved through the file's own imports rather than matched against the
+// spelling "errors", because the spelling is not the package. mssqldb/db.go already imports the
+// standard package as goerrors, so a checker keyed on the identifier walks straight past
+// goerrors.Is(err, migrator.ErrNoChange) in the one file most likely to grow it, and reports
+// nothing at all (#268).
 //
 // Test files are not walked. A test asserting the sentinel is reachable inside a wrapped error is
 // asking exactly the question errors.Is answers, and migrator's own package tests do that on
@@ -85,6 +92,7 @@ func findErrorsIsOnBenignSentinels(root string) ([]errorsIsOnBenignSentinel, int
 			return nil
 		}
 		files++
+		errorsIdents := errorsPackageIdents(file)
 		ast.Inspect(file, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok || len(call.Args) != 2 {
@@ -95,7 +103,7 @@ func findErrorsIsOnBenignSentinels(root string) ([]errorsIsOnBenignSentinel, int
 				return true
 			}
 			pkg, ok := fun.X.(*ast.Ident)
-			if !ok || pkg.Name != "errors" {
+			if !ok || !errorsIdents[pkg.Name] {
 				return true
 			}
 			if name, is := benignSentinelName(call.Args[1]); is {
@@ -108,6 +116,36 @@ func findErrorsIsOnBenignSentinels(root string) ([]errorsIsOnBenignSentinel, int
 		return nil
 	})
 	return found, files, err
+}
+
+// errorsPackageIdents returns the identifiers this file binds to a package whose Is is the
+// standard one: "errors", and github.com/pkg/errors, whose Is forwards to it and which 220 files
+// under src/ import. Both spell their default identifier "errors", and either one aliased is the
+// same hazard under a different name.
+//
+// A dot import is deliberately outside this: it would bind Is with no receiver at all, and a bare
+// call cannot be attributed to a package without type information, which is a tier above what
+// this test buys with go/parser alone. Nothing under src/ dot-imports either package. Neither is
+// a function value assigned from errors.Is, for the same reason; the boundary is the direct call.
+func errorsPackageIdents(file *ast.File) map[string]bool {
+	idents := make(map[string]bool, 1)
+	for _, spec := range file.Imports {
+		path, err := strconv.Unquote(spec.Path.Value)
+		if err != nil || (path != "errors" && path != "github.com/pkg/errors") {
+			continue
+		}
+		switch {
+		case spec.Name == nil:
+			// Both paths end in "errors", which is the identifier an unaliased import binds.
+			idents["errors"] = true
+		case spec.Name.Name == "_" || spec.Name.Name == ".":
+			// A blank import binds nothing to call through, and a dot import is out of reach
+			// above. Neither is a receiver, so neither belongs in this set.
+		default:
+			idents[spec.Name.Name] = true
+		}
+	}
+	return idents
 }
 
 // benignSentinelName reads the target of an errors.Is call. Both spellings count: migrator.X from
@@ -170,6 +208,7 @@ import (
 	"errors"
 
 	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/core/data/matcher"
 )
 
 // errors.Is(err, migrator.ErrNoChange) in a comment is not a call.
@@ -183,13 +222,17 @@ func migrate(m *migrator.Migrator) error {
 	if errors.Is(err, migrator.ErrLocked) {
 		return err
 	}
+	if matcher.Is(err, migrator.ErrNoChange) {
+		return nil
+	}
 	return err
 }
 `)
 	found, files, err := findErrorsIsOnBenignSentinels(root)
 	require.NoError(t, err)
 	require.Equal(t, 1, files)
-	require.Empty(t, found, "the helpers, a non-benign target, a comment and a string are all fine")
+	require.Empty(t, found,
+		"the helpers, a non-benign target, a comment, a string and an Is on some other package are all fine")
 
 	// Refused: both spellings of both sentinels, qualified and bare.
 	write("core/data/mysqldb/db.go", `package mysqldb
@@ -218,6 +261,49 @@ import "errors"
 
 func isNothingToDo(err error) bool { return errors.Is(err, ErrNoChange) }
 `)
+	// goerrors is not a hypothetical spelling: mssqldb/db.go imports the standard package under
+	// exactly this name today, so a checker keyed on the identifier "errors" misses the one file
+	// where the mistake is nearest to hand. The migrator import is aliased too, because the target
+	// is read by selector name and must not depend on the package's spelling either.
+	write("core/data/mssqldb/db.go", `package mssqldb
+
+import (
+	goerrors "errors"
+
+	mig "github.com/leodip/goiabada/core/data/migrator"
+)
+
+func migrate(m *mig.Migrator) error {
+	err := m.Up()
+	if goerrors.Is(err, mig.ErrNoChange) {
+		return nil
+	}
+	_, _, verr := m.Version()
+	if goerrors.Is(verr, mig.ErrNilVersion) {
+		return nil
+	}
+	return err
+}
+`)
+	// github.com/pkg/errors is imported by 220 files under src/ and binds the same identifier an
+	// unaliased standard import does. Its Is forwards to the standard one, so it finds the
+	// sentinel inside the join in exactly the same way and is the same defect.
+	write("core/data/postgresdb/db.go", `package postgresdb
+
+import (
+	"github.com/pkg/errors"
+
+	"github.com/leodip/goiabada/core/data/migrator"
+)
+
+func migrate(m *migrator.Migrator) error {
+	err := m.Up()
+	if errors.Is(err, migrator.ErrNoChange) {
+		return nil
+	}
+	return err
+}
+`)
 	// And a test file carrying the same call, which is walked past rather than reported.
 	write("core/data/mysqldb/db_test.go", `package mysqldb
 
@@ -232,7 +318,7 @@ func assertNoChange(err error) bool { return errors.Is(err, migrator.ErrNoChange
 
 	found, files, err = findErrorsIsOnBenignSentinels(root)
 	require.NoError(t, err)
-	require.Equal(t, 3, files, "the three non-test files, and not the _test.go beside them")
+	require.Equal(t, 5, files, "the five non-test files, and not the _test.go beside them")
 
 	seen := make([]string, 0, len(found))
 	for _, f := range found {
@@ -241,7 +327,10 @@ func assertNoChange(err error) bool { return errors.Is(err, migrator.ErrNoChange
 	sort.Strings(seen)
 	require.Equal(t, []string{
 		"core/data/migrator/inside.go ErrNoChange",
+		"core/data/mssqldb/db.go ErrNilVersion",
+		"core/data/mssqldb/db.go ErrNoChange",
 		"core/data/mysqldb/db.go ErrNilVersion",
 		"core/data/mysqldb/db.go ErrNoChange",
-	}, seen, "both spellings of both sentinels, and nothing from the test file")
+		"core/data/postgresdb/db.go ErrNoChange",
+	}, seen, "both sentinels under every spelling of both errors packages, and nothing from the test file")
 }

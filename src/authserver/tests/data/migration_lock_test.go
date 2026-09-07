@@ -3,6 +3,11 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"errors"
+	"fmt"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +16,8 @@ import (
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/leodip/goiabada/core/data/mysqldb"
 	"github.com/leodip/goiabada/core/data/postgresdb"
+	mssql "github.com/microsoft/go-mssqldb"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -150,6 +157,175 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
 	require.NoErrorf(t, err, "construct a second migrator, which pre-creates schema_migrations again on %s", dbType())
 
 	requireMigrationLockIsFree(t, h, eng, "after the schema_migrations pre-create")
+}
+
+// releaseApplockStatement is the fragment identifying the one statement the fault below refuses.
+// It is matched rather than restated in full because the engine builds it with its own
+// placeholder; matching the procedure name is enough to pick it out of everything else the
+// pre-create issues, and too little to pick out anything it should not.
+const releaseApplockStatement = "sp_releaseapplock"
+
+// errPrecreateUnlockFault is the failure injected into that statement. A sentinel, so the
+// assertion is identity rather than a string match on whatever the driver would have said.
+var errPrecreateUnlockFault = errors.New("injected sp_releaseapplock failure")
+
+// TestMigrationLock_ThePreCreateGivesTheResourceBackWhenTheReleaseFails is the failure half of the
+// test above, and the only thing that can tell the pre-create's cleanup from its absence.
+//
+// The test above exercises a release that works, which is every run against a healthy database, so
+// it stays green with the cleanup deleted: on that path the code being protected never executes.
+// What the cleanup exists for is the other path. When sp_releaseapplock fails, the session still
+// holds an exclusive session-scoped lock that later migrators wait on indefinitely, and returning
+// it to the pool hands that lock to the next borrower for the life of the process. So the failure
+// has to be reported rather than swallowed, and the connection destroyed rather than pooled.
+//
+// The fault goes into the real go-mssqldb driver rather than a fake one, and into exactly one
+// statement. Acquisition, the catalog check, the CREATE and the release are all issued against the
+// real SQL Server; only the release's answer is replaced. A scripted driver would prove the code
+// calls something, and nothing about whether a real exclusive lock came back, which is the only
+// question here. NewMigrator is called unchanged: no production seam, hook or build tag stands
+// behind this, which is what makes it a test of the shipped path.
+//
+// Both DDL outcomes run, because they leave the function through different returns. A successful
+// CREATE reaches the end and the deferred unlock supplies the error; a failing CREATE is already
+// returning one, and the unlock's has to join it rather than replace it.
+//
+// SQL Server only, for the same reason as the test above: it is the one engine whose pre-create
+// takes a lock at all.
+//
+// Run via: ./run-tests.sh --type data --db mssql --run TestMigrationLock
+func TestMigrationLock_ThePreCreateGivesTheResourceBackWhenTheReleaseFails(t *testing.T) {
+	if dbType() != "mssql" {
+		t.Skipf("%s pre-creates schema_migrations without a lock: only SQL Server has no atomic form of that check-then-create", dbType())
+	}
+
+	for _, failDDL := range []bool{false, true} {
+		name := "the create succeeds"
+		if failDDL {
+			name = "the create fails too"
+		}
+		t.Run(name, func(t *testing.T) {
+			h := newIsolatedDB(t)
+			db, ok := h.DB.(*mssqldb.MsSQLDatabase)
+			require.True(t, ok, "the mssql database must be the concrete type whose pool this swaps")
+
+			// newIsolatedDB already pre-created the table, so without this the CREATE would be a
+			// no-op and the succeeding-DDL case would never reach it.
+			_, err := h.SQL.Exec("DROP TABLE schema_migrations")
+			require.NoError(t, err, "clear the table the fixture's own construction created")
+			if failDDL {
+				// A VIEW is not an object of type U, so the pre-create's IF OBJECT_ID guard sees
+				// nothing and issues the CREATE, which SQL Server then refuses for the name.
+				_, err = h.SQL.Exec("CREATE VIEW schema_migrations AS SELECT CAST(0 AS BIGINT) AS version, CAST(0 AS BIT) AS dirty")
+				require.NoError(t, err, "seed the collision the CREATE will hit")
+			}
+
+			faultPool := precreateFaultPool(t, h.Name)
+			original := db.DB
+			db.DB = faultPool
+			t.Cleanup(func() { db.DB = original })
+
+			_, err = db.NewMigrator()
+			require.ErrorIs(t, err, errPrecreateUnlockFault,
+				"a release that failed must reach the caller: it is the only notice that this database now carries a lock held against every later migrator")
+			if failDDL {
+				assert.Contains(t, err.Error(), "unable to create the schema_migrations table",
+					"and it must join the CREATE's failure rather than replacing it")
+			}
+
+			// The session that failed to release must not go back to the pool. Both counters,
+			// because InUse alone is zero for a connection sitting idle in the pool still holding
+			// the lock, which is the exact state being ruled out.
+			stats := faultPool.Stats()
+			assert.Equal(t, 0, stats.InUse, "the connection must not still be checked out")
+			assert.Equal(t, 0, stats.OpenConnections,
+				"the session that failed to release the lock must be destroyed, not pooled for the next borrower")
+
+			// And the resource is actually free, observed from a session that is definitely not
+			// that one. This is the assertion the counters cannot make: a pool's connection count
+			// says nothing about what the server still holds.
+			requireMigrationLockIsFree(t, h, migrationLockEngine(t, h.Name), "after a pre-create whose release failed")
+		})
+	}
+}
+
+// precreateFaultPool opens a pool to an existing database through the real SQL Server driver, with
+// every statement but sp_releaseapplock going to the server untouched.
+//
+// One connection, so the assertions about open connections describe the one session that took the
+// lock rather than a pool that happened to have others.
+func precreateFaultPool(t *testing.T, name string) *sql.DB {
+	t.Helper()
+	cfg := config.GetDatabase()
+
+	dsn := url.URL{
+		Scheme:   "sqlserver",
+		User:     url.UserPassword(cfg.Username, cfg.Password),
+		Host:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		RawQuery: url.Values{"database": {name}, "encrypt": {"disable"}}.Encode(),
+	}
+	connector, err := mssql.NewConnector(dsn.String())
+	require.NoErrorf(t, err, "build a real SQL Server connector to %s", name)
+
+	pool := sql.OpenDB(precreateFaultConnector{Connector: connector})
+	pool.SetMaxOpenConns(1)
+	pool.SetMaxIdleConns(1)
+	t.Cleanup(func() { _ = pool.Close() })
+	return pool
+}
+
+// precreateFaultConnector hands out real connections wrapped so one statement can fail.
+type precreateFaultConnector struct{ *mssql.Connector }
+
+func (c precreateFaultConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	conn, err := c.Connector.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// The concrete type, not the driver.Conn interface, and deliberately: database/sql picks its
+	// path by testing the connection for optional interfaces (ConnBeginTx, NamedValueChecker,
+	// QueryerContext and the rest), and a wrapper embedding the interface would hide every one of
+	// them. The parameterised lock statements need them, so such a fixture would change the very
+	// behaviour it is here to observe.
+	native, ok := conn.(*mssql.Conn)
+	if !ok {
+		_ = conn.Close()
+		return nil, fmt.Errorf("unexpected SQL Server connection type %T", conn)
+	}
+	return &precreateFaultConn{Conn: native}, nil
+}
+
+// precreateFaultConn refuses the release statement and passes everything else through.
+//
+// The fault sits on the prepared statement rather than on an ExecContext override because
+// go-mssqldb's Conn implements no driver.ExecerContext, so database/sql prepares every statement
+// it issues and that is the only path the release can take. Adding an override would introduce a
+// path the driver does not have. Should a later version of the driver add one, this stops
+// intercepting and the assertions below fail rather than quietly passing, which is the direction
+// a fixture like this has to fail in.
+type precreateFaultConn struct{ *mssql.Conn }
+
+func (c *precreateFaultConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+	stmt, err := c.Conn.PrepareContext(ctx, query)
+	if err != nil || !strings.Contains(query, releaseApplockStatement) {
+		return stmt, err
+	}
+	return precreateFaultStmt{Stmt: stmt}, nil
+}
+
+func (c *precreateFaultConn) Prepare(query string) (driver.Stmt, error) {
+	return c.PrepareContext(context.Background(), query)
+}
+
+// precreateFaultStmt is the prepared form of the same refusal.
+type precreateFaultStmt struct{ driver.Stmt }
+
+func (s precreateFaultStmt) Exec([]driver.Value) (driver.Result, error) {
+	return nil, errPrecreateUnlockFault
+}
+
+func (s precreateFaultStmt) ExecContext(context.Context, []driver.NamedValue) (driver.Result, error) {
+	return nil, errPrecreateUnlockFault
 }
 
 // hasSessionMigrationLock is the three engines whose migration lock is a statement rather than a
