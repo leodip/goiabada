@@ -508,6 +508,49 @@ func TestMigrate_RefusesAVersionThisBinaryDoesNotCarry(t *testing.T) {
 	})
 }
 
+// TestErrDirty_DoesNotNameAPredecessorForAVersionThisBinaryDoesNotCarry is the endpoints being
+// endpoints of the right set.
+//
+// Below is the highest version the SOURCE carries beneath the marker, which is the right answer
+// only while the marker is a version this source knows. When a newer release wrote it, the
+// versions between it and the nearest one here live in that release's set and nowhere in this
+// one, so naming the nearest local version presents a version the schema was never at as a
+// recovery endpoint. An operator who records it clean has a database that will re-run every
+// migration in the gap on the next upgrade, against a schema that already has them.
+//
+// The refusal itself is not in question and is asserted below: a dirty database is refused either
+// way. What is under test is that the message stops where the binary's knowledge stops.
+func TestErrDirty_DoesNotNameAPredecessorForAVersionThisBinaryDoesNotCarry(t *testing.T) {
+	db := openTestDB(t)
+
+	// The newer release: 000004 applies and commits, then 000005 fails, leaving the marker at
+	// 000005 dirty. The gap at 000003 is what every real set has.
+	newer := newTestMigrator(t, db, set(map[string]string{
+		"000001_one.up.sql":  "CREATE TABLE one (id INTEGER);",
+		"000002_two.up.sql":  "CREATE TABLE two (id INTEGER);",
+		"000004_four.up.sql": "CREATE TABLE four (id INTEGER);",
+		"000005_five.up.sql": "THIS IS NOT SQL;",
+	}))
+	require.Error(t, newer.Up(), "000005 must fail, leaving the marker dirty at 000005")
+
+	// The older release, carrying 000001 and 000002 only, reading a marker it has no file for.
+	older := newTestMigrator(t, db, set(map[string]string{
+		"000001_one.up.sql": "CREATE TABLE one (id INTEGER);",
+		"000002_two.up.sql": "CREATE TABLE two (id INTEGER);",
+	}))
+
+	var dirty ErrDirty
+	require.ErrorAs(t, older.Up(), &dirty, "a dirty database is refused whatever the version")
+	assert.Equal(t, 5, dirty.Version)
+	assert.False(t, dirty.Carried, "this binary has no file numbered 000005")
+
+	message := dirty.Error()
+	assert.NotContains(t, message, "version 000002 if",
+		"000004 applied and committed, so 000002 is not an end state this schema can be repaired to")
+	assert.Contains(t, message, "no migration 000005")
+	assert.Contains(t, message, "newer release migrated this database")
+}
+
 // TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed is the case behind step 1's
 // arithmetic. An up step to V marks V, so the two end states are V-1 and V. A down step from N
 // marks N-1, so they are N and N-1: the "did not apply" state is the version ABOVE the marker.
@@ -562,7 +605,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 	t.Run("read back from the table, where the direction is not recorded", func(t *testing.T) {
 		// schema_migrations records the version reached and nothing else, so a marker read back
 		// is consistent with two interrupted steps. The message names both rather than guessing.
-		e := ErrDirty{Version: 2, Applied: AppliedUnknown, Below: 1, Above: 5}
+		e := ErrDirty{Version: 2, Applied: AppliedUnknown, Below: 1, Above: 5, Carried: true}
 		assert.Contains(t, e.Error(), "000001")
 		assert.Contains(t, e.Error(), "000002")
 		assert.Contains(t, e.Error(), "000005")

@@ -261,6 +261,10 @@ func (m *Migrator) currentVersion(ctx context.Context, conn *sql.Conn) (int, err
 			Applied: AppliedUnknown,
 			Below:   m.src.prev(current),
 			Above:   m.src.next(current),
+			// Whether the endpoints below and above mean anything at all. A marker this binary
+			// carries no file for came from a newer release, whose set may carry versions between
+			// it and the nearest one here (#268).
+			Carried: current == NilVersion || m.src.exists(current),
 		}
 	}
 	if current != NilVersion {
@@ -403,7 +407,8 @@ func (m *Migrator) apply(ctx context.Context, conn *sql.Conn, steps []step) erro
 					// Below is the source's own predecessor of the marker, never marker minus
 					// one: the sets have gaps, and beneath the first migration there is no
 					// version at all rather than 000000.
-					ErrDirty{Version: s.marker, Applied: s.apply, Below: m.src.prev(s.marker), Above: NilVersion})
+					ErrDirty{Version: s.marker, Applied: s.apply, Below: m.src.prev(s.marker),
+						Above: NilVersion, Carried: true})
 			}
 		}
 		// A version with no file in the direction being travelled runs nothing and still moves

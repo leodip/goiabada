@@ -12,6 +12,7 @@ require (
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
 	github.com/leodip/goiabada/core v0.0.0
+	github.com/microsoft/go-mssqldb v1.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.12.1
@@ -41,7 +42,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/microsoft/go-mssqldb v1.10.0 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.6.1 // indirect
