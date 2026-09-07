@@ -28,13 +28,22 @@ import (
 // under this one it does not, because every copy names the same row. See
 // TestClearedLinkMarkerDoesNotSurviveInACapturedCookie.
 func newMarkerTestStore() *sessionstore.ServerSideStore {
-	return sessionstore.NewServerSideStore(
+	store, err := sessionstore.NewServerSideStore(
 		sessionstore.NewMemoryBackend(),
 		constants.SessionKeySessionIdentifier,
 		false,
-		[]byte("12345678901234567890123456789012"),
-		[]byte("abcdefghijklmnopqrstuvwxyz123456"),
+		sessionstore.KeyPair{
+			AuthenticationKey: []byte("12345678901234567890123456789012"),
+			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
+		},
+		nil,
 	)
+	if err != nil {
+		// The keys are literals above and the derivation cannot fail on them, so this is
+		// unreachable. Panicking rather than dropping it keeps it that way.
+		panic(err)
+	}
+	return store
 }
 
 // requestCarrying builds a request holding the cookies a previous response set, which

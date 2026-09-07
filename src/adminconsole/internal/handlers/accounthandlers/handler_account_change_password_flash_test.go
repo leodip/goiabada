@@ -50,13 +50,22 @@ func (flashStubApiClient) UpdateAccountPassword(accessToken string,
 // save and a load to be worth asserting on, and a mocked store would hand back whatever
 // the test put in it, which is the assertion making itself true.
 func newFlashTestStore() *sessionstore.ServerSideStore {
-	return sessionstore.NewServerSideStore(
+	store, err := sessionstore.NewServerSideStore(
 		sessionstore.NewMemoryBackend(),
 		constants.SessionKeyJwt,
 		false,
-		[]byte("12345678901234567890123456789012"),
-		[]byte("abcdefghijklmnopqrstuvwxyz123456"),
+		sessionstore.KeyPair{
+			AuthenticationKey: []byte("12345678901234567890123456789012"),
+			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
+		},
+		nil,
 	)
+	if err != nil {
+		// The keys are literals above and the derivation cannot fail on them, so this is
+		// unreachable. Panicking rather than dropping it keeps it that way.
+		panic(err)
+	}
+	return store
 }
 
 // withJwtInfo puts the access token the handlers read out of the request context in place.

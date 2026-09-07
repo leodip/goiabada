@@ -378,8 +378,9 @@ type DynamicClientRegistrationRequest struct {
 // that reports slow requests, which is one of the reasons a capability-style endpoint was
 // rejected in the first place.
 //
-// `data` is a string because it is a string in the column: it is securecookie output,
-// which is base64 text, and it is ciphertext the auth server holds no key for.
+// `data` is a string because it is a string in the column: it is the session store's
+// sealed envelope, which is base64 text, and it is ciphertext the auth server holds no
+// key for.
 
 // SessionLoadRequest names the session to read or remove.
 type SessionLoadRequest struct {

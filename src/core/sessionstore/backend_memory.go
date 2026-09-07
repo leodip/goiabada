@@ -9,15 +9,18 @@ import (
 // MemoryBackend keeps browser sessions in a map. No binary constructs it: it exists so a
 // test that needs a real store rather than a mock can have one without a database.
 //
-// Six test files drive the session store for real, because a mock cannot show what they
+// Eight test files drive the session store for real, because a mock cannot show what they
 // are checking. Three check a round trip through it: the link marker tests in the auth
 // server, the account activation tests beside them, and the auth helper's clear-reaches-
-// the-browser tests in core. Three more only need a store that works, and reach for a
-// real one rather than a second implementation of Get and Save: the per-package
-// newTestSessionStore helpers in the two servers and in adminclienthandlers, which is
-// what the cookie stores those tests used became once the cookie store went (#269). All
-// six live outside this package, so the unexported fake the store's own tests use is out
-// of reach, and this is the same thing with a name they can say (#266).
+// the-browser tests in core. Two check that a flash survives one: the admin console's
+// account password and user details tests, which is a stored shape rather than a returned
+// value and so cannot be observed through a double that hands back what it was given
+// (#269). Three more only need a store that works, and reach for a real one rather than a
+// second implementation of Get and Save: the per-package newTestSessionStore helpers in
+// the two servers and in adminclienthandlers, which is what the cookie stores those tests
+// used became once the cookie store went (#269). All eight live outside this package, so
+// the unexported fake the store's own tests use is out of reach, and this is the same
+// thing with a name they can say (#266).
 //
 // It injects no failures on purpose. The error paths belong to the store's own tests,
 // where the fake can be made to fail in one specific way per case, and to the data tier,

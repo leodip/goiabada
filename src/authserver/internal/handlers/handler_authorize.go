@@ -386,8 +386,8 @@ func HandleAuthorizeGet(
 			}
 
 			// Park the error and go and authenticate. It is carried on the auth context, which
-			// securecookie encrypts and HMACs, so it is not a value the visitor can choose, and
-			// it is delivered at /auth/level1completed once level 1 credentials are verified.
+			// the session store seals with an AEAD, so it is not a value the visitor can choose,
+			// and it is delivered at /auth/level1completed once level 1 credentials are verified.
 			//
 			// The description is conformed HERE and not only at the emitter. RFC 6749 Appendix
 			// A.8's character set is enforced in redirToClientWithError as well, and that filter

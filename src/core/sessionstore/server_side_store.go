@@ -1,8 +1,11 @@
 package sessionstore
 
 import (
+	"bytes"
 	"context"
+	"crypto/cipher"
 	"crypto/rand"
+	"encoding/gob"
 	"encoding/hex"
 	"io"
 	"log/slog"
@@ -10,7 +13,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/securecookie"
 	"github.com/pkg/errors"
 )
 
@@ -48,7 +50,7 @@ const (
 	// The largest envelope is 105 bytes: a write request is
 	// {"id":<64 chars>,"data":<blob>,"authenticated":true} and a load response is
 	// {"data":<blob>,"lastAccessed":<RFC 3339 nanos>,"expiresAt":<RFC 3339 nanos>}, plus
-	// the newline json.Encoder appends. The blob is securecookie's base64, so JSON has
+	// the newline json.Encoder appends. The blob is this store's own base64, so JSON has
 	// nothing in it to escape and the encoded length is the stored length. 4 KiB is
 	// roughly forty times what is needed, which is deliberate: an allowance sized to the
 	// current field names would have to be revisited every time one is added, and the
@@ -57,9 +59,11 @@ const (
 
 	// MaxSessionDataBytes bounds an encoded session blob, and it is the ceiling that
 	// actually binds rather than one the store advertises and does not enforce, which is
-	// the defect #266 exists to retire. securecookie checks it on the way in and on the
-	// way out, so an oversized session fails its save with a clear error instead of being
-	// written and then refused somewhere further along.
+	// the defect #266 exists to retire. The store checks it on the way in, against the
+	// sealed length rather than the plaintext one, so an oversized session fails its save
+	// with a clear error instead of being written and then refused somewhere further
+	// along. It is the store's own check since #270: the codec that used to carry it left
+	// with securecookie, and a ceiling nothing enforces is the defect above.
 	//
 	// It sits below MaxSessionWireBytes rather than equal to it, because a blob equal to
 	// the wire ceiling cannot fit through the wire once its envelope is added: the write
@@ -72,11 +76,6 @@ const (
 	// about 13 KB of ciphertext, so nothing a deployment can legitimately produce comes
 	// near either number.
 	MaxSessionDataBytes = MaxSessionWireBytes - sessionEnvelopeBytes
-
-	// MaxCookieDecodeAgeSeconds is the oldest cookie securecookie will decode at all.
-	// It is a backstop and not the session's lifetime: the row's expires_at decides
-	// whether a session is alive, and a cookie older than its row simply names nothing.
-	MaxCookieDecodeAgeSeconds = 86400 * 365
 
 	// hostCookiePrefix is the __Host- prefix, which a browser accepts only on a cookie
 	// that is Secure, carries no Domain and has Path=/. What it buys here is that a
@@ -167,22 +166,18 @@ func ExpiresAt(now, createdAt time.Time, authenticated bool, idleTimeout, maxLif
 // but an opaque, signed identifier. It implements this package's own Store, so the
 // hundred places that already take that interface are untouched (#266).
 type ServerSideStore struct {
-	// Codecs sign and encrypt the identifier in the cookie. What they encode is 64 hex
-	// characters, so they keep securecookie's own 4096 byte ceiling: it finally has
-	// something to guard, where the store this replaced had to disable it.
-	Codecs []securecookie.Codec
+	// current seals everything this store writes, and is tried first on everything it
+	// opens. It holds one AEAD for the cookie and one for the stored blob, derived from
+	// the deployment's configured key pair, so a backend that is somebody else's server
+	// holds bytes it cannot read.
+	current *sealer
 
-	// DataCodecs encrypt the session contents before they reach the backend, with this
-	// module's own keys, so a backend that is somebody else's server holds bytes it
-	// cannot read.
-	//
-	// A separate set from Codecs for one reason, and it is not cosmetic: securecookie's
-	// length ceiling is a property of the codec, and these two encode values whose sizes
-	// differ by four orders of magnitude. Sharing one set means either the cookie's
-	// identifier is guarded by a megabyte, which guards nothing, or the session blob is
-	// capped at a cookie's 4096 bytes, which is smaller than an ordinary admin console
-	// session and would fail every save it made.
-	DataCodecs []securecookie.Codec
+	// previous is the pair the deployment is rotating away from, or nil when it is not
+	// rotating. It is only ever used to open: everything written is sealed with current,
+	// so a session touched after the restart moves onto the new pair by itself and the
+	// operator removes the previous pair once the maximum session lifetime has passed
+	// (decision 10, #270).
+	previous *sealer
 
 	// Options are the cookie defaults. MaxAge is not read from here: it is decided per
 	// save, from PersistentCookie and the row's own expiry.
@@ -212,32 +207,35 @@ type ServerSideStore struct {
 	now func() time.Time
 }
 
-// NewServerSideStore builds a store over the given backend. keyPairs are the same
-// authentication and encryption keys the cookie store used, in the same order.
-func NewServerSideStore(backend Backend, authenticatedKey string, secure bool, keyPairs ...[]byte) *ServerSideStore {
-	codecs := securecookie.CodecsFromPairs(keyPairs...)
-	dataCodecs := securecookie.CodecsFromPairs(keyPairs...)
+// NewServerSideStore builds a store over the given backend.
+//
+// current is the deployment's configured session key pair. previous is the pair it is
+// rotating away from, or nil when it is not rotating: a zero-value KeyPair is not the same
+// thing and must not be passed instead, because HKDF derives a perfectly valid key from
+// two empty inputs and the store would then hold a second opening key anybody can
+// recompute (decision 10).
+//
+// The error is the key derivation's, so a deployment whose keys cannot build a cipher
+// fails at startup rather than at its first save.
+func NewServerSideStore(backend Backend, authenticatedKey string, secure bool,
+	current KeyPair, previous *KeyPair) (*ServerSideStore, error) {
 
-	// securecookie's own length guard is kept on both sets, unlike the chunked store which
-	// had to disable it, and set to what each set actually carries. The cookie's is left at
-	// securecookie's 4096 byte default, which is generous for 64 hex characters; the blob's
-	// is raised to the size a session is allowed to reach, because the default is a cookie's
-	// limit and the blob is no longer in a cookie.
-	for _, codec := range codecs {
-		if sc, ok := codec.(*securecookie.SecureCookie); ok {
-			sc.MaxAge(MaxCookieDecodeAgeSeconds)
-		}
+	currentSealer, err := newSealer(current)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to build the session store's current keys")
 	}
-	for _, codec := range dataCodecs {
-		if sc, ok := codec.(*securecookie.SecureCookie); ok {
-			sc.MaxAge(MaxCookieDecodeAgeSeconds)
-			sc.MaxLength(MaxSessionDataBytes)
+
+	var previousSealer *sealer
+	if previous != nil {
+		previousSealer, err = newSealer(*previous)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to build the session store's previous keys")
 		}
 	}
 
 	return &ServerSideStore{
-		Codecs:     codecs,
-		DataCodecs: dataCodecs,
+		current:  currentSealer,
+		previous: previousSealer,
 		Options: &Options{
 			Path:     "/",
 			HttpOnly: true,
@@ -248,7 +246,77 @@ func NewServerSideStore(backend Backend, authenticatedKey string, secure bool, k
 		AuthenticatedKey: authenticatedKey,
 		Secure:           secure,
 		now:              func() time.Time { return time.Now().UTC() },
+	}, nil
+}
+
+// OpenCookie returns the session identifier a cookie value carries, for the logical
+// session name it was sealed under.
+//
+// Exported because the store is the only thing that can do it and two test tiers need to:
+// asserting that a rotation changed the identifier means reading the identifier, and
+// comparing cookie values proves nothing at all, since every seal draws a fresh nonce and
+// the value therefore changes whether the identifier did or not.
+//
+// Every failure is one error and the caller's answer to all of them is a fresh session.
+func (s *ServerSideStore) OpenCookie(name, value string) (string, error) {
+	id, err := s.openWithEither(func(sl *sealer) cipher.AEAD { return sl.cookie }, name, value)
+	if err != nil {
+		return "", err
 	}
+	return string(id), nil
+}
+
+// openWithEither opens a value with the current keys, and failing that with the previous
+// ones when the deployment is rotating.
+//
+// The current pair is tried first because it is what everything is sealed with, so the
+// second attempt only ever happens for a value written before the restart. Nothing is
+// re-sealed here: the next Save does that with the current pair, and the maximum session
+// lifetime bounds how long anything sealed under the previous pair can still be alive,
+// which is what tells an operator when the previous variables can come out (decision 10).
+//
+// The error returned is the last one, from whichever attempt was made last. Both mean the
+// same thing to every caller -- a value this deployment cannot open -- and no caller
+// distinguishes them.
+func (s *ServerSideStore) openWithEither(pick func(*sealer) cipher.AEAD, name, value string) ([]byte, error) {
+	plaintext, err := open(pick(s.current), name, value)
+	if err == nil {
+		return plaintext, nil
+	}
+
+	if s.previous == nil {
+		return nil, err
+	}
+	return open(pick(s.previous), name, value)
+}
+
+// sealSessionData serialises the session's contents and seals them for the backend.
+//
+// Values is gob encoded, so its Go type is the stored wire type: map[string]any since
+// #269. gob needs nothing registered for the strings and booleans this repository stores,
+// and each main.go registers the one struct type its module puts in a session.
+//
+// The length check is here rather than at either caller because both of them write the
+// blob and a ceiling enforced on one path is not a ceiling. It is applied to the sealed
+// length, which is what the backend and the wire actually carry.
+func (s *ServerSideStore) sealSessionData(session *Session) (string, error) {
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(session.Values); err != nil {
+		return "", errors.Wrap(err, "unable to encode the browser session")
+	}
+
+	encoded, err := seal(s.current.data, session.Name(), buf.Bytes())
+	if err != nil {
+		return "", errors.Wrap(err, "unable to encode the browser session")
+	}
+
+	if len(encoded) > MaxSessionDataBytes {
+		return "", errors.Errorf(
+			"unable to encode the browser session: the value is too long (%d bytes, ceiling %d)",
+			len(encoded), MaxSessionDataBytes)
+	}
+
+	return encoded, nil
 }
 
 // CookieName is the name the cookie physically carries, which is not the name callers
@@ -330,8 +398,8 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 		return session, nil
 	}
 
-	var id string
-	if err := securecookie.DecodeMulti(name, cookie.Value, &id, s.Codecs...); err != nil {
+	id, err := s.OpenCookie(name, cookie.Value)
+	if err != nil {
 		slog.Debug("browser session cookie did not decode, starting a fresh session",
 			"sessionName", name)
 		return session, nil
@@ -357,7 +425,15 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 		return session, errors.Wrap(err, "unable to load the browser session")
 	}
 
-	if err := securecookie.DecodeMulti(name, string(record.Data), &session.Values, s.DataCodecs...); err != nil {
+	plaintext, err := s.openWithEither(
+		func(sl *sealer) cipher.AEAD { return sl.data }, name, string(record.Data))
+	if err != nil {
+		slog.Warn("stored browser session data did not decode, starting a fresh session",
+			"error", err, "sessionName", name)
+		return session, nil
+	}
+
+	if err := gob.NewDecoder(bytes.NewReader(plaintext)).Decode(&session.Values); err != nil {
 		slog.Warn("stored browser session data did not decode, starting a fresh session",
 			"error", err, "sessionName", name)
 		return session, nil
@@ -428,9 +504,9 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 		return s.deleteSession(ctx, w, session)
 	}
 
-	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, s.DataCodecs...)
+	encoded, err := s.sealSessionData(session)
 	if err != nil {
-		return errors.Wrap(err, "unable to encode the browser session")
+		return err
 	}
 
 	authenticated := s.isAuthenticated(session)
@@ -483,7 +559,7 @@ func (s *ServerSideStore) deleteSession(ctx context.Context, w http.ResponseWrit
 // leaves MaxAge at zero, which net/http renders as neither Max-Age nor Expires, so the
 // browser drops the cookie when it closes and the tokens inside never reach disk.
 func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *Session, id string, expiresAt time.Time) error {
-	encodedId, err := securecookie.EncodeMulti(session.Name(), id, s.Codecs...)
+	encodedId, err := seal(s.current.cookie, session.Name(), []byte(id))
 	if err != nil {
 		// The row is already written at this point, so the session exists and the
 		// browser is about to be told nothing about it. That is reported rather than

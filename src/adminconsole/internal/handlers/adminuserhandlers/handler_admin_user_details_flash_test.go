@@ -41,13 +41,22 @@ func (flashStubApiClient) GetUserById(accessToken string, id int64) (*models.Use
 // newFlashTestStore is a real store over an in-memory backend, because a flash is only
 // interesting once it has crossed a save and a load.
 func newFlashTestStore() *sessionstore.ServerSideStore {
-	return sessionstore.NewServerSideStore(
+	store, err := sessionstore.NewServerSideStore(
 		sessionstore.NewMemoryBackend(),
 		constants.SessionKeyJwt,
 		false,
-		[]byte("12345678901234567890123456789012"),
-		[]byte("abcdefghijklmnopqrstuvwxyz123456"),
+		sessionstore.KeyPair{
+			AuthenticationKey: []byte("12345678901234567890123456789012"),
+			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
+		},
+		nil,
 	)
+	if err != nil {
+		// The keys are literals above and the derivation cannot fail on them, so this is
+		// unreachable. Panicking rather than dropping it keeps it that way.
+		panic(err)
+	}
+	return store
 }
 
 // detailsRequest builds the GET the handler expects: the userId route parameter chi would

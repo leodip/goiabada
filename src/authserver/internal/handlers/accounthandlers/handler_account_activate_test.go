@@ -39,13 +39,22 @@ import (
 // in-memory backend since #266 moved the session out of the browser; what these cases
 // assert is unchanged by that, since the marker round-trips either way.
 func newMarkerTestStore() *sessionstore.ServerSideStore {
-	return sessionstore.NewServerSideStore(
+	store, err := sessionstore.NewServerSideStore(
 		sessionstore.NewMemoryBackend(),
 		constants.SessionKeySessionIdentifier,
 		false,
-		[]byte("12345678901234567890123456789012"),
-		[]byte("abcdefghijklmnopqrstuvwxyz123456"),
+		sessionstore.KeyPair{
+			AuthenticationKey: []byte("12345678901234567890123456789012"),
+			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
+		},
+		nil,
 	)
+	if err != nil {
+		// The keys are literals above and the derivation cannot fail on them, so this is
+		// unreachable. Panicking rather than dropping it keeps it that way.
+		panic(err)
+	}
+	return store
 }
 
 // linkFollowedRequest is the emailed link being followed: the code, and nothing else.
