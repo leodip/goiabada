@@ -562,11 +562,141 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 	t.Run("read back from the table, where the direction is not recorded", func(t *testing.T) {
 		// schema_migrations records the version reached and nothing else, so a marker read back
 		// is consistent with two interrupted steps. The message names both rather than guessing.
-		e := ErrDirty{Version: 2, Applied: AppliedUnknown, Above: 5}
+		e := ErrDirty{Version: 2, Applied: AppliedUnknown, Below: 1, Above: 5}
 		assert.Contains(t, e.Error(), "000001")
 		assert.Contains(t, e.Error(), "000002")
 		assert.Contains(t, e.Error(), "000005")
 	})
+
+	// The four cases below are the ones marker-minus-one gets wrong. Every set has gaps and every
+	// set has a first migration, so an operator told to record 000004 or 000000 is told to record
+	// a version their binary carries no file for and refuses on the next start: the dirty
+	// database they were repairing becomes a database that will not open.
+
+	t.Run("a failed up step over a gap", func(t *testing.T) {
+		files := set(map[string]string{
+			"000001_first.up.sql":    "CREATE TABLE t1 (id INTEGER);",
+			"000001_first.down.sql":  "DROP TABLE t1;",
+			"000002_second.up.sql":   "CREATE TABLE t2 (id INTEGER);",
+			"000002_second.down.sql": "DROP TABLE t2;",
+			"000005_broken.up.sql":   "THIS IS NOT SQL;",
+			"000005_broken.down.sql": "SELECT 1;",
+		})
+		db := openTestDB(t)
+		m := newTestMigrator(t, db, files)
+
+		var dirty ErrDirty
+		require.ErrorAs(t, m.Up(), &dirty)
+		assert.Equal(t, 5, dirty.Version)
+		assert.Equal(t, 5, dirty.Applied)
+		assert.Equal(t, 2, dirty.Below, "the version the SOURCE carries below 000005, not 000004")
+		assert.Contains(t, dirty.Error(), "version 000002 if")
+		assert.Contains(t, dirty.Error(), "version 000005 if")
+		assert.NotContains(t, dirty.Error(), "000004", "no file in this set is numbered 000004")
+	})
+
+	t.Run("a failed first up step", func(t *testing.T) {
+		files := set(map[string]string{
+			"000001_broken.up.sql":   "THIS IS NOT SQL;",
+			"000001_broken.down.sql": "SELECT 1;",
+			"000002_second.up.sql":   "CREATE TABLE t2 (id INTEGER);",
+			"000002_second.down.sql": "DROP TABLE t2;",
+		})
+		db := openTestDB(t)
+		m := newTestMigrator(t, db, files)
+
+		var dirty ErrDirty
+		require.ErrorAs(t, m.Up(), &dirty)
+		assert.Equal(t, 1, dirty.Version)
+		assert.Equal(t, NilVersion, dirty.Below, "there is nothing below the first migration")
+		// The state below 000001 is an unmigrated database, which is an empty table rather than
+		// a row reading 000000.
+		assert.Contains(t, dirty.Error(), "none (never migrated)")
+		assert.NotContains(t, dirty.Error(), "000000")
+	})
+
+	t.Run("read back from the table over a gap", func(t *testing.T) {
+		db := openTestDB(t)
+		_, err := db.Exec("INSERT INTO schema_migrations (version, dirty) VALUES (5, 1)")
+		require.NoError(t, err)
+		m := newTestMigrator(t, db, threeVersions())
+
+		var dirty ErrDirty
+		require.ErrorAs(t, m.Up(), &dirty)
+		assert.Equal(t, AppliedUnknown, dirty.Applied, "the row records no direction")
+		assert.Equal(t, 2, dirty.Below)
+		assert.Contains(t, dirty.Error(), "version 000002 if")
+		assert.NotContains(t, dirty.Error(), "000004")
+	})
+
+	t.Run("read back after a failed first down", func(t *testing.T) {
+		// The one interruption that records a nil version: rolling the first migration back
+		// writes the marker for the version being returned to, and below 000001 that is no
+		// version at all. Restarted, only a rollback can have left this row, so the message says
+		// so rather than offering an up step that could never have written it.
+		files := set(map[string]string{
+			"000001_first.up.sql":    "CREATE TABLE t1 (id INTEGER);",
+			"000001_first.down.sql":  "THIS IS NOT SQL;",
+			"000002_second.up.sql":   "CREATE TABLE t2 (id INTEGER);",
+			"000002_second.down.sql": "DROP TABLE t2;",
+		})
+		db := openTestDB(t)
+		m := newTestMigrator(t, db, files)
+		require.NoError(t, m.Up())
+		require.Error(t, m.Migrate(NilVersion), "000001's down does not run")
+		require.Equal(t, []RecordedVersion{{Version: NilVersion, Dirty: true}}, recorded(t, db))
+
+		var dirty ErrDirty
+		require.ErrorAs(t, m.Up(), &dirty, "and the restarted process refuses that row")
+		assert.Equal(t, NilVersion, dirty.Version)
+		assert.Equal(t, AppliedUnknown, dirty.Applied)
+		assert.Equal(t, 1, dirty.Above, "the migration whose rollback left it")
+		assert.Contains(t, dirty.Error(), "rollback of migration 000001")
+		assert.Contains(t, dirty.Error(), "never migrated")
+		assert.NotContains(t, dirty.Error(), "000000")
+	})
+}
+
+// TestIsNoChange_RejectsTheSentinelJoinedWithAnOperationalFailure is the case behind every caller
+// that treats "nothing to do" as success.
+//
+// run joins a failed unlock onto whatever the operation returned rather than replacing it, which
+// is deliberate: a lock that did not come back blocks every other migrator on the database. At
+// head the operation returns the benign sentinel, so the joined error carries BOTH, and errors.Is
+// reports it as ErrNoChange. A caller reading it that way starts the server, logs "no need to
+// migrate the database", and leaves the lock held for the life of the process.
+func TestIsNoChange_RejectsTheSentinelJoinedWithAnOperationalFailure(t *testing.T) {
+	unlockErr := errors.New("the lock did not come back")
+	eng := SQLite()
+	eng.lock = func(context.Context, *sql.Conn) error { return nil }
+	eng.unlock = func(context.Context, *sql.Conn) error { return unlockErr }
+
+	db := openTestDB(t)
+	m, err := New(db, threeVersions(), "migrations", eng)
+	require.NoError(t, err)
+	require.Error(t, m.Up(), "the chain runs and the unlock fails")
+
+	// Now at head, so the operation itself has nothing to do.
+	err = m.Up()
+	require.ErrorIs(t, err, ErrNoChange, "errors.Is finds the sentinel inside the join")
+	require.ErrorIs(t, err, unlockErr, "and the failure it is joined with is in there too")
+	assert.False(t, IsNoChange(err), "which is what a caller must not read as success")
+
+	assert.True(t, IsNoChange(ErrNoChange), "the bare sentinel is what the runner returns when it means it")
+	assert.False(t, IsNoChange(nil))
+	assert.False(t, IsNoChange(fmt.Errorf("migrating: %w", ErrNoChange)))
+	assertPoolReturned(t, db)
+}
+
+// TestIsNilVersion_RejectsTheSentinelJoinedWithAnOperationalFailure is the same reading for the
+// other benign sentinel. Version() runs through withConn, which joins a failed connection close
+// onto the result, so "the database has never been migrated" and "the read did not finish
+// cleanly" arrive in one error and only identity tells them apart.
+func TestIsNilVersion_RejectsTheSentinelJoinedWithAnOperationalFailure(t *testing.T) {
+	assert.True(t, IsNilVersion(ErrNilVersion))
+	assert.False(t, IsNilVersion(nil))
+	assert.False(t, IsNilVersion(errors.Join(ErrNilVersion, errors.New("the connection did not close"))))
+	assert.False(t, IsNilVersion(fmt.Errorf("reading the version: %w", ErrNilVersion)))
 }
 
 // ---------------------------------------------------------------------------

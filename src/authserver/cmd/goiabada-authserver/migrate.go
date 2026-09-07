@@ -136,7 +136,7 @@ func migrateVersion(m *migrator.Migrator, out io.Writer) int {
 
 	version, dirty, err := m.Version()
 	switch {
-	case errors.Is(err, migrator.ErrNilVersion):
+	case migrator.IsNilVersion(err):
 		outf(out, "the database records no version: it has never been migrated\n")
 	case err != nil:
 		outf(out, "unable to read the database's schema version: %s\n", err)
@@ -176,7 +176,10 @@ func migrateTo(m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	// Plan runs nothing and answers every refusal Migrate would, so a dirty database or an
 	// unknown version is reported before anything is written rather than half way up the chain.
 	plan, err := m.Plan(target)
-	if errors.Is(err, migrator.ErrNoChange) {
+	// IsNoChange rather than errors.Is, here and below: the runner joins a failed unlock onto
+	// whatever the operation returned, so errors.Is would print "nothing to do" and exit 0 on a
+	// database whose migration lock is still held (#268).
+	if migrator.IsNoChange(err) {
 		outf(out, "the database is already at schema version %06d; nothing to do\n", target)
 		return migrateExitOK
 	}
@@ -186,7 +189,7 @@ func migrateTo(m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	}
 
 	current, _, versionErr := m.Version()
-	if errors.Is(versionErr, migrator.ErrNilVersion) {
+	if migrator.IsNilVersion(versionErr) {
 		outf(out, "current schema version: none (never migrated)\n")
 	} else if versionErr == nil {
 		outf(out, "current schema version: %06d\n", current)
@@ -195,7 +198,7 @@ func migrateTo(m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	outf(out, "migrations to run, in order: %s\n", formatPlan(plan))
 
 	if err := m.Migrate(target); err != nil {
-		if errors.Is(err, migrator.ErrNoChange) {
+		if migrator.IsNoChange(err) {
 			outf(out, "the database is already at schema version %06d; nothing to do\n", target)
 			return migrateExitOK
 		}

@@ -198,7 +198,10 @@ func (d *MySQLDatabase) Migrate() error {
 	}
 
 	err = m.Up()
-	if errors.Is(err, migrator.ErrNoChange) {
+	// IsNoChange rather than errors.Is: a run whose unlock failed answers the sentinel JOINED
+	// with that failure, and errors.Is would report this start as successful while the migration
+	// lock stays held against every other process on the database (#268).
+	if migrator.IsNoChange(err) {
 		slog.Info("no need to migrate the database")
 		return nil
 	}

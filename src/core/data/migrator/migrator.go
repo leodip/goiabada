@@ -256,7 +256,12 @@ func (m *Migrator) currentVersion(ctx context.Context, conn *sql.Conn) (int, err
 	if dirty {
 		// The row records the version reached and nothing about direction, so which file was
 		// running is not knowable from here; ErrDirty says so rather than guessing.
-		return NilVersion, ErrDirty{Version: current, Applied: AppliedUnknown, Above: m.src.next(current)}
+		return NilVersion, ErrDirty{
+			Version: current,
+			Applied: AppliedUnknown,
+			Below:   m.src.prev(current),
+			Above:   m.src.next(current),
+		}
 	}
 	if current != NilVersion {
 		if err := m.checkCarried(current); err != nil {
@@ -395,7 +400,10 @@ func (m *Migrator) apply(ctx context.Context, conn *sql.Conn, steps []step) erro
 		if present {
 			if err := m.runFile(ctx, conn, body); err != nil {
 				return fmt.Errorf("migration %s failed: %w; %w", name, err,
-					ErrDirty{Version: s.marker, Applied: s.apply, Above: NilVersion})
+					// Below is the source's own predecessor of the marker, never marker minus
+					// one: the sets have gaps, and beneath the first migration there is no
+					// version at all rather than 000000.
+					ErrDirty{Version: s.marker, Applied: s.apply, Below: m.src.prev(s.marker), Above: NilVersion})
 			}
 		}
 		// A version with no file in the direction being travelled runs nothing and still moves
