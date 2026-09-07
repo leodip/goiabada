@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -14,7 +13,7 @@ import (
 
 func HandleAuthCallbackPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	tokenParser TokenParser,
 	tokenExchanger TokenExchanger,
 ) http.HandlerFunc {
@@ -133,7 +132,7 @@ func HandleAuthCallbackPost(
 		// only then sets the cookie, so any failure leaves the administrator without a
 		// session rather than leaving the planted identifier live.
 		//
-		// Save is the fallback because the parameter is sessions.Store, which has no
+		// Save is the fallback because the parameter is sessionstore.Store, which has no
 		// rotation method: a store that cannot rotate must still be able to sign an
 		// administrator in.
 		if regenerator, ok := httpSession.(sessionstore.Regenerator); ok {

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -14,12 +13,13 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pkg/errors"
 )
 
 func HandleAdminSettingsEmailGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -59,8 +59,8 @@ func HandleAdminSettingsEmailGet(
 			return
 		}
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		if savedSuccessfully != nil {
+		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -70,7 +70,7 @@ func HandleAdminSettingsEmailGet(
 
 		bind := map[string]interface{}{
 			"settings":          settingsInfo,
-			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"savedSuccessfully": savedSuccessfully,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email.html", bind)
@@ -83,7 +83,7 @@ func HandleAdminSettingsEmailGet(
 
 func HandleAdminSettingsEmailPost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 	settingsCache *cache.SettingsCache,
 ) http.HandlerFunc {
@@ -160,7 +160,7 @@ func HandleAdminSettingsEmailPost(
 			return
 		}
 
-		sess.AddFlash("true", "savedSuccessfully")
+		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -173,7 +173,7 @@ func HandleAdminSettingsEmailPost(
 
 func HandleAdminSettingsEmailSendTestGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -191,8 +191,8 @@ func HandleAdminSettingsEmailSendTestGet(
 			return
 		}
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		if savedSuccessfully != nil {
+		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -209,7 +209,7 @@ func HandleAdminSettingsEmailSendTestGet(
 
 		bind := map[string]interface{}{
 			"smtpEnabled":       apiResp.SMTPEnabled,
-			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"savedSuccessfully": savedSuccessfully,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html", bind)
@@ -222,7 +222,7 @@ func HandleAdminSettingsEmailSendTestGet(
 
 func HandleAdminSettingsEmailSendTestPost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -278,7 +278,7 @@ func HandleAdminSettingsEmailSendTestPost(
 			return
 		}
 
-		sess.AddFlash("true", "savedSuccessfully")
+		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

@@ -8,8 +8,8 @@ import (
 	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -74,7 +74,7 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 	assert.Equal(t, int64(1), store.gets.Load())
 }
 
-func newStaticBranchTestServer(authServerBaseURL string, store sessions.Store) *Server {
+func newStaticBranchTestServer(authServerBaseURL string, store sessionstore.Store) *Server {
 	return &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  store,
@@ -104,22 +104,19 @@ func newCountingSettingsServer(t *testing.T) *countingSettingsServer {
 	return counter
 }
 
-// countingStore is a sessions.Store that records Get. It never has to return anything usable:
-// MiddlewareCookieReset asks for the session and passes a non-decode error straight through,
-// so a store that answers an empty session is enough to observe whether it was asked at all.
+// countingStore records Get, and it is the whole of sessionstore.Store now that Store is
+// Get and Save (#269). It never has to return anything usable: MiddlewareCookieReset asks
+// for the session and passes a non-decode error straight through, so a store that answers
+// an empty session is enough to observe whether it was asked at all.
 type countingStore struct {
 	gets atomic.Int64
 }
 
-func (s *countingStore) Get(r *http.Request, name string) (*sessions.Session, error) {
+func (s *countingStore) Get(r *http.Request, name string) (*sessionstore.Session, error) {
 	s.gets.Add(1)
-	return sessions.NewSession(s, name), nil
+	return sessionstore.NewSession(s, name), nil
 }
 
-func (s *countingStore) New(r *http.Request, name string) (*sessions.Session, error) {
-	return sessions.NewSession(s, name), nil
-}
-
-func (s *countingStore) Save(*http.Request, http.ResponseWriter, *sessions.Session) error {
+func (s *countingStore) Save(*http.Request, http.ResponseWriter, *sessionstore.Session) error {
 	return nil
 }

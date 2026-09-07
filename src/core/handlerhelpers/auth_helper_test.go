@@ -14,7 +14,6 @@ import (
 
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
@@ -31,7 +30,7 @@ func TestGetAuthContext(t *testing.T) {
 		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		sess := sessions.NewSession(mockStore, testSessionName)
+		sess := sessionstore.NewSession(mockStore, testSessionName)
 		authContext := &oauth.AuthContext{ClientId: "test-client"}
 		jsonData, _ := json.Marshal(authContext)
 		sess.Values[constants.SessionKeyAuthContext] = string(jsonData)
@@ -64,7 +63,7 @@ func TestGetAuthContext(t *testing.T) {
 		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		sess := sessions.NewSession(mockStore, testSessionName)
+		sess := sessionstore.NewSession(mockStore, testSessionName)
 
 		mockStore.On("Get", req, testSessionName).Return(sess, nil)
 
@@ -80,7 +79,7 @@ func TestGetAuthContext(t *testing.T) {
 		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		sess := sessions.NewSession(mockStore, testSessionName)
+		sess := sessionstore.NewSession(mockStore, testSessionName)
 		sess.Values[constants.SessionKeyAuthContext] = "invalid json"
 
 		mockStore.On("Get", req, testSessionName).Return(sess, nil)
@@ -157,7 +156,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
-		sess := sessions.NewSession(mockStore, testSessionName)
+		sess := sessionstore.NewSession(mockStore, testSessionName)
 		authContext := &oauth.AuthContext{ClientId: "test-client"}
 
 		mockStore.On("Get", req, testSessionName).Return(sess, nil)
@@ -192,7 +191,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
-		sess := sessions.NewSession(mockStore, testSessionName)
+		sess := sessionstore.NewSession(mockStore, testSessionName)
 		authContext := &oauth.AuthContext{ClientId: "test-client"}
 
 		mockStore.On("Get", req, testSessionName).Return(sess, nil)
@@ -309,7 +308,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
-		sess := sessions.NewSession(mockStore, testSessionName)
+		sess := sessionstore.NewSession(mockStore, testSessionName)
 		sess.Values[constants.SessionKeyAuthContext] = "test-context"
 
 		mockStore.On("Get", req, testSessionName).Return(sess, nil)
@@ -343,7 +342,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
-		sess := sessions.NewSession(mockStore, testSessionName)
+		sess := sessionstore.NewSession(mockStore, testSessionName)
 
 		mockStore.On("Get", req, testSessionName).Return(sess, nil)
 		mockStore.On("Save", req, w, sess).Return(assert.AnError)

@@ -7,20 +7,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/pkg/errors"
 )
 
 func HandleAccountLogoutGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	authHelper AuthHelper,
 	database data.Database,
 	tokenParser TokenParser,
@@ -543,7 +543,7 @@ func handleExistingSessionOnLogout(
 
 func HandleAccountLogoutPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	authHelper AuthHelper,
 	database data.Database,
 	tokenParser TokenParser,
@@ -572,7 +572,7 @@ func doLogout(
 	w http.ResponseWriter,
 	r *http.Request,
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	authHelper AuthHelper,
 	database data.Database,
 	tokenParser TokenParser,
@@ -905,7 +905,7 @@ func finishLogout(
 	w http.ResponseWriter,
 	r *http.Request,
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	location string,
 	targetSupplied bool,
 ) {
@@ -914,7 +914,7 @@ func finishLogout(
 		httpHelper.InternalServerError(w, r, err)
 		return
 	}
-	sess.Values = make(map[interface{}]interface{})
+	sess.Values = make(map[string]any)
 
 	// MaxAge below zero is what makes the save a deletion rather than a rewrite. Emptying
 	// the values was enough when the session WAS the cookie, because an empty cookie is an

@@ -21,7 +21,7 @@ packages:
           dir: "./data/mocks"
           pkgname: "mocks_data"
   # Session store
-  github.com/gorilla/sessions:
+  github.com/leodip/goiabada/core/sessionstore:
     interfaces:
       Store:
         config:

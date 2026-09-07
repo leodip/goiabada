@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
@@ -91,10 +90,27 @@ func (ds *DatabaseSeeder) Seed() error {
 
 	// Generate session keys for both auth server and admin console
 	// These are only used if bootstrapEnvOutFile is set (legacy two-step bootstrap)
-	authServerSessionAuthKey := securecookie.GenerateRandomKey(64)
-	authServerSessionEncKey := securecookie.GenerateRandomKey(32)
-	adminConsoleSessionAuthKey := securecookie.GenerateRandomKey(64)
-	adminConsoleSessionEncKey := securecookie.GenerateRandomKey(32)
+	//
+	// A CSPRNG failure fails the seed. The library call these replaced answered one with
+	// a nil slice, which the hex encoding below turned into an empty string, so a failed
+	// read produced a bootstrap env file naming a session key of no bytes at all and a
+	// deployment that came up and ran on it (#269).
+	authServerSessionAuthKey, err := encryption.RandomKey(64)
+	if err != nil {
+		return errors.Wrap(err, "unable to generate the auth server session authentication key")
+	}
+	authServerSessionEncKey, err := encryption.RandomKey(32)
+	if err != nil {
+		return errors.Wrap(err, "unable to generate the auth server session encryption key")
+	}
+	adminConsoleSessionAuthKey, err := encryption.RandomKey(64)
+	if err != nil {
+		return errors.Wrap(err, "unable to generate the admin console session authentication key")
+	}
+	adminConsoleSessionEncKey, err := encryption.RandomKey(32)
+	if err != nil {
+		return errors.Wrap(err, "unable to generate the admin console session encryption key")
+	}
 
 	// Use provided OAuth client secret if available, otherwise generate one
 	var clientSecret string
@@ -130,7 +146,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		ShowDisplayName:                         true,
 	}
 
-	err := ds.DB.CreateClient(nil, client1)
+	err = ds.DB.CreateClient(nil, client1)
 	if err != nil {
 		return err
 	}

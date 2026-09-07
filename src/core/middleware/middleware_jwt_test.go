@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -469,8 +469,8 @@ func TestJwtSessionHandler_ValidSession(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	session := &sessions.Session{
-		Values: map[interface{}]interface{}{
+	session := &sessionstore.Session{
+		Values: map[string]any{
 			constants.SessionKeyJwt: oauth.TokenResponse{
 				AccessToken: "validtoken",
 			},
@@ -554,8 +554,8 @@ func TestJwtSessionHandler_NoJwtInSession(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	session := &sessions.Session{
-		Values: map[interface{}]interface{}{},
+	session := &sessionstore.Session{
+		Values: map[string]any{},
 	}
 
 	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
@@ -582,8 +582,8 @@ func TestJwtSessionHandler_InvalidTokenInSession(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	session := &sessions.Session{
-		Values: map[interface{}]interface{}{
+	session := &sessionstore.Session{
+		Values: map[string]any{
 			constants.SessionKeyJwt: oauth.TokenResponse{
 				AccessToken: "invalidtoken",
 			},
@@ -627,8 +627,8 @@ func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	session := &sessions.Session{
-		Values: map[interface{}]interface{}{
+	session := &sessionstore.Session{
+		Values: map[string]any{
 			constants.SessionKeyJwt: oauth.TokenResponse{
 				AccessToken: "validtoken",
 			},
@@ -691,8 +691,8 @@ func TestJwtSessionHandler_ValidRefreshToken(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	// Setup initial session
-	initialSession := &sessions.Session{
-		Values: map[interface{}]interface{}{
+	initialSession := &sessionstore.Session{
+		Values: map[string]any{
 			constants.SessionKeyJwt: oauth.TokenResponse{
 				AccessToken:  "invalidtoken",
 				RefreshToken: "validrefreshtoken",
@@ -781,8 +781,8 @@ func TestRefreshToken_Success(t *testing.T) {
 		RefreshToken: "oldrefreshtoken",
 	}
 
-	session := &sessions.Session{
-		Values: map[interface{}]interface{}{
+	session := &sessionstore.Session{
+		Values: map[string]any{
 			constants.SessionKeyJwt: *initialTokenResponse,
 		},
 	}

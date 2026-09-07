@@ -13,8 +13,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -165,7 +163,7 @@ func newRoutesTestServer(t *testing.T) *Server {
 	s := &Server{
 		router:       chi.NewRouter(),
 		database:     database,
-		sessionStore: sessions.NewCookieStore(securecookie.GenerateRandomKey(64)),
+		sessionStore: newTestSessionStore(),
 		templateFS:   web.TemplateFS(),
 	}
 	s.initRoutes(s.router)
@@ -210,7 +208,7 @@ func apiRequest(method string, target string, body string) *http.Request {
 // otpCeremonyCookie mints the session cookie a user part way through the OTP step carries:
 // an auth context at the level 2 state carrying the enrollment secret HandleAuthOtpGet left
 // on it. Written through the server's own session store, so what the handler reads back is
-// what gorilla wrote rather than a shape this test invented.
+// what the store wrote rather than a shape this test invented.
 func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	t.Helper()
 

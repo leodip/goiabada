@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Database) func(next http.Handler) http.Handler {
+func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database data.Database) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()

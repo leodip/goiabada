@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -12,12 +11,13 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pkg/errors"
 )
 
 func HandleAccountEmailVerificationGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -47,8 +47,8 @@ func HandleAccountEmailVerificationGet(
 			return
 		}
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		if savedSuccessfully != nil {
+		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -57,7 +57,7 @@ func HandleAccountEmailVerificationGet(
 		}
 
 		bind := map[string]interface{}{
-			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"savedSuccessfully": savedSuccessfully,
 			"email":             user.Email,
 			"emailVerified":     user.EmailVerified,
 			"smtpEnabled":       settings.SMTPEnabled,
@@ -104,7 +104,7 @@ func HandleAccountEmailSendVerificationPost(
 
 func HandleAccountEmailVerificationPost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -173,7 +173,7 @@ func HandleAccountEmailVerificationPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		sess.AddFlash("true", "savedSuccessfully")
+		sess.SetFlash("savedSuccessfully", "true")
 		if err := httpSession.Save(r, w, sess); err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

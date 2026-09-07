@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"runtime/debug"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -18,13 +17,13 @@ import (
 )
 
 type AuthHelper struct {
-	sessionStore      sessions.Store
+	sessionStore      sessionstore.Store
 	sessionName       string
 	baseURL           string
 	authServerBaseURL string
 }
 
-func NewAuthHelper(sessionStore sessions.Store, sessionName, baseURL, authServerBaseURL string) *AuthHelper {
+func NewAuthHelper(sessionStore sessionstore.Store, sessionName, baseURL, authServerBaseURL string) *AuthHelper {
 	return &AuthHelper{
 		sessionStore:      sessionStore,
 		sessionName:       sessionName,
@@ -106,7 +105,7 @@ func (s *AuthHelper) ClearAuthContext(w http.ResponseWriter, r *http.Request) er
 
 // RegenerateSession replaces the browser session's identifier, keeping its contents.
 //
-// Callers reach rotation through here rather than through the store because sessions.Store
+// Callers reach rotation through here rather than through the store because sessionstore.Store
 // has no such method and widening it would touch the hundred places that already take the
 // interface. A store that cannot rotate is a no-op, which is what the cookie store in the
 // unit tier is; the property is observed against the real store at the integration tier,

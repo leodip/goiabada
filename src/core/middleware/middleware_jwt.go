@@ -12,10 +12,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pkg/errors"
 )
 
@@ -55,7 +55,7 @@ type ServerErrorRenderer interface {
 }
 
 type MiddlewareJwt struct {
-	sessionStore      sessions.Store
+	sessionStore      sessionstore.Store
 	sessionName       string
 	tokenParser       tokenParser
 	authHelper        authHelper
@@ -70,7 +70,7 @@ type MiddlewareJwt struct {
 // NewMiddlewareJwt constructs a DB-free JWT middleware. It uses provided client
 // credentials for refresh operations. If credentials are empty, refresh is disabled.
 func NewMiddlewareJwt(
-	sessionStore sessions.Store,
+	sessionStore sessionstore.Store,
 	sessionName string,
 	tokenParser tokenParser,
 	authHelper authHelper,

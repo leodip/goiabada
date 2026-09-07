@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/sessions"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -65,7 +64,7 @@ func cleanGetRequest() *http.Request {
 
 // withMarker attaches the session cookies a first hop would have set, which is what makes a
 // request a clean-hop request rather than a bare one.
-func withMarker(t *testing.T, store sessions.Store, req *http.Request, flow handlers.LinkMarkerFlow,
+func withMarker(t *testing.T, store sessionstore.Store, req *http.Request, flow handlers.LinkMarkerFlow,
 	id int64, codeHash string) *http.Request {
 	t.Helper()
 
@@ -81,7 +80,7 @@ func withMarker(t *testing.T, store sessions.Store, req *http.Request, flow hand
 
 // withRawMarker attaches cookies holding an arbitrary marker value, for the one state
 // SaveLinkMarker cannot produce: a marker already past its window.
-func withRawMarker(t *testing.T, store sessions.Store, req *http.Request, value interface{}) *http.Request {
+func withRawMarker(t *testing.T, store sessionstore.Store, req *http.Request, value interface{}) *http.Request {
 	t.Helper()
 
 	seed := cleanGetRequest()
@@ -487,25 +486,25 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 
 		for _, tc := range []struct {
 			name    string
-			request func(t *testing.T, store sessions.Store) *http.Request
+			request func(t *testing.T, store sessionstore.Store) *http.Request
 			// resolves is true when the handler gets far enough to look the hash up.
 			resolves bool
 		}{
 			{
 				name: "no marker at all, a bookmarked clean URL",
-				request: func(t *testing.T, store sessions.Store) *http.Request {
+				request: func(t *testing.T, store sessionstore.Store) *http.Request {
 					return cleanGetRequest()
 				},
 			},
 			{
 				name: "a marker left by the reset flow",
-				request: func(t *testing.T, store sessions.Store) *http.Request {
+				request: func(t *testing.T, store sessionstore.Store) *http.Request {
 					return withMarker(t, store, cleanGetRequest(), handlers.LinkMarkerFlowResetPassword, 7, codeHash)
 				},
 			},
 			{
 				name: "a marker past its window",
-				request: func(t *testing.T, store sessions.Store) *http.Request {
+				request: func(t *testing.T, store sessionstore.Store) *http.Request {
 					return withRawMarker(t, store, cleanGetRequest(),
 						expiredMarkerJSON(t, handlers.LinkMarkerFlowAccountActivate, 7, codeHash))
 				},
@@ -515,7 +514,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				// the cookie taken beforehand still decodes. What refuses it is the hash no
 				// longer resolving, since a client-side cookie cannot be recalled.
 				name: "a live marker whose code hash no longer resolves",
-				request: func(t *testing.T, store sessions.Store) *http.Request {
+				request: func(t *testing.T, store sessionstore.Store) *http.Request {
 					return withMarker(t, store, cleanGetRequest(), handlers.LinkMarkerFlowAccountActivate, 7, codeHash)
 				},
 				resolves: true,

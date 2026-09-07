@@ -9,8 +9,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -40,7 +38,7 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 	newServer := func() *Server {
 		s := &Server{
 			router:        chi.NewRouter(),
-			sessionStore:  sessions.NewCookieStore(securecookie.GenerateRandomKey(64)),
+			sessionStore:  newTestSessionStore(),
 			settingsCache: cache.NewSettingsCache(unreachableAuthServer),
 		}
 		s.initMiddleware()

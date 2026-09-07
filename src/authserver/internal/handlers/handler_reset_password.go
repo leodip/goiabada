@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/core/config"
@@ -217,7 +217,7 @@ func rejectResetPassword(httpHelper HttpHelper, auditLogger AuditLogger, w http.
 // link simply fails. Resolving the hash is what keeps that true (#112, #266).
 //
 // Returns (nil, nil) when the request was refused, having already audited and responded.
-func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessions.Store,
+func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessionstore.Store,
 	database data.Database, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
 	httpStatus int) (*LinkMarker, *models.User) {
 
@@ -260,7 +260,7 @@ func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessions.Stor
 // unreserved, so there is no encoding step left to get wrong.
 func HandleResetPasswordGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	database data.Database,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -297,7 +297,7 @@ func HandleResetPasswordGet(
 // previewer that prefetches the URL therefore writes a marker into its own throwaway cookie
 // jar and leaves the code usable for the real user; consuming here would let any prefetching
 // gateway burn the code before the user ever saw the message.
-func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions.Store,
+func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessionstore.Store,
 	database data.Database, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
 	code string) {
 
@@ -369,7 +369,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 
 func HandleResetPasswordPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	database data.Database,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,

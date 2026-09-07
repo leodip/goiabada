@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
@@ -23,12 +22,12 @@ import (
 
 type UserSessionManager struct {
 	codeIssuer   *oauth.CodeIssuer
-	sessionStore sessions.Store
+	sessionStore sessionstore.Store
 	sessionName  string
 	database     data.Database
 }
 
-func NewUserSessionManager(codeIssuer *oauth.CodeIssuer, sessionStore sessions.Store, sessionName string, database data.Database) *UserSessionManager {
+func NewUserSessionManager(codeIssuer *oauth.CodeIssuer, sessionStore sessionstore.Store, sessionName string, database data.Database) *UserSessionManager {
 	return &UserSessionManager{
 		codeIssuer:   codeIssuer,
 		sessionStore: sessionStore,
