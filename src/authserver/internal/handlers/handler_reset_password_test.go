@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -122,7 +122,7 @@ func postResetRequest(password, passwordConfirmation, continuationId string) *ht
 // continuation id the form rendered from that marker would have carried. Built together
 // because the id only exists once the marker does, which is exactly the coupling the check
 // enforces at runtime.
-func postWithMarker(t *testing.T, store sessions.Store, password, passwordConfirmation string,
+func postWithMarker(t *testing.T, store sessionstore.Store, password, passwordConfirmation string,
 	flow LinkMarkerFlow, id int64, codeHash string) *http.Request {
 	t.Helper()
 
@@ -151,7 +151,7 @@ func postWithMarker(t *testing.T, store sessions.Store, password, passwordConfir
 
 // withMarker attaches the session cookies a first hop would have set, which is what makes a
 // request a clean-hop request rather than a bare one.
-func withMarker(t *testing.T, store sessions.Store, req *http.Request, flow LinkMarkerFlow,
+func withMarker(t *testing.T, store sessionstore.Store, req *http.Request, flow LinkMarkerFlow,
 	id int64, codeHash string) *http.Request {
 	t.Helper()
 
@@ -193,7 +193,7 @@ func postResetWithCredentialsInQuery(password, passwordConfirmation, continuatio
 // handler would never have rendered: the gate must still refuse it, because a marker supplied
 // by a URL is not a submission and reading one from a URL reintroduces the shape #201 removed
 // from the reset link, one indirection later (#202, decision 3).
-func postWithMarkerContinuationInQuery(t *testing.T, store sessions.Store,
+func postWithMarkerContinuationInQuery(t *testing.T, store sessionstore.Store,
 	password, passwordConfirmation string, flow LinkMarkerFlow, id int64, codeHash string) *http.Request {
 	t.Helper()
 
@@ -267,7 +267,7 @@ func postResetWithContinuationInQuery(password, passwordConfirmation, continuati
 
 // withRawMarker attaches cookies holding an arbitrary marker value, for the states
 // SaveLinkMarker cannot produce: an already-expired marker, and a corrupt one.
-func withRawMarker(t *testing.T, store sessions.Store, req *http.Request, value interface{}) *http.Request {
+func withRawMarker(t *testing.T, store sessionstore.Store, req *http.Request, value interface{}) *http.Request {
 	t.Helper()
 
 	seed := cleanGetRequest()
@@ -646,21 +646,21 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 	// Each of these is audited under the reason GetLinkMarker itself reported, so the audit
 	// vocabulary and the control flow cannot drift apart.
 	t.Run("no marker at all", func(t *testing.T) {
-		assertCleanGetRefused(t, string(LinkMarkerMissing), func(t *testing.T, store sessions.Store,
+		assertCleanGetRefused(t, string(LinkMarkerMissing), func(t *testing.T, store sessionstore.Store,
 			database *mocks_data.Database) *http.Request {
 			return cleanGetRequest()
 		})
 	})
 
 	t.Run("a marker left by the activation flow", func(t *testing.T) {
-		assertCleanGetRefused(t, string(LinkMarkerWrongFlow), func(t *testing.T, store sessions.Store,
+		assertCleanGetRefused(t, string(LinkMarkerWrongFlow), func(t *testing.T, store sessionstore.Store,
 			database *mocks_data.Database) *http.Request {
 			return withMarker(t, store, cleanGetRequest(), LinkMarkerFlowAccountActivate, 7, codeHash)
 		})
 	})
 
 	t.Run("a marker past its window", func(t *testing.T) {
-		assertCleanGetRefused(t, string(LinkMarkerExpired), func(t *testing.T, store sessions.Store,
+		assertCleanGetRefused(t, string(LinkMarkerExpired), func(t *testing.T, store sessionstore.Store,
 			database *mocks_data.Database) *http.Request {
 			return withRawMarker(t, store, cleanGetRequest(),
 				expiredMarkerJSON(t, LinkMarkerFlowResetPassword, 1, codeHash))
@@ -671,7 +671,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 	// no longer outstanding. That is what a captured cookie looks like after the reset
 	// completed, after a newer code was issued, or after any other password change.
 	t.Run("a live marker whose hash no longer resolves", func(t *testing.T) {
-		assertCleanGetRefused(t, auditReasonCodeNoLongerOutstanding, func(t *testing.T, store sessions.Store,
+		assertCleanGetRefused(t, auditReasonCodeNoLongerOutstanding, func(t *testing.T, store sessionstore.Store,
 			database *mocks_data.Database) *http.Request {
 			database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
 				Return(nil, nil).Once()
@@ -681,7 +681,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 }
 
 func assertCleanGetRefused(t *testing.T, wantReason string,
-	arrange func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request) {
+	arrange func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request) {
 	t.Helper()
 
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
@@ -847,19 +847,19 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		// wantUserId is 0 where nothing about the request established an account, and the
 		// resolved id where the marker did resolve one before the rejection.
 		wantUserId int64
-		arrange    func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request
+		arrange    func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request
 	}{
 		{
 			name:       "no marker at all",
 			wantReason: string(LinkMarkerMissing),
-			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				return postResetRequest(newPassword, newPassword, "")
 			},
 		},
 		{
 			name:       "a marker left by the activation flow",
 			wantReason: string(LinkMarkerWrongFlow),
-			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				return postWithMarker(t, store, newPassword, newPassword,
 					LinkMarkerFlowAccountActivate, 7, codeHash)
 			},
@@ -867,7 +867,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		{
 			name:       "a marker past its window",
 			wantReason: string(LinkMarkerExpired),
-			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),
 					expiredMarkerJSON(t, LinkMarkerFlowResetPassword, 1, codeHash))
 			},
@@ -875,7 +875,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		{
 			name:       "a live marker whose hash no longer resolves",
 			wantReason: auditReasonCodeNoLongerOutstanding,
-			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 				return postWithMarker(t, store, newPassword, newPassword,
@@ -891,7 +891,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			name:       "the form names a continuation the session has moved on from",
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
-			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return withMarker(t, store,
@@ -903,7 +903,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			name:       "the form names no continuation at all",
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
-			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return withMarker(t, store, postResetRequest(newPassword, newPassword, ""),
@@ -918,7 +918,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			name:       "the form names the live continuation in the query alone",
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
-			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return postWithMarkerContinuationInQuery(t, store, newPassword, newPassword,
@@ -932,7 +932,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			name:       "the marker itself carries no continuation id",
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
-			arrange: func(t *testing.T, store sessions.Store, database *mocks_data.Database) *http.Request {
+			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),

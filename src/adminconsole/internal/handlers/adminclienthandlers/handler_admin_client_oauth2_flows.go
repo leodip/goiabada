@@ -8,18 +8,18 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 func HandleAdminClientOAuth2Get(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -93,8 +93,8 @@ func HandleAdminClientOAuth2Get(
 			return
 		}
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		if savedSuccessfully != nil {
+		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -104,7 +104,7 @@ func HandleAdminClientOAuth2Get(
 
 		bind := map[string]interface{}{
 			"client":            adminClientOAuth2Flows,
-			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"savedSuccessfully": savedSuccessfully,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_oauth2_flows.html", bind)
@@ -117,7 +117,7 @@ func HandleAdminClientOAuth2Get(
 
 func HandleAdminClientOAuth2Post(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -227,7 +227,7 @@ func HandleAdminClientOAuth2Post(
 			return
 		}
 
-		sess.AddFlash("true", "savedSuccessfully")
+		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

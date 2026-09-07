@@ -8,17 +8,17 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 func HandleAdminUserDetailsGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -59,9 +59,9 @@ func HandleAdminUserDetailsGet(
 			return
 		}
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		userCreated := sess.Flashes("userCreated")
-		if savedSuccessfully != nil || userCreated != nil {
+		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, userCreated := sess.TakeFlash("userCreated")
+		if savedSuccessfully || userCreated {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -73,8 +73,8 @@ func HandleAdminUserDetailsGet(
 			"user":              user,
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
-			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"userCreated":       len(userCreated) > 0,
+			"savedSuccessfully": savedSuccessfully,
+			"userCreated":       userCreated,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_details.html", bind)
@@ -87,7 +87,7 @@ func HandleAdminUserDetailsGet(
 
 func HandleAdminUserDetailsPost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -125,7 +125,7 @@ func HandleAdminUserDetailsPost(
 			return
 		}
 
-		sess.AddFlash("true", "savedSuccessfully")
+		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

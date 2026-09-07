@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/sessionstore"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +20,7 @@ func TestMiddlewareCookieReset(t *testing.T) {
 
 	t.Run("No error", func(t *testing.T) {
 		mockStore := new(mocks_sessionstore.Store)
-		mockStore.On("Get", mock.Anything, testSessionName).Return(&sessions.Session{}, nil)
+		mockStore.On("Get", mock.Anything, testSessionName).Return(&sessionstore.Session{}, nil)
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 		middleware := MiddlewareCookieReset(mockStore, testSessionName)
@@ -201,13 +200,13 @@ func deletedCookieNames(t *testing.T, rr *httptest.ResponseRecorder) []string {
 // decodeFailingStore is a ServerSideStore whose Get answers the way a store answers a
 // cookie it cannot decode. ServerSideStore itself never does, by design: it answers an
 // undecodable cookie with a fresh session. The branch is still reachable, because this
-// middleware takes sessions.Store and any store may report a decode failure, and what it
+// middleware takes sessionstore.Store and any store may report a decode failure, and what it
 // must get right when it fires is naming the physical cookie, which on https is prefixed.
 type decodeFailingStore struct {
 	*sessionstore.ServerSideStore
 }
 
-func (s *decodeFailingStore) Get(*http.Request, string) (*sessions.Session, error) {
+func (s *decodeFailingStore) Get(*http.Request, string) (*sessionstore.Session, error) {
 	return nil, securecookie.MultiError{securecookie.ErrMacInvalid}
 }
 

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -70,7 +70,7 @@ func renderActivationLinkExpired(httpHelper handlers.HttpHelper, w http.Response
 // outcome by one more hop.
 func HandleAccountActivateGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	database data.Database,
 	userCreator handlers.UserCreator,
 	auditLogger handlers.AuditLogger,
@@ -92,7 +92,7 @@ func HandleAccountActivateGet(
 // It validates but does not consume the code (#112 decision 7). A mail scanner that prefetches
 // the URL writes a marker into its own throwaway cookie jar and leaves the code usable for the
 // real user.
-func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession sessions.Store,
+func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession sessionstore.Store,
 	database data.Database, w http.ResponseWriter, r *http.Request, code string) {
 
 	codeHash, err := hashutil.HashString(code)
@@ -182,7 +182,7 @@ func isVerificationCodeExpired(preRegistration *models.PreRegistration) bool {
 // to nothing. Clearing the session now reaches every copy of the marker, since the session
 // is a database row rather than a browser cookie, so this is defence in depth rather than
 // the whole boundary it was written as (#112, #266).
-func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessions.Store,
+func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessionstore.Store,
 	database data.Database, userCreator handlers.UserCreator, auditLogger handlers.AuditLogger,
 	w http.ResponseWriter, r *http.Request) {
 

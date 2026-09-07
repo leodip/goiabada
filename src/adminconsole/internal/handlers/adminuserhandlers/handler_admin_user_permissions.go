@@ -9,17 +9,17 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 func HandleAdminUserPermissionsGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -76,8 +76,8 @@ func HandleAdminUserPermissionsGet(
 			return
 		}
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		if savedSuccessfully != nil {
+		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -91,7 +91,7 @@ func HandleAdminUserPermissionsGet(
 			"resources":         resources,
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
-			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"savedSuccessfully": savedSuccessfully,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_permissions.html", bind)
@@ -104,7 +104,7 @@ func HandleAdminUserPermissionsGet(
 
 func HandleAdminUserPermissionsPost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -160,7 +160,7 @@ func HandleAdminUserPermissionsPost(
 			return
 		}
 
-		sess.AddFlash("true", "savedSuccessfully")
+		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)

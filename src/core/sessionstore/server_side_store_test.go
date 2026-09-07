@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -125,7 +124,7 @@ func newTestStore(backend Backend, secure bool) *ServerSideStore {
 }
 
 // saveNew runs the ordinary create path: a request carrying no cookie, one save.
-func saveNew(t *testing.T, store *ServerSideStore, values map[interface{}]interface{}) *http.Cookie {
+func saveNew(t *testing.T, store *ServerSideStore, values map[string]any) *http.Cookie {
 	t.Helper()
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -163,7 +162,7 @@ func TestServerSideStore_SaveCreatesOneRowAndOneCookie(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 
 	assert.Equal(t, storeTestName, cookie.Name)
 	assert.Equal(t, 1, backend.creates)
@@ -224,7 +223,7 @@ func TestServerSideStore_BackendNeverSeesPlaintext(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	const marker = "a-value-nobody-else-should-be-able-to-read"
-	saveNew(t, store, map[interface{}]interface{}{"secret": marker})
+	saveNew(t, store, map[string]any{"secret": marker})
 
 	require.NotEmpty(t, backend.lastData)
 	assert.NotContains(t, string(backend.lastData), marker,
@@ -237,7 +236,7 @@ func TestServerSideStore_RoundTrip(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello", "count": 7})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello", "count": 7})
 
 	session, err := store.New(requestWith(cookie), storeTestName)
 	require.NoError(t, err)
@@ -251,7 +250,7 @@ func TestServerSideStore_TamperedCookieGivesAFreshSession(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 	tampered := &http.Cookie{Name: cookie.Name, Value: cookie.Value[:len(cookie.Value)-4] + "AAAA"}
 
 	session, err := store.New(requestWith(tampered), storeTestName)
@@ -268,7 +267,7 @@ func TestServerSideStore_CookieFromOtherKeysGivesAFreshSession(t *testing.T) {
 	other := NewServerSideStore(newFakeBackend(), "SessionIdentifier", false,
 		[]byte("00000000000000000000000000000000"), []byte("11111111111111111111111111111111"))
 
-	cookie := saveNew(t, other, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, other, map[string]any{"greeting": "hello"})
 
 	session, err := store.New(requestWith(cookie), storeTestName)
 
@@ -281,7 +280,7 @@ func TestServerSideStore_NotFoundGivesAFreshSession(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 	backend.rows = map[string]*Record{} // logged out, expired or reaped
 
 	session, err := store.New(requestWith(cookie), storeTestName)
@@ -295,7 +294,7 @@ func TestServerSideStore_StorageFailurePropagates(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 	backend.loadErr = errors.New("the database is unreachable")
 
 	session, err := store.New(requestWith(cookie), storeTestName)
@@ -304,9 +303,10 @@ func TestServerSideStore_StorageFailurePropagates(t *testing.T) {
 	// interruption, and would erase the difference between "this session is gone" and
 	// "I could not check" (#266).
 	require.Error(t, err)
-	// Non-nil beside the error, which gorilla/sessions requires of Store.New and which
-	// Get's registry dereferences without checking. Asserting nil here is what let the
-	// panic in TestServerSideStore_GetSurvivesAStorageFailure below go unnoticed: it
+	// Non-nil beside the error, which is the store's own rule now that New is off the
+	// interface (#269), and which every caller relies on: Get memoises whatever New
+	// returns and hands it to every middleware that asks. Asserting nil here is what let
+	// the panic in TestServerSideStore_GetSurvivesAStorageFailure below go unnoticed: it
 	// pinned the contract violation rather than the behaviour (#266).
 	require.NotNil(t, session)
 	assert.True(t, session.IsNew)
@@ -361,7 +361,7 @@ func TestServerSideStore_TouchOnAVanishedRowGivesAFreshSession(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 	id := decodeCookieId(t, store, cookie)
 	backend.rows[id].LastAccessed = time.Now().UTC().Add(-30 * time.Second)
 	backend.touchErr = ErrNotFound
@@ -390,20 +390,24 @@ func TestServerSideStore_TouchFailurePropagates(t *testing.T) {
 // --- saving an existing session ------------------------------------------------------
 
 // TestServerSideStore_GetSurvivesAStorageFailure drives Get rather than New, and that is
-// the whole point of it: nothing in production calls New. Every caller reaches the store
-// through Get, which is gorilla's per-request registry, and Registry.Get assigns to
-// session.name on whatever New handed back without looking at the error. A store that
-// answered a storage fault with a nil session therefore panicked inside the library on the
-// one path that exists to make a database outage diagnosable, and the request came back as
-// an empty 500 with the cause nowhere, which is the opposite of what failing closed buys.
+// the whole point of it: nothing outside the store calls New, which is why New is not on
+// Store at all (#269). Every caller reaches the store through Get, which memoises the
+// (session, error) pair New handed back, so a nil session is handed to every middleware on
+// the request and dereferenced by whichever one reads Values before it reads the error. A
+// store that answered a storage fault that way therefore panicked on the one path that
+// exists to make a database outage diagnosable, and the request came back as an empty 500
+// with the cause nowhere, which is the opposite of what failing closed buys.
 //
 // Both failure points are driven, because they are two different returns in New (#266).
+// The same pointer coming back from a second Get is asserted here too, because "answered
+// identically to every middleware that asks" is a claim about the object and not only
+// about the error.
 func TestServerSideStore_GetSurvivesAStorageFailure(t *testing.T) {
 	t.Run("the load fails", func(t *testing.T) {
 		backend := newFakeBackend()
 		store := newTestStore(backend, false)
 
-		cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 		backend.loadErr = errors.New("the database is unreachable")
 
 		req := requestWith(cookie)
@@ -414,18 +418,25 @@ func TestServerSideStore_GetSurvivesAStorageFailure(t *testing.T) {
 		assert.False(t, isDecodeError(err),
 			"a storage failure read as a decode error would clear the cookie instead of refusing")
 
-		// The registry memoises the pair, so the next middleware in the same request is
-		// answered identically rather than being handed a fresh empty session.
+		// Get memoises the pair, so the next middleware in the same request is answered
+		// identically rather than being handed a fresh empty session. Identically means
+		// the same object as well as the same error: a second Get that retried the
+		// backend would answer one middleware differently from the last, and a second
+		// Get that returned a different empty session would let two middlewares on one
+		// request disagree about what the session holds (#269).
 		again, errAgain := store.Get(req, storeTestName)
 		require.Error(t, errAgain)
 		require.NotNil(t, again)
+		assert.Same(t, session, again)
+		assert.Equal(t, err, errAgain)
+		assert.Equal(t, 1, backend.loads, "and the failed lookup is not retried")
 	})
 
 	t.Run("the touch fails", func(t *testing.T) {
 		backend := newFakeBackend()
 		store := newTestStore(backend, false)
 
-		cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 		id := decodeCookieId(t, store, cookie)
 		backend.rows[id].LastAccessed = time.Now().UTC().Add(-30 * time.Second)
 		backend.touchErr = errors.New("the database is unreachable")
@@ -448,7 +459,7 @@ func TestServerSideStore_RegenerateRotatesAnAdminConsoleSession(t *testing.T) {
 	backend := newFakeBackend()
 	store := newMatrixStore(owner, backend, false)
 
-	cookie := liveCookie(t, store, owner, map[interface{}]interface{}{"state": "the handshake"})
+	cookie := liveCookie(t, store, owner, map[string]any{"state": "the handshake"})
 	plantedId := decodeCookieId2(t, store, owner, cookie)
 
 	req := requestWith(cookie)
@@ -484,7 +495,7 @@ func TestServerSideStore_SaveOnALoadedSessionUpdates(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 	backend.creates = 0
 
 	req := requestWith(cookie)
@@ -503,7 +514,7 @@ func TestServerSideStore_SaveOnAVanishedRowFailsAndWritesNothing(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 	id := decodeCookieId(t, store, cookie)
 
 	req := requestWith(cookie)
@@ -533,7 +544,7 @@ func TestServerSideStore_NegativeMaxAgeDeletesRowAndCookie(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 	id := decodeCookieId(t, store, cookie)
 
 	req := requestWith(cookie)
@@ -656,7 +667,7 @@ func TestServerSideStore_SecureLoadsWhatSecureSaved(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, true)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 
 	session, err := store.New(requestWith(cookie), storeTestName)
 
@@ -689,7 +700,7 @@ func TestServerSideStore_RegenerateMovesTheSessionToANewIdentifier(t *testing.T)
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	oldCookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	oldCookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 	oldId := decodeCookieId(t, store, oldCookie)
 
 	req := requestWith(oldCookie)
@@ -718,7 +729,7 @@ func TestServerSideStore_RegenerateWithAFailedCreateEmitsNothing(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	oldCookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	oldCookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 	oldId := decodeCookieId(t, store, oldCookie)
 
 	req := requestWith(oldCookie)
@@ -739,7 +750,7 @@ func TestServerSideStore_RegenerateWithAFailedDeleteEmitsNoCookie(t *testing.T) 
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	oldCookie := saveNew(t, store, map[interface{}]interface{}{"greeting": "hello"})
+	oldCookie := saveNew(t, store, map[string]any{"greeting": "hello"})
 
 	req := requestWith(oldCookie)
 	w := httptest.NewRecorder()
@@ -773,9 +784,136 @@ func TestServerSideStore_RegenerateOnAFreshSessionCreatesWithoutDeleting(t *test
 	assert.Len(t, w.Result().Cookies(), 1)
 }
 
+// --- the per-request cache (decision 3) ----------------------------------------------
+
+// TestServerSideStore_GetIsMemoisedPerRequest pins the property three middlewares and the
+// JWT refresh depend on: every Get for one name on one request is the same *Session.
+//
+// The JWT middleware is the caller that makes this load bearing rather than merely
+// efficient. It obtains the session, calls refreshToken, which obtains the session again
+// through a second Get, writes the refreshed tokens into that object and saves it, and
+// then the outer function reads the refreshed tokens back out of the object it is still
+// holding. Two objects and the outer function serves the tokens from before the refresh
+// (#269).
+func TestServerSideStore_GetIsMemoisedPerRequest(t *testing.T) {
+	t.Run("a fresh session is the same object on every Get", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+
+		req := httptest.NewRequest("GET", "/", nil)
+		first, err := store.Get(req, storeTestName)
+		require.NoError(t, err)
+		second, err := store.Get(req, storeTestName)
+		require.NoError(t, err)
+
+		assert.Same(t, first, second)
+
+		// And a write through one is visible through the other, which is the whole of
+		// what the JWT refresh needs.
+		first.Values["refreshed"] = "yes"
+		assert.Equal(t, "yes", second.Values["refreshed"])
+	})
+
+	t.Run("a loaded session costs one read however many middlewares ask", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+		backend.loads = 0
+
+		req := requestWith(cookie)
+		first, err := store.Get(req, storeTestName)
+		require.NoError(t, err)
+		second, err := store.Get(req, storeTestName)
+		require.NoError(t, err)
+		third, err := store.Get(req, storeTestName)
+		require.NoError(t, err)
+
+		assert.Same(t, first, second)
+		assert.Same(t, first, third)
+		assert.Equal(t, 1, backend.loads,
+			"on the admin console each load is an HTTP round trip to the auth server")
+	})
+
+	t.Run("two names on one request are two sessions", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+
+		req := httptest.NewRequest("GET", "/", nil)
+		first, err := store.Get(req, storeTestName)
+		require.NoError(t, err)
+		other, err := store.Get(req, "SomeOtherSession")
+		require.NoError(t, err)
+
+		// The cache is keyed by name, so collapsing it to one entry per request would
+		// serve one module's session under the other's name.
+		assert.NotSame(t, first, other)
+		assert.Equal(t, storeTestName, first.Name())
+		assert.Equal(t, "SomeOtherSession", other.Name())
+	})
+
+	t.Run("two requests are two sessions", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+
+		first, err := store.Get(requestWith(cookie), storeTestName)
+		require.NoError(t, err)
+		second, err := store.Get(requestWith(cookie), storeTestName)
+		require.NoError(t, err)
+
+		// The cache is per request and must not outlive one. A store-wide cache would
+		// serve one visitor's session to the next request that named it.
+		assert.NotSame(t, first, second)
+		assert.Equal(t, "hello", second.Values["greeting"])
+	})
+}
+
+// --- flashes (decision 4) -------------------------------------------------------------
+
+// TestServerSideStore_FlashSurvivesAReloadAndIsReadOnce is the flash pair through the
+// store rather than on a bare Session, and the reload is the point of it. A flash is
+// written on one request and read on the next, so it has to cross the serialisation the
+// store performs on save. This is the case that catches a stored shape the serialiser
+// cannot encode, which is the requirement the library this replaced satisfied with a
+// package-level type registration; storing a plain string retires it, and this case is
+// what says so rather than the absence of a registration saying nothing (#269).
+func TestServerSideStore_FlashSurvivesAReloadAndIsReadOnce(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+
+	// Request one: the handler that saved something sets the notice and redirects.
+	writeReq := httptest.NewRequest("GET", "/", nil)
+	writeRec := httptest.NewRecorder()
+	session, err := store.Get(writeReq, storeTestName)
+	require.NoError(t, err)
+	session.SetFlash("savedSuccessfully", "true")
+	require.NoError(t, store.Save(writeReq, writeRec, session))
+
+	cookies := writeRec.Result().Cookies()
+	require.Len(t, cookies, 1)
+
+	// Request two: the page renders the notice and consumes it.
+	readReq := requestWith(cookies[0])
+	reloaded, err := store.Get(readReq, storeTestName)
+	require.NoError(t, err)
+	value, ok := reloaded.TakeFlash("savedSuccessfully")
+	assert.True(t, ok, "the flash must survive the round trip through the backend")
+	assert.Equal(t, "true", value)
+	require.NoError(t, store.Save(readReq, httptest.NewRecorder(), reloaded))
+
+	// Request three: the same page, reloaded, and the notice is gone. Without the save
+	// above the consumption would live only in the object request two threw away.
+	third, err := store.Get(requestWith(cookies[0]), storeTestName)
+	require.NoError(t, err)
+	_, ok = third.TakeFlash("savedSuccessfully")
+	assert.False(t, ok, "a notice must not show a second time")
+}
+
 func TestServerSideStore_ImplementsRegenerator(t *testing.T) {
 	var _ Regenerator = newTestStore(newFakeBackend(), false)
-	var _ sessions.Store = newTestStore(newFakeBackend(), false)
+	var _ Store = newTestStore(newFakeBackend(), false)
 }
 
 // --- which lifetime applies --------------------------------------------------------------
@@ -784,13 +922,13 @@ func TestServerSideStore_AuthenticatedFlagFollowsTheConfiguredKey(t *testing.T) 
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	saveNew(t, store, map[interface{}]interface{}{"AuthContext": "a ceremony in progress"})
+	saveNew(t, store, map[string]any{"AuthContext": "a ceremony in progress"})
 	assert.False(t, backend.lastAuthenticated, "a ceremony nobody finished has not authenticated")
 
-	saveNew(t, store, map[interface{}]interface{}{"SessionIdentifier": "a-user-session-uuid"})
+	saveNew(t, store, map[string]any{"SessionIdentifier": "a-user-session-uuid"})
 	assert.True(t, backend.lastAuthenticated)
 
-	saveNew(t, store, map[interface{}]interface{}{"SessionIdentifier": ""})
+	saveNew(t, store, map[string]any{"SessionIdentifier": ""})
 	assert.False(t, backend.lastAuthenticated, "an empty identifier names no user session")
 }
 
@@ -922,7 +1060,7 @@ func newMatrixStore(owner matrixOwner, backend Backend, secure bool) *ServerSide
 
 // liveCookie saves a session carrying value and returns the cookie the browser would then
 // hold, along with the backend it was written to.
-func liveCookie(t *testing.T, store *ServerSideStore, owner matrixOwner, values map[interface{}]interface{}) *http.Cookie {
+func liveCookie(t *testing.T, store *ServerSideStore, owner matrixOwner, values map[string]any) *http.Cookie {
 	t.Helper()
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -941,7 +1079,7 @@ func liveCookie(t *testing.T, store *ServerSideStore, owner matrixOwner, values 
 }
 
 // loadWith runs New against a request carrying the given cookies.
-func loadWith(t *testing.T, store *ServerSideStore, owner matrixOwner, cookies ...*http.Cookie) (*sessions.Session, error) {
+func loadWith(t *testing.T, store *ServerSideStore, owner matrixOwner, cookies ...*http.Cookie) (*Session, error) {
 	t.Helper()
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -982,7 +1120,7 @@ func TestServerSideStore_CutoverMatrix(t *testing.T) {
 			t.Run(label+"/a valid cookie", func(t *testing.T) {
 				backend := newFakeBackend()
 				store := newMatrixStore(owner, backend, secure)
-				cookie := liveCookie(t, store, owner, map[interface{}]interface{}{
+				cookie := liveCookie(t, store, owner, map[string]any{
 					owner.authenticatedKey: "the-value",
 				})
 
@@ -1073,7 +1211,7 @@ func TestServerSideStore_CutoverMatrix(t *testing.T) {
 			t.Run(label+"/the chunk siblings", func(t *testing.T) {
 				backend := newFakeBackend()
 				store := newMatrixStore(owner, backend, secure)
-				cookie := liveCookie(t, store, owner, map[interface{}]interface{}{
+				cookie := liveCookie(t, store, owner, map[string]any{
 					owner.authenticatedKey: "the-value",
 				})
 
@@ -1118,7 +1256,7 @@ func TestServerSideStore_ASessionLargerThanACookieRoundTrips(t *testing.T) {
 	large := strings.Repeat("scope:permission ", 1200)
 	require.Greater(t, len(large), 4096)
 
-	cookie := saveNew(t, store, map[interface{}]interface{}{"payload": large})
+	cookie := saveNew(t, store, map[string]any{"payload": large})
 
 	req := httptest.NewRequest("GET", "/", nil)
 	req.AddCookie(cookie)

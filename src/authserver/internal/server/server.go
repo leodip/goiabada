@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/authserver/web"
+	"github.com/leodip/goiabada/core/sessionstore"
 
 	"log/slog"
 
@@ -30,7 +30,7 @@ import (
 type Server struct {
 	router       *chi.Mux
 	database     data.Database
-	sessionStore sessions.Store
+	sessionStore sessionstore.Store
 	worker       *workers.Worker
 
 	staticFS   fs.FS
@@ -42,7 +42,7 @@ type Server struct {
 	setCookieSecure     bool
 }
 
-func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store) *Server {
+func NewServer(router *chi.Mux, database data.Database, sessionStore sessionstore.Store) *Server {
 
 	s := Server{
 		router:       router,

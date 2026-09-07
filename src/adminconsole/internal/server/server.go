@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/core/sessionstore"
 
 	"log/slog"
 
@@ -25,14 +25,14 @@ import (
 
 type Server struct {
 	router        *chi.Mux
-	sessionStore  sessions.Store
+	sessionStore  sessionstore.Store
 	settingsCache *cache.SettingsCache
 
 	staticFS   fs.FS
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, sessionStore sessions.Store, settingsCache *cache.SettingsCache) *Server {
+func NewServer(router *chi.Mux, sessionStore sessionstore.Store, settingsCache *cache.SettingsCache) *Server {
 
 	s := Server{
 		router:        router,

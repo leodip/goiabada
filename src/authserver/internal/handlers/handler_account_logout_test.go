@@ -18,12 +18,12 @@ import (
 	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -910,19 +910,19 @@ func withSessionIdentifier(req *http.Request, sessionIdentifier string) *http.Re
 // response that writes it back still carrying the session identifier leaves the End-User signed in
 // at the OP immediately after asking to be signed out. It matters most on the redirect branch, where
 // the browser goes straight back to a relying party (#109).
-func expectCookieWipedBeforeSave(t *testing.T, httpSession *mocks_sessionstore.Store) *sessions.Session {
+func expectCookieWipedBeforeSave(t *testing.T, httpSession *mocks_sessionstore.Store) *sessionstore.Session {
 	t.Helper()
 	// Options carries what every real store puts there when it builds a session, because
 	// the save below is what turns it into a deletion and a session without them is a
 	// shape no store produces.
-	sess := &sessions.Session{
-		Values:  map[interface{}]interface{}{"something": "here"},
-		Options: &sessions.Options{Path: "/"},
+	sess := &sessionstore.Session{
+		Values:  map[string]any{"something": "here"},
+		Options: &sessionstore.Options{Path: "/"},
 	}
 	httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(sess, nil)
 	httpSession.On("Save", mock.Anything, mock.Anything, sess).
 		Run(func(args mock.Arguments) {
-			saved := args.Get(2).(*sessions.Session)
+			saved := args.Get(2).(*sessionstore.Session)
 			assert.Empty(t, saved.Values,
 				"the OP session cookie must be cleared before it is written back")
 			// Emptying the values is not a logout against a server-side store: it would
@@ -1718,9 +1718,9 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 		auditLogger.On("Log", mock.Anything, mock.Anything).Return()
 
-		mockSession := &sessions.Session{
-			Values:  make(map[interface{}]interface{}),
-			Options: &sessions.Options{Path: "/"},
+		mockSession := &sessionstore.Session{
+			Values:  make(map[string]any),
+			Options: &sessionstore.Options{Path: "/"},
 		}
 		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(mockSession, nil)
 		httpSession.On("Save", mock.Anything, mock.Anything, mockSession).Return(errors.New("session save error"))

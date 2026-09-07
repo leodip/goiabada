@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/useragent"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -40,7 +40,7 @@ type startSessionMocks struct {
 	db      *mocks_data.Database
 	store   *mocks_sessionstore.Store
 	manager *UserSessionManager
-	session *sessions.Session
+	session *sessionstore.Session
 }
 
 func newStartSessionMocks(t *testing.T) *startSessionMocks {
@@ -55,7 +55,7 @@ func newStartSessionMocks(t *testing.T) *startSessionMocks {
 			sessionStore: store,
 			sessionName:  testSessionName,
 		},
-		session: sessions.NewSession(store, testSessionName),
+		session: sessionstore.NewSession(store, testSessionName),
 	}
 }
 

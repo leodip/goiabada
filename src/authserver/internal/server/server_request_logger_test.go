@@ -10,8 +10,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/config"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
@@ -75,7 +73,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 	s := &Server{
 		router:       chi.NewRouter(),
 		database:     database,
-		sessionStore: sessions.NewCookieStore(securecookie.GenerateRandomKey(64)),
+		sessionStore: newTestSessionStore(),
 	}
 	// The handler is registered on the branch initMiddleware returns, not on s.router,
 	// so this exercises the whole chain: the root's middleware plus the four the

@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -223,7 +221,7 @@ func TestHandleAdminClientRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
 				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
 			req = req.WithContext(ctx)
 
-			httpSession := sessions.NewCookieStore(securecookie.GenerateRandomKey(64))
+			httpSession := newTestSessionStore()
 
 			handler := HandleAdminClientRedirectURIsGet(httpHelper, httpSession, apiClient)
 			handler.ServeHTTP(httptest.NewRecorder(), req)

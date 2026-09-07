@@ -124,8 +124,8 @@ func resolveLocale(ctx context.Context, r *http.Request, authHelper AuthContextR
 	}
 
 	// (2) AuthContext.UILocales — authserver flows in progress.
-	// gorilla/sessions caches the decoded session on the request via the
-	// registry, so this is effectively a map lookup, not a fresh decode.
+	// sessionstore.Get caches the loaded session on the request, so this is
+	// effectively a map lookup, not a fresh load.
 	if authHelper != nil {
 		if ac, err := authHelper.GetAuthContext(r); err == nil && ac != nil && len(ac.UILocales) > 0 {
 			return attachLocale(ctx, bundle.localizerFor(ac.UILocales), ac.UILocales[0], true)

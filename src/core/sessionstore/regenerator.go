@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 )
 
@@ -20,10 +19,10 @@ import (
 // identifier stolen at one authentication level stops working the moment the session
 // reaches a higher one (#266).
 //
-// sessions.Store has no such method, so callers reach it by asserting to this interface
-// rather than by widening the interface every handler already takes.
+// Store has no such method, so callers reach it by asserting to this interface rather
+// than by widening the interface every handler already takes.
 type Regenerator interface {
-	Regenerate(w http.ResponseWriter, r *http.Request, session *sessions.Session) error
+	Regenerate(w http.ResponseWriter, r *http.Request, session *Session) error
 }
 
 // Regenerate writes the session's current contents under a fresh identifier, removes the
@@ -37,7 +36,7 @@ type Regenerator interface {
 // old row gone, then the cookie. Every failure before that last step returns an error
 // and emits no header at all, so the failing direction is a user who loses a session
 // rather than an attacker who keeps one.
-func (s *ServerSideStore) Regenerate(w http.ResponseWriter, r *http.Request, session *sessions.Session) error {
+func (s *ServerSideStore) Regenerate(w http.ResponseWriter, r *http.Request, session *Session) error {
 	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, s.DataCodecs...)
 	if err != nil {
 		return errors.Wrap(err, "unable to encode the browser session")

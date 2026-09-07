@@ -9,18 +9,18 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 func HandleAdminGroupSettingsGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -61,8 +61,8 @@ func HandleAdminGroupSettingsGet(
 			return
 		}
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		if savedSuccessfully != nil {
+		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -76,7 +76,7 @@ func HandleAdminGroupSettingsGet(
 			"description":          group.Description,
 			"includeInIdToken":     group.IncludeInIdToken,
 			"includeInAccessToken": group.IncludeInAccessToken,
-			"savedSuccessfully":    len(savedSuccessfully) > 0,
+			"savedSuccessfully":    savedSuccessfully,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_settings.html", bind)
@@ -89,7 +89,7 @@ func HandleAdminGroupSettingsGet(
 
 func HandleAdminGroupSettingsPost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -163,7 +163,7 @@ func HandleAdminGroupSettingsPost(
 			return
 		}
 
-		sess.AddFlash("true", "savedSuccessfully")
+		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

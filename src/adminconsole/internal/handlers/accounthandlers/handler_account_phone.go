@@ -6,18 +6,18 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 func HandleAccountPhoneGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -47,8 +47,8 @@ func HandleAccountPhoneGet(
 			return
 		}
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		if savedSuccessfully != nil {
+		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		if savedSuccessfully {
 			if err := httpSession.Save(r, w, sess); err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -59,7 +59,7 @@ func HandleAccountPhoneGet(
 			"selectedPhoneCountryUniqueId": user.PhoneNumberCountryUniqueId,
 			"phoneNumber":                  user.PhoneNumber,
 			"phoneCountries":               phoneCountries,
-			"savedSuccessfully":            len(savedSuccessfully) > 0,
+			"savedSuccessfully":            savedSuccessfully,
 		}
 
 		if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind); err != nil {
@@ -71,7 +71,7 @@ func HandleAccountPhoneGet(
 
 func HandleAccountPhonePost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +121,7 @@ func HandleAccountPhonePost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		sess.AddFlash("true", "savedSuccessfully")
+		sess.SetFlash("savedSuccessfully", "true")
 		if err := httpSession.Save(r, w, sess); err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -17,11 +16,12 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 func HandleAdminResourcePermissionsGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -61,8 +61,8 @@ func HandleAdminResourcePermissionsGet(
 			return
 		}
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		if savedSuccessfully != nil {
+		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -90,7 +90,7 @@ func HandleAdminResourcePermissionsGet(
 			"resourceDescription":          resource.Description,
 			"isSystemLevelResource":        resource.IsSystemLevelResource(),
 			"builtInPermissionIdentifiers": builtInPermissionIdentifiers,
-			"savedSuccessfully":            len(savedSuccessfully) > 0,
+			"savedSuccessfully":            savedSuccessfully,
 			"permissions":                  permissions,
 		}
 
@@ -104,7 +104,7 @@ func HandleAdminResourcePermissionsGet(
 
 func HandleAdminResourcePermissionsPost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+	httpSession sessionstore.Store,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
@@ -177,7 +177,7 @@ func HandleAdminResourcePermissionsPost(
 			return
 		}
 
-		sess.AddFlash("true", "savedSuccessfully")
+		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)

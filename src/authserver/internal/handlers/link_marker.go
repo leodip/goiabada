@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/core/constants"
@@ -128,7 +128,7 @@ func (m *LinkMarker) expired(now time.Time) bool {
 // linkMarkerLifetime, and someone who can steer one navigation can pin a session with a
 // marker of their own and deny a reset for that window. A bounded availability loss in
 // place of a wrong-account credential write.
-func SaveLinkMarker(httpSession sessions.Store, w http.ResponseWriter, r *http.Request,
+func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
 	flow LinkMarkerFlow, id int64, codeHash string) (LinkMarkerRejection, error) {
 
 	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
@@ -188,7 +188,7 @@ func SaveLinkMarker(httpSession sessions.Store, w http.ResponseWriter, r *http.R
 // which keeps its stack trace and keeps alerting rather than being answered as a bad
 // link. A value that will not unmarshal is a fault, not a miss: the session cookie is
 // encrypted and signed, so nobody outside this process can put one there.
-func GetLinkMarker(httpSession sessions.Store, r *http.Request,
+func GetLinkMarker(httpSession sessionstore.Store, r *http.Request,
 	want LinkMarkerFlow) (*LinkMarker, LinkMarkerRejection, error) {
 
 	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
@@ -210,7 +210,7 @@ func GetLinkMarker(httpSession sessions.Store, r *http.Request,
 //
 // A value that will not unmarshal is a fault rather than an empty slot: the session
 // cookie is encrypted and signed, so nobody outside this process can put one there.
-func decodeLinkMarker(sess *sessions.Session) (*LinkMarker, error) {
+func decodeLinkMarker(sess *sessionstore.Session) (*LinkMarker, error) {
 	jsonData, ok := sess.Values[constants.SessionKeyLinkMarker].(string)
 	if !ok {
 		return nil, nil
@@ -226,7 +226,7 @@ func decodeLinkMarker(sess *sessions.Session) (*LinkMarker, error) {
 
 // readLinkMarker applies the flow and expiry checks a consuming step needs, so that "is
 // there a live marker of this flow" is one question with one answer wherever it is asked.
-func readLinkMarker(sess *sessions.Session, want LinkMarkerFlow,
+func readLinkMarker(sess *sessionstore.Session, want LinkMarkerFlow,
 	now time.Time) (*LinkMarker, LinkMarkerRejection, error) {
 
 	marker, err := decodeLinkMarker(sess)
@@ -261,7 +261,7 @@ func readLinkMarker(sess *sessions.Session, want LinkMarkerFlow,
 // and that is still worth keeping: it refuses a marker whose code has since been consumed
 // or reissued, which clearing at the end of a flow says nothing about. Defence in depth
 // now rather than the boundary itself.
-func ClearLinkMarker(httpSession sessions.Store, w http.ResponseWriter, r *http.Request) error {
+func ClearLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request) error {
 	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 	if err != nil {
 		return err

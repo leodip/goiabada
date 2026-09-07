@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // cookieNamer is implemented by a session store that knows what its cookies are
 // physically called, what a previous implementation left behind in the browser, and what
 // attributes a deletion has to carry to land.
 //
-// It is asserted rather than required because this middleware takes the sessions.Store
+// It is asserted rather than required because this middleware takes the sessionstore.Store
 // interface, which says nothing about cookies: both modules now pass a ServerSideStore, but
 // the parameter admits any store and the mock in this package's own tests is one. A store
 // that does not implement this gets the behaviour the middleware had before there was one to
@@ -33,7 +33,7 @@ type cookieNamer interface {
 // user would then see no improvement at all from the session moving to the server, which
 // is the entire point of the change. This is the response-capable layer, so the deletion
 // happens here, on first contact with a browser still carrying them (#266).
-func MiddlewareCookieReset(sessionStore sessions.Store, sessionName string) func(next http.Handler) http.Handler {
+func MiddlewareCookieReset(sessionStore sessionstore.Store, sessionName string) func(next http.Handler) http.Handler {
 	namer, _ := sessionStore.(cookieNamer)
 
 	return func(next http.Handler) http.Handler {

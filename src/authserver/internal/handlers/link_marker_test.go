@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -51,7 +50,7 @@ func requestCarrying(t *testing.T, rr *httptest.ResponseRecorder) *http.Request 
 
 // writeRawMarker puts an arbitrary value under the marker key, for the states
 // SaveLinkMarker cannot produce: an already-expired marker and a corrupt one.
-func writeRawMarker(t *testing.T, store sessions.Store, value interface{}) *http.Request {
+func writeRawMarker(t *testing.T, store sessionstore.Store, value interface{}) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest("GET", "/reset-password", nil)
 	rr := httptest.NewRecorder()
@@ -66,7 +65,7 @@ func writeRawMarker(t *testing.T, store sessions.Store, value interface{}) *http
 
 // requireMarkerSaved writes a marker and fails if it was refused, for the cases whose
 // subject is something other than the refusal rule.
-func requireMarkerSaved(t *testing.T, store sessions.Store, rr *httptest.ResponseRecorder,
+func requireMarkerSaved(t *testing.T, store sessionstore.Store, rr *httptest.ResponseRecorder,
 	r *http.Request, flow LinkMarkerFlow, id int64, codeHash string) {
 	t.Helper()
 

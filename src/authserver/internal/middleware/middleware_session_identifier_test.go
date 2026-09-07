@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/sessionstore"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -36,7 +36,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
+		session := sessionstore.NewSession(mockSessionStore, constants.AuthServerSessionName)
 		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
 		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
@@ -56,7 +56,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
+		session := sessionstore.NewSession(mockSessionStore, constants.AuthServerSessionName)
 		session.Values[constants.SessionKeySessionIdentifier] = "valid-session-id"
 		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
@@ -79,7 +79,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
+		session := sessionstore.NewSession(mockSessionStore, constants.AuthServerSessionName)
 		session.Values[constants.SessionKeySessionIdentifier] = "invalid-session-id"
 		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
@@ -103,13 +103,13 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
+		session := sessionstore.NewSession(mockSessionStore, constants.AuthServerSessionName)
 		session.Values[constants.SessionKeySessionIdentifier] = "invalid-session-id"
 		session.Values[constants.SessionKeyAuthContext] = `{"authState":"level1_password"}`
 		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "invalid-session-id").Return(nil, nil)
-		mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(s *sessions.Session) bool {
+		mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(s *sessionstore.Session) bool {
 			// Verify session identifier was removed but auth context was preserved
 			_, hasSessionId := s.Values[constants.SessionKeySessionIdentifier]
 			authContext, hasAuthContext := s.Values[constants.SessionKeyAuthContext]
@@ -132,7 +132,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
+		session := sessionstore.NewSession(mockSessionStore, constants.AuthServerSessionName)
 		session.Values[constants.SessionKeySessionIdentifier] = "error-session-id"
 		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 )
 
@@ -165,8 +164,8 @@ func ExpiresAt(now, createdAt time.Time, authenticated bool, idleTimeout, maxLif
 }
 
 // ServerSideStore keeps session contents in a Backend and puts nothing in the browser
-// but an opaque, signed identifier. It implements sessions.Store, so the hundred places
-// that already take that interface are untouched (#266).
+// but an opaque, signed identifier. It implements this package's own Store, so the
+// hundred places that already take that interface are untouched (#266).
 type ServerSideStore struct {
 	// Codecs sign and encrypt the identifier in the cookie. What they encode is 64 hex
 	// characters, so they keep securecookie's own 4096 byte ceiling: it finally has
@@ -187,7 +186,7 @@ type ServerSideStore struct {
 
 	// Options are the cookie defaults. MaxAge is not read from here: it is decided per
 	// save, from PersistentCookie and the row's own expiry.
-	Options *sessions.Options
+	Options *Options
 
 	// Backend is the storage half.
 	Backend Backend
@@ -239,7 +238,7 @@ func NewServerSideStore(backend Backend, authenticatedKey string, secure bool, k
 	return &ServerSideStore{
 		Codecs:     codecs,
 		DataCodecs: dataCodecs,
-		Options: &sessions.Options{
+		Options: &Options{
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   secure,
@@ -284,13 +283,32 @@ func (s *ServerSideStore) StaleCookieNames(logicalName string) []string {
 	return names
 }
 
-// Get returns the session for this request, memoised by gorilla's per-request registry
-// so the several middlewares that ask for it cost one load between them.
-func (s *ServerSideStore) Get(r *http.Request, name string) (*sessions.Session, error) {
-	return sessions.GetRegistry(r).Get(s, name)
+// Get returns the session for this request, memoised per request so the several
+// middlewares that ask for it cost one load between them.
+//
+// The memoised value is the (session, error) pair, not just the session: a lookup that
+// failed has to give every middleware on the request the same refusal, and a second Get
+// that quietly retried would answer one middleware differently from the last. On the
+// admin console each miss is also an HTTP round trip to the auth server, so the cache is
+// what keeps a request at one of those rather than three. Why the cache lives on the
+// request rather than in a middleware, and what depends on it, is at registryFor (#269).
+func (s *ServerSideStore) Get(r *http.Request, name string) (*Session, error) {
+	reg := registryFor(r)
+	if hit, ok := reg.sessions[name]; ok {
+		return hit.session, hit.err
+	}
+
+	session, err := s.New(r, name)
+	reg.sessions[name] = registryEntry{session: session, err: err}
+	return session, err
 }
 
 // New loads the session named by the request's cookie, or returns a fresh one.
+//
+// This is the store's own method and not part of Store (#269): its only caller is Get,
+// which memoises what it returns, so the rule below that it never returns a nil session
+// is the store's own to keep rather than an obligation on everything that implements
+// the interface.
 //
 // Four outcomes, and they are deliberately distinct (#266):
 //
@@ -304,7 +322,7 @@ func (s *ServerSideStore) Get(r *http.Request, name string) (*sessions.Session, 
 //     is the one that must not become a fresh session: failing open would discard every
 //     session in flight during any database interruption, and would hand anyone who can
 //     briefly disrupt the database a way to sign everybody out
-func (s *ServerSideStore) New(r *http.Request, name string) (*sessions.Session, error) {
+func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 	session := s.freshSession(name)
 
 	cookie, err := r.Cookie(s.CookieName(name))
@@ -324,18 +342,18 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*sessions.Session, 
 		if errors.Is(err, ErrNotFound) {
 			return session, nil
 		}
-		// The session goes back beside the error, and it must not be nil. gorilla/sessions
-		// documents on Store.New that "New should never return a nil session, even in the
-		// case of an error if using the Registry infrastructure to cache the session", and
-		// Get is exactly that infrastructure: Registry.Get assigns to session.name without
-		// looking at the error, so a nil here is a nil pointer dereference inside the
-		// library on the one path that exists to make a storage fault diagnosable.
+		// The session goes back beside the error, and it must not be nil. That is this
+		// store's own rule now rather than an interface's: New is not on Store any more
+		// (#269), and Get memoises whatever New returns, so a nil session here would be
+		// handed to every middleware that asks and dereferenced by whichever one looks
+		// at Values before it looks at the error -- on the one path that exists to make
+		// a storage fault diagnosable.
 		//
-		// Nothing fails open as a result. This error is not a securecookie.MultiError, so
-		// the cookie-reset middleware's decode branch does not fire and it passes the
-		// request along; the registry memoises the (session, error) pair, so the next
-		// middleware to ask receives the same error and answers 500 with the cause logged,
-		// which is the refusal this store owes a lookup it could not perform (#266).
+		// Nothing fails open as a result. The cookie-reset middleware passes a non-decode
+		// error along, and because Get memoises the (session, error) pair the next
+		// middleware to ask receives the same error and answers 500 with the cause
+		// logged, which is the refusal this store owes a lookup it could not perform
+		// (#266).
 		return session, errors.Wrap(err, "unable to load the browser session")
 	}
 
@@ -368,8 +386,8 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*sessions.Session, 
 
 // freshSession is a session nobody has stored yet: no identifier, no contents, and the
 // store's default cookie options.
-func (s *ServerSideStore) freshSession(name string) *sessions.Session {
-	session := sessions.NewSession(s, name)
+func (s *ServerSideStore) freshSession(name string) *Session {
+	session := NewSession(s, name)
 	opts := *s.Options
 	session.Options = &opts
 	session.IsNew = true
@@ -379,7 +397,7 @@ func (s *ServerSideStore) freshSession(name string) *sessions.Session {
 // touchIfStale records that a live session was used, but only once the stored timestamp
 // has gone stale. Writing on every request would put a write in front of every page, and
 // on SQLite that is an fsync on the one connection the whole process shares.
-func (s *ServerSideStore) touchIfStale(ctx context.Context, session *sessions.Session, record *Record) error {
+func (s *ServerSideStore) touchIfStale(ctx context.Context, session *Session, record *Record) error {
 	if s.now().Sub(record.LastAccessed) <= TouchThreshold {
 		return nil
 	}
@@ -403,7 +421,7 @@ func (s *ServerSideStore) touchIfStale(ctx context.Context, session *sessions.Se
 // That failure deliberately writes no cookie either, not even a deletion. A deletion
 // emitted here would clobber the cookie the rotating request just set, which is exactly
 // the outcome the rule above exists to prevent.
-func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *sessions.Session) error {
+func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *Session) error {
 	ctx := requestContext(r)
 
 	if session.Options != nil && session.Options.MaxAge < 0 {
@@ -443,7 +461,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 // deleteSession removes the row and expires the cookie. Emptying the values and saving
 // is not enough under a server-side store: it would leave a live row holding an empty
 // session, where logging out has to actively invalidate both halves.
-func (s *ServerSideStore) deleteSession(ctx context.Context, w http.ResponseWriter, session *sessions.Session) error {
+func (s *ServerSideStore) deleteSession(ctx context.Context, w http.ResponseWriter, session *Session) error {
 	if session.ID != "" {
 		if err := s.Backend.Delete(ctx, session.ID); err != nil {
 			return errors.Wrap(err, "unable to delete the browser session")
@@ -464,7 +482,7 @@ func (s *ServerSideStore) deleteSession(ctx context.Context, w http.ResponseWrit
 // timeout governs both halves through one setting. The module that does not keep one
 // leaves MaxAge at zero, which net/http renders as neither Max-Age nor Expires, so the
 // browser drops the cookie when it closes and the tokens inside never reach disk.
-func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *sessions.Session, id string, expiresAt time.Time) error {
+func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *Session, id string, expiresAt time.Time) error {
 	encodedId, err := securecookie.EncodeMulti(session.Name(), id, s.Codecs...)
 	if err != nil {
 		// The row is already written at this point, so the session exists and the
@@ -515,7 +533,7 @@ func (s *ServerSideStore) DeletionCookie(name string) *http.Cookie {
 	}
 }
 
-func (s *ServerSideStore) buildCookie(logicalName, value string, options *sessions.Options) *http.Cookie {
+func (s *ServerSideStore) buildCookie(logicalName, value string, options *Options) *http.Cookie {
 	cookie := &http.Cookie{
 		Name:     s.CookieName(logicalName),
 		Value:    value,
@@ -541,7 +559,7 @@ func (s *ServerSideStore) buildCookie(logicalName, value string, options *sessio
 // two lifetimes applies to it. Only the store can answer it, because only the store can
 // see inside the blob; what it produces is a boolean about the container, not about the
 // contents, which is why it can cross a module boundary without telling anyone anything.
-func (s *ServerSideStore) isAuthenticated(session *sessions.Session) bool {
+func (s *ServerSideStore) isAuthenticated(session *Session) bool {
 	value, ok := session.Values[s.AuthenticatedKey]
 	if !ok || value == nil {
 		return false

@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -77,8 +77,8 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 			wantCause: "unable to cast the session value to TokenResponse",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
 				store := new(mock_sessionstore.Store)
-				store.On("Get", mock.Anything, sessionName).Return(&sessions.Session{
-					Values: map[interface{}]interface{}{constants.SessionKeyJwt: "not a token response"},
+				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
+					Values: map[string]any{constants.SessionKeyJwt: "not a token response"},
 				}, nil)
 
 				m := NewMiddlewareJwt(store, sessionName, new(mock_oauth.TokenParser),
@@ -95,8 +95,8 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				store := new(mock_sessionstore.Store)
 				// No refresh token, so refreshToken reports "not refreshed" without a
 				// network call and the middleware falls through to clearing the session.
-				store.On("Get", mock.Anything, sessionName).Return(&sessions.Session{
-					Values: map[interface{}]interface{}{
+				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
+					Values: map[string]any{
 						constants.SessionKeyJwt: oauth.TokenResponse{AccessToken: "expired"},
 					},
 				}, nil)
@@ -123,8 +123,8 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				}
 
 				store := new(mock_sessionstore.Store)
-				store.On("Get", mock.Anything, sessionName).Return(&sessions.Session{
-					Values: map[interface{}]interface{}{
+				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
+					Values: map[string]any{
 						constants.SessionKeyJwt: oauth.TokenResponse{AccessToken: "valid"},
 					},
 				}, nil)
