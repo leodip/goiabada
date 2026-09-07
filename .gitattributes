@@ -1,0 +1,12 @@
+# The devcontainer bind-mounts this tree wholesale into Linux:
+#
+#   volumes:
+#     - ../..:/workspaces/goiabada
+#
+# so whatever the checkout puts on disk is what go, gofmt and the shell scripts inside the
+# container read. Under core.autocrlf that is CRLF, and CRLF reaches a Linux toolchain as
+# part of the line: a shell script fails on `\r`, and a golden file never matches.
+#
+# LF everywhere, decided here rather than left to each machine's git config, so the working
+# tree is the same bytes on every checkout of this repo.
+* text=auto eol=lf
