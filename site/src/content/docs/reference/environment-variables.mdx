@@ -196,6 +196,16 @@ These variables are read by **both applications**: the auth server uses them for
       <td>32-byte hex key (see <a href="#session-keys">Session keys</a>)</td>
     </tr>
     <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS</code></td>
+      <td><em>(empty)</em></td>
+      <td>Optional. Set to the old 64-byte hex key, together with its encryption-key twin, only while <a href="#rotating-the-session-keys">rotating</a> the session keys. Remove once the maximum session lifetime has passed.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS</code></td>
+      <td><em>(empty)</em></td>
+      <td>Optional. Set to the old 32-byte hex key, together with its authentication-key twin, only while <a href="#rotating-the-session-keys">rotating</a> the session keys. Remove once the maximum session lifetime has passed.</td>
+    </tr>
+    <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AES_ENCRYPTION_KEY</code></td>
       <td><em>(empty)</em></td>
       <td><strong>Required.</strong> 32-byte hex key that encrypts secrets at rest in the database (see <a href="#data-at-rest-encryption-key">Data-at-rest encryption key</a>). Auth server only; not needed by the admin console.</td>
@@ -475,6 +485,16 @@ The admin console needs to know where the auth server is located. See [Network c
       <td><em>(empty)</em></td>
       <td>32-byte hex key (see <a href="#session-keys">Session keys</a>)</td>
     </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS</code></td>
+      <td><em>(empty)</em></td>
+      <td>Optional. Set to the old 64-byte hex key, together with its encryption-key twin, only while <a href="#rotating-the-session-keys">rotating</a> the session keys. Remove once the maximum session lifetime has passed.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS</code></td>
+      <td><em>(empty)</em></td>
+      <td>Optional. Set to the old 32-byte hex key, together with its authentication-key twin, only while <a href="#rotating-the-session-keys">rotating</a> the session keys. Remove once the maximum session lifetime has passed.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -552,6 +572,10 @@ openssl rand -hex 32
 <Aside type="caution">
 Never use plain text passwords or example keys. Always generate fresh cryptographic keys for each deployment.
 </Aside>
+
+### Rotating the session keys
+
+To change the session keys, set the four `_PREVIOUS` variables to the pair each application is using now, set `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY`, `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY` and the `ADMINCONSOLE` twins to freshly generated keys, then restart both applications. Each seals new sessions with the new pair and still opens sessions sealed under the previous one, so nobody is signed out. Remove the `_PREVIOUS` variables once the maximum session lifetime has passed, after which nothing sealed under the old pair is still alive. Set the new pair without the previous one and everybody signs in again once.
 
 ---
 

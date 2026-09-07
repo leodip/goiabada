@@ -14,26 +14,30 @@ import (
 )
 
 type AuthServerConfig struct {
-	BaseURL                    string
-	InternalBaseURL            string
-	ListenHostHttps            string
-	ListenPortHttps            int
-	ListenHostHttp             string
-	ListenPortHttp             int
-	TrustProxyHeaders          bool
-	TrustedProxies             []string
-	LogHttpRequests            bool
-	CertFile                   string
-	KeyFile                    string
-	LogSQL                     bool
-	StaticDir                  string
-	TemplateDir                string
-	DebugAPIRequests           bool
-	BootstrapEnvOutFile        string
-	SessionAuthenticationKey   string
-	SessionEncryptionKey       string
-	RateLimiterEnabled         bool
-	ProfilePictureMaxSizeBytes int64
+	BaseURL                  string
+	InternalBaseURL          string
+	ListenHostHttps          string
+	ListenPortHttps          int
+	ListenHostHttp           string
+	ListenPortHttp           int
+	TrustProxyHeaders        bool
+	TrustedProxies           []string
+	LogHttpRequests          bool
+	CertFile                 string
+	KeyFile                  string
+	LogSQL                   bool
+	StaticDir                string
+	TemplateDir              string
+	DebugAPIRequests         bool
+	BootstrapEnvOutFile      string
+	SessionAuthenticationKey string
+	SessionEncryptionKey     string
+	// The previous pair is set only while an operator is rotating the session keys. Both
+	// or neither: the store needs both halves to open anything sealed under the old pair.
+	SessionAuthenticationKeyPrevious string
+	SessionEncryptionKeyPrevious     string
+	RateLimiterEnabled               bool
+	ProfilePictureMaxSizeBytes       int64
 }
 
 // GetEffectiveBaseURL returns the InternalBaseURL if set, otherwise returns BaseURL.
@@ -81,6 +85,10 @@ type AdminConsoleConfig struct {
 	OAuthClientSecret        string
 	SessionAuthenticationKey string
 	SessionEncryptionKey     string
+	// The previous pair is set only while an operator is rotating the session keys. Both
+	// or neither: the store needs both halves to open anything sealed under the old pair.
+	SessionAuthenticationKeyPrevious string
+	SessionEncryptionKeyPrevious     string
 }
 
 type DatabaseConfig struct {
@@ -130,43 +138,47 @@ func load() {
 
 	cfg = Config{
 		AuthServer: AuthServerConfig{
-			BaseURL:                    authServerBaseURL,
-			InternalBaseURL:            getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
-			ListenHostHttps:            getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:            getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
-			ListenHostHttp:             getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:             getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
-			TrustProxyHeaders:          getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
-			TrustedProxies:             getEnvAsStringSlice("GOIABADA_AUTHSERVER_TRUSTED_PROXIES"),
-			LogHttpRequests:            getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
-			CertFile:                   getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
-			KeyFile:                    getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
-			LogSQL:                     getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
-			StaticDir:                  getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
-			TemplateDir:                getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
-			DebugAPIRequests:           getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
-			BootstrapEnvOutFile:        getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
-			SessionAuthenticationKey:   getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", ""),
-			SessionEncryptionKey:       getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", ""),
-			RateLimiterEnabled:         getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
-			ProfilePictureMaxSizeBytes: getEnvAsInt64("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024),
+			BaseURL:                          authServerBaseURL,
+			InternalBaseURL:                  getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
+			ListenHostHttps:                  getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
+			ListenPortHttps:                  getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
+			ListenHostHttp:                   getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
+			ListenPortHttp:                   getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
+			TrustProxyHeaders:                getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
+			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_AUTHSERVER_TRUSTED_PROXIES"),
+			LogHttpRequests:                  getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
+			CertFile:                         getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
+			KeyFile:                          getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
+			LogSQL:                           getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
+			StaticDir:                        getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
+			TemplateDir:                      getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
+			DebugAPIRequests:                 getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
+			BootstrapEnvOutFile:              getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
+			SessionAuthenticationKey:         getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", ""),
+			SessionEncryptionKey:             getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", ""),
+			SessionAuthenticationKeyPrevious: getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS", ""),
+			SessionEncryptionKeyPrevious:     getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", ""),
+			RateLimiterEnabled:               getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
+			ProfilePictureMaxSizeBytes:       getEnvAsInt64("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024),
 		},
 		AdminConsole: AdminConsoleConfig{
-			BaseURL:                  getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
-			ListenHostHttps:          getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:          getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
-			ListenHostHttp:           getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:           getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
-			TrustProxyHeaders:        getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
-			TrustedProxies:           getEnvAsStringSlice("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"),
-			LogHttpRequests:          getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
-			CertFile:                 getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
-			KeyFile:                  getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
-			StaticDir:                getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
-			TemplateDir:              getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
-			OAuthClientSecret:        getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
-			SessionAuthenticationKey: getEnv("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", ""),
-			SessionEncryptionKey:     getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", ""),
+			BaseURL:                          getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
+			ListenHostHttps:                  getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
+			ListenPortHttps:                  getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
+			ListenHostHttp:                   getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
+			ListenPortHttp:                   getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
+			TrustProxyHeaders:                getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
+			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"),
+			LogHttpRequests:                  getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
+			CertFile:                         getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
+			KeyFile:                          getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
+			StaticDir:                        getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
+			TemplateDir:                      getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
+			OAuthClientSecret:                getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
+			SessionAuthenticationKey:         getEnv("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", ""),
+			SessionEncryptionKey:             getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", ""),
+			SessionAuthenticationKeyPrevious: getEnv("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS", ""),
+			SessionEncryptionKeyPrevious:     getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS", ""),
 		},
 		Database: DatabaseConfig{
 			Type:     getEnv("GOIABADA_DB_TYPE", "sqlite"),
@@ -408,7 +420,9 @@ func splitCSV(s string) []string {
 	return out
 }
 
-// ValidateAuthServerSessionKeys validates that auth server session keys are present and correct length
+// ValidateAuthServerSessionKeys validates that auth server session keys are present and
+// correct length, and that the optional previous pair, when a rotation is in progress, is
+// set in full and to the same lengths.
 func ValidateAuthServerSessionKeys() error {
 	authKey := cfg.AuthServer.SessionAuthenticationKey
 	encKey := cfg.AuthServer.SessionEncryptionKey
@@ -435,6 +449,38 @@ func ValidateAuthServerSessionKeys() error {
 	}
 	if len(encKeyBytes) != 32 {
 		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
+	}
+	// The previous pair is optional and set only while the session keys are being rotated,
+	// but it is accepted as a pair rather than as two variables: one half alone opens
+	// nothing, so a deployment that sets one and not the other has a rotation it believes
+	// is in place and is not, and everybody it was meant to keep signed in signs in again
+	// (decision 10).
+	prevAuthKey := strings.TrimSpace(cfg.AuthServer.SessionAuthenticationKeyPrevious)
+	prevEncKey := strings.TrimSpace(cfg.AuthServer.SessionEncryptionKeyPrevious)
+
+	if prevAuthKey != "" || prevEncKey != "" {
+		if prevAuthKey == "" {
+			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
+		}
+		if prevEncKey == "" {
+			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
+		}
+
+		prevAuthKeyBytes, err := hex.DecodeString(prevAuthKey)
+		if err != nil {
+			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+		}
+		if len(prevAuthKeyBytes) != 64 {
+			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes (128 hex chars), got %d bytes", len(prevAuthKeyBytes))
+		}
+
+		prevEncKeyBytes, err := hex.DecodeString(prevEncKey)
+		if err != nil {
+			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+		}
+		if len(prevEncKeyBytes) != 32 {
+			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevEncKeyBytes))
+		}
 	}
 
 	return nil
@@ -479,7 +525,9 @@ func ValidateRemovedAdminConsoleVars() error {
 	return nil
 }
 
-// ValidateAdminConsoleSessionKeys validates that admin console session keys are present and correct length
+// ValidateAdminConsoleSessionKeys validates that admin console session keys are present
+// and correct length, and that the optional previous pair, when a rotation is in progress,
+// is set in full and to the same lengths.
 func ValidateAdminConsoleSessionKeys() error {
 	authKey := cfg.AdminConsole.SessionAuthenticationKey
 	encKey := cfg.AdminConsole.SessionEncryptionKey
@@ -506,6 +554,38 @@ func ValidateAdminConsoleSessionKeys() error {
 	}
 	if len(encKeyBytes) != 32 {
 		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
+	}
+	// The previous pair is optional and set only while the session keys are being rotated,
+	// but it is accepted as a pair rather than as two variables: one half alone opens
+	// nothing, so a deployment that sets one and not the other has a rotation it believes
+	// is in place and is not, and everybody it was meant to keep signed in signs in again
+	// (decision 10).
+	prevAuthKey := strings.TrimSpace(cfg.AdminConsole.SessionAuthenticationKeyPrevious)
+	prevEncKey := strings.TrimSpace(cfg.AdminConsole.SessionEncryptionKeyPrevious)
+
+	if prevAuthKey != "" || prevEncKey != "" {
+		if prevAuthKey == "" {
+			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
+		}
+		if prevEncKey == "" {
+			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is required when GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
+		}
+
+		prevAuthKeyBytes, err := hex.DecodeString(prevAuthKey)
+		if err != nil {
+			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+		}
+		if len(prevAuthKeyBytes) != 64 {
+			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes (128 hex chars), got %d bytes", len(prevAuthKeyBytes))
+		}
+
+		prevEncKeyBytes, err := hex.DecodeString(prevEncKey)
+		if err != nil {
+			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+		}
+		if len(prevEncKeyBytes) != 32 {
+			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevEncKeyBytes))
+		}
 	}
 
 	return nil

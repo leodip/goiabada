@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/gob"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/signal"
@@ -232,9 +231,31 @@ func main() {
 
 	slog.Info("cookie secure (derived from base URL): " + fmt.Sprintf("%t", config.GetAuthServer().IsCookieSecure()))
 
-	// Decode session keys from config (already validated at startup)
-	authKey, _ := hex.DecodeString(config.GetAuthServer().SessionAuthenticationKey)
-	encKey, _ := hex.DecodeString(config.GetAuthServer().SessionEncryptionKey)
+	// Decode the session keys from config, which validated them at startup. The decode
+	// errors are still checked: what they would otherwise become is a store keyed with two
+	// empty byte slices, which is a key anyone can recompute rather than a failure (#269).
+	currentKeys, err := sessionstore.DecodeKeyPair(
+		config.GetAuthServer().SessionAuthenticationKey,
+		config.GetAuthServer().SessionEncryptionKey)
+	if err != nil {
+		slog.Error("unable to decode the session keys", "error", err)
+		os.Exit(1)
+	}
+
+	// The previous pair, nil unless an operator is rotating the session keys. The store
+	// seals with the current pair and opens with the current pair and then this one, so a
+	// rotation signs nobody out; the operator removes the two _PREVIOUS variables once the
+	// maximum session lifetime has passed (#269, #270).
+	previousKeys, err := sessionstore.DecodePreviousKeyPair(
+		config.GetAuthServer().SessionAuthenticationKeyPrevious,
+		config.GetAuthServer().SessionEncryptionKeyPrevious)
+	if err != nil {
+		slog.Error("unable to decode the previous session keys", "error", err)
+		os.Exit(1)
+	}
+	if previousKeys != nil {
+		slog.Info("previous session keys configured: a session sealed under them still opens")
+	}
 
 	// The session lives in the database and the browser carries nothing but a sealed,
 	// opaque identifier, about 140 characters in one cookie whatever a deployment
@@ -246,15 +267,12 @@ func main() {
 	//
 	// The backend is scoped to this application's own rows at construction, so no code
 	// path here can name an admin console session however it is composed.
-	//
-	// No previous key pair yet: the store accepts one so a rotation can be made without
-	// signing anybody out, and the configuration that supplies it is the next change.
 	sessionStore, err := sessionstore.NewServerSideStore(
 		sessionstore.NewDatabaseBackend(database, constants.AuthServerSessionName),
 		constants.SessionKeySessionIdentifier,
 		config.GetAuthServer().IsCookieSecure(),
-		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey},
-		nil,
+		currentKeys,
+		previousKeys,
 	)
 	if err != nil {
 		slog.Error("unable to initialize the session store", "error", err)

@@ -5,7 +5,9 @@ import (
 	"crypto/hkdf"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"io"
+	"strings"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/chacha20poly1305"
@@ -55,6 +57,62 @@ type KeyPair struct {
 	EncryptionKey     []byte
 }
 
+// DecodeKeyPair decodes one configured pair from the hex an environment variable carries.
+//
+// Both values are validated at startup, before anything calls this, so an error here means a
+// caller that skipped validation rather than a deployment that is misconfigured. It is
+// returned rather than dropped because the alternative is a store built from two empty byte
+// slices, which is the hazard DecodePreviousKeyPair describes below.
+func DecodeKeyPair(authenticationKey, encryptionKey string) (KeyPair, error) {
+	authKey, err := hex.DecodeString(strings.TrimSpace(authenticationKey))
+	if err != nil {
+		return KeyPair{}, errors.Wrap(err, "unable to decode the session authentication key")
+	}
+
+	encKey, err := hex.DecodeString(strings.TrimSpace(encryptionKey))
+	if err != nil {
+		return KeyPair{}, errors.Wrap(err, "unable to decode the session encryption key")
+	}
+
+	return KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil
+}
+
+// DecodePreviousKeyPair decodes the pair a rotating deployment configured as its previous one,
+// and returns nil when it configured none.
+//
+// nil and a zero-value KeyPair are not the same thing here, and the difference is a security
+// one. That is why this is a function with a test on it rather than an `if` inside each
+// binary's main(): hkdf.Key accepts an empty secret and an empty salt and returns a valid 32
+// byte key, chacha20poly1305.NewX accepts that key, and a value seals and opens under it. A
+// caller that built a previous pair out of two empty strings would therefore hand the store a
+// second, permanently valid opening key derived from nothing but the two info constants above,
+// which anyone holding this source can recompute. Nothing would error and nothing would look
+// wrong. newSealer refuses an empty key too, so the state is unreachable from both sides
+// (#269).
+//
+// Both halves or neither. One alone opens nothing, so it is an error rather than a silent
+// no-rotation: an operator who mistypes one variable name would otherwise be told a rotation
+// is in place while every session sealed under the old pair is being turned away. The startup
+// validators refuse it first, with the variable name in the message; this says the same thing
+// for any caller that has not run them.
+func DecodePreviousKeyPair(authenticationKey, encryptionKey string) (*KeyPair, error) {
+	auth := strings.TrimSpace(authenticationKey)
+	enc := strings.TrimSpace(encryptionKey)
+
+	if auth == "" && enc == "" {
+		return nil, nil
+	}
+	if auth == "" || enc == "" {
+		return nil, errors.New("the previous session key pair needs both the authentication key and the encryption key, or neither")
+	}
+
+	pair, err := DecodeKeyPair(auth, enc)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid previous session key pair")
+	}
+	return &pair, nil
+}
+
 // sealer holds one AEAD per purpose, both derived from one KeyPair.
 //
 // One sealer is one generation of keys. The store keeps the current one and, while an
@@ -74,11 +132,23 @@ type sealer struct {
 // key directly: the authentication key had a job under the previous codec and it keeps one
 // (decision 9).
 //
-// The error return is structural rather than expected. HKDF cannot fail for a 32 byte
-// output and the AEAD cannot fail on a 32 byte key, so this is unreachable with the
-// derivation above; it is returned rather than dropped so a future change to either call
-// cannot fail silently at the first save instead of at startup.
+// The empty-key check below is the one error here a caller can actually provoke. The three
+// after it are structural: HKDF cannot fail for a 32 byte output and the AEAD cannot fail on
+// a 32 byte key, so those are unreachable with the derivation above, and they are returned
+// rather than dropped so a future change to either call cannot fail silently at the first
+// save instead of at startup.
 func newSealer(pair KeyPair) (*sealer, error) {
+	// A key of no bytes is refused rather than trusted to be impossible. HKDF accepts an
+	// empty secret and an empty salt and derives a perfectly valid key from them, so a
+	// zero-value KeyPair arriving here would build a working sealer whose keys anyone can
+	// recompute from the two info constants above -- a permanent skeleton key, produced by
+	// a caller that merely forgot a branch. This is not the length rule: that one lives in
+	// the startup validators and stays there, and "not empty" cannot disagree with
+	// "exactly 64 and 32 bytes" (#269).
+	if len(pair.AuthenticationKey) == 0 || len(pair.EncryptionKey) == 0 {
+		return nil, errors.New("a session key pair needs a non-empty authentication key and a non-empty encryption key")
+	}
+
 	cookieKey, err := hkdf.Key(sha256.New, pair.EncryptionKey, pair.AuthenticationKey,
 		cookieKeyInfo, sealingKeyBytes)
 	if err != nil {

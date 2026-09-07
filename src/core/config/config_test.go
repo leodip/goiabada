@@ -240,15 +240,21 @@ var validEncKey = strings.Repeat("cd", 32)
 func TestValidateAuthServerSessionKeys(t *testing.T) {
 	savedAuth := cfg.AuthServer.SessionAuthenticationKey
 	savedEnc := cfg.AuthServer.SessionEncryptionKey
+	savedPrevAuth := cfg.AuthServer.SessionAuthenticationKeyPrevious
+	savedPrevEnc := cfg.AuthServer.SessionEncryptionKeyPrevious
 	defer func() {
 		cfg.AuthServer.SessionAuthenticationKey = savedAuth
 		cfg.AuthServer.SessionEncryptionKey = savedEnc
+		cfg.AuthServer.SessionAuthenticationKeyPrevious = savedPrevAuth
+		cfg.AuthServer.SessionEncryptionKeyPrevious = savedPrevEnc
 	}()
 
 	tests := []struct {
 		name        string
 		authKey     string
 		encKey      string
+		prevAuthKey string
+		prevEncKey  string
 		wantErr     bool
 		wantErrPart string
 	}{
@@ -320,12 +326,85 @@ func TestValidateAuthServerSessionKeys(t *testing.T) {
 			wantErr:     true,
 			wantErrPart: "must be hex-encoded",
 		},
+		{
+			// The ordinary state: no rotation in progress, so there is no previous pair to
+			// validate. Named rather than left implicit, because every case above it now
+			// relies on the previous pair being absent.
+			name:    "previous pair absent",
+			authKey: validAuthKey,
+			encKey:  validEncKey,
+		},
+		{
+			name:        "previous pair valid",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: validAuthKey,
+			prevEncKey:  validEncKey,
+		},
+		{
+			// Half a previous pair opens nothing, so it is refused rather than read as no
+			// rotation. An operator who mistyped one variable name would otherwise be told
+			// the rotation is in place while every session it was meant to keep alive is
+			// turned away.
+			name:        "previous authentication key set alone",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: validAuthKey,
+			wantErr:     true,
+			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is required",
+		},
+		{
+			name:        "previous encryption key set alone",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevEncKey:  validEncKey,
+			wantErr:     true,
+			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required",
+		},
+		{
+			name:        "previous authentication key not hex",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: strings.Repeat("zz", 64),
+			prevEncKey:  validEncKey,
+			wantErr:     true,
+			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded",
+		},
+		{
+			name:        "previous encryption key not hex",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: validAuthKey,
+			prevEncKey:  strings.Repeat("zz", 32),
+			wantErr:     true,
+			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded",
+		},
+		{
+			name:        "previous authentication key wrong length",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: strings.Repeat("ab", 32),
+			prevEncKey:  validEncKey,
+			wantErr:     true,
+			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes",
+		},
+		{
+			name:        "previous encryption key wrong length",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: validAuthKey,
+			prevEncKey:  strings.Repeat("cd", 33),
+			wantErr:     true,
+			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg.AuthServer.SessionAuthenticationKey = tt.authKey
 			cfg.AuthServer.SessionEncryptionKey = tt.encKey
+			cfg.AuthServer.SessionAuthenticationKeyPrevious = tt.prevAuthKey
+			cfg.AuthServer.SessionEncryptionKeyPrevious = tt.prevEncKey
 
 			err := ValidateAuthServerSessionKeys()
 
@@ -348,15 +427,21 @@ func TestValidateAuthServerSessionKeys(t *testing.T) {
 func TestValidateAdminConsoleSessionKeys(t *testing.T) {
 	savedAuth := cfg.AdminConsole.SessionAuthenticationKey
 	savedEnc := cfg.AdminConsole.SessionEncryptionKey
+	savedPrevAuth := cfg.AdminConsole.SessionAuthenticationKeyPrevious
+	savedPrevEnc := cfg.AdminConsole.SessionEncryptionKeyPrevious
 	defer func() {
 		cfg.AdminConsole.SessionAuthenticationKey = savedAuth
 		cfg.AdminConsole.SessionEncryptionKey = savedEnc
+		cfg.AdminConsole.SessionAuthenticationKeyPrevious = savedPrevAuth
+		cfg.AdminConsole.SessionEncryptionKeyPrevious = savedPrevEnc
 	}()
 
 	tests := []struct {
 		name        string
 		authKey     string
 		encKey      string
+		prevAuthKey string
+		prevEncKey  string
 		wantErr     bool
 		wantErrPart string
 	}{
@@ -414,12 +499,85 @@ func TestValidateAdminConsoleSessionKeys(t *testing.T) {
 			wantErr:     true,
 			wantErrPart: "must be 32 bytes",
 		},
+		{
+			// The ordinary state: no rotation in progress, so there is no previous pair to
+			// validate. Named rather than left implicit, because every case above it now
+			// relies on the previous pair being absent.
+			name:    "previous pair absent",
+			authKey: validAuthKey,
+			encKey:  validEncKey,
+		},
+		{
+			name:        "previous pair valid",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: validAuthKey,
+			prevEncKey:  validEncKey,
+		},
+		{
+			// Half a previous pair opens nothing, so it is refused rather than read as no
+			// rotation. An operator who mistyped one variable name would otherwise be told
+			// the rotation is in place while every session it was meant to keep alive is
+			// turned away.
+			name:        "previous authentication key set alone",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: validAuthKey,
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is required",
+		},
+		{
+			name:        "previous encryption key set alone",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevEncKey:  validEncKey,
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS is required",
+		},
+		{
+			name:        "previous authentication key not hex",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: strings.Repeat("zz", 64),
+			prevEncKey:  validEncKey,
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded",
+		},
+		{
+			name:        "previous encryption key not hex",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: validAuthKey,
+			prevEncKey:  strings.Repeat("zz", 32),
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded",
+		},
+		{
+			name:        "previous authentication key wrong length",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: strings.Repeat("ab", 32),
+			prevEncKey:  validEncKey,
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes",
+		},
+		{
+			name:        "previous encryption key wrong length",
+			authKey:     validAuthKey,
+			encKey:      validEncKey,
+			prevAuthKey: validAuthKey,
+			prevEncKey:  strings.Repeat("cd", 33),
+			wantErr:     true,
+			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg.AdminConsole.SessionAuthenticationKey = tt.authKey
 			cfg.AdminConsole.SessionEncryptionKey = tt.encKey
+			cfg.AdminConsole.SessionAuthenticationKeyPrevious = tt.prevAuthKey
+			cfg.AdminConsole.SessionEncryptionKeyPrevious = tt.prevEncKey
 
 			err := ValidateAdminConsoleSessionKeys()
 
