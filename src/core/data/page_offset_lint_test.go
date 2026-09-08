@@ -61,10 +61,17 @@ type handRolledOffset struct {
 
 // findHandRolledOffsets walks root for non-test Go files under sub and reports
 // every expression of the shape "(x - 1) * y", which is the page offset written
-// out by hand. Parentheses are unwrapped, so "(page-1)*size" and "((p)-1)*n"
-// both match, and the operands are not inspected: the shape is the whole
-// signal, and a read that wanted this arithmetic for something other than an
-// offset would still be clearer calling PageOffset or naming what it is.
+// out by hand.
+//
+// Both operands of the multiplication are examined, not just the left one:
+// multiplication commutes, so "pageSize * (page - 1)" is the same offset and
+// the same overflow, and a checker that reads only the left side is one
+// keystroke away from being silently useless.
+//
+// Parentheses are unwrapped, so "(page-1)*size" and "((p)-1)*n" both match. The
+// operand names are not inspected: the shape is the whole signal, and a read
+// that wanted this arithmetic for something other than an offset would still be
+// clearer calling PageOffset or naming what it is.
 func findHandRolledOffsets(root, sub, owner string) ([]handRolledOffset, int, error) {
 	var found []handRolledOffset
 	files := 0
@@ -101,18 +108,14 @@ func findHandRolledOffsets(root, sub, owner string) ([]handRolledOffset, int, er
 				if !ok || mul.Op != token.MUL {
 					return true
 				}
-				sub, ok := unparen(mul.X).(*ast.BinaryExpr)
-				if !ok || sub.Op != token.SUB {
-					return true
-				}
-				lit, ok := unparen(sub.Y).(*ast.BasicLit)
-				if !ok || lit.Kind != token.INT || lit.Value != "1" {
+				text, ok := offsetText(mul)
+				if !ok {
 					return true
 				}
 				found = append(found, handRolledOffset{
 					file: rel,
 					line: fset.Position(mul.Pos()).Line,
-					text: exprText(mul),
+					text: text,
 				})
 				return true
 			})
@@ -134,14 +137,32 @@ func unparen(e ast.Expr) ast.Expr {
 	}
 }
 
-// exprText renders enough of the expression to recognise it in the failure,
-// without pulling in a printer: the two operand names around the operators.
-func exprText(mul *ast.BinaryExpr) string {
-	sub, ok := unparen(mul.X).(*ast.BinaryExpr)
-	if !ok {
-		return "(? - 1) * ?"
+// minusOne reports whether e is "x - 1", and returns the x if it is.
+func minusOne(e ast.Expr) (ast.Expr, bool) {
+	sub, ok := unparen(e).(*ast.BinaryExpr)
+	if !ok || sub.Op != token.SUB {
+		return nil, false
 	}
-	return "(" + identText(sub.X) + " - 1) * " + identText(mul.Y)
+	lit, ok := unparen(sub.Y).(*ast.BasicLit)
+	if !ok || lit.Kind != token.INT || lit.Value != "1" {
+		return nil, false
+	}
+	return sub.X, true
+}
+
+// offsetText reports whether the multiplication is a page offset, and renders
+// it the way it is written -- either side may hold the subtraction -- so the
+// failure sends the reader to the expression rather than to the file. It does
+// not pull in a printer for that: the operand names around the operators are
+// enough to recognise the line.
+func offsetText(mul *ast.BinaryExpr) (string, bool) {
+	if x, ok := minusOne(mul.X); ok {
+		return "(" + identText(x) + " - 1) * " + identText(mul.Y), true
+	}
+	if y, ok := minusOne(mul.Y); ok {
+		return identText(mul.X) + " * (" + identText(y) + " - 1)", true
+	}
+	return "", false
 }
 
 func identText(e ast.Expr) string {
@@ -224,11 +245,13 @@ func PageOffset(page, pageSize int) int {
 }
 `)
 	// Accepted: arithmetic that is not this shape. Subtracting something other
-	// than 1, and multiplying without subtracting, are not page offsets.
+	// than 1, and multiplying without subtracting, are not page offsets --
+	// written both ways round, so widening the checker to both operands did not
+	// widen what it matches.
 	write("core/data/commondb/other.go", `package commondb
 
-func sizes(a, b int) (int, int, int) {
-	return (a - 2) * b, a * b, (a + 1) * b
+func sizes(a, b int) (int, int, int, int, int, int) {
+	return (a - 2) * b, a * b, (a + 1) * b, b * (a - 2), b * a, b * (a + 1)
 }
 `)
 	// Accepted: the identifier inside a comment and inside a string.
@@ -275,6 +298,15 @@ func offsetD(p params) int {
 	return (p.Page - 1) * p.Size
 }
 `)
+	// Rejected: the same offset with the operands the other way round. It is
+	// the same arithmetic and the same overflow, and it is what a checker
+	// reading only the left operand lets through.
+	write("core/data/sqlitedb/user.go", `package sqlitedb
+
+func offsetE(page, pageSize int) int {
+	return pageSize * (page - 1)
+}
+`)
 
 	found, files, err := findHandRolledOffsets(root, pageOffsetRoot, pageOffsetOwner)
 	require.NoError(t, err)
@@ -289,6 +321,7 @@ func offsetD(p params) int {
 		"core/data/commondb/user_session.go:4",
 		"core/data/postgresdb/audit_log.go:4",
 		"core/data/mysqldb/group.go:6",
+		"core/data/sqlitedb/user.go:4",
 	}, got, "the checker matched the wrong set")
 
 	// And the failure names the expression, so the reader is sent to the line
@@ -299,4 +332,7 @@ func offsetD(p params) int {
 	}
 	assert.Equal(t, "(page - 1) * pageSize", byFile["core/data/commondb/user.go"])
 	assert.Equal(t, "(p.Page - 1) * p.Size", byFile["core/data/mysqldb/group.go"])
+	// And the commuted one is rendered the way it is written, rather than
+	// silently normalised into the other order.
+	assert.Equal(t, "pageSize * (page - 1)", byFile["core/data/sqlitedb/user.go"])
 }
