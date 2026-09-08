@@ -58,6 +58,31 @@ func TestLocalizer_NoCtxFallsBackToEnglish(t *testing.T) {
 	assert.Equal(t, "Login", T(context.Background(), "auth.pwd.title"))
 }
 
+func TestRenderingBeforeLoadBundle_ResolvesEveryKeyToItself(t *testing.T) {
+	// Anything that renders on the way to LoadBundle — a config failure, a
+	// startup error path — reaches the four public rendering surfaces with
+	// defaultBundle still nil. Each must return its visible key or code.
+	// Localizer in particular must return a usable translator rather than
+	// nil, because T dereferences it without checking (#273).
+	//
+	// TestMain loads the bundle before any test in this package runs, so
+	// this is the only case that reaches those arms; it is sequential, and
+	// the cleanup puts the shared bundle back.
+	saved := defaultBundle
+	t.Cleanup(func() { defaultBundle = saved })
+	defaultBundle = nil
+
+	loc := Localizer(context.Background())
+	require.NotNil(t, loc, "Localizer must not return nil before LoadBundle: T dereferences it")
+
+	assert.Equal(t, "auth.pwd.title", T(context.Background(), "auth.pwd.title"))
+	assert.Equal(t, "js.error.unexpected", Raw(context.Background(), "js.error.unexpected"))
+
+	le := NewLocalizedError(ErrCodeLoginAuthFailed, nil)
+	assert.Equal(t, ErrCodeLoginAuthFailed, le.EnglishFallback())
+	assert.Equal(t, ErrCodeLoginAuthFailed, le.Localize(context.Background()))
+}
+
 func TestOverrideDir_MergesOnTopOfEmbedded(t *testing.T) {
 	// Build a minimal override layout in a temp dir, point the env var at it,
 	// reload, and verify the override wins.
@@ -210,10 +235,25 @@ func TestT_ValueThatIsNotAGoTemplateRendersTheKey(t *testing.T) {
 	assert.Equal(t, "js.error.unexpected", T(context.Background(), "js.error.unexpected"))
 }
 
-// TestLocalizerFor_MatchesAsGoI18nDid holds every row of the parity table in
-// docs/issue-273-retire-go-i18n/probe/matcher.out, which ran go-i18n's
-// Localizer and this matcher side by side over the same inputs. The rows that
-// decide it, because nothing else observes them: a later range winning
+func TestT_TemplatedValueThatFailsToExecuteRendersTheKey(t *testing.T) {
+	// A value that parses can still fail while evaluating its data: {{.x.Y}}
+	// reaches for a field on an int. That is the fifth rendering outcome, and
+	// it renders the key like the parse failure above rather than the half
+	// string Execute wrote before it failed. Missing data is not this case —
+	// missingkey=default renders <no value> and returns no error (#273).
+	require.NoError(t, loadBundleWithOverrides(t, map[string]string{
+		"active.pt-BR.toml": "\"auth.pwd.title\" = \"{{.x.Y}}\"\n",
+	}))
+
+	ctx := ctxFor("pt-BR")
+	assert.Equal(t, "auth.pwd.title", T(ctx, "auth.pwd.title", map[string]any{"x": 1}))
+}
+
+// TestLocalizerFor_MatchesAsGoI18nDid is the parity table for the matcher that
+// replaced go-i18n's: every row was derived by running go-i18n's Localizer and
+// this one side by side over the same input, and every row is self-contained
+// here. The rows that decide it, because nothing else observes them: a later
+// range winning
 // ("fr-FR,pt;q=0.8"), a q=0 range being excluded, quality reordering the list,
 // unparseable input falling to English, and the ui_locales shape where the
 // first tag is unsupported.
