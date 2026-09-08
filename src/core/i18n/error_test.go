@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLocalizedError_EnglishFallback(t *testing.T) {
@@ -21,20 +22,30 @@ func TestLocalizedError_ErrorReturnsEnglishFallback(t *testing.T) {
 
 func TestLocalizedError_LocalizePtBR(t *testing.T) {
 	le := NewLocalizedError(ErrCodeLoginAuthFailed, nil)
-	r := DefaultBundle().localizerFor([]string{"pt-BR"})
-	ctx := context.WithValue(context.Background(), ctxKeyLocalizer, r)
-	assert.Equal(t, "Falha na autenticação.", le.Localize(ctx))
+	assert.Equal(t, "Falha na autenticação.", le.Localize(ctxFor("pt-BR")))
 }
 
 func TestLocalizedError_LocalizeFallsThroughToEnglishWhenLocaleMissesKey(t *testing.T) {
-	// pt-BR catalog stub doesn't include arbitrary keys — go-i18n falls
-	// through to English via the bundle's default tag.
-	le := NewLocalizedError("validator.login.email_required", nil)
-	r := DefaultBundle().localizerFor([]string{"pt-BR"})
-	ctx := context.WithValue(context.Background(), ctxKeyLocalizer, r)
-	// "validator.login.email_required" IS in pt-BR stub, so this assertion
-	// confirms localization works for keys present in the resolved locale.
-	assert.Equal(t, "O e-mail é obrigatório.", le.Localize(ctx))
+	// The embedded catalogs are held to identical key sets, so the fallback
+	// needs a locale that genuinely misses the key: an override-only fr
+	// catalog carrying nothing but the title.
+	require.NoError(t, loadBundleWithOverrides(t, map[string]string{
+		"active.fr.toml": `"auth.pwd.title" = "Connexion"` + "\n",
+	}))
+
+	le := NewLocalizedError(ErrCodeLoginAuthFailed, nil)
+	assert.Equal(t, "Authentication failed.", le.Localize(ctxFor("fr")))
+}
+
+func TestLocalizedError_ArgsSubstituteInEveryRendering(t *testing.T) {
+	// 15 production constructors pass Args; all three renderings must
+	// substitute them, in the resolved locale and in English.
+	le := NewLocalizedError(ErrCodeEmailTooLong, map[string]any{"max": 60})
+	const english = "The email address cannot exceed a maximum length of 60 characters."
+	assert.Equal(t, english, le.EnglishFallback())
+	assert.Equal(t, english, le.Error())
+	assert.Equal(t, "O endereço de e-mail não pode ter mais que 60 caracteres.",
+		le.Localize(ctxFor("pt-BR")))
 }
 
 func TestLocalizedError_UnknownCodeReturnsCodeString(t *testing.T) {

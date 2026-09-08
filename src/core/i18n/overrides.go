@@ -6,17 +6,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/nicksnyder/go-i18n/v2/i18n"
-	"golang.org/x/text/language"
 )
 
 // loadOverrideCatalogs walks $GOIABADA_I18N_OVERRIDES_DIR/catalogs/ and
-// merges each *.toml message file on top of the embedded set. Override
-// files win on conflict (this is by design — self-hosters need to be able
-// to fix typos or ship locales without rebuilding the binary).
+// returns each *.toml message file in directory order, for the caller to
+// merge on top of the embedded set. Override files win on conflict (this is
+// by design — self-hosters need to be able to fix typos or ship locales
+// without rebuilding the binary), and an empty value removes the embedded
+// translation so the key renders English.
 //
-// Returns the language tags parsed from override files so the caller can
+// The language tags come back on the returned catalogs so the caller can
 // merge them into Bundle.tags. A locale that's only present via the
 // override directory must still surface from SupportedTags() so callers
 // like the locale picker see it.
@@ -26,7 +25,7 @@ import (
 // reference-data layer: country and phone-country names come from CLDR, and
 // timezone labels are assembled from the CLDR-localized country name, IANA
 // zone ID, and optional English comment (see RefCountry/RefPhoneCountry/RefTimezone).
-func loadOverrideCatalogs(b *i18n.Bundle, dir string) ([]language.Tag, error) {
+func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 	catalogsDir := filepath.Join(dir, "catalogs")
 	info, err := os.Stat(catalogsDir)
 	if err != nil {
@@ -44,7 +43,7 @@ func loadOverrideCatalogs(b *i18n.Bundle, dir string) ([]language.Tag, error) {
 	if err != nil {
 		return nil, fmt.Errorf("i18n: read override catalogs dir: %w", err)
 	}
-	var tags []language.Tag
+	var out []catalogFile
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".toml") {
 			continue
@@ -54,15 +53,13 @@ func loadOverrideCatalogs(b *i18n.Bundle, dir string) ([]language.Tag, error) {
 		if err != nil {
 			return nil, fmt.Errorf("i18n: read override catalog %s: %w", path, err)
 		}
-		mf, err := b.ParseMessageFileBytes(data, e.Name())
+		tag, messages, err := parseCatalog(path, data)
 		if err != nil {
-			return nil, fmt.Errorf("i18n: parse override catalog %s: %w", path, err)
+			return nil, err
 		}
-		if mf != nil {
-			tags = append(tags, mf.Tag)
-		}
+		out = append(out, catalogFile{tag: tag, messages: messages})
 		slog.Info("i18n: loaded override catalog (overrides win over embedded)",
 			slog.String("path", path))
 	}
-	return tags, nil
+	return out, nil
 }

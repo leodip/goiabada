@@ -2,8 +2,6 @@ package i18n
 
 import (
 	"context"
-
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // LocalizedError carries a stable error code and template arguments. The
@@ -40,33 +38,16 @@ func (e *LocalizedError) EnglishFallback() string {
 	if defaultBundle == nil {
 		return e.Code
 	}
-	return localize(defaultBundle.english, e.Code, e.Args)
+	return defaultBundle.english.render(e.Code, e.Args)
 }
 
 // Localize renders e against the locale carried on ctx, with e.Args
 // substituted. Falls back to EnglishFallback() if the key is missing in
 // the resolved locale.
 func (e *LocalizedError) Localize(ctx context.Context) string {
-	loc := Localizer(ctx)
-	out, err := loc.Localize(buildConfig(e.Code, e.Args))
-	if err != nil {
+	out, ok := Localizer(ctx).renderOrMiss(e.Code, e.Args)
+	if !ok {
 		return e.EnglishFallback()
 	}
 	return out
-}
-
-func localize(loc *i18n.Localizer, code string, args map[string]any) string {
-	out, err := loc.Localize(buildConfig(code, args))
-	if err != nil {
-		return code
-	}
-	return out
-}
-
-func buildConfig(code string, args map[string]any) *i18n.LocalizeConfig {
-	cfg := &i18n.LocalizeConfig{MessageID: code}
-	if len(args) > 0 {
-		cfg.TemplateData = args
-	}
-	return cfg
 }
