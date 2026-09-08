@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +18,7 @@ import (
 func TestAPIResourcesCreate_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	identifier := "api-test-create-resource-" + gofakeit.LetterN(8)
+	identifier := "api-test-create-resource-" + fake.LetterN(8)
 	reqBody := api.CreateResourceRequest{
 		ResourceIdentifier: identifier,
 		Description:        "  Created via API  ",
@@ -101,7 +101,7 @@ func TestAPIResourcesCreate_DuplicateIdentifier(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Pre-create a resource
-	identifier := "api-test-dup-resource-" + gofakeit.LetterN(8)
+	identifier := "api-test-dup-resource-" + fake.LetterN(8)
 	existing := createTestResource(t, identifier, "Existing")
 	defer func() { _ = database.DeleteResource(nil, existing.Id) }()
 
@@ -155,7 +155,7 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 
 	// Insufficient scope (e.g., userinfo only)
 	token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
-	resp3 := makeAPIRequest(t, "POST", url, token, api.CreateResourceRequest{ResourceIdentifier: "valid-" + gofakeit.LetterN(6), Description: "x"})
+	resp3 := makeAPIRequest(t, "POST", url, token, api.CreateResourceRequest{ResourceIdentifier: "valid-" + fake.LetterN(6), Description: "x"})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 	body3, _ := io.ReadAll(resp3.Body)

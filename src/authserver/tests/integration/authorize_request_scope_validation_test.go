@@ -7,16 +7,16 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -28,7 +28,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -62,7 +62,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 
 func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -74,7 +74,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -109,7 +109,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 	pkceRequired := true
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		PKCERequired:             &pkceRequired,
@@ -122,7 +122,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -157,7 +157,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 	pkceRequired := true
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		PKCERequired:             &pkceRequired,
@@ -170,7 +170,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -205,7 +205,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 	pkceRequired := true
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		PKCERequired:             &pkceRequired,
@@ -218,7 +218,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -255,16 +255,16 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 		codeChallenge string
 	}{
 		// less than 43
-		{codeChallenge: gofakeit.LetterN(42)},
+		{codeChallenge: fake.LetterN(42)},
 
 		// more than 128
-		{codeChallenge: gofakeit.LetterN(129)},
+		{codeChallenge: fake.LetterN(129)},
 	}
 
 	for _, testCase := range testCases {
 		pkceRequired := true
 		client := &models.Client{
-			ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+			ClientIdentifier:         "test-client-" + fake.LetterN(8),
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			PKCERequired:             &pkceRequired,
@@ -277,7 +277,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 
 		redirectUri := &models.RedirectURI{
 			ClientId: client.Id,
-			URI:      gofakeit.URL(),
+			URI:      fake.URL(),
 		}
 
 		err = database.CreateRedirectURI(nil, redirectUri)
@@ -324,7 +324,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 // withdrawn from this failure altogether, for every request, not postponed.
 func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -336,7 +336,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -348,7 +348,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&response_mode=invalid"
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -383,7 +383,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 // to /auth/level1 would mean the error was parked instead of answered.
 func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogIn(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -395,7 +395,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -407,7 +407,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&response_mode=invalid"
 
 	// Cookieless: no session, and no prompt parameter, which is the combination every other
@@ -442,7 +442,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 // TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale already owns it.
 func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLocale(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -454,7 +454,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -466,7 +466,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&response_mode=invalid" +
 		"&ui_locales=pt-BR"
 
@@ -492,7 +492,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 
 func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -504,7 +504,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -516,7 +516,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&response_mode=query" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
@@ -544,7 +544,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 
 func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -556,7 +556,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -568,7 +568,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&response_mode=fragment" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
@@ -597,7 +597,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 
 func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -609,7 +609,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -621,7 +621,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&response_mode=form_post" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
@@ -653,7 +653,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 
 func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -665,7 +665,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -677,7 +677,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43)
+		"&code_challenge=" + fake.LetterN(43)
 
 	httpClient := createAuthenticatedHttpClient(t)
 
@@ -702,7 +702,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 
 func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -714,7 +714,7 @@ func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -730,7 +730,7 @@ func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 	params.Add("redirect_uri", redirectUri.URI)
 	params.Add("response_type", "code")
 	params.Add("code_challenge_method", "S256")
-	params.Add("code_challenge", gofakeit.LetterN(43))
+	params.Add("code_challenge", fake.LetterN(43))
 	params.Add("scope", "openid profile "+userInfoScope)
 
 	destUrl := baseUrl + "?" + params.Encode()
@@ -759,7 +759,7 @@ func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 
 func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -771,7 +771,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -799,7 +799,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
-				"&code_challenge=" + gofakeit.LetterN(43) +
+				"&code_challenge=" + fake.LetterN(43) +
 				"&scope=" + url.QueryEscape(tc.scope)
 
 			httpClient := createAuthenticatedHttpClient(t)
@@ -828,7 +828,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 
 func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -840,7 +840,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -855,7 +855,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape(scope)
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -882,7 +882,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 
 func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -894,7 +894,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -903,7 +903,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 	}
 
 	resource := &models.Resource{
-		ResourceIdentifier: "test-resource-" + gofakeit.LetterN(8),
+		ResourceIdentifier: "test-resource-" + fake.LetterN(8),
 		Description:        "Test Resource",
 	}
 
@@ -919,7 +919,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape(scope)
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -969,7 +969,7 @@ func TestAuthorize_ValidateScopes_EmojiScope_FormPostDescriptionIsConformed(t *t
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&response_mode=form_post" +
 		"&scope=" + url.QueryEscape("emoji💣scope")
 

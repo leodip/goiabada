@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +59,7 @@ func TestUpdateRefreshToken_TheKeysAreNotRewritten(t *testing.T) {
 	original.CodeId = sql.NullInt64{Int64: otherCode.Id, Valid: true}
 	original.UserId = sql.NullInt64{Int64: otherUser.Id, Valid: true}
 	original.ClientId = sql.NullInt64{Int64: otherClient.Id, Valid: true}
-	original.Scope = "rewritten_" + gofakeit.LetterN(6)
+	original.Scope = "rewritten_" + fake.LetterN(6)
 	original.Revoked = true
 
 	require.NoError(t, database.UpdateRefreshToken(nil, original))

@@ -7,24 +7,24 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 // createClientWithGranularScope creates a client with a specific granular permission scope
 // and returns an access token for that client
 func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (string, *models.Client) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "granular-test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "granular-test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -89,7 +89,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 	testUser := &models.User{
 		Subject:   uuid.New(),
 		Enabled:   true,
-		Email:     gofakeit.Email(),
+		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(nil, testUser)
@@ -119,7 +119,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 
 	// Test: Should NOT be able to create user (POST)
 	resp = makeAPIRequest(t, "POST", baseURL+"/api/v1/admin/users/create", accessToken, map[string]string{
-		"email": gofakeit.Email(),
+		"email": fake.Email(),
 	})
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode, "admin-read should NOT create user")
 	_ = resp.Body.Close()
@@ -141,7 +141,7 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 
 	// Create a test client for the tests
 	testClient := &models.Client{
-		ClientIdentifier: "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
 	err := database.CreateClient(nil, testClient)
@@ -171,7 +171,7 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 
 	// Test: Should NOT be able to create client (POST)
 	resp = makeAPIRequest(t, "POST", baseURL+"/api/v1/admin/clients", accessToken, map[string]string{
-		"clientIdentifier": "new-client-" + gofakeit.LetterN(8),
+		"clientIdentifier": "new-client-" + fake.LetterN(8),
 	})
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode, "admin-read should NOT create client")
 	_ = resp.Body.Close()
@@ -217,7 +217,7 @@ func TestGranularScopes_AdminReadCanOnlyReadSettingsEndpoints(t *testing.T) {
 
 	// Test: Should NOT be able to create resource (POST)
 	resp = makeAPIRequest(t, "POST", baseURL+"/api/v1/admin/resources", accessToken, map[string]string{
-		"resourceIdentifier": "new-resource-" + gofakeit.LetterN(8),
+		"resourceIdentifier": "new-resource-" + fake.LetterN(8),
 	})
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode, "admin-read should NOT create resource")
 	_ = resp.Body.Close()
@@ -236,7 +236,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 	testUser := &models.User{
 		Subject:   uuid.New(),
 		Enabled:   true,
-		Email:     gofakeit.Email(),
+		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(nil, testUser)
@@ -247,7 +247,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 
 	// Create a test client
 	testClient := &models.Client{
-		ClientIdentifier: "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
 	err = database.CreateClient(nil, testClient)
@@ -295,7 +295,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 	testUser := &models.User{
 		Subject:   uuid.New(),
 		Enabled:   true,
-		Email:     gofakeit.Email(),
+		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(nil, testUser)
@@ -306,7 +306,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 
 	// Create a test client
 	testClient := &models.Client{
-		ClientIdentifier: "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
 	err = database.CreateClient(nil, testClient)
@@ -354,7 +354,7 @@ func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.
 	testUser := &models.User{
 		Subject:   uuid.New(),
 		Enabled:   true,
-		Email:     gofakeit.Email(),
+		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(nil, testUser)
@@ -399,7 +399,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 	testUser := &models.User{
 		Subject:   uuid.New(),
 		Enabled:   true,
-		Email:     gofakeit.Email(),
+		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(nil, testUser)
@@ -410,7 +410,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 
 	// Create a test client
 	testClient := &models.Client{
-		ClientIdentifier: "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
 	err = database.CreateClient(nil, testClient)
@@ -608,7 +608,7 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 	testUser := &models.User{
 		Subject:   uuid.New(),
 		Enabled:   true,
-		Email:     gofakeit.Email(),
+		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(nil, testUser)
@@ -651,7 +651,7 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 	// Create a test client
 	testClient := &models.Client{
-		ClientIdentifier: "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
 	err := database.CreateClient(nil, testClient)
@@ -709,8 +709,8 @@ func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
 	// Test user creation
 	t.Run("user creation requires manage-users scope", func(t *testing.T) {
 		newUserPayload := map[string]interface{}{
-			"email":    gofakeit.Email(),
-			"password": gofakeit.Password(true, true, true, true, false, 12),
+			"email":    fake.Email(),
+			"password": fake.Password(12),
 		}
 
 		// admin-read should fail
@@ -737,7 +737,7 @@ func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
 	// Test group creation
 	t.Run("group creation requires manage-users scope", func(t *testing.T) {
 		newGroupPayload := map[string]interface{}{
-			"groupIdentifier": "test-group-" + gofakeit.LetterN(8),
+			"groupIdentifier": "test-group-" + fake.LetterN(8),
 			"description":     "Test group",
 		}
 

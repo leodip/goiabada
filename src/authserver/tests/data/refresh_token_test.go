@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateRefreshToken(t *testing.T) {
@@ -238,8 +238,8 @@ func createTestRefreshToken(t *testing.T) *models.RefreshToken {
 		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
 		UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
-		RefreshTokenJti:   gofakeit.UUID(),
-		SessionIdentifier: gofakeit.UUID(),
+		RefreshTokenJti:   fake.UUID(),
+		SessionIdentifier: fake.UUID(),
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile",
 		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -306,7 +306,7 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 
 	rt1 := &models.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
-		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Refresh",
 		Scope:            "openid",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -318,7 +318,7 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 
 	rt2 := &models.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
-		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Offline",
 		Scope:            "openid offline_access",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -332,7 +332,7 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 	otherCode := createTestCode(t, client.Id, user.Id)
 	rtOther := &models.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: otherCode.Id, Valid: true},
-		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Refresh",
 		Scope:            "openid",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -371,16 +371,16 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	sessionId := "sess_" + gofakeit.LetterN(12)
+	sessionId := "sess_" + fake.LetterN(12)
 
 	// Two codes share the same session identifier (e.g., user federated to two clients
 	// during the same SSO session, or one online + one offline exchange).
 	codeA := &models.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
-		Code:                "code_a_" + gofakeit.LetterN(6),
-		CodeHash:            "hash_a_" + gofakeit.LetterN(6),
-		CodeChallenge:       sql.NullString{String: "challenge_a_" + gofakeit.LetterN(6), Valid: true},
+		Code:                "code_a_" + fake.LetterN(6),
+		CodeHash:            "hash_a_" + fake.LetterN(6),
+		CodeChallenge:       sql.NullString{String: "challenge_a_" + fake.LetterN(6), Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid",
@@ -400,9 +400,9 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	codeB := &models.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
-		Code:                "code_b_" + gofakeit.LetterN(6),
-		CodeHash:            "hash_b_" + gofakeit.LetterN(6),
-		CodeChallenge:       sql.NullString{String: "challenge_b_" + gofakeit.LetterN(6), Valid: true},
+		Code:                "code_b_" + fake.LetterN(6),
+		CodeHash:            "hash_b_" + fake.LetterN(6),
+		CodeChallenge:       sql.NullString{String: "challenge_b_" + fake.LetterN(6), Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid offline_access",
@@ -422,7 +422,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	// Online refresh token (carries session_identifier on the row).
 	rtOnline := &models.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: codeA.Id, Valid: true},
-		RefreshTokenJti:   gofakeit.UUID(),
+		RefreshTokenJti:   fake.UUID(),
 		SessionIdentifier: sessionId,
 		RefreshTokenType:  "Refresh",
 		Scope:             "openid",
@@ -436,7 +436,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	// Offline refresh token (empty session_identifier on the row, but its code carries it).
 	rtOffline := &models.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: codeB.Id, Valid: true},
-		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Offline",
 		Scope:            "openid offline_access",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -450,9 +450,9 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	unrelatedCode := &models.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
-		Code:                "code_c_" + gofakeit.LetterN(6),
-		CodeHash:            "hash_c_" + gofakeit.LetterN(6),
-		CodeChallenge:       sql.NullString{String: "challenge_c_" + gofakeit.LetterN(6), Valid: true},
+		Code:                "code_c_" + fake.LetterN(6),
+		CodeHash:            "hash_c_" + fake.LetterN(6),
+		CodeChallenge:       sql.NullString{String: "challenge_c_" + fake.LetterN(6), Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid",
@@ -460,7 +460,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		UserAgent:           "test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
-		SessionIdentifier:   "different_" + gofakeit.LetterN(8),
+		SessionIdentifier:   "different_" + fake.LetterN(8),
 		AcrLevel:            "1",
 		AuthMethods:         "pwd",
 		Used:                true,
@@ -470,7 +470,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	}
 	rtUnrelated := &models.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: unrelatedCode.Id, Valid: true},
-		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Refresh",
 		Scope:            "openid",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -499,7 +499,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	}
 
 	// Unknown session identifier returns empty.
-	gotEmpty, err := database.GetRefreshTokensBySessionIdentifier(nil, "no-such-session-"+gofakeit.LetterN(8))
+	gotEmpty, err := database.GetRefreshTokensBySessionIdentifier(nil, "no-such-session-"+fake.LetterN(8))
 	if err != nil {
 		t.Fatalf("GetRefreshTokensBySessionIdentifier(unknown) failed: %v", err)
 	}
@@ -636,7 +636,7 @@ func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
 
 	refreshToken.AuthStateGeneration = 7
 	refreshToken.Id = 0
-	refreshToken.RefreshTokenJti = gofakeit.UUID()
+	refreshToken.RefreshTokenJti = fake.UUID()
 	if err := database.CreateRefreshToken(nil, refreshToken); err != nil {
 		t.Fatalf("Failed to create refresh token with a generation: %v", err)
 	}
@@ -692,9 +692,9 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 		code := &models.Code{
 			ClientId:            client.Id,
 			UserId:              user.Id,
-			Code:                "code_" + gofakeit.LetterN(8),
-			CodeHash:            "hash_" + gofakeit.LetterN(8),
-			CodeChallenge:       sql.NullString{String: "chal_" + gofakeit.LetterN(8), Valid: true},
+			Code:                "code_" + fake.LetterN(8),
+			CodeHash:            "hash_" + fake.LetterN(8),
+			CodeChallenge:       sql.NullString{String: "chal_" + fake.LetterN(8), Valid: true},
 			CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 			RedirectURI:         "https://example.com/callback",
 			Scope:               "openid",
@@ -714,7 +714,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	}
 
 	newToken := func(rt *models.RefreshToken) *models.RefreshToken {
-		rt.RefreshTokenJti = gofakeit.UUID()
+		rt.RefreshTokenJti = fake.UUID()
 		rt.Scope = "openid"
 		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 		rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
@@ -766,12 +766,12 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	// only the user, so neither can pass with the predicate removed.
 	otherCode := &models.Code{
 		ClientId: client.Id, UserId: otherUser.Id,
-		Code: "code_o_" + gofakeit.LetterN(8), CodeHash: "hash_o_" + gofakeit.LetterN(8),
+		Code: "code_o_" + fake.LetterN(8), CodeHash: "hash_o_" + fake.LetterN(8),
 		CodeChallenge: sql.NullString{String: "chal_o", Valid: true}, CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI: "https://example.com/callback", Scope: "openid", IpAddress: "127.0.0.1",
 		UserAgent: "test", ResponseMode: "query",
 		AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
-		SessionIdentifier: "sess_o_" + gofakeit.LetterN(8), AcrLevel: "1", AuthMethods: "pwd", Used: true,
+		SessionIdentifier: "sess_o_" + fake.LetterN(8), AcrLevel: "1", AuthMethods: "pwd", Used: true,
 	}
 	if err := database.CreateCode(nil, otherCode); err != nil {
 		t.Fatalf("Failed to create the other user's code: %v", err)
@@ -868,7 +868,7 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 	user := createTestUser(t)
 
 	newToken := func(rt *models.RefreshToken) *models.RefreshToken {
-		rt.RefreshTokenJti = gofakeit.UUID()
+		rt.RefreshTokenJti = fake.UUID()
 		rt.Scope = "openid"
 		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 		rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
@@ -989,7 +989,7 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 
 	tx := beginTx(t)
 
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	code := &models.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
@@ -1013,7 +1013,7 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 	refreshToken := &models.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
 		SessionIdentifier: code.SessionIdentifier,
-		RefreshTokenJti:   gofakeit.UUID(),
+		RefreshTokenJti:   fake.UUID(),
 		RefreshTokenType:  "Refresh",
 		Scope:             "openid",
 		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -1221,7 +1221,7 @@ func seedFamilyToken(t *testing.T, spec familyTokenSpec) *models.RefreshToken {
 	t.Helper()
 
 	rt := &models.RefreshToken{
-		RefreshTokenJti:      gofakeit.UUID(),
+		RefreshTokenJti:      fake.UUID(),
 		FirstRefreshTokenJti: spec.FamilyJti,
 		SessionIdentifier:    spec.SessionIdentifier,
 		RefreshTokenType:     "Refresh",
@@ -1252,7 +1252,7 @@ func seedFamilyToken(t *testing.T, spec familyTokenSpec) *models.RefreshToken {
 func seedCodeOnSession(t *testing.T, clientId, userId int64, sessionIdentifier string) *models.Code {
 	t.Helper()
 
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	code := &models.Code{
 		ClientId:            clientId,
 		UserId:              userId,
@@ -1299,7 +1299,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		client := createTestClient(t)
 		user := createTestUser(t)
 		code := createTestCode(t, client.Id, user.Id)
-		family := gofakeit.UUID()
+		family := fake.UUID()
 
 		parent := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
 		child := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
@@ -1325,7 +1325,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		client := createTestClient(t)
 		user := createTestUser(t)
 		code := createTestCode(t, client.Id, user.Id)
-		family := gofakeit.UUID()
+		family := fake.UUID()
 
 		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
 		childA := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
@@ -1349,7 +1349,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		client := createTestClient(t)
 		user := createTestUser(t)
 		code := createTestCode(t, client.Id, user.Id)
-		family := gofakeit.UUID()
+		family := fake.UUID()
 
 		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
 		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
@@ -1368,9 +1368,9 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		user := createTestUser(t)
 		code := createTestCode(t, client.Id, user.Id)
 
-		bystander := seedFamilyToken(t, familyTokenSpec{FamilyJti: gofakeit.UUID(), CodeId: code.Id})
+		bystander := seedFamilyToken(t, familyTokenSpec{FamilyJti: fake.UUID(), CodeId: code.Id})
 
-		count, err := database.RevokeRefreshTokenFamily(nil, "no-such-family-"+gofakeit.UUID())
+		count, err := database.RevokeRefreshTokenFamily(nil, "no-such-family-"+fake.UUID())
 		if err != nil {
 			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
 		}
@@ -1389,12 +1389,12 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		// clients in one SSO session looks like.
 		client := createTestClient(t)
 		user := createTestUser(t)
-		sessionId := "sess_" + gofakeit.LetterN(12)
+		sessionId := "sess_" + fake.LetterN(12)
 		codeA := seedCodeOnSession(t, client.Id, user.Id, sessionId)
 		codeB := seedCodeOnSession(t, client.Id, user.Id, sessionId)
 
-		familyA := gofakeit.UUID()
-		familyB := gofakeit.UUID()
+		familyA := fake.UUID()
+		familyB := fake.UUID()
 
 		seedFamilyToken(t, familyTokenSpec{
 			FamilyJti: familyA, CodeId: codeA.Id, SessionIdentifier: sessionId, Revoked: true})
@@ -1428,7 +1428,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		// no join for it to work.
 		client := createTestClient(t)
 		user := createTestUser(t)
-		family := gofakeit.UUID()
+		family := fake.UUID()
 
 		parent := seedFamilyToken(t, familyTokenSpec{
 			FamilyJti: family, UserId: user.Id, ClientId: client.Id, Revoked: true})

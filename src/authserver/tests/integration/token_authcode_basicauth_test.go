@@ -4,8 +4,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +14,7 @@ import (
 // ============================================================================
 
 func TestToken_AuthCode_ClientSecretBasic_Success(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -42,7 +42,7 @@ func TestToken_AuthCode_ClientSecretBasic_Success(t *testing.T) {
 }
 
 func TestToken_AuthCode_ClientSecretBasic_WrongSecret(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -63,7 +63,7 @@ func TestToken_AuthCode_ClientSecretBasic_WrongSecret(t *testing.T) {
 }
 
 func TestToken_AuthCode_ClientSecretBasic_BothMethodsProvided(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"

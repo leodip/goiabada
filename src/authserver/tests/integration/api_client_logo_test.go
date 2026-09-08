@@ -11,17 +11,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 // createTestClientForLogo creates a client for logo tests
 func createTestClientForLogo(t *testing.T) *models.Client {
 	t.Helper()
-	ident := "test-logo-" + strings.ToLower(gofakeit.LetterN(10))
+	ident := "test-logo-" + strings.ToLower(fake.LetterN(10))
 	client := &models.Client{
 		ClientIdentifier: ident,
 		Description:      "Test client for logo tests",

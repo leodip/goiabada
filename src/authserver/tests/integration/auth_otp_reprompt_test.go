@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,10 +36,10 @@ func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *m
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile email") +
-		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&state=" + fake.LetterN(8) +
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {

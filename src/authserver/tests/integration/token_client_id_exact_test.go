@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +21,7 @@ func createClientForClientIdComparison(t *testing.T) *models.Client {
 	t.Helper()
 
 	client := &models.Client{
-		ClientIdentifier:         strings.ToLower("test-client-" + gofakeit.LetterN(8)),
+		ClientIdentifier:         strings.ToLower("test-client-" + fake.LetterN(8)),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,

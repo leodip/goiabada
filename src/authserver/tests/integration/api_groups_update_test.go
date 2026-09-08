@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +28,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 
 	// Test: Update group
 	updateReq := api.UpdateGroupRequest{
-		GroupIdentifier:      "updated-group-" + gofakeit.LetterN(6),
+		GroupIdentifier:      "updated-group-" + fake.LetterN(6),
 		Description:          "Updated group description",
 		IncludeInIdToken:     false,
 		IncludeInAccessToken: true,
@@ -288,7 +288,7 @@ func TestAPIGroupUpdatePut_WhitespaceHandling(t *testing.T) {
 
 	// Test: Update with whitespace that should fail validation
 	updateReq := api.UpdateGroupRequest{
-		GroupIdentifier:      "  whitespace-identifier-" + gofakeit.LetterN(4) + "  ",
+		GroupIdentifier:      "  whitespace-identifier-" + fake.LetterN(4) + "  ",
 		Description:          "  Whitespace description  ",
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,
@@ -325,7 +325,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 
 	// Setup: Create test group with specific initial values
 	testGroup := &models.Group{
-		GroupIdentifier:      "test-bool-group-" + gofakeit.LetterN(8),
+		GroupIdentifier:      "test-bool-group-" + fake.LetterN(8),
 		Description:          "Test boolean flags",
 		IncludeInIdToken:     false,
 		IncludeInAccessToken: false,

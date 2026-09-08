@@ -6,12 +6,12 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 // =============================================================================
@@ -44,7 +44,7 @@ func readResponseBody(t *testing.T, resp *http.Response) string {
 // createTestClientAndRedirectURI creates a basic test client and redirect URI
 func createTestClientAndRedirectURI(t *testing.T) (*models.Client, *models.RedirectURI) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -70,7 +70,7 @@ func createTestClientAndRedirectURI(t *testing.T) (*models.Client, *models.Redir
 // createSessionWithAcrLevel1AndPassword creates a session at ACR level 1 and returns the password for re-auth tests
 func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.Client, *models.RedirectURI, *models.User, string) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -84,7 +84,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -92,7 +92,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +101,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -110,9 +110,9 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +

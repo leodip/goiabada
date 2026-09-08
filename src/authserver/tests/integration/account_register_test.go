@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -130,7 +130,7 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 	httpClient := createHttpClient(t)
 	loadRegisterPage(t, httpClient)
 
-	email := gofakeit.Email()
+	email := fake.Email()
 	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
 	defer func() { _ = resp.Body.Close() }()
 
@@ -164,7 +164,7 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 	httpClient := createHttpClient(t)
 	loadRegisterPage(t, httpClient)
 
-	email := gofakeit.Email()
+	email := fake.Email()
 	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
 	defer func() { _ = resp.Body.Close() }()
 
@@ -189,7 +189,7 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 // form-urlencoded rules where '+' decodes to a space, so the pre-registration was never found
 // and these users could not register at all.
 func registerPlusAddress() string {
-	return "register+tag." + strings.ToLower(gofakeit.LetterN(10)) + "@example.com"
+	return "register+tag." + strings.ToLower(fake.LetterN(10)) + "@example.com"
 }
 
 var activationLinkPattern = regexp.MustCompile(`https?://[^"'<>\s]+/account/activate[^"'<>\s]*`)
@@ -414,7 +414,7 @@ func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {
 
 	setRegSettings(t, false, false, false)
 
-	resp := postRegister(t, httpClient, gofakeit.Email(), "Password123!", "Password123!")
+	resp := postRegister(t, httpClient, fake.Email(), "Password123!", "Password123!")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
@@ -428,7 +428,7 @@ func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
 	existing := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: "irrelevant",
 	}
 	err := database.CreateUser(nil, existing)
@@ -453,7 +453,7 @@ func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
 	httpClient := createHttpClient(t)
 	loadRegisterPage(t, httpClient)
 
-	email := gofakeit.Email()
+	email := fake.Email()
 	resp1 := postRegister(t, httpClient, email, "Password123!", "Password123!")
 	_ = resp1.Body.Close()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
@@ -480,7 +480,7 @@ func TestSelfRegister_Post_PasswordMismatch(t *testing.T) {
 	httpClient := createHttpClient(t)
 	loadRegisterPage(t, httpClient)
 
-	email := gofakeit.Email()
+	email := fake.Email()
 	resp := postRegister(t, httpClient, email, "Password123!", "Different456!")
 	defer func() { _ = resp.Body.Close() }()
 

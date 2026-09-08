@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateClientPermission(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier: "test_client_" + gofakeit.LetterN(6),
+		ClientIdentifier: "test_client_" + fake.LetterN(6),
 		Description:      "Test Client",
 	}
 	err := database.CreateClient(nil, client)
@@ -21,7 +21,7 @@ func TestCreateClientPermission(t *testing.T) {
 
 	// Create a resource for testing
 	resource := &models.Resource{
-		ResourceIdentifier: "test_resource_" + gofakeit.LetterN(6),
+		ResourceIdentifier: "test_resource_" + fake.LetterN(6),
 		Description:        "Test Resource",
 	}
 	err = database.CreateResource(nil, resource)
@@ -31,7 +31,7 @@ func TestCreateClientPermission(t *testing.T) {
 
 	// Create a permission for testing
 	permission := &models.Permission{
-		PermissionIdentifier: "test_permission_" + gofakeit.LetterN(6),
+		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
 	}
@@ -98,7 +98,7 @@ func TestCreateClientPermission(t *testing.T) {
 func TestUpdateClientPermission(t *testing.T) {
 	// Create a client for testing
 	client := &models.Client{
-		ClientIdentifier: "test_client_" + gofakeit.LetterN(6),
+		ClientIdentifier: "test_client_" + fake.LetterN(6),
 		Description:      "Test Client",
 	}
 	err := database.CreateClient(nil, client)
@@ -108,7 +108,7 @@ func TestUpdateClientPermission(t *testing.T) {
 
 	// Create another client for updating
 	newClient := &models.Client{
-		ClientIdentifier: "new_test_client_" + gofakeit.LetterN(6),
+		ClientIdentifier: "new_test_client_" + fake.LetterN(6),
 		Description:      "New Test Client",
 	}
 	err = database.CreateClient(nil, newClient)
@@ -118,7 +118,7 @@ func TestUpdateClientPermission(t *testing.T) {
 
 	// Create a resource for testing
 	resource := &models.Resource{
-		ResourceIdentifier: "test_resource_" + gofakeit.LetterN(6),
+		ResourceIdentifier: "test_resource_" + fake.LetterN(6),
 		Description:        "Test Resource",
 	}
 	err = database.CreateResource(nil, resource)
@@ -128,7 +128,7 @@ func TestUpdateClientPermission(t *testing.T) {
 
 	// Create a permission for testing
 	permission := &models.Permission{
-		PermissionIdentifier: "test_permission_" + gofakeit.LetterN(6),
+		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
 	}
@@ -139,7 +139,7 @@ func TestUpdateClientPermission(t *testing.T) {
 
 	// Create another permission for updating
 	newPermission := &models.Permission{
-		PermissionIdentifier: "new_test_permission_" + gofakeit.LetterN(6),
+		PermissionIdentifier: "new_test_permission_" + fake.LetterN(6),
 		Description:          "New Test Permission",
 		ResourceId:           resource.Id,
 	}
@@ -195,7 +195,7 @@ func TestUpdateClientPermission(t *testing.T) {
 func TestGetClientPermissionById(t *testing.T) {
 	// Create a client for testing
 	client := &models.Client{
-		ClientIdentifier: "test_client_" + gofakeit.LetterN(6),
+		ClientIdentifier: "test_client_" + fake.LetterN(6),
 		Description:      "Test Client",
 	}
 	err := database.CreateClient(nil, client)
@@ -205,7 +205,7 @@ func TestGetClientPermissionById(t *testing.T) {
 
 	// Create a resource for testing
 	resource := &models.Resource{
-		ResourceIdentifier: "test_resource_" + gofakeit.LetterN(6),
+		ResourceIdentifier: "test_resource_" + fake.LetterN(6),
 		Description:        "Test Resource",
 	}
 	err = database.CreateResource(nil, resource)
@@ -215,7 +215,7 @@ func TestGetClientPermissionById(t *testing.T) {
 
 	// Create a permission for testing
 	permission := &models.Permission{
-		PermissionIdentifier: "test_permission_" + gofakeit.LetterN(6),
+		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
 	}
@@ -274,7 +274,7 @@ func TestGetClientPermissionById(t *testing.T) {
 func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
 	// Create a client for testing
 	client := &models.Client{
-		ClientIdentifier: "test_client_" + gofakeit.LetterN(6),
+		ClientIdentifier: "test_client_" + fake.LetterN(6),
 		Description:      "Test Client",
 	}
 	err := database.CreateClient(nil, client)
@@ -284,7 +284,7 @@ func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
 
 	// Create a resource for testing
 	resource := &models.Resource{
-		ResourceIdentifier: "test_resource_" + gofakeit.LetterN(6),
+		ResourceIdentifier: "test_resource_" + fake.LetterN(6),
 		Description:        "Test Resource",
 	}
 	err = database.CreateResource(nil, resource)
@@ -294,7 +294,7 @@ func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
 
 	// Create a permission for testing
 	permission := &models.Permission{
-		PermissionIdentifier: "test_permission_" + gofakeit.LetterN(6),
+		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
 	}
@@ -344,7 +344,7 @@ func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
 func TestGetClientPermissionsByClientId(t *testing.T) {
 	// Create a client for testing
 	client := &models.Client{
-		ClientIdentifier: "test_client_" + gofakeit.LetterN(6),
+		ClientIdentifier: "test_client_" + fake.LetterN(6),
 		Description:      "Test Client",
 	}
 	err := database.CreateClient(nil, client)
@@ -354,7 +354,7 @@ func TestGetClientPermissionsByClientId(t *testing.T) {
 
 	// Create a resource for testing
 	resource := &models.Resource{
-		ResourceIdentifier: "test_resource_" + gofakeit.LetterN(6),
+		ResourceIdentifier: "test_resource_" + fake.LetterN(6),
 		Description:        "Test Resource",
 	}
 	err = database.CreateResource(nil, resource)
@@ -366,7 +366,7 @@ func TestGetClientPermissionsByClientId(t *testing.T) {
 	permissions := make([]*models.Permission, 3)
 	for i := 0; i < 3; i++ {
 		permissions[i] = &models.Permission{
-			PermissionIdentifier: "test_permission_" + gofakeit.LetterN(6),
+			PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 			Description:          "Test Permission " + strconv.Itoa(i+1),
 			ResourceId:           resource.Id,
 		}
@@ -415,7 +415,7 @@ func TestGetClientPermissionsByClientId(t *testing.T) {
 func TestDeleteClientPermission(t *testing.T) {
 	// Create a client for testing
 	client := &models.Client{
-		ClientIdentifier: "test_client_" + gofakeit.LetterN(6),
+		ClientIdentifier: "test_client_" + fake.LetterN(6),
 		Description:      "Test Client",
 	}
 	err := database.CreateClient(nil, client)
@@ -425,7 +425,7 @@ func TestDeleteClientPermission(t *testing.T) {
 
 	// Create a resource for testing
 	resource := &models.Resource{
-		ResourceIdentifier: "test_resource_" + gofakeit.LetterN(6),
+		ResourceIdentifier: "test_resource_" + fake.LetterN(6),
 		Description:        "Test Resource",
 	}
 	err = database.CreateResource(nil, resource)
@@ -435,7 +435,7 @@ func TestDeleteClientPermission(t *testing.T) {
 
 	// Create a permission for testing
 	permission := &models.Permission{
-		PermissionIdentifier: "test_permission_" + gofakeit.LetterN(6),
+		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
 	}

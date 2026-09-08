@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
@@ -16,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,14 +70,14 @@ type crossUserBrowser struct {
 // plaintext on the model so a case can generate a passcode from it, and encrypted at rest the way
 // production stores it.
 func createCrossUserUser(t *testing.T, withOtp bool) (*models.User, string) {
-	password := gofakeit.Password(true, true, true, true, false, 10)
+	password := fake.Password(10)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -121,12 +121,12 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel enums.AcrLevel,
 	require.False(t, defaultAcrLevel.IsHigherThan(aSessionAcrLevel),
 		"the client's level is a floor under A's ceremony too, so A's session cannot end up below it")
 
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	require.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -199,8 +199,8 @@ func crossUserAuthorizeUrl(b *crossUserBrowser, extra string) string {
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(crossUserCodeVerifier) +
 		"&scope=" + url.QueryEscape(crossUserScope) +
-		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8) +
+		"&state=" + fake.LetterN(8) +
+		"&nonce=" + fake.LetterN(8) +
 		extra
 }
 

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +18,7 @@ import (
 func TestAPIResourceGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	res := createTestResource(t, "api-test-get-resource-"+gofakeit.LetterN(6), "Get Resource")
+	res := createTestResource(t, "api-test-get-resource-"+fake.LetterN(6), "Get Resource")
 	defer func() { _ = database.DeleteResource(nil, res.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
@@ -92,11 +92,11 @@ func TestAPIResourceGet_UnauthorizedAndScope(t *testing.T) {
 func TestAPIResourceUpdatePut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	res := createTestResource(t, "api-test-update-resource-"+gofakeit.LetterN(6), "Original")
+	res := createTestResource(t, "api-test-update-resource-"+fake.LetterN(6), "Original")
 	defer func() { _ = database.DeleteResource(nil, res.Id) }()
 
 	updateReq := api.UpdateResourceRequest{
-		ResourceIdentifier: "updated-resource-" + gofakeit.LetterN(6),
+		ResourceIdentifier: "updated-resource-" + fake.LetterN(6),
 		Description:        "  Updated desc  ",
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
@@ -124,7 +124,7 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 
 func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	res := createTestResource(t, "api-test-update-val-"+gofakeit.LetterN(6), "desc")
+	res := createTestResource(t, "api-test-update-val-"+fake.LetterN(6), "desc")
 	defer func() { _ = database.DeleteResource(nil, res.Id) }()
 
 	// Empty identifier
@@ -156,8 +156,8 @@ func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 
 func TestAPIResourceUpdatePut_DuplicateIdentifier(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	res1 := createTestResource(t, "api-test-dup1-"+gofakeit.LetterN(6), "desc")
-	res2 := createTestResource(t, "api-test-dup2-"+gofakeit.LetterN(6), "desc")
+	res1 := createTestResource(t, "api-test-dup1-"+fake.LetterN(6), "desc")
+	res2 := createTestResource(t, "api-test-dup2-"+fake.LetterN(6), "desc")
 	defer func() { _ = database.DeleteResource(nil, res1.Id); _ = database.DeleteResource(nil, res2.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res2.Id, 10)
@@ -231,7 +231,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 
 	// Not found
 	urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/9999999"
-	respNF := makeAPIRequest(t, "PUT", urlNF, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "valid-" + gofakeit.LetterN(6), Description: "y"})
+	respNF := makeAPIRequest(t, "PUT", urlNF, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "valid-" + fake.LetterN(6), Description: "y"})
 	defer func() { _ = respNF.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
 
@@ -251,7 +251,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 
 func TestAPIResourceUpdatePut_UnauthorizedAndScope(t *testing.T) {
 	// Prepare a test resource to reference
-	res := createTestResource(t, "api-test-update-unauth-"+gofakeit.LetterN(6), "desc")
+	res := createTestResource(t, "api-test-update-unauth-"+fake.LetterN(6), "desc")
 	defer func() { _ = database.DeleteResource(nil, res.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)

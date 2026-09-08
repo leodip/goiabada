@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +18,7 @@ func TestHandleAPIGroupCreatePost_Success(t *testing.T) {
 
 	// Create request data
 	reqData := map[string]interface{}{
-		"groupIdentifier":      "test-group-" + gofakeit.LetterN(6),
+		"groupIdentifier":      "test-group-" + fake.LetterN(6),
 		"description":          "Test Group Description",
 		"includeInIdToken":     true,
 		"includeInAccessToken": false,
@@ -142,7 +142,7 @@ func TestHandleAPIGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 
 	// Create a group first
 	existingGroup := &models.Group{
-		GroupIdentifier:      "existing-group-" + gofakeit.LetterN(6),
+		GroupIdentifier:      "existing-group-" + fake.LetterN(6),
 		Description:          "Existing Group",
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,
@@ -180,7 +180,7 @@ func TestHandleAPIGroupCreatePost_InputSanitization(t *testing.T) {
 
 	// Create request data with potentially malicious input in description
 	reqData := map[string]interface{}{
-		"groupIdentifier":      "test-group-" + gofakeit.LetterN(6), // Valid identifier (no spaces) to pass validation
+		"groupIdentifier":      "test-group-" + fake.LetterN(6), // Valid identifier (no spaces) to pass validation
 		"description":          "  <script>alert('xss')</script>Test Description  ",
 		"includeInIdToken":     true,
 		"includeInAccessToken": false,

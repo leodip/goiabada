@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,7 +31,7 @@ const auditLogsURL = "/api/v1/admin/audit-logs"
 // deterministic.
 func seedAuditLogs(t *testing.T, count int) string {
 	t.Helper()
-	auditEvent := "test_audit_event_" + gofakeit.LetterN(10)
+	auditEvent := "test_audit_event_" + fake.LetterN(10)
 	base := time.Now().UTC().Add(-time.Duration(count) * time.Second)
 
 	for i := 0; i < count; i++ {
@@ -224,7 +224,7 @@ func TestAPIAuditLogsGet_EventFilter(t *testing.T) {
 	})
 
 	t.Run("an unmatched event yields nothing", func(t *testing.T) {
-		body, resp := getAuditLogs(t, accessToken, "auditEvent=no_such_event_"+gofakeit.LetterN(8))
+		body, resp := getAuditLogs(t, accessToken, "auditEvent=no_such_event_"+fake.LetterN(8))
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
@@ -16,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,7 +131,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesTheClientsGrants(t *test
 	requireDatabaseAuditLogs(t)
 	adminToken, _ := createAdminClientWithToken(t)
 
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 	defer func() { _ = database.DeleteClient(nil, code.ClientId) }()
 
@@ -188,18 +188,18 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesTheClientsGrants(t *test
 func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	require.NoError(t, database.CreateUser(nil, user))
 
-	flippedSecret := gofakeit.LetterN(32)
+	flippedSecret := fake.LetterN(32)
 	flippedClient, flippedCode := createAuthCode(t, flippedSecret, "openid profile email",
 		authCodeOptions{user: user, userPassword: password})
 	defer func() { _ = database.DeleteClient(nil, flippedCode.ClientId) }()
@@ -208,7 +208,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 	// decoration: two ceremonies for one user from the same device replace each other's session,
 	// so without this the first grant would be dead before the flip ever ran and the refusal
 	// below would prove nothing.
-	otherSecret := gofakeit.LetterN(32)
+	otherSecret := fake.LetterN(32)
 	otherClient, otherCode := createAuthCode(t, otherSecret, "openid profile email",
 		authCodeOptions{user: user, userPassword: password, userAgent: "goiabada-d2-second-device"})
 	defer func() { _ = database.DeleteClient(nil, otherCode.ClientId) }()
@@ -257,8 +257,8 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing
 		}
 	}()
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	clientSecret := fake.Password(32)
+	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false)
 	defer func() { _ = database.DeleteClient(nil, client.Id) }()
 	user := createROPCUser(t, password)
@@ -292,7 +292,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing
 func TestAPIClientAuthenticationPut_FlipToConfidential_DoesNotRevoke(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email",
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
 	defer func() { _ = database.DeleteClient(nil, code.ClientId) }()
 
@@ -314,7 +314,7 @@ func TestAPIClientAuthenticationPut_FlipToConfidential_DoesNotRevoke(t *testing.
 func TestAPIClientAuthenticationPut_RotatingAConfidentialSecret_DoesNotRevoke(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 	defer func() { _ = database.DeleteClient(nil, code.ClientId) }()
 
@@ -337,7 +337,7 @@ func TestAPIClientAuthenticationPut_RotatingAConfidentialSecret_DoesNotRevoke(t 
 func TestAPIClientAuthenticationPut_SavingAnAlreadyPublicClient_DoesNotRevoke(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email",
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
 	defer func() { _ = database.DeleteClient(nil, code.ClientId) }()
 
@@ -363,7 +363,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_SetsPKCERequired(t *testing.T) 
 	// been left alone.
 	pkceOptional := false
 	client := &models.Client{
-		ClientIdentifier:         "flip-pkce-" + strings.ToLower(gofakeit.LetterN(10)),
+		ClientIdentifier:         "flip-pkce-" + strings.ToLower(fake.LetterN(10)),
 		Enabled:                  true,
 		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,

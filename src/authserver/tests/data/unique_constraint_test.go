@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,8 +72,8 @@ func TestUnique_UserSubject(t *testing.T) {
 	duplicate := &models.User{
 		Enabled:  true,
 		Subject:  existing.Subject,
-		Username: gofakeit.Username(),
-		Email:    "dup_subject_" + gofakeit.LetterN(10) + "@example.com",
+		Username: fake.Username(),
+		Email:    "dup_subject_" + fake.LetterN(10) + "@example.com",
 	}
 	err := database.CreateUser(nil, duplicate)
 	assert.Error(t, err, "two users must not share a subject")
@@ -85,7 +85,7 @@ func TestUnique_UserEmail(t *testing.T) {
 	duplicate := &models.User{
 		Enabled:  true,
 		Subject:  uuid.New(),
-		Username: gofakeit.Username(),
+		Username: fake.Username(),
 		Email:    existing.Email,
 	}
 	err := database.CreateUser(nil, duplicate)
@@ -99,7 +99,7 @@ func TestUnique_CodeHash(t *testing.T) {
 
 	duplicate := *existing
 	duplicate.Id = 0
-	duplicate.Code = "other_" + gofakeit.LetterN(6)
+	duplicate.Code = "other_" + fake.LetterN(6)
 	err := database.CreateCode(nil, &duplicate)
 	assert.Error(t, err, "two codes must not share a code_hash")
 }
@@ -113,7 +113,7 @@ func TestUnique_KeyPairState(t *testing.T) {
 
 	duplicate := &models.KeyPair{
 		State:         existing.State,
-		KeyIdentifier: gofakeit.UUID(),
+		KeyIdentifier: fake.UUID(),
 		Type:          "RSA",
 		Algorithm:     "RS256",
 	}

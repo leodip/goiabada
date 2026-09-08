@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,7 +26,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
-		ClientIdentifier:      "auth-client-" + strings.ToLower(gofakeit.LetterN(10)),
+		ClientIdentifier:      "auth-client-" + strings.ToLower(fake.LetterN(10)),
 		Enabled:               true,
 		ConsentRequired:       false,
 		IsPublic:              false,
@@ -195,7 +195,7 @@ func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "inscope-auth-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "inscope-auth-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -250,7 +250,7 @@ func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 func createPublicClient(t *testing.T) *models.Client {
 	t.Helper()
 	client := &models.Client{
-		ClientIdentifier:         "pub-client-" + strings.ToLower(gofakeit.LetterN(10)),
+		ClientIdentifier:         "pub-client-" + strings.ToLower(fake.LetterN(10)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,

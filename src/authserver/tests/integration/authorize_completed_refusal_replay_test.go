@@ -6,12 +6,12 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +33,7 @@ import (
 // login makes /auth/pwd reject the credentials and /auth/completed is never reached.
 func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -47,7 +47,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -55,7 +55,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +64,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -73,15 +73,15 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 
 	httpClient := createHttpClient(t)
 
@@ -146,7 +146,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 // filtering to nothing happens at /auth/completed.
 func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -160,7 +160,7 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -168,7 +168,7 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -177,7 +177,7 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -191,12 +191,12 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 	permission := createPermission(t, resource.Id)
 	requestScope := resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState
 

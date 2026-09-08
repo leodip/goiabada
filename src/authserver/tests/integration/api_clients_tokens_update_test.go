@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -194,12 +194,12 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 
 func TestAPIClientTokensPut_InsufficientScope(t *testing.T) {
 	// Create a client with only auth-server:userinfo scope
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "inscope-client-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "inscope-client-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,

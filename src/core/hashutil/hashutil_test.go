@@ -3,7 +3,7 @@ package hashutil
 import (
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestHashString(t *testing.T) {
@@ -61,8 +61,8 @@ func TestHashPassword(t *testing.T) {
 	}{
 		{"Normal password", "password123", false},
 		{"Empty password", "", false},
-		{"Max length password", gofakeit.LetterN(72), false},
-		{"Exceeds max length", gofakeit.LetterN(73), true},
+		{"Max length password", fake.LetterN(72), false},
+		{"Exceeds max length", fake.LetterN(73), true},
 	}
 
 	for _, tt := range tests {

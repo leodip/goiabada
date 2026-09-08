@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -513,12 +513,12 @@ func TestAPIClientUpdatePut_InvalidDefaultAcrLevelValue(t *testing.T) {
 
 func TestAPIClientUpdatePut_InsufficientScope(t *testing.T) {
 	// Create a token with only auth-server:userinfo scope
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "inscope-client-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "inscope-client-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -572,7 +572,7 @@ func TestAPIClientUpdatePut_InsufficientScope(t *testing.T) {
 // helper to create a client directly in DB
 func createTestClientUnique(t *testing.T, authCodeEnabled bool) *models.Client {
 	t.Helper()
-	ident := "test-client-" + strings.ToLower(gofakeit.LetterN(10))
+	ident := "test-client-" + strings.ToLower(fake.LetterN(10))
 	client := &models.Client{
 		ClientIdentifier:         ident,
 		Description:              "Test client",

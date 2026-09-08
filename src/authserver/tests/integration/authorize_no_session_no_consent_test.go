@@ -8,19 +8,19 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -34,7 +34,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -42,7 +42,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +51,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -60,9 +60,9 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -127,7 +127,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIsNotRequired(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -141,7 +141,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -149,7 +149,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -158,7 +158,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 		OTPEnabled:   false,
 	}
@@ -168,9 +168,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -239,7 +239,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsNotRequired(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -253,7 +253,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -261,13 +261,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	userEmail := gofakeit.Email()
+	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
@@ -291,9 +291,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -373,7 +373,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsNotRequired(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -387,7 +387,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -395,13 +395,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	userEmail := gofakeit.Email()
+	userEmail := fake.Email()
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
@@ -415,9 +415,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -498,7 +498,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsNotRequired(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -512,7 +512,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -520,13 +520,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	userEmail := gofakeit.Email()
+	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
@@ -550,9 +550,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -632,7 +632,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 
 func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_PasswordIsIncorrect(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -646,7 +646,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -654,7 +654,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -663,7 +663,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -672,9 +672,9 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -723,7 +723,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsNotRequired_OtpCodeIsIncorrect(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -737,7 +737,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -745,13 +745,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	userEmail := gofakeit.Email()
+	userEmail := fake.Email()
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
@@ -765,9 +765,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -833,7 +833,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsNotRequired_OtpIsIncorrect(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -847,7 +847,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -855,13 +855,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	userEmail := gofakeit.Email()
+	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
@@ -885,9 +885,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/otp"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,7 +30,7 @@ import (
 // user the account API created needs the same fixture to be driven through the browser flow.
 func createLevel2MandatoryClient(t *testing.T) (*models.Client, *models.RedirectURI) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -43,7 +43,7 @@ func createLevel2MandatoryClient(t *testing.T) (*models.Client, *models.Redirect
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(nil, redirectUri)
 	if err != nil {
@@ -66,7 +66,7 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 
 	client, redirectUri := createLevel2MandatoryClient(t)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -138,10 +138,10 @@ func startOtpCeremonyOn(t *testing.T, httpClient *http.Client, client *models.Cl
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile email") +
-		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8) +
+		"&state=" + fake.LetterN(8) +
+		"&nonce=" + fake.LetterN(8) +
 		extra
 
 	resp, err := httpClient.Get(destUrl)

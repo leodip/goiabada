@@ -4,15 +4,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateGroupAttribute(t *testing.T) {
 	// Create a test group
 	group := createTestGroup(t)
 
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	groupAttribute := &models.GroupAttribute{
 		GroupId:              group.Id,
 		Key:                  "testkey_" + random,
@@ -275,7 +275,7 @@ func TestDeleteGroupAttribute(t *testing.T) {
 }
 
 func createTestGroupAttribute(t *testing.T, groupId int64) *models.GroupAttribute {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	groupAttribute := &models.GroupAttribute{
 		GroupId:              groupId,
 		Key:                  "TestKey_" + random,

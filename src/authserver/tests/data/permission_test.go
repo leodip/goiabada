@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreatePermission(t *testing.T) {
 	resource := createTestResource(t)
 	permission := &models.Permission{
-		PermissionIdentifier: "test_permission_" + gofakeit.LetterN(6),
+		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
 	}
@@ -211,7 +211,7 @@ func TestDeletePermission(t *testing.T) {
 
 func createTestPermission(t *testing.T, resource *models.Resource) *models.Permission {
 	permission := &models.Permission{
-		PermissionIdentifier: "test_permission" + gofakeit.LetterN(6),
+		PermissionIdentifier: "test_permission" + fake.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
 	}

@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -12,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +20,7 @@ import (
 func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.Client {
 	ropcEnabled := true
 	client := &models.Client{
-		ClientIdentifier: "ropc-client-" + gofakeit.LetterN(8),
+		ClientIdentifier: "ropc-client-" + fake.LetterN(8),
 		Enabled:          true,
 		IsPublic:         isPublic,
 		// Off deliberately, so this is an ROPC-ONLY client. With the authorization code flow
@@ -45,7 +45,7 @@ func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(nil, redirectUri)
 	assert.Nil(t, err)
@@ -61,10 +61,10 @@ func createROPCUser(t *testing.T, password string) *models.User {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
-		GivenName:    gofakeit.FirstName(),
-		FamilyName:   gofakeit.LastName(),
+		GivenName:    fake.FirstName(),
+		FamilyName:   fake.LastName(),
 	}
 
 	err = database.CreateUser(nil, user)
@@ -88,7 +88,7 @@ func TestROPC_Success(t *testing.T) {
 	}()
 
 	// Create client and user
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	client := createROPCClient(t, "", true) // public client
 	user := createROPCUser(t, password)
 
@@ -128,8 +128,8 @@ func TestROPC_ConfidentialClient(t *testing.T) {
 	}()
 
 	// Create confidential client and user
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	clientSecret := fake.Password(32)
+	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false) // confidential client
 	user := createROPCUser(t, password)
 
@@ -169,9 +169,9 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 	}()
 
 	// Create client with ROPC set to nil (follows global setting) and user
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	client := &models.Client{
-		ClientIdentifier:                        "ropc-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "ropc-client-" + fake.LetterN(8),
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
@@ -217,7 +217,7 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 	// Create client with ROPC disabled at client level
 	ropcDisabled := false
 	client := &models.Client{
-		ClientIdentifier:                        "ropc-disabled-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "ropc-disabled-client-" + fake.LetterN(8),
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
@@ -227,7 +227,7 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 	err = database.CreateClient(nil, client)
 	assert.Nil(t, err)
 
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	user := createROPCUser(t, password)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -327,7 +327,7 @@ func TestROPC_InvalidCredentials(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
@@ -397,7 +397,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
 
 	// Create disabled user
@@ -406,7 +406,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      false, // Disabled
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -443,7 +443,7 @@ func TestROPC_WithOfflineAccess(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
@@ -487,8 +487,8 @@ func TestROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 	}()
 
 	// Create confidential client
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	clientSecret := fake.Password(32)
+	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false) // confidential client
 	user := createROPCUser(t, password)
 
@@ -526,8 +526,8 @@ func TestROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 	}()
 
 	// Create confidential client
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	clientSecret := fake.Password(32)
+	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
 
@@ -565,7 +565,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
 
 	// Create user with 2FA (OTP) enabled
@@ -574,7 +574,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 	user := &models.User{
 		Subject:            uuid.New(),
 		Enabled:            true,
-		Email:              gofakeit.Email(),
+		Email:              fake.Email(),
 		PasswordHash:       passwordHashed,
 		OTPEnabled:         true,               // 2FA enabled
 		OTPSecret:          "JBSWY3DPEHPK3PXP", // Dummy OTP secret
@@ -617,10 +617,10 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 	}()
 
 	// Create resource and permission
-	resource := createResourceWithId(t, "testapi-"+gofakeit.LetterN(8))
+	resource := createResourceWithId(t, "testapi-"+fake.LetterN(8))
 	permission := createPermissionWithId(t, resource.Id, "read")
 
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
@@ -675,8 +675,8 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	clientSecret := fake.Password(32)
+	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
 
@@ -802,8 +802,8 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 				}
 			}()
 
-			clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-			password := gofakeit.Password(true, true, true, true, false, 12)
+			clientSecret := fake.Password(32)
+			password := fake.Password(12)
 			client := createROPCClient(t, clientSecret, false)
 			user := createROPCUser(t, password)
 

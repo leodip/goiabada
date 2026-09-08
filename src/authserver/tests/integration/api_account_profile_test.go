@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -72,7 +72,7 @@ func TestAPIAccountProfilePut_Success(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
 	// Use a random username to avoid uniqueness collisions across runs
-	randUsername := "u" + strings.ToLower(gofakeit.LetterN(7))
+	randUsername := "u" + strings.ToLower(fake.LetterN(7))
 	reqBody := api.UpdateUserProfileRequest{
 		Username:            randUsername,
 		GivenName:           "First",

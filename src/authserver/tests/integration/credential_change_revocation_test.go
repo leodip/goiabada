@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -21,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,7 +96,7 @@ func (g *offlineGrant) codeFromSameSession(t *testing.T, scope string, codeVerif
 		"&response_type=code&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
 		"&scope=" + url.QueryEscape(scope) +
-		"&state=" + gofakeit.LetterN(8) + "&nonce=" + gofakeit.LetterN(8) +
+		"&state=" + fake.LetterN(8) + "&nonce=" + fake.LetterN(8) +
 		"&prompt=none"
 
 	resp, err := g.httpClient.Get(destURL)
@@ -138,7 +138,7 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 		"&response_type=code&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
 		"&scope=" + url.QueryEscape(scope) +
-		"&state=" + gofakeit.LetterN(8) + "&nonce=" + gofakeit.LetterN(8)
+		"&state=" + fake.LetterN(8) + "&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
@@ -217,7 +217,7 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 		"&response_type=code&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
 		"&scope=" + url.QueryEscape(scope) +
-		"&state=" + gofakeit.LetterN(8) + "&nonce=" + gofakeit.LetterN(8)
+		"&state=" + fake.LetterN(8) + "&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
@@ -316,12 +316,12 @@ func (g *offlineGrant) exchange(t *testing.T, code string, codeVerifier string) 
 func createOfflineGrant(t *testing.T) *offlineGrant {
 	t.Helper()
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	require.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "revoke-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "revoke-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -340,14 +340,14 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: "https://example.com/callback"}
 	require.NoError(t, database.CreateRedirectURI(nil, redirectURI))
 
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        strings.ToLower(gofakeit.LetterN(12)) + "@example.com",
+		Email:        strings.ToLower(fake.LetterN(12)) + "@example.com",
 		PasswordHash: passwordHashed,
 	}
 	require.NoError(t, database.CreateUser(nil, user))
@@ -380,8 +380,8 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge +
 		"&scope=" + url.QueryEscape(scope) +
-		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&state=" + fake.LetterN(8) +
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
@@ -481,7 +481,7 @@ func (g *offlineGrant) refresh(t *testing.T) map[string]interface{} {
 func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	t.Helper()
 
-	code := gofakeit.LetterN(32)
+	code := fake.LetterN(32)
 	encrypted, err := encryption.EncryptData(code)
 	require.NoError(t, err)
 	codeHash, err := hashutil.HashString(code)

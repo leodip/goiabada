@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,17 +58,17 @@ func newUserSubjectValidAsClientIdentifier(t *testing.T) uuid.UUID {
 func createUserWithSubject(t *testing.T, subject uuid.UUID) (*models.User, string) {
 	t.Helper()
 
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 
 	user := &models.User{
 		Subject:      subject,
 		Enabled:      true,
-		Email:        strings.ToLower(gofakeit.LetterN(10)) + "@example.com",
+		Email:        strings.ToLower(fake.LetterN(10)) + "@example.com",
 		PasswordHash: passwordHashed,
-		GivenName:    gofakeit.FirstName(),
-		FamilyName:   gofakeit.LastName(),
+		GivenName:    fake.FirstName(),
+		FamilyName:   fake.LastName(),
 	}
 	err = database.CreateUser(nil, user)
 	require.NoError(t, err)
@@ -82,7 +82,7 @@ func createUserWithSubject(t *testing.T, subject uuid.UUID) (*models.User, strin
 func createImpersonatingClientCredentialsToken(t *testing.T, subject uuid.UUID, permissionIdentifier string) string {
 	t.Helper()
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	require.NoError(t, err)
 
@@ -163,7 +163,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 		accessToken := createImpersonatingClientCredentialsToken(t, accountSubject,
 			constants.ManageAccountPermissionIdentifier)
 
-		attemptedEmail := strings.ToLower(gofakeit.LetterN(9)) + "@attacker.example.com"
+		attemptedEmail := strings.ToLower(fake.LetterN(9)) + "@attacker.example.com"
 		resp := makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/account/email",
 			accessToken, api.UpdateAccountEmailRequest{Email: attemptedEmail})
 		defer func() { _ = resp.Body.Close() }()
@@ -230,7 +230,7 @@ func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
 	assertEmailChangeSucceeds := func(t *testing.T, accessToken string, user *models.User) {
 		t.Helper()
 
-		newEmail := strings.ToLower(gofakeit.LetterN(9)) + "@example.com"
+		newEmail := strings.ToLower(fake.LetterN(9)) + "@example.com"
 		resp := makeAPIRequest(t, "PUT", accountEmailUrl, accessToken,
 			api.UpdateAccountEmailRequest{Email: newEmail})
 		defer func() { _ = resp.Body.Close() }()
@@ -292,7 +292,7 @@ func userAccessTokenViaAuthCodeRefresh(t *testing.T) (string, *models.User) {
 	// which createAuthCodeEnsuringUserScope does not walk, and the auth code grant returns a
 	// refresh token with these scopes anyway. Same reasoning as the comment in
 	// token_amr_test.go:TestToken_Refresh_AMR_IsArray.
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	scope := "openid profile email " +
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
@@ -339,10 +339,10 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 		_ = database.UpdateSettings(nil, settings)
 	})
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	client := createROPCClient(t, clientSecret, false)
 
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	password := fake.Password(12)
 	user, _ := createUserWithSubject(t, uuid.New())
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
@@ -452,7 +452,7 @@ func userAccessTokenViaImplicit(t *testing.T) string {
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape(requestScope) +
-		"&state=" + gofakeit.LetterN(16)
+		"&state=" + fake.LetterN(16)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Get(destUrl)

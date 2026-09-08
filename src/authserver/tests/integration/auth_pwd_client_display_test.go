@@ -3,16 +3,16 @@ package integrationtests
 import (
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
 	// Create client with display name enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		DisplayName:      "My Awesome Application",
 		ShowDisplayName:  true,
 		ShowLogo:         false,
@@ -25,7 +25,7 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
 	// Create redirect URI
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -49,7 +49,7 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
 
 func TestAuthPwd_ClientDisplay_ShowDisplayName_Empty(t *testing.T) {
 	// Create client with display name enabled but empty
-	clientId := "test-app-" + gofakeit.LetterN(8)
+	clientId := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: clientId,
 		DisplayName:      "", // Empty display name
@@ -63,7 +63,7 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_Empty(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -83,7 +83,7 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_Empty(t *testing.T) {
 
 func TestAuthPwd_ClientDisplay_HideDisplayName(t *testing.T) {
 	// Create client with display name set but ShowDisplayName=false
-	clientId := "test-app-" + gofakeit.LetterN(8)
+	clientId := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: clientId,
 		DisplayName:      "My Awesome Application",
@@ -97,7 +97,7 @@ func TestAuthPwd_ClientDisplay_HideDisplayName(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -118,7 +118,7 @@ func TestAuthPwd_ClientDisplay_HideDisplayName(t *testing.T) {
 func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 	// Create client with logo enabled and uploaded
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		ShowLogo:         true,
 		UploadLogo:       true, // Upload logo
 		ShowDisplayName:  false,
@@ -130,7 +130,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -151,7 +151,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
 	// Create client with logo enabled but not uploaded
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		ShowLogo:         true,
 		UploadLogo:       false, // No logo uploaded
 		ShowDisplayName:  false,
@@ -163,7 +163,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -184,7 +184,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
 func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
 	// Create client with logo uploaded but ShowLogo=false
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		ShowLogo:         false, // Hidden
 		UploadLogo:       true,  // Logo exists
 		ShowDisplayName:  false,
@@ -196,7 +196,7 @@ func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -217,7 +217,7 @@ func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
 func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
 	// Create client with description enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		Description:      "The best app for testing OAuth flows",
 		ShowDescription:  true,
 		ShowLogo:         false,
@@ -229,7 +229,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -250,7 +250,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
 func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
 	// Create client with description enabled but empty
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		Description:      "", // Empty
 		ShowDescription:  true,
 		ShowLogo:         false,
@@ -262,7 +262,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -283,7 +283,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
 func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
 	// Create client with description set but ShowDescription=false
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		Description:      "The best app for testing OAuth flows",
 		ShowDescription:  false, // Hidden
 		ShowLogo:         false,
@@ -295,7 +295,7 @@ func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -316,7 +316,7 @@ func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
 func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
 	// Create client with website URL enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		WebsiteURL:       "https://example.com",
 		ShowWebsiteURL:   true,
 		ShowLogo:         false,
@@ -328,7 +328,7 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -349,7 +349,7 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
 func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
 	// Create client with website URL enabled but empty
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		WebsiteURL:       "", // Empty
 		ShowWebsiteURL:   true,
 		ShowLogo:         false,
@@ -361,7 +361,7 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -382,7 +382,7 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
 func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
 	// Create client with website URL set but ShowWebsiteURL=false
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		WebsiteURL:       "https://example.com",
 		ShowWebsiteURL:   false, // Hidden
 		ShowLogo:         false,
@@ -394,7 +394,7 @@ func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -415,7 +415,7 @@ func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
 func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
 	// Create client with all display settings enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		DisplayName:      "My Awesome Application",
 		Description:      "The best app for testing OAuth flows",
 		WebsiteURL:       "https://example.com",
@@ -430,7 +430,7 @@ func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
@@ -450,7 +450,7 @@ func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
 
 func TestAuthPwd_ClientDisplay_AllDisabled(t *testing.T) {
 	// Create client with all display settings disabled
-	clientId := "test-app-" + gofakeit.LetterN(8)
+	clientId := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: clientId,
 		DisplayName:      "My Awesome Application",
@@ -467,7 +467,7 @@ func TestAuthPwd_ClientDisplay_AllDisabled(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)

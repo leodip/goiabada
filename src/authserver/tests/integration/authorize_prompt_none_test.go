@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,8 +24,8 @@ import (
 func TestPromptNone_MaxAge0_ReturnsLoginRequired(t *testing.T) {
 	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	// max_age=0 means authentication must have JUST happened, which it hasn't
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -71,8 +71,8 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	// Request level2_optional with existing level1 session - requires step-up
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -110,8 +110,8 @@ func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T)
 		t.Fatal(err)
 	}
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	// Request level2_mandatory - requires OTP enrollment (interaction)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -147,8 +147,8 @@ func TestPromptNone_UserDisabled_ReturnsAccessDenied(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -175,7 +175,7 @@ func TestPromptNone_UserDisabled_ReturnsAccessDenied(t *testing.T) {
 func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	// Create client that requires consent
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true, // Consent required
@@ -196,7 +196,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	}
 
 	// Create user and session
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -205,7 +205,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -215,9 +215,9 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 
 	// Create session first (normal flow, will ask for consent)
 	httpClient := createHttpClient(t)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -258,8 +258,8 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	_ = assertRedirect(t, resp, "/auth/consent")
 
 	// Now try prompt=none - should fail because no consent exists
-	requestState2 := gofakeit.LetterN(8)
-	requestCodeChallenge2 := gofakeit.LetterN(43)
+	requestState2 := fake.LetterN(8)
+	requestCodeChallenge2 := fake.LetterN(43)
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -317,7 +317,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 	}
 	redirectUri := &redirectURIs[0]
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -326,7 +326,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -339,10 +339,10 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile") +
-		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&state=" + fake.LetterN(8) +
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -404,9 +404,9 @@ func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile") +
-		"&state=" + gofakeit.LetterN(8) +
+		"&state=" + fake.LetterN(8) +
 		"&prompt=none"
 
 	resp, err := httpClient.Get(destUrl)
@@ -439,15 +439,15 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8) +
+		"&nonce=" + fake.LetterN(8) +
 		"&prompt=none"
 
 	resp, err := httpClient.Get(destUrl)
@@ -483,9 +483,9 @@ func TestPromptNone_MaxAgeSatisfied_Success(t *testing.T) {
 	// Create session - it will be very recent
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	// max_age=600 (10 minutes) should be satisfied by a session created just now
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -542,8 +542,8 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	// Request level2_optional with session at level1 - this is an ACR step-up
 	// Even though user has no OTP, prompt=none cannot silently step up ACR levels
@@ -613,8 +613,8 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 
 	advanceOtpConfigGeneration(t, user.Id)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	// Request level2_optional - should require interaction because OTP config changed
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -680,12 +680,12 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 	snapshotBefore := userSessions[0].OtpConfigGeneration
 
 	silentRequest := func() string {
-		requestState := gofakeit.LetterN(8)
+		requestState := fake.LetterN(8)
 		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 			"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 			"&response_type=code" +
 			"&code_challenge_method=S256" +
-			"&code_challenge=" + gofakeit.LetterN(43) +
+			"&code_challenge=" + fake.LetterN(43) +
 			"&scope=" + url.QueryEscape("openid profile") +
 			"&state=" + requestState +
 			"&prompt=none" +
@@ -731,9 +731,9 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 
 	advanceOtpConfigGeneration(t, user.Id)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	// Request level1 - the OTP config changed flag should be irrelevant
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -781,9 +781,9 @@ func TestPromptNone_ConsentExists_Success(t *testing.T) {
 	// This tests that prompt=none works with a valid session when no consent is needed
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	// prompt=none with valid session and client that doesn't require consent
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -840,9 +840,9 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	// Wait a bit to ensure different timestamp
 	time.Sleep(100 * time.Millisecond)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -894,7 +894,7 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	// Create client that requires consent
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
@@ -914,7 +914,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -923,7 +923,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -945,9 +945,9 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 
 	// Create session
 	httpClient := createHttpClient(t)
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -997,9 +997,9 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// Now prompt=none should work since consent covers requested scopes
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
-	requestCodeChallenge2 := gofakeit.LetterN(43)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
+	requestCodeChallenge2 := fake.LetterN(43)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1038,7 +1038,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	// Create client that requires consent
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
@@ -1058,7 +1058,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -1067,7 +1067,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -1089,9 +1089,9 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 
 	// Create session
 	httpClient := createHttpClient(t)
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1132,8 +1132,8 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	assertRedirect(t, resp, "/auth/consent")
 
 	// Now prompt=none should fail with consent_required
-	requestState2 := gofakeit.LetterN(8)
-	requestCodeChallenge2 := gofakeit.LetterN(43)
+	requestState2 := fake.LetterN(8)
+	requestCodeChallenge2 := fake.LetterN(43)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1161,7 +1161,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	// Create client that requires consent
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
@@ -1181,7 +1181,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -1190,7 +1190,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -1212,9 +1212,9 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 
 	// Create session first (without requesting offline_access)
 	httpClient := createHttpClient(t)
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1264,8 +1264,8 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// Now request with offline_access - should fail since not consented
-	requestState2 := gofakeit.LetterN(8)
-	requestCodeChallenge2 := gofakeit.LetterN(43)
+	requestState2 := fake.LetterN(8)
+	requestCodeChallenge2 := fake.LetterN(43)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1293,7 +1293,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	// Create client that requires consent
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
@@ -1313,7 +1313,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -1322,7 +1322,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -1344,9 +1344,9 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 
 	// Create session
 	httpClient := createHttpClient(t)
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1396,9 +1396,9 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// Now request with offline_access - should succeed since consented
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
-	requestCodeChallenge2 := gofakeit.LetterN(43)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
+	requestCodeChallenge2 := fake.LetterN(43)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1437,7 +1437,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	// Create client that requires consent
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
@@ -1457,7 +1457,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -1466,7 +1466,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -1488,9 +1488,9 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 
 	// Create session
 	httpClient := createHttpClient(t)
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1541,9 +1541,9 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// Now request only openid with prompt=none - should succeed
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
-	requestCodeChallenge2 := gofakeit.LetterN(43)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
+	requestCodeChallenge2 := fake.LetterN(43)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1592,7 +1592,7 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 
 	client, redirectUri := createTestClientAndRedirectURI(t)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -1601,7 +1601,7 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -1611,8 +1611,8 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	// Note: user does NOT have the permission assigned
 
 	httpClient := createHttpClient(t)
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	// First, create a session by logging in with openid scope
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -1622,7 +1622,7 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 		"&code_challenge=" + requestCodeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1658,13 +1658,13 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	// Now use prompt=none requesting ONLY the custom scope (no openid)
 	// The user does NOT have the permission, so effective scope will be empty
 	customScope := resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
-	requestState2 := gofakeit.LetterN(8)
+	requestState2 := fake.LetterN(8)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape(customScope) +
 		"&state=" + requestState2 +
 		"&prompt=none"
@@ -1686,13 +1686,13 @@ func TestPromptNone_InvalidScope(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 
 	httpClient := createHttpClient(t)
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid invalid:scope:format") +
 		"&state=" + requestState +
 		"&prompt=none"

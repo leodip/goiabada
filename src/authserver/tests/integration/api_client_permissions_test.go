@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func TestAPIClientPermissions_Get_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create client
-	client := &models.Client{ClientIdentifier: "api-perm-get-" + gofakeit.LetterN(6), Enabled: true, IsPublic: true}
+	client := &models.Client{ClientIdentifier: "api-perm-get-" + fake.LetterN(6), Enabled: true, IsPublic: true}
 	err := database.CreateClient(nil, client)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(nil, client.Id) }()
@@ -84,12 +84,12 @@ func TestAPIClientPermissions_Put_AddRemove(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create confidential client with client-credentials enabled
-	secret := gofakeit.Password(true, true, true, true, false, 32)
+	secret := fake.Password(32)
 	enc, err := encryption.EncryptData(secret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "api-perm-put-" + strings.ToLower(gofakeit.LetterN(6)),
+		ClientIdentifier:         "api-perm-put-" + strings.ToLower(fake.LetterN(6)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -138,11 +138,11 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create confidential client with client-credentials enabled
-	secret := gofakeit.Password(true, true, true, true, false, 32)
+	secret := fake.Password(32)
 	enc, err := encryption.EncryptData(secret)
 	assert.NoError(t, err)
 
-	client := &models.Client{ClientIdentifier: "api-perm-put-same-" + strings.ToLower(gofakeit.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}
+	client := &models.Client{ClientIdentifier: "api-perm-put-same-" + strings.ToLower(fake.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}
 	err = database.CreateClient(nil, client)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(nil, client.Id) }()
@@ -178,7 +178,7 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
 // Test GET and PUT unauthorized (no access token)
 func TestAPIClientPermissions_Unauthorized(t *testing.T) {
 	// Create a target client
-	client := &models.Client{ClientIdentifier: "api-perm-unauth-" + gofakeit.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
+	client := &models.Client{ClientIdentifier: "api-perm-unauth-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
 	err := database.CreateClient(nil, client)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(nil, client.Id) }()
@@ -214,7 +214,7 @@ func TestAPIClientPermissions_Put_ClientCredentialsDisabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
-		ClientIdentifier:         "api-perm-put-nocc-" + gofakeit.LetterN(6),
+		ClientIdentifier:         "api-perm-put-nocc-" + fake.LetterN(6),
 		Enabled:                  true,
 		ClientCredentialsEnabled: false,
 		IsPublic:                 true,
@@ -326,7 +326,7 @@ func TestAPIClientPermissions_Put_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create client with client-credentials enabled
-	client := &models.Client{ClientIdentifier: "api-perm-put-noperm-" + gofakeit.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
+	client := &models.Client{ClientIdentifier: "api-perm-put-noperm-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
 	err := database.CreateClient(nil, client)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(nil, client.Id) }()
@@ -348,11 +348,11 @@ func TestAPIClientPermissions_Put_InsufficientScope(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	// Create confidential client and grant userinfo
-	secret := gofakeit.Password(true, true, true, true, false, 32)
+	secret := fake.Password(32)
 	enc, err := encryption.EncryptData(secret)
 	assert.NoError(t, err)
 
-	client := &models.Client{ClientIdentifier: "api-perm-put-scope-" + strings.ToLower(gofakeit.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}
+	client := &models.Client{ClientIdentifier: "api-perm-put-scope-" + strings.ToLower(fake.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}
 	err = database.CreateClient(nil, client)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(nil, client.Id) }()
@@ -386,7 +386,7 @@ func TestAPIClientPermissions_Put_InsufficientScope(t *testing.T) {
 	assert.NotEmpty(t, tok)
 
 	// Create target client to update
-	target := &models.Client{ClientIdentifier: "api-perm-put-target-" + gofakeit.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
+	target := &models.Client{ClientIdentifier: "api-perm-put-target-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
 	err = database.CreateClient(nil, target)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(nil, target.Id) }()

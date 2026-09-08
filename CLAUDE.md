@@ -267,6 +267,10 @@ Three test types:
 
 **Best way to run all tests**: `./run-tests.sh` inside the dev container (from `src/authserver/`).
 
+**Test fixtures**: tests draw random values from `core/testutil/fake`, a `_test.go`-only package
+over `crypto/rand` that replaced a third-party faker in #272. Reach for it rather than adding a
+dependency the next time a test needs a random string.
+
 **gofmt guard**: every module's unit tier runs `TestGoSourcesAreGofmted`, which holds every Go
 file under `src/` to gofmt's formatting through `core/testutil.AssertGofmted`. The walk is
 repository-wide from each tier because `cmd/goiabada-setup` has no tier of its own. CI's Lint job

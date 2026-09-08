@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,8 +19,8 @@ func TestPromptNone_Error_QueryModeDefault(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -58,8 +58,8 @@ func TestPromptNone_Error_QueryModeExplicit(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -96,8 +96,8 @@ func TestPromptNone_Error_FragmentMode(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -140,9 +140,9 @@ func TestPromptNone_Error_FragmentMode(t *testing.T) {
 func TestPromptNone_Success_QueryMode(t *testing.T) {
 	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -185,9 +185,9 @@ func TestPromptNone_Success_QueryMode(t *testing.T) {
 func TestPromptNone_Success_FragmentMode(t *testing.T) {
 	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -235,9 +235,9 @@ func TestPromptNone_Success_FragmentMode(t *testing.T) {
 func TestPromptNone_Success_FormPostMode(t *testing.T) {
 	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -276,8 +276,8 @@ func TestPromptNone_Error_FormPostMode(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -314,8 +314,8 @@ func TestPromptNone_StateEchoedOnError(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := "my-custom-state-" + gofakeit.LetterN(16)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := "my-custom-state-" + fake.LetterN(16)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -340,9 +340,9 @@ func TestPromptNone_StateEchoedOnError(t *testing.T) {
 func TestPromptNone_StateEchoedOnSuccess(t *testing.T) {
 	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
 
-	requestState := "success-state-" + gofakeit.LetterN(16)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := "success-state-" + fake.LetterN(16)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -373,7 +373,7 @@ func TestPromptNone_NoStateInRequest(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestCodeChallenge := fake.LetterN(43)
 	// No state parameter
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -408,7 +408,7 @@ func TestPromptNone_EmptyStateInRequest(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestCodeChallenge := fake.LetterN(43)
 	// Empty state parameter
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateKeyPair(t *testing.T) {
@@ -43,13 +43,13 @@ func TestUpdateKeyPair(t *testing.T) {
 
 	// Update all properties
 	keyPair.State = enums.KeyStatePrevious.String()
-	keyPair.KeyIdentifier = "updated_" + gofakeit.UUID()
+	keyPair.KeyIdentifier = "updated_" + fake.UUID()
 	keyPair.Type = "EC"
 	keyPair.Algorithm = "ES256"
-	keyPair.PrivateKeyPEM = []byte(gofakeit.LoremIpsumSentence(120))
-	keyPair.PublicKeyPEM = []byte(gofakeit.LoremIpsumSentence(60))
-	keyPair.PublicKeyASN1_DER = []byte(gofakeit.LoremIpsumSentence(40))
-	keyPair.PublicKeyJWK = []byte(gofakeit.LoremIpsumSentence(50))
+	keyPair.PrivateKeyPEM = []byte(fake.Sentence(120))
+	keyPair.PublicKeyPEM = []byte(fake.Sentence(60))
+	keyPair.PublicKeyASN1_DER = []byte(fake.Sentence(40))
+	keyPair.PublicKeyJWK = []byte(fake.Sentence(50))
 
 	time.Sleep(timestampTick)
 
@@ -291,13 +291,13 @@ func createKeyPairInState(t *testing.T, state string) *models.KeyPair {
 
 	keyPair := &models.KeyPair{
 		State:             state,
-		KeyIdentifier:     gofakeit.UUID(),
+		KeyIdentifier:     fake.UUID(),
 		Type:              "RSA",
 		Algorithm:         "RS256",
-		PrivateKeyPEM:     []byte(gofakeit.LoremIpsumSentence(100)),
-		PublicKeyPEM:      []byte(gofakeit.LoremIpsumSentence(50)),
-		PublicKeyASN1_DER: []byte(gofakeit.LoremIpsumSentence(30)),
-		PublicKeyJWK:      []byte(gofakeit.LoremIpsumSentence(40)),
+		PrivateKeyPEM:     []byte(fake.Sentence(100)),
+		PublicKeyPEM:      []byte(fake.Sentence(50)),
+		PublicKeyASN1_DER: []byte(fake.Sentence(30)),
+		PublicKeyJWK:      []byte(fake.Sentence(40)),
 	}
 	if err := database.CreateKeyPair(nil, keyPair); err != nil {
 		t.Fatalf("Failed to create test key pair in state %s: %v", state, err)

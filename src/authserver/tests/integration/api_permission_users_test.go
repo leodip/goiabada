@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func TestAPIPermissionUsersGet_Success(t *testing.T) {
 	perm := createPermission(t, res.Id)
 
 	// Create three users; assign permission to two
-	randSuffix := gofakeit.LetterN(6)
+	randSuffix := fake.LetterN(6)
 	u1 := &models.User{Subject: uuid.New(), Enabled: true, Username: "permuser1-" + randSuffix, Email: "permuser1-" + randSuffix + "@test.com", GivenName: "U1", FamilyName: "T"}
 	u2 := &models.User{Subject: uuid.New(), Enabled: true, Username: "permuser2-" + randSuffix, Email: "permuser2-" + randSuffix + "@test.com", GivenName: "U2", FamilyName: "T"}
 	u3 := &models.User{Subject: uuid.New(), Enabled: true, Username: "permuser3-" + randSuffix, Email: "permuser3-" + randSuffix + "@test.com", GivenName: "U3", FamilyName: "T"}
@@ -82,7 +82,7 @@ func TestAPIPermissionUsersGet_InvalidPermissionId(t *testing.T) {
 
 func TestAPIPermissionUsersGet_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	missingId := int64(gofakeit.Number(7_000_000, 7_999_999))
+	missingId := int64(fake.Number(7_000_000, 7_999_999))
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(missingId, 10) + "/users"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()

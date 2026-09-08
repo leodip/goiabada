@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +30,7 @@ const deadlockCeiling = 60 * time.Second
 // newClientModel is a client that has not been inserted, for bodies that insert it themselves.
 func newClientModel() *models.Client {
 	return &models.Client{
-		ClientIdentifier: "rit_client_" + gofakeit.LetterN(8),
+		ClientIdentifier: "rit_client_" + fake.LetterN(8),
 		Description:      "RunInTransaction test client",
 	}
 }

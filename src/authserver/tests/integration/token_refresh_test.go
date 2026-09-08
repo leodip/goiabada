@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
@@ -20,12 +19,13 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -58,7 +58,7 @@ func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
 }
 
 func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -92,12 +92,12 @@ func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
 func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
@@ -122,7 +122,7 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 }
 
 func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	// Get the token using the authorization code
@@ -158,7 +158,7 @@ func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
 }
 
 func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -191,7 +191,7 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 }
 
 func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -256,14 +256,14 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 
 	httpClient := createHttpClient(t)
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -320,7 +320,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 }
 
 func TestToken_Refresh_WrongClient(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -341,12 +341,12 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 	refreshToken := data["refresh_token"].(string)
 
 	// Create a new client
-	wrongClientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	wrongClientSecret := fake.Password(32)
 	wrongClientSecretEncrypted, err := encryption.EncryptData(wrongClientSecret)
 	assert.NoError(t, err)
 
 	wrongClient := &models.Client{
-		ClientIdentifier:         "wrong-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "wrong-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -372,7 +372,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 }
 
 func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -393,8 +393,8 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	refreshToken := data["refresh_token"].(string)
 
 	// Create a new resource and permission with randomized identifiers
-	resourceIdentifier := "additional-resource-" + gofakeit.LetterN(8)
-	permissionIdentifier := "read-" + gofakeit.LetterN(8)
+	resourceIdentifier := "additional-resource-" + fake.LetterN(8)
+	permissionIdentifier := "read-" + fake.LetterN(8)
 	resource := createResourceWithId(t, resourceIdentifier)
 	permission := createPermissionWithId(t, resource.Id, permissionIdentifier)
 
@@ -434,12 +434,12 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	// Create a client with consent required
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
@@ -452,19 +452,19 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	// Create a redirect URI for the client
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create a user
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -486,8 +486,8 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge("code-verifier") +
 		"&scope=" + url.QueryEscape(requestScope) +
-		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&state=" + fake.LetterN(8) +
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	assert.NoError(t, err)
@@ -568,12 +568,12 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 }
 
 func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
@@ -585,18 +585,18 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -617,8 +617,8 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge("code-verifier") +
 		"&scope=" + url.QueryEscape(initialScope) +
-		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&state=" + fake.LetterN(8) +
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	assert.NoError(t, err)
@@ -688,7 +688,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 }
 
 func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -773,7 +773,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 // only way to reach it. In production it arrives through user deletion, a referential
 // cascade or a database restore.
 func TestToken_Refresh_MissingRowIsInvalidGrant(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	refreshToken := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,

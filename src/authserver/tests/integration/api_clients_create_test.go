@@ -8,19 +8,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAPIClientCreate_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	reqBody := api.CreateClientRequest{
 		ClientIdentifier:         ident,
 		Description:              "  Test client  ",
@@ -130,7 +130,7 @@ func TestAPIClientCreate_Validation(t *testing.T) {
 func TestAPIClientCreate_Duplicate(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
 
 	first := api.CreateClientRequest{ClientIdentifier: ident, Description: "first"}
@@ -168,12 +168,12 @@ func TestAPIClientCreate_InsufficientScope(t *testing.T) {
 	// Create a client with a different permission (auth-server:userinfo) and request a token for that scope
 	// Then call the admin endpoint and expect 403
 	// Setup client
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "inscope-client-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "inscope-client-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -214,7 +214,7 @@ func TestAPIClientCreate_InsufficientScope(t *testing.T) {
 
 	// Attempt to create client with token lacking required scope
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
-	reqBody := api.CreateClientRequest{ClientIdentifier: "noadmin-" + strings.ToLower(gofakeit.LetterN(8)), Description: "x"}
+	reqBody := api.CreateClientRequest{ClientIdentifier: "noadmin-" + strings.ToLower(fake.LetterN(8)), Description: "x"}
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
@@ -223,7 +223,7 @@ func TestAPIClientCreate_InsufficientScope(t *testing.T) {
 func TestAPIClientCreate_WithDisplayName(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	reqBody := api.CreateClientRequest{
 		ClientIdentifier:         ident,
 		DisplayName:              "My App",
@@ -247,7 +247,7 @@ func TestAPIClientCreate_WithDisplayName(t *testing.T) {
 func TestAPIClientCreate_EmptyDisplayName(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	reqBody := api.CreateClientRequest{
 		ClientIdentifier:         ident,
 		DisplayName:              "",
@@ -271,7 +271,7 @@ func TestAPIClientCreate_EmptyDisplayName(t *testing.T) {
 func TestAPIClientCreate_DisplayNameTooLong(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	reqBody := api.CreateClientRequest{
 		ClientIdentifier:         ident,
 		DisplayName:              strings.Repeat("a", 101),
@@ -293,7 +293,7 @@ func TestAPIClientCreate_DisplayNameTooLong(t *testing.T) {
 func TestAPIClientCreate_DisplayNameTrimmed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	reqBody := api.CreateClientRequest{
 		ClientIdentifier:         ident,
 		DisplayName:              "  My App  ",
@@ -317,7 +317,7 @@ func TestAPIClientCreate_DisplayNameTrimmed(t *testing.T) {
 func TestAPIClientCreate_DisplayNameSanitizedToEmpty(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	reqBody := api.CreateClientRequest{
 		ClientIdentifier:         ident,
 		DisplayName:              "<script>alert(1)</script>",
@@ -341,7 +341,7 @@ func TestAPIClientCreate_DisplayNameSanitizedToEmpty(t *testing.T) {
 func TestAPIClientCreate_DescriptionOnlyBackwardCompat(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	reqBody := api.CreateClientRequest{
 		ClientIdentifier:         ident,
 		Description:              "some desc",
@@ -365,7 +365,7 @@ func TestAPIClientCreate_DescriptionOnlyBackwardCompat(t *testing.T) {
 func TestAPIClientCreate_BothDescriptionAndDisplayName(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	reqBody := api.CreateClientRequest{
 		ClientIdentifier:         ident,
 		Description:              "some desc",

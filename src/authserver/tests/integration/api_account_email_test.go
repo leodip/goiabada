@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +25,7 @@ func TestAPIAccountEmailPut_Success(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_Email(t)
 
 	// New random email (<= 60 chars total)
-	local := strings.ToLower(gofakeit.LetterN(8))
+	local := strings.ToLower(fake.LetterN(8))
 	newEmail := local + "@example.com"
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email"
@@ -90,7 +90,7 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Email(t)
 
 	// Create another user with a known email
-	otherEmail := "existing_" + strings.ToLower(gofakeit.LetterN(6)) + "@example.com"
+	otherEmail := "existing_" + strings.ToLower(fake.LetterN(6)) + "@example.com"
 	otherUser := &models.User{Email: otherEmail, Enabled: true, Subject: uuid.New()}
 	err := database.CreateUser(nil, otherUser)
 	assert.NoError(t, err)

@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -60,7 +60,7 @@ func getErrorFromFragment(t *testing.T, resp *http.Response) (errorCode string, 
 // createImplicitFlowClient creates a client configured for implicit flow
 func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*models.Client, *models.RedirectURI) {
 	client := &models.Client{
-		ClientIdentifier:         "implicit-test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "implicit-test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: false, // Disable auth code to test implicit-only
 		ImplicitGrantEnabled:     implicitEnabled,
@@ -88,7 +88,7 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*models.Clie
 
 // createTestUser creates a user for testing
 func createTestUserForImplicit(t *testing.T) (*models.User, string) {
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func createTestUserForImplicit(t *testing.T) (*models.User, string) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -126,7 +126,7 @@ func TestImplicitFlow_TokenResponseType(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 	requestScope := "openid"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -203,8 +203,8 @@ func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	requestState := gofakeit.LetterN(16)
-	requestNonce := gofakeit.LetterN(16) // Required for id_token
+	requestState := fake.LetterN(16)
+	requestNonce := fake.LetterN(16) // Required for id_token
 	requestScope := "openid"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -287,8 +287,8 @@ func TestImplicitFlow_IdTokenTokenResponseType(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	requestState := gofakeit.LetterN(16)
-	requestNonce := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
+	requestNonce := fake.LetterN(16)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -369,7 +369,7 @@ func TestImplicitFlow_Disabled_GlobalSetting(t *testing.T) {
 
 	client, redirectUri := createImplicitFlowClient(t, nil) // nil means inherit from global
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -413,7 +413,7 @@ func TestImplicitFlow_ClientOverride_Enabled(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, &implicitEnabled)
 	user, password := createTestUserForImplicit(t)
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -476,7 +476,7 @@ func TestImplicitFlow_ClientOverride_Disabled(t *testing.T) {
 	implicitDisabled := false
 	client, redirectUri := createImplicitFlowClient(t, &implicitDisabled)
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -514,7 +514,7 @@ func TestImplicitFlow_MissingNonce_IdToken(t *testing.T) {
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 
 	// No nonce parameter
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -553,8 +553,8 @@ func TestImplicitFlow_MissingOpenIdScope_IdToken(t *testing.T) {
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 
-	requestState := gofakeit.LetterN(16)
-	requestNonce := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
+	requestNonce := fake.LetterN(16)
 
 	// No openid scope
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -594,7 +594,7 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 
 	// Create a client with both auth code and implicit enabled
 	client := &models.Client{
-		ClientIdentifier:         "hybrid-test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "hybrid-test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     nil,
@@ -611,7 +611,7 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 	err = database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 
 	// Try hybrid flow: code token
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -655,7 +655,7 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 	requestScope := "openid profile"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -742,7 +742,7 @@ func TestImplicitFlow_ErrorInFragment(t *testing.T) {
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 
 	// Missing openid scope for id_token - should return error in fragment
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -792,7 +792,7 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 
 	// Create client with consent required
 	client := &models.Client{
-		ClientIdentifier:         "implicit-consent-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "implicit-consent-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: false,
 		ImplicitGrantEnabled:     nil,
@@ -816,7 +816,7 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 	permission := createPermission(t, resource.Id)
 	assignPermissionToUser(t, user.Id, permission.Id)
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 	// Include resource permission in scope
 	requestScope := "openid profile " + resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 
@@ -890,8 +890,8 @@ func TestImplicitFlow_AtHashValidation(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	requestState := gofakeit.LetterN(16)
-	requestNonce := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
+	requestNonce := fake.LetterN(16)
 	requestScope := "openid"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -984,8 +984,8 @@ func TestImplicitFlow_NoRefreshTokenInResponse(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	requestState := gofakeit.LetterN(16)
-	requestNonce := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
+	requestNonce := fake.LetterN(16)
 	// Request multiple scopes to verify no refresh token is issued
 	requestScope := "openid profile email"
 
@@ -1187,8 +1187,8 @@ func TestImplicitFlow_NonceInIdToken(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	requestNonce := "unique-nonce-" + gofakeit.LetterN(16)
-	requestState := gofakeit.LetterN(16)
+	requestNonce := "unique-nonce-" + fake.LetterN(16)
+	requestState := fake.LetterN(16)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1258,8 +1258,8 @@ func TestImplicitFlow_AudienceInTokens(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	requestNonce := gofakeit.LetterN(16)
-	requestState := gofakeit.LetterN(16)
+	requestNonce := fake.LetterN(16)
+	requestState := fake.LetterN(16)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1336,7 +1336,7 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 
 	// Create client with BOTH auth code AND implicit enabled
 	client := &models.Client{
-		ClientIdentifier:         "both-flows-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "both-flows-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true, // Auth code enabled
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
@@ -1355,7 +1355,7 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 
 	user, password := createTestUserForImplicit(t)
 
-	requestState := gofakeit.LetterN(16)
+	requestState := fake.LetterN(16)
 
 	// Use implicit flow with this client
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +

@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +24,7 @@ func TestAPIClientDelete_Success(t *testing.T) {
 
 	// Create a client directly in DB to delete
 	client := &models.Client{
-		ClientIdentifier: "del-client-" + gofakeit.LetterN(8),
+		ClientIdentifier: "del-client-" + fake.LetterN(8),
 		Description:      "to delete",
 		Enabled:          true,
 		IsPublic:         true,
@@ -118,7 +118,7 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 
 	// Create a client and assign a permission
 	client := &models.Client{
-		ClientIdentifier: "perm-client-" + gofakeit.LetterN(8),
+		ClientIdentifier: "perm-client-" + fake.LetterN(8),
 		Enabled:          true,
 		IsPublic:         true,
 	}
@@ -160,12 +160,12 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 	var accessToken string
 	var clientWithScope *models.Client
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "inscope-client-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "inscope-client-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -209,7 +209,7 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 
 	// Create a target client to attempt deleting
 	target := &models.Client{
-		ClientIdentifier: "target-del-" + gofakeit.LetterN(6),
+		ClientIdentifier: "target-del-" + fake.LetterN(6),
 		Enabled:          true,
 		IsPublic:         true,
 	}
@@ -229,7 +229,7 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 
 	// Create client
 	client := &models.Client{
-		ClientIdentifier: "cascade-client-" + gofakeit.LetterN(6),
+		ClientIdentifier: "cascade-client-" + fake.LetterN(6),
 		Enabled:          true,
 		IsPublic:         true,
 	}
@@ -243,7 +243,7 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create user and consent to the client
-	user := &models.User{Subject: uuid.New(), Enabled: true, Email: gofakeit.Email()}
+	user := &models.User{Subject: uuid.New(), Enabled: true, Email: fake.Email()}
 	err = database.CreateUser(nil, user)
 	assert.NoError(t, err)
 	consent := &models.UserConsent{ClientId: client.Id, UserId: user.Id, Scope: "openid"}

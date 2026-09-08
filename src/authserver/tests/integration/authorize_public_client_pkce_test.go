@@ -5,13 +5,13 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +46,7 @@ func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*models.Client, stri
 	t.Helper()
 
 	client := &models.Client{
-		ClientIdentifier:         "public-pkce-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "public-pkce-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 true,
@@ -62,14 +62,14 @@ func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*models.Client, stri
 		URI:      redirectURI,
 	}))
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	require.NoError(t, database.CreateUser(nil, user))
@@ -84,8 +84,8 @@ func authorizeURLWithoutChallenge(clientIdentifier, redirectURI string) string {
 		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&scope=" + url.QueryEscape("openid profile email") +
-		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&state=" + fake.LetterN(8) +
+		"&nonce=" + fake.LetterN(8)
 }
 
 // authorizeErrorFromLocation reads the error pair out of an emitted error redirect.
@@ -162,7 +162,7 @@ func TestAuthorize_PublicClient_NullColumnAndGlobalPKCEOff_IsStillRefused(t *tes
 // Without this row every assertion above is satisfied by a server that refuses public clients
 // outright, which is not what the mandate says.
 func TestAuthorize_PublicClient_WithPKCE_CompletesAndIssuesTokens(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email",
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
 
 	assert.True(t, code.Client.IsPublic, "the fixture must be a public client")
@@ -188,7 +188,7 @@ func TestAuthorize_PublicClient_WithPKCE_CompletesAndIssuesTokens(t *testing.T) 
 // is not about.
 func TestAuthorize_ConfidentialClient_PKCEOff_WithoutCodeChallenge_Succeeds(t *testing.T) {
 	pkceRequired := false
-	_, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email",
+	_, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{noPKCE: true, pkceRequired: &pkceRequired})
 
 	assert.False(t, code.Client.IsPublic, "the fixture must be a confidential client")

@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +25,7 @@ func TestAPIClientOAuth2FlowsPut_Success_PublicClient_ForcesNoClientCredentials(
 
 	// Create a public client
 	client := &models.Client{
-		ClientIdentifier:         "flows-public-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-public-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,
@@ -68,7 +68,7 @@ func TestAPIClientOAuth2FlowsPut_Success_ConfidentialClient_ToggleBoth(t *testin
 	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
-		ClientIdentifier:         "flows-conf-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-conf-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 false,
@@ -167,7 +167,7 @@ func TestAPIClientOAuth2FlowsPut_InvalidRequestBodyAndUnauthorized(t *testing.T)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
-		ClientIdentifier:         "flows-invalid-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-invalid-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,
@@ -213,7 +213,7 @@ func TestAPIClientOAuth2FlowsPut_InsufficientScope(t *testing.T) {
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "flows-inscope-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-inscope-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -255,7 +255,7 @@ func TestAPIClientOAuth2FlowsPut_InsufficientScope(t *testing.T) {
 
 	// Create a target client to attempt updating
 	target := &models.Client{
-		ClientIdentifier:         "flows-target-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-target-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: false,
@@ -280,7 +280,7 @@ func TestAPIClientOAuth2FlowsPut_BothDisabledAllowed(t *testing.T) {
 	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
-		ClientIdentifier:         "flows-bothoff-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-bothoff-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 false,
@@ -319,7 +319,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_UseGlobalSetting(t *testin
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
-		ClientIdentifier:         "flows-implicit-global-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-implicit-global-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: true,
@@ -354,7 +354,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitEnable(t *testing.
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
-		ClientIdentifier:         "flows-implicit-on-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-implicit-on-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: true,
@@ -393,7 +393,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitDisable(t *testing
 	// Start with implicit explicitly enabled
 	implicitEnabled := true
 	client := &models.Client{
-		ClientIdentifier:         "flows-implicit-off-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-implicit-off-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: true,
@@ -435,7 +435,7 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_TriState(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
-		ClientIdentifier:         "flows-pkce-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-pkce-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
@@ -507,7 +507,7 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_PublicClientIsAlwaysRequired(t *te
 
 	pkceOptional := false
 	client := &models.Client{
-		ClientIdentifier:         "flows-pub-pkce-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-pub-pkce-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: true,
@@ -558,7 +558,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitOnly_NoAuthCode(t *testing.T) {
 	// Create client with only implicit flow (no auth code)
 	implicitEnabled := true
 	client := &models.Client{
-		ClientIdentifier:         "flows-implicit-only-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "flows-implicit-only-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: false,
@@ -598,7 +598,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_UseGlobalSetting(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
-		ClientIdentifier:                        "flows-ropc-global-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:                        "flows-ropc-global-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
@@ -633,7 +633,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitEnable(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
-		ClientIdentifier:                        "flows-ropc-on-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:                        "flows-ropc-on-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
@@ -672,7 +672,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitDisable(t *testing.T) {
 	// Start with ROPC explicitly enabled
 	ropcEnabled := true
 	client := &models.Client{
-		ClientIdentifier:                        "flows-ropc-off-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:                        "flows-ropc-off-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
@@ -709,7 +709,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_TriState(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := &models.Client{
-		ClientIdentifier:                        "flows-ropc-tristate-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:                        "flows-ropc-tristate-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
@@ -771,7 +771,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCOnly_NoOtherFlows(t *testing.T) {
 	// Create client with only ROPC flow (no auth code or client credentials)
 	ropcEnabled := true
 	client := &models.Client{
-		ClientIdentifier:                        "flows-ropc-only-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:                        "flows-ropc-only-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                false,

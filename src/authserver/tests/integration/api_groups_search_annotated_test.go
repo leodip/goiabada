@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -105,7 +105,7 @@ func TestAPIGroupsSearch_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Use a random large ID that should not exist
-	missingId := int64(gofakeit.Number(9_000_000, 9_999_999))
+	missingId := int64(fake.Number(9_000_000, 9_999_999))
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()

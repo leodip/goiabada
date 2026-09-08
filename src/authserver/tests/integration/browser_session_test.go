@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -16,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -376,14 +376,14 @@ func newLevel1Actors(t *testing.T) (*models.Client, *models.RedirectURI, *models
 
 	client, redirectUri := newClientAndRedirectUri(t, enums.AcrLevel1)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	require.NoError(t, database.CreateUser(nil, user))
@@ -395,7 +395,7 @@ func newClientAndRedirectUri(t *testing.T, acrLevel enums.AcrLevel) (*models.Cli
 	t.Helper()
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -403,7 +403,7 @@ func newClientAndRedirectUri(t *testing.T, acrLevel enums.AcrLevel) (*models.Cli
 	}
 	require.NoError(t, database.CreateClient(nil, client))
 
-	redirectUri := &models.RedirectURI{ClientId: client.Id, URI: gofakeit.URL()}
+	redirectUri := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(nil, redirectUri))
 
 	return client, redirectUri
@@ -417,10 +417,10 @@ func beginAuthorize(t *testing.T, httpClient *http.Client,
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile email") +
-		"&state=" + gofakeit.LetterN(8) +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&state=" + fake.LetterN(8) +
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	require.NoError(t, err)

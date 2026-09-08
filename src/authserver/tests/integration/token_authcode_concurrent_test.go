@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -53,7 +53,7 @@ func concurrentTokenPost(client *http.Client, urlStr string, formData url.Values
 // compare-and-set in MarkCodeAsUsed lets exactly one request win the claim; the
 // rest are treated as reuse.
 func TestToken_AuthCode_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"

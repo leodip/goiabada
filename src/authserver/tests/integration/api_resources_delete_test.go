@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +18,7 @@ func TestAPIResourceDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create a test resource to delete
-	res := createTestResource(t, "api-test-del-resource-"+gofakeit.LetterN(6), "To be deleted")
+	res := createTestResource(t, "api-test-del-resource-"+fake.LetterN(6), "To be deleted")
 
 	// Delete the resource via API
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
@@ -87,7 +87,7 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 
 func TestAPIResourceDelete_UnauthorizedAndScope(t *testing.T) {
 	// Prepare a test resource to reference
-	res := createTestResource(t, "api-test-del-unauth-"+gofakeit.LetterN(6), "desc")
+	res := createTestResource(t, "api-test-del-unauth-"+fake.LetterN(6), "desc")
 	defer func() { _ = database.DeleteResource(nil, res.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)

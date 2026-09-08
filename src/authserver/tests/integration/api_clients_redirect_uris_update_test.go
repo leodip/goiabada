@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +28,7 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
-		ClientIdentifier:         "redir-succ-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "redir-succ-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 false,
@@ -98,7 +98,7 @@ func TestAPIClientRedirectURIsPut_NoRedirectFlowRejected(t *testing.T) {
 
 	implicitDisabled := false
 	client := &models.Client{
-		ClientIdentifier:         "redir-disabled-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "redir-disabled-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,
@@ -133,7 +133,7 @@ func TestAPIClientRedirectURIsPut_ImplicitOnlyClientAllowed(t *testing.T) {
 
 	implicitEnabled := true
 	client := &models.Client{
-		ClientIdentifier:         "redir-implicit-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "redir-implicit-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,
@@ -199,7 +199,7 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 
 	// Auth code enabled client
 	client := &models.Client{
-		ClientIdentifier:         "redir-vali-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "redir-vali-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,
@@ -323,7 +323,7 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 
 	// Invalid body
 	client2 := &models.Client{
-		ClientIdentifier:         "redir-bad-body-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "redir-bad-body-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,
@@ -367,7 +367,7 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "redir-inscope-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "redir-inscope-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -409,7 +409,7 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 
 	// Create a target client with auth code enabled
 	target := &models.Client{
-		ClientIdentifier:         "redir-target-" + strings.ToLower(gofakeit.LetterN(8)),
+		ClientIdentifier:         "redir-target-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: true,

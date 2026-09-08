@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +19,7 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create resource
-	resource := createTestResource(t, "perm-put-res-"+gofakeit.LetterN(6), "Perms Test")
+	resource := createTestResource(t, "perm-put-res-"+fake.LetterN(6), "Perms Test")
 	defer func() { _ = database.DeleteResource(nil, resource.Id) }()
 
 	// Seed existing permissions
@@ -74,7 +74,7 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
 func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	resource := createTestResource(t, "perm-put-val-"+gofakeit.LetterN(6), "Val Test")
+	resource := createTestResource(t, "perm-put-val-"+fake.LetterN(6), "Val Test")
 	defer func() { _ = database.DeleteResource(nil, resource.Id) }()
 
 	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
@@ -108,7 +108,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	resource := createTestResource(t, "perm-put-conf-"+gofakeit.LetterN(6), "Conf Test")
+	resource := createTestResource(t, "perm-put-conf-"+fake.LetterN(6), "Conf Test")
 	defer func() { _ = database.DeleteResource(nil, resource.Id) }()
 
 	p1 := createTestPermission(t, resource.Id, "aaa", "A")
@@ -155,7 +155,7 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 		})
 	}
 	// Add a new permission
-	newPermIdentifier := "test-new-perm-" + gofakeit.LetterN(6)
+	newPermIdentifier := "test-new-perm-" + fake.LetterN(6)
 	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
 		Id:                   0, // New permission
 		PermissionIdentifier: newPermIdentifier,
@@ -458,7 +458,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	resource := createTestResource(t, "perm-put-dupid-"+gofakeit.LetterN(6), "DupId Test")
+	resource := createTestResource(t, "perm-put-dupid-"+fake.LetterN(6), "DupId Test")
 	defer func() { _ = database.DeleteResource(nil, resource.Id) }()
 
 	p1 := createTestPermission(t, resource.Id, "read", "Read")
@@ -482,7 +482,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
 // Test unauthorized and invalid token
 func TestAPIResourcePermissionsPut_Unauthorized(t *testing.T) {
 	// Create a resource
-	res := createTestResource(t, "perm-put-unauth-"+gofakeit.LetterN(6), "Unauth Test")
+	res := createTestResource(t, "perm-put-unauth-"+fake.LetterN(6), "Unauth Test")
 	defer func() { _ = database.DeleteResource(nil, res.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10) + "/permissions"

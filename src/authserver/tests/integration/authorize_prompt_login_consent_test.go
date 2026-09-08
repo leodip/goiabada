@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
@@ -15,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,7 +26,7 @@ import (
 func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	// Create client that does NOT require consent normally
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false, // Consent NOT normally required
@@ -47,7 +47,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	}
 
 	// Create user
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -78,9 +78,9 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 
 	// Create session first
 	httpClient := createHttpClient(t)
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -125,9 +125,9 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// Now request with prompt=consent - should force consent screen
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
-	requestCodeChallenge2 := gofakeit.LetterN(43)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
+	requestCodeChallenge2 := fake.LetterN(43)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -162,8 +162,8 @@ func TestPromptConsent_NoSession_RequiresLoginFirst(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -199,9 +199,9 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	// Use both prompt=login and prompt=consent
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -252,8 +252,8 @@ func TestPromptLogin_NoSession(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -277,8 +277,8 @@ func TestPromptLogin_MaxAgeIrrelevant(t *testing.T) {
 	// Create very recent session
 	httpClient, client, redirectUri, _, _ := createSessionWithAcrLevel1AndPassword(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	// Even with max_age=600 (which would normally allow SSO), prompt=login forces re-auth
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -319,9 +319,9 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	// Request level2_optional with prompt=login
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -364,9 +364,9 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 func TestPromptLogin_PreservesNonce(t *testing.T) {
 	httpClient, client, redirectUri, user, password := createSessionWithAcrLevel1AndPassword(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := "test-nonce-" + gofakeit.LetterN(16)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := "test-nonce-" + fake.LetterN(16)
+	requestCodeChallenge := fake.LetterN(43)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -421,7 +421,7 @@ func TestPromptLogin_PreservesNonce(t *testing.T) {
 
 func TestPromptConsent_UserDeclines(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
@@ -441,7 +441,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -450,7 +450,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -459,9 +459,9 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	}
 
 	httpClient := createHttpClient(t)
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -521,9 +521,9 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 func TestPromptLogin_WrongPassword(t *testing.T) {
 	httpClient, client, redirectUri, user, _ := createSessionWithAcrLevel1AndPassword(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -577,8 +577,8 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -587,7 +587,7 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 		"&code_challenge=" + requestCodeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8) +
+		"&nonce=" + fake.LetterN(8) +
 		"&prompt=login"
 
 	resp, err := httpClient.Get(destUrl)
@@ -619,14 +619,14 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 // TestPromptLogin_NewAuthTime verifies that prompt=login re-authentication
 // creates a new auth_time in the issued token (not preserving the old one).
 func TestPromptLogin_NewAuthTime(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &models.Client{
-		ClientIdentifier:                        "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
@@ -650,7 +650,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -659,7 +659,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -670,7 +670,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	httpClient := createHttpClient(t)
 	codeVerifier := "code-verifier"
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 
 	// Login at T1 to establish session
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -680,7 +680,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		"&code_challenge=" + codeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -736,7 +736,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	// Re-authenticate with prompt=login at T2
 	codeVerifier2 := "code-verifier-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
-	requestState2 := gofakeit.LetterN(8)
+	requestState2 := fake.LetterN(8)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -745,7 +745,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		"&code_challenge=" + codeChallenge2 +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState2 +
-		"&nonce=" + gofakeit.LetterN(8) +
+		"&nonce=" + fake.LetterN(8) +
 		"&prompt=login"
 
 	resp2, err := httpClient.Get(destUrl2)

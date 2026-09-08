@@ -3,11 +3,11 @@ package integrationtests
 import (
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +15,7 @@ import (
 func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 	// Create client with display name enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		DisplayName:      "My Awesome Application",
 		ShowDisplayName:  true,
 		ShowLogo:         false,
@@ -27,17 +27,17 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user with OTP enabled
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
-	userEmail := gofakeit.Email()
+	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
@@ -74,7 +74,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 	// Create client with all display settings enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		DisplayName:      "My Awesome Application",
 		Description:      "The best app for testing OAuth flows",
 		WebsiteURL:       "https://example.com",
@@ -89,17 +89,17 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user with OTP enabled
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
-	userEmail := gofakeit.Email()
+	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
@@ -135,7 +135,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 
 func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 	// Create client with all display settings disabled
-	clientId := "test-app-" + gofakeit.LetterN(8)
+	clientId := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: clientId,
 		DisplayName:      "My Awesome Application",
@@ -152,17 +152,17 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user with OTP enabled
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
-	userEmail := gofakeit.Email()
+	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
@@ -199,7 +199,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 	// Create client with display name enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		DisplayName:      "My Awesome Application",
 		ShowDisplayName:  true,
 		ShowLogo:         false,
@@ -211,20 +211,20 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 		OTPEnabled:   false, // No OTP yet
 	}
@@ -249,7 +249,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 	// Create client with all display settings enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		DisplayName:      "My Awesome Application",
 		Description:      "The best app for testing OAuth flows",
 		WebsiteURL:       "https://example.com",
@@ -264,20 +264,20 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 		OTPEnabled:   false,
 	}
@@ -301,7 +301,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 
 func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 	// Create client with all display settings disabled
-	clientId := "test-app-" + gofakeit.LetterN(8)
+	clientId := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: clientId,
 		DisplayName:      "My Awesome Application",
@@ -318,20 +318,20 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 		OTPEnabled:   false,
 	}
