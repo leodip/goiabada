@@ -62,24 +62,47 @@ func intn(n int) int {
 	return int(v.Int64())
 }
 
+// mustDraw returns s unless it is short of the n characters that were asked
+// for, which is how the stringutil helpers report a CSPRNG failure: they
+// swallow the error and return "" to preserve a contract their production
+// callers were written against. A fixture that degrades to a constant instead
+// produces tests that pass while every username is the same string, which is
+// exactly the collision #136 describes, so the draw fails closed here rather
+// than propagating an invalid value into a fixture (#272).
+//
+// The alphabets are ASCII, so a byte count is a character count.
+func mustDraw(s string, n uint, who string) string {
+	if uint(len(s)) != n {
+		panic("fake: " + who + " could not draw " + strconv.FormatUint(uint64(n), 10) +
+			" characters: crypto/rand is unavailable")
+	}
+	return s
+}
+
 // LetterN returns n characters drawn from [A-Za-z]. n == 0 returns one
 // character, matching what the call sites were written against.
+//
+// It panics on a CSPRNG failure, like intn. Removing the mustDraw guard breaks
+// TestLetterN_PanicsOnEntropyFailure.
 func LetterN(n uint) string {
 	if n == 0 {
 		n = 1
 	}
-	return stringutil.GenerateRandomLetterString(int(n))
+	return mustDraw(stringutil.GenerateRandomLetterString(int(n)), n, "LetterN")
 }
 
 // DigitN returns n characters drawn from [0-9]. It stands in for the phone
 // numbers, postcodes and street numbers the fixtures used to ask for by name:
 // nothing parses those fields, only the column width constrains them, so a digit
 // run of the right length is the whole requirement (#272).
+//
+// It panics on a CSPRNG failure, like intn. Removing the mustDraw guard breaks
+// TestDigitN_PanicsOnEntropyFailure.
 func DigitN(n uint) string {
 	if n == 0 {
 		n = 1
 	}
-	return stringutil.GenerateRandomNumberString(int(n))
+	return mustDraw(stringutil.GenerateRandomNumberString(int(n)), n, "DigitN")
 }
 
 // Password returns an n-character password containing at least one lowercase
