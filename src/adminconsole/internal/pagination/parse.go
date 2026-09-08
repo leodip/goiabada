@@ -17,10 +17,16 @@ const maxApiPageSize = 200
 // an offset of (page-1)*pageSize, in the auth server's SQL and once, on the
 // groups-with-permission page, in a slice expression here. A page large enough
 // to overflow that product is not a page at all -- it is the value that
-// panicked the slice and that turns a SQL OFFSET negative, which the API then
-// answers 500 to (#305). Bounding it here is what keeps the offset in range at
-// both ends of the call, so the clamp that follows has a total to work from
-// rather than an error.
+// panicked the slice, and that turns a SQL OFFSET negative, where it went two
+// ways: sqlbuilder drops a negative OFFSET clause, so the query came back with
+// the FIRST page's rows labelled as the page asked for, and the one read that
+// formats the offset into SQL itself got the engine's refusal and a 500 (#305).
+//
+// commondb.PageOffset now saturates the offset on the far side of that call, so
+// neither half can happen any more. Bounding the page here is still this
+// package's own business: the console should not send a page it knows is
+// nonsense, and the bound is what keeps the offset in range at both ends of the
+// call, so the clamp that follows has a total to work from.
 //
 // The bound is math.MaxInt/maxApiPageSize, so the product is in range on any
 // platform's int rather than only on a 64-bit one. That is a page number no

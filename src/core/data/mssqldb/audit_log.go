@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/pkg/errors"
 )
@@ -83,7 +84,7 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int
 		pageSize = 200
 	}
 
-	offset := (page - 1) * pageSize
+	offset := commondb.PageOffset(page, pageSize)
 
 	auditLogStruct := sqlbuilder.NewStruct(new(models.AuditLog)).
 		For(sqlbuilder.SQLServer)

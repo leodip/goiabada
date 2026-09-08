@@ -65,8 +65,9 @@ func TestParsePage_Table(t *testing.T) {
 		// Above maxPage. These parse, so they are pages rather than errors, but
 		// they come back bounded: an offset built from math.MaxInt wraps
 		// negative, and the wrapped value is what panicked a slice here and what
-		// makes the auth server API answer 500 to a negative SQL OFFSET. They
-		// stay past the end, so ClampPage still brings them to the last page.
+		// made the auth server return the first page's rows, or refuse outright,
+		// for a page far past the end. They stay past the end themselves, so
+		// ClampPage still brings them to the last page.
 		{strconv.Itoa(math.MaxInt), maxPage, "the largest int, bounded"},
 		{strconv.Itoa(math.MaxInt - 1), maxPage, "one below it, bounded"},
 		{strconv.Itoa(maxPage + 1), maxPage, "one above the bound"},
@@ -272,12 +273,14 @@ func TestParsePage_ThenClampPage(t *testing.T) {
 // it is about the *first* query rather than the clamped one.
 //
 // A handler cannot clamp before it knows the total, and it only learns the
-// total by asking, so the page ParsePage returns goes to the auth server API
-// as it stands. There it becomes "OFFSET (page-1)*size" in SQL. Unbounded,
-// math.MaxInt wrapped that product negative and the query failed, so the
-// handler got an error instead of the total it needed and answered 500 -- the
-// clamp below it never ran. On the groups-with-permission page the same
-// product is a slice offset, and there it panicked (#305).
+// total by asking, so the page ParsePage returns goes to the auth server API as
+// it stands. There it becomes "OFFSET (page-1)*size" in SQL. Unbounded,
+// math.MaxInt wrapped that product negative, and the clamp below never got a
+// usable answer to work from: the query either came back with the first page's
+// rows, because sqlbuilder drops a negative OFFSET clause, or failed outright
+// on the one read that formats the offset into SQL itself, which the handler
+// then answered 500 to. On the groups-with-permission page the same product is
+// a slice offset, and there it panicked (#305).
 //
 // So: whatever a browser puts in "?page=", the offset built from the result is
 // non-negative, at every page size that can reach the database.
