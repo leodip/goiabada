@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
 	perm := createPermission(t, res.Id)
 
 	// Create three users; grant permission to two
-	randSuffix := gofakeit.LetterN(6)
+	randSuffix := fake.LetterN(6)
 	u1 := &models.User{Subject: uuid.New(), Enabled: true, Username: "annperm1-" + randSuffix, Email: "annperm1-" + randSuffix + "@test.com", GivenName: "A1", FamilyName: "T"}
 	u2 := &models.User{Subject: uuid.New(), Enabled: true, Username: "annperm2-" + randSuffix, Email: "annperm2-" + randSuffix + "@test.com", GivenName: "A2", FamilyName: "T"}
 	u3 := &models.User{Subject: uuid.New(), Enabled: true, Username: "annperm3-" + randSuffix, Email: "annperm3-" + randSuffix + "@test.com", GivenName: "A3", FamilyName: "T"}
@@ -84,7 +84,7 @@ func TestAPIUsersSearch_AnnotatePermission_InvalidParam(t *testing.T) {
 
 func TestAPIUsersSearch_AnnotatePermission_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	missingId := int64(gofakeit.Number(8_000_000, 8_999_999))
+	missingId := int64(fake.Number(8_000_000, 8_999_999))
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()

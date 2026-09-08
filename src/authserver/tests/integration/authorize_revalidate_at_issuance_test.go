@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
@@ -15,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -62,7 +62,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "revalidate-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "revalidate-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		// The consent screen is what holds the ceremony still between /auth/completed and
@@ -74,18 +74,18 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 	err = database.CreateClient(nil, client)
 	assert.NoError(t, err)
 
-	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: gofakeit.URL()}
+	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	err = database.CreateRedirectURI(nil, redirectURI)
 	assert.NoError(t, err)
 
-	password := gofakeit.Password(true, true, true, true, false, 10)
+	password := fake.Password(10)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -116,7 +116,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 	// rather than two.
 	httpClient := createHttpClient(t)
 
-	state := gofakeit.LetterN(8)
+	state := fake.LetterN(8)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
@@ -124,7 +124,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + state +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	assert.NoError(t, err)
@@ -173,7 +173,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 // only the idle timeout refuses. Before #241 this yielded a usable code, the access token worked,
 // and the first refresh answered invalid_grant.
 func TestSessionExpiredOnConsentScreen_NoCodeIsIssued(t *testing.T) {
-	parked := parkOnConsentScreen(t, "openid profile email", gofakeit.LetterN(32), "code-verifier", nil)
+	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), "code-verifier", nil)
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	sessions, err := database.GetUserSessionsByUserId(nil, parked.user.Id)
@@ -226,7 +226,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 	readScope := resource.ResourceIdentifier + ":" + readPermission.PermissionIdentifier
 	writeScope := resource.ResourceIdentifier + ":" + writePermission.PermissionIdentifier
 
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	parked := parkOnConsentScreen(t, "openid profile "+readScope+" "+writeScope,
 		clientSecret, "code-verifier", []string{readScope, writeScope})
 	defer func() { _ = parked.consentPage.Body.Close() }()
@@ -293,7 +293,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 // redirect would be as wrong as a code (RFC 9700 section 4.11.2). The refusal is therefore
 // rendered locally, on the page the error emitter already withholds a redirect through.
 func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
-	parked := parkOnConsentScreen(t, "openid profile email", gofakeit.LetterN(32), "code-verifier", nil)
+	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), "code-verifier", nil)
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3, 4})
@@ -357,7 +357,7 @@ func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
 // The two cases together are the property: whatever a ceremony in progress has to say to a client,
 // it says nothing at all to a callback the client no longer has.
 func TestRedirectURIDeletedOnConsentScreen_CancelIsNotDeliveredEither(t *testing.T) {
-	parked := parkOnConsentScreen(t, "openid profile email", gofakeit.LetterN(32), "code-verifier", nil)
+	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), "code-verifier", nil)
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	// The window opens before the submission here rather than after it, because this refusal is
@@ -409,7 +409,7 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 	readScope := resource.ResourceIdentifier + ":" + readPermission.PermissionIdentifier
 	writeScope := resource.ResourceIdentifier + ":" + writePermission.PermissionIdentifier
 
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	parked := parkOnConsentScreen(t, "openid profile "+readScope+" "+writeScope,
 		clientSecret, "code-verifier", []string{readScope, writeScope})
 	defer func() { _ = parked.consentPage.Body.Close() }()

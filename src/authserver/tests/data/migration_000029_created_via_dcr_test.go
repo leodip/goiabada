@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -80,7 +80,7 @@ func TestMigration000029_CreatedViaDCR(t *testing.T) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
 
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	cases := []struct {
 		identifier  string
 		wantDCR     bool

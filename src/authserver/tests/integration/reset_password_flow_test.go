@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -40,7 +40,7 @@ import (
 // reports as broken: Go parses a query with form-urlencoded rules, where '+' decodes to a
 // space, so the address came back mangled and the lookup failed.
 func plusAddress() string {
-	return "reset+tag." + strings.ToLower(gofakeit.LetterN(10)) + "@example.com"
+	return "reset+tag." + strings.ToLower(fake.LetterN(10)) + "@example.com"
 }
 
 // useMailpitSMTP points the deployment's SMTP settings at mailpit for the duration of a test
@@ -74,7 +74,7 @@ func useMailpitSMTP(t *testing.T) func() {
 func createResetTestUser(t *testing.T, email string) (*models.User, string) {
 	t.Helper()
 
-	password := gofakeit.Password(true, true, true, true, false, 12) + "aA1!"
+	password := fake.Password(12) + "aA1!"
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 

@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
@@ -14,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,12 +26,12 @@ import (
 // database (core/validators), so neither shows an ephemeral-port callback actually
 // completing. This does (#41).
 func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	require.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "loopback-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "loopback-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -56,21 +56,21 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	ephemeralPort := reserveEphemeralPort(t)
 	requestedURI := fmt.Sprintf("http://127.0.0.1:%d/callback", ephemeralPort)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
 	require.NoError(t, err)
 
 	codeVerifier := "code-verifier"
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(requestedURI) +
@@ -79,7 +79,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 
 	httpClient := createHttpClient(t)
 

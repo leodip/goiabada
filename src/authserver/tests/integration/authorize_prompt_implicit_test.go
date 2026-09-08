@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,7 +41,7 @@ func enableImplicitFlowGlobally(t *testing.T) func() {
 // (for establishing sessions) and implicit flow (for prompt=none implicit tests).
 func createImplicitClientForPromptTests(t *testing.T) (*models.Client, *models.RedirectURI) {
 	client := &models.Client{
-		ClientIdentifier:         "implicit-prompt-test-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "implicit-prompt-test-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true, // Needed for establishing session
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
@@ -77,7 +77,7 @@ func TestPromptNone_ImplicitResponseTypeToken(t *testing.T) {
 	// Create a client that supports implicit flow
 	client, redirectUri := createImplicitClientForPromptTests(t)
 
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
@@ -122,8 +122,8 @@ func TestPromptNone_ImplicitResponseTypeIdToken(t *testing.T) {
 
 	client, redirectUri := createImplicitClientForPromptTests(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := "test-nonce-" + gofakeit.LetterN(16)
+	requestState := fake.LetterN(8)
+	requestNonce := "test-nonce-" + fake.LetterN(16)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=id_token" +
@@ -167,8 +167,8 @@ func TestPromptNone_ImplicitResponseTypeIdTokenToken(t *testing.T) {
 
 	client, redirectUri := createImplicitClientForPromptTests(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := "test-nonce-" + gofakeit.LetterN(16)
+	requestState := fake.LetterN(8)
+	requestNonce := "test-nonce-" + fake.LetterN(16)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
@@ -219,8 +219,8 @@ func TestPromptNone_ImplicitAuthTimeCorrect(t *testing.T) {
 	time.Sleep(1100 * time.Millisecond)
 
 	// Use prompt=none at T2 with implicit flow
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
@@ -264,7 +264,7 @@ func TestPromptNone_ImplicitMissingNonce(t *testing.T) {
 
 	client, redirectUri := createImplicitClientForPromptTests(t)
 
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 	// Missing nonce - required for response_type=id_token
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +

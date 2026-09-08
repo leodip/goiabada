@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,8 +22,8 @@ func TestPromptNone_NoSession_ReturnsLoginRequired(t *testing.T) {
 	// Create fresh HTTP client (no session)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -64,9 +64,9 @@ func TestPromptNone_ValidSession_SilentCodeIssuance(t *testing.T) {
 	// Wait a bit to ensure different timestamps if auth_time was recalculated
 	time.Sleep(100 * time.Millisecond)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -129,9 +129,9 @@ func TestPromptLogin_WithSession_ForcesReAuth(t *testing.T) {
 	// Wait to ensure new auth_time will be different
 	time.Sleep(200 * time.Millisecond)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -194,8 +194,8 @@ func TestPrompt_InvalidValue(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createAuthenticatedHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -224,8 +224,8 @@ func TestPrompt_ConflictNoneLogin(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -254,8 +254,8 @@ func TestPrompt_ConflictNoneConsent(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -284,8 +284,8 @@ func TestPrompt_ConflictNoneLoginConsent(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -313,8 +313,8 @@ func TestPrompt_CaseSensitivityUppercase(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createAuthenticatedHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -342,8 +342,8 @@ func TestPrompt_CaseSensitivityMixed(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createAuthenticatedHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -371,8 +371,8 @@ func TestPrompt_SelectAccountNotImplemented(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createAuthenticatedHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -400,8 +400,8 @@ func TestPrompt_EmptyParameter(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	// Empty prompt parameter should be treated as absent (normal flow)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -427,8 +427,8 @@ func TestPrompt_WhitespaceOnlyParameter(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	// Whitespace-only prompt parameter should be treated as absent
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -454,8 +454,8 @@ func TestPrompt_UrlEncodedSpaces(t *testing.T) {
 	// With a valid session, "login consent" should work
 	httpClient, client, redirectUri, _, _ := createSessionWithAcrLevel1AndPassword(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	// URL encoded "login consent" - this is valid and should trigger re-auth flow
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +

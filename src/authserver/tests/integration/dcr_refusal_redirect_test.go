@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -190,7 +190,7 @@ func TestDCR_Refusal_SilentRequestIsNotDeliveredByRedirect(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	resp, err := httpClient.Get(authorizeURLWithScope(client.ClientIdentifier, redirectURI,
-		"openid nonsense", gofakeit.LetterN(8)) + "&prompt=none")
+		"openid nonsense", fake.LetterN(8)) + "&prompt=none")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -208,7 +208,7 @@ func TestDCR_Refusal_SilentAdministratorClientStillRedirects(t *testing.T) {
 	client, redirectUri := createConsentClient(t)
 
 	httpClient := createHttpClient(t)
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 
 	resp, err := httpClient.Get(authorizeURLWithScope(client.ClientIdentifier, redirectUri.URI,
 		"openid nonsense", requestState) + "&prompt=none")
@@ -227,14 +227,14 @@ func TestDCR_Refusal_SilentAdministratorClientStillRedirects(t *testing.T) {
 // caller puts in the scope.
 func authorizeURLWithScope(clientIdentifier string, redirectURI string, scope string, state string) string {
 	if state == "" {
-		state = gofakeit.LetterN(8)
+		state = fake.LetterN(8)
 	}
 	return config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape(scope) +
 		"&state=" + state +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 }

@@ -4,8 +4,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +52,7 @@ func challengelessRefreshToken(t *testing.T, clientSecret string) (string, int64
 
 // C1. The grant outlives the configuration it was issued under, and this is what catches it.
 func TestToken_Refresh_ChallengelessGrant_RefusedOnceTheClientIsPublic(t *testing.T) {
-	refreshToken, clientId, clientIdentifier, destUrl := challengelessRefreshToken(t, gofakeit.LetterN(32))
+	refreshToken, clientId, clientIdentifier, destUrl := challengelessRefreshToken(t, fake.LetterN(32))
 
 	client, err := database.GetClientById(nil, clientId)
 	require.NoError(t, err)
@@ -75,7 +75,7 @@ func TestToken_Refresh_ChallengelessGrant_RefusedOnceTheClientIsPublic(t *testin
 // C2. The positive control, on its own grant. The same challenge-less shape still refreshes
 // while the client authenticates.
 func TestToken_Refresh_ChallengelessGrant_ConfidentialClientStillRefreshes(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	refreshToken, _, clientIdentifier, destUrl := challengelessRefreshToken(t, clientSecret)
 
 	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
@@ -98,7 +98,7 @@ func TestToken_Refresh_ChallengelessGrant_ConfidentialClientStillRefreshes(t *te
 // application whose administrator has just flipped it to public still holds the secret that was
 // deleted server-side. The release note says so.
 func TestToken_Refresh_PublicClient_PresentingASecret_IsRefused(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email",
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"

@@ -3,18 +3,18 @@ package integrationtests
 import (
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 	// Create client with display name enabled and consent required
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		DisplayName:      "My Awesome Application",
 		ShowDisplayName:  true,
 		ShowLogo:         false,
@@ -26,20 +26,20 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -63,7 +63,7 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 	// Create client with logo enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		ShowLogo:         true,
 		UploadLogo:       true,
 		ShowDisplayName:  false,
@@ -75,20 +75,20 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -112,7 +112,7 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 	// Create client with description enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		Description:      "The best app for testing OAuth flows",
 		ShowDescription:  true,
 		ShowLogo:         false,
@@ -124,20 +124,20 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -161,7 +161,7 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 	// Create client with all display settings enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-app-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-app-" + fake.LetterN(8),
 		DisplayName:      "My Awesome Application",
 		Description:      "The best app for testing OAuth flows",
 		WebsiteURL:       "https://example.com",
@@ -176,20 +176,20 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -212,7 +212,7 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 
 func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 	// Create client with all display settings disabled
-	clientId := "test-app-" + gofakeit.LetterN(8)
+	clientId := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: clientId,
 		DisplayName:      "My Awesome Application",
@@ -229,20 +229,20 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)

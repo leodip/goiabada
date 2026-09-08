@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,8 +34,8 @@ func createROPCRefreshToken(t *testing.T, userId, clientId int64) *models.Refres
 	refreshToken := &models.RefreshToken{
 		UserId:            sql.NullInt64{Int64: userId, Valid: true},
 		ClientId:          sql.NullInt64{Int64: clientId, Valid: true},
-		RefreshTokenJti:   gofakeit.UUID(),
-		SessionIdentifier: gofakeit.UUID(),
+		RefreshTokenJti:   fake.UUID(),
+		SessionIdentifier: fake.UUID(),
 		RefreshTokenType:  "Offline",
 		Scope:             "openid profile offline_access",
 		IssuedAt:          sql.NullTime{Time: now, Valid: true},
@@ -55,8 +55,8 @@ func createCodeLinkedRefreshToken(t *testing.T, codeId int64) *models.RefreshTok
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	refreshToken := &models.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: codeId, Valid: true},
-		RefreshTokenJti:   gofakeit.UUID(),
-		SessionIdentifier: gofakeit.UUID(),
+		RefreshTokenJti:   fake.UUID(),
+		SessionIdentifier: fake.UUID(),
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile",
 		IssuedAt:          sql.NullTime{Time: now, Valid: true},

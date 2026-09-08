@@ -4,11 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateUserSession(t *testing.T) {
@@ -38,7 +38,7 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession := createTestUserSession(t, user.Id)
 
 	// Update all properties
-	userSession.SessionIdentifier = "updated_" + gofakeit.UUID()
+	userSession.SessionIdentifier = "updated_" + fake.UUID()
 	userSession.Started = time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Microsecond)
 	userSession.LastAccessed = time.Now().UTC().Truncate(time.Microsecond)
 	userSession.AuthMethods = "pwd,otp"
@@ -324,14 +324,14 @@ func createTestUserSession(t *testing.T, userId int64) *models.UserSession {
 
 func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *models.UserSession {
 	userSession := &models.UserSession{
-		SessionIdentifier: gofakeit.UUID(),
+		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Truncate(time.Microsecond),
 		LastAccessed:      time.Now().UTC().Truncate(time.Microsecond),
 		AuthMethods:       "pwd",
 		AcrLevel:          enums.AcrLevel1.String(),
 		AuthTime:          time.Now().UTC().Truncate(time.Microsecond),
-		IpAddress:         gofakeit.IPv4Address(),
-		DeviceName:        gofakeit.Name(),
+		IpAddress:         fake.IPv4Address(),
+		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserId:            userId,
@@ -428,14 +428,14 @@ func assertUserSessionEqual(t *testing.T, expected, actual *models.UserSession) 
 func TestDeleteIdleSessions(t *testing.T) {
 	// Create a test user
 	user := &models.User{
-		Username:      gofakeit.Username(),
-		Email:         gofakeit.Email(),
+		Username:      fake.Username(),
+		Email:         fake.Email(),
 		EmailVerified: true,
-		PasswordHash:  gofakeit.Password(true, true, true, true, false, 32),
+		PasswordHash:  fake.Password(32),
 		Subject:       uuid.New(),
 		Enabled:       true,
-		GivenName:     gofakeit.FirstName(),
-		FamilyName:    gofakeit.LastName(),
+		GivenName:     fake.FirstName(),
+		FamilyName:    fake.LastName(),
 		OTPEnabled:    false,
 	}
 	err := database.CreateUser(nil, user)
@@ -445,7 +445,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create a test client
 	client := &models.Client{
-		ClientIdentifier:                        gofakeit.UUID(),
+		ClientIdentifier:                        fake.UUID(),
 		Description:                             "Test Client",
 		Enabled:                                 true,
 		ConsentRequired:                         true,
@@ -468,14 +468,14 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create an active session (accessed 10 minutes ago)
 	activeSession := &models.UserSession{
-		SessionIdentifier: gofakeit.UUID(),
+		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-10 * time.Minute),
 		LastAccessed:      now.Add(-10 * time.Minute),
 		AuthMethods:       "pwd",
 		AcrLevel:          enums.AcrLevel1.String(),
 		AuthTime:          now.Add(-10 * time.Minute),
-		IpAddress:         gofakeit.IPv4Address(),
-		DeviceName:        gofakeit.Name(),
+		IpAddress:         fake.IPv4Address(),
+		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserId:            user.Id,
@@ -499,14 +499,14 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create an idle session (accessed 2 hours ago)
 	idleSession := &models.UserSession{
-		SessionIdentifier: gofakeit.UUID(),
+		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-3 * time.Hour),
 		LastAccessed:      now.Add(-2 * time.Hour),
 		AuthMethods:       "pwd",
 		AcrLevel:          enums.AcrLevel1.String(),
 		AuthTime:          now.Add(-3 * time.Hour),
-		IpAddress:         gofakeit.IPv4Address(),
-		DeviceName:        gofakeit.Name(),
+		IpAddress:         fake.IPv4Address(),
+		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserId:            user.Id,
@@ -530,14 +530,14 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create a very idle session (accessed 4 hours ago)
 	veryIdleSession := &models.UserSession{
-		SessionIdentifier: gofakeit.UUID(),
+		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-5 * time.Hour),
 		LastAccessed:      now.Add(-4 * time.Hour),
 		AuthMethods:       "pwd",
 		AcrLevel:          enums.AcrLevel1.String(),
 		AuthTime:          now.Add(-5 * time.Hour),
-		IpAddress:         gofakeit.IPv4Address(),
-		DeviceName:        gofakeit.Name(),
+		IpAddress:         fake.IPv4Address(),
+		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserId:            user.Id,
@@ -626,14 +626,14 @@ func TestDeleteIdleSessions(t *testing.T) {
 func TestDeleteExpiredSessions(t *testing.T) {
 	// Create a test user
 	user := &models.User{
-		Username:      gofakeit.Username(),
-		Email:         gofakeit.Email(),
+		Username:      fake.Username(),
+		Email:         fake.Email(),
 		EmailVerified: true,
-		PasswordHash:  gofakeit.Password(true, true, true, true, false, 32),
+		PasswordHash:  fake.Password(32),
 		Subject:       uuid.New(),
 		Enabled:       true,
-		GivenName:     gofakeit.FirstName(),
-		FamilyName:    gofakeit.LastName(),
+		GivenName:     fake.FirstName(),
+		FamilyName:    fake.LastName(),
 		OTPEnabled:    false,
 	}
 	err := database.CreateUser(nil, user)
@@ -643,7 +643,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create a test client
 	client := &models.Client{
-		ClientIdentifier:                        gofakeit.UUID(),
+		ClientIdentifier:                        fake.UUID(),
 		Description:                             "Test Client",
 		Enabled:                                 true,
 		ConsentRequired:                         true,
@@ -666,14 +666,14 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create a recent session (started 1 hour ago)
 	recentSession := &models.UserSession{
-		SessionIdentifier: gofakeit.UUID(),
+		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-1 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
 		AcrLevel:          enums.AcrLevel1.String(),
 		AuthTime:          now.Add(-1 * time.Hour),
-		IpAddress:         gofakeit.IPv4Address(),
-		DeviceName:        gofakeit.Name(),
+		IpAddress:         fake.IPv4Address(),
+		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserId:            user.Id,
@@ -697,14 +697,14 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create an old session (started 2 days ago)
 	oldSession := &models.UserSession{
-		SessionIdentifier: gofakeit.UUID(),
+		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-48 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
 		AcrLevel:          enums.AcrLevel1.String(),
 		AuthTime:          now.Add(-48 * time.Hour),
-		IpAddress:         gofakeit.IPv4Address(),
-		DeviceName:        gofakeit.Name(),
+		IpAddress:         fake.IPv4Address(),
+		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserId:            user.Id,
@@ -728,14 +728,14 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create a very old session (started 5 days ago)
 	veryOldSession := &models.UserSession{
-		SessionIdentifier: gofakeit.UUID(),
+		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-120 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
 		AcrLevel:          enums.AcrLevel1.String(),
 		AuthTime:          now.Add(-120 * time.Hour),
-		IpAddress:         gofakeit.IPv4Address(),
-		DeviceName:        gofakeit.Name(),
+		IpAddress:         fake.IPv4Address(),
+		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserId:            user.Id,
@@ -838,7 +838,7 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	// than passing silently.
 	userSession.OtpConfigGeneration = 5
 	userSession.Id = 0
-	userSession.SessionIdentifier = gofakeit.UUID()
+	userSession.SessionIdentifier = fake.UUID()
 	if err := database.CreateUserSession(nil, userSession); err != nil {
 		t.Fatalf("Failed to create user session with a generation: %v", err)
 	}
@@ -1080,7 +1080,7 @@ func TestUpdateUserSession_TheOwnerIsNotRewritten(t *testing.T) {
 	userSession := createTestUserSession(t, owner.Id)
 
 	userSession.UserId = other.Id
-	userSession.DeviceName = "moved-" + gofakeit.LetterN(6)
+	userSession.DeviceName = "moved-" + fake.LetterN(6)
 	err := database.UpdateUserSession(nil, userSession)
 	if err != nil {
 		t.Fatalf("Failed to update user session: %v", err)

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateWebOrigin(t *testing.T) {
@@ -213,7 +213,7 @@ func TestWebOriginExists(t *testing.T) {
 // mock-backed test can see that.
 func TestWebOriginExists_Transaction(t *testing.T) {
 	client := createTestClient(t)
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	origin := "https://" + random + ".tx.example.com"
 
 	tx := beginTx(t)
@@ -285,7 +285,7 @@ func webOriginExistsWithin(t *testing.T, tx *sql.Tx, origin string, within time.
 }
 
 func createTestWebOrigin(t *testing.T, clientId int64) *models.WebOrigin {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	webOrigin := &models.WebOrigin{
 		Origin:   "https://" + random + ".example.com",
 		ClientId: clientId,

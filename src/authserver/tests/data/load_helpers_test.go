@@ -3,9 +3,9 @@ package datatests
 import (
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 // The association loaders in commondb had no direct data-layer tests: they are
@@ -21,9 +21,9 @@ func createUserWithGivenName(t *testing.T, givenName string) *models.User {
 	user := &models.User{
 		Enabled:   true,
 		Subject:   uuid.New(),
-		Username:  "u" + gofakeit.LetterN(12),
+		Username:  "u" + fake.LetterN(12),
 		GivenName: givenName,
-		Email:     gofakeit.LetterN(12) + "@example.com",
+		Email:     fake.LetterN(12) + "@example.com",
 	}
 	if err := database.CreateUser(nil, user); err != nil {
 		t.Fatalf("Failed to create user: %v", err)
@@ -519,7 +519,7 @@ func TestCountGroupMembers(t *testing.T) {
 // Members are ordered by given name, so the page boundaries are deterministic.
 func TestGetGroupMembersPaginated(t *testing.T) {
 	group := createTestGroup(t)
-	suffix := gofakeit.LetterN(6)
+	suffix := fake.LetterN(6)
 
 	userA := createUserWithGivenName(t, "Aaa"+suffix)
 	userB := createUserWithGivenName(t, "Bbb"+suffix)
@@ -622,7 +622,7 @@ func TestGetGroupMembersPaginated_InvalidGroupId(t *testing.T) {
 
 func TestGetLastUserWithOTPState(t *testing.T) {
 	t.Run("otp enabled", func(t *testing.T) {
-		user := createUserWithGivenName(t, "Otp"+gofakeit.LetterN(6))
+		user := createUserWithGivenName(t, "Otp"+fake.LetterN(6))
 		user.OTPEnabled = true
 		if err := database.UpdateUser(nil, user); err != nil {
 			t.Fatalf("Failed to update user: %v", err)
@@ -644,7 +644,7 @@ func TestGetLastUserWithOTPState(t *testing.T) {
 	})
 
 	t.Run("otp disabled", func(t *testing.T) {
-		user := createUserWithGivenName(t, "NoOtp"+gofakeit.LetterN(6))
+		user := createUserWithGivenName(t, "NoOtp"+fake.LetterN(6))
 		user.OTPEnabled = false
 		if err := database.UpdateUser(nil, user); err != nil {
 			t.Fatalf("Failed to update user: %v", err)
@@ -667,13 +667,13 @@ func TestGetLastUserWithOTPState(t *testing.T) {
 
 	// A disabled user is skipped even when its OTP state matches.
 	t.Run("disabled users are ignored", func(t *testing.T) {
-		enabledUser := createUserWithGivenName(t, "Enabled"+gofakeit.LetterN(6))
+		enabledUser := createUserWithGivenName(t, "Enabled"+fake.LetterN(6))
 		enabledUser.OTPEnabled = true
 		if err := database.UpdateUser(nil, enabledUser); err != nil {
 			t.Fatalf("Failed to update user: %v", err)
 		}
 
-		disabledUser := createUserWithGivenName(t, "Disabled"+gofakeit.LetterN(6))
+		disabledUser := createUserWithGivenName(t, "Disabled"+fake.LetterN(6))
 		disabledUser.OTPEnabled = true
 		disabledUser.Enabled = false
 		if err := database.UpdateUser(nil, disabledUser); err != nil {

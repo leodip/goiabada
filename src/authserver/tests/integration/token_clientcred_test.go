@@ -6,31 +6,31 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
-	resourceIdentifier := "backend-svc-" + gofakeit.LetterN(8)
+	resourceIdentifier := "backend-svc-" + fake.LetterN(8)
 	resource := createResourceWithId(t, resourceIdentifier)
-	permissionIdentifier := "read-data-" + gofakeit.LetterN(8)
+	permissionIdentifier := "read-data-" + fake.LetterN(8)
 	permission := createPermissionWithId(t, resource.Id, permissionIdentifier)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
@@ -63,12 +63,12 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
@@ -97,7 +97,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false, // Client credentials flow is not enabled
@@ -111,7 +111,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 	formData := url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
-		"client_secret": {gofakeit.Password(true, true, true, true, false, 32)},
+		"client_secret": {fake.Password(32)},
 	}
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
@@ -123,7 +123,7 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
@@ -150,12 +150,12 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
@@ -183,12 +183,12 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// Create a client for testing
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
@@ -199,8 +199,8 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create a resource and permission for the last test cases
-	resourceIdentifier := "backend-svcA-" + gofakeit.LetterN(8)
-	permissionIdentifier := "read-product-" + gofakeit.LetterN(8)
+	resourceIdentifier := "backend-svcA-" + fake.LetterN(8)
+	permissionIdentifier := "read-product-" + fake.LetterN(8)
 	resource := createResourceWithId(t, resourceIdentifier)
 	createPermissionWithId(t, resource.Id, permissionIdentifier)
 
@@ -263,12 +263,12 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// Create a client for testing
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
@@ -279,14 +279,14 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
-	resourceAIdentifier := "backend-svcA-" + gofakeit.LetterN(8)
+	resourceAIdentifier := "backend-svcA-" + fake.LetterN(8)
 	resourceA := createResourceWithId(t, resourceAIdentifier)
-	permissionAIdentifier := "create-product-" + gofakeit.LetterN(8)
+	permissionAIdentifier := "create-product-" + fake.LetterN(8)
 	permissionA := createPermissionWithId(t, resourceA.Id, permissionAIdentifier)
 
-	resourceBIdentifier := "backend-svcB-" + gofakeit.LetterN(8)
+	resourceBIdentifier := "backend-svcB-" + fake.LetterN(8)
 	resourceB := createResourceWithId(t, resourceBIdentifier)
-	permissionBIdentifier := "read-info-" + gofakeit.LetterN(8)
+	permissionBIdentifier := "read-info-" + fake.LetterN(8)
 	permissionB := createPermissionWithId(t, resourceB.Id, permissionBIdentifier)
 
 	// Assign permissions to the client
@@ -329,12 +329,12 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// Create a client for testing
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
@@ -345,14 +345,14 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
-	resourceAIdentifier := "backend-svcA-" + gofakeit.LetterN(8)
+	resourceAIdentifier := "backend-svcA-" + fake.LetterN(8)
 	resourceA := createResourceWithId(t, resourceAIdentifier)
-	permissionAIdentifier := "create-product-" + gofakeit.LetterN(8)
+	permissionAIdentifier := "create-product-" + fake.LetterN(8)
 	permissionA := createPermissionWithId(t, resourceA.Id, permissionAIdentifier)
 
-	resourceBIdentifier := "backend-svcB-" + gofakeit.LetterN(8)
+	resourceBIdentifier := "backend-svcB-" + fake.LetterN(8)
 	resourceB := createResourceWithId(t, resourceBIdentifier)
-	permissionBIdentifier := "read-info-" + gofakeit.LetterN(8)
+	permissionBIdentifier := "read-info-" + fake.LetterN(8)
 	permissionB := createPermissionWithId(t, resourceB.Id, permissionBIdentifier)
 
 	// Assign permissions to the client
@@ -404,12 +404,12 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
@@ -420,13 +420,13 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 	assert.NoError(t, err)
 
 	// One permission identifier, defined on two different resources.
-	sharedPermissionIdentifier := "read-product-" + gofakeit.LetterN(8)
+	sharedPermissionIdentifier := "read-product-" + fake.LetterN(8)
 
-	resourceAIdentifier := "billing-api-" + gofakeit.LetterN(8)
+	resourceAIdentifier := "billing-api-" + fake.LetterN(8)
 	resourceA := createResourceWithId(t, resourceAIdentifier)
 	permissionA := createPermissionWithId(t, resourceA.Id, sharedPermissionIdentifier)
 
-	resourceBIdentifier := "reports-api-" + gofakeit.LetterN(8)
+	resourceBIdentifier := "reports-api-" + fake.LetterN(8)
 	resourceB := createResourceWithId(t, resourceBIdentifier)
 	createPermissionWithId(t, resourceB.Id, sharedPermissionIdentifier)
 
@@ -486,12 +486,12 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
@@ -502,7 +502,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	assert.NoError(t, err)
 
 	// A custom resource whose permission identifier collides with the built-in one.
-	customResourceIdentifier := "billing-api-" + gofakeit.LetterN(8)
+	customResourceIdentifier := "billing-api-" + fake.LetterN(8)
 	customResource := createResourceWithId(t, customResourceIdentifier)
 	customManage := createPermissionWithId(t, customResource.Id, constants.ManagePermissionIdentifier)
 
@@ -577,12 +577,12 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
@@ -592,10 +592,10 @@ func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 	err = database.CreateClient(nil, client)
 	assert.NoError(t, err)
 
-	resourceIdentifier := "billing-api-" + gofakeit.LetterN(8)
+	resourceIdentifier := "billing-api-" + fake.LetterN(8)
 	resource := createResourceWithId(t, resourceIdentifier)
-	readPermission := createPermissionWithId(t, resource.Id, "read-"+gofakeit.LetterN(6))
-	writePermission := createPermissionWithId(t, resource.Id, "write-"+gofakeit.LetterN(6))
+	readPermission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(6))
+	writePermission := createPermissionWithId(t, resource.Id, "write-"+fake.LetterN(6))
 
 	for _, permission := range []*models.Permission{readPermission, writePermission} {
 		err = database.CreateClientPermission(nil, &models.ClientPermission{
@@ -651,12 +651,12 @@ func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          enums.AcrLevel2Optional,

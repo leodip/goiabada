@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	pquernaotp "github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -92,8 +92,8 @@ func TestGenerateOTPSecret(t *testing.T) {
 
 	t.Run("Input length restrictions", func(t *testing.T) {
 		t.Run("Valid lengths", func(t *testing.T) {
-			email := gofakeit.LetterN(58) + "@b.com" // 64 characters
-			appName := gofakeit.LetterN(32)
+			email := fake.LetterN(58) + "@b.com" // 64 characters
+			appName := fake.LetterN(32)
 
 			keyURL, err := generator.GenerateOTPSecret(email, appName)
 

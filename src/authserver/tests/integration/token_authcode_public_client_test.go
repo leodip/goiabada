@@ -4,9 +4,9 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +44,7 @@ func challengelessCode(t *testing.T, clientSecret string) (*models.Code, string)
 // what bound it. Once the secret stops being required the code is bound to nothing, and it has
 // up to 60 seconds of life left in which anybody holding it can spend it.
 func TestToken_AuthCode_ChallengelessCode_RefusedAfterClientBecomesPublic(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	code, destUrl := challengelessCode(t, clientSecret)
 
 	client, err := database.GetClientById(nil, code.ClientId)
@@ -69,7 +69,7 @@ func TestToken_AuthCode_ChallengelessCode_RefusedAfterClientBecomesPublic(t *tes
 // B2. The positive control. The same code, redeemed by the client that still authenticates,
 // still works, so the refusal above is about the client being public and not about the code.
 func TestToken_AuthCode_ChallengelessCode_ConfidentialClientStillSucceeds(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	code, destUrl := challengelessCode(t, clientSecret)
 
 	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
@@ -89,7 +89,7 @@ func TestToken_AuthCode_ChallengelessCode_ConfidentialClientStillSucceeds(t *tes
 // and grant already outstanding: those are still authenticated by the secret, and refusing them
 // would make a security improvement look like an outage.
 func TestToken_AuthCode_ChallengelessCode_SurvivesTurningPKCEOnForAConfidentialClient(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	code, destUrl := challengelessCode(t, clientSecret)
 
 	client, err := database.GetClientById(nil, code.ClientId)

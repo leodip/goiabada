@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreatePreRegistration(t *testing.T) {
@@ -33,9 +33,9 @@ func TestCreatePreRegistration(t *testing.T) {
 func TestUpdatePreRegistration(t *testing.T) {
 	preReg := createTestPreRegistration(t)
 
-	preReg.Email = "updated_" + gofakeit.Email()
-	preReg.PasswordHash = gofakeit.Password(true, true, true, true, false, 16)
-	preReg.VerificationCodeEncrypted = []byte(gofakeit.UUID())
+	preReg.Email = "updated_" + fake.Email()
+	preReg.PasswordHash = fake.Password(16)
+	preReg.VerificationCodeEncrypted = []byte(fake.UUID())
 	preReg.VerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 
 	time.Sleep(timestampTick)
@@ -122,11 +122,11 @@ func createTestPreRegistration(t *testing.T) *models.PreRegistration {
 	// caller does: verification_code_hash is UNIQUE, so two rows sharing the '' default
 	// would be refused by the index (#112).
 	preReg := &models.PreRegistration{
-		Email:                     gofakeit.Email(),
-		PasswordHash:              gofakeit.Password(true, true, true, true, false, 16),
-		VerificationCodeEncrypted: []byte(gofakeit.UUID()),
+		Email:                     fake.Email(),
+		PasswordHash:              fake.Password(16),
+		VerificationCodeEncrypted: []byte(fake.UUID()),
 		VerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
-		VerificationCodeHash:      codeHashOf(t, gofakeit.UUID()),
+		VerificationCodeHash:      codeHashOf(t, fake.UUID()),
 	}
 	err := database.CreatePreRegistration(nil, preReg)
 	if err != nil {
@@ -173,7 +173,7 @@ func TestGetPreRegistrationByVerificationCodeHash(t *testing.T) {
 	validatePreRegistration(t, preReg, found)
 
 	// 9. A hash no row carries is a miss, not an error.
-	missing, err := database.GetPreRegistrationByVerificationCodeHash(nil, codeHashOf(t, gofakeit.UUID()))
+	missing, err := database.GetPreRegistrationByVerificationCodeHash(nil, codeHashOf(t, fake.UUID()))
 	if err != nil {
 		t.Errorf("a hash no row carries must not be an error, got: %v", err)
 	}
@@ -209,7 +209,7 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 
 	dormant := &models.PreRegistration{
 		Email:        dormantEmail,
-		PasswordHash: gofakeit.Password(true, true, true, true, false, 16),
+		PasswordHash: fake.Password(16),
 	}
 	if err := database.CreatePreRegistration(nil, dormant); err != nil {
 		t.Fatalf("Failed to create the dormant pre-registration: %v", err)
@@ -243,14 +243,14 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 // benign "no such code". It reads only through the transaction while that transaction is
 // open, for the reasons the users mirror documents.
 func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
-	hash := codeHashOf(t, gofakeit.UUID())
+	hash := codeHashOf(t, fake.UUID())
 
 	tx := beginTx(t)
 
 	preReg := &models.PreRegistration{
-		Email:                     gofakeit.Email(),
-		PasswordHash:              gofakeit.Password(true, true, true, true, false, 16),
-		VerificationCodeEncrypted: []byte(gofakeit.UUID()),
+		Email:                     fake.Email(),
+		PasswordHash:              fake.Password(16),
+		VerificationCodeEncrypted: []byte(fake.UUID()),
 		VerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		VerificationCodeHash:      hash,
 	}

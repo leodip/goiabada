@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
@@ -15,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,7 +41,7 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -129,7 +129,7 @@ func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -185,7 +185,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
 	// Set client-level override to "on"
@@ -242,7 +242,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
 	// Set client-level override to "off"
@@ -289,7 +289,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -305,7 +305,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -313,35 +313,43 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// The gender column is 16 characters and the claim is echoed back verbatim,
+	// so the fixture picks one of the two strings enums.Gender.String() returns
+	// rather than a generated run (#272).
+	gender := enums.GenderFemale.String()
+	if fake.Bool() {
+		gender = enums.GenderMale.String()
 	}
 
 	// Create user with full profile data
 	user := &models.User{
 		Subject:             uuid.New(),
 		Enabled:             true,
-		Email:               gofakeit.Email(),
+		Email:               fake.Email(),
 		EmailVerified:       true,
 		PasswordHash:        passwordHashed,
-		GivenName:           gofakeit.FirstName(),
-		FamilyName:          gofakeit.LastName(),
-		MiddleName:          gofakeit.MiddleName(),
-		Nickname:            gofakeit.Username(),
-		Website:             gofakeit.URL(),
-		Gender:              gofakeit.Gender(),
-		BirthDate:           sql.NullTime{Time: gofakeit.Date(), Valid: true},
-		ZoneInfo:            gofakeit.TimeZoneFull(),
+		GivenName:           fake.FirstName(),
+		FamilyName:          fake.LastName(),
+		MiddleName:          fake.MiddleName(),
+		Nickname:            fake.Username(),
+		Website:             fake.URL(),
+		Gender:              gender,
+		BirthDate:           sql.NullTime{Time: fake.Date(), Valid: true},
+		ZoneInfo:            "tz" + fake.LetterN(6),
 		Locale:              "en-US",
-		PhoneNumber:         gofakeit.Phone(),
+		PhoneNumber:         fake.DigitN(10),
 		PhoneNumberVerified: true,
-		AddressLine1:        gofakeit.Street(),
-		AddressLine2:        gofakeit.StreetNumber(),
-		AddressLocality:     gofakeit.City(),
-		AddressRegion:       gofakeit.State(),
-		AddressPostalCode:   gofakeit.Zip(),
+		AddressLine1:        "Street " + fake.LetterN(8),
+		AddressLine2:        fake.DigitN(3),
+		AddressLocality:     "City" + fake.LetterN(6),
+		AddressRegion:       "State" + fake.LetterN(6),
+		AddressPostalCode:   fake.DigitN(5),
 		AddressCountry:      "US",
 	}
 
@@ -352,8 +360,8 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 
 	codeVerifier := "code-verifier"
 	requestCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +

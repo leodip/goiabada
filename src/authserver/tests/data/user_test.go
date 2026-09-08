@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateUser(t *testing.T) {
@@ -45,37 +45,37 @@ func TestUpdateUser(t *testing.T) {
 	// Update all fields
 	user.Enabled = !user.Enabled
 	user.Subject = uuid.New()
-	user.Username = "updated_" + gofakeit.Username()
-	user.GivenName = "Updated" + gofakeit.FirstName()
-	user.MiddleName = "Updated" + gofakeit.MiddleName()
-	user.FamilyName = "Updated" + gofakeit.LastName()
-	user.Nickname = "Updated" + gofakeit.FirstName()
-	user.Website = "https://updated" + gofakeit.DomainName()
+	user.Username = "updated_" + fake.Username()
+	user.GivenName = "Updated" + fake.FirstName()
+	user.MiddleName = "Updated" + fake.MiddleName()
+	user.FamilyName = "Updated" + fake.LastName()
+	user.Nickname = "Updated" + fake.FirstName()
+	user.Website = "https://updated" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	user.Gender = enums.GenderFemale.String()
-	user.Email = "updated_" + gofakeit.Email()
+	user.Email = "updated_" + fake.Email()
 	user.EmailVerified = !user.EmailVerified
-	user.EmailVerificationCodeEncrypted = []byte(gofakeit.Password(true, true, true, true, false, 32))
+	user.EmailVerificationCodeEncrypted = []byte(fake.Password(32))
 	user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
-	user.ZoneInfoCountryName = gofakeit.Country()
-	user.ZoneInfo = gofakeit.TimeZone()
-	user.Locale = gofakeit.Language()
-	user.BirthDate = sql.NullTime{Time: gofakeit.Date().Truncate(time.Microsecond), Valid: true}
-	user.PhoneNumberCountryUniqueId = gofakeit.CountryAbr()
-	user.PhoneNumberCountryCallingCode = fmt.Sprintf("+%s", gofakeit.Numerify("##"))
-	user.PhoneNumber = gofakeit.Phone()
+	user.ZoneInfoCountryName = "Country" + fake.LetterN(6)
+	user.ZoneInfo = "tz" + fake.LetterN(6)
+	user.Locale = "lang" + fake.LetterN(4)
+	user.BirthDate = sql.NullTime{Time: fake.Date().Truncate(time.Microsecond), Valid: true}
+	user.PhoneNumberCountryUniqueId = strings.ToUpper(fake.LetterN(2))
+	user.PhoneNumberCountryCallingCode = fmt.Sprintf("+%s", fake.DigitN(2))
+	user.PhoneNumber = fake.DigitN(10)
 	user.PhoneNumberVerified = !user.PhoneNumberVerified
-	user.PhoneNumberVerificationCodeEncrypted = []byte(gofakeit.Password(true, true, true, true, false, 32))
+	user.PhoneNumberVerificationCodeEncrypted = []byte(fake.Password(32))
 	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
-	user.AddressLine1 = gofakeit.StreetName()
-	user.AddressLine2 = gofakeit.StreetNumber()
-	user.AddressLocality = gofakeit.City()
-	user.AddressRegion = gofakeit.State()
-	user.AddressPostalCode = gofakeit.Zip()
-	user.AddressCountry = gofakeit.CountryAbr()
-	user.PasswordHash = gofakeit.Password(true, true, true, true, false, 64)
-	user.OTPSecret = gofakeit.UUID()
+	user.AddressLine1 = "Street " + fake.LetterN(8)
+	user.AddressLine2 = fake.DigitN(3)
+	user.AddressLocality = "City" + fake.LetterN(6)
+	user.AddressRegion = "State" + fake.LetterN(6)
+	user.AddressPostalCode = fake.DigitN(5)
+	user.AddressCountry = strings.ToUpper(fake.LetterN(2))
+	user.PasswordHash = fake.Password(64)
+	user.OTPSecret = fake.UUID()
 	user.OTPEnabled = !user.OTPEnabled
-	user.ForgotPasswordCodeEncrypted = []byte(gofakeit.Password(true, true, true, true, false, 32))
+	user.ForgotPasswordCodeEncrypted = []byte(fake.Password(32))
 	user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 
 	time.Sleep(timestampTick)
@@ -217,8 +217,8 @@ func TestSearchUsersPaginated(t *testing.T) {
 	t.Run("the search folds case on every engine", func(t *testing.T) {
 		// The tag begins "Tag", so it differs from both its own lowercase and its own uppercase
 		// form whatever LetterN returns, which is what makes the two folding queries real.
-		tag := "Tag" + gofakeit.LetterN(10)
-		want := createSearchUser(t, tag, "u"+gofakeit.LetterN(12))
+		tag := "Tag" + fake.LetterN(10)
+		want := createSearchUser(t, tag, "u"+fake.LetterN(12))
 
 		for _, c := range []struct {
 			name  string
@@ -241,11 +241,11 @@ func TestSearchUsersPaginated(t *testing.T) {
 	})
 
 	t.Run("a % in the term is matched literally", func(t *testing.T) {
-		tag := "Tag" + gofakeit.LetterN(10)
-		withPercent := createSearchUser(t, tag+"%x", "u"+gofakeit.LetterN(12))
+		tag := "Tag" + fake.LetterN(10)
+		withPercent := createSearchUser(t, tag+"%x", "u"+fake.LetterN(12))
 		// Differs from the row above in exactly one character, the one under test, so it can
 		// only be matched by reading "%" as a wildcard.
-		createSearchUser(t, tag+"zx", "u"+gofakeit.LetterN(12))
+		createSearchUser(t, tag+"zx", "u"+fake.LetterN(12))
 
 		assertSearchFindsExactly(t, tag+"%x", withPercent.Id)
 	})
@@ -253,9 +253,9 @@ func TestSearchUsersPaginated(t *testing.T) {
 	t.Run("a term of % stops matching every user", func(t *testing.T) {
 		// #95 as reported: the term is the wildcard itself, so the search returns the whole
 		// user table a page at a time.
-		tag := "Tag" + gofakeit.LetterN(10)
-		withPercent := createSearchUser(t, tag+"%x", "u"+gofakeit.LetterN(12))
-		plain := createSearchUser(t, tag+"plain", "u"+gofakeit.LetterN(12))
+		tag := "Tag" + fake.LetterN(10)
+		withPercent := createSearchUser(t, tag+"%x", "u"+fake.LetterN(12))
+		plain := createSearchUser(t, tag+"plain", "u"+fake.LetterN(12))
 
 		// Large enough that the whole result set fits on one page in a test database of any
 		// plausible size, and the guard below turns an overflow into this test's own failure
@@ -278,10 +278,10 @@ func TestSearchUsersPaginated(t *testing.T) {
 	})
 
 	t.Run("an _ in the term is matched literally", func(t *testing.T) {
-		tag := "Tag" + gofakeit.LetterN(10)
-		withUnderscore := createSearchUser(t, "g"+gofakeit.LetterN(12), tag+"a_b")
+		tag := "Tag" + fake.LetterN(10)
+		withUnderscore := createSearchUser(t, "g"+fake.LetterN(12), tag+"a_b")
 		// Again one character apart: "_" matches any single character until it is escaped.
-		createSearchUser(t, "g"+gofakeit.LetterN(12), tag+"axb")
+		createSearchUser(t, "g"+fake.LetterN(12), tag+"axb")
 
 		assertSearchFindsExactly(t, tag+"a_b", withUnderscore.Id)
 	})
@@ -290,8 +290,8 @@ func TestSearchUsersPaginated(t *testing.T) {
 		// "!" is the escape character the predicate declares, so the escaper has to double it.
 		// Undoubled, the pattern reads "!e" as an escaped "e" and finds a row spelled without
 		// the "!" instead of this one. An email local part may legally contain "!".
-		tag := "Tag" + gofakeit.LetterN(10)
-		withBang := createSearchUser(t, tag+"!e", "u"+gofakeit.LetterN(12))
+		tag := "Tag" + fake.LetterN(10)
+		withBang := createSearchUser(t, tag+"!e", "u"+fake.LetterN(12))
 
 		assertSearchFindsExactly(t, tag+"!e", withBang.Id)
 	})
@@ -301,9 +301,9 @@ func TestSearchUsersPaginated(t *testing.T) {
 		// class, so this case is only rejected there: unescaped, "[x]" matches a single "x" and
 		// finds the second row instead of the first. On the other three "[" is already a
 		// literal and both spellings pass, which is why the data tier has to run on all four.
-		tag := "Tag" + gofakeit.LetterN(10)
-		withClass := createSearchUser(t, tag+"[x]y", "u"+gofakeit.LetterN(12))
-		createSearchUser(t, tag+"xy", "u"+gofakeit.LetterN(12))
+		tag := "Tag" + fake.LetterN(10)
+		withClass := createSearchUser(t, tag+"[x]y", "u"+fake.LetterN(12))
+		createSearchUser(t, tag+"xy", "u"+fake.LetterN(12))
 
 		assertSearchFindsExactly(t, tag+"[x]y", withClass.Id)
 	})
@@ -318,7 +318,7 @@ func createSearchUser(t *testing.T, givenName string, username string) *models.U
 		Subject:   uuid.New(),
 		Username:  username,
 		GivenName: givenName,
-		Email:     gofakeit.LetterN(12) + "@example.com",
+		Email:     fake.LetterN(12) + "@example.com",
 	}
 	if err := database.CreateUser(nil, user); err != nil {
 		t.Fatalf("Failed to create user: %v", err)
@@ -364,7 +364,7 @@ func userIds(users []models.User) map[int64]bool {
 func TestSearchUsersPaginated_TiedGivenNamesStillPageAsAPartition(t *testing.T) {
 	// One given name shared by every user, which is the worst case: the entire result set is a
 	// single tie group. The random suffix is what keeps the search matching only these rows.
-	givenName := "TiedPage" + gofakeit.LetterN(10)
+	givenName := "TiedPage" + fake.LetterN(10)
 
 	const userCount = 7
 	wantIds := make([]int64, 0, userCount)
@@ -439,39 +439,39 @@ func createTestUser(t *testing.T) *models.User {
 
 func createTestUserOn(t *testing.T, db data.Database) *models.User {
 	user := &models.User{
-		Enabled:                              gofakeit.Bool(),
+		Enabled:                              fake.Bool(),
 		Subject:                              uuid.New(),
-		Username:                             gofakeit.Username(),
-		GivenName:                            gofakeit.FirstName(),
-		MiddleName:                           gofakeit.MiddleName(),
-		FamilyName:                           gofakeit.LastName(),
-		Nickname:                             gofakeit.FirstName(),
-		Website:                              gofakeit.URL(),
+		Username:                             fake.Username(),
+		GivenName:                            fake.FirstName(),
+		MiddleName:                           fake.MiddleName(),
+		FamilyName:                           fake.LastName(),
+		Nickname:                             fake.FirstName(),
+		Website:                              fake.URL(),
 		Gender:                               enums.GenderOther.String(),
-		Email:                                gofakeit.Email(),
-		EmailVerified:                        gofakeit.Bool(),
-		EmailVerificationCodeEncrypted:       []byte(gofakeit.Password(true, true, true, true, false, 32)),
+		Email:                                fake.Email(),
+		EmailVerified:                        fake.Bool(),
+		EmailVerificationCodeEncrypted:       []byte(fake.Password(32)),
 		EmailVerificationCodeIssuedAt:        sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
-		ZoneInfoCountryName:                  gofakeit.Country(),
-		ZoneInfo:                             gofakeit.TimeZone(),
-		Locale:                               gofakeit.Language(),
-		BirthDate:                            sql.NullTime{Time: gofakeit.Date().Truncate(time.Microsecond), Valid: true},
-		PhoneNumberCountryUniqueId:           gofakeit.CountryAbr(),
-		PhoneNumberCountryCallingCode:        fmt.Sprintf("+%s", gofakeit.Numerify("##")),
-		PhoneNumber:                          gofakeit.Phone(),
-		PhoneNumberVerified:                  gofakeit.Bool(),
-		PhoneNumberVerificationCodeEncrypted: []byte(gofakeit.Password(true, true, true, true, false, 32)),
+		ZoneInfoCountryName:                  "Country" + fake.LetterN(6),
+		ZoneInfo:                             "tz" + fake.LetterN(6),
+		Locale:                               "lang" + fake.LetterN(4),
+		BirthDate:                            sql.NullTime{Time: fake.Date().Truncate(time.Microsecond), Valid: true},
+		PhoneNumberCountryUniqueId:           strings.ToUpper(fake.LetterN(2)),
+		PhoneNumberCountryCallingCode:        fmt.Sprintf("+%s", fake.DigitN(2)),
+		PhoneNumber:                          fake.DigitN(10),
+		PhoneNumberVerified:                  fake.Bool(),
+		PhoneNumberVerificationCodeEncrypted: []byte(fake.Password(32)),
 		PhoneNumberVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
-		AddressLine1:                         gofakeit.StreetName(),
-		AddressLine2:                         gofakeit.StreetNumber(),
-		AddressLocality:                      gofakeit.City(),
-		AddressRegion:                        gofakeit.State(),
-		AddressPostalCode:                    gofakeit.Zip(),
-		AddressCountry:                       gofakeit.CountryAbr(),
-		PasswordHash:                         gofakeit.Password(true, true, true, true, false, 64),
-		OTPSecret:                            gofakeit.UUID(),
-		OTPEnabled:                           gofakeit.Bool(),
-		ForgotPasswordCodeEncrypted:          []byte(gofakeit.Password(true, true, true, true, false, 32)),
+		AddressLine1:                         "Street " + fake.LetterN(8),
+		AddressLine2:                         fake.DigitN(3),
+		AddressLocality:                      "City" + fake.LetterN(6),
+		AddressRegion:                        "State" + fake.LetterN(6),
+		AddressPostalCode:                    fake.DigitN(5),
+		AddressCountry:                       strings.ToUpper(fake.LetterN(2)),
+		PasswordHash:                         fake.Password(64),
+		OTPSecret:                            fake.UUID(),
+		OTPEnabled:                           fake.Bool(),
+		ForgotPasswordCodeEncrypted:          []byte(fake.Password(32)),
 		ForgotPasswordCodeIssuedAt:           sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 	}
 
@@ -609,8 +609,8 @@ func TestUpdateUser_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	// not do, so the nonzero value has to arrive through an insert.
 	user.Id = 0
 	user.Subject = uuid.New()
-	user.Username = "gen_" + gofakeit.LetterN(8)
-	user.Email = gofakeit.LetterN(8) + "@example.com"
+	user.Username = "gen_" + fake.LetterN(8)
+	user.Email = fake.LetterN(8) + "@example.com"
 	if err := database.CreateUser(nil, user); err != nil {
 		t.Fatalf("Failed to create user with a generation: %v", err)
 	}
@@ -1736,7 +1736,7 @@ func TestTryConsumeForgotPasswordCode_ConcurrentCallersProduceOneWinner(t *testi
 // editor or a tool that normalises the file would silently turn the NFD case into a
 // comparison of a string with itself, and the test would pass having stopped testing.
 func TestGetUserByEmailIsCaseSensitive(t *testing.T) {
-	random := strings.ToLower(gofakeit.LetterN(6))
+	random := strings.ToLower(fake.LetterN(6))
 	lower := "case_email_" + random + "@case.local"
 	upper := strings.ToUpper(lower)
 
@@ -1829,9 +1829,9 @@ func createUserWithEmail(t *testing.T, email string) *models.User {
 	user := &models.User{
 		Enabled:      true,
 		Subject:      uuid.New(),
-		Username:     "case_" + gofakeit.LetterN(10),
+		Username:     "case_" + fake.LetterN(10),
 		Email:        email,
-		PasswordHash: gofakeit.Password(true, true, true, true, false, 60),
+		PasswordHash: fake.Password(60),
 	}
 	if err := database.CreateUser(nil, user); err != nil {
 		t.Fatalf("Failed to create a user at %q, which every engine must now accept: %v", email, err)

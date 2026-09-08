@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,7 +84,7 @@ func TestMigration000026_CodeRevoked(t *testing.T) {
 // migrated shared test database rather than this one.
 func seedCode000026(t *testing.T, h *isolatedDB) int64 {
 	t.Helper()
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 
 	client := &models.Client{
 		ClientIdentifier: "mig26_client_" + random,

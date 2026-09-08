@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 // TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted is the data half of #139 decision 2.
@@ -106,7 +106,7 @@ func createTokenOfCodeOn(t *testing.T, db data.Database, clientId, userId, codeI
 		CodeId:            sql.NullInt64{Int64: codeId, Valid: true},
 		UserId:            sql.NullInt64{Int64: userId, Valid: true},
 		ClientId:          sql.NullInt64{Int64: clientId, Valid: true},
-		RefreshTokenJti:   gofakeit.UUID(),
+		RefreshTokenJti:   fake.UUID(),
 		SessionIdentifier: sessionIdentifier,
 		RefreshTokenType:  tokenType,
 		Scope:             "openid profile offline_access",

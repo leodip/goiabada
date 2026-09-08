@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -88,7 +88,7 @@ func TestAPISettingsGeneralPut_DisableSelfRegForcesVerificationFalse(t *testing.
 	// First enable both
 	preReq := api.UpdateSettingsGeneralRequest{
 		AppName:                 "App X",
-		Issuer:                  "issuer-" + gofakeit.LetterN(6),
+		Issuer:                  "issuer-" + fake.LetterN(6),
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
 		PasswordPolicy: "low",

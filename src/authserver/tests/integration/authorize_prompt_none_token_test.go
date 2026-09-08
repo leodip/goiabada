@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
@@ -15,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +28,7 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 
 	// Create a different client with DefaultAcrLevel=level2_optional
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -49,8 +49,8 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 	}
 
 	// prompt=none without acr_values, client default is level2_optional, session is level1
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -79,9 +79,9 @@ func TestPromptNone_ClientDefaultAcrSatisfied(t *testing.T) {
 	// Client with DefaultAcrLevel=level1, session at level1 - should succeed
 	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -128,7 +128,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 
 	// Create client with DefaultAcrLevel=level2_optional
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -150,9 +150,9 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 
 	// Ask for less than the client requires. Before the floor this lowered the target to level1,
 	// which the session met, and a code was issued.
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -188,8 +188,8 @@ func TestPromptNone_InvalidRedirectUri(t *testing.T) {
 	client, _ := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	// Use a redirect_uri that doesn't match the client's registered URIs
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape("https://evil.com/callback") +
@@ -216,8 +216,8 @@ func TestPromptNone_InvalidRedirectUri(t *testing.T) {
 func TestPromptNone_InvalidClientId(t *testing.T) {
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=nonexistent-client-12345" +
 		"&redirect_uri=" + url.QueryEscape("https://example.com/callback") +
 		"&response_type=code" +
@@ -244,8 +244,8 @@ func TestPromptNone_InvalidResponseType(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
-	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=invalid_type" +
@@ -275,14 +275,14 @@ func TestPromptNone_InvalidResponseType(t *testing.T) {
 
 func TestPromptNone_CodeExchange(t *testing.T) {
 	// Create a confidential client for token exchange
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &models.Client{
-		ClientIdentifier:                        "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
@@ -306,7 +306,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -315,7 +315,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -326,8 +326,8 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	httpClient := createHttpClient(t)
 	codeVerifier := "code-verifier"
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	// Create session via normal login
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -373,8 +373,8 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	// Now use prompt=none with proper PKCE
 	codeVerifier2 := "code-verifier-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := "test-nonce-" + gofakeit.LetterN(16)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := "test-nonce-" + fake.LetterN(16)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -428,14 +428,14 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 }
 
 func TestPromptNone_SubClaimConsistent(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &models.Client{
-		ClientIdentifier:                        "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
@@ -459,7 +459,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -468,7 +468,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -481,8 +481,8 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	// First login
 	codeVerifier1 := "code-verifier-one"
 	codeChallenge1 := oauth.GeneratePKCECodeChallenge(codeVerifier1)
-	requestState1 := gofakeit.LetterN(8)
-	requestNonce1 := gofakeit.LetterN(8)
+	requestState1 := fake.LetterN(8)
+	requestNonce1 := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -542,8 +542,8 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	// prompt=none to get token2
 	codeVerifier2 := "code-verifier-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -586,14 +586,14 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 }
 
 func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &models.Client{
-		ClientIdentifier:                        "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
@@ -617,7 +617,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -626,7 +626,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -638,8 +638,8 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 
 	codeVerifier1 := "code-verifier-one"
 	codeChallenge1 := oauth.GeneratePKCECodeChallenge(codeVerifier1)
-	requestState1 := gofakeit.LetterN(8)
-	requestNonce1 := gofakeit.LetterN(8)
+	requestState1 := fake.LetterN(8)
+	requestNonce1 := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -701,8 +701,8 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 
 	codeVerifier2 := "code-verifier-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -745,14 +745,14 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 }
 
 func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &models.Client{
-		ClientIdentifier:                        "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
@@ -776,7 +776,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -785,7 +785,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -798,8 +798,8 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	// Create session
 	codeVerifierSession := "session-code-verifier"
 	codeChallengeSession := oauth.GeneratePKCECodeChallenge(codeVerifierSession)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -844,8 +844,8 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	// prompt=none with PKCE
 	correctVerifier := "correct-verifier"
 	correctChallenge := oauth.GeneratePKCECodeChallenge(correctVerifier)
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -895,14 +895,14 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 // TestPromptNone_RefreshWithOfflineAccess verifies that a code obtained via prompt=none
 // with offline_access scope can be exchanged for tokens and then refreshed.
 func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &models.Client{
-		ClientIdentifier:                        "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
@@ -926,7 +926,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -935,7 +935,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -958,8 +958,8 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	httpClient := createHttpClient(t)
 	codeVerifier := "code-verifier"
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	// Create session via normal login with offline_access
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -1015,8 +1015,8 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	// Now use prompt=none with offline_access
 	codeVerifier2 := "code-verifier-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1085,14 +1085,14 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 // TestPromptNone_NoncePreserved verifies that the nonce parameter in a prompt=none
 // request is preserved in the issued id_token.
 func TestPromptNone_NoncePreserved(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &models.Client{
-		ClientIdentifier:                        "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
@@ -1116,7 +1116,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -1125,7 +1125,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -1136,7 +1136,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	httpClient := createHttpClient(t)
 	codeVerifier := "code-verifier"
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 
 	// Create session via normal login
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -1146,7 +1146,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		"&code_challenge=" + codeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1182,8 +1182,8 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	// Now use prompt=none with a specific nonce
 	codeVerifier2 := "code-verifier-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
-	requestState2 := gofakeit.LetterN(8)
-	testNonce := "test-nonce-" + gofakeit.LetterN(16)
+	requestState2 := fake.LetterN(8)
+	testNonce := "test-nonce-" + fake.LetterN(16)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1232,14 +1232,14 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 // TestPromptNone_PKCESupported verifies that PKCE works correctly with prompt=none
 // (success case - correct verifier).
 func TestPromptNone_PKCESupported(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &models.Client{
-		ClientIdentifier:                        "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
@@ -1263,7 +1263,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -1272,7 +1272,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -1283,7 +1283,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	httpClient := createHttpClient(t)
 	codeVerifier := "initial-code-verifier"
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 
 	// Create session via normal login
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -1293,7 +1293,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		"&code_challenge=" + codeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1329,7 +1329,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	// Now use prompt=none with a NEW PKCE code_challenge/verifier pair
 	pkceVerifier := "pkce-verifier-for-prompt-none-test"
 	pkceChallenge := oauth.GeneratePKCECodeChallenge(pkceVerifier)
-	requestState2 := gofakeit.LetterN(8)
+	requestState2 := fake.LetterN(8)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1338,7 +1338,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		"&code_challenge=" + pkceChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState2 +
-		"&nonce=" + gofakeit.LetterN(8) +
+		"&nonce=" + fake.LetterN(8) +
 		"&prompt=none"
 
 	resp2, err := httpClient.Get(destUrl2)

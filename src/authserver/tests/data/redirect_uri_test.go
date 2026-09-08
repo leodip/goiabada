@@ -3,8 +3,8 @@ package datatests
 import (
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateRedirectURI(t *testing.T) {
@@ -119,7 +119,7 @@ func TestDeleteRedirectURI(t *testing.T) {
 
 func createTestRedirectURI(t *testing.T, clientId int64) *models.RedirectURI {
 	redirectURI := &models.RedirectURI{
-		URI:      "https://example.com/callback_" + gofakeit.LetterN(6),
+		URI:      "https://example.com/callback_" + fake.LetterN(6),
 		ClientId: clientId,
 	}
 	err := database.CreateRedirectURI(nil, redirectURI)

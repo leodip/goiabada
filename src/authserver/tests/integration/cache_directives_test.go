@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,7 +42,7 @@ func TestCacheDirectives_ThePasswordFormIsNotStorable(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	resp := loadPage(t, httpClient,
-		authorizeUrlFor(client, redirectUri, "openid profile email", gofakeit.LetterN(8)))
+		authorizeUrlFor(client, redirectUri, "openid profile email", fake.LetterN(8)))
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	_ = resp.Body.Close()
 

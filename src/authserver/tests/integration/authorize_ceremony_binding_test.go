@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,7 +26,7 @@ func createConsentClient(t *testing.T) (*models.Client, *models.RedirectURI) {
 // a stale login form finished it and the code was issued with nothing shown to the user at all.
 func createLevel1Client(t *testing.T, consentRequired bool) (*models.Client, *models.RedirectURI) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          consentRequired,
@@ -38,7 +38,7 @@ func createLevel1Client(t *testing.T, consentRequired bool) (*models.Client, *mo
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	if err := database.CreateRedirectURI(nil, redirectUri); err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func createLevel1Client(t *testing.T, consentRequired bool) (*models.Client, *mo
 
 // createCeremonyUser makes an enabled user with a password, and returns that password.
 func createCeremonyUser(t *testing.T) (*models.User, string) {
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func createCeremonyUser(t *testing.T) (*models.User, string) {
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	if err := database.CreateUser(nil, user); err != nil {
@@ -99,10 +99,10 @@ func authorizeUrlFor(client *models.Client, redirectUri *models.RedirectURI, sco
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape(scope) +
 		"&state=" + state +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 }
 
 // TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused walks the defect end to end.
@@ -125,7 +125,7 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	// Client A's authorization, all the way to its consent screen.
-	stateA := gofakeit.LetterN(8)
+	stateA := fake.LetterN(8)
 	resp, err := httpClient.Get(authorizeUrlFor(clientA, redirectUriA, "openid profile email", stateA))
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 
 	// The second tab. Client B's authorization runs on the same browser, reusing the session A's
 	// ceremony created, and its auth context replaces A's. A's consent screen is still on screen.
-	stateB := gofakeit.LetterN(8)
+	stateB := fake.LetterN(8)
 	resp, err = httpClient.Get(authorizeUrlFor(clientB, redirectUriB, "openid profile", stateB))
 	if err != nil {
 		t.Fatal(err)
@@ -254,7 +254,7 @@ func TestAuthorize_PasswordFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	// Client A's authorization, as far as its login screen.
-	stateA := gofakeit.LetterN(8)
+	stateA := fake.LetterN(8)
 	resp, err := httpClient.Get(authorizeUrlFor(clientA, redirectUriA, "openid profile email", stateA))
 	if err != nil {
 		t.Fatal(err)
@@ -273,7 +273,7 @@ func TestAuthorize_PasswordFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 
 	// The second tab. Client B's authorization replaces A's context, and A's login screen is still
 	// on the user's screen.
-	stateB := gofakeit.LetterN(8)
+	stateB := fake.LetterN(8)
 	resp, err = httpClient.Get(authorizeUrlFor(clientB, redirectUriB, "openid profile", stateB))
 	if err != nil {
 		t.Fatal(err)
@@ -378,14 +378,14 @@ func TestAuthorize_OtpFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 
 	httpClient := createHttpClient(t)
 
-	stateA := gofakeit.LetterN(8)
+	stateA := fake.LetterN(8)
 	otpUrlA, otpPageA := walkToOtpPrompt(t, httpClient, clientA, redirectUriA, stateA, user, password)
 	defer func() { _ = otpPageA.Body.Close() }()
 
 	ceremonyA := getCeremonyIdFromPage(t, otpPageA)
 
 	// The second tab, on the same browser. A's OTP prompt is still on the user's screen.
-	stateB := gofakeit.LetterN(8)
+	stateB := fake.LetterN(8)
 	otpUrlB, otpPageB := walkToOtpPrompt(t, httpClient, clientB, redirectUriB, stateB, user, password)
 	defer func() { _ = otpPageB.Body.Close() }()
 

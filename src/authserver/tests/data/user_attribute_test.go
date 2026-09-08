@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateUserAttribute(t *testing.T) {
@@ -162,10 +162,10 @@ func TestDeleteUserAttribute(t *testing.T) {
 
 func createTestUserAttribute(t *testing.T, userId int64) *models.UserAttribute {
 	attr := &models.UserAttribute{
-		Key:                  "TestKey_" + gofakeit.LetterN(6),
-		Value:                "TestValue_" + gofakeit.LetterN(6),
-		IncludeInIdToken:     gofakeit.Bool(),
-		IncludeInAccessToken: gofakeit.Bool(),
+		Key:                  "TestKey_" + fake.LetterN(6),
+		Value:                "TestValue_" + fake.LetterN(6),
+		IncludeInIdToken:     fake.Bool(),
+		IncludeInAccessToken: fake.Bool(),
 		UserId:               userId,
 	}
 	err := database.CreateUserAttribute(nil, attr)

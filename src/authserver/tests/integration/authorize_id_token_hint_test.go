@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
@@ -13,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,27 +29,27 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// =========================================================================
 	// Step 1: Create User A and User B
 	// =========================================================================
-	passwordA := gofakeit.Password(true, true, true, true, false, 10)
+	passwordA := fake.Password(10)
 	passwordHashedA, err := hashutil.HashPassword(passwordA)
 	assert.NoError(t, err)
 
 	userA := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashedA,
 	}
 	err = database.CreateUser(nil, userA)
 	assert.NoError(t, err)
 
-	passwordB := gofakeit.Password(true, true, true, true, false, 10)
+	passwordB := fake.Password(10)
 	passwordHashedB, err := hashutil.HashPassword(passwordB)
 	assert.NoError(t, err)
 
 	userB := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashedB,
 	}
 	err = database.CreateUser(nil, userB)
@@ -58,12 +58,12 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// =========================================================================
 	// Step 2: Create client with confidential credentials
 	// =========================================================================
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -87,8 +87,8 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	httpClientA := createHttpClient(t)
 	codeVerifierA := "code-verifier-a"
 	requestCodeChallengeA := oauth.GeneratePKCECodeChallenge(codeVerifierA)
-	requestStateA := gofakeit.LetterN(8)
-	requestNonceA := gofakeit.LetterN(8)
+	requestStateA := fake.LetterN(8)
+	requestNonceA := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrlA := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -164,8 +164,8 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	httpClientB := createHttpClient(t) // Fresh client, no session
 	codeVerifierB := "code-verifier-b"
 	requestCodeChallengeB := oauth.GeneratePKCECodeChallenge(codeVerifierB)
-	requestStateB := gofakeit.LetterN(8)
-	requestNonceB := gofakeit.LetterN(8)
+	requestStateB := fake.LetterN(8)
+	requestNonceB := fake.LetterN(8)
 
 	destUrlB := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -251,14 +251,14 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// =========================================================================
 	// Step 1: Create User A
 	// =========================================================================
-	password := gofakeit.Password(true, true, true, true, false, 10)
+	password := fake.Password(10)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -267,12 +267,12 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// =========================================================================
 	// Step 2: Create client
 	// =========================================================================
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -296,8 +296,8 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	httpClient1 := createHttpClient(t)
 	codeVerifier1 := "code-verifier-1"
 	requestCodeChallenge1 := oauth.GeneratePKCECodeChallenge(codeVerifier1)
-	requestState1 := gofakeit.LetterN(8)
-	requestNonce1 := gofakeit.LetterN(8)
+	requestState1 := fake.LetterN(8)
+	requestNonce1 := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl1 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -365,8 +365,8 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	httpClient2 := createHttpClient(t) // Fresh client
 	codeVerifier2 := "code-verifier-2"
 	requestCodeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -441,39 +441,39 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 // id_token_hint works even without prompt=login parameter.
 func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// Create two users
-	passwordA := gofakeit.Password(true, true, true, true, false, 10)
+	passwordA := fake.Password(10)
 	passwordHashedA, err := hashutil.HashPassword(passwordA)
 	assert.NoError(t, err)
 
 	userA := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashedA,
 	}
 	err = database.CreateUser(nil, userA)
 	assert.NoError(t, err)
 
-	passwordB := gofakeit.Password(true, true, true, true, false, 10)
+	passwordB := fake.Password(10)
 	passwordHashedB, err := hashutil.HashPassword(passwordB)
 	assert.NoError(t, err)
 
 	userB := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashedB,
 	}
 	err = database.CreateUser(nil, userB)
 	assert.NoError(t, err)
 
 	// Create client
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -495,8 +495,8 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	httpClientA := createHttpClient(t)
 	codeVerifierA := "code-verifier-a"
 	requestCodeChallengeA := oauth.GeneratePKCECodeChallenge(codeVerifierA)
-	requestStateA := gofakeit.LetterN(8)
-	requestNonceA := gofakeit.LetterN(8)
+	requestStateA := fake.LetterN(8)
+	requestNonceA := fake.LetterN(8)
 	requestScope := "openid profile"
 
 	destUrlA := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -555,8 +555,8 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	httpClientB := createHttpClient(t)
 	codeVerifierB := "code-verifier-b"
 	requestCodeChallengeB := oauth.GeneratePKCECodeChallenge(codeVerifierB)
-	requestStateB := gofakeit.LetterN(8)
-	requestNonceB := gofakeit.LetterN(8)
+	requestStateB := fake.LetterN(8)
+	requestNonceB := fake.LetterN(8)
 
 	// Note: NO prompt=login parameter here
 	destUrlB := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +

@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateClient(t *testing.T) {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	client := &models.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
@@ -93,7 +93,7 @@ func TestCreateClient(t *testing.T) {
 }
 
 func TestUpdateClient(t *testing.T) {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	originalClient := &models.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("original_secret"),
@@ -224,7 +224,7 @@ func TestUpdateClient(t *testing.T) {
 }
 
 func TestGetClientById(t *testing.T) {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	client := &models.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
@@ -323,7 +323,7 @@ func TestGetClientById(t *testing.T) {
 }
 
 func TestGetClientByClientIdentifier(t *testing.T) {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	clientIdentifier := "test_client_" + random
 	client := &models.Client{
 		ClientIdentifier:                        clientIdentifier,
@@ -403,7 +403,7 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 	}
 
 	// Test retrieving a non-existent client
-	nonExistentIdentifier := "non_existent_client_" + gofakeit.LetterN(6)
+	nonExistentIdentifier := "non_existent_client_" + fake.LetterN(6)
 	nonExistentClient, err := database.GetClientByClientIdentifier(nil, nonExistentIdentifier)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent client, got: %v", err)
@@ -423,7 +423,7 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 }
 
 func TestClientLoadRedirectURIs(t *testing.T) {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	client := &models.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
@@ -484,7 +484,7 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 
 	// Test loading redirect URIs for a client with no URIs
 	clientWithNoURIs := &models.Client{
-		ClientIdentifier: "client_with_no_uris_" + gofakeit.LetterN(6),
+		ClientIdentifier: "client_with_no_uris_" + fake.LetterN(6),
 	}
 	err = database.CreateClient(nil, clientWithNoURIs)
 	if err != nil {
@@ -508,7 +508,7 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 }
 
 func TestClientLoadWebOrigins(t *testing.T) {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	client := &models.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
@@ -569,7 +569,7 @@ func TestClientLoadWebOrigins(t *testing.T) {
 
 	// Test loading web origins for a client with no origins
 	clientWithNoOrigins := &models.Client{
-		ClientIdentifier: "client_with_no_origins_" + gofakeit.LetterN(6),
+		ClientIdentifier: "client_with_no_origins_" + fake.LetterN(6),
 	}
 	err = database.CreateClient(nil, clientWithNoOrigins)
 	if err != nil {
@@ -598,7 +598,7 @@ func TestGetClientsByIds(t *testing.T) {
 	clientIds := make([]int64, 3)
 
 	for i := 0; i < 3; i++ {
-		random := gofakeit.LetterN(6)
+		random := fake.LetterN(6)
 		client := models.Client{
 			ClientIdentifier:                        "test_client_" + random,
 			ClientSecretEncrypted:                   []byte("encrypted_secret_" + random),
@@ -705,7 +705,7 @@ func TestGetClientsByIds(t *testing.T) {
 }
 
 func TestClientLoadPermissions(t *testing.T) {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	client := &models.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
@@ -791,7 +791,7 @@ func TestClientLoadPermissions(t *testing.T) {
 
 	// Test loading permissions for a client with no permissions
 	clientWithNoPermissions := &models.Client{
-		ClientIdentifier: "client_with_no_permissions_" + gofakeit.LetterN(6),
+		ClientIdentifier: "client_with_no_permissions_" + fake.LetterN(6),
 	}
 	err = database.CreateClient(nil, clientWithNoPermissions)
 	if err != nil {
@@ -832,7 +832,7 @@ func TestGetAllClients(t *testing.T) {
 	createdClients := make([]*models.Client, numClients)
 
 	for i := 0; i < numClients; i++ {
-		random := gofakeit.LetterN(6)
+		random := fake.LetterN(6)
 		client := &models.Client{
 			ClientIdentifier:                        "test_client_" + random,
 			ClientSecretEncrypted:                   []byte("encrypted_secret_" + random),
@@ -954,7 +954,7 @@ func TestGetAllClients(t *testing.T) {
 }
 
 func TestDeleteClient(t *testing.T) {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	client := &models.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
@@ -1089,7 +1089,7 @@ func createTestClient(t *testing.T) *models.Client {
 }
 
 func createTestClientOn(t *testing.T, db data.Database) *models.Client {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	client := &models.Client{
 		ClientIdentifier: "test_client_" + random,
 		Description:      "Test Client",
@@ -1103,7 +1103,7 @@ func createTestClientOn(t *testing.T, db data.Database) *models.Client {
 
 func TestClientNullableOverrideFields(t *testing.T) {
 	// Test 1: Create client with nil override fields (use global settings)
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	clientWithNilOverrides := &models.Client{
 		ClientIdentifier:                        "test_client_nil_overrides_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
@@ -1143,7 +1143,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 	}
 
 	// Test 2: Create client with explicit override values set to true
-	random2 := gofakeit.LetterN(6)
+	random2 := fake.LetterN(6)
 	pkceTrue := true
 	implicitTrue := true
 	ropcTrue := true
@@ -1188,7 +1188,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 	}
 
 	// Test 3: Create client with explicit override values set to false
-	random3 := gofakeit.LetterN(6)
+	random3 := fake.LetterN(6)
 	pkceFalse := false
 	implicitFalse := false
 	ropcFalse := false
@@ -1616,7 +1616,7 @@ func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
 // row comes back. The data layer discards it (see commondb.engineFoldedTheMatch), which is
 // what makes this assertion mean the same thing on four engines.
 func TestGetClientByClientIdentifierIsCaseSensitive(t *testing.T) {
-	lower := "case_client_" + strings.ToLower(gofakeit.LetterN(6))
+	lower := "case_client_" + strings.ToLower(fake.LetterN(6))
 	upper := strings.ToUpper(lower)
 
 	lowerClient := newCaseTestClient(t, lower)

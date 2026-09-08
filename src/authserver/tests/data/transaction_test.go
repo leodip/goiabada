@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ import (
 // newTestGroup returns an unsaved group with a unique identifier.
 func newTestGroup() *models.Group {
 	return &models.Group{
-		GroupIdentifier: "TxGroup_" + gofakeit.LetterN(8),
+		GroupIdentifier: "TxGroup_" + fake.LetterN(8),
 		Description:     "Transaction test group",
 	}
 }

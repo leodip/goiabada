@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 // Verifies OIDC Core 3.1.2.1: the authorization endpoint MUST support POST
@@ -29,7 +29,7 @@ func TestAuthorize_PostRequest(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := &models.Client{
-				ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+				ClientIdentifier:         "test-client-" + fake.LetterN(8),
 				Enabled:                  true,
 				AuthorizationCodeEnabled: true,
 				ConsentRequired:          false,
@@ -41,7 +41,7 @@ func TestAuthorize_PostRequest(t *testing.T) {
 
 			redirectUri := &models.RedirectURI{
 				ClientId: client.Id,
-				URI:      gofakeit.URL(),
+				URI:      fake.URL(),
 			}
 			if err := database.CreateRedirectURI(nil, redirectUri); err != nil {
 				t.Fatal(err)
@@ -52,10 +52,10 @@ func TestAuthorize_PostRequest(t *testing.T) {
 			form.Set("redirect_uri", redirectUri.URI)
 			form.Set("response_type", "code")
 			form.Set("code_challenge_method", "S256")
-			form.Set("code_challenge", gofakeit.LetterN(43))
+			form.Set("code_challenge", fake.LetterN(43))
 			form.Set("scope", "openid profile")
-			form.Set("state", gofakeit.LetterN(8))
-			form.Set("nonce", gofakeit.LetterN(8))
+			form.Set("state", fake.LetterN(8))
+			form.Set("nonce", fake.LetterN(8))
 
 			destURL := config.GetAuthServer().BaseURL + tc.path
 

@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateGroup(t *testing.T) {
 	group := &models.Group{
-		GroupIdentifier:      "test_group_" + gofakeit.LetterN(6),
+		GroupIdentifier:      "test_group_" + fake.LetterN(6),
 		Description:          "Test Group",
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,
@@ -290,7 +290,7 @@ func TestDeleteGroup(t *testing.T) {
 }
 
 func createTestGroup(t *testing.T) *models.Group {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	group := &models.Group{
 		GroupIdentifier: "TestGroup_" + random,
 		Description:     "Test Group Description",
@@ -312,7 +312,7 @@ func createTestGroup(t *testing.T) *models.Group {
 // row comes back and the data layer discards it (commondb.engineFoldedTheMatch). See
 // TestGetClientByClientIdentifierIsCaseSensitive for the whole of the reasoning.
 func TestGetGroupByGroupIdentifierIsCaseSensitive(t *testing.T) {
-	lower := "case_group_" + strings.ToLower(gofakeit.LetterN(6))
+	lower := "case_group_" + strings.ToLower(fake.LetterN(6))
 	upper := strings.ToUpper(lower)
 
 	lowerGroup := &models.Group{GroupIdentifier: lower, Description: "lowercase"}

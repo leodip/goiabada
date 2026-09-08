@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -151,7 +151,7 @@ type byValueReader struct {
 
 func byValueReaders() []byValueReader {
 	randomUUID := func() string { return uuid.New().String() }
-	randomWord := func() string { return "missing_" + gofakeit.LetterN(16) }
+	randomWord := func() string { return "missing_" + fake.LetterN(16) }
 
 	return []byValueReader{
 		{"GetClientByClientIdentifier", randomWord, func(tx *sql.Tx, v string) (bool, error) {
@@ -166,7 +166,7 @@ func byValueReaders() []byValueReader {
 			u, err := database.GetUserBySubject(tx, v)
 			return u != nil, err
 		}},
-		{"GetUserByEmail", func() string { return "missing_" + gofakeit.LetterN(12) + "@example.com" },
+		{"GetUserByEmail", func() string { return "missing_" + fake.LetterN(12) + "@example.com" },
 			func(tx *sql.Tx, v string) (bool, error) {
 				u, err := database.GetUserByEmail(tx, v)
 				return u != nil, err
@@ -183,7 +183,7 @@ func byValueReaders() []byValueReader {
 			s, err := database.GetUserSessionBySessionIdentifier(tx, v)
 			return s != nil, err
 		}},
-		{"GetPreRegistrationByEmail", func() string { return "missing_" + gofakeit.LetterN(12) + "@example.com" },
+		{"GetPreRegistrationByEmail", func() string { return "missing_" + fake.LetterN(12) + "@example.com" },
 			func(tx *sql.Tx, v string) (bool, error) {
 				p, err := database.GetPreRegistrationByEmail(tx, v)
 				return p != nil, err

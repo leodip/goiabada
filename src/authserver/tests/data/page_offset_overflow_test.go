@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,7 +82,7 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 	t.Run("SearchUsersPaginated", func(t *testing.T) {
 		// A given name shared by three users, so the search has rows of its own
 		// rather than depending on what the shared database happens to hold.
-		givenName := "offsettest" + gofakeit.LetterN(10)
+		givenName := "offsettest" + fake.LetterN(10)
 		for i := 0; i < 3; i++ {
 			user := createUserWithGivenName(t, givenName)
 			t.Cleanup(func() { _ = database.DeleteUser(nil, user.Id) })

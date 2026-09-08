@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateCode(t *testing.T) {
@@ -15,7 +15,7 @@ func TestCreateCode(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	code := &models.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
@@ -515,7 +515,7 @@ func createTestCode(t *testing.T, clientId, userId int64) *models.Code {
 }
 
 func createTestCodeOn(t *testing.T, db data.Database, clientId, userId int64) *models.Code {
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	code := &models.Code{
 		ClientId:            clientId,
 		UserId:              userId,
@@ -566,8 +566,8 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	// Create refresh token for code2
 	refreshToken := &models.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: code2.Id, Valid: true},
-		RefreshTokenJti:   "test_jti_" + gofakeit.LetterN(6),
-		SessionIdentifier: "test_session_" + gofakeit.LetterN(6),
+		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
+		SessionIdentifier: "test_session_" + fake.LetterN(6),
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile",
 		IssuedAt:          sql.NullTime{Time: time.Now().UTC(), Valid: true},
@@ -632,8 +632,8 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	// Create an expired refresh token for code4 (revoked too, which no longer matters)
 	revokedRefreshToken := &models.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: code4.Id, Valid: true},
-		RefreshTokenJti:   "test_jti_" + gofakeit.LetterN(6),
-		SessionIdentifier: "test_session_" + gofakeit.LetterN(6),
+		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
+		SessionIdentifier: "test_session_" + fake.LetterN(6),
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile",
 		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Add(-2 * time.Hour), Valid: true},
@@ -795,7 +795,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnused(t *testing.T) {
 	markCodeUsed(t, revokedUsedWithToken)
 	racingChild := &models.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: revokedUsedWithToken.Id, Valid: true},
-		RefreshTokenJti:   "test_jti_" + gofakeit.LetterN(6),
+		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
 		SessionIdentifier: revokedUsedWithToken.SessionIdentifier,
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile offline_access",
@@ -867,7 +867,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnusedWithRopcTokenPresent(t
 		CodeId:            sql.NullInt64{Valid: false},
 		UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
-		RefreshTokenJti:   "test_jti_" + gofakeit.LetterN(6),
+		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
 		SessionIdentifier: "",
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile",
@@ -906,7 +906,7 @@ func TestUpdateCode_DoesNotClobberAuthStateGeneration(t *testing.T) {
 
 	code.AuthStateGeneration = 7
 	code.Id = 0
-	code.CodeHash = "genhash_" + gofakeit.LetterN(8)
+	code.CodeHash = "genhash_" + fake.LetterN(8)
 	if err := database.CreateCode(nil, code); err != nil {
 		t.Fatalf("Failed to create code with a generation: %v", err)
 	}
@@ -989,8 +989,8 @@ func TestRevokeCodesBySessionIdentifier(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	sessionA := "revoke_a_" + gofakeit.LetterN(8)
-	sessionB := "revoke_b_" + gofakeit.LetterN(8)
+	sessionA := "revoke_a_" + fake.LetterN(8)
+	sessionB := "revoke_b_" + fake.LetterN(8)
 
 	first := createTestCodeInSession(t, client.Id, user.Id, sessionA)
 	second := createTestCodeInSession(t, client.Id, user.Id, sessionA)
@@ -1027,7 +1027,7 @@ func TestRevokeCodesBySessionIdentifier(t *testing.T) {
 	assertCodeRevoked(t, first.Id, true, "a code after its session was revoked twice")
 
 	// An unknown session identifier is not an error, it simply matches nothing.
-	count, err = database.RevokeCodesBySessionIdentifier(nil, "revoke_missing_"+gofakeit.LetterN(8))
+	count, err = database.RevokeCodesBySessionIdentifier(nil, "revoke_missing_"+fake.LetterN(8))
 	if err != nil {
 		t.Fatalf("RevokeCodesBySessionIdentifier for an unknown session returned error: %v", err)
 	}
@@ -1055,7 +1055,7 @@ func TestRevokeCodesBySessionIdentifier(t *testing.T) {
 func TestRevokeCodesBySessionIdentifier_TransactionAndFailurePath(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
-	session := "revoke_tx_" + gofakeit.LetterN(8)
+	session := "revoke_tx_" + fake.LetterN(8)
 	code := createTestCodeInSession(t, client.Id, user.Id, session)
 
 	tx := beginTx(t)

@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +17,7 @@ func createTestClientWithRedirect(t *testing.T) (*models.Client, *models.Redirec
 	t.Helper()
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
@@ -27,7 +27,7 @@ func createTestClientWithRedirect(t *testing.T) (*models.Client, *models.Redirec
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	if err := database.CreateRedirectURI(nil, redirectUri); err != nil {
 		t.Fatal(err)
@@ -39,7 +39,7 @@ func createTestClientWithRedirect(t *testing.T) (*models.Client, *models.Redirec
 func TestAuthorize_RequestParameter_RejectedAsUnsupported(t *testing.T) {
 	client, redirectUri := createTestClientWithRedirect(t)
 
-	state := gofakeit.LetterN(8)
+	state := fake.LetterN(8)
 
 	params := url.Values{}
 	params.Set("client_id", client.ClientIdentifier)
@@ -102,7 +102,7 @@ func TestAuthorize_RequestParameter_EmptyValue_RejectedAsUnsupported(t *testing.
 func TestAuthorize_RequestUriParameter_RejectedAsUnsupported(t *testing.T) {
 	client, redirectUri := createTestClientWithRedirect(t)
 
-	state := gofakeit.LetterN(8)
+	state := fake.LetterN(8)
 
 	params := url.Values{}
 	params.Set("client_id", client.ClientIdentifier)
@@ -141,7 +141,7 @@ func TestAuthorize_RequestParameter_PostBody_RejectedAsUnsupported(t *testing.T)
 	form.Set("redirect_uri", redirectUri.URI)
 	form.Set("response_type", "code")
 	form.Set("scope", "openid")
-	form.Set("state", gofakeit.LetterN(8))
+	form.Set("state", fake.LetterN(8))
 	form.Set("request", "some.jwt.value")
 
 	destURL := config.GetAuthServer().BaseURL + "/auth/authorize"
@@ -203,7 +203,7 @@ func TestAuthorize_RequestParameter_InvalidClient_RendersErrorUi(t *testing.T) {
 func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 	t.Run("query response mode", func(t *testing.T) {
 		client, redirectUri := createTestClientWithRedirect(t)
-		state := gofakeit.LetterN(8)
+		state := fake.LetterN(8)
 
 		params := url.Values{}
 		params.Set("client_id", client.ClientIdentifier)
@@ -235,7 +235,7 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 
 	t.Run("fragment response mode", func(t *testing.T) {
 		client, redirectUri := createTestClientWithRedirect(t)
-		state := gofakeit.LetterN(8)
+		state := fake.LetterN(8)
 
 		params := url.Values{}
 		params.Set("client_id", client.ClientIdentifier)
@@ -269,7 +269,7 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 
 	t.Run("form_post response mode", func(t *testing.T) {
 		client, redirectUri := createTestClientWithRedirect(t)
-		state := gofakeit.LetterN(8)
+		state := fake.LetterN(8)
 
 		params := url.Values{}
 		params.Set("client_id", client.ClientIdentifier)
@@ -310,7 +310,7 @@ func TestAuthorize_RequestUriParameter_RejectedAcrossResponseModes(t *testing.T)
 	// we exercise fragment mode since query is already covered by the
 	// non-matrix request_uri test above.
 	client, redirectUri := createTestClientWithRedirect(t)
-	state := gofakeit.LetterN(8)
+	state := fake.LetterN(8)
 
 	params := url.Values{}
 	params.Set("client_id", client.ClientIdentifier)

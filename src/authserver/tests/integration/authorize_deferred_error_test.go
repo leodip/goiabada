@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -182,7 +182,7 @@ func TestAuthorize_Deferred_NonConformingDescriptionMatchesTheImmediatePath(t *t
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&state=" + url.QueryEscape(deferralState) +
 		"&scope=" + url.QueryEscape(emojiScope)
 
@@ -228,7 +228,7 @@ func TestAuthorizePost_Deferred_CookielessRequestIsSentToLogin(t *testing.T) {
 	form.Set("redirect_uri", deferralRedirectURI)
 	form.Set("response_type", "code")
 	form.Set("code_challenge_method", "S256")
-	form.Set("code_challenge", gofakeit.LetterN(43))
+	form.Set("code_challenge", fake.LetterN(43))
 	form.Set("scope", "not_a_valid_scope")
 	form.Set("state", deferralState)
 
@@ -270,7 +270,7 @@ func TestAuthorize_Deferred_LeavesNoUserSession(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile email")
 
 	second, err := httpClient.Get(valid)
@@ -289,7 +289,7 @@ func deferralAuthorizeURL(clientIdentifier string, responseMode string) string {
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&state=" + url.QueryEscape(deferralState) +
 		"&scope=not_a_valid_scope"
 
@@ -357,7 +357,7 @@ func newDeferralClient(t *testing.T) (*models.Client, *models.User, string) {
 	t.Helper()
 
 	client := &models.Client{
-		ClientIdentifier:         "deferral-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "deferral-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -372,14 +372,14 @@ func newDeferralClient(t *testing.T) (*models.Client, *models.User, string) {
 	})
 	require.NoError(t, err)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)

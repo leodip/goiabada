@@ -4,8 +4,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +16,7 @@ import (
 
 // TestToken_AuthCode_AMR_IsArray verifies that AMR in tokens is a JSON array per OIDC spec
 func TestToken_AuthCode_AMR_IsArray(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -64,7 +64,7 @@ func TestToken_AuthCode_AMR_IsArray(t *testing.T) {
 
 // TestToken_Refresh_AMR_IsArray verifies AMR is preserved as array through refresh
 func TestToken_Refresh_AMR_IsArray(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	// Use "openid profile email" instead of "offline_access" to avoid consent flow
 	// The auth code flow still returns a refresh token with these scopes
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")

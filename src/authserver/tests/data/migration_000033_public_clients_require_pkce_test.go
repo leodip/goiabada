@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -75,7 +75,7 @@ func TestMigration000033_PublicClientsRequirePKCE(t *testing.T) {
 	}
 
 	no, yes := false, true
-	random := gofakeit.LetterN(6)
+	random := fake.LetterN(6)
 	cases := []struct {
 		name     string
 		isPublic bool

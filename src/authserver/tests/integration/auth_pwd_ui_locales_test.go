@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,7 +22,7 @@ import (
 // or the form-body capture not being persisted on POST authorize).
 func TestAuthPwd_UILocales_PreservedAcrossFlow(t *testing.T) {
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: "test-uiloc-" + gofakeit.LetterN(8),
+		ClientIdentifier: "test-uiloc-" + fake.LetterN(8),
 		DisplayName:      "Test app",
 		ShowDisplayName:  true,
 		ConsentRequired:  false,
@@ -31,7 +31,7 @@ func TestAuthPwd_UILocales_PreservedAcrossFlow(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)

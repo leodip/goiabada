@@ -5,12 +5,12 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,7 +103,7 @@ func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, client
 	require.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "second-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "second-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -113,7 +113,7 @@ func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, client
 	}
 	require.NoError(t, database.CreateClient(nil, client))
 
-	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: gofakeit.URL()}
+	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(nil, redirectURI))
 
 	const codeVerifier = "code-verifier-second-client"
@@ -122,7 +122,7 @@ func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, client
 		"&response_type=code&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
 		"&scope=" + url.QueryEscape(scope) +
-		"&state=" + gofakeit.LetterN(8) + "&nonce=" + gofakeit.LetterN(8) +
+		"&state=" + fake.LetterN(8) + "&nonce=" + fake.LetterN(8) +
 		"&prompt=none"
 
 	resp, err := httpClient.Get(destURL)
@@ -145,7 +145,7 @@ func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, client
 // token and lost the rotation race simply waited and kept using the family, while the
 // legitimate holder was the one locked out. That is the inversion the issue exists to fix.
 func TestToken_Refresh_Replay_ContainsFamily(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	rt1 := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
@@ -178,11 +178,11 @@ func TestToken_Refresh_Replay_ContainsFamily(t *testing.T) {
 // wrong for a refresh token replay, which implicates one grant's client-side storage.
 // Widening it would punish the legitimate user for the thief's access.
 func TestToken_Refresh_Replay_DoesNotContainOtherFamilies(t *testing.T) {
-	secretA := gofakeit.Password(true, true, true, true, false, 32)
+	secretA := fake.Password(32)
 	httpClient, codeA := createAuthCode(t, secretA, "openid profile email")
 
 	// A second client, federated onto the SAME browser session, with its own family.
-	secretB := gofakeit.Password(true, true, true, true, false, 32)
+	secretB := fake.Password(32)
 	clientB, redirectB, rawCodeB := codeOnSameSessionForNewClient(t, httpClient, secretB, "openid profile")
 
 	storedCodeA, err := database.GetCodeById(nil, codeA.Id)
@@ -212,7 +212,7 @@ func TestToken_Refresh_Replay_DoesNotContainOtherFamilies(t *testing.T) {
 
 	// The browser session itself must survive. A third authorization riding the same
 	// session is what proves it: containment must not have deleted or invalidated it.
-	_, _, rawCodeC := codeOnSameSessionForNewClient(t, httpClient, gofakeit.Password(true, true, true, true, false, 32), "openid")
+	_, _, rawCodeC := codeOnSameSessionForNewClient(t, httpClient, fake.Password(32), "openid")
 	storedCodeC := loadCodeFromDatabase(t, rawCodeC)
 	assert.Equal(t, storedCodeA.SessionIdentifier, storedCodeC.SessionIdentifier,
 		"the browser session must survive containment and still serve new authorizations")
@@ -233,8 +233,8 @@ func TestToken_Refresh_Replay_ContainsROPCFamily(t *testing.T) {
 		_ = database.UpdateSettings(nil, settings)
 	}()
 
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	password := gofakeit.Password(true, true, true, true, false, 12)
+	clientSecret := fake.Password(32)
+	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
 
@@ -280,7 +280,7 @@ func TestToken_Refresh_Replay_ContainsROPCFamily(t *testing.T) {
 // (TestHandleTokenPost_Refresh_Replay_AuditsContainment and the already-revoked subtest),
 // not here: this tier cannot see the audit logger.
 func TestToken_Refresh_Replay_RepeatIsANoOp(t *testing.T) {
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	rt1 := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,

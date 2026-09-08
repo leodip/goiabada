@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateResource(t *testing.T) {
 	resource := &models.Resource{
-		ResourceIdentifier: "test_resource_" + gofakeit.LetterN(6),
+		ResourceIdentifier: "test_resource_" + fake.LetterN(6),
 		Description:        "Test Resource",
 	}
 
@@ -46,7 +46,7 @@ func TestCreateResource(t *testing.T) {
 func TestUpdateResource(t *testing.T) {
 	resource := createTestResource(t)
 
-	resource.ResourceIdentifier = "updated_resource_identifier_" + gofakeit.LetterN(6)
+	resource.ResourceIdentifier = "updated_resource_identifier_" + fake.LetterN(6)
 	resource.Description = "Updated Description"
 
 	time.Sleep(timestampTick)
@@ -229,7 +229,7 @@ func TestDeleteResource(t *testing.T) {
 
 func createTestResource(t *testing.T) *models.Resource {
 	resource := &models.Resource{
-		ResourceIdentifier: "test_resource" + gofakeit.LetterN(4),
+		ResourceIdentifier: "test_resource" + fake.LetterN(4),
 		Description:        "Test Resource",
 	}
 	err := database.CreateResource(nil, resource)
@@ -250,7 +250,7 @@ func createTestResource(t *testing.T) *models.Resource {
 // row comes back and the data layer discards it (commondb.engineFoldedTheMatch). See
 // TestGetClientByClientIdentifierIsCaseSensitive for the whole of the reasoning.
 func TestGetResourceByResourceIdentifierIsCaseSensitive(t *testing.T) {
-	lower := "case_resource_" + strings.ToLower(gofakeit.LetterN(6))
+	lower := "case_resource_" + strings.ToLower(fake.LetterN(6))
 	upper := strings.ToUpper(lower)
 
 	lowerResource := &models.Resource{ResourceIdentifier: lower, Description: "lowercase"}

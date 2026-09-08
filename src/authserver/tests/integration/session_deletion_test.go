@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,7 +35,7 @@ import (
 func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	// Step 1: Create a client and user for testing
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -46,19 +46,19 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -67,9 +67,9 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	// Step 2: Complete a full login to create a session in the database
 	httpClient := createHttpClient(t)
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -130,9 +130,9 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 
 	// Step 5: Start a NEW auth flow with the same httpClient (which still has the old session cookie)
 	// This simulates the user clicking "Login" again after their DB session was deleted
-	requestCodeChallenge2 := gofakeit.LetterN(43)
-	requestState2 := gofakeit.LetterN(8)
-	requestNonce2 := gofakeit.LetterN(8)
+	requestCodeChallenge2 := fake.LetterN(43)
+	requestState2 := fake.LetterN(8)
+	requestNonce2 := fake.LetterN(8)
 
 	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -211,7 +211,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 // on authentication passes and only one keyed on the session refuses.
 func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		// The consent screen is what holds the ceremony still between /auth/completed and
@@ -224,19 +224,19 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(nil, redirectUri)
 	assert.NoError(t, err)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)
@@ -246,15 +246,15 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	// rather than two.
 	httpClient := createHttpClient(t)
 
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
 	assert.NoError(t, err)
@@ -375,9 +375,9 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 
 	// A second authorization request on the same browser, asking for level 2. The session
 	// is reused, so this ceremony never reaches the password handler.
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -466,15 +466,15 @@ func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 
 	// A second authorization on the same browser, silent this time. The client does not
 	// require consent, so with a live session behind it this goes straight to /auth/issue.
-	requestState := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + requestState +
-		"&nonce=" + gofakeit.LetterN(8) +
+		"&nonce=" + fake.LetterN(8) +
 		"&prompt=none"
 
 	resp, err := httpClient.Get(destUrl)

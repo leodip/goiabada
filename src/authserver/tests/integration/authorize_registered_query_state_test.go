@@ -6,12 +6,12 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,10 +53,10 @@ func TestAuthorize_RegisteredQuery_SuccessRedirectCarriesOneState(t *testing.T) 
 		"&redirect_uri=" + url.QueryEscape(registeredQueryRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + url.QueryEscape(registeredQueryState) +
-		"&nonce=" + gofakeit.LetterN(8)
+		"&nonce=" + fake.LetterN(8)
 
 	httpClient := createHttpClient(t)
 
@@ -117,10 +117,10 @@ func TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(registeredQueryRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + gofakeit.LetterN(43) +
+		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + url.QueryEscape(registeredQueryState) +
-		"&nonce=" + gofakeit.LetterN(8) +
+		"&nonce=" + fake.LetterN(8) +
 		"&prompt=none"
 
 	// A fresh cookie jar, so this request carries no session and the silent authentication cannot
@@ -150,7 +150,7 @@ func TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState(t *testing.T) {
 // because this file is its only reader.
 func newRegisteredQueryClient(t *testing.T) (*models.Client, *models.User, string) {
 	client := &models.Client{
-		ClientIdentifier:         "registered-query-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "registered-query-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -165,14 +165,14 @@ func newRegisteredQueryClient(t *testing.T) (*models.Client, *models.User, strin
 	})
 	require.NoError(t, err)
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(nil, user)

@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ import (
 // Returns (httpClientWithCookies, accessToken, code)
 func getUserAccessTokenAndCodeForAccountScope(t *testing.T) (*http.Client, string, *models.Code) {
 	scope := "openid profile email " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
 
 	// Exchange code for tokens using the same client to preserve cookies for session
@@ -51,7 +51,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	// Request logout URL
 	reqBody := api.AccountLogoutRequest{
 		PostLogoutRedirectUri: code.RedirectURI,
-		State:                 gofakeit.LetterN(12),
+		State:                 fake.LetterN(12),
 		ResponseMode:          "redirect",
 	}
 	urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
@@ -159,7 +159,7 @@ func TestLogout_RejectedHint_AsksTheEndUserAndRefusesTheRedirect(t *testing.T) {
 		"id_token_hint":            {"not.a.token"},
 		"post_logout_redirect_uri": {grant.redirectURI},
 		"client_id":                {grant.client.ClientIdentifier},
-		"state":                    {gofakeit.LetterN(8)},
+		"state":                    {fake.LetterN(8)},
 	})
 	defer func() { _ = resp.Body.Close() }()
 
@@ -193,7 +193,7 @@ func TestLogout_RejectedHint_AsksTheEndUserAndRefusesTheRedirect(t *testing.T) {
 func logoutWithHint(t *testing.T, grant *offlineGrant, idToken string) {
 	t.Helper()
 
-	state := gofakeit.LetterN(10)
+	state := fake.LetterN(10)
 	logoutURL := config.GetAuthServer().BaseURL + "/auth/logout?id_token_hint=" + url.QueryEscape(idToken) +
 		"&post_logout_redirect_uri=" + url.QueryEscape(grant.redirectURI) +
 		"&state=" + state
@@ -268,7 +268,7 @@ func TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWork
 	// session listings. What handleExistingSessionOnLogout reads is the NUMBER of clients on the
 	// session, not how each got there.
 	otherClient := &models.Client{
-		ClientIdentifier:         "logout-other-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "logout-other-" + fake.LetterN(8),
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Second client sharing the session",
 		Enabled:                  true,
@@ -955,7 +955,7 @@ func TestLogout_Hintless_UnregisteredTargetIsDeclinedButTheLogoutHappens(t *test
 	resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
 		"post_logout_redirect_uri": {"https://example.com/not-registered"},
 		"client_id":                {grant.client.ClientIdentifier},
-		"state":                    {gofakeit.LetterN(8)},
+		"state":                    {fake.LetterN(8)},
 	})
 	defer func() { _ = resp.Body.Close() }()
 
@@ -1071,7 +1071,7 @@ func followSeeOther(t *testing.T, httpClient *http.Client, resp *http.Response) 
 func TestLogout_CrossOriginPost_WithHintInTheBody_LogsTheUserOut(t *testing.T) {
 	grant := createOfflineGrant(t)
 	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
-	state := gofakeit.LetterN(8)
+	state := fake.LetterN(8)
 
 	before, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
 	require.NoError(t, err)
@@ -1163,7 +1163,7 @@ func TestLogout_CrossOriginPost_WithoutHint_IsRefused(t *testing.T) {
 	resp := crossOriginLogoutPost(t, grant.httpClient, url.Values{
 		"post_logout_redirect_uri": {grant.redirectURI},
 		"client_id":                {grant.client.ClientIdentifier},
-		"state":                    {gofakeit.LetterN(8)},
+		"state":                    {fake.LetterN(8)},
 	})
 	defer func() { _ = resp.Body.Close() }()
 
@@ -1204,7 +1204,7 @@ func TestLogout_CrossOriginPost_WithoutHint_IsRefused(t *testing.T) {
 // exists to avoid, and because it feeds input already judged unusable back into the next request.
 func TestLogout_CrossOriginPost_RejectedHint_ReachesASubmittableConsentPage(t *testing.T) {
 	grant := createOfflineGrant(t)
-	state := gofakeit.LetterN(8)
+	state := fake.LetterN(8)
 
 	// A registered URI and a real client_id, so the redirect below is refused because the hint was
 	// rejected and not because the target failed validation. Without the hint these same parameters

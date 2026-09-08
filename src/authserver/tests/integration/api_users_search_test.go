@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 
 	// Setup: Create test users with unique identifiers to avoid conflicts
 	// and allow searching by query instead of paginating through all users
-	uniqueSuffix := gofakeit.LetterN(10)
+	uniqueSuffix := fake.LetterN(10)
 	testUsers := createTestUsersWithSuffix(t, uniqueSuffix)
 	defer func() {
 		// Cleanup: Delete test users
@@ -82,7 +82,7 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test users with more unique identifiers to avoid conflicts
-	uniqueSuffix := gofakeit.LetterN(8)
+	uniqueSuffix := fake.LetterN(8)
 	user1 := &models.User{
 		Subject:       uuid.New(),
 		Enabled:       true,

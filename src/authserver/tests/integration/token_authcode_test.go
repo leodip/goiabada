@@ -5,16 +5,16 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestToken_AuthCode_MissingCode(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
@@ -22,7 +22,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {gofakeit.LetterN(43)},
+		"code_verifier": {fake.LetterN(43)},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
@@ -32,7 +32,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 }
 
 func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
@@ -40,7 +40,7 @@ func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
-		"code_verifier": {gofakeit.LetterN(43)},
+		"code_verifier": {fake.LetterN(43)},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
@@ -50,7 +50,7 @@ func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 }
 
 func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -70,7 +70,7 @@ func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 }
 
 func TestToken_AuthCode_ClientDoesNotExist(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
@@ -79,7 +79,7 @@ func TestToken_AuthCode_ClientDoesNotExist(t *testing.T) {
 		"client_id":     {"non-existent-client"},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {gofakeit.LetterN(43)},
+		"code_verifier": {fake.LetterN(43)},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
@@ -89,7 +89,7 @@ func TestToken_AuthCode_ClientDoesNotExist(t *testing.T) {
 }
 
 func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
@@ -98,7 +98,7 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {"invalid_code"},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {gofakeit.LetterN(43)},
+		"code_verifier": {fake.LetterN(43)},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
@@ -108,7 +108,7 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 }
 
 func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
@@ -117,7 +117,7 @@ func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {"https://invalid-redirect-uri.com"},
-		"code_verifier": {gofakeit.LetterN(43)},
+		"code_verifier": {fake.LetterN(43)},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
@@ -127,11 +127,11 @@ func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 }
 
 func TestToken_AuthCode_WrongClient(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
 	// Create a new client to use as the wrong client
 	wrongClient := &models.Client{
-		ClientIdentifier:         "wrong-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "wrong-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -147,7 +147,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 		"client_id":     {wrongClient.ClientIdentifier}, // Use the wrong client ID
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {gofakeit.LetterN(43)},
+		"code_verifier": {fake.LetterN(43)},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
@@ -157,7 +157,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 }
 
 func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
+	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
 	// Ensure the client is not public (confidential)
 	code.Client.IsPublic = false
@@ -171,7 +171,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {gofakeit.LetterN(43)},
+		"code_verifier": {fake.LetterN(43)},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
@@ -182,7 +182,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 }
 
 func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	// Ensure the client is confidential (not public)
@@ -197,7 +197,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {gofakeit.LetterN(43)},
+		"code_verifier": {fake.LetterN(43)},
 		"client_secret": {"incorrect_secret"}, // Provide an incorrect client secret
 	}
 
@@ -209,7 +209,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 }
 
 func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	code.Client.IsPublic = false
@@ -234,7 +234,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 }
 
 func TestToken_AuthCode_SuccessPath(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -265,7 +265,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 // RFC 6749 Section 4.1.2: a previously used authorization code MUST be rejected.
 // First exchange succeeds; replaying the same code returns invalid_grant.
 func TestToken_AuthCode_CodeReuse_ReturnsInvalidGrant(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -297,7 +297,7 @@ func TestToken_AuthCode_CodeReuse_ReturnsInvalidGrant(t *testing.T) {
 // revoke any tokens previously issued from that code. This pins the refresh-token
 // half of that requirement.
 func TestToken_AuthCode_CodeReuse_RevokesRefreshToken(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -336,7 +336,7 @@ func TestToken_AuthCode_CodeReuse_RevokesRefreshToken(t *testing.T) {
 // half of the revocation requirement (covers the OIDC conformance scenario
 // oidcc-codereuse-30seconds, which calls /userinfo after replaying a code).
 func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -390,7 +390,7 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 // Deliberately thin, because normalizeScope's exhaustive table lives in the handlers package; this
 // asserts only that refresh benefits from the shared helper.
 func TestToken_Refresh_TabSeparatedDownScopeIsNormalized(t *testing.T) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 
 	// Not offline_access: it routes the flow through /auth/consent, which createAuthCode does not
 	// walk, and the auth code grant returns a refresh token with these scopes anyway.

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -24,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -236,7 +236,7 @@ func assertWithinLastXSeconds(t *testing.T, timeToCheck time.Time, seconds float
 
 func createResource(t *testing.T) *models.Resource {
 	resource := &models.Resource{
-		ResourceIdentifier: "res-" + gofakeit.LetterN(8),
+		ResourceIdentifier: "res-" + fake.LetterN(8),
 	}
 	err := database.CreateResource(nil, resource)
 	if err != nil {
@@ -258,7 +258,7 @@ func createResourceWithId(t *testing.T, resourceIdentifier string) *models.Resou
 
 func createPermission(t *testing.T, resourceId int64) *models.Permission {
 	permission := &models.Permission{
-		PermissionIdentifier: "perm-" + gofakeit.LetterN(8),
+		PermissionIdentifier: "perm-" + fake.LetterN(8),
 		ResourceId:           resourceId,
 	}
 	err := database.CreatePermission(nil, permission)
@@ -347,7 +347,7 @@ func createAuthenticatedHttpClient(t *testing.T) *http.Client {
 
 func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *models.RedirectURI, *models.User) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -361,7 +361,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -369,7 +369,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -378,7 +378,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -387,9 +387,9 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -456,7 +456,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 
 func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Client, *models.RedirectURI, *models.User) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -470,7 +470,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -478,7 +478,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
@@ -487,7 +487,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 	user := &models.User{
 		Subject:      uuid.New(),
 		Enabled:      true,
-		Email:        gofakeit.Email(),
+		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
 
@@ -496,9 +496,9 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -569,7 +569,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 
 func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Client, *models.RedirectURI, *models.User) {
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
@@ -583,7 +583,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -591,13 +591,13 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 		t.Fatal(err)
 	}
 
-	password := gofakeit.Password(true, true, true, true, false, 8)
+	password := fake.Password(8)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	userEmail := gofakeit.Email()
+	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
@@ -609,7 +609,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	user := &models.User{
 		Subject:            uuid.New(),
 		Enabled:            true,
-		Email:              gofakeit.Email(),
+		Email:              fake.Email(),
 		PasswordHash:       passwordHashed,
 		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
@@ -621,9 +621,9 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -750,7 +750,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 opt.isPublic,
@@ -772,7 +772,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
-		URI:      gofakeit.URL(),
+		URI:      fake.URL(),
 	}
 
 	err = database.CreateRedirectURI(nil, redirectUri)
@@ -783,7 +783,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 	password := opt.userPassword
 	user := opt.user
 	if user == nil {
-		password = gofakeit.Password(true, true, true, true, false, 8)
+		password = fake.Password(8)
 		passwordHashed, err := hashutil.HashPassword(password)
 		if err != nil {
 			t.Fatal(err)
@@ -792,7 +792,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		user = &models.User{
 			Subject:      uuid.New(),
 			Enabled:      true,
-			Email:        gofakeit.Email(),
+			Email:        fake.Email(),
 			PasswordHash: passwordHashed,
 		}
 
@@ -804,8 +804,8 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 
 	codeVerifier := "code-verifier"
 	requestCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -874,7 +874,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 	assert.NoError(t, err)
 
 	client := &models.Client{
-		ClientIdentifier:         "acctscope-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "acctscope-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
@@ -888,20 +888,20 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{ClientId: client.Id, URI: gofakeit.URL()}
+	redirectUri := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	err = database.CreateRedirectURI(nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a user and pre-grant all custom resource scopes requested
-	password := gofakeit.Password(true, true, true, true, false, 10)
+	password := fake.Password(10)
 	passwordHashed, err := hashutil.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	user := &models.User{Subject: uuid.New(), Enabled: true, Email: gofakeit.Email(), PasswordHash: passwordHashed}
+	user := &models.User{Subject: uuid.New(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	err = database.CreateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -949,8 +949,8 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 
 	codeVerifier := "code-verifier"
 	requestCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -1006,7 +1006,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 // createUserAccessTokenWithScope issues an access token for a user making sure requested
 // custom scopes are granted to that user before the flow. Returns (accessToken, *user).
 func createUserAccessTokenWithScope(t *testing.T, scope string) (string, *models.User) {
-	clientSecret := gofakeit.LetterN(32)
+	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
 
 	// Exchange code for tokens
@@ -1108,13 +1108,13 @@ func dumpResponseBody(t *testing.T, response *http.Response) {
 // createAdminClientWithToken creates a client with admin permissions and returns an access token
 func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 	// Generate client secret
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	// Create client with admin permissions
 	client := &models.Client{
-		ClientIdentifier:         "admin-test-client-" + gofakeit.LetterN(8),
+		ClientIdentifier:         "admin-test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -1496,9 +1496,9 @@ func navigateToPasswordScreen(t *testing.T, httpClient *http.Client, client *mod
 // but appends an ui_locales query parameter (space-separated BCP 47 tags) when
 // non-empty, exercising the OIDC hint preservation across the redirect chain.
 func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client, client *models.Client, redirectUri, uiLocales string) *http.Response {
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -1535,9 +1535,9 @@ func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client
 func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *models.Client, user *models.User,
 	password string, redirectUri string) *http.Response {
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -1589,9 +1589,9 @@ func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *models.C
 func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *models.Client,
 	user *models.User, password string, redirectUri string) *http.Response {
 
-	requestCodeChallenge := gofakeit.LetterN(43)
-	requestState := gofakeit.LetterN(8)
-	requestNonce := gofakeit.LetterN(8)
+	requestCodeChallenge := fake.LetterN(43)
+	requestState := fake.LetterN(8)
+	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
