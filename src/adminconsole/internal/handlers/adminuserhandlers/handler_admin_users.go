@@ -6,10 +6,10 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
-	"github.com/unknwon/paginater"
 )
 
 func HandleAdminUsersGet(
@@ -53,7 +53,7 @@ func HandleAdminUsersGet(
 			PageSize: pageSize,
 		}
 
-		p := paginater.New(total, pageSize, pageInt, 5)
+		p := pagination.New(total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
 			"pageResult": pageResult,

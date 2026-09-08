@@ -7,13 +7,13 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pkg/errors"
-	"github.com/unknwon/paginater"
 )
 
 func HandleAdminSettingsAuditLogsGet(
@@ -185,7 +185,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 			AuditEvent: auditEvent,
 		}
 
-		p := paginater.New(auditLogsResp.Total, pageSize, pageInt, 5)
+		p := pagination.New(auditLogsResp.Total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
 			"pageResult":      pageResult,
