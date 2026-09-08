@@ -523,7 +523,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	// Ordering by the primary key as well makes the order total, which is what makes paging
 	// through it correct. Same reason audit_log.go pages by created_at DESC, id DESC (#112).
 	selectBuilder.OrderByAsc("users.given_name").OrderByAsc("users.id")
-	selectBuilder.Offset((page - 1) * pageSize)
+	selectBuilder.Offset(PageOffset(page, pageSize))
 	selectBuilder.Limit(pageSize)
 
 	sql, args := selectBuilder.Build()

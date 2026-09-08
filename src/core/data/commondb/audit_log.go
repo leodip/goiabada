@@ -115,7 +115,7 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 		pageSize = 200
 	}
 
-	offset := (page - 1) * pageSize
+	offset := PageOffset(page, pageSize)
 
 	auditLogStruct := sqlbuilder.NewStruct(new(models.AuditLog)).
 		For(d.Flavor)

@@ -227,7 +227,7 @@ func (d *CommonDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionI
 	// given_name does not order the rows totally, so paging over it alone can repeat a user on
 	// the next page and skip another. See SearchUsersPaginated in user.go for the full reason (#112).
 	selectBuilder.OrderByAsc("users.given_name").OrderByAsc("users.id")
-	selectBuilder.Offset((page - 1) * pageSize)
+	selectBuilder.Offset(PageOffset(page, pageSize))
 	selectBuilder.Limit(pageSize)
 
 	sql, args := selectBuilder.Build()
