@@ -3,8 +3,8 @@
 # Every key referenced by code or templates must have an entry here.
 # Other locales are translations of this file.
 #
-# Format: simple "key" = "value" (go-i18n parses dotted keys via TOML
-# string keys). Use [section]\nother = "..." for plural forms when needed.
+# Format: simple "key" = "value". Values are plain strings; {{.name}}
+# placeholders render with Go text/template. A [table] is refused at startup.
 
 # --- Common shared strings ---------------------------------------------------
 

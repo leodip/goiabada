@@ -9,7 +9,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // AuthContextReader matches the subset of *handlerhelpers.AuthHelper that
@@ -132,7 +131,8 @@ func resolveLocale(ctx context.Context, r *http.Request, authHelper AuthContextR
 		}
 	}
 
-	// (3) Accept-Language. go-i18n parses the header per RFC 7231.
+	// (3) Accept-Language, parsed per RFC 9110 section 12.5.4 and matched
+	// against the loaded catalogs (see Bundle.localizerFor).
 	if al := r.Header.Get("Accept-Language"); al != "" {
 		return attachLocale(ctx, bundle.localizerFor([]string{al}), al, false)
 	}
@@ -247,7 +247,7 @@ func RefineLocalizerWithUILocales(r *http.Request, uiLocales []string) *http.Req
 // (the first preference used to build the localizer; "en" for the bundle's
 // English fallback). The tag is used by the CLDR-backed display helpers
 // (RefCountry/RefPhoneCountry/RefTimezone).
-func attachLocale(ctx context.Context, loc *i18n.Localizer, tag string, explicit bool) context.Context {
+func attachLocale(ctx context.Context, loc *Translator, tag string, explicit bool) context.Context {
 	ctx = context.WithValue(ctx, ctxKeyLocalizer, loc)
 	ctx = context.WithValue(ctx, ctxKeyLocaleTag, primaryTag(tag))
 	ctx = context.WithValue(ctx, ctxKeyExplicitIntent, explicit)
