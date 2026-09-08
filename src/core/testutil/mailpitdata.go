@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,7 +84,10 @@ func deleteMailpitMessage(t *testing.T, messageID string) {
 	defer func() { _ = resp.Body.Close() }()
 }
 
-func AssertEmailSent(t *testing.T, to string, containing string) {
+// AssertEmailSent finds the message mailpit received for the recipient whose body contains the
+// given text, and returns it as mailpit parsed it, so a caller can go on to assert on headers a
+// real MIME parser read back rather than on the bytes we wrote (#274).
+func AssertEmailSent(t *testing.T, to string, containing string) MailpitMessage {
 	// Mailpit uses /api/v1/messages with query parameter for searching
 	// Search syntax: to:email@example.com
 	query := url.QueryEscape("to:" + to)
@@ -105,6 +107,7 @@ func AssertEmailSent(t *testing.T, to string, containing string) {
 	require.GreaterOrEqual(t, len(mailpitData.Messages), 1, "expecting to find at least 1 email for recipient: %s", to)
 
 	// Find the most recent message (first in the list) that matches our criteria
+	var matched MailpitMessage
 	var matchedMessageID string
 	var matchFound bool
 
@@ -138,15 +141,20 @@ func AssertEmailSent(t *testing.T, to string, containing string) {
 		// Check if the content is in either HTML or Text body
 		if strings.Contains(message.HTML, containing) || strings.Contains(message.Text, containing) {
 			matchFound = true
+			matched = message
 			matchedMessageID = messageID
 			break
 		}
 	}
 
-	assert.True(t, matchFound, "Email body should contain: %s", containing)
+	// require rather than assert: the message is returned now, so continuing past a miss would
+	// assert on a zero value and report a second, misleading failure about the headers (#274).
+	require.True(t, matchFound, "Email body should contain: %s", containing)
 
 	// Clean up: delete the matched message to avoid accumulation
 	if matchedMessageID != "" {
 		deleteMailpitMessage(t, matchedMessageID)
 	}
+
+	return matched
 }
