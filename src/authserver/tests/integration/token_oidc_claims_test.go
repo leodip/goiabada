@@ -327,7 +327,14 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		gender = enums.GenderMale.String()
 	}
 
-	// Create user with full profile data
+	// Create user with full profile data.
+	//
+	// ZoneInfo and Locale are the two profile fields ProfileValidator checks
+	// against a fixed repository list, so both carry a value from those lists
+	// rather than a generated run: a profile the server would refuse at its own
+	// API is a weaker thing for the claim assertions to run against. Nothing
+	// below asserts on either value, only that the claim carries what was
+	// stored (#272).
 	user := &models.User{
 		Subject:             uuid.New(),
 		Enabled:             true,
@@ -341,7 +348,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		Website:             fake.URL(),
 		Gender:              gender,
 		BirthDate:           sql.NullTime{Time: fake.Date(), Valid: true},
-		ZoneInfo:            "tz" + fake.LetterN(6),
+		ZoneInfo:            "America/New_York",
 		Locale:              "en-US",
 		PhoneNumber:         fake.DigitN(10),
 		PhoneNumberVerified: true,
