@@ -28,11 +28,18 @@ const maxApiPageSize = 200
 // nonsense, and the bound is what keeps the offset in range at both ends of the
 // call, so the clamp that follows has a total to work from.
 //
-// The bound is math.MaxInt/maxApiPageSize, so the product is in range on any
-// platform's int rather than only on a 64-bit one. That is a page number no
-// list will ever reach: at the console's page size of 10 it is a list of
-// 4.6e17 rows.
-var maxPage = math.MaxInt / maxApiPageSize
+// The bound is the largest page whose offset fits: the offset is
+// (page-1)*pageSize, so it fits exactly while page-1 is at most
+// math.MaxInt/pageSize, which makes the last good page math.MaxInt/pageSize+1.
+// The "+1" is not decoration -- without it the bound is one page tighter than
+// the arithmetic requires, and a bound documented as the largest safe one has
+// to actually be it.
+//
+// Dividing rather than hard-coding a number keeps the product in range on any
+// platform's int rather than only on a 64-bit one. Either way it is a page
+// number no list will ever reach: at the console's page size of 10 it is a list
+// of 4.6e17 rows.
+var maxPage = math.MaxInt/maxApiPageSize + 1
 
 // ParsePage turns the raw value of a "?page=" query parameter into a page
 // number. Anything a browser can put there and this package cannot use -- an
