@@ -98,19 +98,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 			}
 		}
 
-		page := r.URL.Query().Get("page")
-		if len(page) == 0 {
-			page = "1"
-		}
-		pageInt, err := strconv.Atoi(page)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if pageInt < 1 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("invalid page %d", pageInt)))
-			return
-		}
+		pageInt := pagination.ParsePage(r.URL.Query().Get("page"))
 
 		const pageSize = 10
 		var usersWithPermission []models.User
@@ -121,6 +109,22 @@ func HandleAdminResourceUsersWithPermissionGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
+
+			// A page past the last one is only visible once the total has come
+			// back. Ask again at the last page rather than render an empty list
+			// under a bar that highlights a full one (#305).
+			if clamped := pagination.ClampPage(total, pageSize, pageInt); clamped != pageInt {
+				pageInt = clamped
+				usersWithPermission, total, err = apiClient.GetUsersByPermission(accessToken, selectedPermission, pageInt, pageSize)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+			}
+		} else {
+			// No permission is selected, so nothing is listed and the bar holds a
+			// lone page 1. Any page number lands on it.
+			pageInt = 1
 		}
 
 		pageResult := UsersWithPermissionPageResult{
@@ -360,15 +364,10 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 			return
 		}
 
-		page := r.URL.Query().Get("page")
-		if len(page) == 0 {
-			page = "1"
-		}
-		pageInt, err := strconv.Atoi(page)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+		// Only carried forward, into the link back to the list; the same parse as
+		// the list's, so an unparseable page does not answer 500 on one page and
+		// render on the other (#305).
+		pageInt := pagination.ParsePage(r.URL.Query().Get("page"))
 
 		bind := map[string]interface{}{
 			"resourceId":                   resource.Id,

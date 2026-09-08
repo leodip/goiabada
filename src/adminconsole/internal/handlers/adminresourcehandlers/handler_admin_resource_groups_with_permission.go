@@ -103,19 +103,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			}
 		}
 
-		page := r.URL.Query().Get("page")
-		if len(page) == 0 {
-			page = "1"
-		}
-		pageInt, err := strconv.Atoi(page)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if pageInt < 1 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("invalid page %d", pageInt)))
-			return
-		}
+		pageInt := pagination.ParsePage(r.URL.Query().Get("page"))
 
 		const pageSize = 10
 		var (
@@ -130,6 +118,21 @@ func HandleAdminResourceGroupsWithPermissionGet(
 				return
 			}
 			total = len(allGroups)
+
+			// This is the one page in the admin console that slices the list itself
+			// rather than asking the API for a page of it, so the clamp is
+			// arithmetic here and not a second call.
+			//
+			// It is also what keeps the slice below in range. pageInt comes from
+			// "?page=" and used to be checked only for being at least 1, so
+			// "?page=9223372036854775807" wrapped the product negative and panicked
+			// the request on allGroups[start:end] before anything rendered (#305).
+			// A clamped page cannot: it is at most the page count, so start is at
+			// most total. The two guards after it are kept as the bound on the
+			// slice expression itself, so a future edit to the clamp cannot turn
+			// back into a panic.
+			pageInt = pagination.ClampPage(total, pageSize, pageInt)
+
 			start := (pageInt - 1) * pageSize
 			if start > total {
 				start = total
@@ -150,6 +153,20 @@ func HandleAdminResourceGroupsWithPermissionGet(
 				return
 			}
 			total = total2
+
+			// A page past the last one is only visible once the total has come
+			// back. Ask again at the last page rather than render an empty list
+			// under a bar that highlights a full one (#305).
+			if clamped := pagination.ClampPage(total, pageSize, pageInt); clamped != pageInt {
+				pageInt = clamped
+				annotatedGroups, total2, err = apiClient.SearchGroupsWithPermissionAnnotation(accessToken, selectedPermission, pageInt, pageSize)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+				total = total2
+			}
+
 			groupInfoArr = make([]GroupInfo, len(annotatedGroups))
 			for i, grp := range annotatedGroups {
 				groupInfoArr[i] = GroupInfo{

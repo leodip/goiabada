@@ -40,19 +40,7 @@ func New(total, pageSize, current, numPages int) *Paginator {
 		current = 1
 	}
 
-	// Quotient and remainder, not (total + pageSize - 1) / pageSize: that
-	// addition overflows once total is within pageSize of the largest int, and
-	// the negative count it produces is then clamped to one page, so a result
-	// set that large would draw a single "[1]" and hide every other page behind
-	// a disabled arrow. The library this replaced divided first for the same
-	// reason (#271).
-	totalPages := total / pageSize
-	if total%pageSize != 0 {
-		totalPages++
-	}
-	if totalPages < 1 {
-		totalPages = 1
-	}
+	totalPages := pageCount(total, pageSize)
 	if current > totalPages {
 		current = totalPages
 	}
@@ -116,4 +104,30 @@ func New(total, pageSize, current, numPages int) *Paginator {
 	}
 
 	return p
+}
+
+// pageCount is how many pages of pageSize items a list of total items fills,
+// with an empty list still filling one page: a bar is drawn for it, holding a
+// lone "[1]".
+//
+// Quotient and remainder, not (total + pageSize - 1) / pageSize: that addition
+// overflows once total is within pageSize of the largest int, and the negative
+// count it produces is then clamped to one page, so a result set that large
+// would draw a single "[1]" and hide every other page behind a disabled arrow.
+// The library this replaced divided first for the same reason (#271).
+//
+// New and ClampPage both count pages through here, which is what makes the page
+// a handler settles on and the page the bar highlights the same page (#305).
+func pageCount(total, pageSize int) int {
+	if pageSize <= 0 {
+		pageSize = 1
+	}
+	pages := total / pageSize
+	if total%pageSize != 0 {
+		pages++
+	}
+	if pages < 1 {
+		pages = 1
+	}
+	return pages
 }
