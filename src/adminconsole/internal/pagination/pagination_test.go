@@ -2,6 +2,7 @@ package pagination
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -454,14 +455,20 @@ func parseTable(t *testing.T) (rows []tableRow, marked int) {
 
 // format writes a Paginator back into the table's notation, so a failing row
 // prints beside the row that produced it.
+//
+// The arms are ordered as partials/paginator.html orders its own: IsCurrent
+// first, then the -1 sentinel. Testing Num == -1 first instead would print a
+// sentinel that wrongly carried IsCurrent as plain "...", matching the table
+// while the partial rendered it as an active "-1" button, so the notation would
+// hide the one Page value the template can tell apart and the table cannot.
 func format(row tableRow, p *Paginator) string {
 	bar := make([]string, 0, len(p.Pages))
 	for _, page := range p.Pages {
 		switch {
-		case page.Num == -1:
-			bar = append(bar, "...")
 		case page.IsCurrent:
 			bar = append(bar, "["+strconv.Itoa(page.Num)+"]")
+		case page.Num == -1:
+			bar = append(bar, "...")
 		default:
 			bar = append(bar, strconv.Itoa(page.Num))
 		}
@@ -483,6 +490,38 @@ func TestNew_Table(t *testing.T) {
 		t.Run(fmt.Sprintf("total=%d_size=%d_cur=%d_n=%d", row.total, row.size, row.cur, row.n), func(t *testing.T) {
 			assert.Equal(t, row.expected, format(row, New(row.total, row.size, row.cur, row.n)))
 		})
+	}
+}
+
+// TestNew_HugeTotalDoesNotOverflow pins the page count where the table cannot
+// reach: a total within pageSize of the largest int. Computing the count as
+// (total + pageSize - 1) / pageSize wraps there and the clamp turns the
+// negative into a single page, so the bar would draw "[1]" alone over a result
+// set with billions of pages in it.
+//
+// Only the page count is swept here. HasNext multiplies current by pageSize and
+// that product still wraps on the last page of a MaxInt-sized total, which is
+// what the library did too and what decision 3 keeps.
+func TestNew_HugeTotalDoesNotOverflow(t *testing.T) {
+	for _, size := range []int{10, 20} { // the two page sizes the handlers pass
+		// The largest exact multiple of size, so the count is total/size with
+		// nothing left over and current*size cannot wrap on the last page
+		// either. Adding size-1 to it does wrap, which is the bug.
+		total := math.MaxInt - math.MaxInt%size
+		wantPages := total / size
+
+		first := New(total, size, 1, 5)
+		assert.Equal(t, []Page{{Num: 1, IsCurrent: true}, {Num: 2}, {Num: 3}, {Num: 4}, {Num: 5}, {Num: -1}}, first.Pages,
+			"size=%d: five pages and an ellipsis, not a lone [1]", size)
+		assert.True(t, first.HasNext, "size=%d: the forward arrow is live on page 1", size)
+
+		// The clamp lands on the real last page rather than a wrapped one.
+		last := New(total, size, math.MaxInt, 5)
+		require.NotEmpty(t, last.Pages, "size=%d", size)
+		assert.Equal(t, Page{Num: wantPages, IsCurrent: true}, last.Pages[len(last.Pages)-1],
+			"size=%d: the last page is current", size)
+		assert.True(t, last.HasPrevious, "size=%d: the back arrow is live on the last page", size)
+		assert.False(t, last.HasNext, "size=%d: nothing follows the last page", size)
 	}
 }
 

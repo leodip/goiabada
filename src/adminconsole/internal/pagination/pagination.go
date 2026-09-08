@@ -40,7 +40,16 @@ func New(total, pageSize, current, numPages int) *Paginator {
 		current = 1
 	}
 
-	totalPages := (total + pageSize - 1) / pageSize
+	// Quotient and remainder, not (total + pageSize - 1) / pageSize: that
+	// addition overflows once total is within pageSize of the largest int, and
+	// the negative count it produces is then clamped to one page, so a result
+	// set that large would draw a single "[1]" and hide every other page behind
+	// a disabled arrow. The library this replaced divided first for the same
+	// reason (#271).
+	totalPages := total / pageSize
+	if total%pageSize != 0 {
+		totalPages++
+	}
 	if totalPages < 1 {
 		totalPages = 1
 	}

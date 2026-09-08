@@ -28,8 +28,6 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/timezones"
 
-	"github.com/google/uuid"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -299,7 +297,10 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 func TestRender_AdminUsersPaginator(t *testing.T) {
 	out := render(t, "/admin_users.html", map[string]interface{}{
 		"pageResult": adminuserhandlers.PageResult{
-			Users:    []models.User{{Id: 1, Subject: uuid.New(), Username: "alice", Email: "alice@example.com"}},
+			// Subject is left at its zero UUID: the row only has to render, and
+			// importing google/uuid for it would make adminconsole a direct
+			// consumer of a module it otherwise only inherits.
+			Users:    []models.User{{Id: 1, Username: "alice", Email: "alice@example.com"}},
 			Total:    73,
 			Query:    "",
 			Page:     4,
