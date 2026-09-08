@@ -32,7 +32,7 @@ func TestSendEmail(t *testing.T) {
 		SMTPUsername:          "",
 		SMTPPasswordEncrypted: nil,
 		SMTPEncryption:        "none",
-		SMTPFromName:          "Test Sender",
+		SMTPFromName:          "Acme, Inc.",
 		SMTPFromEmail:         "sender@example.com",
 	})
 
@@ -47,7 +47,21 @@ func TestSendEmail(t *testing.T) {
 	err := emailSender.SendEmail(ctx, input)
 	assert.NoError(t, err)
 
-	testutil.AssertEmailSent(t, recipient, "<p>This is a test email</p>")
+	sent := testutil.AssertEmailSent(t, recipient, "<p>This is a test email</p>")
+
+	// The from-name carries a comma on purpose. go-simple-mail concatenated the name unquoted and
+	// then parsed the result, so this send failed outright with "mail: missing '@' or angle-addr"
+	// while the settings API accepted the name; net/mail quotes it. Read back here through a real
+	// SMTP server and a real MIME parser rather than off the bytes we wrote (#274).
+	assert.Equal(t, "Acme, Inc.", sent.From.Name)
+	assert.Equal(t, "sender@example.com", sent.From.Address)
+
+	// RFC 5322 section 3.6.4: every message SHOULD carry a Message-ID. Mailpit reports it without
+	// the angle brackets it arrived in, so this asserts on the domain rather than the whole value;
+	// its shape is pinned at the unit seam by TestSendEmail_MessageID (#274).
+	assert.NotEmpty(t, sent.MessageID)
+	assert.True(t, strings.HasSuffix(sent.MessageID, "@example.com"),
+		"Message-ID %q should be rooted in the from address's domain", sent.MessageID)
 }
 
 // The fixtures the table below shares. The from address's domain is what the Message-ID assertion
