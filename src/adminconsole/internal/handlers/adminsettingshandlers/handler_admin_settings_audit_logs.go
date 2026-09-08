@@ -163,10 +163,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		pageStr := r.URL.Query().Get("page")
 		auditEvent := r.URL.Query().Get("auditEvent")
 
-		pageInt, err := strconv.Atoi(pageStr)
-		if err != nil || pageInt < 1 {
-			pageInt = 1
-		}
+		pageInt := pagination.ParsePage(pageStr)
 
 		const pageSize = 20
 
@@ -175,6 +172,18 @@ func HandleAdminSettingsAuditLogViewerGet(
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
+		}
+
+		// A page past the last one is only visible once the total has come back.
+		// Ask again at the last page rather than render an empty list under a bar
+		// that highlights a full one (#305).
+		if clamped := pagination.ClampPage(auditLogsResp.Total, pageSize, pageInt); clamped != pageInt {
+			pageInt = clamped
+			auditLogsResp, err = apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent)
+			if err != nil {
+				handlers.HandleAPIError(httpHelper, w, r, err)
+				return
+			}
 		}
 
 		pageResult := AuditLogsPageResult{

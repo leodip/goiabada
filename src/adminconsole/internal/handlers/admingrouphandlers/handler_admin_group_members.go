@@ -1,7 +1,6 @@
 package admingrouphandlers
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -52,25 +51,25 @@ func HandleAdminGroupMembersGet(
 			return
 		}
 
-		page := r.URL.Query().Get("page")
-		if len(page) == 0 {
-			page = "1"
-		}
-		pageInt, err := strconv.Atoi(page)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if pageInt < 1 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("invalid page %d", pageInt)))
-			return
-		}
+		pageInt := pagination.ParsePage(r.URL.Query().Get("page"))
 
 		const pageSize = 10
 		users, total, err := apiClient.GetGroupMembers(jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
+		}
+
+		// A page past the last one is only visible once the total has come back.
+		// Ask again at the last page rather than render an empty list under a bar
+		// that highlights a full one (#305).
+		if clamped := pagination.ClampPage(total, pageSize, pageInt); clamped != pageInt {
+			pageInt = clamped
+			users, total, err = apiClient.GetGroupMembers(jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
+			if err != nil {
+				handlers.HandleAPIError(httpHelper, w, r, err)
+				return
+			}
 		}
 
 		pageResult := PageResult{

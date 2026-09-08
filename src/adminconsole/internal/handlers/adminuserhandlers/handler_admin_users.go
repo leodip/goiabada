@@ -2,7 +2,6 @@ package adminuserhandlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -22,13 +21,7 @@ func HandleAdminUsersGet(
 		page := r.URL.Query().Get("page")
 		query := r.URL.Query().Get("query")
 
-		pageInt, err := strconv.Atoi(page)
-		if err != nil {
-			pageInt = 1
-		}
-		if pageInt < 1 {
-			pageInt = 1
-		}
+		pageInt := pagination.ParsePage(page)
 
 		const pageSize = 10
 
@@ -43,6 +36,21 @@ func HandleAdminUsersGet(
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
+		}
+
+		// The total is only known once the search has answered, so a page past the
+		// end can only be caught here. Ask again at the last page, so the rows and
+		// the bar agree instead of an empty list rendering under a bar that
+		// highlights a full one (#305). Once, not in a loop: a total that moves
+		// again between these two calls is a list somebody else is editing, and the
+		// page after it is as good an answer as any.
+		if clamped := pagination.ClampPage(total, pageSize, pageInt); clamped != pageInt {
+			pageInt = clamped
+			users, total, err = apiClient.SearchUsersPaginated(jwtInfo.TokenResponse.AccessToken, query, pageInt, pageSize)
+			if err != nil {
+				handlers.HandleAPIError(httpHelper, w, r, err)
+				return
+			}
 		}
 
 		pageResult := PageResult{
