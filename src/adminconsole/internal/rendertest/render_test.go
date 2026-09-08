@@ -16,6 +16,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
+	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -25,6 +27,8 @@ import (
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/timezones"
+
+	"github.com/google/uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -282,4 +286,48 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 	// The intro says the value is a bare origin rather than a URL, which is where the trailing
 	// slash that CORS can never match used to come from.
 	assert.Contains(t, out, "sem nada depois do host")
+}
+
+// TestRender_AdminUsersPaginator is the template hop of the paginator swap (#271): the partial is
+// unchanged and now reads a *pagination.Paginator instead of the unmaintained library's value, so
+// what needs proving is that a Go template resolves the replacement's exported fields the way it
+// resolved the library's niladic methods, and that addUrlParam turns them into page links.
+//
+// 73 users at 10 a page on page 4 is 8 pages, which exercises both ends of the bar at once:
+// "1 2 3 [4] 5 6 ...". The lone "1" is decision 3's rule, the one place this change departs from
+// the library, which would have put dots there and left page 1 reachable only by walking back.
+func TestRender_AdminUsersPaginator(t *testing.T) {
+	out := render(t, "/admin_users.html", map[string]interface{}{
+		"pageResult": adminuserhandlers.PageResult{
+			Users:    []models.User{{Id: 1, Subject: uuid.New(), Username: "alice", Email: "alice@example.com"}},
+			Total:    73,
+			Query:    "",
+			Page:     4,
+			PageSize: 10,
+		},
+		"paginator": pagination.New(73, 10, 4, 5),
+	})
+
+	// Page 1 is a link, not dots. Reverting the rule renders "..." here instead.
+	assert.Contains(t, out, `href="/admin/users?page=1"`)
+	assert.Contains(t, out, `href="/admin/users?page=2"`)
+	assert.Contains(t, out, `href="/admin/users?page=6"`)
+
+	// One set of dots, at the trailing end, standing for pages 7 and 8. btn-disabled is the
+	// partial's ellipsis class and nothing else on this page uses it.
+	assert.Equal(t, 1, strings.Count(out, "btn-disabled"), "expected exactly one ellipsis in the bar")
+	assert.Contains(t, out, ">...</a>")
+
+	// Pages 3 and 5 are each a number link and an arrow target, so two occurrences each. That
+	// count is what says Previous and Next resolved at all: a field the template cannot read
+	// renders as nothing and would leave one.
+	assert.Equal(t, 2, strings.Count(out, `href="/admin/users?page=3"`), "page 3 as a number and as the back arrow")
+	assert.Equal(t, 2, strings.Count(out, `href="/admin/users?page=5"`), "page 5 as a number and as the forward arrow")
+
+	// The current page is the active button and carries no link of its own.
+	assert.Contains(t, out, `class="join-item btn btn-sm btn-active">4</a>`)
+	assert.NotContains(t, out, `href="/admin/users?page=4"`)
+
+	// The -1 sentinel must never reach addUrlParam: it means "ellipsis", not a page.
+	assert.NotContains(t, out, "page=-1")
 }

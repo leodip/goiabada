@@ -11,12 +11,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/unknwon/paginater"
 )
 
 func HandleAdminResourceGroupsWithPermissionGet(
@@ -162,7 +162,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		}
 
 		pageResult := GroupsWithPermissionPageResult{Page: pageInt, PageSize: pageSize, Total: total, Groups: groupInfoArr}
-		p := paginater.New(total, pageSize, pageInt, 5)
+		p := pagination.New(total, pageSize, pageInt, 5)
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {

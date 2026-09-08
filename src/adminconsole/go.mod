@@ -8,7 +8,6 @@ require (
 	github.com/leodip/goiabada/core v0.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.12.1
-	github.com/unknwon/paginater v0.0.0-20200328080006-042474bd0eae
 )
 
 replace github.com/leodip/goiabada/core => ../core
