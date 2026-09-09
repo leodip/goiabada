@@ -137,10 +137,9 @@ const (
 	// Deliberately NOT emitted on every rejection. Every audit write is a settings read
 	// plus a table insert on an unauthenticated path, so an event per 429 would turn the
 	// rate limiter into the write amplifier it exists to stop (#212). Each limiter pairs
-	// with a gate of one event per key per its own window, which bounds the writes by
-	// construction rather than by convention. The gate's window cannot be phase-aligned
-	// with the limiter's through httprate's public API, so the guarantee is at most one
-	// event per key per window and at most two per window length in the worst phase.
+	// with a gate of one event per key per window, which bounds the writes by construction
+	// rather than by convention. The gate shares its limiter's window and phase, so the
+	// guarantee is exactly one event per key per window (#276).
 	//
 	// Payload: the limiter name, plus the identifier that limiter's neighbours already
 	// carry, which is the email for account tiers, the user id for the OTP tier and the

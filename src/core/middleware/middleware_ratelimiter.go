@@ -14,11 +14,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-chi/httprate"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/ratelimit"
 )
 
 type AuthHelper interface {
@@ -42,8 +42,8 @@ type AuditLogger interface {
 // rejectClass is the shape a rejected caller can parse. A browser gets the error page it
 // would get from any other refusal; an OAuth2 or RFC 7591 client gets the JSON error
 // object it is already parsing at that endpoint; a caller of the account or admin API gets
-// that API's own error envelope. Answering every route in plain text, as httprate's default
-// does, breaks both machine callers (#219).
+// that API's own error envelope. Answering every route in plain text, which is what a limiter
+// that knows only the status code can do, breaks both machine callers (#219).
 type rejectClass int
 
 const (
@@ -54,9 +54,10 @@ const (
 
 // tier is one rate-limit bucket plus everything a rejection has to say about it.
 //
-// The pairing is the point. httprate.WithLimitHandler takes an http.HandlerFunc, so a
-// reject reached through it learns neither which limiter tripped nor which bucket, and the
-// audit event needs both while the log line needs the name.
+// The pairing is the point. A counter answers only "over budget or not", so a rejection
+// written from inside one learns neither which limiter tripped nor which bucket; the audit
+// event needs both while the log line needs the name. Keeping them together here is what
+// lets the refusal path have them.
 //
 // The reject class is deliberately NOT here, and it used to be. A bucket can serve two
 // routes whose callers parse different things: accountFailureGate is shared by the browser
@@ -64,7 +65,7 @@ const (
 // endpoint with an HTML error page. The shape of a refusal belongs to the caller being
 // refused, so every refusal names it (#219).
 type tier struct {
-	rl   *httprate.RateLimiter
+	rl   *ratelimit.Limiter
 	name string
 	// keyField is the slog attribute the bucket key is logged under, empty when the key
 	// names a person. The request logger in this package establishes that identifiers are
@@ -73,36 +74,36 @@ type tier struct {
 	// identifier is carried by the audit event instead, which is the surface built to hold
 	// one (#219).
 	keyField string
-	// auditGate bounds the audit writes to one event per key per window. Its budget is 1
-	// over the protected limiter's own window, so OnLimit returns false exactly once per
-	// key per window and that first call is the report. Per limiter rather than one shared
+	// auditGate bounds the audit writes to exactly one event per key per window. It is taken
+	// from rl, so it rolls at the same instant rl does and its First answers true once per
+	// key per that window; that first call is the report. Per limiter rather than one shared
 	// gate: windows here are 1, 5 and 15 minutes, and a single shared duration would either
 	// under-report the short windows by up to 15x or over-report the long ones.
-	auditGate *httprate.RateLimiter
-	// window is what Retry-After carries, which is the value httprate itself writes.
-	// Kept here because a failures-only tier refuses without ever calling OnLimit, so
-	// nothing else on that path knows the window (#219).
+	auditGate *ratelimit.Gate
+	// window is what Retry-After carries. Kept here because a failures-only tier refuses
+	// without consulting the limiter at all, so nothing else on that path knows the window
+	// (#219).
 	window time.Duration
 }
 
-// rateLimitHeaders leaves Retry-After and blanks the four X-RateLimit-* names, which
-// httprate's setHeader skips when the configured name is empty.
+// newTier builds the limiter and takes its gate from it, which is the only way the two share
+// a phase: a limiter anchors its windows at its own construction instant, so a gate built
+// independently would roll at a different one and the guarantee above would weaken to at most
+// two events per window length in the worst phase (#276).
 //
-// They rode every response including successful ones, so any caller could read the exact
-// budget, how much of it was left and whether the limiter was switched on at all without
-// tripping anything. And on a two-tier limiter the second OnLimit overwrote the first, so
-// /auth/pwd reported the per-email budget as though it were the per-IP one (#219).
-// Retry-After stays because RFC 6585 Section 4 names it as what a 429 MAY carry.
-var rateLimitHeaders = httprate.WithResponseHeaders(httprate.ResponseHeaders{
-	RetryAfter: "Retry-After",
-})
-
+// No X-RateLimit-* header is written anywhere. They used to ride every response including
+// successful ones, so any caller could read the exact budget, how much of it was left and
+// whether the limiter was switched on at all without tripping anything; and on a two-tier
+// limiter the second write overwrote the first, so /auth/pwd reported the per-email budget as
+// though it were the per-IP one (#219). Retry-After is written by refuse and stays, because
+// RFC 6585 Section 4 names it as what a 429 MAY carry.
 func newTier(name string, keyField string, limit int, window time.Duration) *tier {
+	rl := ratelimit.New(limit, window)
 	return &tier{
-		rl:        httprate.NewRateLimiter(limit, window, rateLimitHeaders),
+		rl:        rl,
 		name:      name,
 		keyField:  keyField,
-		auditGate: httprate.NewRateLimiter(1, window, rateLimitHeaders),
+		auditGate: rl.Gate(),
 		window:    window,
 	}
 }
@@ -116,8 +117,9 @@ func newTier(name string, keyField string, limit int, window time.Duration) *tie
 // replace: a user who signs in, verifies a code or changes a password successfully never
 // touches the counter (#219).
 //
-// The mutex and inFlight are not bookkeeping. httprate serializes check-and-increment
-// inside OnLimit, but Status only reads, so a gate written as read, check credential,
+// The mutex and inFlight are not bookkeeping. The limiter serializes check-and-charge inside
+// Allow, but this tier cannot use Allow: it must decide before the credential is checked and
+// charge only afterwards. Rate only reads, so a gate written as read, check credential,
 // charge admits every caller that reads before anyone charges: measured at 141 of 1000
 // overlapping callers against a budget of 10, and the sample varies between runs because it
 // is scheduler-dependent, which is the finding. The attacker picks the concurrency.
@@ -147,20 +149,18 @@ func newFailureTier(name string, limit int, window time.Duration) *failureTier {
 // Reserve claims one slot against key's budget, atomically with reading what is already
 // recorded, and reports whether another credential check may proceed.
 //
-// The predicate is RespondOnLimit's own, round(rate)+1 > limit, plus the in-flight count.
-// Deliberately not Status's own bool, which reports over-limit only at rate > limit, one
-// attempt looser: taking it would silently grant every failures-only budget an extra
-// attempt and falsify the numbers published in the reference documentation.
+// The predicate is the limiter's own, round(rate)+1 > limit, plus the in-flight count. It is
+// applied here rather than by calling Allow because Allow charges what it admits, and this
+// tier charges only once the credential has been found wrong.
 //
-// Returns false when Status errors, so the gate fails closed. That branch is unreachable
-// through the middleware, since httprate's in-process counter documents that all its
-// methods always return a nil error, but the direction has to be stated because it is the
-// one an error path gets wrong.
+// Returns false when Rate errors, so the gate fails closed. That branch is unreachable
+// through the middleware, since the in-process store cannot fail, but the direction has to
+// be stated because it is the one an error path gets wrong.
 func (f *failureTier) Reserve(key string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	_, rate, err := f.rl.Status(key)
+	rate, err := f.rl.Rate(key)
 	if err != nil {
 		return false
 	}
@@ -173,13 +173,15 @@ func (f *failureTier) Reserve(key string) bool {
 
 // Release hands the slot back, charging it first when the credential was wrong.
 //
-// OnLimit is the only exported call that increments, so it is asked with a throwaway
-// writer purely for its side effect. Charging before dropping the slot keeps recorded plus
-// in-flight from ever dipping below what has been spent; the transient double-count that
-// produces refuses one extra caller rather than admitting one, which is the safe direction.
-func (f *failureTier) Release(r *http.Request, key string, failed bool) {
+// Add charges without checking, which is what this path wants: the decision was taken at
+// Reserve. Its error is dropped for the same reason the slot is handed back regardless --
+// the in-process store cannot fail, and a failed charge here has no caller left to answer.
+// Charging before dropping the slot keeps recorded plus in-flight from ever dipping below
+// what has been spent; the transient double-count that produces refuses one extra caller
+// rather than admitting one, which is the safe direction.
+func (f *failureTier) Release(key string, failed bool) {
 	if failed {
-		f.rl.OnLimit(&discardResponseWriter{}, r, key)
+		_ = f.rl.Add(key)
 	}
 
 	f.mu.Lock()
@@ -216,12 +218,12 @@ type accountFailureGate struct {
 // the key it refused, so the caller can report the trip and answer in that tier's class;
 // nil means the request may proceed. The tight slot is handed back when the backstop
 // refuses, so a refusal never strands one.
-func (g *accountFailureGate) reserve(r *http.Request, networkKey, accountKey string) (*failureTier, string) {
+func (g *accountFailureGate) reserve(networkKey, accountKey string) (*failureTier, string) {
 	if !g.tight.Reserve(networkKey) {
 		return g.tight, networkKey
 	}
 	if !g.backstop.Reserve(accountKey) {
-		g.tight.Release(r, networkKey, false)
+		g.tight.Release(networkKey, false)
 		return g.backstop, accountKey
 	}
 	return nil, ""
@@ -229,9 +231,9 @@ func (g *accountFailureGate) reserve(r *http.Request, networkKey, accountKey str
 
 // release charges or drops both tiers together, which is what keeps them counting the same
 // events.
-func (g *accountFailureGate) release(r *http.Request, networkKey, accountKey string, failed bool) {
-	g.backstop.Release(r, accountKey, failed)
-	g.tight.Release(r, networkKey, failed)
+func (g *accountFailureGate) release(networkKey, accountKey string, failed bool) {
+	g.backstop.Release(accountKey, failed)
+	g.tight.Release(networkKey, failed)
 }
 
 // credentialReservation is the slot a failures-only tier holds for the life of one request.
@@ -381,10 +383,10 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 // tripped charges one request against the tier's bucket and, when that trips the budget,
 // reports the trip and writes the rejection. It returns true when the caller must stop.
 //
-// OnLimit rather than RespondOnLimit: RespondOnLimit's only addition is httprate's default
-// handler, which answers "Too Many Requests\n" as text/plain on every route, and dropping
-// it removes that default rather than overriding it. OnLimit sets Retry-After itself on the
-// reject path, which is the one header a 429 keeps.
+// Allow is check-and-charge under the limiter's own lock, so two concurrent requests on one
+// key cannot both read a budget with one left and both spend it. It answers true when the
+// request is within budget, which is the case where this function has nothing to do; the
+// refusal is everything below.
 //
 // details carries the identifier the audit event records, which is the one this limiter's
 // neighbours in the audit log already carry for the same event: the email for account
@@ -392,7 +394,7 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, aud
 func (m *RateLimiterMiddleware) tripped(w http.ResponseWriter, r *http.Request, t *tier, key string,
 	class rejectClass, details map[string]interface{}) bool {
 
-	if !t.rl.OnLimit(w, r, key) {
+	if t.rl.Allow(key) {
 		return false
 	}
 	m.refuse(w, r, t, key, class, details)
@@ -402,12 +404,11 @@ func (m *RateLimiterMiddleware) tripped(w http.ResponseWriter, r *http.Request, 
 // refuse writes everything a rejection consists of: the Retry-After RFC 6585 Section 4
 // names, the two records the trip leaves, and the body the route's caller parses.
 //
-// Both paths reach it. A tier that counts every request arrives from tripped, where
-// httprate's OnLimit has already written the same Retry-After; a failures-only tier arrives
-// from its own gate, which never calls OnLimit on the reject path and so would otherwise
-// answer without the header. One function rather than two is also what keeps a failures-only
-// tier from quietly returning httprate's plain text with everything around it apparently
-// wired up (#219).
+// Both paths reach it, and the header is written here for both: a tier that counts every
+// request arrives from tripped and a failures-only tier from its own gate, and neither the
+// limiter nor the gate touches the response at all. One function rather than two is what
+// keeps a rejection from either path from arriving with everything around it apparently
+// wired up and the header missing (#219).
 // class comes from the caller rather than from the tier because one bucket can serve two
 // routes: pwdAccount is shared by the browser password form and the ROPC grant, and each has
 // to answer in the shape its own caller parses.
@@ -415,16 +416,16 @@ func (m *RateLimiterMiddleware) refuse(w http.ResponseWriter, r *http.Request, t
 	class rejectClass, details map[string]interface{}) {
 
 	w.Header().Set("Retry-After", strconv.Itoa(int(t.window.Seconds())))
-	m.reportTrip(r, t, key, details)
+	m.reportTrip(t, key, details)
 	m.reject(w, r, class)
 }
 
 // reportTrip writes the two records a rejection leaves: a warning line every time, and an
-// audit event at most once per key per window.
+// audit event exactly once per key per window.
 //
 // Warn rather than Error because a limiter doing its job is an expected event, and an auth
 // server whose error log fills with them has no error log left.
-func (m *RateLimiterMiddleware) reportTrip(r *http.Request, t *tier, key string,
+func (m *RateLimiterMiddleware) reportTrip(t *tier, key string,
 	details map[string]interface{}) {
 
 	attrs := []any{"limiter", t.name}
@@ -436,10 +437,10 @@ func (m *RateLimiterMiddleware) reportTrip(r *http.Request, t *tier, key string,
 	if m.auditLogger == nil {
 		return
 	}
-	// OnLimit is the only exported call that both reads and increments a bucket, so the
-	// gate is asked with a throwaway writer: false means this key has not been reported in
-	// this window yet, and that first call is the report.
-	if t.auditGate.OnLimit(&discardResponseWriter{}, r, t.name+"|"+key) {
+	// First is read-and-record in one call: true means this key has not been reported in
+	// this window yet, and that first call is the report. The gate shares the limiter's
+	// window and phase, so "this window" is the one the trip happened in.
+	if !t.auditGate.First(t.name + "|" + key) {
 		return
 	}
 	if details == nil {
@@ -503,24 +504,6 @@ func (m *RateLimiterMiddleware) reject(w http.ResponseWriter, r *http.Request, c
 	}
 }
 
-// discardResponseWriter absorbs what httprate writes when OnLimit is being used purely as
-// a counter. The audit gate calls it for its return value alone and must not touch the
-// real response.
-type discardResponseWriter struct {
-	header http.Header
-}
-
-func (d *discardResponseWriter) Header() http.Header {
-	if d.header == nil {
-		d.header = http.Header{}
-	}
-	return d.header
-}
-
-func (d *discardResponseWriter) Write(b []byte) (int, error) { return len(b), nil }
-
-func (d *discardResponseWriter) WriteHeader(int) {}
-
 func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
@@ -541,7 +524,7 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 		// user signing in normally is never refused by it however often they do.
 		accountKey := accountRateLimitKey(r.FormValue("email"))
 		networkKey := accountNetworkRateLimitKey(r, accountKey)
-		if t, key := m.pwdAccount.reserve(r, networkKey, accountKey); t != nil {
+		if t, key := m.pwdAccount.reserve(networkKey, accountKey); t != nil {
 			m.refuse(w, r, &t.tier, key, rejectBrowser, map[string]interface{}{"email": accountKey, "ip": ipKey})
 			return
 		}
@@ -552,7 +535,7 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 		reservation := &credentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.pwdAccount.release(r, networkKey, accountKey, reservation.failed.Load())
+			m.pwdAccount.release(networkKey, accountKey, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -593,7 +576,7 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 		reservation := &credentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.otp.Release(r, key, reservation.failed.Load())
+			m.otp.Release(key, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -636,7 +619,7 @@ func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.H
 		reservation := &credentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.emailVerification.Release(r, key, reservation.failed.Load())
+			m.emailVerification.Release(key, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -684,7 +667,7 @@ func (m *RateLimiterMiddleware) LimitAccountPassword(next http.Handler) http.Han
 		reservation := &credentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.accountPassword.Release(r, key, reservation.failed.Load())
+			m.accountPassword.Release(key, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -877,8 +860,15 @@ func GetClientIPFromRequest(r *http.Request) string {
 // and an X-Real-IP that net.ParseIP rejects, and net/http guarantees RemoteAddr is
 // host:port. That matters because CanonicalizeIP returns anything that is not an IP
 // unchanged, "" included, which would put every such request in one global bucket.
+//
+// Two keys differ from what the retired library produced (#276). An IPv4-mapped address is
+// unmapped first, so a dual-stack proxy reporting ::ffff:203.0.113.7 spends the same bucket
+// as one reporting 203.0.113.7, where before every such client shared one bucket with
+// loopback and with each other. And a zone is dropped, so fe80::1%eth0 keys as its /64
+// rather than getting a bucket of its own; that is reachable only for a direct link-local
+// peer, since MiddlewareRealIP drops a zoned entry in a forwarded header.
 func clientIPRateLimitKey(r *http.Request) string {
-	return httprate.CanonicalizeIP(GetClientIPFromRequest(r))
+	return ratelimit.CanonicalizeIP(GetClientIPFromRequest(r))
 }
 
 // accountRateLimitKey buckets by the account an identifier names rather than by the
@@ -957,7 +947,7 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 		// key: a ceiling an attacker escapes by registering a second client is not a ceiling.
 		accountKey := accountRateLimitKey(r.PostFormValue("username"))
 		networkKey := accountNetworkRateLimitKey(r, accountKey)
-		if t, key := m.pwdAccount.reserve(r, networkKey, accountKey); t != nil {
+		if t, key := m.pwdAccount.reserve(networkKey, accountKey); t != nil {
 			m.refuse(w, r, &t.tier, key, rejectOAuth,
 				map[string]interface{}{"email": accountKey, "ip": ipKey})
 			return
@@ -969,7 +959,7 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 		reservation := &credentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.pwdAccount.release(r, networkKey, accountKey, reservation.failed.Load())
+			m.pwdAccount.release(networkKey, accountKey, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)
