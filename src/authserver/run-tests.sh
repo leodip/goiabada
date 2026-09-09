@@ -23,6 +23,12 @@
 #                           and only the first needs to build. Integration tests
 #                           require a prior build, and this refuses to run them
 #                           without one.
+#   -R, --race              Run the module tiers (internal, core, adminconsole)
+#                           under Go's race detector. Needs a C toolchain, since
+#                           `go test -race` requires cgo: the dev container ships
+#                           gcc for this, and CI's golang image has it. Refused
+#                           together with --type data or --type integration, which
+#                           the flag does not cover (see Notes).
 #   -h, --help              Show this help and exit.
 #
 # Examples:
@@ -42,11 +48,19 @@
 #   # Just the internal authserver unit tests
 #   ./run-tests.sh --type internal
 #
+#   # The three module tiers under the race detector, as CI's Unit / race job runs them
+#   ./run-tests.sh --type modules --race
+#
 # Notes:
 #   * --run only affects `data` and `integration` runs (where go test is invoked
 #     against ./tests/<type>/...). It is ignored for module-level test runs.
 #   * `integration` requires a running authserver; this script starts/stops it
 #     automatically per DB.
+#   * --race covers the module tiers only. The integration tier exercises the
+#     binary build.sh produced, which the detector cannot be attached to from
+#     here, and the data tier would need it per database; neither is wired up.
+#     Under --race each module leg runs with CGO_ENABLED=1 for itself, so the
+#     dev container's pinned CGO_ENABLED=0 stays in force for everything else.
 #   * Rate limiter is disabled via GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false.
 #   * Per-phase output is also written to $LOG_DIR (printed at startup). On
 #     failure the log path plus a FAIL/panic summary is printed at the bottom
@@ -64,6 +78,7 @@ TYPE="all"
 DB="all"
 RUN_PATTERN=""
 BUILD=true
+RACE=false
 
 # Print the header comment block by deriving its extent, rather than with a
 # hardcoded line range. The previous '2,46p' had already gone stale: adding
@@ -84,6 +99,8 @@ while [ $# -gt 0 ]; do
             RUN_PATTERN="${2:-}"; shift 2 ;;
         -n|--no-build)
             BUILD=false; shift ;;
+        -R|--race)
+            RACE=true; shift ;;
         -h|--help)
             print_help; exit 0 ;;
         *)
@@ -109,6 +126,27 @@ case "$DB" in
         echo "Invalid --db '$DB'. Run './run-tests.sh --help'."
         exit 2 ;;
 esac
+
+# --race applies to the module legs, so a run with none of them is a mistake
+# rather than a no-op to let through silently.
+if [ "$RACE" = true ]; then
+    case "$TYPE" in
+        data|integration)
+            echo "--race covers the module tiers only; it does nothing for --type '$TYPE'."
+            exit 2 ;;
+    esac
+fi
+
+# The go test invocation the three module legs share. Under --race the
+# detector is added and CGO_ENABLED is set for that command alone, because
+# -race needs cgo and the dev container pins CGO_ENABLED=0 for everything else.
+if [ "$RACE" = true ]; then
+    module_go_test=(env CGO_ENABLED=1 go test -race -v -count=1)
+    race_label=" (race)"
+else
+    module_go_test=(go test -v -count=1)
+    race_label=""
+fi
 
 # Helpers to decide whether a section should run for the chosen --type.
 should_run_internal()     { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ "$TYPE" = "internal" ]; }
@@ -164,7 +202,7 @@ gha_summary_row() {
 LOG_DIR="/tmp/goiabada-tests-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -p "$LOG_DIR"
 
-echo "==> type=$TYPE db=$DB run='${RUN_PATTERN:-<all>}'"
+echo "==> type=$TYPE db=$DB run='${RUN_PATTERN:-<all>}' race=$RACE"
 echo "==> log dir: $LOG_DIR"
 
 # fail_with prints the phase that failed, the log path, every failure
@@ -455,12 +493,12 @@ if should_run_internal; then
     # they were passing without being run. The adminconsole never had either gap because its leg
     # runs ./... . Only ./tests/data and ./tests/integration stay out on purpose: they have their
     # own tiers and need a database.
-    if ! go test -v -count=1 "./internal/..." "./web" "./cmd/..." 2>&1 | tee "$log"; then
-        gha_summary_row "Internal" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+    if ! "${module_go_test[@]}" "./internal/..." "./web" "./cmd/..." 2>&1 | tee "$log"; then
+        gha_summary_row "Internal$race_label" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Authserver internal tests" "$log"
     fi
     gha_endgroup
-    gha_summary_row "Internal" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
+    gha_summary_row "Internal$race_label" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 if should_run_core; then
@@ -468,12 +506,12 @@ if should_run_core; then
     echo "Running tests for core module... (log: $log)"
     start=$SECONDS
     gha_group "Core module tests"
-    if ! (cd ../core && go test -v -count=1 ./...) 2>&1 | tee "$log"; then
-        gha_summary_row "Core" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+    if ! (cd ../core && "${module_go_test[@]}" ./...) 2>&1 | tee "$log"; then
+        gha_summary_row "Core$race_label" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Core module tests" "$log"
     fi
     gha_endgroup
-    gha_summary_row "Core" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
+    gha_summary_row "Core$race_label" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 if should_run_adminconsole; then
@@ -481,12 +519,12 @@ if should_run_adminconsole; then
     echo "Running tests for admin console module... (log: $log)"
     start=$SECONDS
     gha_group "Admin console module tests"
-    if ! (cd ../adminconsole && go test -v -count=1 ./...) 2>&1 | tee "$log"; then
-        gha_summary_row "Adminconsole" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+    if ! (cd ../adminconsole && "${module_go_test[@]}" ./...) 2>&1 | tee "$log"; then
+        gha_summary_row "Adminconsole$race_label" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Admin console module tests" "$log"
     fi
     gha_endgroup
-    gha_summary_row "Adminconsole" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
+    gha_summary_row "Adminconsole$race_label" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 # ---- DB-matrix runs (data + integration) ------------------------------------
