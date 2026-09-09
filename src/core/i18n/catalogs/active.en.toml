@@ -1453,6 +1453,16 @@
 "validator.address.region_too_long" = "Please ensure the region is no longer than {{.max}} characters."
 "validator.address.postal_code_too_long" = "Please ensure the postal code is no longer than {{.max}} characters."
 "validator.address.country_invalid" = "Invalid country."
+"validator.address.angle_brackets" = "Address fields cannot contain the characters < or >."
+
+# --- Angle brackets validator (LocalizedError-backed) ------------------------
+
+"validator.description.angle_brackets" = "The description cannot contain the characters < or >."
+"validator.display_name.angle_brackets" = "The display name cannot contain the characters < or >."
+"validator.attribute.value_angle_brackets" = "The attribute value cannot contain the characters < or >."
+"validator.settings.app_name_angle_brackets" = "The application name cannot contain the characters < or >."
+"validator.settings.issuer_angle_brackets" = "The issuer cannot contain the characters < or >."
+"validator.settings.smtp_from_name_angle_brackets" = "The from name cannot contain the characters < or >."
 
 # --- Identifier validator (LocalizedError-backed) ----------------------------
 

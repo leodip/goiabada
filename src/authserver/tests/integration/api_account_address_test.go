@@ -164,6 +164,46 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, "Invalid country.", err6.ErrorDescription)
 }
 
+// Angle brackets are refused rather than stripped (#275): the endpoint answers
+// 400 with the address validator's code, and nothing reaches the row.
+func TestAPIAccountAddressPut_AngleBracketsRefused(t *testing.T) {
+	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{
+		AddressLine1:   "<b>x</b>",
+		AddressCountry: "US",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "validator.address.angle_brackets", errResp.ErrorCode)
+	assert.Equal(t, "Address fields cannot contain the characters < or >.", errResp.ErrorDescription)
+}
+
+// Only "<" and ">" are refused (#275, decision 2). An address carrying an
+// ampersand, an apostrophe and quotes comes back byte for byte as it was sent,
+// which is the property that replaces the sanitizer's rewriting.
+func TestAPIAccountAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+
+	line1 := `O'Brien & Sons, "The Mews"`
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{
+		AddressLine1:   line1,
+		AddressCountry: "US",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	var updateResp api.UpdateUserResponse
+	err := json.NewDecoder(resp.Body).Decode(&updateResp)
+	assert.NoError(t, err)
+	assert.Equal(t, line1, updateResp.User.AddressLine1)
+}
+
 func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
 

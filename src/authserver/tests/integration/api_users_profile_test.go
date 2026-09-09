@@ -521,6 +521,91 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 	assert.Equal(t, "", updateResponse.User.AddressCountry)
 }
 
+// Angle brackets are refused rather than stripped (#275): the admin endpoint
+// answers 400 with the address validator's code, the same as the account twin.
+func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
+	// Setup: Create admin client and get access token
+	accessToken, _ := createAdminClientWithToken(t)
+
+	// Setup: Create test user
+	testUser := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "testuser@angle-brackets.test",
+		GivenName:     "Test",
+		FamilyName:    "User",
+		EmailVerified: true,
+	}
+	err := database.CreateUser(nil, testUser)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(nil, testUser.Id)
+	}()
+
+	updateReq := api.UpdateUserAddressRequest{
+		AddressLine1:   "<b>x</b>",
+		AddressCountry: "US",
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	defer func() { _ = resp.Body.Close() }()
+
+	// Assert: Refused with the address validator's code
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "validator.address.angle_brackets", errResp.ErrorCode)
+	assert.Equal(t, "Address fields cannot contain the characters < or >.", errResp.ErrorDescription)
+
+	// Assert: Nothing was written
+	unchanged, err := database.GetUserById(nil, testUser.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, "", unchanged.AddressLine1)
+}
+
+// Only "<" and ">" are refused (#275, decision 2). An address carrying an
+// ampersand, an apostrophe and quotes comes back byte for byte as it was sent.
+func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
+	// Setup: Create admin client and get access token
+	accessToken, _ := createAdminClientWithToken(t)
+
+	// Setup: Create test user
+	testUser := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "testuser@verbatim-address.test",
+		GivenName:     "Test",
+		FamilyName:    "User",
+		EmailVerified: true,
+	}
+	err := database.CreateUser(nil, testUser)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(nil, testUser.Id)
+	}()
+
+	line1 := `O'Brien & Sons, "The Mews"`
+	updateReq := api.UpdateUserAddressRequest{
+		AddressLine1:   line1,
+		AddressCountry: "US",
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	var updateResponse api.UpdateUserResponse
+	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
+	assert.NoError(t, err)
+	assert.Equal(t, line1, updateResponse.User.AddressLine1)
+
+	stored, err := database.GetUserById(nil, testUser.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, line1, stored.AddressLine1)
+}
+
 func TestAPIUserAddressPut_UserNotFound(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)

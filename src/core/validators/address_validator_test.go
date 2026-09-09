@@ -111,6 +111,96 @@ func TestValidateAddress(t *testing.T) {
 			},
 			expectedCode: i18n.ErrCodeAddressCountryInvalid,
 		},
+		// Decision 3 of #275: the alpha-2 lookup is the only guard against markup
+		// in the country code, so one row per character pins it here.
+		{
+			name: "Pins decision 3 of #275 - country with a less-than",
+			input: ValidateAddressInput{
+				AddressCountry: "U<",
+			},
+			expectedCode: i18n.ErrCodeAddressCountryInvalid,
+		},
+		{
+			name: "Pins decision 3 of #275 - country with a greater-than",
+			input: ValidateAddressInput{
+				AddressCountry: "U>",
+			},
+			expectedCode: i18n.ErrCodeAddressCountryInvalid,
+		},
+		// The five text fields are refused by ValidateNoAngleBrackets (#275). These
+		// rows prove the wiring, one per field; angle_brackets_validator_test.go
+		// owns the table that isolates the two characters.
+		{
+			name: "Markup in address line 1",
+			input: ValidateAddressInput{
+				AddressLine1:      "<b>x</b>",
+				AddressLine2:      "Apt 4B",
+				AddressLocality:   "Springfield",
+				AddressRegion:     "IL",
+				AddressPostalCode: "62701",
+				AddressCountry:    "US",
+			},
+			expectedCode: i18n.ErrCodeAddressAngleBrackets,
+		},
+		{
+			name: "Markup in address line 2",
+			input: ValidateAddressInput{
+				AddressLine1:      "123 Main St",
+				AddressLine2:      "<b>x</b>",
+				AddressLocality:   "Springfield",
+				AddressRegion:     "IL",
+				AddressPostalCode: "62701",
+				AddressCountry:    "US",
+			},
+			expectedCode: i18n.ErrCodeAddressAngleBrackets,
+		},
+		{
+			name: "Markup in the locality",
+			input: ValidateAddressInput{
+				AddressLine1:      "123 Main St",
+				AddressLine2:      "Apt 4B",
+				AddressLocality:   "<b>x</b>",
+				AddressRegion:     "IL",
+				AddressPostalCode: "62701",
+				AddressCountry:    "US",
+			},
+			expectedCode: i18n.ErrCodeAddressAngleBrackets,
+		},
+		{
+			name: "Markup in the region",
+			input: ValidateAddressInput{
+				AddressLine1:      "123 Main St",
+				AddressLine2:      "Apt 4B",
+				AddressLocality:   "Springfield",
+				AddressRegion:     "<b>x</b>",
+				AddressPostalCode: "62701",
+				AddressCountry:    "US",
+			},
+			expectedCode: i18n.ErrCodeAddressAngleBrackets,
+		},
+		{
+			name: "Markup in the postal code",
+			input: ValidateAddressInput{
+				AddressLine1:      "123 Main St",
+				AddressLine2:      "Apt 4B",
+				AddressLocality:   "Springfield",
+				AddressRegion:     "IL",
+				AddressPostalCode: "<b>x</b>",
+				AddressCountry:    "US",
+			},
+			expectedCode: i18n.ErrCodeAddressAngleBrackets,
+		},
+		{
+			// Decision 2 of #275: only "<" and ">" are refused, so an apostrophe,
+			// an ampersand and quotes all reach the row unchanged.
+			name: "Ampersand, apostrophe and quotes are accepted",
+			input: ValidateAddressInput{
+				AddressLine1:      `O'Brien & Sons, "The Mews"`,
+				AddressLocality:   "Springfield",
+				AddressPostalCode: "62701",
+				AddressCountry:    "US",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -126,6 +216,11 @@ func TestValidateAddress(t *testing.T) {
 					assert.Equal(t, tt.expectedCode, locErr.Code)
 					if tt.expectedArgs != nil {
 						assert.Equal(t, tt.expectedArgs, locErr.Args)
+					} else {
+						// A row that names no args expects none: the message is a
+						// fixed sentence and a stray arg would mean the wrong call
+						// site produced the error.
+						assert.Nil(t, locErr.Args)
 					}
 				}
 			}
