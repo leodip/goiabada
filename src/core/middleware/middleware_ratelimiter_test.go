@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -207,9 +208,9 @@ func spellingsOf(local, domain string) []string {
 // TestAccountRateLimitKey_BoundsTheIdentifier pins the length bound on the account key.
 // The key is retained by the limiter's store for two windows and comes straight off an
 // unauthenticated form with no body cap, so what matters is that an arbitrarily long
-// submission cannot become an arbitrarily long map entry, and that the bound sits far
-// enough above any real address that no account is ever folded into the shared bucket
-// (#276).
+// submission cannot become an arbitrarily long map entry, and that bounding it does not
+// put two identifiers in one bucket: nothing caps an account identifier's length on the
+// way in, so a threshold that folded would fold real accounts (#276).
 func TestAccountRateLimitKey_BoundsTheIdentifier(t *testing.T) {
 	// The longest address there is: a 64-octet local-part and a 255-octet domain, the
 	// maxima RFC 5321 sections 4.5.3.1.1 and 4.5.3.1.2 state.
@@ -235,38 +236,58 @@ func TestAccountRateLimitKey_BoundsTheIdentifier(t *testing.T) {
 			"   " + longestAddress + "   ",
 			longestAddress,
 		},
-		{"one octet past it is folded", longestAddress + "x", oversizedAccountKey},
-		{
-			"a form value at net/http's limit is folded rather than retained",
-			strings.Repeat("x", 10<<20) + "@example.com",
-			oversizedAccountKey,
-		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := accountRateLimitKey(tc.identifier); got != tc.want {
-				// Truncated: an input of ten mebibytes has no place in a failure line.
-				t.Errorf("accountRateLimitKey(%.40q...) = %.40q..., want %.40q...",
-					tc.identifier, got, tc.want)
+				t.Errorf("accountRateLimitKey(%q) = %q, want %q", tc.identifier, got, tc.want)
 			}
 		})
 	}
 
-	t.Run("two distinct oversized identifiers share one bucket", func(t *testing.T) {
-		a := accountRateLimitKey(strings.Repeat("a", maxAccountIdentifierLen+1))
-		b := accountRateLimitKey(strings.Repeat("b", maxAccountIdentifierLen+1))
-		if a != b {
-			t.Errorf("two oversized identifiers keyed as %q and %q; want one shared bucket", a, b)
+	// The identifier the store must never retain whole: net/http's form limit is the only
+	// ceiling on it, and the limiter holds a key for two windows.
+	huge := strings.Repeat("x", 10<<20) + "@example.com"
+
+	t.Run("a form value at net/http's limit is digested rather than retained", func(t *testing.T) {
+		got := accountRateLimitKey(huge)
+		if len(got) != len(oversizedAccountKeyPrefix)+2*sha256.Size {
+			// Truncated: an input of ten mebibytes has no place in a failure line.
+			t.Errorf("accountRateLimitKey(%.20q...) is %d octets: %.80q", huge, len(got), got)
+		}
+		if !strings.HasPrefix(got, oversizedAccountKeyPrefix) {
+			t.Errorf("key %.80q does not carry the digest prefix %q, so an audit reader "+
+				"cannot tell it from an address", got, oversizedAccountKeyPrefix)
 		}
 	})
 
-	t.Run("the sentinel is not an address any account could hold", func(t *testing.T) {
-		// ValidateEmailAddress admits neither, so nothing that reaches the shared
-		// bucket can collide with a real account's key.
-		if !strings.ContainsAny(oversizedAccountKey, "< >") {
-			t.Errorf("oversizedAccountKey = %q, which an address could be spelled as",
-				oversizedAccountKey)
+	t.Run("one octet past the bound is digested", func(t *testing.T) {
+		if got := accountRateLimitKey(longestAddress + "x"); !strings.HasPrefix(got, oversizedAccountKeyPrefix) {
+			t.Errorf("accountRateLimitKey(longestAddress+\"x\") = %.80q, want a digest", got)
+		}
+	})
+
+	// The property the digest exists for, and the one a shared bucket cost. Nothing bounds
+	// an account identifier's length on the way in: ValidateEmailAddress checks the shape
+	// without a length, self-registration and the setup program use it, and users.email is
+	// TEXT on sqlite. So an identifier past the bound can name a real account, and folding
+	// would spend that account's budget on strangers' submissions (#276).
+	t.Run("two distinct oversized identifiers keep distinct buckets", func(t *testing.T) {
+		a := accountRateLimitKey(strings.Repeat("a", maxAccountIdentifierLen) + "@example.com")
+		b := accountRateLimitKey(strings.Repeat("b", maxAccountIdentifierLen) + "@example.com")
+		if a == b {
+			t.Errorf("two distinct oversized identifiers both keyed as %.80q; want a bucket each", a)
+		}
+	})
+
+	t.Run("an oversized identifier normalizes before it is digested", func(t *testing.T) {
+		// Otherwise a long account has 2^n buckets from case alone, which is the whole
+		// reason this function exists (#219).
+		long := strings.Repeat("a", maxAccountIdentifierLen) + "@Example.COM"
+		if got, want := accountRateLimitKey("  "+strings.ToUpper(long)+"\t"), accountRateLimitKey(long); got != want {
+			t.Errorf("two spellings of one oversized identifier keyed as %.80q and %.80q; want one bucket",
+				got, want)
 		}
 	})
 }
@@ -706,29 +727,37 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 		}
 	})
 
-	t.Run("distinct oversized addresses share one bucket", func(t *testing.T) {
+	t.Run("an oversized address keeps its own bucket", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
-		// Each of these is a different string, and under an unbounded key each would
-		// buy its own bucket and its own retained map entry. Folded together they
-		// spend one budget, which is the bound observable from out here (#276).
+		// Nothing caps an account identifier's length on the way in, so any of these
+		// can name a real account. Folding them into one bucket would let the flood
+		// below spend the budget of whichever one does (#276).
 		oversized := func(i int) string {
 			return fmt.Sprintf("%s%d@example.com", strings.Repeat("a", maxAccountIdentifierLen), i)
 		}
-		for i := 0; i < emailBudget; i++ {
+		for i := 0; i < emailBudget+1; i++ {
 			if code, reached := run(m, oversized(i), freshIP(i)); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+				t.Fatalf("request %d, each on its own oversized address: got code %d, handler "+
+					"reached %v; want %d and true", i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		// The one address submitted twice is the one that spends a budget, and it spends
+		// only its own.
+		repeated := oversized(emailBudget + 1)
+		for i := 0; i < emailBudget; i++ {
+			if code, reached := run(m, repeated, freshIP(emailBudget+2+i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("repeat %d: got code %d, handler reached %v; want %d and true",
 					i+1, code, reached, http.StatusTeapot)
 			}
 		}
-		if code, reached := run(m, oversized(emailBudget), freshIP(emailBudget)); code != http.StatusTooManyRequests || reached {
-			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+		if code, reached := run(m, repeated, freshIP(0)); code != http.StatusTooManyRequests || reached {
+			t.Errorf("repeat %d: got code %d, handler reached %v; want %d and false",
 				emailBudget+1, code, reached, http.StatusTooManyRequests)
 		}
-		// And a real address is untouched by the flood, which is the property the
-		// headroom over the longest address buys.
-		if code, reached := run(m, "victim@example.com", freshIP(emailBudget+1)); code != http.StatusTeapot || !reached {
-			t.Errorf("a real address after the flood: got code %d, handler reached %v; want %d and true",
-				code, reached, http.StatusTeapot)
+		// And a different oversized address is untouched by it, which folding cost.
+		if code, reached := run(m, oversized(emailBudget+2), freshIP(1)); code != http.StatusTeapot || !reached {
+			t.Errorf("a second oversized address after the flood: got code %d, handler reached %v; "+
+				"want %d and true", code, reached, http.StatusTeapot)
 		}
 	})
 

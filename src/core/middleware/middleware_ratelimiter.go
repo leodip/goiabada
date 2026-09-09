@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -879,41 +881,48 @@ func clientIPRateLimitKey(r *http.Request) string {
 // The handlers that look the account up normalize identically, so the limiter and the
 // account it protects cannot disagree about who the request is.
 //
-// The result is bounded, because it becomes a map key the limiter's store retains for two
-// windows and it is read straight off an unauthenticated form. None of these routes caps
-// its body, so without the bound net/http's 10 MiB form limit is the only ceiling on what
-// one accepted request can make the process hold, and LimitForgotPwd accepts twenty per
-// client block per window. httprate retained 8 bytes whatever arrived because it hashed
-// every key to a uint64; this package stores exact keys, which is what stops two accounts
-// sharing a bucket, and bounding the identifier here is what that costs (#276). It also
-// bounds the key reportTrip puts in the warning line and the audit event.
+// The result is bounded in length, because it becomes a map key the limiter's store
+// retains for two windows and it is read straight off an unauthenticated form. None of
+// these routes caps its body, so without the bound net/http's 10 MiB form limit is the
+// only ceiling on what one accepted request can make the process hold, and LimitForgotPwd
+// accepts twenty per client block per window. httprate retained 8 bytes whatever arrived
+// because it hashed every key to a uint64; this package stores exact keys, which is what
+// stops two accounts sharing a bucket, and digesting the overlong tail here is what that
+// costs (#276). It also bounds the key reportTrip puts in the warning line and the audit
+// event.
+//
+// A long identifier is digested rather than folded into one shared bucket. Sharing would
+// make the key non-injective, and any two accounts landing on one key is the cross-account
+// leak this function exists to prevent: nothing bounds an account identifier's length on
+// the way in, since self-registration and the setup program validate the shape without a
+// length and users.email is TEXT on sqlite, so a real account can sit past any threshold
+// chosen here and would then spend its budget on strangers' submissions (#276).
 func accountRateLimitKey(identifier string) string {
-	// TrimSpace returns a substring and allocates nothing, so an oversized identifier is
-	// answered before ToLower would copy it.
-	trimmed := strings.TrimSpace(identifier)
-	if len(trimmed) > maxAccountIdentifierLen {
-		return oversizedAccountKey
+	normalized := strings.ToLower(strings.TrimSpace(identifier))
+	if len(normalized) > maxAccountIdentifierLen {
+		// Over a 10 MiB form value this copies and digests what net/http has already
+		// parsed and allocated; what matters is that nothing of that size is retained.
+		sum := sha256.Sum256([]byte(normalized))
+		return oversizedAccountKeyPrefix + hex.EncodeToString(sum[:])
 	}
-	return strings.ToLower(trimmed)
+	return normalized
 }
 
-// maxAccountIdentifierLen is the longest an address can be, which is the point: nothing
-// that could name an account here is ever folded into the shared bucket, so a stranger's
-// overlong submissions can never spend an owner's budget. RFC 5321 section 4.5.3.1.1 caps
-// a local-part at 64 octets and 4.5.3.1.2 caps a domain at 255, plus the '@'.
-//
-// This repository is far stricter than the RFC already: users.email is varchar(64) on the
-// narrowest engine and every write path that has a length check refuses above 60. The
-// headroom over those numbers is deliberate, because self-registration validates the shape
-// without a length, so tightening this to 60 would put a real account in the shared bucket
-// on an engine whose email column is not narrow.
+// maxAccountIdentifierLen is where exact keying stops and the digest begins. It is a
+// legibility threshold rather than a security boundary: correctness does not depend on
+// its value, because both branches are injective on the normalized identifier, so two
+// accounts cannot share a bucket wherever it sits. It is set at the longest address RFC
+// 5321 sections 4.5.3.1.1 and 4.5.3.1.2 allow for a local-part and a domain, plus the
+// '@', so every address a deployment could plausibly hold stays readable in the warning
+// line and the audit event rather than arriving there as 64 hex characters.
 const maxAccountIdentifierLen = 64 + 1 + 255
 
-// oversizedAccountKey is the one bucket every identifier past that length shares. Sharing
-// is safe only because none of them can name an account: they are past the longest address
-// there is, and the sentinel itself is not an address either, since ValidateEmailAddress
-// admits neither '<' nor a space.
-const oversizedAccountKey = "<identifier longer than any address>"
+// oversizedAccountKeyPrefix marks a digested key, so a reader of an audit event can tell
+// one from an address. A submission short enough to be keyed exactly could be spelled to
+// look like one, which buys nothing: producing a given account's digest key means knowing
+// that account's identifier, and knowing it means being able to spend the same bucket by
+// submitting it.
+const oversizedAccountKeyPrefix = "<sha256>"
 
 // accountNetworkRateLimitKey buckets by an account as seen from one client block, which is
 // the tight half of the password gate: an attacker in another network spends their own
