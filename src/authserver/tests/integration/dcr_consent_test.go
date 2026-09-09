@@ -128,17 +128,23 @@ func TestDCR_Consent_ReachesConsentAndMarksTheNameUnverified(t *testing.T) {
 // assumed. client_name is attacker-controlled text that now reaches a rendered page, and Go's
 // html/template escapes it by default, so this asserts that default rather than trusting it.
 //
+// The name it registers no longer contains angle brackets, because registration refuses those
+// outright since #275. Escaping is still the property under test and this still observes it: the
+// ampersand and the quotes are ordinary text a registration accepts, they are stored byte for
+// byte, and the renderer is what turns them into entities on the page. A registration that could
+// carry "<script>" is exactly what this file no longer has to rely on.
+//
 // It cannot be observed at the unit tier: handler_consent_test.go mocks RenderTemplate, so no
 // escaping happens there at all.
 func TestDCR_Consent_SelfAssertedNameIsEscaped(t *testing.T) {
 	enableDCR(t)
 	defer disableDCR(t)
 
-	const payload = `<script>alert(1)</script>`
+	const payload = `Acme & "Sons"`
 	const redirectURI = "https://dcr-escape-app.example.com/callback"
 
 	client := registerDCRClient(t, payload, redirectURI)
-	require.Equal(t, payload, client.Description, "the payload is stored verbatim; escaping is the renderer's job")
+	require.Equal(t, payload, client.Description, "the name is stored verbatim; escaping is the renderer's job")
 
 	user, password := createCeremonyUser(t)
 	httpClient := createHttpClient(t)
@@ -153,9 +159,9 @@ func TestDCR_Consent_SelfAssertedNameIsEscaped(t *testing.T) {
 	page := string(raw)
 
 	// Asserted against the raw bytes on purpose. goquery decodes entities, so reading the name
-	// through the parsed document cannot tell an escaped payload from an executed one.
-	assert.NotContains(t, page, payload, "the payload must not reach the page as markup")
-	assert.Contains(t, page, "&lt;script&gt;alert(1)&lt;/script&gt;", "it reaches the page as text")
+	// through the parsed document cannot tell an escaped value from an unescaped one.
+	assert.NotContains(t, page, payload, "the name must not reach the page unescaped")
+	assert.Contains(t, page, "Acme &amp; &#34;Sons&#34;", "it reaches the page as text")
 }
 
 // TestDCR_Consent_UnverifiedNameSuppressesTheDescriptionLine covers the one behaviour in this stage

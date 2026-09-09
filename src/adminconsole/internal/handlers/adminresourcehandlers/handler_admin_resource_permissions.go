@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/validators"
 )
 
 func HandleAdminResourcePermissionsGet(
@@ -189,10 +190,19 @@ func HandleAdminResourcePermissionsPost(
 	}
 }
 
+// HandleAdminResourceValidatePermissionPost answers the permission form's pre-save check, and it
+// has to agree with the API's own refusal at PUT .../permissions: whatever this accepts, the save
+// that follows must accept too.
+//
+// It used to detect markup by sanitizing the description and seeing whether the value changed,
+// which disagreed on everything the sanitizer's allowlist let through: "<b>x</b>" survived
+// unchanged, so this said valid and the API then refused the save. Asking the same validator both
+// sites ask is what makes the two agree (#275). The identifier is checked raw for the same reason:
+// sanitizing it first turned "valid<b" into "valid" and reported a name the API would reject as
+// available.
 func HandleAdminResourceValidatePermissionPost(
 	httpHelper handlers.HttpHelper,
 	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -206,13 +216,11 @@ func HandleAdminResourceValidatePermissionPost(
 			return
 		}
 
-		permissionIdentifier := inputSanitizer.Sanitize(strings.TrimSpace(data["permissionIdentifier"]))
-
-		originalDescription := strings.TrimSpace(data["description"])
-		description := inputSanitizer.Sanitize(strings.TrimSpace(data["description"]))
+		permissionIdentifier := strings.TrimSpace(data["permissionIdentifier"])
+		description := strings.TrimSpace(data["description"])
 
 		// i18n surface: A — admin browser-flow, JSON to in-page handler.
-		if originalDescription != description {
+		if validators.ContainsAngleBrackets(description) {
 			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed, nil).Localize(r.Context())
 			httpHelper.EncodeJson(w, r, result)
 			return

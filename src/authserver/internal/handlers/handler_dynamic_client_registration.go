@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/urlutil"
+	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleDynamicClientRegistrationPost implements RFC 7591 §3 Client Registration Endpoint
@@ -219,6 +220,16 @@ func validateDCRRequest(req *api.DynamicClientRegistrationRequest) error {
 	// Validate client_name length if provided (matches database column size)
 	if len(req.ClientName) > 128 {
 		return fmt.Errorf("client_name cannot exceed 128 characters")
+	}
+
+	// client_name is written to clients.description, the same column the admin API refuses
+	// angle brackets in, so every write path to it applies one rule and a self-registered
+	// client cannot hold markup the admin API would have refused (#275). RFC 7591 section
+	// 3.2.2 defines invalid_client_metadata for a rejected metadata value, and the caller
+	// answers with it. The message is English like the handler's other refusals: DCR errors
+	// are protocol responses and are not localized.
+	if validators.ContainsAngleBrackets(req.ClientName) {
+		return fmt.Errorf("client_name cannot contain the characters < or >")
 	}
 
 	return nil
