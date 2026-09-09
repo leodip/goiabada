@@ -13,8 +13,9 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/inputsanitizer"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPISettingsGeneralGet - GET /api/v1/admin/settings/general
@@ -51,7 +52,6 @@ func HandleAPISettingsGeneralPut(
 	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +71,11 @@ func HandleAPISettingsGeneralPut(
 		const appNameMaxLength = 30
 		if len(req.AppName) > appNameMaxLength {
 			writeJSONError(w, fmt.Sprintf("App name is too long. The maximum length is %v characters.", appNameMaxLength), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		if err := validators.ValidateNoAngleBrackets(req.AppName, i18n.ErrCodeSettingsAppNameAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -105,6 +110,15 @@ func HandleAPISettingsGeneralPut(
 			return
 		}
 
+		// Both branches above pass this, but only the URL one can reach it holding a "<": the
+		// identifier branch's regex has already refused the character with its own message, while
+		// url.ParseRequestURI accepts "<" in a path or a host. The issuer is copied into the iss
+		// claim of every token this server signs (#275).
+		if err := validators.ValidateNoAngleBrackets(issuer, i18n.ErrCodeSettingsIssuerAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
 		// Validation: Password policy
 		passwordPolicy, err := enums.PasswordPolicyFromString(strings.TrimSpace(req.PasswordPolicy))
 		if err != nil {
@@ -112,9 +126,9 @@ func HandleAPISettingsGeneralPut(
 			return
 		}
 
-		// Apply updates with sanitization
-		currentSettings.AppName = inputSanitizer.Sanitize(strings.TrimSpace(req.AppName))
-		currentSettings.Issuer = inputSanitizer.Sanitize(issuer)
+		// Apply updates
+		currentSettings.AppName = strings.TrimSpace(req.AppName)
+		currentSettings.Issuer = issuer
 		currentSettings.SelfRegistrationEnabled = req.SelfRegistrationEnabled
 		if req.SelfRegistrationEnabled {
 			currentSettings.SelfRegistrationRequiresEmailVerification = req.SelfRegistrationRequiresEmailVerification

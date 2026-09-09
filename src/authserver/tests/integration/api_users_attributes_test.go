@@ -869,3 +869,88 @@ func createTestUserAttribute(t *testing.T, userId int64, key, value string) *mod
 	assert.NoError(t, err)
 	return attr
 }
+
+// TestAPIUserAttribute_AngleBracketsRejected pins the reject on both wiring points, create and
+// update: each carries its own check (#275).
+func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testUser := &models.User{
+		Subject:    uuid.New(),
+		Enabled:    true,
+		Email:      "testuser@attr-angle.test",
+		GivenName:  "Test",
+		FamilyName: "User",
+	}
+	err := database.CreateUser(nil, testUser)
+	assert.NoError(t, err)
+	defer func() { _ = database.DeleteUser(nil, testUser.Id) }()
+
+	attr := createTestUserAttribute(t, testUser.Id, "status", "active")
+	defer func() { _ = database.DeleteUserAttribute(nil, attr.Id) }()
+
+	base := config.GetAuthServer().BaseURL + "/api/v1/admin/user-attributes"
+
+	t.Run("create", func(t *testing.T) {
+		resp := makeAPIRequest(t, "POST", base, accessToken, api.CreateUserAttributeRequest{
+			Key:    "location",
+			Value:  "<b>San Francisco</b>",
+			UserId: testUser.Id,
+		})
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		var errResp api.ErrorResponse
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		assert.Equal(t, "validator.attribute.value_angle_brackets", errResp.ErrorCode)
+	})
+
+	t.Run("update", func(t *testing.T) {
+		resp := makeAPIRequest(t, "PUT", base+"/"+strconv.FormatInt(attr.Id, 10), accessToken,
+			api.UpdateUserAttributeRequest{Key: "status", Value: "a < b"})
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		var errResp api.ErrorResponse
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		assert.Equal(t, "validator.attribute.value_angle_brackets", errResp.ErrorCode)
+
+		stored, err := database.GetUserAttributeById(nil, attr.Id)
+		assert.NoError(t, err)
+		assert.Equal(t, "active", stored.Value)
+	})
+}
+
+// TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim is the accepted twin. Attribute values
+// are not trimmed, so the surrounding spaces come back too.
+func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testUser := &models.User{
+		Subject:    uuid.New(),
+		Enabled:    true,
+		Email:      "testuser@attr-verbatim.test",
+		GivenName:  "Test",
+		FamilyName: "User",
+	}
+	err := database.CreateUser(nil, testUser)
+	assert.NoError(t, err)
+	defer func() { _ = database.DeleteUser(nil, testUser.Id) }()
+
+	value := `  Tom & Jerry said "hi"  `
+	resp := makeAPIRequest(t, "POST", config.GetAuthServer().BaseURL+"/api/v1/admin/user-attributes",
+		accessToken, api.CreateUserAttributeRequest{Key: "motto", Value: value, UserId: testUser.Id})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var createResponse api.CreateUserAttributeResponse
+	err = json.NewDecoder(resp.Body).Decode(&createResponse)
+	assert.NoError(t, err)
+	assert.Equal(t, value, createResponse.Attribute.Value)
+
+	stored, err := database.GetUserAttributeById(nil, createResponse.Attribute.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, value, stored.Value)
+	_ = database.DeleteUserAttribute(nil, createResponse.Attribute.Id)
+}

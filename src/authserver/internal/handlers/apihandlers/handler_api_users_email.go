@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/inputsanitizer"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -21,7 +20,6 @@ import (
 func HandleAPIUserEmailPut(
 	database data.Database,
 	emailValidator *validators.EmailValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +71,7 @@ func HandleAPIUserEmailPut(
 		}
 
 		// Update user email fields
-		user.Email = inputSanitizer.Sanitize(input.Email)
+		user.Email = input.Email
 		user.EmailVerified = req.EmailVerified
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}

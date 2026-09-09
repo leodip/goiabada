@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/inputsanitizer"
 	"github.com/leodip/goiabada/core/phonecountries"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -19,7 +18,6 @@ import (
 func HandleAPIAccountPhonePut(
 	database data.Database,
 	phoneValidator *validators.PhoneValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +89,7 @@ func HandleAPIAccountPhonePut(
 		} else {
 			user.PhoneNumberCountryUniqueId = input.PhoneCountryUniqueId
 			user.PhoneNumberCountryCallingCode = callingCode
-			user.PhoneNumber = inputSanitizer.Sanitize(input.PhoneNumber)
+			user.PhoneNumber = input.PhoneNumber
 			user.PhoneNumberVerified = false
 		}
 

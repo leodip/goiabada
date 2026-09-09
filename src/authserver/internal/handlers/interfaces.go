@@ -90,10 +90,6 @@ type TokenValidator interface {
 	ValidateTokenRequest(ctx context.Context, input *validators.ValidateTokenRequestInput) (*validators.ValidateTokenRequestResult, error)
 }
 
-type InputSanitizer interface {
-	Sanitize(str string) string
-}
-
 type UserCreator interface {
 	CreateUser(input *user.CreateUserInput) (*models.User, error)
 }

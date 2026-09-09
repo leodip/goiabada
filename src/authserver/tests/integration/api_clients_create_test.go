@@ -314,13 +314,59 @@ func TestAPIClientCreate_DisplayNameTrimmed(t *testing.T) {
 	assert.Equal(t, true, client["showDisplayName"])
 }
 
-func TestAPIClientCreate_DisplayNameSanitizedToEmpty(t *testing.T) {
+// TestAPIClientCreate_AngleBracketsRejected pins that a display name or a description holding "<"
+// or ">" is refused rather than rewritten. This used to store "<script>alert(1)</script>" as the
+// empty string and create the client anyway, which is the silent rewrite #275 removed.
+func TestAPIClientCreate_AngleBracketsRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+
+	cases := []struct {
+		name     string
+		body     api.CreateClientRequest
+		wantCode string
+	}{
+		{"display name", api.CreateClientRequest{
+			ClientIdentifier:         "client-" + strings.ToLower(fake.LetterN(8)),
+			DisplayName:              "<script>alert(1)</script>",
+			AuthorizationCodeEnabled: true,
+		}, "validator.display_name.angle_brackets"},
+		{"description", api.CreateClientRequest{
+			ClientIdentifier:         "client-" + strings.ToLower(fake.LetterN(8)),
+			Description:              "a > b",
+			AuthorizationCodeEnabled: true,
+		}, "validator.description.angle_brackets"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := makeAPIRequest(t, "POST", url, accessToken, tc.body)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var errResp api.ErrorResponse
+			_ = json.NewDecoder(resp.Body).Decode(&errResp)
+			assert.Equal(t, tc.wantCode, errResp.ErrorCode)
+
+			// Nothing was created.
+			stored, err := database.GetClientByClientIdentifier(nil, tc.body.ClientIdentifier)
+			assert.NoError(t, err)
+			assert.Nil(t, stored)
+		})
+	}
+}
+
+// TestAPIClientCreate_AmpersandsAndQuotesStoredVerbatim is the accepted twin of the case above:
+// what is not refused is stored exactly as it was sent.
+func TestAPIClientCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	ident := "client-" + strings.ToLower(fake.LetterN(8))
 	reqBody := api.CreateClientRequest{
 		ClientIdentifier:         ident,
-		DisplayName:              "<script>alert(1)</script>",
+		Description:              `Tom & Jerry said "hi"`,
+		DisplayName:              `AT&T "Wireless"`,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
@@ -334,8 +380,16 @@ func TestAPIClientCreate_DisplayNameSanitizedToEmpty(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
 	client := response["client"].(map[string]interface{})
-	assert.Equal(t, "", client["displayName"])
-	assert.Equal(t, false, client["showDisplayName"])
+	assert.Equal(t, `Tom & Jerry said "hi"`, client["description"])
+	assert.Equal(t, `AT&T "Wireless"`, client["displayName"])
+	assert.Equal(t, true, client["showDisplayName"])
+
+	stored, err := database.GetClientByClientIdentifier(nil, ident)
+	assert.NoError(t, err)
+	assert.NotNil(t, stored)
+	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
+	assert.Equal(t, `AT&T "Wireless"`, stored.DisplayName)
+	_ = database.DeleteClient(nil, stored.Id)
 }
 
 func TestAPIClientCreate_DescriptionOnlyBackwardCompat(t *testing.T) {

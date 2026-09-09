@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/inputsanitizer"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -23,7 +22,6 @@ import (
 func HandleAPIUserProfilePut(
 	database data.Database,
 	profileValidator *validators.ProfileValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -88,11 +86,11 @@ func HandleAPIUserProfilePut(
 		}
 
 		// Update user fields
-		user.Username = inputSanitizer.Sanitize(input.Username)
-		user.GivenName = inputSanitizer.Sanitize(input.GivenName)
-		user.MiddleName = inputSanitizer.Sanitize(input.MiddleName)
-		user.FamilyName = inputSanitizer.Sanitize(input.FamilyName)
-		user.Nickname = inputSanitizer.Sanitize(input.Nickname)
+		user.Username = input.Username
+		user.GivenName = input.GivenName
+		user.MiddleName = input.MiddleName
+		user.FamilyName = input.FamilyName
+		user.Nickname = input.Nickname
 		user.Website = input.Website
 
 		// Handle gender
@@ -158,7 +156,6 @@ func HandleAPIUserProfilePut(
 func HandleAPIUserAddressPut(
 	database data.Database,
 	addressValidator *validators.AddressValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -213,12 +210,12 @@ func HandleAPIUserAddressPut(
 		}
 
 		// Update user address fields
-		user.AddressLine1 = inputSanitizer.Sanitize(input.AddressLine1)
-		user.AddressLine2 = inputSanitizer.Sanitize(input.AddressLine2)
-		user.AddressLocality = inputSanitizer.Sanitize(input.AddressLocality)
-		user.AddressRegion = inputSanitizer.Sanitize(input.AddressRegion)
-		user.AddressPostalCode = inputSanitizer.Sanitize(input.AddressPostalCode)
-		user.AddressCountry = inputSanitizer.Sanitize(input.AddressCountry)
+		user.AddressLine1 = input.AddressLine1
+		user.AddressLine2 = input.AddressLine2
+		user.AddressLocality = input.AddressLocality
+		user.AddressRegion = input.AddressRegion
+		user.AddressPostalCode = input.AddressPostalCode
+		user.AddressCountry = input.AddressCountry
 
 		// Update user in database
 		err = database.UpdateUser(nil, user)

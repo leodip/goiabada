@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/inputsanitizer"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -64,7 +64,6 @@ func HandleAPIGroupCreatePost(
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -90,6 +89,11 @@ func HandleAPIGroupCreatePost(
 			return
 		}
 
+		if err := validators.ValidateNoAngleBrackets(createReq.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
 		// Validate identifier format
 		err = identifierValidator.ValidateIdentifier(createReq.GroupIdentifier, true)
 		if err != nil {
@@ -111,8 +115,8 @@ func HandleAPIGroupCreatePost(
 
 		// Create the group
 		group := &models.Group{
-			GroupIdentifier:      strings.TrimSpace(inputSanitizer.Sanitize(createReq.GroupIdentifier)),
-			Description:          strings.TrimSpace(inputSanitizer.Sanitize(createReq.Description)),
+			GroupIdentifier:      strings.TrimSpace(createReq.GroupIdentifier),
+			Description:          strings.TrimSpace(createReq.Description),
 			IncludeInIdToken:     createReq.IncludeInIdToken,
 			IncludeInAccessToken: createReq.IncludeInAccessToken,
 		}
@@ -195,7 +199,6 @@ func HandleAPIGroupUpdatePut(
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -244,6 +247,11 @@ func HandleAPIGroupUpdatePut(
 			return
 		}
 
+		if err := validators.ValidateNoAngleBrackets(updateReq.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
 		// Validate identifier format
 		err = identifierValidator.ValidateIdentifier(updateReq.GroupIdentifier, true)
 		if err != nil {
@@ -264,8 +272,8 @@ func HandleAPIGroupUpdatePut(
 		}
 
 		// Update the group
-		group.GroupIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.GroupIdentifier))
-		group.Description = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.Description))
+		group.GroupIdentifier = strings.TrimSpace(updateReq.GroupIdentifier)
+		group.Description = strings.TrimSpace(updateReq.Description)
 		group.IncludeInIdToken = updateReq.IncludeInIdToken
 		group.IncludeInAccessToken = updateReq.IncludeInAccessToken
 

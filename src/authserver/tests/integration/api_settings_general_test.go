@@ -65,7 +65,7 @@ func TestAPISettingsGeneralPut_Success(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&body)
 	assert.NoError(t, err)
 
-	// App name should be trimmed by sanitizer
+	// App name should be trimmed
 	assert.Equal(t, "My New App", body.AppName)
 	assert.Equal(t, req.Issuer, body.Issuer)
 	assert.Equal(t, true, body.SelfRegistrationEnabled)
@@ -399,4 +399,75 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp4.StatusCode)
+}
+
+// TestAPISettingsGeneralPut_AngleBracketsRejected covers the two checks this endpoint carries. The
+// issuer one matters only on the URL branch: the identifier branch's regex has always refused "<"
+// with its own message, while url.ParseRequestURI accepts it in a path or a host, so an issuer
+// holding markup used to reach the iss claim of every token (#275).
+func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+
+	before, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	cases := []struct {
+		name     string
+		body     api.UpdateSettingsGeneralRequest
+		wantCode string
+	}{
+		{"app name", api.UpdateSettingsGeneralRequest{
+			AppName:        "Acme <the third>",
+			Issuer:         "issuer-valid",
+			PasswordPolicy: "low",
+		}, "validator.settings.app_name_angle_brackets"},
+		{"issuer, URL branch", api.UpdateSettingsGeneralRequest{
+			AppName:        "Acme",
+			Issuer:         "https://example.org/<b>",
+			PasswordPolicy: "low",
+		}, "validator.settings.issuer_angle_brackets"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := makeAPIRequest(t, "PUT", url, accessToken, tc.body)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var errResp api.ErrorResponse
+			_ = json.NewDecoder(resp.Body).Decode(&errResp)
+			assert.Equal(t, tc.wantCode, errResp.ErrorCode)
+
+			stored, err := database.GetSettingsById(nil, 1)
+			assert.NoError(t, err)
+			assert.Equal(t, before.AppName, stored.AppName)
+			assert.Equal(t, before.Issuer, stored.Issuer)
+		})
+	}
+}
+
+// TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim is the accepted twin.
+func TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+
+	req := api.UpdateSettingsGeneralRequest{
+		AppName:        `  R&D "labs"  `,
+		Issuer:         "https://example.org",
+		PasswordPolicy: "low",
+	}
+	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body api.SettingsGeneralResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	assert.NoError(t, err)
+	assert.Equal(t, `R&D "labs"`, body.AppName)
+
+	stored, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, `R&D "labs"`, stored.AppName)
 }

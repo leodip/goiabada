@@ -587,3 +587,82 @@ func createTestClientUnique(t *testing.T, authCodeEnabled bool) *models.Client {
 	assert.NoError(t, err)
 	return client
 }
+
+// TestAPIClientUpdatePut_AngleBracketsRejected covers the update handler's own checks: they are a
+// separate wiring point from the create handler's, so a check deleted from one would be invisible
+// to a case on the other (#275).
+func TestAPIClientUpdatePut_AngleBracketsRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	client := createTestClientUnique(t, true)
+	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+	endpoint := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+
+	cases := []struct {
+		name     string
+		body     api.UpdateClientSettingsRequest
+		wantCode string
+	}{
+		{"description", api.UpdateClientSettingsRequest{
+			ClientIdentifier: client.ClientIdentifier,
+			Description:      "<b>bold</b>",
+			DefaultAcrLevel:  "urn:goiabada:level1",
+		}, "validator.description.angle_brackets"},
+		{"display name", api.UpdateClientSettingsRequest{
+			ClientIdentifier: client.ClientIdentifier,
+			DisplayName:      "Acme <the third>",
+			DefaultAcrLevel:  "urn:goiabada:level1",
+		}, "validator.display_name.angle_brackets"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := makeAPIRequest(t, "PUT", endpoint, accessToken, tc.body)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var errResp api.ErrorResponse
+			_ = json.NewDecoder(resp.Body).Decode(&errResp)
+			assert.Equal(t, tc.wantCode, errResp.ErrorCode)
+
+			// Refused before the write, so the row is untouched.
+			stored, err := database.GetClientById(nil, client.Id)
+			assert.NoError(t, err)
+			assert.Equal(t, client.Description, stored.Description)
+			assert.Equal(t, client.DisplayName, stored.DisplayName)
+		})
+	}
+}
+
+// TestAPIClientUpdatePut_AmpersandsAndQuotesStoredVerbatim is the accepted twin.
+func TestAPIClientUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	client := createTestClientUnique(t, true)
+	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+	updateReq := api.UpdateClientSettingsRequest{
+		ClientIdentifier: client.ClientIdentifier,
+		Description:      `R&D "phase 2"`,
+		DisplayName:      `Tom & Jerry`,
+		DefaultAcrLevel:  "urn:goiabada:level1",
+	}
+
+	endpoint := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	resp := makeAPIRequest(t, "PUT", endpoint, accessToken, updateReq)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var updateResp api.UpdateClientResponse
+	err := json.NewDecoder(resp.Body).Decode(&updateResp)
+	assert.NoError(t, err)
+	assert.Equal(t, `R&D "phase 2"`, updateResp.Client.Description)
+	assert.Equal(t, `Tom & Jerry`, updateResp.Client.DisplayName)
+
+	stored, err := database.GetClientById(nil, client.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, `R&D "phase 2"`, stored.Description)
+	assert.Equal(t, `Tom & Jerry`, stored.DisplayName)
+}

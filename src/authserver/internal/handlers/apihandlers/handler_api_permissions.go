@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/inputsanitizer"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -79,7 +79,6 @@ func HandleAPIResourcePermissionsPut(
 	database data.Database,
 	authHelper srvhandlers.AuthHelper,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger srvhandlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -130,46 +129,41 @@ func HandleAPIResourcePermissionsPut(
 			rawDescription := strings.TrimSpace(req.Permissions[i].Description)
 
 			// Explicitly forbid HTML angle brackets in description
-			if strings.ContainsAny(rawDescription, "<>") {
-				writeJSONError(w, "The description contains invalid characters, as we do not permit the use of HTML in the description.", "VALIDATION_ERROR", http.StatusBadRequest)
+			if err := validators.ValidateNoAngleBrackets(rawDescription,
+				i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed); err != nil {
+				writeValidationError(w, r, err)
 				return
 			}
 
-			// Sanitize description and enforce that it must not change (no HTML allowed)
-			sanitizedDescription := inputSanitizer.Sanitize(rawDescription)
-			if sanitizedDescription != rawDescription {
-				writeJSONError(w, "The description contains invalid characters, as we do not permit the use of HTML in the description.", "VALIDATION_ERROR", http.StatusBadRequest)
-				return
-			}
-
-			// Sanitize identifier (defensive) then validate format
-			sanitizedIdentifier := inputSanitizer.Sanitize(rawIdentifier)
-
-			if len(sanitizedIdentifier) == 0 {
+			// The identifier is validated as it was sent, trimmed and nothing else. It used to be
+			// run through the HTML sanitizer first, which meant "valid<b" was stored as "valid":
+			// the sanitizer dropped everything from the "<" onwards and ValidateIdentifier then
+			// saw a name the caller never asked for. It is now refused instead (#275).
+			if len(rawIdentifier) == 0 {
 				writeJSONError(w, "Permission identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
-			if err := identifierValidator.ValidateIdentifier(sanitizedIdentifier, true); err != nil {
+			if err := identifierValidator.ValidateIdentifier(rawIdentifier, true); err != nil {
 				writeValidationError(w, r, err)
 				return
 			}
 
 			const maxLengthDescription = 100
-			if len(sanitizedDescription) > maxLengthDescription {
+			if len(rawDescription) > maxLengthDescription {
 				writeJSONError(w, fmt.Sprintf("The description cannot exceed a maximum length of %d characters.", maxLengthDescription), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
-			if seenIdentifiers[sanitizedIdentifier] {
-				writeJSONError(w, fmt.Sprintf("Permission %s is duplicated.", sanitizedIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
+			if seenIdentifiers[rawIdentifier] {
+				writeJSONError(w, fmt.Sprintf("Permission %s is duplicated.", rawIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			seenIdentifiers[sanitizedIdentifier] = true
+			seenIdentifiers[rawIdentifier] = true
 
-			// Persist sanitized values back on request for subsequent operations
-			req.Permissions[i].PermissionIdentifier = sanitizedIdentifier
-			req.Permissions[i].Description = sanitizedDescription
+			// Persist the trimmed values back on request for subsequent operations
+			req.Permissions[i].PermissionIdentifier = rawIdentifier
+			req.Permissions[i].Description = rawDescription
 		}
 
 		// Load existing permissions once

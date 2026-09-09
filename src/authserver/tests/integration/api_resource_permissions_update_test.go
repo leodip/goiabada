@@ -84,12 +84,20 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 		req        api.UpdateResourcePermissionsRequest
 		wantStatus int
 		wantMsg    string
+		// wantCode is asserted only when set: most of these refusals are literal strings under
+		// the generic VALIDATION_ERROR code, and only the ones going through a localized
+		// validator carry a catalog key.
+		wantCode string
 	}{
-		{"empty identifier", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "", Description: "x"}}}, http.StatusBadRequest, "Permission identifier is required"},
-		{"invalid format", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "__bad", Description: "x"}}}, http.StatusBadRequest, "Invalid identifier format"},
-		{"html in description", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "good", Description: "<b>x</b>"}}}, http.StatusBadRequest, "The description contains invalid characters, as we do not permit the use of HTML in the description."},
-		{"too long description", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "good", Description: strings.Repeat("a", 101)}}}, http.StatusBadRequest, "The description cannot exceed a maximum length of 100 characters."},
-		{"duplicate identifiers", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "dup", Description: "x"}, {PermissionIdentifier: "dup", Description: "y"}}}, http.StatusBadRequest, "Permission dup is duplicated."},
+		{"empty identifier", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "", Description: "x"}}}, http.StatusBadRequest, "Permission identifier is required", ""},
+		{"invalid format", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "__bad", Description: "x"}}}, http.StatusBadRequest, "Invalid identifier format", ""},
+		// The identifier reaches ValidateIdentifier as it was sent. It used to be run through the
+		// HTML sanitizer first, which turned "valid<b" into "valid" and created a permission under
+		// a name the caller never asked for (#275).
+		{"html in identifier", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "valid<b", Description: "x"}}}, http.StatusBadRequest, "Invalid identifier format", ""},
+		{"html in description", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "good", Description: "<b>x</b>"}}}, http.StatusBadRequest, "The description contains invalid characters, as we do not permit the use of HTML in the description.", "handler.admin_resource_permissions.description_html_not_allowed"},
+		{"too long description", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "good", Description: strings.Repeat("a", 101)}}}, http.StatusBadRequest, "The description cannot exceed a maximum length of 100 characters.", ""},
+		{"duplicate identifiers", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "dup", Description: "x"}, {PermissionIdentifier: "dup", Description: "y"}}}, http.StatusBadRequest, "Permission dup is duplicated.", ""},
 	}
 
 	for _, tc := range cases {
@@ -100,8 +108,16 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 			var errResp api.ErrorResponse
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
 			assert.Contains(t, errResp.ErrorDescription, tc.wantMsg)
+			if tc.wantCode != "" {
+				assert.Equal(t, tc.wantCode, errResp.ErrorCode)
+			}
 		})
 	}
+
+	// Nothing in the table above was created, "valid<b" included.
+	perms, err := database.GetPermissionsByResourceId(nil, resource.Id)
+	assert.NoError(t, err)
+	assert.Empty(t, perms)
 }
 
 // Test conflict when updating to an existing identifier

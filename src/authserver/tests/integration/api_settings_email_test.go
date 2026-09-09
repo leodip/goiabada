@@ -394,3 +394,61 @@ func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
+
+// TestAPISettingsEmailPut_AngleBracketsRejected pins the from-name reject. mail.Address.String
+// quotes the name, so this is a consistency choice rather than a header-injection fix: every
+// plain-text field this API writes now applies the same rule (#275).
+func TestAPISettingsEmailPut_AngleBracketsRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+
+	before, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
+		SMTPEnabled:    true,
+		SMTPHost:       "mailpit",
+		SMTPPort:       1025,
+		SMTPEncryption: "starttls",
+		SMTPFromName:   "Acme <Support>",
+		SMTPFromEmail:  "qa@goiabada.dev",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "validator.settings.smtp_from_name_angle_brackets", errResp.ErrorCode)
+
+	stored, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, before.SMTPFromName, stored.SMTPFromName)
+}
+
+// TestAPISettingsEmailPut_AmpersandsAndQuotesStoredVerbatim is the accepted twin.
+func TestAPISettingsEmailPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
+		SMTPEnabled:    true,
+		SMTPHost:       "mailpit",
+		SMTPPort:       1025,
+		SMTPPassword:   "secret123",
+		SMTPEncryption: "starttls",
+		SMTPFromName:   `  Tom & Jerry "QA"  `,
+		SMTPFromEmail:  "qa@goiabada.dev",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body api.SettingsEmailResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	assert.NoError(t, err)
+	assert.Equal(t, `Tom & Jerry "QA"`, body.SMTPFromName)
+
+	stored, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, `Tom & Jerry "QA"`, stored.SMTPFromName)
+}

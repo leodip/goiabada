@@ -5143,7 +5143,7 @@ components:
           type: string
         displayName:
           type: string
-          description: A user-friendly name for the client (max 100 chars after sanitization). When the sanitized value is non-empty, showDisplayName is automatically set to true; otherwise false.
+          description: A user-friendly name for the client (max 100 chars after trimming). When the trimmed value is non-empty, showDisplayName is automatically set to true; otherwise false.
         authorizationCodeEnabled:
           type: boolean
         clientCredentialsEnabled:

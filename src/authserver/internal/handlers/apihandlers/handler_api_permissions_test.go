@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
-	"github.com/leodip/goiabada/core/inputsanitizer"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
@@ -27,9 +26,8 @@ func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testi
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	identifierValidator := validators.NewIdentifierValidator()
-	inputSan := inputsanitizer.NewInputSanitizer()
 
-	handler := HandleAPIResourcePermissionsPut(database, nil, identifierValidator, inputSan, auditLogger)
+	handler := HandleAPIResourcePermissionsPut(database, nil, identifierValidator, auditLogger)
 
 	// System-level resource (authserver)
 	resource := &models.Resource{
