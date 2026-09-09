@@ -43,6 +43,19 @@ const (
 	ErrCodeAddressRegionTooLong     = "validator.address.region_too_long"      // Args: {"max": int}
 	ErrCodeAddressPostalCodeTooLong = "validator.address.postal_code_too_long" // Args: {"max": int}
 	ErrCodeAddressCountryInvalid    = "validator.address.country_invalid"
+	ErrCodeAddressAngleBrackets     = "validator.address.angle_brackets"
+
+	// Angle brackets validator — ValidateNoAngleBrackets refuses "<" and ">" in
+	// the plain-text fields that no other validator constrains. One code per
+	// field family, so the banner the API's error_description feeds names the
+	// field that was refused (#275). The permission description keeps its own
+	// handler.admin_resource_permissions.description_html_not_allowed.
+	ErrCodeDescriptionAngleBrackets          = "validator.description.angle_brackets"
+	ErrCodeDisplayNameAngleBrackets          = "validator.display_name.angle_brackets"
+	ErrCodeAttributeValueAngleBrackets       = "validator.attribute.value_angle_brackets"
+	ErrCodeSettingsAppNameAngleBrackets      = "validator.settings.app_name_angle_brackets"
+	ErrCodeSettingsIssuerAngleBrackets       = "validator.settings.issuer_angle_brackets"
+	ErrCodeSettingsSmtpFromNameAngleBrackets = "validator.settings.smtp_from_name_angle_brackets"
 
 	// Identifier validator — used for client / resource / permission /
 	// group identifiers and attribute keys.

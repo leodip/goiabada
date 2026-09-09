@@ -29,6 +29,10 @@ func TestValidateEmailAddress(t *testing.T) {
 		{"Invalid email - starting with dot", ".test@example.com", i18n.ErrCodeEmailInvalidFormat},
 		{"Invalid email - ending with dot", "test.@example.com", i18n.ErrCodeEmailInvalidFormat},
 		{"Valid email with subdomains", "test@subdomain.example.com", ""},
+		// Decision 3 of #275: the address pattern is the only guard against markup
+		// in an email address once nothing sanitizes.
+		{"Pins decision 3 of #275 - no less-than", "a<b@example.com", i18n.ErrCodeEmailInvalidFormat},
+		{"Pins decision 3 of #275 - no greater-than", "a>b@example.com", i18n.ErrCodeEmailInvalidFormat},
 	}
 
 	for _, tt := range tests {

@@ -44,6 +44,21 @@ SMTP settings, registration). Protocol token/authorize email errors stay in
 | `validator.address.region_too_long` | `max` (int) | Please ensure the region is no longer than {{.max}} characters. |
 | `validator.address.postal_code_too_long` | `max` (int) | Please ensure the postal code is no longer than {{.max}} characters. |
 | `validator.address.country_invalid` | (none) | Invalid country. |
+| `validator.address.angle_brackets` | (none) | Address fields cannot contain the characters < or >. |
+
+## Angle brackets validator
+
+Emitted by `validators.ValidateNoAngleBrackets`, one code per field family. The
+address family's code is in the address table above.
+
+| Code | Args | English message |
+|---|---|---|
+| `validator.description.angle_brackets` | (none) | The description cannot contain the characters < or >. |
+| `validator.display_name.angle_brackets` | (none) | The display name cannot contain the characters < or >. |
+| `validator.attribute.value_angle_brackets` | (none) | The attribute value cannot contain the characters < or >. |
+| `validator.settings.app_name_angle_brackets` | (none) | The application name cannot contain the characters < or >. |
+| `validator.settings.issuer_angle_brackets` | (none) | The issuer cannot contain the characters < or >. |
+| `validator.settings.smtp_from_name_angle_brackets` | (none) | The from name cannot contain the characters < or >. |
 
 ## Identifier validator
 

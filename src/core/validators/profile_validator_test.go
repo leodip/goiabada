@@ -166,6 +166,11 @@ func TestValidateName_Rejected(t *testing.T) {
 		{"contains an at sign", "Jane@Doe"},
 		{"leading digit", "1Jane"},
 		{"emoji", "Jane😀"},
+		// Decision 3 of #275: the name shape is the only guard against markup in a
+		// name once nothing sanitizes. One row per character, so relaxing the
+		// pattern for either of them fails here with a reason attached.
+		{"pins decision 3 of #275: less-than is refused by the name shape", "Ann<e"},
+		{"pins decision 3 of #275: greater-than is refused by the name shape", "Ann>e"},
 	}
 
 	for _, tc := range testCases {
@@ -237,6 +242,10 @@ func TestValidateProfile_UsernameFormat(t *testing.T) {
 		{"no space", "j doe", i18n.ErrCodeProfileUsernameInvalid},
 		{"no at sign", "j@doe", i18n.ErrCodeProfileUsernameInvalid},
 		{"no accented letters", "josé", i18n.ErrCodeProfileUsernameInvalid},
+		// Decision 3 of #275: the username pattern is the only guard against
+		// markup here once nothing sanitizes.
+		{"pins decision 3 of #275: no less-than", "us<er", i18n.ErrCodeProfileUsernameInvalid},
+		{"pins decision 3 of #275: no greater-than", "us>er", i18n.ErrCodeProfileUsernameInvalid},
 	}
 
 	for _, tc := range testCases {
@@ -424,6 +433,10 @@ func TestValidateProfile_Nickname(t *testing.T) {
 		{"hyphen", "j-d", i18n.ErrCodeProfileNicknameInvalid},
 		{"space", "j d", i18n.ErrCodeProfileNicknameInvalid},
 		{"empty is allowed", "", ""},
+		// Decision 3 of #275: the nickname pattern is the only guard against
+		// markup here once nothing sanitizes.
+		{"pins decision 3 of #275: no less-than", "ni<ck", i18n.ErrCodeProfileNicknameInvalid},
+		{"pins decision 3 of #275: no greater-than", "ni>ck", i18n.ErrCodeProfileNicknameInvalid},
 	}
 
 	for _, tc := range testCases {

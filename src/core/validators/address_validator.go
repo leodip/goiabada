@@ -48,6 +48,29 @@ func (val *AddressValidator) ValidateAddress(input *ValidateAddressInput) error 
 		return i18n.NewLocalizedError(i18n.ErrCodeAddressPostalCodeTooLong, map[string]any{"max": 30})
 	}
 
+	// Refuse "<" and ">" rather than stripping them, so an accepted address is
+	// stored exactly as it was sent (#275). Country is left to its alpha-2
+	// lookup below, which already excludes both characters.
+	if err := ValidateNoAngleBrackets(input.AddressLine1, i18n.ErrCodeAddressAngleBrackets); err != nil {
+		return err
+	}
+
+	if err := ValidateNoAngleBrackets(input.AddressLine2, i18n.ErrCodeAddressAngleBrackets); err != nil {
+		return err
+	}
+
+	if err := ValidateNoAngleBrackets(input.AddressLocality, i18n.ErrCodeAddressAngleBrackets); err != nil {
+		return err
+	}
+
+	if err := ValidateNoAngleBrackets(input.AddressRegion, i18n.ErrCodeAddressAngleBrackets); err != nil {
+		return err
+	}
+
+	if err := ValidateNoAngleBrackets(input.AddressPostalCode, i18n.ErrCodeAddressAngleBrackets); err != nil {
+		return err
+	}
+
 	// The canonical stored country representation is ISO 3166-1 alpha-2
 	// (e.g. "US", "BR"). The form posts alpha-2 codes; the stored value
 	// is also alpha-2 (a one-time migration converted any pre-existing

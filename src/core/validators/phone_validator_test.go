@@ -83,6 +83,24 @@ func TestValidatePhone(t *testing.T) {
 			},
 			expectedCode: i18n.ErrCodePhoneCountryRequired,
 		},
+		// Decision 3 of #275: the digits-and-separators pattern is the only guard
+		// against markup in a phone number once nothing sanitizes.
+		{
+			name: "Pins decision 3 of #275 - no less-than",
+			input: ValidatePhoneInput{
+				PhoneCountryUniqueId: "USA_0",
+				PhoneNumber:          "123<456",
+			},
+			expectedCode: i18n.ErrCodePhoneInvalidFormat,
+		},
+		{
+			name: "Pins decision 3 of #275 - no greater-than",
+			input: ValidatePhoneInput{
+				PhoneCountryUniqueId: "USA_0",
+				PhoneNumber:          "123>456",
+			},
+			expectedCode: i18n.ErrCodePhoneInvalidFormat,
+		},
 	}
 
 	for _, tt := range tests {

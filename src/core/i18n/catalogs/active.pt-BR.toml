@@ -1396,6 +1396,14 @@
 "validator.address.region_too_long" = "Garanta que o estado/província não tenha mais que {{.max}} caracteres."
 "validator.address.postal_code_too_long" = "Garanta que o CEP/código postal não tenha mais que {{.max}} caracteres."
 "validator.address.country_invalid" = "País inválido."
+"validator.address.angle_brackets" = "Os campos de endereço não podem conter os caracteres < ou >."
+
+"validator.description.angle_brackets" = "A descrição não pode conter os caracteres < ou >."
+"validator.display_name.angle_brackets" = "O nome de exibição não pode conter os caracteres < ou >."
+"validator.attribute.value_angle_brackets" = "O valor do atributo não pode conter os caracteres < ou >."
+"validator.settings.app_name_angle_brackets" = "O nome da aplicação não pode conter os caracteres < ou >."
+"validator.settings.issuer_angle_brackets" = "O emissor não pode conter os caracteres < ou >."
+"validator.settings.smtp_from_name_angle_brackets" = "O nome do remetente não pode conter os caracteres < ou >."
 
 "validator.identifier.too_long" = "O identificador não pode ter mais que {{.max}} caracteres."
 "validator.identifier.too_short" = "O identificador deve ter pelo menos {{.min}} caracteres."

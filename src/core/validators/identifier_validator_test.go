@@ -38,6 +38,12 @@ func TestValidateIdentifier(t *testing.T) {
 			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
 		{name: "Invalid characters", identifier: "invalid@identifier", enforceMinLength: true,
 			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
+		// Decision 3 of #275: the identifier pattern is the only guard against
+		// markup in an identifier or attribute key once nothing sanitizes.
+		{name: "Pins decision 3 of #275 - no less-than", identifier: "my<id", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
+		{name: "Pins decision 3 of #275 - no greater-than", identifier: "my>id", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
 	}
 
 	for _, tt := range tests {
