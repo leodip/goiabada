@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -210,7 +211,25 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
 	var err6 api.ErrorResponse
 	_ = json.NewDecoder(resp6.Body).Decode(&err6)
-	assert.Equal(t, "SMTP password must be less than 256 characters.", err6.ErrorDescription)
+	assert.Equal(t, "VALIDATION_ERROR", err6.ErrorCode)
+	assert.Equal(t, "SMTP password must be at most 256 bytes.", err6.ErrorDescription)
+
+	// Oversized password against an unreachable host: the bound is checked before the
+	// dial, so the answer is the password error and arrives without the 3s connect wait.
+	resp7 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
+		SMTPEnabled:    true,
+		SMTPHost:       "127.0.0.1",
+		SMTPPort:       65534, // likely closed
+		SMTPFromEmail:  "noreply@goiabada.dev",
+		SMTPEncryption: "none",
+		SMTPPassword:   strings.Repeat("p", 257),
+	})
+	defer func() { _ = resp7.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp7.StatusCode)
+	var err7 api.ErrorResponse
+	_ = json.NewDecoder(resp7.Body).Decode(&err7)
+	assert.Equal(t, "VALIDATION_ERROR", err7.ErrorCode)
+	assert.Equal(t, "SMTP password must be at most 256 bytes.", err7.ErrorDescription)
 }
 
 func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
@@ -236,7 +255,9 @@ func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 
 	settings, err := database.GetSettingsById(nil, 1)
 	assert.NoError(t, err)
-	assert.Greater(t, len(settings.SMTPPasswordEncrypted), 0)
+	stored, err := encryption.DecryptData(settings.SMTPPasswordEncrypted)
+	assert.NoError(t, err)
+	assert.Equal(t, strings.Repeat("p", 256), stored)
 }
 
 // PUT: TCP connectivity failure
