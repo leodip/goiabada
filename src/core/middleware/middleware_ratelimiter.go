@@ -902,10 +902,12 @@ func clientIPRateLimitKey(r *http.Request) string {
 // digest buys is not injectivity but unreachability. The exact branch is injective, the
 // prefix test above keeps the two branches disjoint, and putting two accounts in one
 // bucket through the digest branch means producing a SHA-256 collision. The width is the
-// reason that holds: a 64-bit hash collides constructibly, which is the shared-bucket
-// defect again in a different shape, while SHA-256's collision resistance is already what
-// the token endpoint rests on for PKCE S256, where breaking it is an authentication
-// bypass rather than a shared rate-limit bucket (#276).
+// reason that holds: a 64-bit hash collides at around 2^32 attempts, which is constructible
+// and is the shared-bucket defect again in a different shape, while SHA-256 puts a collision
+// between two identifiers an attacker is free to choose at around 2^128. Aiming at one
+// particular account is harder still, and it is the case that would matter: making some
+// other submission land in that account's bucket is a second preimage of its digest, around
+// 2^256, not any colliding pair (#276).
 func accountRateLimitKey(identifier string) string {
 	normalized := strings.ToLower(strings.TrimSpace(identifier))
 	// The prefix test is what keeps the two branches from sharing a namespace. Without
