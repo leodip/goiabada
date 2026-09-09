@@ -29,8 +29,28 @@ type Gate struct {
 	window time.Duration
 	anchor time.Time
 	now    func() time.Time
-	store  *memStore
+	store  gateStore
 	mu     sync.Mutex
+}
+
+// gateStore is what a Gate asks of a store: memStore's unexported half, which answers
+// without an error because a Gate has no failure path to reach.
+//
+// It is an interface rather than *memStore for one reason, and it is a testing reason.
+// First is a compound read-and-record whose whole correctness is that one mutex covers
+// all of it, and a concurrency test that asserts the outcome only reports that the race
+// did not happen this time. Checking the lock directly needs a caller suspended inside
+// the section, and now() sits one statement into it, so parking there pins the entrance
+// and says nothing about the read and the record after it: an unlock moved below now(),
+// or below the read, leaves both Gate concurrency cases green in a hundred runs. A store
+// that parks inside the write puts the check at the last instant of the section instead,
+// where an unlock anywhere above it is visible (#276).
+//
+// Production is always a memStore, because Gate() is the only constructor and it builds
+// one; nothing outside this package can substitute, the interface being unexported.
+type gateStore interface {
+	get(key string, current, previous time.Time) (curr, prev int)
+	add(key string, current time.Time)
 }
 
 // Gate returns a fresh gate over this limiter's window, phase and clock. Its counts are

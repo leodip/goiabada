@@ -81,10 +81,12 @@ func TestGate_ConcurrentFirstReportsExactlyOnce(t *testing.T) {
 	// second caller, and it does not.
 	//
 	// This case asserts the outcome and is a probabilistic witness of the cause: with
-	// the unlock moved above now(), it caught the mutation in four of six runs. What
-	// pins the cause is TestGate_FirstHoldsItsLockAcrossTheWholeReadAndRecord below,
-	// which fails on every run of that mutant. Both are kept: one says the lock is
-	// held, the other says holding it produces exactly one report (#276).
+	// the unlock moved above now(), it caught the mutation in four of six runs, and it
+	// misses the two later truncations of the same critical section entirely, passing a
+	// hundred consecutive runs against each. What pins the cause is
+	// TestGate_FirstHoldsItsLockAcrossTheWholeReadAndRecord below, which fails on every
+	// run of all three. Both are kept: one says the lock is held, the other says holding
+	// it produces exactly one report (#276).
 	base := g.now()
 	g.now = func() time.Time {
 		time.Sleep(time.Millisecond)
@@ -118,47 +120,77 @@ func TestGate_ConcurrentFirstReportsExactlyOnce(t *testing.T) {
 	}
 }
 
+// parkingStore is a memStore that suspends its first caller inside the write. It is how
+// the case below reaches the far end of First's critical section: the store's add is the
+// last thing First does under the lock, so a caller parked there has executed the whole
+// compound operation bar the unlock.
+//
+// Only add parks. Parking in get would put the check between the read and the record and
+// leave the record itself unpinned, which is one of the two truncations the previous
+// version of this test missed.
+type parkingStore struct {
+	*memStore
+	once    sync.Once
+	parked  chan struct{}
+	release chan struct{}
+}
+
+func newParkingStore(window time.Duration) *parkingStore {
+	return &parkingStore{
+		memStore: newMemStore(window),
+		parked:   make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+}
+
+func (s *parkingStore) add(key string, current time.Time) {
+	s.once.Do(func() {
+		close(s.parked)
+		<-s.release
+	})
+	s.memStore.add(key, current)
+}
+
 // TestGate_FirstHoldsItsLockAcrossTheWholeReadAndRecord pins the cause the case above
 // can only witness. A concurrency test that asserts an outcome depends on the scheduler
 // to interleave two callers, so it answers "the race did not happen this time" rather
 // than "the race cannot happen": moving First's unlock above now() leaves the outcome
 // case passing four runs in six.
 //
-// Suspending the first caller inside now() removes the scheduler from the question. now()
-// is called after the lock is taken, so while that caller is parked the mutex must be
-// held, and TryLock reports whether it is. Every run of the unlocked Gate fails here
-// (#276).
+// Suspending a caller inside First and asking TryLock whether the mutex is held removes
+// the scheduler from the question. Where the caller is suspended is the whole of what
+// this proves, and the first version of this test got it wrong: it parked inside now(),
+// which First calls one statement after taking the lock, so it pinned the entrance to
+// the critical section and nothing after it. An unlock moved below now(), or below the
+// store read, left this case and the outcome case above green in a hundred consecutive
+// runs each. Both are real defects -- two callers read a count of zero and both are told
+// they are first -- and neither was observable.
+//
+// So the park is at the far end instead, inside the store's write, which is the last
+// thing First does under the lock. The mutex must still be held there, whatever the
+// unlock's position, unless it was released somewhere above -- which is exactly the
+// family of truncations worth catching (#276).
 func TestGate_FirstHoldsItsLockAcrossTheWholeReadAndRecord(t *testing.T) {
 	g := New(1, testWindow).Gate()
-
-	base := g.now()
-	parked := make(chan struct{})
-	release := make(chan struct{})
-	var once sync.Once
-	g.now = func() time.Time {
-		once.Do(func() {
-			close(parked)
-			<-release
-		})
-		return base
-	}
+	store := newParkingStore(testWindow)
+	g.store = store
 
 	reported := make(chan bool, 1)
 	go func() { reported <- g.First("k") }()
 
-	<-parked
+	<-store.parked
 	locked := !g.mu.TryLock()
 	if !locked {
 		// Taken, so release it: leaving it held would deadlock the parked caller's
 		// own deferred unlock and hang the test rather than failing it.
 		g.mu.Unlock()
 	}
-	close(release)
+	close(store.release)
 	first := <-reported
 
 	if !locked {
-		t.Error("Gate.mu was free while a caller was inside First: the read and the record " +
-			"are not one critical section, so two callers can both be told they are first")
+		t.Error("Gate.mu was free while a caller was inside First's record: the read and the " +
+			"record are not one critical section, so two callers can both be told they are first")
 	}
 	if !first {
 		t.Error("the only caller was not told it was first")
