@@ -17,13 +17,13 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/go-chi/httprate"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/ratelimit"
 )
 
 // testTemplateFS is the smallest tree RenderTemplate needs: a layout that includes the
@@ -522,9 +522,9 @@ func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 		if rr.Code != http.StatusTooManyRequests {
 			t.Fatalf("got code %d, want %d", rr.Code, http.StatusTooManyRequests)
 		}
-		// The failures-only path never calls OnLimit on a refusal, so it writes this
-		// header itself. httprate would otherwise have written it and nothing here would
-		// notice it was gone.
+		// Nothing below the middleware touches the response, so refuse writes this header
+		// on both paths. Asserting it on the failures-only one is what would notice if
+		// only the every-request path kept it.
 		if got := rr.Header().Get("Retry-After"); got != "900" {
 			t.Errorf("Retry-After = %q, want 900, the tier's 15 minute window", got)
 		}
@@ -547,34 +547,28 @@ func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 
 // TestFailureTier_FailsClosedOnACounterError is the one case that reaches failureTier
 // directly, and the reason for the exception is that nothing else can reach this branch:
-// httprate's in-process counter documents that all its methods always return a nil error,
-// so no request through the middleware can produce one. An implementation that returned
-// true on a counter error would leave every other case in this file green while the gate
-// failed open for the duration of a storage fault (#219).
+// the in-process store the limiter is built with cannot fail, so no request through the
+// middleware can produce an error here. An implementation that returned true on a counter
+// error would leave every other case in this file green while the gate failed open for the
+// duration of a storage fault (#219).
 func TestFailureTier_FailsClosedOnACounterError(t *testing.T) {
 	f := newFailureTier("test", 5, time.Minute)
-	f.rl = httprate.NewRateLimiter(5, time.Minute, httprate.WithLimitCounter(&erroringLimitCounter{}))
+	f.rl = ratelimit.New(5, time.Minute, ratelimit.WithStore(&erroringStore{}))
 
 	if f.Reserve("anyone@example.com") {
 		t.Error("Reserve returned true with the counter erroring; the gate must fail closed")
 	}
 }
 
-// erroringLimitCounter is a LimitCounter whose reads fail, standing in for a counter
+// erroringStore is a ratelimit.Store whose reads fail, standing in for a store
 // implementation that can (unlike the in-process one).
-type erroringLimitCounter struct{}
+type erroringStore struct{}
 
-func (c *erroringLimitCounter) Config(requestLimit int, windowLength time.Duration) {}
-
-func (c *erroringLimitCounter) Increment(key string, currentWindow time.Time) error { return nil }
-
-func (c *erroringLimitCounter) IncrementBy(key string, currentWindow time.Time, amount int) error {
-	return nil
-}
-
-func (c *erroringLimitCounter) Get(key string, currentWindow, previousWindow time.Time) (int, int, error) {
+func (s *erroringStore) Get(key string, current, previous time.Time) (int, int, error) {
 	return 0, 0, errors.New("counter unavailable")
 }
+
+func (s *erroringStore) Add(key string, current time.Time) error { return nil }
 
 // TestLimitForgotPwd_PerEmailAndPerIP verifies the forgot-password limiter bounds
 // both a single address (mail-bombing) and a single source IP, and that neither
@@ -963,7 +957,7 @@ func TestLimitRegister_PerIP(t *testing.T) {
 			t.Errorf("Retry-After = %q, want 300, the tier's 5 minute window", got)
 		}
 		// A registration form is a browser route, so the refusal is the error page rather
-		// than httprate's plain text.
+		// than the plain text a status-code-only refusal would write.
 		if got := rr.Header().Get("Content-Type"); got != "text/html; charset=UTF-8" {
 			t.Errorf("Content-Type = %q, want text/html; charset=UTF-8", got)
 		}
@@ -1402,8 +1396,8 @@ func TestLimitAccountPassword_PerSubject(t *testing.T) {
 // Every case below drives a real limiter past its budget and reads the response
 // the caller would actually receive. Nothing asserts on a spy, because the defect
 // these exist to prevent is a rejection wired up everywhere except where it is
-// written: httprate's own default answers "Too Many Requests\n" as text/plain on
-// every route regardless of how much configuration surrounds it (#219).
+// written: the shape a limiter reaches for by default is "Too Many Requests\n" as
+// text/plain on every route, regardless of how much configuration surrounds it (#219).
 // -----------------------------------------------------------------------------
 
 // tripBrowser drives failed password checks at LimitPwd from one host until it is refused
@@ -1454,7 +1448,7 @@ func TestRejection_BrowserClass(t *testing.T) {
 	rr := tripBrowser(t, m)
 
 	if got := rr.Header().Get("Content-Type"); got != "text/html; charset=UTF-8" {
-		t.Errorf("Content-Type = %q, want %q; a plain-text body is what httprate's default writes",
+		t.Errorf("Content-Type = %q, want %q; a plain-text body is the default a refusal falls back to",
 			got, "text/html; charset=UTF-8")
 	}
 	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
@@ -1546,7 +1540,7 @@ func TestRejection_APIClass(t *testing.T) {
 	rr := tripAPI(t, m)
 
 	if got := rr.Header().Get("Content-Type"); got != "application/json" {
-		t.Errorf("Content-Type = %q, want application/json; a plain-text body is what httprate's default writes", got)
+		t.Errorf("Content-Type = %q, want application/json; a plain-text body is the default a refusal falls back to", got)
 	}
 	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
 		t.Errorf("Cache-Control = %q, want no-store", got)
