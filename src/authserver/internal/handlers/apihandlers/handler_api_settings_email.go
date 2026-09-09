@@ -151,6 +151,14 @@ func HandleAPISettingsEmailPut(
 			writeJSONError(w, fmt.Sprintf("SMTP username must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
+		// 256 holds every provider credential shape seen in the wild, including Azure
+		// Communication Services' composite of two GUIDs and a client secret at about
+		// 114 characters, and stays well under the 512-octet SMTP command line that
+		// smtp_plain_auth.go handles by falling back to the challenge form.
+		if len(req.SMTPPassword) > 256 {
+			writeJSONError(w, fmt.Sprintf("SMTP password must be less than %v characters.", 256), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
 		if len(req.SMTPFromName) > 60 {
 			writeJSONError(w, fmt.Sprintf("SMTP from name must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
