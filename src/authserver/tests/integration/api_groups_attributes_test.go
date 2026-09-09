@@ -807,8 +807,10 @@ func TestAPIGroupAttribute_AngleBracketsRejected(t *testing.T) {
 	})
 }
 
-// TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim is the accepted twin. Attribute values
-// are not trimmed, so the surrounding spaces come back too.
+// TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim is the accepted twin, on both wiring
+// points like its rejected counterpart above: create and update assign the value independently, so
+// a rewrite installed on one of them is invisible to a test that only exercises the other.
+// Attribute values are not trimmed, so the surrounding spaces come back too.
 func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -830,5 +832,22 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	stored, err := database.GetGroupAttributeById(nil, createResponse.Attribute.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, value, stored.Value)
-	_ = database.DeleteGroupAttribute(nil, createResponse.Attribute.Id)
+	defer func() { _ = database.DeleteGroupAttribute(nil, createResponse.Attribute.Id) }()
+
+	updated := `  AT&T "phase 3"  `
+	updateResp := makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/admin/group-attributes/"+
+		strconv.FormatInt(createResponse.Attribute.Id, 10), accessToken,
+		api.UpdateGroupAttributeRequest{Key: "motto", Value: updated})
+	defer func() { _ = updateResp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
+
+	var updateResponse api.UpdateGroupAttributeResponse
+	err = json.NewDecoder(updateResp.Body).Decode(&updateResponse)
+	assert.NoError(t, err)
+	assert.Equal(t, updated, updateResponse.Attribute.Value)
+
+	stored, err = database.GetGroupAttributeById(nil, createResponse.Attribute.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, updated, stored.Value)
 }

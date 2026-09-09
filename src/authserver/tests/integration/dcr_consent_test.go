@@ -164,6 +164,43 @@ func TestDCR_Consent_SelfAssertedNameIsEscaped(t *testing.T) {
 	assert.Contains(t, page, "Acme &amp; &#34;Sons&#34;", "it reaches the page as text")
 }
 
+// TestDCR_Consent_RetainedMarkupNameIsEscaped covers the names that are already in the database.
+// Registration refuses "<" and ">" since #275, but that change migrated nothing, so a client
+// registered before it still holds a complete tag in the column this page renders. The test above
+// can no longer carry those two characters through /connect/register, and they are the two the
+// renderer exists to neutralise, so this is what observes them at the template seam: without it, a
+// consent page that escaped ampersands and quotes and trusted the rest would still pass.
+func TestDCR_Consent_RetainedMarkupNameIsEscaped(t *testing.T) {
+	enableDCR(t)
+	defer disableDCR(t)
+
+	const retained = `<b>Existing</b>`
+	const redirectURI = "https://dcr-retained-app.example.com/callback"
+
+	client := registerDCRClient(t, "Existing Portal", redirectURI)
+
+	// Written straight to the row, because no write path accepts it any more. This is a client
+	// that predates the reject, which decision 7 of #275 leaves exactly as it is.
+	client.Description = retained
+	require.NoError(t, database.UpdateClient(nil, client))
+
+	user, password := createCeremonyUser(t)
+	httpClient := createHttpClient(t)
+
+	chain, resp := followAuthChain(t, httpClient, client.ClientIdentifier, redirectURI, user, password)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Contains(t, strings.Join(chain, " -> "), "/auth/consent")
+
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	page := string(raw)
+
+	// Raw bytes, for the reason given above.
+	assert.NotContains(t, page, retained, "the stored tag must not reach the page as markup")
+	assert.Contains(t, page, "&lt;b&gt;Existing&lt;/b&gt;", "it reaches the page as text")
+}
+
 // TestDCR_Consent_UnverifiedNameSuppressesTheDescriptionLine covers the one behaviour in this stage
 // that no other case would notice being deleted. A self-registered client's name and its
 // description are the same self-asserted string, so an administrator who ticks "show description"
