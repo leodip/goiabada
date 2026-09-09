@@ -2,6 +2,7 @@ package adminresourcehandlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -52,7 +53,7 @@ func validatePermissionResponse(t *testing.T, identifier string, description str
 
 func TestValidatePermissionPost_DescriptionAngleBrackets(t *testing.T) {
 	htmlNotAllowed := i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed, nil).
-		Localize(nil)
+		Localize(context.Background())
 
 	testCases := []struct {
 		name        string
@@ -88,7 +89,7 @@ func TestValidatePermissionPost_DescriptionAngleBrackets(t *testing.T) {
 // The identifier reached ValidateIdentifier sanitized, so "valid<b" arrived as "valid" and this
 // endpoint reported a well-formed identifier the user had not typed. It is now checked raw.
 func TestValidatePermissionPost_TheIdentifierIsValidatedRaw(t *testing.T) {
-	invalidFormat := i18n.NewLocalizedError(i18n.ErrCodeIdentifierInvalidFormat, nil).Localize(nil)
+	invalidFormat := i18n.NewLocalizedError(i18n.ErrCodeIdentifierInvalidFormat, nil).Localize(context.Background())
 
 	result := validatePermissionResponse(t, "valid<b", "")
 	assert.False(t, result.Valid, "the identifier the user typed is what gets validated")
