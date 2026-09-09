@@ -51,6 +51,11 @@ type fakeSMTP struct {
 	// sets them to something else to reach loginAuth's answer-by-position path.
 	loginChallenges []string
 
+	// plainExtraChallenge makes the server issue a second empty 334 after it has already taken the
+	// PLAIN response, which no conforming server does: PLAIN carries one response and no more. It
+	// exists to reach plainAuth's refusal of a repeated challenge.
+	plainExtraChallenge bool
+
 	// maxCommandLine, when set, is the octet limit this server enforces on a command line, CRLF
 	// included: RFC 5321 section 4.5.3.1.4's 512. Only the command loop counts, which is what the
 	// specification bounds; a SASL continuation line is read inside its own arm and is exempt.
@@ -220,6 +225,19 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 			f.mu.Lock()
 			f.authUser, f.authPass = parts[1], parts[2]
 			f.mu.Unlock()
+			if f.plainExtraChallenge {
+				// Ask again, having already been answered. A client that treats the exchange as
+				// stateless replies with a second copy of the password; the recorded lines are
+				// what tells the two apart, since either way this arm then fails the login.
+				say("334 ")
+				next, err := r.ReadString('\n')
+				if err != nil {
+					return
+				}
+				f.record(strings.TrimRight(next, "\r\n"))
+				say("535 5.7.8 authentication failed")
+				continue
+			}
 			say("235 2.7.0 authentication succeeded")
 
 		case up == "AUTH LOGIN":

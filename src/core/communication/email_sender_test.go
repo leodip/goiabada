@@ -2,6 +2,7 @@ package communication
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -327,26 +328,91 @@ func TestSendEmail_LoginAnswersUnconventionalChallenges(t *testing.T) {
 	assert.True(t, f.hasLinePrefix("MAIL FROM:"))
 }
 
-// TestSendEmail_PlainCredentialsTooLongForTheCommandLine holds RFC 4954 section 4's MUST: where the
-// initial response would push the AUTH command past RFC 5321 section 4.5.3.1.4's 512 octets, the
-// client omits it and answers the empty 334 challenge instead. The fake enforces the limit, so an
-// inline response would be answered 500 and the send would fail. Nothing bounds the SMTP password
-// on the way into the settings, so a password this long is one an admin can save today.
+// TestSendEmail_PlainInitialResponseBoundary holds RFC 4954 section 4's MUST at the octet where it
+// takes effect: once the initial response would push the AUTH command past RFC 5321 section
+// 4.5.3.1.4's 512 octets, the client omits it and answers the empty 334 challenge instead. The two
+// rows are one password octet apart, so what they measure is the boundary rather than the two
+// shapes in general, and the fake enforces the 512 itself: an inline response one octet over is
+// answered 500 and the send fails. Nothing bounds the SMTP password on the way into the settings,
+// so a password this long is one an admin can save today.
 //
 // The inline form for an ordinary password is pinned by the mechanism table's `AUTH PLAIN ` rows.
-func TestSendEmail_PlainCredentialsTooLongForTheCommandLine(t *testing.T) {
+func TestSendEmail_PlainInitialResponseBoundary(t *testing.T) {
+
+	// The response has smtpCommandLineLimit less `AUTH PLAIN ` and the CRLF to fit in, 499 octets,
+	// and base64 emits 4 octets for every 3, so the largest raw response that fits is 372. RFC
+	// 4616's response is authzid NUL authcid NUL passwd, so the password gets what the two
+	// separators and the username leave of that. Derived here rather than read from
+	// plainInitialResponseFits, which is the thing under test.
+	largestFitting := (smtpCommandLineLimit-len("AUTH PLAIN ")-len("\r\n"))/4*3 - 2 - len(fixtureUser)
+
+	tests := []struct {
+		name        string
+		passwordLen int
+		wantInline  bool
+	}{
+		{"the longest response that fits stays on the command line", largestFitting, true},
+		{"one octet more moves to the empty challenge", largestFitting + 1, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			password := strings.Repeat("p", test.passwordLen)
+
+			f := &fakeSMTP{
+				ext:            []string{"AUTH PLAIN", "8BITMIME"},
+				maxCommandLine: smtpCommandLineLimit,
+			}
+			port := f.start(t)
+
+			ctx := fakeSettings(t, "127.0.0.1", port, "none", fixtureUser, password, "Goiabada")
+
+			err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+				To:       fixtureRecipient,
+				Subject:  "Test email",
+				HtmlBody: "<p>hello</p>",
+			})
+			require.NoError(t, err)
+
+			gotUser, gotPassword := f.credentials()
+			assert.Equal(t, fixtureUser, gotUser)
+			assert.Equal(t, password, gotPassword)
+
+			if test.wantInline {
+				assert.True(t, f.hasLinePrefix("AUTH PLAIN "), "the response still fits on the command line at this length")
+			} else {
+				assert.Contains(t, f.lines(), "AUTH PLAIN", "the command carries no initial response at this length")
+				assert.False(t, f.hasLinePrefix("AUTH PLAIN "), "an inline response would have overrun the command line")
+			}
+			assert.True(t, f.hasLinePrefix("MAIL FROM:"))
+		})
+	}
+}
+
+// TestSendEmail_PlainChallengeFormOverProtectedConnection runs the challenge form where a real
+// deployment meets it: over TLS, to a name that is not loopback, with AUTH advertised only after
+// the handshake. RFC 4954 section 4 requires PLAIN over TLS to interoperate and that is the
+// ordinary shape, yet the boundary table above can only reach the challenge form in the clear,
+// through decision 1's loopback exception. Without this a regression refusing the challenge form on
+// the protected modes would leave the whole suite green.
+func TestSendEmail_PlainChallengeFormOverProtectedConnection(t *testing.T) {
 
 	longPassword := strings.Repeat("p", 400)
 
+	cert := newFakeCert(t)
+
 	f := &fakeSMTP{
-		ext:            []string{"AUTH PLAIN", "8BITMIME"},
+		ext:            []string{"STARTTLS", "8BITMIME"},
+		tlsExt:         []string{"AUTH PLAIN", "8BITMIME"},
+		cert:           cert,
 		maxCommandLine: smtpCommandLineLimit,
 	}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, "127.0.0.1", port, "none", fixtureUser, longPassword, "Goiabada")
+	ctx := fakeSettings(t, fakeHostname(t), port, "starttls", fixtureUser, longPassword, "Goiabada")
 
-	err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+	err := (&EmailSender{rootCAs: cert.pool}).SendEmail(ctx, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -357,9 +423,49 @@ func TestSendEmail_PlainCredentialsTooLongForTheCommandLine(t *testing.T) {
 	assert.Equal(t, fixtureUser, user)
 	assert.Equal(t, longPassword, password)
 
+	startTLS := f.indexOfLinePrefix("STARTTLS")
+	require.GreaterOrEqual(t, startTLS, 0, "the client never issued STARTTLS")
+	assert.Greater(t, f.indexOfLinePrefix("AUTH PLAIN"), startTLS, "the credentials may only follow the handshake")
 	assert.Contains(t, f.lines(), "AUTH PLAIN", "the command carries no initial response at this length")
-	assert.False(t, f.hasLinePrefix("AUTH PLAIN "), "an inline response would have overrun the command line")
 	assert.True(t, f.hasLinePrefix("MAIL FROM:"))
+}
+
+// TestSendEmail_PlainRepeatedChallenge pins plainAuth's one-response cardinality. PLAIN carries
+// exactly one response (RFC 4616 section 2), so a server challenging again after it has taken that
+// response is broken or fishing, and the answer is an error rather than a second copy of the
+// password on the wire. The send fails either way, because this fake refuses the login at the end
+// of the exchange, so what separates a client that holds the property from one that does not is the
+// number of responses the server got.
+func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
+
+	longPassword := strings.Repeat("p", 400)
+
+	f := &fakeSMTP{
+		ext:                 []string{"AUTH PLAIN", "8BITMIME"},
+		maxCommandLine:      smtpCommandLineLimit,
+		plainExtraChallenge: true,
+	}
+	port := f.start(t)
+
+	ctx := fakeSettings(t, "127.0.0.1", port, "none", fixtureUser, longPassword, "Goiabada")
+
+	err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+		To:       fixtureRecipient,
+		Subject:  "Test email",
+		HtmlBody: "<p>hello</p>",
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "unexpected server challenge")
+
+	answered := 0
+	for _, line := range f.lines() {
+		raw, decodeErr := base64.StdEncoding.DecodeString(line)
+		if decodeErr == nil && strings.Contains(string(raw), longPassword) {
+			answered++
+		}
+	}
+	assert.Equal(t, 1, answered, "the repeated challenge may not be answered with the password again")
+	assert.False(t, f.hasLinePrefix("MAIL FROM:"), "no message may follow a login that failed")
 }
 
 // TestSendEmail_FailsClosed covers decisions 1, 2 and 4. Every refusal sits next to the row it
