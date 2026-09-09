@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -137,6 +138,83 @@ func TestLogout_WithIdTokenHint_NoRedirectTarget_LogsTheUserOut(t *testing.T) {
 	after, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, after, "a hinted logout with no redirect target must still tear the session down")
+}
+
+// The two cases below are the only place an ENCRYPTED id_token_hint is driven through the real
+// stack. Every other hinted case on this endpoint sends the plain signed ID Token, so until these
+// landed the whole JWE path -- five segments, the key derived from the client's stored secret, the
+// dir + A256GCM parse -- was exercised at the unit tier only, against a mocked database (#277).
+//
+// What the mocks cannot reach is the key itself. The unit tier hands decryptIDTokenHint a client
+// row it built, so it proves the handler consults the parser and nothing about where the secret
+// came from. Here the secret is the one the client was registered with, stored encrypted under the
+// data cipher and decrypted by the handler, and the assertion is that the key derived from it is
+// the key the RP encrypted under. Get that wrong anywhere along the chain and both tests still
+// compile and one of them still passes, which is why the pair is a pair.
+
+// TestLogout_WithEncryptedIdTokenHint_LogsTheUserOut is the confirmed half: the same request as
+// TestLogout_WithIdTokenHint_NoRedirectTarget_LogsTheUserOut above, with the hint encrypted and
+// client_id added, since an encrypted hint is the one shape that needs client_id to say whose
+// secret derives the key.
+func TestLogout_WithEncryptedIdTokenHint_LogsTheUserOut(t *testing.T) {
+	grant := createOfflineGrant(t)
+	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
+
+	hint, err := encryption.EncryptIDTokenHintJWE(idToken, grant.clientSecret)
+	require.NoError(t, err)
+	require.Equal(t, 5, len(strings.Split(hint, ".")),
+		"the hint must reach the endpoint as a compact JWE, or it takes the plain-token path instead")
+
+	before, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, before, "the ceremony should have left a session row to tear down")
+
+	resp, err := grant.httpClient.Get(config.GetAuthServer().BaseURL + "/auth/logout?" + url.Values{
+		"id_token_hint": {hint},
+		"client_id":     {grant.client.ClientIdentifier},
+	}.Encode())
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Empty(t, resp.Header.Get("Location"), "no target was asked for, so there is nothing to redirect to")
+	assertSignedOutPage(t, resp, signedOutEnglish, false)
+
+	after, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	assert.Nil(t, after, "a confirmed encrypted hint must tear the session down like any other")
+}
+
+// TestLogout_EncryptedIdTokenHint_WrongSecret_AsksTheEndUserAndRefusesTheRedirect is the refused
+// half, in the shape of TestLogout_RejectedHint_AsksTheEndUserAndRefusesTheRedirect below: a
+// well-formed JWE carrying the right ID Token, encrypted under a secret that is not this client's.
+//
+// Only the key is wrong, so nothing but the GCM tag check can be refusing it. The redirect
+// parameters are the ones that redirect without a hint, and they must not redirect here: a hint the
+// OP cannot confirm costs the RP its return and costs the End-User nothing.
+func TestLogout_EncryptedIdTokenHint_WrongSecret_AsksTheEndUserAndRefusesTheRedirect(t *testing.T) {
+	grant := createOfflineGrant(t)
+	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
+
+	hint, err := encryption.EncryptIDTokenHintJWE(idToken, fake.LetterN(32))
+	require.NoError(t, err)
+
+	resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
+		"id_token_hint":            {hint},
+		"post_logout_redirect_uri": {grant.redirectURI},
+		"client_id":                {grant.client.ClientIdentifier},
+		"state":                    {fake.LetterN(8)},
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Empty(t, resp.Header.Get("Location"),
+		"a hint encrypted under the wrong secret earns no redirect, however good the client_id beside it looks")
+	assertSignedOutPage(t, resp, signedOutEnglish, true)
+
+	gone, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	assert.Nil(t, gone, "the consent page precedes the teardown, it does not replace it")
 }
 
 // TestLogout_RejectedHint_AsksTheEndUserAndRefusesTheRedirect is decision 15 driven through the real
