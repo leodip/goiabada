@@ -196,6 +196,47 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	var err5 api.ErrorResponse
 	_ = json.NewDecoder(resp5.Body).Decode(&err5)
 	assert.Equal(t, "Invalid SMTP encryption.", err5.ErrorDescription)
+
+	// Password too long
+	resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
+		SMTPEnabled:    true,
+		SMTPHost:       "mailpit",
+		SMTPPort:       1025,
+		SMTPFromEmail:  "noreply@goiabada.dev",
+		SMTPEncryption: "none",
+		SMTPPassword:   strings.Repeat("p", 257),
+	})
+	defer func() { _ = resp6.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
+	var err6 api.ErrorResponse
+	_ = json.NewDecoder(resp6.Body).Decode(&err6)
+	assert.Equal(t, "SMTP password must be less than 256 characters.", err6.ErrorDescription)
+}
+
+func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
+		SMTPEnabled:    true,
+		SMTPHost:       "mailpit",
+		SMTPPort:       1025,
+		SMTPUsername:   "user",
+		SMTPPassword:   strings.Repeat("p", 256),
+		SMTPEncryption: "none",
+		SMTPFromEmail:  "noreply@goiabada.dev",
+	})
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body api.SettingsEmailResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	assert.NoError(t, err)
+	assert.Equal(t, true, body.HasSMTPPassword)
+
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+	assert.Greater(t, len(settings.SMTPPasswordEncrypted), 0)
 }
 
 // PUT: TCP connectivity failure
