@@ -878,9 +878,42 @@ func clientIPRateLimitKey(r *http.Request) string {
 //
 // The handlers that look the account up normalize identically, so the limiter and the
 // account it protects cannot disagree about who the request is.
+//
+// The result is bounded, because it becomes a map key the limiter's store retains for two
+// windows and it is read straight off an unauthenticated form. None of these routes caps
+// its body, so without the bound net/http's 10 MiB form limit is the only ceiling on what
+// one accepted request can make the process hold, and LimitForgotPwd accepts twenty per
+// client block per window. httprate retained 8 bytes whatever arrived because it hashed
+// every key to a uint64; this package stores exact keys, which is what stops two accounts
+// sharing a bucket, and bounding the identifier here is what that costs (#276). It also
+// bounds the key reportTrip puts in the warning line and the audit event.
 func accountRateLimitKey(identifier string) string {
-	return strings.ToLower(strings.TrimSpace(identifier))
+	// TrimSpace returns a substring and allocates nothing, so an oversized identifier is
+	// answered before ToLower would copy it.
+	trimmed := strings.TrimSpace(identifier)
+	if len(trimmed) > maxAccountIdentifierLen {
+		return oversizedAccountKey
+	}
+	return strings.ToLower(trimmed)
 }
+
+// maxAccountIdentifierLen is the longest an address can be, which is the point: nothing
+// that could name an account here is ever folded into the shared bucket, so a stranger's
+// overlong submissions can never spend an owner's budget. RFC 5321 section 4.5.3.1.1 caps
+// a local-part at 64 octets and 4.5.3.1.2 caps a domain at 255, plus the '@'.
+//
+// This repository is far stricter than the RFC already: users.email is varchar(64) on the
+// narrowest engine and every write path that has a length check refuses above 60. The
+// headroom over those numbers is deliberate, because self-registration validates the shape
+// without a length, so tightening this to 60 would put a real account in the shared bucket
+// on an engine whose email column is not narrow.
+const maxAccountIdentifierLen = 64 + 1 + 255
+
+// oversizedAccountKey is the one bucket every identifier past that length shares. Sharing
+// is safe only because none of them can name an account: they are past the longest address
+// there is, and the sentinel itself is not an address either, since ValidateEmailAddress
+// admits neither '<' nor a space.
+const oversizedAccountKey = "<identifier longer than any address>"
 
 // accountNetworkRateLimitKey buckets by an account as seen from one client block, which is
 // the tight half of the password gate: an attacker in another network spends their own
