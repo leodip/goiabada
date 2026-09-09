@@ -290,6 +290,42 @@ func TestAccountRateLimitKey_BoundsTheIdentifier(t *testing.T) {
 				got, want)
 		}
 	})
+
+	// The two branches have to be disjoint, or bounding the key reintroduces the shared
+	// bucket it was meant to remove. A digest key is the eight-octet prefix and sixty-four
+	// hex characters, seventy-two in all and far inside the bound, so it can be submitted
+	// as an ordinary identifier; and it is not a secret, since reportTrip writes it to the
+	// warning line and the audit event. Without the prefix test in accountRateLimitKey,
+	// submitting one back lands in the bucket of the long identifier it names, with no
+	// SHA-256 collision involved and without the sender ever knowing that identifier (#276).
+	t.Run("a submission spelled as a digest key cannot reach a digested bucket", func(t *testing.T) {
+		long := strings.Repeat("a", maxAccountIdentifierLen) + "@example.com"
+		digested := accountRateLimitKey(long)
+		if len(digested) > maxAccountIdentifierLen {
+			t.Fatalf("setup: the digest key is %d octets, past the bound, so it could not be "+
+				"submitted as an exact key in the first place", len(digested))
+		}
+		if got := accountRateLimitKey(digested); got == digested {
+			t.Errorf("submitting %q back keyed as itself, so it shares the bucket of the "+
+				"oversized identifier it names", digested)
+		}
+	})
+
+	t.Run("the exact branch never emits a key carrying the digest prefix", func(t *testing.T) {
+		// The last spelling also pins the order: normalizing before the prefix is tested
+		// is what stops "<SHA256>" reaching the exact branch.
+		for _, spelling := range []string{
+			oversizedAccountKeyPrefix,
+			oversizedAccountKeyPrefix + "victim@example.com",
+			"  " + strings.ToUpper(oversizedAccountKeyPrefix) + "abc\t",
+		} {
+			got := accountRateLimitKey(spelling)
+			if len(got) != len(oversizedAccountKeyPrefix)+2*sha256.Size {
+				t.Errorf("accountRateLimitKey(%q) = %q, want a digest: an exact key carrying "+
+					"the prefix shares a namespace with the digested ones", spelling, got)
+			}
+		}
+	})
 }
 
 // runPwd drives one request through LimitPwd and reports the status, whether the handler
