@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -61,6 +62,57 @@ func TestGate_ReportsOncePerParentWindow(t *testing.T) {
 	c.advance(30 * time.Second) // t0+120.1s
 	check("120.1s", aligned, "aligned", true)
 	check("120.1s", aligned, "aligned", false)
+}
+
+// TestGate_ConcurrentFirstReportsExactlyOnce is the Gate half of what
+// TestLimiter_ConcurrentAllowChargesExactlyTheBudget does for Allow. First is a compound
+// read-and-record, and reportTrip calls it from whichever request happened to trip the
+// tier, so several can arrive at once on one key. Without the lock held across the read
+// and the write, two callers both see a count of zero and the audit guarantee becomes "at
+// least one event per key per window" rather than exactly one (#276).
+func TestGate_ConcurrentFirstReportsExactlyOnce(t *testing.T) {
+	g := New(1, testWindow).Gate()
+
+	// First calls now() with the lock held, so replacing the clock widens the critical
+	// section: this is the package's own unexported hook being used for the reason it
+	// exists, determinism rather than a real interval to measure. Releasing the callers
+	// against the untouched clock does not catch a missing lock -- the body is a map
+	// read and a map write, a few nanoseconds during which the scheduler has to land a
+	// second caller, and it does not. With the pause, a correct Gate lets exactly one
+	// caller through the pause at a time, while an unlocked one has every caller inside
+	// it at once, all reading a count of zero. The pause is not what the case asserts,
+	// so a slow machine only makes it more certain, never flaky.
+	base := g.now()
+	g.now = func() time.Time {
+		time.Sleep(time.Millisecond)
+		return base
+	}
+
+	const callers = 32
+	var wg sync.WaitGroup
+	reported := make([]bool, callers)
+	start := make(chan struct{})
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			reported[i] = g.First("k")
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	got := 0
+	for _, first := range reported {
+		if first {
+			got++
+		}
+	}
+	if got != 1 {
+		t.Errorf("%d of %d concurrent callers were told they were first, want exactly 1: "+
+			"read-and-record is atomic", got, callers)
+	}
 }
 
 // TestGate_CountsSeparatelyFromItsLimiter pins that gating a key spends none of the
