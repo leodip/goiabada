@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	jose "github.com/go-jose/go-jose/v4"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -26,32 +25,13 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
-// encryptIDTokenHintForTest builds a compact JWE id_token_hint the way a client
-// must: dir + A256GCM with the key derived from the client secret (SHA-256).
-// This mirrors the documented wire contract the logout endpoint decrypts.
-func encryptIDTokenHintForTest(t *testing.T, innerToken, clientSecret string) string {
-	t.Helper()
-	key := encryption.DeriveIDTokenHintKey(clientSecret)
-	encrypter, err := jose.NewEncrypter(
-		jose.A256GCM,
-		jose.Recipient{Algorithm: jose.DIRECT, Key: key},
-		(&jose.EncrypterOptions{}).WithContentType("JWT"),
-	)
-	if err != nil {
-		t.Fatalf("NewEncrypter: %v", err)
-	}
-	obj, err := encrypter.Encrypt([]byte(innerToken))
-	if err != nil {
-		t.Fatalf("Encrypt: %v", err)
-	}
-	compact, err := obj.CompactSerialize()
-	if err != nil {
-		t.Fatalf("CompactSerialize: %v", err)
-	}
-	return compact
-}
+// The fixtures below encrypt through encryption.EncryptIDTokenHintJWE, the reference encryptor for
+// the documented scheme, rather than through a builder of their own. A second encryptor in this
+// package could drift from the parser it is meant to feed, and a fixture that drifts turns a real
+// refusal into a passing test (#277).
 
 func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("No id token hint given", func(t *testing.T) {
@@ -517,7 +497,8 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 
 		innerToken := "test_token"
-		jwe := encryptIDTokenHintForTest(t, innerToken, clientSecret)
+		jwe, err := encryption.EncryptIDTokenHintJWE(innerToken, clientSecret)
+		require.NoError(t, err)
 
 		result, err := decryptIDTokenHint(jwe, "test_client", database)
 
@@ -559,9 +540,10 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 
 		// Encrypted with a different secret than the client's.
-		jwe := encryptIDTokenHintForTest(t, "test_token", "a-different-secret")
+		jwe, err := encryption.EncryptIDTokenHintJWE("test_token", "a-different-secret")
+		require.NoError(t, err)
 
-		_, err := decryptIDTokenHint(jwe, "test_client", database)
+		_, err = decryptIDTokenHint(jwe, "test_client", database)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
@@ -2046,6 +2028,11 @@ func TestClassifyIdTokenHint(t *testing.T) {
 
 	strPtr := func(s string) *string { return &s }
 
+	// The one row that decrypts, built outside the table so the encryptor's error is checked rather
+	// than discarded into a fixture that silently becomes the empty string.
+	confirmedEncryptedHint, err := encryption.EncryptIDTokenHintJWE("inner.signed.token", "some_client_secret")
+	require.NoError(t, err)
+
 	for _, tc := range []struct {
 		name string
 		// gate names the check that is expected to refuse the row, so a failure says which one stopped
@@ -2117,7 +2104,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// inner token being what gets parsed: the parser is stubbed on the inner value, so a
 			// classifier that parsed the JWE itself would find no expectation and fail.
 			name: "an encrypted hint that decrypts", gate: "JWE decryption",
-			hintValue:  strPtr(encryptIDTokenHintForTest(t, "inner.signed.token", "some_client_secret")),
+			hintValue:  strPtr(confirmedEncryptedHint),
 			innerToken: strPtr("inner.signed.token"),
 			stubDB: func(database *mocks_data.Database) {
 				secret, err := encryption.EncryptData("some_client_secret")
