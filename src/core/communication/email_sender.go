@@ -28,6 +28,9 @@ import (
 const (
 	// RFC 5322 section 2.1.1: a line SHOULD be no more than 78 characters excluding the CRLF.
 	maxHeaderLineBytes = 78
+	// The same sentence's other half, which is a MUST rather than a SHOULD: no more than 998
+	// characters, excluding the CRLF.
+	maxHeaderLineHardBytes = 998
 
 	defaultDialTimeout = 10 * time.Second
 	// One deadline covers EHLO through QUIT rather than a per-command one, so a slow relay is not
@@ -209,7 +212,14 @@ func authenticate(client *smtp.Client, host string, smtpEnc enums.SMTPEncryption
 	var auth smtp.Auth
 	switch mechanism {
 	case "PLAIN":
-		auth = smtp.PlainAuth("", username, password, host)
+		// The inline initial response is what smtp.PlainAuth writes and what all but a pathological
+		// password uses. One long enough to push the AUTH line past RFC 5321's 512 octets has to go
+		// through the challenge form instead, which RFC 4954 section 4 makes a MUST (#274).
+		if plainInitialResponseFits(username, password) {
+			auth = smtp.PlainAuth("", username, password, host)
+		} else {
+			auth = &plainAuth{username: username, password: password}
+		}
 	case "LOGIN":
 		auth = &loginAuth{username: username, password: password}
 	case "CRAM-MD5":
@@ -245,7 +255,9 @@ func (e *EmailSender) buildMessage(from, to *mail.Address, input *SendEmailInput
 	// That is what makes a header value out of an operator-editable setting safe (#274).
 	writeHeader(&b, "From", from.String())
 	writeHeader(&b, "To", to.String())
-	writeFoldedHeader(&b, "Subject", mime.QEncoding.Encode("UTF-8", input.Subject))
+	if err := writeFoldedHeader(&b, "Subject", mime.QEncoding.Encode("UTF-8", input.Subject)); err != nil {
+		return nil, err
+	}
 	writeHeader(&b, "Date", time.Now().Format(time.RFC1123Z))
 	writeHeader(&b, "Message-ID", messageID)
 	writeHeader(&b, "MIME-Version", "1.0")
@@ -309,7 +321,7 @@ func writeHeader(b *bytes.Buffer, name, value string) {
 // current line or as the continuation line's leading whitespace. Unfolding per section 2.2.3,
 // which removes the CRLF and keeps the whitespace, therefore restores the value byte for byte,
 // double spaces included.
-func writeFoldedHeader(b *bytes.Buffer, name, value string) {
+func writeFoldedHeader(b *bytes.Buffer, name, value string) error {
 	b.WriteString(name)
 	b.WriteString(":")
 	lineLen := len(name) + 1
@@ -317,6 +329,16 @@ func writeFoldedHeader(b *bytes.Buffer, name, value string) {
 	firstLine := true
 	tokensOnLine := 0
 	for _, token := range strings.Split(value, " ") {
+		// A token has no legal fold point inside it, so one too long for a line of its own cannot
+		// be emitted at all. 78 is a SHOULD and folding serves it; 998 is a MUST and nothing here
+		// can serve it, so this refuses rather than writing a line a conforming server may reject
+		// mid-DATA with a message the admin cannot act on. Every subject the callers pass is a
+		// catalog string with at most a 30-character app name in it, so this is a bound on the
+		// package's API rather than a path a deployment can reach (#274).
+		if 1+len(token) > maxHeaderLineHardBytes {
+			return errors.WithStack(errors.New("the " + name + " header contains a word of " +
+				strconv.Itoa(len(token)) + " bytes, which cannot be folded under RFC 5322 section 2.1.1's 998-byte line limit"))
+		}
 		// Fold unless the line has nothing on it yet: a single token longer than a whole line
 		// cannot be split here, and folding before it would loop forever.
 		if lineLen+1+len(token) > maxHeaderLineBytes && (tokensOnLine > 0 || firstLine) {
@@ -332,4 +354,5 @@ func writeFoldedHeader(b *bytes.Buffer, name, value string) {
 	}
 
 	b.WriteString("\r\n")
+	return nil
 }

@@ -208,6 +208,15 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 			wantPass: fixturePassword,
 		},
 		{
+			// PLAIN absent, so this is the only row that separates second place from third. The
+			// recorded password is what decides it: CRAM-MD5 never sends one, so a client that
+			// took the server's first token instead would leave it empty.
+			name:     "LOGIN and CRAM-MD5 offered, CRAM-MD5 first, still picks LOGIN",
+			authExt:  "AUTH CRAM-MD5 LOGIN",
+			wantLine: "AUTH LOGIN",
+			wantPass: fixturePassword,
+		},
+		{
 			// CRAM-MD5 never puts the password on the wire, so the fake has nothing to record
 			// for it: it verifies the digest instead.
 			name:     "only CRAM-MD5 offered picks CRAM-MD5",
@@ -253,6 +262,104 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 			assert.True(t, f.hasLinePrefix("MAIL FROM:"))
 		})
 	}
+}
+
+// TestSendEmail_LoginOverProtectedConnection is the shape decision 3 keeps LOGIN for:
+// smtp.office365.com advertises `AUTH LOGIN XOAUTH2` and nothing else after STARTTLS
+// (probe/ehlo-public.out), reached by a name that is not loopback. Every row in the mechanism table
+// runs over `none` to 127.0.0.1, so without this the suite's only LOGIN exchange is the one
+// decision 1's loopback exception allows, and a regression refusing LOGIN on the protected modes
+// would leave the whole table green.
+func TestSendEmail_LoginOverProtectedConnection(t *testing.T) {
+
+	cert := newFakeCert(t)
+
+	f := &fakeSMTP{
+		ext:    []string{"STARTTLS", "8BITMIME"},
+		tlsExt: []string{"AUTH LOGIN XOAUTH2", "8BITMIME"},
+		cert:   cert,
+	}
+	port := f.start(t)
+
+	ctx := fakeSettings(t, fakeHostname(t), port, "starttls", fixtureUser, fixturePassword, "Goiabada")
+
+	err := (&EmailSender{rootCAs: cert.pool}).SendEmail(ctx, &SendEmailInput{
+		To:       fixtureRecipient,
+		Subject:  "Test email",
+		HtmlBody: "<p>hello</p>",
+	})
+	require.NoError(t, err)
+
+	user, password := f.credentials()
+	assert.Equal(t, fixtureUser, user)
+	assert.Equal(t, fixturePassword, password)
+
+	startTLS := f.indexOfLinePrefix("STARTTLS")
+	require.GreaterOrEqual(t, startTLS, 0, "the client never issued STARTTLS")
+	assert.Greater(t, f.indexOfLinePrefix("AUTH LOGIN"), startTLS, "the credentials may only follow the handshake")
+	assert.True(t, f.hasLinePrefix("MAIL FROM:"))
+}
+
+// TestSendEmail_LoginAnswersUnconventionalChallenges pins loginAuth's answer-by-position path. No
+// RFC specifies LOGIN -- draft-murchison-sasl-login expired -- so "Username:" and "Password:" are
+// convention rather than syntax, and a relay wording its prompts differently still has to be
+// answered in order rather than refused.
+func TestSendEmail_LoginAnswersUnconventionalChallenges(t *testing.T) {
+
+	f := &fakeSMTP{
+		ext:             []string{"AUTH LOGIN", "8BITMIME"},
+		loginChallenges: []string{"first value:", "second value:"},
+	}
+	port := f.start(t)
+
+	ctx := fakeSettings(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
+
+	err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+		To:       fixtureRecipient,
+		Subject:  "Test email",
+		HtmlBody: "<p>hello</p>",
+	})
+	require.NoError(t, err)
+
+	user, password := f.credentials()
+	assert.Equal(t, fixtureUser, user, "the first challenge is answered with the username whatever it says")
+	assert.Equal(t, fixturePassword, password, "and the second with the password")
+	assert.True(t, f.hasLinePrefix("MAIL FROM:"))
+}
+
+// TestSendEmail_PlainCredentialsTooLongForTheCommandLine holds RFC 4954 section 4's MUST: where the
+// initial response would push the AUTH command past RFC 5321 section 4.5.3.1.4's 512 octets, the
+// client omits it and answers the empty 334 challenge instead. The fake enforces the limit, so an
+// inline response would be answered 500 and the send would fail. Nothing bounds the SMTP password
+// on the way into the settings, so a password this long is one an admin can save today.
+//
+// The inline form for an ordinary password is pinned by the mechanism table's `AUTH PLAIN ` rows.
+func TestSendEmail_PlainCredentialsTooLongForTheCommandLine(t *testing.T) {
+
+	longPassword := strings.Repeat("p", 400)
+
+	f := &fakeSMTP{
+		ext:            []string{"AUTH PLAIN", "8BITMIME"},
+		maxCommandLine: smtpCommandLineLimit,
+	}
+	port := f.start(t)
+
+	ctx := fakeSettings(t, "127.0.0.1", port, "none", fixtureUser, longPassword, "Goiabada")
+
+	err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+		To:       fixtureRecipient,
+		Subject:  "Test email",
+		HtmlBody: "<p>hello</p>",
+	})
+	require.NoError(t, err)
+
+	user, password := f.credentials()
+	assert.Equal(t, fixtureUser, user)
+	assert.Equal(t, longPassword, password)
+
+	assert.Contains(t, f.lines(), "AUTH PLAIN", "the command carries no initial response at this length")
+	assert.False(t, f.hasLinePrefix("AUTH PLAIN "), "an inline response would have overrun the command line")
+	assert.True(t, f.hasLinePrefix("MAIL FROM:"))
 }
 
 // TestSendEmail_FailsClosed covers decisions 1, 2 and 4. Every refusal sits next to the row it
@@ -665,6 +772,69 @@ func TestSendEmail_SubjectHeader(t *testing.T) {
 	}
 }
 
+// TestSendEmail_SubjectHardLineLimit holds the other half of RFC 5322 section 2.1.1, the MUST: a
+// word with no space in it carries no legal fold point, so once it passes 998 bytes there is no way
+// to write it as a header at all and the send is refused before the dial. No caller can reach the
+// refusal -- every subject is a catalog string with at most a 30-character app name in it -- so it
+// bounds this package's API rather than a deployment.
+func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
+
+	// A continuation line is one space followed by the word, so the longest word that still fits
+	// is one byte shorter than the limit.
+	longest := maxHeaderLineHardBytes - 1
+
+	t.Run("the longest word that can be folded is sent", func(t *testing.T) {
+		subject := strings.Repeat("s", longest)
+		m := send(t, "Goiabada", &SendEmailInput{
+			To:       fixtureRecipient,
+			Subject:  subject,
+			HtmlBody: "<p>hello</p>",
+		})
+		assert.Equal(t, subject, m.headers["Subject"])
+		for _, line := range m.rawHeaders {
+			assert.LessOrEqual(t, len(line), maxHeaderLineHardBytes,
+				"RFC 5322 section 2.1.1: no line may exceed 998 bytes before the CRLF")
+		}
+	})
+
+	t.Run("one byte longer is refused before the dial", func(t *testing.T) {
+		f := &fakeSMTP{ext: []string{"8BITMIME"}}
+		port := f.start(t)
+
+		ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+
+		err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+			To:       fixtureRecipient,
+			Subject:  strings.Repeat("s", longest+1),
+			HtmlBody: "<p>hello</p>",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "998-byte line limit")
+		assert.False(t, f.sawConnection(), "the message is built before the dial, so nothing should have connected")
+	})
+}
+
+// TestSendEmail_FinalDataRejection holds the last exchange in the conversation: the relay takes the
+// whole message and refuses it at the terminator. net/smtp reports that reply only from the data
+// writer's Close, so an unchecked Close would report a message as sent that no relay ever accepted.
+func TestSendEmail_FinalDataRejection(t *testing.T) {
+
+	f := &fakeSMTP{ext: []string{"8BITMIME"}, rejectAfterData: true}
+	port := f.start(t)
+
+	ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+
+	err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+		To:       fixtureRecipient,
+		Subject:  "Test email",
+		HtmlBody: "<p>hello</p>",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to send SMTP message")
+	assert.Contains(t, err.Error(), "550", "the relay's own refusal is what reaches the admin")
+	assert.NotEmpty(t, f.data(), "the whole message arrived; only the verdict on it was a refusal")
+}
+
 // TestSendEmail_MessageID holds decision 5: RFC 5322 section 3.6.4's SHOULD, and that a failed
 // entropy read is an error rather than a repeatable `<@domain>`.
 func TestSendEmail_MessageID(t *testing.T) {
@@ -802,6 +972,29 @@ func TestSendEmail_InvalidRecipient(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid recipient address")
 	assert.False(t, f.sawConnection(), "the address is parsed before the dial, so nothing should have connected")
+}
+
+// TestSendEmail_DialTimeout holds decision 7's other half: the connect carries its own bound,
+// separate from the conversation deadline below. The seam is handed a duration already in the past,
+// so the dial cannot complete however quickly the fake would have accepted it, and the default it
+// stands in for is asserted alongside.
+func TestSendEmail_DialTimeout(t *testing.T) {
+
+	assert.Equal(t, 10*time.Second, defaultDialTimeout, "decision 7: ten seconds to connect")
+
+	f := &fakeSMTP{ext: []string{"8BITMIME"}}
+	port := f.start(t)
+
+	ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+
+	err := (&EmailSender{dialTimeout: -time.Second}).SendEmail(ctx, &SendEmailInput{
+		To:       fixtureRecipient,
+		Subject:  "Test email",
+		HtmlBody: "<p>hello</p>",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to connect to SMTP server")
+	assert.Empty(t, f.data(), "nothing may be delivered once the dial has timed out")
 }
 
 // TestSendEmail_ConversationTimeout holds decision 7: one deadline covers EHLO through QUIT, so a

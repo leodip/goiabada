@@ -43,6 +43,18 @@ type fakeSMTP struct {
 	// stallAfterData swallows the DATA block and never answers its terminator, so the client has
 	// to reach its own deadline.
 	stallAfterData bool
+	// rejectAfterData answers the DATA terminator with a 550 instead of a 250, which is the relay
+	// deciding it does not want the finished message.
+	rejectAfterData bool
+
+	// loginChallenges are the two AUTH LOGIN prompts, defaulting to the conventional words. A row
+	// sets them to something else to reach loginAuth's answer-by-position path.
+	loginChallenges []string
+
+	// maxCommandLine, when set, is the octet limit this server enforces on a command line, CRLF
+	// included: RFC 5321 section 4.5.3.1.4's 512. Only the command loop counts, which is what the
+	// specification bounds; a SASL continuation line is read inside its own arm and is exempt.
+	maxCommandLine int
 
 	// expectPassword is the password CRAM-MD5 digests are verified against; the other mechanisms
 	// send it and it is recorded in authPass instead.
@@ -144,6 +156,11 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 		f.record(line)
 		up := strings.ToUpper(line)
 
+		if f.maxCommandLine > 0 && len(line)+len("\r\n") > f.maxCommandLine {
+			say("500 5.5.6 line too long")
+			continue
+		}
+
 		switch {
 		case strings.HasPrefix(up, "EHLO"), strings.HasPrefix(up, "HELO"):
 			if len(ext) == 0 {
@@ -178,8 +195,9 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 		case strings.HasPrefix(up, "AUTH PLAIN"):
 			payload := strings.TrimSpace(line[len("AUTH PLAIN"):])
 			if payload == "" {
-				// The challenge form. net/smtp.PlainAuth sends the inline form, so this arm is
-				// here for completeness rather than for a row.
+				// The challenge form, RFC 4954 section 4: a 334 reply with no text part, then the
+				// response on a line of its own. plainAuth takes this route when the credentials
+				// would not fit on the command line.
 				say("334 ")
 				next, err := r.ReadString('\n')
 				if err != nil {
@@ -205,12 +223,16 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 			say("235 2.7.0 authentication succeeded")
 
 		case up == "AUTH LOGIN":
-			say("334 " + base64.StdEncoding.EncodeToString([]byte("Username:")))
+			challenges := f.loginChallenges
+			if len(challenges) == 0 {
+				challenges = []string{"Username:", "Password:"}
+			}
+			say("334 " + base64.StdEncoding.EncodeToString([]byte(challenges[0])))
 			user, err := f.readBase64Line(r)
 			if err != nil {
 				return
 			}
-			say("334 " + base64.StdEncoding.EncodeToString([]byte("Password:")))
+			say("334 " + base64.StdEncoding.EncodeToString([]byte(challenges[1])))
 			pass, err := f.readBase64Line(r)
 			if err != nil {
 				return
@@ -260,6 +282,12 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 				// conversation deadline expires and closes the connection, which ends this read.
 				_, _ = io.Copy(io.Discard, r)
 				return
+			}
+			if f.rejectAfterData {
+				// The relay took the whole message and then refused it. Only the reply to the
+				// terminator says so, which is the response net/smtp surfaces from Close.
+				say("550 5.7.1 message rejected by the fake")
+				continue
 			}
 			say("250 2.0.0 queued")
 
