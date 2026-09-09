@@ -921,8 +921,10 @@ func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 	})
 }
 
-// TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim is the accepted twin. Attribute values
-// are not trimmed, so the surrounding spaces come back too.
+// TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim is the accepted twin, on both wiring
+// points like its rejected counterpart above: create and update assign the value independently, so
+// a rewrite installed on one of them is invisible to a test that only exercises the other.
+// Attribute values are not trimmed, so the surrounding spaces come back too.
 func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -952,5 +954,22 @@ func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	stored, err := database.GetUserAttributeById(nil, createResponse.Attribute.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, value, stored.Value)
-	_ = database.DeleteUserAttribute(nil, createResponse.Attribute.Id)
+	defer func() { _ = database.DeleteUserAttribute(nil, createResponse.Attribute.Id) }()
+
+	updated := `  AT&T said "again"  `
+	updateResp := makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/admin/user-attributes/"+
+		strconv.FormatInt(createResponse.Attribute.Id, 10), accessToken,
+		api.UpdateUserAttributeRequest{Key: "motto", Value: updated})
+	defer func() { _ = updateResp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
+
+	var updateResponse api.GetUserAttributeResponse
+	err = json.NewDecoder(updateResp.Body).Decode(&updateResponse)
+	assert.NoError(t, err)
+	assert.Equal(t, updated, updateResponse.Attribute.Value)
+
+	stored, err = database.GetUserAttributeById(nil, createResponse.Attribute.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, updated, stored.Value)
 }
