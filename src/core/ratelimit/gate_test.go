@@ -78,10 +78,13 @@ func TestGate_ConcurrentFirstReportsExactlyOnce(t *testing.T) {
 	// exists, determinism rather than a real interval to measure. Releasing the callers
 	// against the untouched clock does not catch a missing lock -- the body is a map
 	// read and a map write, a few nanoseconds during which the scheduler has to land a
-	// second caller, and it does not. With the pause, a correct Gate lets exactly one
-	// caller through the pause at a time, while an unlocked one has every caller inside
-	// it at once, all reading a count of zero. The pause is not what the case asserts,
-	// so a slow machine only makes it more certain, never flaky.
+	// second caller, and it does not.
+	//
+	// This case asserts the outcome and is a probabilistic witness of the cause: with
+	// the unlock moved above now(), it caught the mutation in four of six runs. What
+	// pins the cause is TestGate_FirstHoldsItsLockAcrossTheWholeReadAndRecord below,
+	// which fails on every run of that mutant. Both are kept: one says the lock is
+	// held, the other says holding it produces exactly one report (#276).
 	base := g.now()
 	g.now = func() time.Time {
 		time.Sleep(time.Millisecond)
@@ -112,6 +115,53 @@ func TestGate_ConcurrentFirstReportsExactlyOnce(t *testing.T) {
 	if got != 1 {
 		t.Errorf("%d of %d concurrent callers were told they were first, want exactly 1: "+
 			"read-and-record is atomic", got, callers)
+	}
+}
+
+// TestGate_FirstHoldsItsLockAcrossTheWholeReadAndRecord pins the cause the case above
+// can only witness. A concurrency test that asserts an outcome depends on the scheduler
+// to interleave two callers, so it answers "the race did not happen this time" rather
+// than "the race cannot happen": moving First's unlock above now() leaves the outcome
+// case passing four runs in six.
+//
+// Suspending the first caller inside now() removes the scheduler from the question. now()
+// is called after the lock is taken, so while that caller is parked the mutex must be
+// held, and TryLock reports whether it is. Every run of the unlocked Gate fails here
+// (#276).
+func TestGate_FirstHoldsItsLockAcrossTheWholeReadAndRecord(t *testing.T) {
+	g := New(1, testWindow).Gate()
+
+	base := g.now()
+	parked := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	g.now = func() time.Time {
+		once.Do(func() {
+			close(parked)
+			<-release
+		})
+		return base
+	}
+
+	reported := make(chan bool, 1)
+	go func() { reported <- g.First("k") }()
+
+	<-parked
+	locked := !g.mu.TryLock()
+	if !locked {
+		// Taken, so release it: leaving it held would deadlock the parked caller's
+		// own deferred unlock and hang the test rather than failing it.
+		g.mu.Unlock()
+	}
+	close(release)
+	first := <-reported
+
+	if !locked {
+		t.Error("Gate.mu was free while a caller was inside First: the read and the record " +
+			"are not one critical section, so two callers can both be told they are first")
+	}
+	if !first {
+		t.Error("the only caller was not told it was first")
 	}
 }
 
