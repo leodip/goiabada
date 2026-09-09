@@ -162,3 +162,56 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, "application/json", resp3.Header.Get("Content-Type"))
 	assert.Contains(t, string(body3), "Insufficient scope.")
 }
+
+// TestAPIResourcesCreate_AngleBracketsRejected pins the description reject on the create endpoint
+// (#275).
+func TestAPIResourcesCreate_AngleBracketsRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	identifier := "api-test-create-resource-" + fake.LetterN(8)
+	reqBody := api.CreateResourceRequest{
+		ResourceIdentifier: identifier,
+		Description:        "O'Brien <the third>",
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
+
+	stored, err := database.GetResourceByResourceIdentifier(nil, identifier)
+	assert.NoError(t, err)
+	assert.Nil(t, stored)
+}
+
+// TestAPIResourcesCreate_AmpersandsAndQuotesStoredVerbatim is the accepted twin.
+func TestAPIResourcesCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	identifier := "api-test-create-resource-" + fake.LetterN(8)
+	reqBody := api.CreateResourceRequest{
+		ResourceIdentifier: identifier,
+		Description:        `  AT&T "Wireless"  `,
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var createResp api.CreateResourceResponse
+	err := json.NewDecoder(resp.Body).Decode(&createResp)
+	assert.NoError(t, err)
+	assert.Equal(t, `AT&T "Wireless"`, createResp.Resource.Description)
+
+	stored, err := database.GetResourceByResourceIdentifier(nil, identifier)
+	assert.NoError(t, err)
+	assert.NotNil(t, stored)
+	assert.Equal(t, `AT&T "Wireless"`, stored.Description)
+	_ = database.DeleteResource(nil, stored.Id)
+}

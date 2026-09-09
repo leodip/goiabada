@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/inputsanitizer"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -18,7 +17,6 @@ import (
 func HandleAPIAccountAddressPut(
 	database data.Database,
 	addressValidator *validators.AddressValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -68,12 +66,12 @@ func HandleAPIAccountAddressPut(
 		}
 
 		// Apply sanitized updates
-		user.AddressLine1 = inputSanitizer.Sanitize(input.AddressLine1)
-		user.AddressLine2 = inputSanitizer.Sanitize(input.AddressLine2)
-		user.AddressLocality = inputSanitizer.Sanitize(input.AddressLocality)
-		user.AddressRegion = inputSanitizer.Sanitize(input.AddressRegion)
-		user.AddressPostalCode = inputSanitizer.Sanitize(input.AddressPostalCode)
-		user.AddressCountry = inputSanitizer.Sanitize(input.AddressCountry)
+		user.AddressLine1 = input.AddressLine1
+		user.AddressLine2 = input.AddressLine2
+		user.AddressLocality = input.AddressLocality
+		user.AddressRegion = input.AddressRegion
+		user.AddressPostalCode = input.AddressPostalCode
+		user.AddressCountry = input.AddressCountry
 
 		if err := database.UpdateUser(nil, user); err != nil {
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)

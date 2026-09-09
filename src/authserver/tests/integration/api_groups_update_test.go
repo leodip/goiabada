@@ -439,3 +439,57 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	assert.Equal(t, updateReq.IncludeInIdToken, updateResponse.Group.IncludeInIdToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updateResponse.Group.IncludeInAccessToken)
 }
+
+// TestAPIGroupUpdatePut_AngleBracketsRejected covers the update handler's own description check,
+// which is a separate wiring point from the create handler's (#275).
+func TestAPIGroupUpdatePut_AngleBracketsRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testGroup := createTestGroup(t)
+	defer func() { _ = database.DeleteGroup(nil, testGroup.Id) }()
+
+	updateReq := api.UpdateGroupRequest{
+		GroupIdentifier:      testGroup.GroupIdentifier,
+		Description:          "1 < 2 and 3 > 2",
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: true,
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
+
+	stored, err := database.GetGroupById(nil, testGroup.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, testGroup.Description, stored.Description)
+}
+
+// TestAPIGroupUpdatePut_AmpersandsAndQuotesStoredVerbatim is the accepted twin.
+func TestAPIGroupUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testGroup := createTestGroup(t)
+	defer func() { _ = database.DeleteGroup(nil, testGroup.Id) }()
+
+	updateReq := api.UpdateGroupRequest{
+		GroupIdentifier:      testGroup.GroupIdentifier,
+		Description:          `R&D "phase 2"`,
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: true,
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	stored, err := database.GetGroupById(nil, testGroup.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, `R&D "phase 2"`, stored.Description)
+}

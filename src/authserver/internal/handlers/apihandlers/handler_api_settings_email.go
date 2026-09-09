@@ -16,8 +16,9 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/inputsanitizer"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPISettingsEmailGet - GET /api/v1/admin/settings/email
@@ -53,7 +54,6 @@ func HandleAPISettingsEmailPut(
 	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	emailValidator handlers.EmailValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -152,6 +152,11 @@ func HandleAPISettingsEmailPut(
 			writeJSONError(w, fmt.Sprintf("SMTP from name must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
+
+		if err := validators.ValidateNoAngleBrackets(req.SMTPFromName, i18n.ErrCodeSettingsSmtpFromNameAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
 		if len(req.SMTPFromEmail) > 60 {
 			writeJSONError(w, fmt.Sprintf("SMTP from email must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -191,7 +196,7 @@ func HandleAPISettingsEmailPut(
 			currentSettings.SMTPPasswordEncrypted = nil
 		}
 
-		currentSettings.SMTPFromName = strings.TrimSpace(inputSanitizer.Sanitize(req.SMTPFromName))
+		currentSettings.SMTPFromName = strings.TrimSpace(req.SMTPFromName)
 		currentSettings.SMTPFromEmail = strings.ToLower(req.SMTPFromEmail)
 
 		if err := database.UpdateSettings(nil, currentSettings); err != nil {

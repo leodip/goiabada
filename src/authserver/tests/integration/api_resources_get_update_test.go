@@ -276,3 +276,53 @@ func TestAPIResourceUpdatePut_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 }
+
+// TestAPIResourceUpdatePut_AngleBracketsRejected covers the update handler's own description check,
+// a separate wiring point from the create handler's (#275).
+func TestAPIResourceUpdatePut_AngleBracketsRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	res := createTestResource(t, "api-test-update-angle-"+fake.LetterN(6), "Original")
+	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+
+	updateReq := api.UpdateResourceRequest{
+		ResourceIdentifier: res.ResourceIdentifier,
+		Description:        "x > y",
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
+
+	// The old sanitizer rewrote a bare ">" to the literal "&gt;" and stored it; nothing is stored
+	// now.
+	stored, err := database.GetResourceById(nil, res.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, "Original", stored.Description)
+}
+
+// TestAPIResourceUpdatePut_AmpersandsAndQuotesStoredVerbatim is the accepted twin.
+func TestAPIResourceUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	res := createTestResource(t, "api-test-update-verbatim-"+fake.LetterN(6), "Original")
+	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+
+	updateReq := api.UpdateResourceRequest{
+		ResourceIdentifier: res.ResourceIdentifier,
+		Description:        `Tom & Jerry said "hi"`,
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	stored, err := database.GetResourceById(nil, res.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
+}

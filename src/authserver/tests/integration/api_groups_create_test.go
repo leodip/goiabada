@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
@@ -174,13 +175,16 @@ func TestHandleAPIGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 	assert.Contains(t, response["error_description"].(string), "The group identifier is already in use")
 }
 
-func TestHandleAPIGroupCreatePost_InputSanitization(t *testing.T) {
+// TestHandleAPIGroupCreatePost_AngleBracketsRejected pins the reject that replaced the strip: this
+// description used to be stored as "Test Description" with a 201, the script tag silently dropped
+// (#275).
+func TestHandleAPIGroupCreatePost_AngleBracketsRejected(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Create request data with potentially malicious input in description
+	identifier := "test-group-" + fake.LetterN(6)
 	reqData := map[string]interface{}{
-		"groupIdentifier":      "test-group-" + fake.LetterN(6), // Valid identifier (no spaces) to pass validation
+		"groupIdentifier":      identifier, // Valid identifier (no spaces) to pass validation
 		"description":          "  <script>alert('xss')</script>Test Description  ",
 		"includeInIdToken":     true,
 		"includeInAccessToken": false,
@@ -190,7 +194,36 @@ func TestHandleAPIGroupCreatePost_InputSanitization(t *testing.T) {
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqData)
 	defer func() { _ = resp.Body.Close() }()
 
-	// Assert response
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var errResp api.ErrorResponse
+	err := json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.NoError(t, err)
+	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
+
+	// Nothing was created.
+	stored, err := database.GetGroupByGroupIdentifier(nil, identifier)
+	assert.NoError(t, err)
+	assert.Nil(t, stored)
+}
+
+// TestHandleAPIGroupCreatePost_AmpersandsAndQuotesStoredVerbatim is the accepted twin: a
+// description the validator does not refuse is trimmed and otherwise stored byte for byte.
+func TestHandleAPIGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	identifier := "test-group-" + fake.LetterN(6)
+	reqData := map[string]interface{}{
+		"groupIdentifier":      identifier,
+		"description":          `  Tom & Jerry said "hi"  `,
+		"includeInIdToken":     true,
+		"includeInAccessToken": false,
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqData)
+	defer func() { _ = resp.Body.Close() }()
+
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	var response map[string]interface{}
@@ -198,18 +231,16 @@ func TestHandleAPIGroupCreatePost_InputSanitization(t *testing.T) {
 	assert.NoError(t, err)
 
 	group := response["group"].(map[string]interface{})
+	assert.Equal(t, `Tom & Jerry said "hi"`, group["description"])
 
-	// Verify input was sanitized
-	assert.Equal(t, reqData["groupIdentifier"].(string), group["groupIdentifier"])
-	// Description should be sanitized (script tags removed) and trimmed
-	expectedDesc := "Test Description"
-	assert.Equal(t, expectedDesc, group["description"])
-
-	// Clean up
 	groupId := int64(group["id"].(float64))
 	defer func() {
 		_ = database.DeleteGroup(nil, groupId)
 	}()
+
+	stored, err := database.GetGroupById(nil, groupId)
+	assert.NoError(t, err)
+	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 }
 
 func TestHandleAPIGroupCreatePost_Unauthorized(t *testing.T) {

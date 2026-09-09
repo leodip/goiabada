@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/inputsanitizer"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/urlutil"
@@ -294,7 +294,6 @@ func HandleAPIClientCreatePost(
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -319,11 +318,21 @@ func HandleAPIClientCreatePost(
 			return
 		}
 
-		// Sanitize and validate display name
-		sanitizedDisplayName := strings.TrimSpace(inputSanitizer.Sanitize(req.DisplayName))
+		if err := validators.ValidateNoAngleBrackets(req.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
+		// Validate display name
+		trimmedDisplayName := strings.TrimSpace(req.DisplayName)
 		const maxLengthDisplayName = 100
-		if len(sanitizedDisplayName) > maxLengthDisplayName {
+		if len(trimmedDisplayName) > maxLengthDisplayName {
 			writeJSONError(w, "The display name cannot exceed a maximum length of "+strconv.Itoa(maxLengthDisplayName)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		if err := validators.ValidateNoAngleBrackets(trimmedDisplayName, i18n.ErrCodeDisplayNameAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -356,10 +365,10 @@ func HandleAPIClientCreatePost(
 
 		// Create client model mimicking current implementation defaults
 		client := &models.Client{
-			ClientIdentifier:                        strings.TrimSpace(inputSanitizer.Sanitize(req.ClientIdentifier)),
-			Description:                             strings.TrimSpace(inputSanitizer.Sanitize(req.Description)),
-			DisplayName:                             sanitizedDisplayName,
-			ShowDisplayName:                         sanitizedDisplayName != "",
+			ClientIdentifier:                        strings.TrimSpace(req.ClientIdentifier),
+			Description:                             strings.TrimSpace(req.Description),
+			DisplayName:                             trimmedDisplayName,
+			ShowDisplayName:                         trimmedDisplayName != "",
 			ClientSecretEncrypted:                   clientSecretEncrypted,
 			IsPublic:                                false,
 			ConsentRequired:                         false,
@@ -411,7 +420,6 @@ func HandleAPIClientUpdatePut(
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -458,8 +466,13 @@ func HandleAPIClientUpdatePut(
 			return
 		}
 
-		// Sanitize and prepare the new identifier value
-		sanitizedClientIdentifier := strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ClientIdentifier))
+		if err := validators.ValidateNoAngleBrackets(updateReq.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
+		// Prepare the new identifier value
+		trimmedClientIdentifier := strings.TrimSpace(updateReq.ClientIdentifier)
 
 		// The identifier is checked only when the request actually submits a different one, and
 		// that is load bearing rather than an optimisation. A client that registered itself is
@@ -470,11 +483,11 @@ func HandleAPIClientUpdatePut(
 		// is done on the same form (#108, decision 17).
 		//
 		// Compared byte for byte against what is stored, deliberately, rather than against the
-		// sanitized value. "  same-identifier  " has always been refused as an invalid format and
-		// still is; only a request submitting exactly what is already there skips the check. That
-		// also makes the skip provably safe: an identifier that is already stored passed this same
-		// validator, so it holds no character the sanitizer would touch, and the assignment below
-		// writes back the bytes that are already in the row.
+		// raw submitted value. "  same-identifier  " has always been refused as an invalid format
+		// and still is; only a request submitting exactly what is already there skips the check.
+		// That also makes the skip provably safe: an identifier that is already stored passed this
+		// same validator, and the assignment below writes back the bytes that are already in the
+		// row.
 		//
 		// Skipping the uniqueness query alongside it changes nothing either: it excludes the
 		// current client, so an unchanged identifier can only ever match the row being updated.
@@ -524,7 +537,7 @@ func HandleAPIClientUpdatePut(
 		}
 
 		// System-level client protection: block identifier changes
-		if client.IsSystemLevelClient() && sanitizedClientIdentifier != client.ClientIdentifier {
+		if client.IsSystemLevelClient() && trimmedClientIdentifier != client.ClientIdentifier {
 			writeJSONError(w, "The identifier of a system-level client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -542,20 +555,25 @@ func HandleAPIClientUpdatePut(
 		// stays editable, Consent required above all: unticking it for one reviewed client is the
 		// escape hatch this whole change rests on, so a guard that refused the update outright
 		// would take away the remedy along with the risk.
-		if client.CreatedViaDCR && sanitizedClientIdentifier != client.ClientIdentifier {
+		if client.CreatedViaDCR && trimmedClientIdentifier != client.ClientIdentifier {
 			writeJSONError(w, "The identifier of a self-registered client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		client.ClientIdentifier = sanitizedClientIdentifier
-		client.Description = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.Description))
+		client.ClientIdentifier = trimmedClientIdentifier
+		client.Description = strings.TrimSpace(updateReq.Description)
 		client.WebsiteURL = websiteURL
-		client.DisplayName = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.DisplayName))
+		client.DisplayName = strings.TrimSpace(updateReq.DisplayName)
 
-		// Validate display name length after sanitization
+		// Validate display name length
 		const maxLengthDisplayName = 100
 		if len(client.DisplayName) > maxLengthDisplayName {
 			writeJSONError(w, "The display name cannot exceed a maximum length of "+strconv.Itoa(maxLengthDisplayName)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		if err := validators.ValidateNoAngleBrackets(client.DisplayName, i18n.ErrCodeDisplayNameAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
 			return
 		}
 

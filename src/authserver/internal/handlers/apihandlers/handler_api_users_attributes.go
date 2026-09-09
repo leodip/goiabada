@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/inputsanitizer"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -117,7 +117,6 @@ func HandleAPIUserAttributeGet(
 func HandleAPIUserAttributeCreatePost(
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -161,10 +160,15 @@ func HandleAPIUserAttributeCreatePost(
 			return
 		}
 
+		if err := validators.ValidateNoAngleBrackets(req.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
 		// Create user attribute
 		userAttribute := &models.UserAttribute{
 			Key:                  req.Key,
-			Value:                inputSanitizer.Sanitize(req.Value),
+			Value:                req.Value,
 			IncludeInAccessToken: req.IncludeInAccessToken,
 			IncludeInIdToken:     req.IncludeInIdToken,
 			UserId:               req.UserId,
@@ -209,7 +213,6 @@ func HandleAPIUserAttributeCreatePost(
 func HandleAPIUserAttributeUpdatePut(
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -266,9 +269,14 @@ func HandleAPIUserAttributeUpdatePut(
 			return
 		}
 
+		if err := validators.ValidateNoAngleBrackets(req.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
 		// Update attribute fields
 		attribute.Key = req.Key
-		attribute.Value = inputSanitizer.Sanitize(req.Value)
+		attribute.Value = req.Value
 		attribute.IncludeInAccessToken = req.IncludeInAccessToken
 		attribute.IncludeInIdToken = req.IncludeInIdToken
 

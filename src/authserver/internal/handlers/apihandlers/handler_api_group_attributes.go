@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/inputsanitizer"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -121,7 +121,6 @@ func HandleAPIGroupAttributeCreatePost(
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -159,6 +158,11 @@ func HandleAPIGroupAttributeCreatePost(
 			return
 		}
 
+		if err := validators.ValidateNoAngleBrackets(createReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
 		// Verify group exists
 		group, err := database.GetGroupById(nil, createReq.GroupId)
 		if err != nil {
@@ -173,7 +177,7 @@ func HandleAPIGroupAttributeCreatePost(
 		// Create group attribute
 		groupAttribute := &models.GroupAttribute{
 			Key:                  createReq.Key,
-			Value:                inputSanitizer.Sanitize(createReq.Value),
+			Value:                createReq.Value,
 			IncludeInIdToken:     createReq.IncludeInIdToken,
 			IncludeInAccessToken: createReq.IncludeInAccessToken,
 			GroupId:              createReq.GroupId,
@@ -210,7 +214,6 @@ func HandleAPIGroupAttributeUpdatePut(
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -272,6 +275,11 @@ func HandleAPIGroupAttributeUpdatePut(
 			return
 		}
 
+		if err := validators.ValidateNoAngleBrackets(updateReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
 		// Get group for audit log
 		group, err := database.GetGroupById(nil, attribute.GroupId)
 		if err != nil {
@@ -281,7 +289,7 @@ func HandleAPIGroupAttributeUpdatePut(
 
 		// Update attribute
 		attribute.Key = updateReq.Key
-		attribute.Value = inputSanitizer.Sanitize(updateReq.Value)
+		attribute.Value = updateReq.Value
 		attribute.IncludeInIdToken = updateReq.IncludeInIdToken
 		attribute.IncludeInAccessToken = updateReq.IncludeInAccessToken
 

@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/inputsanitizer"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -50,7 +50,6 @@ func HandleAPIResourceCreatePost(
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +69,11 @@ func HandleAPIResourceCreatePost(
 		const maxLengthDescription = 100
 		if len(createReq.Description) > maxLengthDescription {
 			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		if err := validators.ValidateNoAngleBrackets(createReq.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -93,8 +97,8 @@ func HandleAPIResourceCreatePost(
 
 		// Create resource
 		resource := &models.Resource{
-			ResourceIdentifier: strings.TrimSpace(inputSanitizer.Sanitize(createReq.ResourceIdentifier)),
-			Description:        strings.TrimSpace(inputSanitizer.Sanitize(createReq.Description)),
+			ResourceIdentifier: strings.TrimSpace(createReq.ResourceIdentifier),
+			Description:        strings.TrimSpace(createReq.Description),
 		}
 		if err := database.CreateResource(nil, resource); err != nil {
 			slog.Error("AuthServer API: Database error creating resource", "error", err, "resourceIdentifier", resource.ResourceIdentifier)
@@ -163,7 +167,6 @@ func HandleAPIResourceUpdatePut(
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -209,6 +212,11 @@ func HandleAPIResourceUpdatePut(
 			return
 		}
 
+		if err := validators.ValidateNoAngleBrackets(updateReq.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
+
 		// Validate identifier format
 		if err := identifierValidator.ValidateIdentifier(updateReq.ResourceIdentifier, true); err != nil {
 			writeValidationError(w, r, err)
@@ -228,17 +236,16 @@ func HandleAPIResourceUpdatePut(
 		}
 
 		// Apply changes
-		// Sanitize and prepare the new identifier value
-		sanitizedResourceIdentifier := strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ResourceIdentifier))
+		trimmedResourceIdentifier := strings.TrimSpace(updateReq.ResourceIdentifier)
 
 		// System-level resource protection: block identifier changes
-		if resource.IsSystemLevelResource() && sanitizedResourceIdentifier != resource.ResourceIdentifier {
+		if resource.IsSystemLevelResource() && trimmedResourceIdentifier != resource.ResourceIdentifier {
 			writeJSONError(w, "The identifier of a system-level resource cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		resource.ResourceIdentifier = sanitizedResourceIdentifier
-		resource.Description = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.Description))
+		resource.ResourceIdentifier = trimmedResourceIdentifier
+		resource.Description = strings.TrimSpace(updateReq.Description)
 
 		if err := database.UpdateResource(nil, resource); err != nil {
 			slog.Error("AuthServer API: Database error updating resource", "error", err, "resourceId", resource.Id, "resourceIdentifier", resource.ResourceIdentifier)

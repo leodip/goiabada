@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/inputsanitizer"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -59,7 +58,6 @@ func HandleAPIAccountProfileGet(
 func HandleAPIAccountProfilePut(
 	database data.Database,
 	profileValidator *validators.ProfileValidator,
-	inputSanitizer *inputsanitizer.InputSanitizer,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -116,11 +114,11 @@ func HandleAPIAccountProfilePut(
 		}
 
 		// Update user fields with sanitized values
-		user.Username = inputSanitizer.Sanitize(input.Username)
-		user.GivenName = inputSanitizer.Sanitize(input.GivenName)
-		user.MiddleName = inputSanitizer.Sanitize(input.MiddleName)
-		user.FamilyName = inputSanitizer.Sanitize(input.FamilyName)
-		user.Nickname = inputSanitizer.Sanitize(input.Nickname)
+		user.Username = input.Username
+		user.GivenName = input.GivenName
+		user.MiddleName = input.MiddleName
+		user.FamilyName = input.FamilyName
+		user.Nickname = input.Nickname
 		user.Website = input.Website
 
 		if len(input.Gender) > 0 {

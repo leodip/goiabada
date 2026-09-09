@@ -763,3 +763,72 @@ func createTestGroupAttribute(t *testing.T, groupId int64, key, value string) *m
 	assert.NoError(t, err)
 	return attr
 }
+
+// TestAPIGroupAttribute_AngleBracketsRejected pins the reject on both wiring points, create and
+// update: each carries its own check (#275).
+func TestAPIGroupAttribute_AngleBracketsRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testGroup := createTestGroup(t)
+	defer func() { _ = database.DeleteGroup(nil, testGroup.Id) }()
+
+	attr := createTestGroupAttribute(t, testGroup.Id, "status", "active")
+	defer func() { _ = database.DeleteGroupAttribute(nil, attr.Id) }()
+
+	base := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes"
+
+	t.Run("create", func(t *testing.T) {
+		resp := makeAPIRequest(t, "POST", base, accessToken, api.CreateGroupAttributeRequest{
+			Key:     "location",
+			Value:   "<b>San Francisco</b>",
+			GroupId: testGroup.Id,
+		})
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		var errResp api.ErrorResponse
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		assert.Equal(t, "validator.attribute.value_angle_brackets", errResp.ErrorCode)
+	})
+
+	t.Run("update", func(t *testing.T) {
+		resp := makeAPIRequest(t, "PUT", base+"/"+strconv.FormatInt(attr.Id, 10), accessToken,
+			api.UpdateGroupAttributeRequest{Key: "status", Value: "a < b"})
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		var errResp api.ErrorResponse
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		assert.Equal(t, "validator.attribute.value_angle_brackets", errResp.ErrorCode)
+
+		stored, err := database.GetGroupAttributeById(nil, attr.Id)
+		assert.NoError(t, err)
+		assert.Equal(t, "active", stored.Value)
+	})
+}
+
+// TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim is the accepted twin. Attribute values
+// are not trimmed, so the surrounding spaces come back too.
+func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testGroup := createTestGroup(t)
+	defer func() { _ = database.DeleteGroup(nil, testGroup.Id) }()
+
+	value := `  R&D "phase 2"  `
+	resp := makeAPIRequest(t, "POST", config.GetAuthServer().BaseURL+"/api/v1/admin/group-attributes",
+		accessToken, api.CreateGroupAttributeRequest{Key: "motto", Value: value, GroupId: testGroup.Id})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var createResponse api.CreateGroupAttributeResponse
+	err := json.NewDecoder(resp.Body).Decode(&createResponse)
+	assert.NoError(t, err)
+	assert.Equal(t, value, createResponse.Attribute.Value)
+
+	stored, err := database.GetGroupAttributeById(nil, createResponse.Attribute.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, value, stored.Value)
+	_ = database.DeleteGroupAttribute(nil, createResponse.Attribute.Id)
+}
