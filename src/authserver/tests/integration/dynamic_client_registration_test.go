@@ -459,6 +459,7 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 		name           string
 		clientName     string
 		expectedStatus int
+		expectedError  string
 	}{
 		{
 			name:           "Normal name",
@@ -479,6 +480,27 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 			name:           "Too long (129 chars)",
 			clientName:     strings.Repeat("a", 129),
 			expectedStatus: http.StatusBadRequest,
+			expectedError:  api.DCRErrorInvalidClientMetadata,
+		},
+		// client_name lands in clients.description, which the admin API refuses angle
+		// brackets in, so this path refuses them too (#275).
+		{
+			name:           "Markup is refused",
+			clientName:     "<script>alert(1)</script>",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  api.DCRErrorInvalidClientMetadata,
+		},
+		{
+			name:           "A bare closing bracket is refused",
+			clientName:     "Acme > Corp",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  api.DCRErrorInvalidClientMetadata,
+		},
+		// The accepted twin: ampersands and quotes are ordinary text and stay accepted.
+		{
+			name:           "Ampersands and quotes are accepted",
+			clientName:     `Acme & "Sons"`,
+			expectedStatus: http.StatusCreated,
 		},
 	}
 
@@ -495,6 +517,13 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
+
+			if tc.expectedStatus == http.StatusBadRequest {
+				var errorResp api.DynamicClientRegistrationError
+				err := json.NewDecoder(resp.Body).Decode(&errorResp)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedError, errorResp.Error)
+			}
 		})
 	}
 }

@@ -70,10 +70,6 @@ type IdentifierValidator interface {
 	ValidateIdentifier(identifier string, enforceMinLength bool) error
 }
 
-type InputSanitizer interface {
-	Sanitize(str string) string
-}
-
 type UserCreator interface {
 	CreateUser(input *user.CreateUserInput) (*models.User, error)
 }

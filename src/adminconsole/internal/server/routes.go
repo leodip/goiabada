@@ -18,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/inputsanitizer"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/validators"
@@ -34,7 +33,6 @@ func (s *Server) initRoutes(root chi.Router) {
 	tokenExchanger := oauth.NewTokenExchanger()
 
 	identifierValidator := validators.NewIdentifierValidator()
-	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AdminConsoleSessionName, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
@@ -176,7 +174,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Post("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsPost(httpHelper, s.sessionStore, apiClient))
-		r.Post("/resources/validate-permission", adminresourcehandlers.HandleAdminResourceValidatePermissionPost(httpHelper, identifierValidator, inputSanitizer))
+		r.Post("/resources/validate-permission", adminresourcehandlers.HandleAdminResourceValidatePermissionPost(httpHelper, identifierValidator))
 		r.Get("/resources/{resourceId}/users-with-permission", adminresourcehandlers.HandleAdminResourceUsersWithPermissionGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/resources/{resourceId}/users-with-permission/remove/{userId}/{permissionId}", adminresourcehandlers.HandleAdminResourceUsersWithPermissionRemovePermissionPost(httpHelper, apiClient))
 		r.Get("/resources/{resourceId}/users-with-permission/add/{permissionId}", adminresourcehandlers.HandleAdminResourceUsersWithPermissionAddGet(httpHelper, apiClient))
