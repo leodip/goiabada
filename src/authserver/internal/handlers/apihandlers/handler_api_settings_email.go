@@ -130,16 +130,6 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 
-		// TCP connectivity test with 3s timeout
-		conn, err := net.DialTimeout("tcp", net.JoinHostPort(req.SMTPHost, strconv.Itoa(req.SMTPPort)), 3*time.Second)
-		if err != nil {
-			writeJSONError(w, "Unable to connect to the SMTP server: "+err.Error(), "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
-		if conn != nil {
-			_ = conn.Close()
-		}
-
 		// Encryption value
 		smtpEncryption, err := enums.SMTPEncryptionFromString(req.SMTPEncryption)
 		if err != nil {
@@ -151,12 +141,11 @@ func HandleAPISettingsEmailPut(
 			writeJSONError(w, fmt.Sprintf("SMTP username must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		// 256 holds every provider credential shape seen in the wild, including Azure
-		// Communication Services' composite of two GUIDs and a client secret at about
-		// 114 characters, and stays well under the 512-octet SMTP command line that
-		// smtp_plain_auth.go handles by falling back to the challenge form.
+		// An application bound, measured in bytes because len(string) counts bytes. No
+		// PLAIN or LOGIN provider credential is known to exceed it, and it must not shrink
+		// to the neighbours' 60: SendGrid's SMTP password is its 69-character API key.
 		if len(req.SMTPPassword) > 256 {
-			writeJSONError(w, fmt.Sprintf("SMTP password must be less than %v characters.", 256), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeJSONError(w, fmt.Sprintf("SMTP password must be at most %v bytes.", 256), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if len(req.SMTPFromName) > 60 {
@@ -171,6 +160,17 @@ func HandleAPISettingsEmailPut(
 		if err := emailValidator.ValidateEmailAddress(req.SMTPFromEmail); err != nil {
 			writeValidationError(w, r, err)
 			return
+		}
+
+		// TCP connectivity test with 3s timeout. Every check that needs no network runs
+		// above, so a bad field is answered without waiting on the dial.
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort(req.SMTPHost, strconv.Itoa(req.SMTPPort)), 3*time.Second)
+		if err != nil {
+			writeJSONError(w, "Unable to connect to the SMTP server: "+err.Error(), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+		if conn != nil {
+			_ = conn.Close()
 		}
 
 		// Apply updates
