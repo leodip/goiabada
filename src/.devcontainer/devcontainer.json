@@ -50,7 +50,14 @@
 		"GOIABADA_ADMINCONSOLE_STATICDIR": "",
 		"GOIABADA_ADMINCONSOLE_TEMPLATEDIR": "",
 		"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
-		"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+		"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+
+		// The Dockerfile installs gcc so that `run-tests.sh --race` can run the race detector,
+		// which needs cgo. Go turns cgo on by default whenever a C compiler is found, which would
+		// make every ordinary build in the container link glibc and use the cgo DNS resolver,
+		// unlike the release binaries (build-binaries.sh exports CGO_ENABLED=0). Pinning it here
+		// keeps the default build as it was; the --race leg sets CGO_ENABLED=1 for itself.
+		"CGO_ENABLED": "0"
 	},
 
 	"forwardPorts": [19090, 19091],	

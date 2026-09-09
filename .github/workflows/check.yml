@@ -417,6 +417,42 @@ jobs:
         working-directory: src/cmd/goiabada-setup
         run: go test ./... -count=1
 
+  # The three module tiers again, under the race detector. The plain unit jobs
+  # above stay: the detector slows a run several times over and changes its
+  # timing, so it complements the plain run rather than replacing it. One job
+  # rather than three so the sidebar gains one line, with the tier on the step
+  # axis where a red run names it in one click, like everything else here.
+  #
+  # `go test -race` needs cgo, and cgo needs a C compiler. The golang image
+  # ships gcc, and CGO_ENABLED defaults to 1 wherever a compiler is found, so
+  # nothing is installed for it; run-tests.sh sets CGO_ENABLED=1 for the leg
+  # regardless, so the same flag works in the dev container, which pins it to
+  # 0 for ordinary builds. Mailpit is here for the same reason as in Unit /
+  # core. The data and integration tiers do not run under the detector (#276,
+  # section 9 of the closing log).
+  unit-race:
+    name: Unit / race
+    needs: versions
+    runs-on: ubuntu-latest
+    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    services:
+      mailpit:
+        image: axllent/mailpit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+      - name: Authserver internal tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type internal --race --no-build
+      - name: Core module tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type core --race --no-build
+      - name: Admin console module tests
+        working-directory: src/authserver
+        run: ./run-tests.sh --type adminconsole --race --no-build
+
   # The four database jobs are written out rather than expressed as a matrix.
   # `matrix` IS available to `services`, so a matrix is possible -- this is a
   # readability choice. Each database needs its own env block, health command

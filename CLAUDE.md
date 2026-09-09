@@ -271,6 +271,13 @@ Three test types:
 over `crypto/rand` that replaced a third-party faker in #272. Reach for it rather than adding a
 dependency the next time a test needs a random string.
 
+**Race detector**: `./run-tests.sh --type modules --race` runs the three module tiers under
+`go test -race`, and CI's `Unit / race` job does the same beside the plain unit jobs. The
+detector needs cgo, so the dev container ships gcc and pins `CGO_ENABLED=0` for everything
+except that leg, which sets it to 1 for itself. Code whose correctness is a locking argument
+(`core/ratelimit`, the middleware's in-flight count, the concurrent transactions of #301) is
+covered there and nowhere else; the data and integration tiers do not run under it.
+
 **gofmt guard**: every module's unit tier runs `TestGoSourcesAreGofmted`, which holds every Go
 file under `src/` to gofmt's formatting through `core/testutil.AssertGofmted`. The walk is
 repository-wide from each tier because `cmd/goiabada-setup` has no tier of its own. CI's Lint job

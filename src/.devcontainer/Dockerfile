@@ -22,6 +22,12 @@ RUN apt-get install -y ripgrep
 RUN apt-get install -y openssl
 RUN apt-get install -y sudo
 
+# gcc and the libc headers are here for one reason: `go test -race` needs cgo, and cgo needs a
+# C toolchain. Nothing in the project links C. CGO_ENABLED is pinned to 0 in devcontainer.json
+# so that having a compiler present does not flip Go's default to cgo for ordinary builds in
+# the container; `run-tests.sh --race` sets it to 1 for the detector run alone.
+RUN apt-get install -y gcc libc6-dev
+
 # Generate the en_US.UTF-8 locale. The host editor forwards LANG/LC_* set to
 # en_US.UTF-8 into the container; without the locale generated, the shell prints
 # "setlocale: cannot change locale (en_US.UTF-8)" warnings on every session.
