@@ -96,14 +96,6 @@ func HandleAuthorizeGet(
 		// checks it, so a page left open in another tab cannot act on the authorization
 		// request that replaced it (#79).
 		ceremonyId := stringutil.GenerateSecurityRandomString(ceremonyIdLength)
-		if ceremonyId == "" {
-			// GenerateSecurityRandomString answers "" when the system CSPRNG is unavailable.
-			// Saving that would put an empty id in the context, which every bound POST refuses,
-			// so the ceremony would render its forms and then reject each one. Failing here is
-			// the same outcome with a stack trace attached, as SaveLinkMarker does (#112).
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to generate an auth ceremony id")))
-			return
-		}
 
 		authContext := oauth.AuthContext{
 			AuthState:                     oauth.AuthStateInitial,

@@ -63,12 +63,13 @@ func intn(n int) int {
 }
 
 // mustDraw returns s unless it is short of the n characters that were asked
-// for, which is how the stringutil helpers report a CSPRNG failure: they
-// swallow the error and return "" to preserve a contract their production
-// callers were written against. A fixture that degrades to a constant instead
-// produces tests that pass while every username is the same string, which is
-// exactly the collision #136 describes, so the draw fails closed here rather
-// than propagating an invalid value into a fixture (#272).
+// for, in which case it panics. No caller can reach that panic today: the
+// stringutil helpers draw through crypto/rand.Read, which ends the process on a
+// CSPRNG failure rather than returning a short string (#211). The check is kept
+// as this package's own contract, independent of what stringutil promises: a
+// fixture that quietly degrades to a shorter or constant value produces tests
+// that pass while every username is the same string, which is exactly the
+// collision #136 describes. TestMustDraw_PanicsOnShortResult is what holds it.
 //
 // The alphabets are ASCII, so a byte count is a character count.
 func mustDraw(s string, n uint, who string) string {
@@ -82,8 +83,8 @@ func mustDraw(s string, n uint, who string) string {
 // LetterN returns n characters drawn from [A-Za-z]. n == 0 returns one
 // character, matching what the call sites were written against.
 //
-// It panics on a CSPRNG failure, like intn. Removing the mustDraw guard breaks
-// TestLetterN_PanicsOnEntropyFailure.
+// It panics rather than return a run shorter than n. Removing the mustDraw
+// guard breaks TestMustDraw_PanicsOnShortResult.
 func LetterN(n uint) string {
 	if n == 0 {
 		n = 1
@@ -96,8 +97,8 @@ func LetterN(n uint) string {
 // nothing parses those fields, only the column width constrains them, so a digit
 // run of the right length is the whole requirement (#272).
 //
-// It panics on a CSPRNG failure, like intn. Removing the mustDraw guard breaks
-// TestDigitN_PanicsOnEntropyFailure.
+// It panics rather than return a run shorter than n. Removing the mustDraw
+// guard breaks TestMustDraw_PanicsOnShortResult.
 func DigitN(n uint) string {
 	if n == 0 {
 		n = 1

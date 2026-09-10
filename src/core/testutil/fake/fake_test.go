@@ -1,8 +1,6 @@
 package fake
 
 import (
-	"crypto/rand"
-	"errors"
 	"net"
 	"net/url"
 	"strings"
@@ -62,53 +60,29 @@ func TestDigitN(t *testing.T) {
 	}
 }
 
-// brokenReader stands in for a system CSPRNG that has stopped answering. It is
-// the only way to reach the branch stringutil takes when crypto/rand fails,
-// because that helper swallows the error and returns "".
-type brokenReader struct{}
-
-func (brokenReader) Read([]byte) (int, error) {
-	return 0, errors.New("fake_test: entropy source is unavailable")
-}
-
-// withBrokenEntropy runs fn with crypto/rand.Reader replaced, and restores it
-// however fn leaves: these cases expect a panic, and a reader left broken would
-// take every later case in the package down with it. No test in this repository
-// calls t.Parallel(), so swapping the package variable for the length of one
-// case races with nothing.
-func withBrokenEntropy(t *testing.T, fn func()) {
-	t.Helper()
-	saved := rand.Reader
-	rand.Reader = brokenReader{}
-	defer func() { rand.Reader = saved }()
-	fn()
-}
-
-// TestLetterN_PanicsOnEntropyFailure and its DigitN twin pin the fail-closed
-// contract the package documents: a generator either produces its shape or stops
-// the test. stringutil returns "" on a CSPRNG failure, so without the mustDraw
-// guard LetterN hands a fixture an empty username and the suite goes green while
-// every generated value is identical (#272).
-func TestLetterN_PanicsOnEntropyFailure(t *testing.T) {
-	withBrokenEntropy(t, func() {
+// TestMustDraw_PanicsOnShortResult pins the fail-closed contract LetterN and
+// DigitN document, directly on the guard that carries it. It replaces a pair of
+// cases that swapped crypto/rand.Reader for a failing reader and called through
+// stringutil: since #211 that helper draws through crypto/rand.Read, which ends
+// the process on a read error rather than returning "", so those cases would now
+// take this whole test binary down instead of observing a panic.
+//
+// Calling mustDraw directly is what is left, and it is what the guard is for:
+// nothing can produce a short draw today, and the panic is this package's own
+// refusal to put a degraded value in a fixture (#272, #136).
+func TestMustDraw_PanicsOnShortResult(t *testing.T) {
+	func() {
 		defer func() {
 			if recover() == nil {
-				t.Error("LetterN(8) with a broken CSPRNG: want a panic, got none")
+				t.Error(`mustDraw("ab", 3, "x"): want a panic on a short draw, got none`)
 			}
 		}()
-		_ = LetterN(8)
-	})
-}
+		_ = mustDraw("ab", 3, "x")
+	}()
 
-func TestDigitN_PanicsOnEntropyFailure(t *testing.T) {
-	withBrokenEntropy(t, func() {
-		defer func() {
-			if recover() == nil {
-				t.Error("DigitN(8) with a broken CSPRNG: want a panic, got none")
-			}
-		}()
-		_ = DigitN(8)
-	})
+	if got := mustDraw("abc", 3, "x"); got != "abc" {
+		t.Errorf(`mustDraw("abc", 3, "x") = %q, want "abc"`, got)
+	}
 }
 
 // TestPassword_AllClassesPresent is the pin for the guarantee Password documents:

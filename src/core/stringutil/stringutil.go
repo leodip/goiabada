@@ -41,22 +41,47 @@ func randomStringFromReader(r io.Reader, length int, alphabet string) (string, e
 	return string(out), nil
 }
 
+// cryptoRandReader is the system CSPRNG presented as an io.Reader that cannot
+// fail. crypto/rand.Read has not returned an error since Go 1.24: on a failed
+// read it calls the runtime's fatal handler, which no recover can catch, so the
+// process is gone before Read could return one.
+//
+// io.ReadFull(rand.Reader, p) reads the same source and is deliberately not the
+// call here. It hands the error back, and randomStringFromAlphabet has no error
+// return of its own, so it would have to invent a value; the value it used to
+// invent was "", and an empty security token, ceremony id or continuation id is
+// exactly what this contract exists to make impossible (#211).
+type cryptoRandReader struct{}
+
+func (cryptoRandReader) Read(p []byte) (int, error) {
+	_, _ = rand.Read(p) // cannot fail; the process dies first, see above
+	return len(p), nil
+}
+
 // randomStringFromAlphabet is the crypto/rand-backed convenience wrapper around
-// randomStringFromReader. It preserves the package's historical contract of
-// returning "" when the system CSPRNG is unavailable.
+// randomStringFromReader. It cannot fail: cryptoRandReader never returns an
+// error, so the error randomStringFromReader declares is always nil here and a
+// branch on it would be dead code.
 func randomStringFromAlphabet(length int, alphabet string) string {
-	s, err := randomStringFromReader(rand.Reader, length, alphabet)
-	if err != nil {
-		return ""
-	}
+	s, _ := randomStringFromReader(cryptoRandReader{}, length, alphabet)
 	return s
 }
 
+// GenerateSecurityRandomString returns length characters drawn uniformly from
+// [0-9a-zA-Z-_.], the alphabet the ceremony ids, continuation ids and security
+// tokens in this repository are minted over.
+//
+// A CSPRNG failure ends the process rather than this call: it never returns a
+// short, empty or non-random string, so callers need no guard against one
+// (#211).
 func GenerateSecurityRandomString(length int) string {
 	const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
 	return randomStringFromAlphabet(length, chars)
 }
 
+// GenerateRandomLetterString returns length characters drawn uniformly from
+// [A-Za-z]. Like GenerateSecurityRandomString, a CSPRNG failure ends the
+// process rather than this call (#211).
 func GenerateRandomLetterString(length int) string {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	return randomStringFromAlphabet(length, letters)
@@ -78,6 +103,9 @@ func ConvertToString(v interface{}) string {
 	}
 }
 
+// GenerateRandomNumberString returns length characters drawn uniformly from
+// [0-9]. Like GenerateSecurityRandomString, a CSPRNG failure ends the process
+// rather than this call (#211).
 func GenerateRandomNumberString(length int) string {
 	const chars = "0123456789"
 	return randomStringFromAlphabet(length, chars)

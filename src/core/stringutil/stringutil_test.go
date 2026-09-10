@@ -2,7 +2,11 @@ package stringutil
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -119,6 +123,77 @@ func TestGenerateRandomLetterString_LettersOnly(t *testing.T) {
 		if !isLetter {
 			t.Fatalf("GenerateRandomLetterString emitted non-letter %q", c)
 		}
+	}
+}
+
+// crashChildEnv marks the re-executed child of
+// TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure. Only the
+// child swaps crypto/rand.Reader, so the parent's binary -- and every other case
+// in this package -- keeps the real source.
+const crashChildEnv = "GOIABADA_STRINGUTIL_CRASH_CHILD"
+
+// alwaysFailingReader is a CSPRNG that has stopped answering. errReader above is
+// the same shape but is fed straight to randomStringFromReader; this one is
+// installed as crypto/rand.Reader, which is the only way to reach the exported
+// generators' source.
+type alwaysFailingReader struct{}
+
+func (alwaysFailingReader) Read([]byte) (int, error) {
+	return 0, errors.New("stringutil_test: entropy source is unavailable")
+}
+
+// TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure pins the
+// half of the exported generators' contract that no length or alphabet
+// assertion can reach: on a CSPRNG failure the process dies, and no caller gets
+// a string or a chance to invent one.
+//
+// It is the case #211 was missing. The wrapper this package shipped until then
+// answered a failed draw with "", and every other case in this file passes
+// against that version, so the ceremony ids and continuation ids it fed were
+// guarded by hand at two call sites and nowhere else. Reverting
+// randomStringFromAlphabet to io.ReadFull with an `if err != nil { return "" }`
+// branch leaves the whole rest of this file green and fails only here.
+//
+// It runs in a re-executed child because the failure is a runtime fatal that no
+// recover can catch, so it takes its process with it. The child needs no broken
+// OS: crypto/rand.Read reads whatever crypto/rand.Reader holds and calls the
+// fatal handler on any error from it.
+func TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure(t *testing.T) {
+	if os.Getenv(crashChildEnv) == "1" {
+		rand.Reader = alwaysFailingReader{}
+		defer func() {
+			// Reached only if the draw failed in a catchable way, which is the
+			// contract being violated. Exit 0 so the parent's assertion fails.
+			if r := recover(); r != nil {
+				fmt.Fprintf(os.Stderr, "GenerateSecurityRandomString panicked recoverably with %v\n", r)
+				os.Exit(0)
+			}
+		}()
+		got := GenerateSecurityRandomString(32)
+		fmt.Fprintf(os.Stderr, "GenerateSecurityRandomString returned %q from a failing reader\n", got)
+		os.Exit(0)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0],
+		"-test.run=^TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure$")
+	cmd.Env = append(os.Environ(), crashChildEnv+"=1")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+
+	err := cmd.Run()
+	if err == nil {
+		t.Fatalf("child exited 0 with a failing CSPRNG, want a fatal crash; output:\n%s", out.String())
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("could not run the child: %v; output:\n%s", err, out.String())
+	}
+	const wantFatal = "crypto/rand: failed to read random data"
+	if !strings.Contains(out.String(), wantFatal) {
+		t.Fatalf("child died without %q, so it died of something other than the CSPRNG; output:\n%s",
+			wantFatal, out.String())
 	}
 }
 
