@@ -672,10 +672,12 @@ func chunkCookieName(logicalName string, n int) string {
 
 // newSessionId returns 256 bits from the CSPRNG, hex encoded.
 //
-// Deliberately not stringutil.GenerateSecurityRandomString: that helper returns "" when
-// the CSPRNG fails rather than an error (#211), and a session identifier that silently
-// becomes the empty string for every session is the one fail-open this store must not
-// have. A failure here fails the save instead.
+// Deliberately not stringutil.GenerateSecurityRandomString: that helper has no error
+// return at all, because a CSPRNG failure there ends the process (#211, closed by #278).
+// A save does have one, so an entropy failure costs the one save -- no cookie, no backend
+// row -- rather than the server. It also keeps that failure reachable from a test through
+// randReader, which is what pins the behaviour; the helper reads crypto/rand directly and
+// nothing can make it fail in-process.
 func newSessionId() (string, error) {
 	buf := make([]byte, SessionIdBytes)
 	if _, err := io.ReadFull(randReader, buf); err != nil {

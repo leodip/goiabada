@@ -126,6 +126,30 @@ func TestParse(t *testing.T) {
 			in:      "550e8400_e29b_41d4_a716_446655440000",
 			wantErr: errHyphen,
 		},
+		// One row per separator position, because the row above cannot pin any single
+		// one of them: with the check relaxed at index 8 alone, its underscore at 13
+		// still raises errHyphen and the case passes over a parser that now accepts an
+		// arbitrary character in the middle of a subject (#278).
+		{
+			name:    "an underscore at index 8 only",
+			in:      "550e8400_e29b-41d4-a716-446655440000",
+			wantErr: errHyphen,
+		},
+		{
+			name:    "an underscore at index 13 only",
+			in:      "550e8400-e29b_41d4-a716-446655440000",
+			wantErr: errHyphen,
+		},
+		{
+			name:    "an underscore at index 18 only",
+			in:      "550e8400-e29b-41d4_a716-446655440000",
+			wantErr: errHyphen,
+		},
+		{
+			name:    "an underscore at index 23 only",
+			in:      "550e8400-e29b-41d4-a716_446655440000",
+			wantErr: errHyphen,
+		},
 		{
 			name:    "empty",
 			in:      "",
