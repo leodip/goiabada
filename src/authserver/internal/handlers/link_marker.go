@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/stringutil"
@@ -167,7 +167,7 @@ func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *ht
 		ContinuationId: continuationId,
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "unable to marshal link marker")
+		return "", errs.Wrap(err, "unable to marshal link marker")
 	}
 
 	sess.Values[constants.SessionKeyLinkMarker] = string(jsonData)
@@ -212,7 +212,7 @@ func decodeLinkMarker(sess *sessionstore.Session) (*LinkMarker, error) {
 
 	var marker LinkMarker
 	if err := json.Unmarshal([]byte(jsonData), &marker); err != nil {
-		return nil, errors.Wrap(err, "unable to unmarshal link marker")
+		return nil, errs.Wrap(err, "unable to unmarshal link marker")
 	}
 
 	return &marker, nil

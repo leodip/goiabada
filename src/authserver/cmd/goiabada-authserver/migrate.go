@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // rollbackFloor is the lowest schema version `migrate to` will step down to: the version this
@@ -117,12 +117,12 @@ func runMigrate(args []string, m *migrator.Migrator, floor int, out io.Writer) i
 func parseTargetVersion(arg string) (int, error) {
 	trimmed := strings.TrimSpace(arg)
 	if trimmed == "" {
-		return 0, errors.New("no version given")
+		return 0, errs.New("no version given")
 	}
 	// Base 10 explicitly: ParseInt with base 0 would read 000041 as octal and answer 33.
 	v, err := strconv.ParseInt(trimmed, 10, 32)
 	if err != nil || v < 0 {
-		return 0, fmt.Errorf("%q is not a schema version; give it as a number, for example 44 or 000044", arg)
+		return 0, errs.Errorf("%q is not a schema version; give it as a number, for example 44 or 000044", arg)
 	}
 	return int(v), nil
 }

@@ -219,17 +219,21 @@ func broken( {
 	assert.Empty(t, describe(scoped), "the caught subtree is outside the named directory")
 }
 
-// TestNoLegacyErrors_TheTreeItself is the real half, scoped to the modules that have moved: all
-// of core, which now constructs every error through errs. The authserver and the admin console
-// still import pkg/errors, so naming them here would fail on work that has not happened yet; each
-// is added as its own sweep lands, and the last one drops the arguments so the whole tree is held.
+// TestNoLegacyErrors_TheTreeItself is the real half, scoped to the modules that have moved: core
+// and the authserver, both of which now construct every error through errs. The admin console
+// still imports pkg/errors, so naming it here would fail on work that has not happened yet; it is
+// added as its sweep lands, and that last one drops the arguments so the whole tree is held.
+//
+// Every module's tier holds the same scope rather than only its own subtree, for the reason
+// AssertGofmted's three callers do: the guard is about the source root, and a stale construction
+// is worth catching in whichever tier runs first.
 //
 // core/testutil is a live instance of the row the parser exists for: errors_lint.go names the
 // pkg/errors import path in a comment and in a string literal, and neither is an import.
 // core/data/benign_sentinel_lint_test.go spells it inside a raw string, and being a test file it
 // is out of scope twice over.
 func TestNoLegacyErrors_TheTreeItself(t *testing.T) {
-	AssertNoLegacyErrors(t, "core")
+	AssertNoLegacyErrors(t, "core", "authserver")
 }
 
 // describe renders findings as "file:line what", which is what a reader compares. The fix text is

@@ -7,8 +7,8 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 // revokeRefreshTokens marks the given refresh tokens revoked and returns the JTIs this call
@@ -87,7 +87,7 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 	// one nested call cares about. Checking at entry also keeps the unit tests honest: without
 	// it they would pass nil and exercise a shape production never runs.
 	if tx == nil {
-		return result, errors.WithStack(errors.New("revoking a user's auth state requires a transaction: the increment and the sweep must not be separable"))
+		return result, errs.New("revoking a user's auth state requires a transaction: the increment and the sweep must not be separable")
 	}
 
 	// Increment first, then derive the old generation as new-1. Reading the stored value
@@ -381,14 +381,14 @@ func TerminateUserSessionTx(db data.Database, userSession *models.UserSession) (
 	// loaded row rather than two loose values: from one row they cannot describe two different
 	// sessions, and both call sites already load it for their own not-found and ownership checks.
 	if userSession == nil {
-		return TerminationResult{}, errors.WithStack(errors.New("terminating a user session requires the session to terminate"))
+		return TerminationResult{}, errs.New("terminating a user session requires the session to terminate")
 	}
 
 	// Refused at entry rather than three statements later. RevokeCodesBySessionIdentifier rejects
 	// an empty identifier itself, so the outcome is the same either way, but reaching it means
 	// opening a transaction first and surfacing a bad argument as a database failure.
 	if userSession.SessionIdentifier == "" {
-		return TerminationResult{}, errors.WithStack(errors.New("terminating a user session requires a session identifier"))
+		return TerminationResult{}, errs.New("terminating a user session requires a session identifier")
 	}
 
 	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
@@ -492,7 +492,7 @@ func RevokeClientGrants(db data.Database, tx *sql.Tx, clientId int64) (ClientGra
 	result := ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
 
 	if tx == nil {
-		return result, errors.WithStack(errors.New("revoking a client's grants requires a transaction: the code marker and the sweep must not be separable"))
+		return result, errs.New("revoking a client's grants requires a transaction: the code marker and the sweep must not be separable")
 	}
 
 	revokedCodeCount, err := db.RevokeCodesByClientId(tx, clientId)

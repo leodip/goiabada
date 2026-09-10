@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
@@ -145,7 +146,7 @@ func (s *Server) Start(ctx context.Context) {
 			slog.Info(fmt.Sprintf("starting HTTPS server on %s:%d", httpsHost, httpsPort))
 			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil &&
 				!errors.Is(err, http.ErrServerClosed) {
-				errChan <- fmt.Errorf("HTTPS server error: %v", err)
+				errChan <- errs.Errorf("HTTPS server error: %v", err)
 			}
 		}()
 	}
@@ -161,7 +162,7 @@ func (s *Server) Start(ctx context.Context) {
 			slog.Info(fmt.Sprintf("starting HTTP server on %s:%d", httpHost, httpPort))
 			if err := httpServer.ListenAndServe(); err != nil &&
 				!errors.Is(err, http.ErrServerClosed) {
-				errChan <- fmt.Errorf("HTTP server error: %v", err)
+				errChan <- errs.Errorf("HTTP server error: %v", err)
 			}
 		}()
 	}
@@ -205,7 +206,7 @@ func (s *Server) shutdown(httpServers []*http.Server) {
 
 	for _, httpServer := range httpServers {
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			slog.Error(fmt.Sprintf("error shutting down listener %v: %v", httpServer.Addr, err))
+			slog.Error("error shutting down listener", "addr", httpServer.Addr, "error", err)
 		}
 	}
 	slog.Info("listeners drained")

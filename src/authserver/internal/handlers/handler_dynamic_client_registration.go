@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -14,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/urlutil"
@@ -202,7 +202,7 @@ func validateDCRRequest(req *api.DynamicClientRegistrationRequest) error {
 		"client_secret_post":  true,
 	}
 	if !allowedAuthMethods[req.TokenEndpointAuthMethod] {
-		return fmt.Errorf("unsupported token_endpoint_auth_method: %s", req.TokenEndpointAuthMethod)
+		return errs.Errorf("unsupported token_endpoint_auth_method: %s", req.TokenEndpointAuthMethod)
 	}
 
 	// Validate grant_types
@@ -213,13 +213,13 @@ func validateDCRRequest(req *api.DynamicClientRegistrationRequest) error {
 	}
 	for _, gt := range req.GrantTypes {
 		if !supportedGrants[gt] {
-			return fmt.Errorf("unsupported grant_type: %s", gt)
+			return errs.Errorf("unsupported grant_type: %s", gt)
 		}
 	}
 
 	// Validate client_name length if provided (matches database column size)
 	if len(req.ClientName) > 128 {
-		return fmt.Errorf("client_name cannot exceed 128 characters")
+		return errs.Errorf("client_name cannot exceed 128 characters")
 	}
 
 	// client_name is written to clients.description, the same column the admin API refuses
@@ -229,7 +229,7 @@ func validateDCRRequest(req *api.DynamicClientRegistrationRequest) error {
 	// answers with it. The message is English like the handler's other refusals: DCR errors
 	// are protocol responses and are not localized.
 	if validators.ContainsAngleBrackets(req.ClientName) {
-		return fmt.Errorf("client_name cannot contain the characters < or >")
+		return errs.Errorf("client_name cannot contain the characters < or >")
 	}
 
 	return nil
@@ -241,7 +241,7 @@ func validateDCRRedirectURIs(req *api.DynamicClientRegistrationRequest) error {
 	requiresRedirectURIs := containsGrantType(req.GrantTypes, "authorization_code")
 
 	if requiresRedirectURIs && len(req.RedirectURIs) == 0 {
-		return fmt.Errorf("redirect_uris required for authorization_code grant type")
+		return errs.Errorf("redirect_uris required for authorization_code grant type")
 	}
 
 	// Validate each redirect URI
@@ -282,7 +282,7 @@ var deniedRedirectURISchemes = map[string]bool{
 func validateRedirectURI(uri string, isPublic bool) error {
 	parsed, err := url.ParseRequestURI(uri)
 	if err != nil {
-		return fmt.Errorf("invalid redirect_uri format: %s", uri)
+		return errs.Errorf("invalid redirect_uri format: %s", uri)
 	}
 
 	// RFC 6749 section 3.1.2 requires an absolute-URI (RFC 3986 section 4.3) and forbids a
@@ -297,7 +297,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// matching, which is what covers rows stored before any of these rules existed. Keep the
 	// rule in the predicate rather than here, so the three cannot drift (#122).
 	if !urlutil.IsAbsoluteRedirectURI(uri) {
-		return fmt.Errorf("redirect_uri must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host: %s", uri)
+		return errs.Errorf("redirect_uri must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host: %s", uri)
 	}
 
 	// Characters RFC 3986 excludes from URIs entirely. A redirect URI carrying them is
@@ -308,7 +308,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// client reaches the same place, so gating this inside the custom-scheme branch would
 	// miss it.
 	if strings.ContainsAny(uri, excludedURIChars) {
-		return fmt.Errorf("redirect_uri contains characters that are not permitted in a URI: %s", uri)
+		return errs.Errorf("redirect_uri contains characters that are not permitted in a URI: %s", uri)
 	}
 
 	// Schemes that cannot receive an authorization response, or that execute script.
@@ -318,7 +318,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// above is what stops that class. This gate stops the schemes that carry no excluded
 	// characters at all, such as javascript: and ftp:.
 	if deniedRedirectURISchemes[strings.ToLower(parsed.Scheme)] {
-		return fmt.Errorf("redirect_uri scheme %q is not permitted: %s", parsed.Scheme, uri)
+		return errs.Errorf("redirect_uri scheme %q is not permitted: %s", parsed.Scheme, uri)
 	}
 
 	// For public clients (MCP use case), only allow loopback http or custom schemes.
@@ -332,7 +332,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 			if urlutil.IsLoopbackHost(parsed.Host) {
 				return nil
 			}
-			return fmt.Errorf("public clients can only use http redirect_uris on the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
+			return errs.Errorf("public clients can only use http redirect_uris on the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
 		}
 
 		// Allow custom schemes (native apps)
@@ -341,7 +341,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 		}
 
 		// Reject HTTPS for public clients registered via DCR
-		return fmt.Errorf("public clients registered via DCR cannot use https redirect_uris (security restriction): %s", uri)
+		return errs.Errorf("public clients registered via DCR cannot use https redirect_uris (security restriction): %s", uri)
 	}
 
 	// For confidential clients, allow HTTPS or loopback http. Same exact-host comparison as
@@ -354,12 +354,12 @@ func validateRedirectURI(uri string, isPublic bool) error {
 		if urlutil.IsLoopbackHost(parsed.Host) {
 			return nil
 		}
-		return fmt.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
+		return errs.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
 	}
 
 	// Custom schemes are for public clients only, which is what this branch not accepting
 	// them means. The message used to offer "custom scheme" here, which was never true.
-	return fmt.Errorf("confidential clients must use an https redirect_uri, or http on a loopback host: %s", uri)
+	return errs.Errorf("confidential clients must use an https redirect_uri, or http on a loopback host: %s", uri)
 }
 
 // generateDCRClientIdentifier generates unique client identifier (RFC 7591 §3.2.1)

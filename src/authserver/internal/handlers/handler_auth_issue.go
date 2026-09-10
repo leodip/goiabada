@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"database/sql"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -15,10 +16,10 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/urlutil"
-	"github.com/pkg/errors"
 )
 
 func HandleIssueGet(
@@ -47,7 +48,7 @@ func HandleIssueGet(
 
 		requiredState := oauth.AuthStateReadyToIssueCode
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
 			return
 		}
 
@@ -334,7 +335,7 @@ func HandleIssueGet(
 			}
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("user %v not found", authContext.UserId))))
+			httpHelper.InternalServerError(w, r, errs.Errorf("user %v not found", authContext.UserId))
 			return
 		}
 
@@ -881,7 +882,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 
 		t, err := template.ParseFS(templateFS, "form_post.html")
 		if err != nil {
-			return errors.Wrap(err, "unable to parse template")
+			return errs.Wrap(err, "unable to parse template")
 		}
 
 		// Render into a buffer, not straight to w, matching the error emitter's twin. Execute
@@ -896,7 +897,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 		var rendered bytes.Buffer
 		err = t.Execute(&rendered, m)
 		if err != nil {
-			return errors.Wrap(err, "unable to execute template")
+			return errs.Wrap(err, "unable to execute template")
 		}
 		// OAuth 2.0 Form Post Response Mode section 2: "Because the Authorization Response is
 		// intended to be used only once, the Authorization Server MUST instruct the User Agent (and
@@ -915,7 +916,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 		if err != nil {
 			// The connection itself failed. Nothing can be recovered from here, including the
 			// caller's 500, but the error is still worth reporting rather than swallowing.
-			return errors.Wrap(err, "unable to write the form_post response")
+			return errs.Wrap(err, "unable to write the form_post response")
 		}
 		return nil
 	}
@@ -940,7 +941,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 	// state on this redirect that it did not send (#146).
 	location, err := writeResponseParams(code.RedirectURI, params, authorizationResponseParamNames)
 	if err != nil {
-		return errors.Wrap(err, "unable to build the authorization code redirect")
+		return errs.Wrap(err, "unable to build the authorization code redirect")
 	}
 
 	http.Redirect(w, r, location, http.StatusFound)

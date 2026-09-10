@@ -151,7 +151,7 @@ func (w *Worker) poll(ctx context.Context) {
 // Do not move this call into performTask (#266 decision 19).
 func (w *Worker) reapBrowserSessions() {
 	if err := w.database.DeleteExpiredBrowserSessions(nil, time.Now().UTC()); err != nil {
-		slog.Error(fmt.Sprintf("error deleting expired browser sessions: %v", err))
+		slog.Error("error deleting expired browser sessions", "error", err)
 	}
 }
 
@@ -162,7 +162,7 @@ func (w *Worker) runIfClaimed(ctx context.Context) {
 
 	claimed, err := w.database.TryClaimCleanupRun(nil, now, now.Add(-cleanupInterval))
 	if err != nil {
-		slog.Error(fmt.Sprintf("error claiming the cleanup run: %v", err))
+		slog.Error("error claiming the cleanup run", "error", err)
 		return
 	}
 	if !claimed {
@@ -207,7 +207,7 @@ func (w *Worker) performTask(ctx context.Context) {
 	// signal, retained until the token itself expires (#128).
 	err := w.database.DeleteExpiredRefreshTokens(nil)
 	if err != nil {
-		slog.Error(fmt.Sprintf("error deleting expired refresh tokens: %v", err))
+		slog.Error("error deleting expired refresh tokens", "error", err)
 	} else {
 		slog.Info("deleted expired refresh tokens")
 	}
@@ -218,7 +218,7 @@ func (w *Worker) performTask(ctx context.Context) {
 
 	err = w.database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(-usedCodeCleanupGrace))
 	if err != nil {
-		slog.Error(fmt.Sprintf("error deleting used codes without refresh tokens: %v", err))
+		slog.Error("error deleting used codes without refresh tokens", "error", err)
 	} else {
 		slog.Info("deleted used codes without refresh tokens")
 	}
@@ -229,7 +229,7 @@ func (w *Worker) performTask(ctx context.Context) {
 
 	settings, err := w.database.GetSettingsById(nil, 1)
 	if err != nil {
-		slog.Error(fmt.Sprintf("error getting settings: %v", err))
+		slog.Error("error getting settings", "error", err)
 		return
 	}
 	// GetSettingsById returns (nil, nil) when the row is absent. Every remaining
@@ -242,7 +242,7 @@ func (w *Worker) performTask(ctx context.Context) {
 
 	err = w.database.DeleteIdleSessions(nil, time.Duration(settings.UserSessionIdleTimeoutInSeconds)*time.Second)
 	if err != nil {
-		slog.Error(fmt.Sprintf("error deleting idle sessions: %v", err))
+		slog.Error("error deleting idle sessions", "error", err)
 	} else {
 		slog.Info(fmt.Sprintf("deleted idle sessions (idle timeout: %d seconds)", settings.UserSessionIdleTimeoutInSeconds))
 	}
@@ -253,7 +253,7 @@ func (w *Worker) performTask(ctx context.Context) {
 
 	err = w.database.DeleteExpiredSessions(nil, time.Duration(settings.UserSessionMaxLifetimeInSeconds)*time.Second)
 	if err != nil {
-		slog.Error(fmt.Sprintf("error deleting expired sessions: %v", err))
+		slog.Error("error deleting expired sessions", "error", err)
 	} else {
 		slog.Info(fmt.Sprintf("deleted expired sessions (max lifetime: %d seconds)", settings.UserSessionMaxLifetimeInSeconds))
 	}
@@ -286,7 +286,7 @@ func (w *Worker) deleteOldAuditLogs(ctx context.Context, retentionDays int) {
 
 		deleted, err := w.database.DeleteOldAuditLogs(nil, cutoff, auditLogDeleteBatchSize)
 		if err != nil {
-			slog.Error(fmt.Sprintf("error deleting old audit logs: %v", err))
+			slog.Error("error deleting old audit logs", "error", err)
 			break
 		}
 

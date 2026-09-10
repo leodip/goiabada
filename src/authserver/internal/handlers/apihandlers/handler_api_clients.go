@@ -3,6 +3,7 @@ package apihandlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,12 +18,12 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/leodip/goiabada/core/validators"
-	"github.com/pkg/errors"
 )
 
 // updateClientNotOwningAuthenticationMode writes a client through an endpoint that changes some
@@ -79,7 +80,7 @@ func updateClientNotOwningAuthenticationMode(database data.Database, client *mod
 			return err
 		}
 		if current == nil {
-			return errors.WithStack(errors.New("client no longer exists"))
+			return errs.New("client no longer exists")
 		}
 		client.IsPublic = current.IsPublic
 		client.ClientSecretEncrypted = current.ClientSecretEncrypted
@@ -768,7 +769,7 @@ func HandleAPIClientAuthenticationPut(
 func validateClientSecret(secret string) error {
 	// Length policy: min 60, max 255
 	if len(secret) < 60 || len(secret) > 255 {
-		return fmt.Errorf("invalid length")
+		return errs.Errorf("invalid length")
 	}
 	// Allowed charset: 0-9 a-z A-Z - _ .
 	for i := 0; i < len(secret); i++ {
@@ -776,7 +777,7 @@ func validateClientSecret(secret string) error {
 		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-' || c == '_' || c == '.' {
 			continue
 		}
-		return fmt.Errorf("invalid character")
+		return errs.Errorf("invalid character")
 	}
 	return nil
 }

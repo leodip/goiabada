@@ -5,14 +5,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 func HandleUserInfoGetPost(
@@ -25,13 +24,13 @@ func HandleUserInfoGetPost(
 		// Authentication and authorization handled by middleware
 		jwtToken, ok := middleware.GetValidatedToken(r)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to get validated token from context")))
+			httpHelper.InternalServerError(w, r, errs.New("unable to get validated token from context"))
 			return
 		}
 
 		sub := jwtToken.GetStringClaim("sub")
 		if len(sub) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to get the sub claim from the access token")))
+			httpHelper.InternalServerError(w, r, errs.New("unable to get the sub claim from the access token"))
 			return
 		}
 

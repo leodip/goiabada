@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"html/template"
 	"io/fs"
 	"log/slog"
@@ -10,14 +10,13 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
@@ -40,7 +39,7 @@ func validateIdTokenHint(idTokenHint string, tokenParser TokenParser, settings *
 
 	// Defensive check: tokenParser should never be nil in production wiring, but guard against future refactors
 	if tokenParser == nil {
-		return "", errors.WithStack(errors.New("tokenParser is nil"))
+		return "", errs.New("tokenParser is nil")
 	}
 
 	// Parse JWT: verify signature, skip expiration (spec: SHOULD accept expired)
@@ -226,7 +225,7 @@ func HandleAuthorizeGet(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
+			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
 			return
 		}
 
@@ -1173,7 +1172,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database dat
 
 		t, err := template.ParseFS(templateFS, "form_post.html")
 		if err != nil {
-			return errors.Wrap(err, "unable to parse template")
+			return errs.Wrap(err, "unable to parse template")
 		}
 
 		// Render into a buffer, not straight to w. Execute writes as it walks the template, so a
@@ -1187,7 +1186,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database dat
 		var rendered bytes.Buffer
 		err = t.Execute(&rendered, m)
 		if err != nil {
-			return errors.Wrap(err, "unable to execute template")
+			return errs.Wrap(err, "unable to execute template")
 		}
 		// OAuth 2.0 Form Post Response Mode section 2: "Because the Authorization Response is
 		// intended to be used only once, the Authorization Server MUST instruct the User Agent (and
@@ -1207,7 +1206,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database dat
 		if err != nil {
 			// The connection itself failed. Nothing can be recovered from here, including the
 			// caller's 500, but the error is still worth reporting rather than swallowing.
-			return errors.Wrap(err, "unable to write the form_post response")
+			return errs.Wrap(err, "unable to write the form_post response")
 		}
 		return nil
 	}
@@ -1228,7 +1227,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database dat
 	// what makes that true (#146).
 	location, err := writeResponseParams(input.redirectURI, params, authorizationResponseParamNames)
 	if err != nil {
-		return errors.Wrap(err, "unable to build the error redirect")
+		return errs.Wrap(err, "unable to build the error redirect")
 	}
 
 	http.Redirect(w, r, location, http.StatusFound)

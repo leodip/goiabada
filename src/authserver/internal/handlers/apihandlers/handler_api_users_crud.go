@@ -3,6 +3,7 @@ package apihandlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,7 +23,6 @@ import (
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
-	"github.com/pkg/errors"
 )
 
 // HandleAPIUserGet - GET /api/v1/admin/users/{id}

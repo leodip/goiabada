@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/errs"
 	// Aliased because this file's own package is named middleware.
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
@@ -117,7 +118,7 @@ func redact(v any, depth int) (any, error) {
 	switch value := v.(type) {
 	case map[string]any:
 		if depth > maxLoggedDepth {
-			return nil, fmt.Errorf("nested deeper than %d levels", maxLoggedDepth)
+			return nil, errs.Errorf("nested deeper than %d levels", maxLoggedDepth)
 		}
 		for key, element := range value {
 			if isSensitiveKey(key) {
@@ -133,7 +134,7 @@ func redact(v any, depth int) (any, error) {
 		return value, nil
 	case []any:
 		if depth > maxLoggedDepth {
-			return nil, fmt.Errorf("nested deeper than %d levels", maxLoggedDepth)
+			return nil, errs.Errorf("nested deeper than %d levels", maxLoggedDepth)
 		}
 		for i, element := range value {
 			redacted, err := redact(element, depth+1)

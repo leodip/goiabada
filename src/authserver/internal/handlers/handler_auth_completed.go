@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -12,11 +13,11 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/leodip/goiabada/core/user"
-	"github.com/pkg/errors"
 )
 
 func HandleAuthCompletedGet(
@@ -44,7 +45,7 @@ func HandleAuthCompletedGet(
 
 		requiredState := oauth.AuthStateAuthenticationCompleted
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
 			return
 		}
 
@@ -71,7 +72,7 @@ func HandleAuthCompletedGet(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
+			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
 			return
 		}
 
@@ -327,7 +328,7 @@ func HandleAuthCompletedGet(
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 

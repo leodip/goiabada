@@ -1,11 +1,10 @@
 package handlers
 
 import (
+	"github.com/leodip/goiabada/core/errs"
 	"net/url"
 	"slices"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // responseParam is one parameter this server writes into a client's redirect URI: an
@@ -125,7 +124,7 @@ func encodeResponseParams(params []responseParam) string {
 func writeResponseParams(redirectURI string, params []responseParam, reservedNames []string) (string, error) {
 	redirUrl, err := url.Parse(redirectURI)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to parse redirect URI")
+		return "", errs.Wrap(err, "unable to parse redirect URI")
 	}
 
 	fields := make([]string, 0, 4+len(params))

@@ -22,7 +22,7 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database data.
 
 			sess, err := sessionStore.Get(r, constants.AuthServerSessionName)
 			if err != nil {
-				slog.Error(fmt.Sprintf("unable to get the session store: %+v", err), "request-id", requestId)
+				slog.Error("unable to get the session store", "error", err, "request_id", requestId)
 				http.Error(w, errorMsg, http.StatusInternalServerError)
 				return
 			}
@@ -32,7 +32,7 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database data.
 
 				userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 				if err != nil {
-					slog.Error(fmt.Sprintf("unable to get the user session: %+v", err), "request-id", requestId)
+					slog.Error("unable to get the user session", "error", err, "request_id", requestId)
 					http.Error(w, errorMsg, http.StatusInternalServerError)
 					return
 				}
@@ -43,7 +43,7 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database data.
 					delete(sess.Values, constants.SessionKeySessionIdentifier)
 					err = sessionStore.Save(r, w, sess)
 					if err != nil {
-						slog.Error(fmt.Sprintf("unable to save the session: %+v", err), "request-id", requestId)
+						slog.Error("unable to save the session", "error", err, "request_id", requestId)
 						http.Error(w, errorMsg, http.StatusInternalServerError)
 						return
 					}
