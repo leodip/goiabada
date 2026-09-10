@@ -1,11 +1,10 @@
 package apihandlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
-	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -19,13 +18,22 @@ import (
 // text (when relevant) or a stable English message for non-localized
 // codes. writeValidationError is the localizing wrapper.
 func writeJSONError(w http.ResponseWriter, message, code string, statusCode int) {
-	resp := api.ErrorResponse{
-		ErrorCode:        code,
-		ErrorDescription: message,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(resp)
+	apiresponse.WriteError(w, message, code, statusCode)
+}
+
+// writeJSON is the one JSON writer on this surface: it buffers the encode before the header, so a
+// failure answers a real 500 instead of a superfluous WriteHeader on a body already half on the
+// wire (#279 decision 8).
+func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
+	apiresponse.WriteJSON(w, r, status, v)
+}
+
+// writeInternalServerError is the one 500 on this surface: one structured log record with the
+// stack, the request id and the caller's own attributes, and one envelope naming
+// INTERNAL_SERVER_ERROR and that request id. It replaced seven per-site codes, of which 194 sites
+// logged nothing at all (#279 decision 7).
+func writeInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
+	apiresponse.WriteInternalServerError(w, r, err, attrs...)
 }
 
 // writeValidationError emits a 400 Bad Request envelope from a validation

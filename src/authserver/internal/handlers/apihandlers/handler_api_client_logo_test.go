@@ -436,7 +436,7 @@ func TestHandleAPIClientLogoDelete_DatabaseError(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "DELETE_ERROR", response["error_code"])
+	assert.Equal(t, "INTERNAL_SERVER_ERROR", response["error_code"])
 
 	database.AssertExpectations(t)
 }

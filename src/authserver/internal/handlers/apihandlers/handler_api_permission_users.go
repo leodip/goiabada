@@ -1,8 +1,6 @@
 package apihandlers
 
 import (
-	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -10,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // HandleAPIPermissionUsersGet
@@ -33,8 +32,7 @@ func HandleAPIPermissionUsersGet(
 		// Validate permission exists and enforce special rules
 		perm, err := database.GetPermissionById(nil, permissionId)
 		if err != nil {
-			slog.Error("AuthServer API: error getting permission by ID for users listing", "error", err, "permissionId", permissionId)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: error getting permission by ID for users listing"), "permissionId", permissionId)
 			return
 		}
 		if perm == nil {
@@ -45,8 +43,7 @@ func HandleAPIPermissionUsersGet(
 		// Load its resource to check for authserver:userinfo special case
 		resource, err := database.GetResourceById(nil, perm.ResourceId)
 		if err != nil {
-			slog.Error("AuthServer API: error getting resource for permission users listing", "error", err, "permissionId", permissionId)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: error getting resource for permission users listing"), "permissionId", permissionId)
 			return
 		}
 		if resource != nil && resource.ResourceIdentifier == constants.AuthServerResourceIdentifier && perm.PermissionIdentifier == constants.UserinfoPermissionIdentifier {
@@ -70,8 +67,7 @@ func HandleAPIPermissionUsersGet(
 
 		users, total, err := database.GetUsersByPermissionIdPaginated(nil, permissionId, page, size)
 		if err != nil {
-			slog.Error("AuthServer API: error getting users by permission paginated", "error", err, "permissionId", permissionId, "page", page, "size", size)
-			writeJSONError(w, "Failed to list users", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: error getting users by permission paginated"), "permissionId", permissionId, "page", page, "size", size)
 			return
 		}
 
@@ -81,8 +77,6 @@ func HandleAPIPermissionUsersGet(
 			Page:  page,
 			Size:  size,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

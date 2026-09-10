@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -26,7 +25,7 @@ func HandleAPIUserSessionGet(
 		// Get user session from database
 		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -41,10 +40,6 @@ func HandleAPIUserSessionGet(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

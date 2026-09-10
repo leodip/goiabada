@@ -2,15 +2,18 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -1709,4 +1712,50 @@ func TestGetValidatedToken(t *testing.T) {
 		assert.False(t, ok)
 		assert.Nil(t, result)
 	})
+}
+
+// The bearer middleware's three 500s answered INTERNAL_ERROR with no request id on the wire and
+// logged without one, so an operator holding a caller's report had nothing to join it to. They now
+// go through the same primitive every handler 500 goes through (#279 decision 7, plan finding 9).
+func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testing.T) {
+	const requestId = "req-bearer-1"
+
+	mockDB := mocks_data.NewDatabase(t)
+	mockDB.On("GetUserBySubject", (*sql.Tx)(nil), "user-1").
+		Return(&models.User{Id: 1, Subject: "user-1", Enabled: true}, nil)
+	mockDB.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), "sid-boom").
+		Return(nil, errors.New("the database is down"))
+
+	token := oauth.JwtToken{Claims: map[string]interface{}{
+		"sid": "sid-boom", "auth_time": float64(1), "sub": "user-1",
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
+	ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
+	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, requestId)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { nextCalled = true })
+
+	var buf strings.Builder
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+	slog.SetDefault(previous)
+
+	assert.False(t, nextCalled)
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+
+	var body api.ErrorResponse
+	assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	assert.Equal(t, "INTERNAL_SERVER_ERROR", body.ErrorCode)
+	assert.Contains(t, body.ErrorDescription, requestId)
+
+	logged := buf.String()
+	assert.Equal(t, 1, strings.Count(logged, "internal server error"))
+	assert.Contains(t, logged, "the database is down")
+	assert.Contains(t, logged, "request_id="+requestId)
+	assert.Contains(t, logged, "sid=sid-boom", "the site's own attribute survives the move")
 }

@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -37,7 +36,7 @@ func HandleAPIAccountSessionsGet(
 		// Resolve user by subject
 		user, err := database.GetUserBySubject(nil, subject)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -48,13 +47,13 @@ func HandleAPIAccountSessionsGet(
 		// Load sessions
 		userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		// Load nested client info (to collect client identifiers)
 		if err := database.UserSessionsLoadClients(nil, userSessions); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -71,7 +70,7 @@ func HandleAPIAccountSessionsGet(
 
 			// Ensure clients on session are also loaded
 			if err := database.UserSessionClientsLoadClients(nil, us.Clients); err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -120,12 +119,7 @@ func HandleAPIAccountSessionsGet(
 		}
 
 		resp := api.GetUserSessionsResponse{Sessions: enhanced}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -161,7 +155,7 @@ func HandleAPIAccountSessionDelete(
 		// Check that the session exists and belongs to the user
 		us, err := database.GetUserSessionById(nil, sessionId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if us == nil {
@@ -172,7 +166,7 @@ func HandleAPIAccountSessionDelete(
 		// Resolve user and verify ownership
 		user, err := database.GetUserBySubject(nil, subject)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil || us.UserId != user.Id {
@@ -187,7 +181,7 @@ func HandleAPIAccountSessionDelete(
 		// never reached for somebody else's session.
 		result, err := handlers.TerminateUserSessionTx(database, us)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -203,11 +197,6 @@ func HandleAPIAccountSessionDelete(
 
 		// Success response
 		resp := api.SuccessResponse{Success: true}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

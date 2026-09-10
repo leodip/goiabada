@@ -33,7 +33,7 @@ func HandleAPIAccountConsentsGet(
 
 		user, err := database.GetUserBySubject(nil, subject)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -43,18 +43,17 @@ func HandleAPIAccountConsentsGet(
 
 		consents, err := database.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		if err := database.UserConsentsLoadClients(nil, consents); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		resp := api.GetUserConsentsResponse{Consents: api.ToUserConsentResponses(consents)}
-		w.Header().Set("Content-Type", "application/json")
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -78,7 +77,7 @@ func HandleAPIAccountConsentDelete(
 
 		user, err := database.GetUserBySubject(nil, subject)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -99,7 +98,7 @@ func HandleAPIAccountConsentDelete(
 
 		consent, err := database.GetUserConsentById(nil, consentId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if consent == nil {
@@ -114,7 +113,7 @@ func HandleAPIAccountConsentDelete(
 		}
 
 		if err := database.DeleteUserConsent(nil, consentId); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -125,7 +124,6 @@ func HandleAPIAccountConsentDelete(
 		})
 
 		resp := api.SuccessResponse{Success: true}
-		w.Header().Set("Content-Type", "application/json")
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

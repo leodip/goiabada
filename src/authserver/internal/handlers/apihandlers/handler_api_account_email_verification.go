@@ -4,7 +4,6 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -50,8 +50,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 
 		user, err := database.GetUserBySubject(nil, subject)
 		if err != nil {
-			slog.Error("Failed to get user by subject in email verification send (first call)", "error", err, "subject", subject)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to get user by subject in email verification send (first call)"), "subject", subject)
 			return
 		}
 		if user == nil {
@@ -62,8 +61,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 		// If already verified, inform client
 		if user.EmailVerified {
 			resp := api.AccountEmailVerificationSendResponse{EmailVerified: true}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
+			writeJSON(w, r, http.StatusOK, resp)
 			return
 		}
 
@@ -73,8 +71,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 			remaining := int(user.EmailVerificationCodeIssuedAt.Time.Add(waitTime).Sub(time.Now().UTC()).Seconds())
 			if remaining > 0 {
 				resp := api.AccountEmailVerificationSendResponse{TooManyRequests: true, WaitInSeconds: remaining}
-				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(resp)
+				writeJSON(w, r, http.StatusOK, resp)
 				return
 			}
 		}
@@ -83,15 +80,13 @@ func HandleAPIAccountEmailVerificationSendPost(
 		verificationCode := generateEmailVerificationCode()
 		encrypted, err := encryption.EncryptData(verificationCode)
 		if err != nil {
-			slog.Error("Failed to encrypt verification code", "error", err)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to encrypt verification code"))
 			return
 		}
 		user.EmailVerificationCodeEncrypted = encrypted
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 		if err := database.UpdateUser(nil, user); err != nil {
-			slog.Error("Failed to update user with verification code", "error", err, "userId", user.Id)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to update user with verification code"), "userId", user.Id)
 			return
 		}
 
@@ -104,8 +99,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 		emailReq := r.WithContext(i18n.EmailContext(r.Context(), user.Locale))
 		buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
 		if err != nil {
-			slog.Error("Failed to render email template", "error", err, "userId", user.Id)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to render email template"), "userId", user.Id)
 			return
 		}
 
@@ -115,8 +109,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 			HtmlBody: buf.String(),
 		}
 		if err := emailSender.SendEmail(r.Context(), input); err != nil {
-			slog.Error("Failed to send verification email", "error", err, "userId", user.Id, "email", user.Email)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to send verification email"), "userId", user.Id, "email", user.Email)
 			return
 		}
 
@@ -132,8 +125,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 			EmailVerificationSent: true,
 			EmailDestination:      user.Email,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -172,7 +164,7 @@ func HandleAPIAccountEmailVerificationPost(
 
 		user, err := database.GetUserBySubject(nil, subject)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -183,8 +175,7 @@ func HandleAPIAccountEmailVerificationPost(
 		if user.EmailVerified {
 			// Already verified; return current state
 			resp := api.UpdateUserResponse{User: *api.ToUserResponse(user)}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
+			writeJSON(w, r, http.StatusOK, resp)
 			return
 		}
 
@@ -229,7 +220,7 @@ func HandleAPIAccountEmailVerificationPost(
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 		if err := database.UpdateUser(nil, user); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -239,7 +230,6 @@ func HandleAPIAccountEmailVerificationPost(
 		})
 
 		resp := api.UpdateUserResponse{User: *api.ToUserResponse(user)}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

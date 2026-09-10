@@ -60,14 +60,14 @@ func HandleAPIAccountLogoutRequestPost(
 			// Automatic resolution by post_logout_redirect_uri
 			clients, err := database.GetAllClients(nil)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 			var matches []*models.Client
 			for i := range clients {
 				c := &clients[i]
 				if derr := database.ClientLoadRedirectURIs(nil, c); derr != nil {
-					writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, err)
 					return
 				}
 				for _, uri := range c.RedirectURIs {
@@ -86,7 +86,7 @@ func HandleAPIAccountLogoutRequestPost(
 
 		// Validate redirect URI belongs to client
 		if err = database.ClientLoadRedirectURIs(nil, client); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		found := false
@@ -113,11 +113,11 @@ func HandleAPIAccountLogoutRequestPost(
 			return
 		}
 		if err = database.UserSessionLoadClients(nil, userSession); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if err = database.UserSessionClientsLoadClients(nil, userSession.Clients); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		hasClient := false
@@ -135,12 +135,12 @@ func HandleAPIAccountLogoutRequestPost(
 		// Build a short-lived ID Token (id_token_hint)
 		privKeyPair, err := database.GetCurrentSigningKey(nil)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		privKey, err := privKeyPair.ParsePrivateKey()
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -158,7 +158,7 @@ func HandleAPIAccountLogoutRequestPost(
 		token.Header["kid"] = privKeyPair.KeyIdentifier
 		idToken, err := token.SignedString(privKey)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -168,7 +168,6 @@ func HandleAPIAccountLogoutRequestPost(
 			logoutUrl += "&state=" + url.QueryEscape(req.State)
 		}
 		resp := api.AccountLogoutRedirectResponse{LogoutUrl: logoutUrl}
-		w.Header().Set("Content-Type", "application/json")
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

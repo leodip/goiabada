@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
@@ -25,7 +26,7 @@ func HandleAPISettingsGeneralGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if settings == nil {
-			writeJSONError(w, "Failed to load settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.New("settings are missing from the request context"))
 			return
 		}
 
@@ -41,9 +42,7 @@ func HandleAPISettingsGeneralGet(
 			ResourceOwnerPasswordCredentialsEnabled:   settings.ResourceOwnerPasswordCredentialsEnabled,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -57,7 +56,7 @@ func HandleAPISettingsGeneralPut(
 	return func(w http.ResponseWriter, r *http.Request) {
 		currentSettings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if currentSettings == nil {
-			writeJSONError(w, "Failed to load settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.New("settings are missing from the request context"))
 			return
 		}
 
@@ -142,7 +141,7 @@ func HandleAPISettingsGeneralPut(
 		currentSettings.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled
 
 		if err := database.UpdateSettings(nil, currentSettings); err != nil {
-			writeJSONError(w, "Failed to update settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -163,8 +162,6 @@ func HandleAPISettingsGeneralPut(
 			ResourceOwnerPasswordCredentialsEnabled:   currentSettings.ResourceOwnerPasswordCredentialsEnabled,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

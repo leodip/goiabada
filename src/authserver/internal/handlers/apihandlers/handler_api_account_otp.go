@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/otp"
@@ -84,7 +85,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 		// Load user
 		user, err := database.GetUserBySubject(nil, subject)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -115,7 +116,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 
 		keyURL, err := livePendingEnrollmentKeyURL(user, staleBefore)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -126,19 +127,19 @@ func HandleAPIAccountOTPEnrollmentGet(
 			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 			keyURL, err = otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
 			secretEncrypted, err := encryption.EncryptData(keyURL)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
 			installed, err := database.TryInstallPendingOTPEnrollment(nil, user.Id, secretEncrypted, now, staleBefore)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 			if !installed {
@@ -151,7 +152,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 				// install is conditional at all.
 				user, err = database.GetUserById(nil, user.Id)
 				if err != nil {
-					writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, err)
 					return
 				}
 				if user == nil {
@@ -165,7 +166,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 
 				keyURL, err = livePendingEnrollmentKeyURL(user, staleBefore)
 				if err != nil {
-					writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, err)
 					return
 				}
 				if keyURL == "" {
@@ -174,7 +175,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 					// draw the expiry line at the same instant, so it means the row moved in
 					// a way this handler cannot account for. Answering 200 with an
 					// unstored seed is the one thing that must not happen here.
-					writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.New("no live pending OTP enrollment after the upsert, with OTP still disabled"))
 					return
 				}
 			}
@@ -182,22 +183,18 @@ func HandleAPIAccountOTPEnrollmentGet(
 
 		base64Image, err := otp.RenderQRCodeImage(keyURL)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		secretKey, err := otp.SecretFromKeyURL(keyURL)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		resp := api.AccountOTPEnrollmentResponse{Base64Image: base64Image, SecretKey: secretKey}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -267,7 +264,7 @@ func HandleAPIAccountOTPPut(
 		// Load user
 		user, err := database.GetUserBySubject(nil, subject)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -336,7 +333,7 @@ func HandleAPIAccountOTPPut(
 			now := time.Now().UTC()
 			keyURL, err := livePendingEnrollmentKeyURL(user, now.Add(-otpEnrollmentLifetime))
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 			if keyURL == "" {
@@ -348,7 +345,7 @@ func HandleAPIAccountOTPPut(
 
 			pendingSecret, err := otp.SecretFromKeyURL(keyURL)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -371,7 +368,7 @@ func HandleAPIAccountOTPPut(
 			// the reverse order would leave OTP enabled on a request that was refused.
 			consumed, err := database.TryConsumeUserOTPStep(nil, user.Id, step, false)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 			if !consumed {
@@ -388,7 +385,7 @@ func HandleAPIAccountOTPPut(
 			}
 
 			if err := user.SetOTPSecret(pendingSecret); err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 			user.OTPEnabled = true
@@ -399,7 +396,7 @@ func HandleAPIAccountOTPPut(
 			// ceremony, which captured the pre-enrollment value earlier in the same ceremony,
 			// has a use for it.
 			if _, err := handlers.EnableUserOTPTx(database, user); err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -414,7 +411,7 @@ func HandleAPIAccountOTPPut(
 			}
 
 			if err := disableUserOTP(database, user); err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -437,16 +434,12 @@ func HandleAPIAccountOTPPut(
 		// Get updated user and respond
 		updated, err := database.GetUserById(nil, user.Id)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		resp := api.UpdateUserResponse{User: *api.ToUserResponse(updated)}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 

@@ -67,6 +67,10 @@ func TestPublicSettings_OnlyGetIsAllowed(t *testing.T) {
 			handler.ServeHTTP(recorder, httptest.NewRequest(method, "/api/public/settings", nil))
 
 			assert.Equal(t, http.StatusMethodNotAllowed, recorder.Code)
+			// The refusal is JSON too. It answered text/plain until #279 decision 17,
+			// on a route whose whole purpose is to be parsed.
+			assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+			assert.Contains(t, recorder.Body.String(), "METHOD_NOT_ALLOWED")
 		})
 	}
 }
@@ -81,8 +85,11 @@ func TestPublicSettings_DatabaseError(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
 
+	// JSON, not text/plain: this endpoint answers JSON, so its refusals do too, and the body is
+	// the API envelope every other 500 answers with (#279 decision 17).
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-	assert.Contains(t, recorder.Body.String(), "Unable to retrieve settings")
+	assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+	assert.Contains(t, recorder.Body.String(), "INTERNAL_SERVER_ERROR")
 }
 
 // GetSettingsById returns (nil, nil) when the row is absent. Without a nil guard
@@ -100,7 +107,8 @@ func TestPublicSettings_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	})
 
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-	assert.Contains(t, recorder.Body.String(), "Unable to retrieve settings")
+	assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+	assert.Contains(t, recorder.Body.String(), "INTERNAL_SERVER_ERROR")
 }
 
 // failingResponseWriter fails every write, so the encode error path is reachable.

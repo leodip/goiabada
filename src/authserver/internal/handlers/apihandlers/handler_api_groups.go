@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
@@ -26,8 +26,7 @@ func HandleAPIGroupsGet(
 
 		groups, err := database.GetAllGroups(nil)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting all groups", "error", err)
-			writeJSONError(w, "Failed to get groups", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting all groups"))
 			return
 		}
 
@@ -53,9 +52,7 @@ func HandleAPIGroupsGet(
 			Groups: groupResponses,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -104,8 +101,7 @@ func HandleAPIGroupCreatePost(
 		// Check if group identifier already exists
 		existingGroup, err := database.GetGroupByGroupIdentifier(nil, createReq.GroupIdentifier)
 		if err != nil {
-			slog.Error("AuthServer API: Database error checking group existence by identifier", "error", err, "groupIdentifier", createReq.GroupIdentifier)
-			writeJSONError(w, "Failed to check group existence", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking group existence by identifier"), "groupIdentifier", createReq.GroupIdentifier)
 			return
 		}
 		if existingGroup != nil {
@@ -123,8 +119,7 @@ func HandleAPIGroupCreatePost(
 
 		err = database.CreateGroup(nil, group)
 		if err != nil {
-			slog.Error("AuthServer API: Database error creating group", "error", err, "groupIdentifier", group.GroupIdentifier)
-			writeJSONError(w, "Failed to create group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating group"), "groupIdentifier", group.GroupIdentifier)
 			return
 		}
 
@@ -140,9 +135,7 @@ func HandleAPIGroupCreatePost(
 			Group: *api.ToGroupResponse(group, 0), // New group has 0 members
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusCreated, response)
 	}
 }
 
@@ -167,8 +160,7 @@ func HandleAPIGroupGet(
 
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group by ID", "error", err, "groupId", id)
-			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID"), "groupId", id)
 			return
 		}
 		if group == nil {
@@ -179,8 +171,7 @@ func HandleAPIGroupGet(
 		// Get member count
 		memberCount, err := database.CountGroupMembers(nil, group.Id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error counting group members", "error", err, "groupId", group.Id)
-			writeJSONError(w, "Failed to get group member count", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error counting group members"), "groupId", group.Id)
 			return
 		}
 
@@ -188,9 +179,7 @@ func HandleAPIGroupGet(
 			Group: *api.ToGroupResponse(group, memberCount),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -218,8 +207,7 @@ func HandleAPIGroupUpdatePut(
 
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group by ID for update", "error", err, "groupId", id)
-			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for update"), "groupId", id)
 			return
 		}
 		if group == nil {
@@ -262,8 +250,7 @@ func HandleAPIGroupUpdatePut(
 		// Check if group identifier already exists (but not for this group)
 		existingGroup, err := database.GetGroupByGroupIdentifier(nil, updateReq.GroupIdentifier)
 		if err != nil {
-			slog.Error("AuthServer API: Database error checking group existence by identifier for update", "error", err, "groupIdentifier", updateReq.GroupIdentifier, "groupId", group.Id)
-			writeJSONError(w, "Failed to check group existence", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking group existence by identifier for update"), "groupIdentifier", updateReq.GroupIdentifier, "groupId", group.Id)
 			return
 		}
 		if existingGroup != nil && existingGroup.Id != group.Id {
@@ -279,8 +266,7 @@ func HandleAPIGroupUpdatePut(
 
 		err = database.UpdateGroup(nil, group)
 		if err != nil {
-			slog.Error("AuthServer API: Database error updating group", "error", err, "groupId", group.Id, "groupIdentifier", group.GroupIdentifier)
-			writeJSONError(w, "Failed to update group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating group"), "groupId", group.Id, "groupIdentifier", group.GroupIdentifier)
 			return
 		}
 
@@ -294,8 +280,7 @@ func HandleAPIGroupUpdatePut(
 		// Get member count for response
 		memberCount, err := database.CountGroupMembers(nil, group.Id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error counting group members for update response", "error", err, "groupId", group.Id)
-			writeJSONError(w, "Failed to get group member count", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error counting group members for update response"), "groupId", group.Id)
 			return
 		}
 
@@ -304,9 +289,7 @@ func HandleAPIGroupUpdatePut(
 			Group: *api.ToGroupResponse(group, memberCount),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -334,8 +317,7 @@ func HandleAPIGroupDelete(
 		// Check if group exists
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group by ID for deletion", "error", err, "groupId", id)
-			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for deletion"), "groupId", id)
 			return
 		}
 		if group == nil {
@@ -346,8 +328,7 @@ func HandleAPIGroupDelete(
 		// Delete the group
 		err = database.DeleteGroup(nil, group.Id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error deleting group", "error", err, "groupId", group.Id, "groupIdentifier", group.GroupIdentifier)
-			writeJSONError(w, "Failed to delete group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting group"), "groupId", group.Id, "groupIdentifier", group.GroupIdentifier)
 			return
 		}
 
@@ -363,8 +344,6 @@ func HandleAPIGroupDelete(
 			Success: true,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

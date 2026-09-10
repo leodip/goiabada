@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -38,7 +37,7 @@ func HandleAPIUserEmailVerificationCodePost(
 
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -49,7 +48,7 @@ func HandleAPIUserEmailVerificationCodePost(
 		verificationCode := generateEmailVerificationCode()
 		encrypted, err := encryption.EncryptData(verificationCode)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -58,7 +57,7 @@ func HandleAPIUserEmailVerificationCodePost(
 		user.EmailVerificationCodeEncrypted = encrypted
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: issuedAt, Valid: true}
 		if err := database.UpdateUser(nil, user); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -82,11 +81,6 @@ func HandleAPIUserEmailVerificationCodePost(
 			Email:                     user.Email,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

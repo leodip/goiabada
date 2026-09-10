@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/uithemes"
 )
@@ -20,7 +21,7 @@ func HandleAPISettingsUIThemeGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if settings == nil {
-			writeJSONError(w, "Failed to load settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.New("settings are missing from the request context"))
 			return
 		}
 
@@ -29,9 +30,7 @@ func HandleAPISettingsUIThemeGet(
 			AvailableThemes: uithemes.Get(),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -45,7 +44,7 @@ func HandleAPISettingsUIThemePut(
 	return func(w http.ResponseWriter, r *http.Request) {
 		currentSettings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if currentSettings == nil {
-			writeJSONError(w, "Failed to load settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.New("settings are missing from the request context"))
 			return
 		}
 
@@ -74,7 +73,7 @@ func HandleAPISettingsUIThemePut(
 		currentSettings.UITheme = desired
 
 		if err := database.UpdateSettings(nil, currentSettings); err != nil {
-			writeJSONError(w, "Failed to update settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -90,8 +89,6 @@ func HandleAPISettingsUIThemePut(
 			AvailableThemes: uithemes.Get(),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

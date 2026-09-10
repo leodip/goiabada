@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -87,7 +87,7 @@ func HandleDynamicClientRegistrationPost(
 			var err error
 			clientSecretEncrypted, err = encryption.EncryptData(clientSecret)
 			if err != nil {
-				slog.Error("DCR: Failed to encrypt client secret", "error", err)
+				apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: failed to encrypt client secret"))
 				writeDCRError(w, "server_error", "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -126,7 +126,7 @@ func HandleDynamicClientRegistrationPost(
 
 		// 10. Save client to database
 		if err := database.CreateClient(nil, client); err != nil {
-			slog.Error("DCR: Database error creating client", "error", err)
+			apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: database error creating client"))
 			writeDCRError(w, "server_error", "Failed to register client", http.StatusInternalServerError)
 			return
 		}
@@ -138,7 +138,7 @@ func HandleDynamicClientRegistrationPost(
 				URI:      uri,
 			}
 			if err := database.CreateRedirectURI(nil, redirectURI); err != nil {
-				slog.Error("DCR: Failed to create redirect URI", "error", err, "uri", uri)
+				apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: failed to create redirect URI"), "uri", uri)
 				// Rollback client creation
 				_ = database.DeleteClient(nil, client.Id)
 				writeDCRError(w, "server_error", "Failed to register redirect URIs", http.StatusInternalServerError)

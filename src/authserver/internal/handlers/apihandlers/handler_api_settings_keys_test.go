@@ -172,7 +172,7 @@ func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 	HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Equal(t, "INTERNAL_ERROR", decodeErrorBody(t, rr).ErrorCode)
+	assert.Equal(t, "INTERNAL_SERVER_ERROR", decodeErrorBody(t, rr).ErrorCode)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }

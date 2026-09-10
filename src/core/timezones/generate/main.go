@@ -321,7 +321,7 @@ func Get() []*Zone {
 			var err error
 			tz.Location, err = time.LoadLocation(tz.Zone)
 			if err != nil {
-				slog.Error(fmt.Sprintf("unable to load time zone location from the OS: %%+v", err))
+				slog.Error("unable to load time zone location from the OS", "error", err)
 				os.Exit(1)
 			}
 		}

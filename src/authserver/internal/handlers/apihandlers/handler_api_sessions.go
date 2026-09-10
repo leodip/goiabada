@@ -3,13 +3,13 @@ package apihandlers
 import (
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -83,9 +83,8 @@ func readSessionRequest(r *http.Request, w http.ResponseWriter, target interface
 	return "", "", true
 }
 
-func writeSessionJSON(w http.ResponseWriter, body interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(body)
+func writeSessionJSON(w http.ResponseWriter, r *http.Request, body interface{}) {
+	writeJSON(w, r, http.StatusOK, body)
 }
 
 // HandleAPISessionLoadPost - POST /api/v1/sessions/load
@@ -116,12 +115,11 @@ func HandleAPISessionLoadPost(database data.Database) http.HandlerFunc {
 				writeJSONError(w, "Session not found", "SESSION_NOT_FOUND", http.StatusNotFound)
 				return
 			}
-			slog.Error("failed to load a browser session", "error", err)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to load a browser session"))
 			return
 		}
 
-		writeSessionJSON(w, api.SessionLoadResponse{
+		writeSessionJSON(w, r, api.SessionLoadResponse{
 			Data:         string(record.Data),
 			LastAccessed: record.LastAccessed,
 			ExpiresAt:    record.ExpiresAt,
@@ -144,12 +142,11 @@ func HandleAPISessionCreatePost(database data.Database) http.HandlerFunc {
 
 		expiresAt, err := backend.Create(r.Context(), req.Id, []byte(req.Data), req.Authenticated)
 		if err != nil {
-			slog.Error("failed to create a browser session", "error", err)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to create a browser session"))
 			return
 		}
 
-		writeSessionJSON(w, api.SessionWriteResponse{ExpiresAt: expiresAt})
+		writeSessionJSON(w, r, api.SessionWriteResponse{ExpiresAt: expiresAt})
 	}
 }
 
@@ -174,12 +171,11 @@ func HandleAPISessionUpdatePost(database data.Database) http.HandlerFunc {
 				writeJSONError(w, "Session not found", "SESSION_NOT_FOUND", http.StatusNotFound)
 				return
 			}
-			slog.Error("failed to update a browser session", "error", err)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to update a browser session"))
 			return
 		}
 
-		writeSessionJSON(w, api.SessionWriteResponse{ExpiresAt: expiresAt})
+		writeSessionJSON(w, r, api.SessionWriteResponse{ExpiresAt: expiresAt})
 	}
 }
 
@@ -204,12 +200,11 @@ func HandleAPISessionTouchPost(database data.Database) http.HandlerFunc {
 				writeJSONError(w, "Session not found", "SESSION_NOT_FOUND", http.StatusNotFound)
 				return
 			}
-			slog.Error("failed to touch a browser session", "error", err)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to touch a browser session"))
 			return
 		}
 
-		writeSessionJSON(w, api.SessionWriteResponse{ExpiresAt: expiresAt})
+		writeSessionJSON(w, r, api.SessionWriteResponse{ExpiresAt: expiresAt})
 	}
 }
 
@@ -229,8 +224,7 @@ func HandleAPISessionDeletePost(database data.Database) http.HandlerFunc {
 		}
 
 		if err := backend.Delete(r.Context(), req.Id); err != nil {
-			slog.Error("failed to delete a browser session", "error", err)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to delete a browser session"))
 			return
 		}
 

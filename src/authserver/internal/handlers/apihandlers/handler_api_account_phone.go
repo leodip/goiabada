@@ -44,7 +44,7 @@ func HandleAPIAccountPhonePut(
 		// Load current user
 		user, err := database.GetUserBySubject(nil, subject)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -95,7 +95,7 @@ func HandleAPIAccountPhonePut(
 
 		// Persist
 		if err := database.UpdateUser(nil, user); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -107,10 +107,6 @@ func HandleAPIAccountPhonePut(
 
 		// Response
 		resp := api.UpdateUserResponse{User: *api.ToUserResponse(user)}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

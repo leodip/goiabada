@@ -2606,8 +2606,8 @@ paths:
           description: |
             error_code is KEY_SET_INCOMPLETE when the deployment has no current
             or no next key, which is an operator problem rather than a
-            transient one and a retry will not clear it, or INTERNAL_ERROR for
-            a storage or key generation failure. Nothing was rotated either
+            transient one and a retry will not clear it, or INTERNAL_SERVER_ERROR
+            for a storage or key generation failure. Nothing was rotated either
             way: the whole transition is one transaction.
           content:
             application/json:
@@ -3234,8 +3234,8 @@ paths:
           description: |
             The request failed inside the server. This operation is the one account endpoint
             with two 500 bodies: a failure deleting the picture is the JSON error envelope with
-            error_code DELETE_ERROR, and a failure loading the user beforehand is the server's
-            HTML error page, because that branch renders the shared error template.
+            error_code INTERNAL_SERVER_ERROR, and a failure loading the user beforehand is the
+            server's HTML error page, because that branch renders the shared error template.
           content:
             application/json:
               schema:
@@ -3552,9 +3552,10 @@ components:
     InternalServerError:
       description: |
         The request failed inside the server, most often a storage error.
-        error_code is INTERNAL_ERROR, INTERNAL_SERVER_ERROR or an operation
-        specific code; the description is safe to show and carries no detail
-        about the failure. Retrying is reasonable.
+        error_code is INTERNAL_SERVER_ERROR, except on key rotation, which also
+        answers KEY_SET_INCOMPLETE. The description carries no detail about the
+        failure, only the request id an operator can find the log line by.
+        Retrying is reasonable.
       content:
         application/json:
           schema:

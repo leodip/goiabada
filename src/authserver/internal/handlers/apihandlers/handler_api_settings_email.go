@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
@@ -28,7 +29,7 @@ func HandleAPISettingsEmailGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if settings == nil {
-			writeJSONError(w, "Failed to load settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.New("settings are missing from the request context"))
 			return
 		}
 
@@ -43,9 +44,7 @@ func HandleAPISettingsEmailGet(
 			HasSMTPPassword: len(settings.SMTPPasswordEncrypted) > 0,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -60,7 +59,7 @@ func HandleAPISettingsEmailPut(
 	return func(w http.ResponseWriter, r *http.Request) {
 		currentSettings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if currentSettings == nil {
-			writeJSONError(w, "Failed to load settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.New("settings are missing from the request context"))
 			return
 		}
 
@@ -82,7 +81,7 @@ func HandleAPISettingsEmailPut(
 			currentSettings.SMTPFromEmail = ""
 
 			if err := database.UpdateSettings(nil, currentSettings); err != nil {
-				writeJSONError(w, "Failed to update settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -100,9 +99,7 @@ func HandleAPISettingsEmailPut(
 				SMTPFromEmail:   currentSettings.SMTPFromEmail,
 				HasSMTPPassword: len(currentSettings.SMTPPasswordEncrypted) > 0,
 			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			httpHelper.EncodeJson(w, r, resp)
+			writeJSON(w, r, http.StatusOK, resp)
 			return
 		}
 
@@ -188,7 +185,7 @@ func HandleAPISettingsEmailPut(
 		if len(req.SMTPPassword) > 0 {
 			encrypted, err := encryption.EncryptData(req.SMTPPassword)
 			if err != nil {
-				writeJSONError(w, "Failed to encrypt password", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 			currentSettings.SMTPPasswordEncrypted = encrypted
@@ -200,7 +197,7 @@ func HandleAPISettingsEmailPut(
 		currentSettings.SMTPFromEmail = strings.ToLower(req.SMTPFromEmail)
 
 		if err := database.UpdateSettings(nil, currentSettings); err != nil {
-			writeJSONError(w, "Failed to update settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -218,9 +215,7 @@ func HandleAPISettingsEmailPut(
 			SMTPFromEmail:   currentSettings.SMTPFromEmail,
 			HasSMTPPassword: len(currentSettings.SMTPPasswordEncrypted) > 0,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -235,7 +230,7 @@ func HandleAPISettingsEmailSendTestPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if settings == nil {
-			writeJSONError(w, "Failed to load settings", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.New("settings are missing from the request context"))
 			return
 		}
 		if !settings.SMTPEnabled {
@@ -274,8 +269,6 @@ func HandleAPISettingsEmailSendTestPost(
 			"to":           req.To,
 		})
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, api.SuccessResponse{Success: true})
+		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
 	}
 }

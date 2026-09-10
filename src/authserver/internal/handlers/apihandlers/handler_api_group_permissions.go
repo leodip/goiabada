@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -32,8 +32,7 @@ func HandleAPIGroupPermissionsGet(
 
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group by ID for permissions", "error", err, "groupId", id)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for permissions"), "groupId", id)
 			return
 		}
 		if group == nil {
@@ -43,8 +42,7 @@ func HandleAPIGroupPermissionsGet(
 
 		err = database.GroupLoadPermissions(nil, group)
 		if err != nil {
-			slog.Error("AuthServer API: Database error loading group permissions", "error", err, "groupId", group.Id)
-			writeJSONError(w, "Failed to load group permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading group permissions"), "groupId", group.Id)
 			return
 		}
 
@@ -52,8 +50,7 @@ func HandleAPIGroupPermissionsGet(
 		for i := range group.Permissions {
 			resource, err := database.GetResourceById(nil, group.Permissions[i].ResourceId)
 			if err != nil {
-				slog.Error("AuthServer API: Database error getting resource by ID for permission", "error", err, "resourceId", group.Permissions[i].ResourceId, "groupId", group.Id)
-				writeJSONError(w, "Failed to load resource information", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for permission"), "resourceId", group.Permissions[i].ResourceId, "groupId", group.Id)
 				return
 			}
 			if resource != nil {
@@ -72,9 +69,7 @@ func HandleAPIGroupPermissionsGet(
 			Permissions: api.ToPermissionResponses(group.Permissions),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -98,8 +93,7 @@ func HandleAPIGroupPermissionsPut(
 
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group by ID for permissions update", "error", err, "groupId", id)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for permissions update"), "groupId", id)
 			return
 		}
 		if group == nil {
@@ -127,8 +121,7 @@ func HandleAPIGroupPermissionsPut(
 		// Load current group permissions
 		err = database.GroupLoadPermissions(nil, group)
 		if err != nil {
-			slog.Error("AuthServer API: Database error loading current group permissions for update", "error", err, "groupId", group.Id)
-			writeJSONError(w, "Failed to load current permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading current group permissions for update"), "groupId", group.Id)
 			return
 		}
 
@@ -136,8 +129,7 @@ func HandleAPIGroupPermissionsPut(
 		for _, permissionId := range request.PermissionIds {
 			permission, err := database.GetPermissionById(nil, permissionId)
 			if err != nil {
-				slog.Error("AuthServer API: Database error getting permission by ID for validation", "error", err, "permissionId", permissionId, "groupId", group.Id)
-				writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permission by ID for validation"), "permissionId", permissionId, "groupId", group.Id)
 				return
 			}
 			if permission == nil {
@@ -159,8 +151,7 @@ func HandleAPIGroupPermissionsPut(
 			if !found {
 				permission, err := database.GetPermissionById(nil, permissionId)
 				if err != nil {
-					slog.Error("AuthServer API: Database error retrieving permission for group assignment", "error", err, "permissionId", permissionId, "groupId", group.Id)
-					writeJSONError(w, "Failed to retrieve permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error retrieving permission for group assignment"), "permissionId", permissionId, "groupId", group.Id)
 					return
 				}
 
@@ -169,8 +160,7 @@ func HandleAPIGroupPermissionsPut(
 					PermissionId: permission.Id,
 				})
 				if err != nil {
-					slog.Error("AuthServer API: Database error creating group permission", "error", err, "groupId", group.Id, "permissionId", permission.Id)
-					writeJSONError(w, "Failed to create group permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating group permission"), "groupId", group.Id, "permissionId", permission.Id)
 					return
 				}
 
@@ -201,15 +191,13 @@ func HandleAPIGroupPermissionsPut(
 		for _, permissionId := range toDelete {
 			groupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permissionId)
 			if err != nil {
-				slog.Error("AuthServer API: Database error getting group permission for deletion", "error", err, "groupId", group.Id, "permissionId", permissionId)
-				writeJSONError(w, "Failed to find group permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group permission for deletion"), "groupId", group.Id, "permissionId", permissionId)
 				return
 			}
 
 			err = database.DeleteGroupPermission(nil, groupPermission.Id)
 			if err != nil {
-				slog.Error("AuthServer API: Database error deleting group permission", "error", err, "groupPermissionId", groupPermission.Id, "groupId", group.Id, "permissionId", permissionId)
-				writeJSONError(w, "Failed to delete group permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting group permission"), "groupPermissionId", groupPermission.Id, "groupId", group.Id, "permissionId", permissionId)
 				return
 			}
 
@@ -222,8 +210,6 @@ func HandleAPIGroupPermissionsPut(
 
 		// Return success response
 		response := api.SuccessResponse{Success: true}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

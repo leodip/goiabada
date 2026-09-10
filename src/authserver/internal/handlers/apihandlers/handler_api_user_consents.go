@@ -57,9 +57,7 @@ func HandleAPIUserConsentsGet(
 			Consents: api.ToUserConsentResponses(userConsents),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -106,8 +104,6 @@ func HandleAPIUserConsentDelete(
 		})
 
 		response := api.SuccessResponse{Success: true}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

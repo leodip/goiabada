@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -245,8 +247,8 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 
 			user, err := database.GetUserBySubject(nil, sub)
 			if err != nil {
-				slog.Error("failed to look up user for bearer token validation", "err", err)
-				emitAuthError(w, "INTERNAL_ERROR", "Internal server error.", http.StatusInternalServerError, false)
+				apiresponse.WriteInternalServerError(w, r,
+					errs.Wrap(err, "failed to look up user for bearer token validation"))
 				return
 			}
 			if user == nil {
@@ -278,9 +280,8 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 
 			session, err := database.GetUserSessionBySessionIdentifier(nil, sid)
 			if err != nil {
-				slog.Error("failed to look up user session for bearer token validation",
-					"sid", sid, "err", err)
-				emitAuthError(w, "INTERNAL_ERROR", "Internal server error.", http.StatusInternalServerError, false)
+				apiresponse.WriteInternalServerError(w, r,
+					errs.Wrap(err, "failed to look up user session for bearer token validation"), "sid", sid)
 				return
 			}
 
@@ -318,9 +319,9 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 				// Fail closed: without settings we cannot enforce idle/max-lifetime
 				// limits, and silently skipping the check would let an expired
 				// session ride a still-valid JWT past us.
-				slog.Error("missing or malformed settings in context; cannot validate session lifetime",
+				apiresponse.WriteInternalServerError(w, r,
+					errs.New("missing or malformed settings in context; cannot validate session lifetime"),
 					"sid", sid)
-				emitAuthError(w, "INTERNAL_ERROR", "Internal server error.", http.StatusInternalServerError, false)
 				return
 			}
 			if !session.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
