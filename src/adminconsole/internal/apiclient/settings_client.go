@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/adminconsole/internal/dtos"
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // SettingsClient fetches PUBLIC settings from the authserver's unauthenticated API.
@@ -45,18 +45,18 @@ func (c *SettingsClient) GetPublicSettings() (*dtos.PublicSettingsResponse, erro
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch public settings from authserver")
+		return nil, errs.Wrap(err, "failed to fetch public settings from authserver")
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.Errorf("authserver returned status %d: %s", resp.StatusCode, string(body))
+		return nil, errs.Errorf("authserver returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var settings dtos.PublicSettingsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
-		return nil, errors.Wrap(err, "failed to decode public settings response")
+		return nil, errs.Wrap(err, "failed to decode public settings response")
 	}
 
 	return &settings, nil

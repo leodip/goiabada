@@ -10,6 +10,7 @@ import (
 	"net/url"
 
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -18,20 +19,20 @@ func (c *AuthServerClient) GetAllGroups(accessToken string) ([]models.Group, err
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -40,7 +41,7 @@ func (c *AuthServerClient) GetAllGroups(accessToken string) ([]models.Group, err
 
 	var apiResp api.GetGroupsResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	groups := make([]models.Group, len(apiResp.Groups))
@@ -71,12 +72,12 @@ func (c *AuthServerClient) CreateGroup(accessToken string, request *api.CreateGr
 	fullURL := fmt.Sprintf("%s/api/v1/admin/groups", c.baseURL)
 	reqBody, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(reqBody))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -84,13 +85,13 @@ func (c *AuthServerClient) CreateGroup(accessToken string, request *api.CreateGr
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusCreated {
@@ -99,7 +100,7 @@ func (c *AuthServerClient) CreateGroup(accessToken string, request *api.CreateGr
 
 	var createResp api.CreateGroupResponse
 	if err := json.Unmarshal(respBody, &createResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	// Convert response to model
@@ -126,20 +127,20 @@ func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*mod
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, 0, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to make request: %w", err)
+		return nil, 0, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+		return nil, 0, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -148,7 +149,7 @@ func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*mod
 
 	var getResp api.GetGroupResponse
 	if err := json.Unmarshal(respBody, &getResp); err != nil {
-		return nil, 0, fmt.Errorf("failed to decode response: %w", err)
+		return nil, 0, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	group := models.Group{
@@ -174,12 +175,12 @@ func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, reques
 
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -187,13 +188,13 @@ func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, reques
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -202,7 +203,7 @@ func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, reques
 
 	var updateResp api.UpdateGroupResponse
 	if err := json.Unmarshal(respBody, &updateResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	group := models.Group{
@@ -228,20 +229,20 @@ func (c *AuthServerClient) DeleteGroup(accessToken string, groupId int64) error 
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -256,20 +257,20 @@ func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*mod
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -278,7 +279,7 @@ func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*mod
 
 	var apiResp api.GetUserGroupsResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	user := apiResp.User.ToUser()
@@ -311,20 +312,20 @@ func (c *AuthServerClient) GetGroupMembers(accessToken string, groupId int64, pa
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, 0, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to make request: %w", err)
+		return nil, 0, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+		return nil, 0, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -333,7 +334,7 @@ func (c *AuthServerClient) GetGroupMembers(accessToken string, groupId int64, pa
 
 	var apiResp api.GetGroupMembersResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, 0, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, 0, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	members := make([]models.User, len(apiResp.Members))
@@ -356,12 +357,12 @@ func (c *AuthServerClient) AddUserToGroup(accessToken string, groupId int64, use
 
 	reqBody, err := json.Marshal(request)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
+		return errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(reqBody))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -369,13 +370,13 @@ func (c *AuthServerClient) AddUserToGroup(accessToken string, groupId int64, use
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusCreated {
@@ -391,20 +392,20 @@ func (c *AuthServerClient) RemoveUserFromGroup(accessToken string, groupId int64
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -421,20 +422,20 @@ func (c *AuthServerClient) SearchUsersWithGroupAnnotation(accessToken, query str
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, 0, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to make request: %w", err)
+		return nil, 0, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+		return nil, 0, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -443,7 +444,7 @@ func (c *AuthServerClient) SearchUsersWithGroupAnnotation(accessToken, query str
 
 	var apiResp api.SearchUsersWithGroupAnnotationResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, 0, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, 0, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return apiResp.Users, apiResp.Total, nil
@@ -456,19 +457,19 @@ func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(accessToken stri
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, 0, errs.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to make request: %w", err)
+		return nil, 0, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+		return nil, 0, errs.Errorf("failed to read response body: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, 0, parseAPIError(resp, body)
@@ -476,7 +477,7 @@ func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(accessToken stri
 
 	var apiResp api.SearchGroupsWithPermissionAnnotationResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, 0, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, 0, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return apiResp.Groups, apiResp.Total, nil
@@ -487,12 +488,12 @@ func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, re
 
 	reqBody, err := json.Marshal(request)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(reqBody))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -500,13 +501,13 @@ func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, re
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -515,7 +516,7 @@ func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, re
 
 	var apiResp api.GetUserGroupsResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	user := apiResp.User.ToUser()

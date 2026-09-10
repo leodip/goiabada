@@ -219,10 +219,12 @@ func broken( {
 	assert.Empty(t, describe(scoped), "the caught subtree is outside the named directory")
 }
 
-// TestNoLegacyErrors_TheTreeItself is the real half, scoped to the modules that have moved: core
-// and the authserver, both of which now construct every error through errs. The admin console
-// still imports pkg/errors, so naming it here would fail on work that has not happened yet; it is
-// added as its sweep lands, and that last one drops the arguments so the whole tree is held.
+// TestNoLegacyErrors_TheTreeItself is the real half, and it is unscoped: every module has moved,
+// so the whole source root is held, cmd/goiabada-setup and any module added later included. The
+// call carried "core", "authserver" while the sweep was in flight, because naming a module that
+// had not moved would have failed on work that had not happened; dropping the arguments is what
+// measures goal 1 of #279, and it is stronger than any grep because it resolves the name written
+// at each call site through the file's own imports.
 //
 // Every module's tier holds the same scope rather than only its own subtree, for the reason
 // AssertGofmted's three callers do: the guard is about the source root, and a stale construction
@@ -233,7 +235,7 @@ func broken( {
 // core/data/benign_sentinel_lint_test.go spells it inside a raw string, and being a test file it
 // is out of scope twice over.
 func TestNoLegacyErrors_TheTreeItself(t *testing.T) {
-	AssertNoLegacyErrors(t, "core", "authserver")
+	AssertNoLegacyErrors(t)
 }
 
 // describe renders findings as "file:line what", which is what a reader compares. The fix text is

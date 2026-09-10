@@ -7,14 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -35,7 +34,7 @@ func HandleAccountProfileGet(
 		// Get JWT info to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -89,7 +88,7 @@ func HandleAccountProfilePost(
 		// Get access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -107,7 +106,7 @@ func HandleAccountProfilePost(
 		if zoneInfoValue != "" {
 			zoneInfoParts := strings.Split(zoneInfoValue, "___")
 			if len(zoneInfoParts) != 2 {
-				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid zoneInfo")))
+				httpHelper.InternalServerError(w, r, errs.New("invalid zoneInfo"))
 				return
 			}
 			zoneInfoCountryName = zoneInfoParts[0]

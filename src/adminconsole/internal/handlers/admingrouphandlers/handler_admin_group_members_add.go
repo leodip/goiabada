@@ -1,17 +1,16 @@
 package admingrouphandlers
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -24,7 +23,7 @@ func HandleAdminGroupMembersAddGet(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -37,7 +36,7 @@ func HandleAdminGroupMembersAddGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -47,7 +46,7 @@ func HandleAdminGroupMembersAddGet(
 			return
 		}
 		if group == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.InternalServerError(w, r, errs.New("group not found"))
 			return
 		}
 
@@ -75,7 +74,7 @@ func HandleAdminGroupMembersSearchGet(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.JsonError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -88,7 +87,7 @@ func HandleAdminGroupMembersSearchGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -96,14 +95,14 @@ func HandleAdminGroupMembersSearchGet(
 		if err != nil {
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
+				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
 			} else {
 				httpHelper.JsonError(w, r, err)
 			}
 			return
 		}
 		if group == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.JsonError(w, r, errs.New("group not found"))
 			return
 		}
 
@@ -117,7 +116,7 @@ func HandleAdminGroupMembersSearchGet(
 		if err != nil {
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
+				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
 			} else {
 				httpHelper.JsonError(w, r, err)
 			}
@@ -152,7 +151,7 @@ func HandleAdminGroupMembersAddPost(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.JsonError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -164,7 +163,7 @@ func HandleAdminGroupMembersAddPost(
 
 		userIdStr := r.URL.Query().Get("userId")
 		if len(userIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errs.New("userId is required"))
 			return
 		}
 
@@ -177,7 +176,7 @@ func HandleAdminGroupMembersAddPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -185,7 +184,7 @@ func HandleAdminGroupMembersAddPost(
 		if err != nil {
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
+				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
 			} else {
 				httpHelper.JsonError(w, r, err)
 			}

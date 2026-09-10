@@ -1,12 +1,10 @@
 package adminresourcehandlers
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"slices"
 	"strconv"
-
-	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -14,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -29,7 +28,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
 			return
 		}
 
@@ -41,7 +40,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -52,7 +51,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
 			return
 		}
 
@@ -98,7 +97,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			}
 
 			if !found {
-				httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id)))
+				httpHelper.InternalServerError(w, r, errs.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
 				return
 			}
 		}
@@ -225,7 +224,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
 			return
 		}
 
@@ -237,7 +236,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -248,13 +247,13 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
 			return
 		}
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.JsonError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -270,13 +269,13 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 			return
 		}
 		if group == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.JsonError(w, r, errs.New("group not found"))
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			httpHelper.JsonError(w, r, errs.New("permissionId is required"))
 			return
 		}
 
@@ -308,7 +307,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
+			httpHelper.JsonError(w, r, errs.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
 			return
 		}
 
@@ -321,7 +320,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}
 
 		if found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("group %v already has permission %v", group.Id, permissionId)))
+			httpHelper.JsonError(w, r, errs.Errorf("group %v already has permission %v", group.Id, permissionId))
 			return
 		}
 		// Build the new set and update via API
@@ -336,7 +335,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 			// Provide clean error to UI if API returned structured error
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
+				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
 				return
 			}
 			httpHelper.JsonError(w, r, err)
@@ -361,7 +360,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
 			return
 		}
 
@@ -373,7 +372,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -384,13 +383,13 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
 			return
 		}
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.JsonError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -406,13 +405,13 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 			return
 		}
 		if group == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.JsonError(w, r, errs.New("group not found"))
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			httpHelper.JsonError(w, r, errs.New("permissionId is required"))
 			return
 		}
 
@@ -450,7 +449,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
+			httpHelper.JsonError(w, r, errs.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
 			return
 		}
 
@@ -463,7 +462,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("group %v does not have permission %v", group.Id, permissionId)))
+			httpHelper.JsonError(w, r, errs.Errorf("group %v does not have permission %v", group.Id, permissionId))
 			return
 		}
 		// Build reduced set and update via API
@@ -477,7 +476,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		if err := apiClient.UpdateGroupPermissions(accessToken, group.Id, req); err != nil {
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
+				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
 				return
 			}
 			httpHelper.JsonError(w, r, err)

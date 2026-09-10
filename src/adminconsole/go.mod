@@ -6,7 +6,6 @@ require (
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/leodip/goiabada/core v0.0.0
-	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.12.1
 )
 

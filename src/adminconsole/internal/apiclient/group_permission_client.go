@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -16,20 +17,20 @@ func (c *AuthServerClient) GetGroupPermissions(accessToken string, groupId int64
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -38,7 +39,7 @@ func (c *AuthServerClient) GetGroupPermissions(accessToken string, groupId int64
 
 	var apiResp api.GetGroupPermissionsResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	group := apiResp.Group.ToGroup()
@@ -65,12 +66,12 @@ func (c *AuthServerClient) UpdateGroupPermissions(accessToken string, groupId in
 
 	reqBody, err := json.Marshal(request)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
+		return errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(reqBody))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -78,13 +79,13 @@ func (c *AuthServerClient) UpdateGroupPermissions(accessToken string, groupId in
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {

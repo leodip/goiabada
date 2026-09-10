@@ -5,9 +5,12 @@ go 1.27.0
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/go-sql-driver/mysql v1.10.0
+	github.com/leodip/goiabada/core v0.0.0
 	github.com/lib/pq v1.12.3
 	github.com/microsoft/go-mssqldb v1.10.0
 )
+
+replace github.com/leodip/goiabada/core => ../../core
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect

@@ -2,14 +2,14 @@ package accounthandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
-
-	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -58,7 +58,7 @@ func HandleAccountProfilePicturePost(
 		// Read file data
 		pictureData, err := io.ReadAll(file)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, errors.Wrap(err, "failed to read picture data"))
+			httpHelper.InternalServerError(w, r, errs.Wrap(err, "failed to read picture data"))
 			return
 		}
 

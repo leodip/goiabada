@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -18,7 +19,7 @@ func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) 
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -26,13 +27,13 @@ func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("request failed: %w", err)
+		return nil, nil, errs.Errorf("request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, nil, errs.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -42,7 +43,7 @@ func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) 
 
 	var apiResp api.GetUserPermissionsResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
 	user := apiResp.User.ToUser()
@@ -70,12 +71,12 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 
 	requestBody, err := json.Marshal(request)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
+		return errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -83,13 +84,13 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return errs.Errorf("request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
+		return errs.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -106,7 +107,7 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -114,13 +115,13 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, errs.Errorf("request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, errs.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -130,7 +131,7 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 
 	var apiResp api.GetResourcesResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
 	resources := make([]models.Resource, len(apiResp.Resources))
@@ -151,7 +152,7 @@ func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resource
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -159,13 +160,13 @@ func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resource
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, errs.Errorf("request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, errs.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -175,7 +176,7 @@ func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resource
 
 	var apiResp api.GetPermissionsByResourceResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
 	permissions := make([]models.Permission, len(apiResp.Permissions))
@@ -202,25 +203,25 @@ func (c *AuthServerClient) UpdateResourcePermissions(accessToken string, resourc
 
 	body, err := json.Marshal(request)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
+		return errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return errs.Errorf("request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
+		return errs.Errorf("failed to read response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return parseAPIError(resp, respBody)
@@ -234,20 +235,20 @@ func (c *AuthServerClient) GetUsersByPermission(accessToken string, permissionId
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, 0, errs.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("request failed: %w", err)
+		return nil, 0, errs.Errorf("request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+		return nil, 0, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -256,7 +257,7 @@ func (c *AuthServerClient) GetUsersByPermission(accessToken string, permissionId
 
 	var apiResp api.GetUsersByPermissionResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, 0, fmt.Errorf("failed to parse response: %w", err)
+		return nil, 0, errs.Errorf("failed to parse response: %w", err)
 	}
 
 	users := make([]models.User, len(apiResp.Users))
@@ -275,19 +276,19 @@ func (c *AuthServerClient) SearchUsersWithPermissionAnnotation(accessToken strin
 
 	req, err := http.NewRequest("GET", base, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, 0, errs.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("request failed: %w", err)
+		return nil, 0, errs.Errorf("request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read response: %w", err)
+		return nil, 0, errs.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -296,7 +297,7 @@ func (c *AuthServerClient) SearchUsersWithPermissionAnnotation(accessToken strin
 
 	var apiResp api.SearchUsersWithPermissionAnnotationResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, 0, fmt.Errorf("failed to parse response: %w", err)
+		return nil, 0, errs.Errorf("failed to parse response: %w", err)
 	}
 	return apiResp.Users, apiResp.Total, nil
 }

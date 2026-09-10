@@ -5,11 +5,10 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/pkg/errors"
-
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -23,7 +22,7 @@ func HandleAccountSessionsGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -78,20 +77,20 @@ func HandleAccountSessionsEndSesssionPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, errors.Wrap(err, "could not decode request body"))
+			httpHelper.JsonError(w, r, errs.Wrap(err, "could not decode request body"))
 			return
 		}
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
+			httpHelper.JsonError(w, r, errs.New("could not find user session id to revoke"))
 			return
 		}
 

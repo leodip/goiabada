@@ -3,12 +3,12 @@ package apiclient
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -17,7 +17,7 @@ func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId 
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -25,13 +25,13 @@ func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -40,7 +40,7 @@ func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId 
 
 	var response api.GetUserAttributesResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	// Convert responses back to models.UserAttribute
@@ -59,7 +59,7 @@ func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId 
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -67,13 +67,13 @@ func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -82,7 +82,7 @@ func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId 
 
 	var response api.GetUserAttributeResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	return response.Attribute.ToUserAttribute(), nil
@@ -93,12 +93,12 @@ func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.
 
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -106,13 +106,13 @@ func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusCreated {
@@ -121,7 +121,7 @@ func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.
 
 	var response api.CreateUserAttributeResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	return response.Attribute.ToUserAttribute(), nil
@@ -132,12 +132,12 @@ func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId i
 
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -145,13 +145,13 @@ func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId i
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -160,7 +160,7 @@ func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId i
 
 	var response api.UpdateUserAttributeResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	return response.Attribute.ToUserAttribute(), nil
@@ -171,7 +171,7 @@ func (c *AuthServerClient) DeleteUserAttribute(accessToken string, attributeId i
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -179,13 +179,13 @@ func (c *AuthServerClient) DeleteUserAttribute(accessToken string, attributeId i
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {

@@ -77,7 +77,7 @@ func main() {
 
 	dir, err := os.Getwd()
 	if err != nil {
-		slog.Error(fmt.Sprintf("%+v", err))
+		slog.Error("unable to determine the current working directory", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("current working directory: " + dir)
@@ -89,7 +89,7 @@ func main() {
 	// Load i18n message catalogs (and merge GOIABADA_I18N_OVERRIDES_DIR if set).
 	// Fail-fast: a malformed catalog or missing override dir is a config bug.
 	if _, err := i18n.LoadBundle(); err != nil {
-		slog.Error(fmt.Sprintf("i18n LoadBundle failed: %+v", err))
+		slog.Error("i18n LoadBundle failed", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("i18n catalogs loaded")

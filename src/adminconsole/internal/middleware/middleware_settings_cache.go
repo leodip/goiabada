@@ -24,9 +24,9 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 				// only to the browser and was never logged at all.
 				//
 				// err.Error() rather than err: slog renders an error value with %+v, and this
-				// one carries a pkg/errors stack. The cache does not cache a failure, so an auth
+				// one carries a core/errs stack. The cache does not cache a failure, so an auth
 				// server that is down produces one of these per request, and the stack is the
-				// same three frames every time.
+				// same frames every time.
 				slog.Error("unable to fetch settings from the auth server", "error", err.Error())
 				http.Error(w, i18n.T(r.Context(), "adminconsole.error.settings_unavailable"), http.StatusInternalServerError)
 				return

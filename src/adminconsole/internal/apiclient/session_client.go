@@ -13,8 +13,8 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -115,37 +115,35 @@ func (s *SessionTokenSource) fetch(ctx context.Context) (string, time.Time, erro
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, s.tokenURL,
 		strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", time.Time{}, errors.Wrap(err, "unable to build the session token request")
+		return "", time.Time{}, errs.Wrap(err, "unable to build the session token request")
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Accept", "application/json")
 
 	response, err := s.httpClient.Do(request)
 	if err != nil {
-		return "", time.Time{}, errors.Wrap(err, "unable to reach the auth server's token endpoint")
+		return "", time.Time{}, errs.Wrap(err, "unable to reach the auth server's token endpoint")
 	}
 	defer func() { _ = response.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if err != nil {
-		return "", time.Time{}, errors.Wrap(err, "unable to read the session token response")
+		return "", time.Time{}, errs.Wrap(err, "unable to read the session token response")
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return "", time.Time{}, errors.WithStack(errors.New(
-			s.refusalMessage(response.StatusCode, body)))
+		return "", time.Time{}, errs.New(s.refusalMessage(response.StatusCode, body))
 	}
 
 	var tokenResponse oauth.TokenResponse
 	if err := json.Unmarshal(body, &tokenResponse); err != nil {
-		return "", time.Time{}, errors.Wrap(err, "unable to decode the session token response")
+		return "", time.Time{}, errs.Wrap(err, "unable to decode the session token response")
 	}
 	if strings.TrimSpace(tokenResponse.AccessToken) == "" {
 		// Reported rather than cached. An empty bearer would be sent on every session
 		// call and answered 401 on every one of them, which reads in a log as the
 		// endpoint refusing the admin console rather than as the token never arriving.
-		return "", time.Time{}, errors.WithStack(errors.New(
-			"the auth server's token endpoint returned no access token"))
+		return "", time.Time{}, errs.New("the auth server's token endpoint returned no access token")
 	}
 
 	return tokenResponse.AccessToken,

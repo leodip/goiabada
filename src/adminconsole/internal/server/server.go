@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"log/slog"
@@ -125,7 +126,7 @@ func (s *Server) Start() {
 			}
 			slog.Info(fmt.Sprintf("starting HTTPS server on %s:%d", httpsHost, httpsPort))
 			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil {
-				errChan <- fmt.Errorf("HTTPS server error: %v", err)
+				errChan <- errs.Errorf("HTTPS server error: %v", err)
 			}
 		}()
 	}
@@ -139,7 +140,7 @@ func (s *Server) Start() {
 			}
 			slog.Info(fmt.Sprintf("starting HTTP server on %s:%d", httpHost, httpPort))
 			if err := httpServer.ListenAndServe(); err != nil {
-				errChan <- fmt.Errorf("HTTP server error: %v", err)
+				errChan <- errs.Errorf("HTTP server error: %v", err)
 			}
 		}()
 	}

@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -9,10 +10,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/pkg/errors"
 )
 
 func HandleAccountEmailVerificationGet(
@@ -26,7 +27,7 @@ func HandleAccountEmailVerificationGet(
 		// Get JWT info to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
@@ -37,7 +38,7 @@ func HandleAccountEmailVerificationGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if !settings.SMTPEnabled {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("SMTP is not enabled")))
+			httpHelper.InternalServerError(w, r, errs.New("SMTP is not enabled"))
 			return
 		}
 
@@ -83,7 +84,7 @@ func HandleAccountEmailSendVerificationPost(
 		// Get JWT info to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -113,7 +114,7 @@ func HandleAccountEmailVerificationPost(
 		// Get JWT info for API calls and current profile rendering
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 

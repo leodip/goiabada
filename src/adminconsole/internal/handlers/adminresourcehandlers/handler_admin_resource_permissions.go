@@ -2,11 +2,10 @@ package adminresourcehandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -14,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -30,7 +30,7 @@ func HandleAdminResourcePermissionsGet(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
 			return
 		}
 
@@ -42,7 +42,7 @@ func HandleAdminResourcePermissionsGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -52,7 +52,7 @@ func HandleAdminResourcePermissionsGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
 			return
 		}
 
@@ -115,7 +115,7 @@ func HandleAdminResourcePermissionsPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.JsonError(w, r, errs.New("resourceId is required"))
 			return
 		}
 
@@ -127,7 +127,7 @@ func HandleAdminResourcePermissionsPost(
 		// Get JWT info
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
@@ -136,7 +136,7 @@ func HandleAdminResourcePermissionsPost(
 			return
 		}
 		if resource == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.JsonError(w, r, errs.New("resource not found"))
 			return
 		}
 
@@ -148,7 +148,7 @@ func HandleAdminResourcePermissionsPost(
 		}
 
 		if data.ResourceId != resource.Id {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resourceId mismatch")))
+			httpHelper.JsonError(w, r, errs.New("resourceId mismatch"))
 			return
 		}
 

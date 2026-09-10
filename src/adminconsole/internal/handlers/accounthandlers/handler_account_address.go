@@ -11,9 +11,9 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/countries"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/pkg/errors"
 )
 
 func HandleAccountAddressGet(
@@ -32,7 +32,7 @@ func HandleAccountAddressGet(
 		// Get JWT info to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -103,7 +103,7 @@ func HandleAccountAddressPost(
 		// Get access token and current profile for potential error render
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
