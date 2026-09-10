@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -243,7 +242,7 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create user and consent to the client
-	user := &models.User{Subject: uuid.New(), Enabled: true, Email: fake.Email()}
+	user := &models.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email()}
 	err = database.CreateUser(nil, user)
 	assert.NoError(t, err)
 	consent := &models.UserConsent{ClientId: client.Id, UserId: user.Id, Scope: "openid"}

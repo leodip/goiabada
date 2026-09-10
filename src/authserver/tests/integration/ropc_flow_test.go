@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
@@ -59,7 +58,7 @@ func createROPCUser(t *testing.T, password string) *models.User {
 	assert.Nil(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -404,7 +403,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.Nil(t, err)
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      false, // Disabled
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -572,7 +571,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.Nil(t, err)
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              fake.Email(),
 		PasswordHash:       passwordHashed,

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -24,9 +23,9 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
 
 	// Create three users; grant permission to two
 	randSuffix := fake.LetterN(6)
-	u1 := &models.User{Subject: uuid.New(), Enabled: true, Username: "annperm1-" + randSuffix, Email: "annperm1-" + randSuffix + "@test.com", GivenName: "A1", FamilyName: "T"}
-	u2 := &models.User{Subject: uuid.New(), Enabled: true, Username: "annperm2-" + randSuffix, Email: "annperm2-" + randSuffix + "@test.com", GivenName: "A2", FamilyName: "T"}
-	u3 := &models.User{Subject: uuid.New(), Enabled: true, Username: "annperm3-" + randSuffix, Email: "annperm3-" + randSuffix + "@test.com", GivenName: "A3", FamilyName: "T"}
+	u1 := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annperm1-" + randSuffix, Email: "annperm1-" + randSuffix + "@test.com", GivenName: "A1", FamilyName: "T"}
+	u2 := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annperm2-" + randSuffix, Email: "annperm2-" + randSuffix + "@test.com", GivenName: "A2", FamilyName: "T"}
+	u3 := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annperm3-" + randSuffix, Email: "annperm3-" + randSuffix + "@test.com", GivenName: "A3", FamilyName: "T"}
 	assert.NoError(t, database.CreateUser(nil, u1))
 	assert.NoError(t, database.CreateUser(nil, u2))
 	assert.NoError(t, database.CreateUser(nil, u3))

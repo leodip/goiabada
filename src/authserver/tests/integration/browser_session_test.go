@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
@@ -381,7 +380,7 @@ func newLevel1Actors(t *testing.T) (*models.Client, *models.RedirectURI, *models
 	require.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,

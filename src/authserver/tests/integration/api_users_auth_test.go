@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,7 +24,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@password.test",
 		GivenName:     "Test",
@@ -73,7 +73,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@password-validation.test",
 		GivenName:     "Test",
@@ -155,7 +155,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	assert.NoError(t, err)
 
 	testUser := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              "testuser@otp.test",
 		GivenName:          "Test",
@@ -262,7 +262,7 @@ func TestAPIUserOTPPut_EnableNotSupported(t *testing.T) {
 
 	// Setup: Create test user without OTP
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@otp-enable.test",
 		GivenName:     "Test",
@@ -310,7 +310,7 @@ func TestAPIUserOTPPut_OTPNotEnabled(t *testing.T) {
 
 	// Setup: Create test user without OTP enabled
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@otp-not-enabled.test",
 		GivenName:     "Test",
@@ -343,7 +343,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@session.test",
 		GivenName:     "Test",
@@ -358,7 +358,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 
 	// Setup: Create test session
 	testSession := &models.UserSession{
-		SessionIdentifier: uuid.New().String(),
+		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC(),
 		LastAccessed:      time.Now().UTC(),
 		AuthMethods:       "pwd",
@@ -421,7 +421,7 @@ func TestAPIUserSessionPut_MethodNotAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: PUT the session path, which no longer registers that method
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + uuid.New().String()
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + fake.UUID()
 	resp := makeAPIRequest(t, "PUT", url, accessToken, map[string]interface{}{"level2AuthConfigHasChanged": true})
 	defer func() { _ = resp.Body.Close() }()
 

@@ -119,7 +119,7 @@ func HandleAPIAccountProfilePicturePost(
 		// Return success response
 		response := map[string]interface{}{
 			"success":    true,
-			"pictureUrl": config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject.String(),
+			"pictureUrl": config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -223,7 +223,7 @@ func HandleAPIAccountProfilePictureGet(
 		}
 
 		if hasPicture {
-			response["pictureUrl"] = config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject.String()
+			response["pictureUrl"] = config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject
 		}
 
 		w.Header().Set("Content-Type", "application/json")

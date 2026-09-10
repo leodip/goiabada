@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -55,7 +54,7 @@ func createCeremonyUser(t *testing.T) (*models.User, string) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,

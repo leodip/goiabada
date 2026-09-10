@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -40,22 +39,22 @@ import (
 // maximum. A 36 character UUID satisfies all of it whenever its first hex digit is a-f,
 // which is 6 of 16 values, so 3 in 8 UUIDs qualify and a handful of draws suffices.
 // Generated rather than hardcoded so the test does not silently depend on one literal.
-func newUserSubjectValidAsClientIdentifier(t *testing.T) uuid.UUID {
+func newUserSubjectValidAsClientIdentifier(t *testing.T) string {
 	t.Helper()
 
 	for i := 0; i < 200; i++ {
-		candidate := uuid.New()
-		first := candidate.String()[0]
+		candidate := fake.UUID()
+		first := candidate[0]
 		if first >= 'a' && first <= 'f' {
 			return candidate
 		}
 	}
 	t.Fatal("could not generate a UUID whose first character is a-f")
-	return uuid.UUID{}
+	return ""
 }
 
 // createUserWithSubject creates an enabled user with a caller-chosen subject.
-func createUserWithSubject(t *testing.T, subject uuid.UUID) (*models.User, string) {
+func createUserWithSubject(t *testing.T, subject string) (*models.User, string) {
 	t.Helper()
 
 	password := fake.Password(12)
@@ -79,7 +78,7 @@ func createUserWithSubject(t *testing.T, subject uuid.UUID) (*models.User, strin
 // createImpersonatingClientCredentialsToken mints a real client credentials token for a
 // client whose identifier EQUALS the given user's subject, carrying the given built-in
 // authserver permission. This is the attacker's token in the original vulnerability.
-func createImpersonatingClientCredentialsToken(t *testing.T, subject uuid.UUID, permissionIdentifier string) string {
+func createImpersonatingClientCredentialsToken(t *testing.T, subject string, permissionIdentifier string) string {
 	t.Helper()
 
 	clientSecret := fake.Password(32)
@@ -88,7 +87,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject uuid.UUID, 
 
 	client := &models.Client{
 		// The whole point: the client identifier is the user's subject.
-		ClientIdentifier:         subject.String(),
+		ClientIdentifier:         subject,
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
@@ -343,7 +342,7 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 	client := createROPCClient(t, clientSecret, false)
 
 	password := fake.Password(12)
-	user, _ := createUserWithSubject(t, uuid.New())
+	user, _ := createUserWithSubject(t, fake.UUID())
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
 	user.PasswordHash = passwordHashed

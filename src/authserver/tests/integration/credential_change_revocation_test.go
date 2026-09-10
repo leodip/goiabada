@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
@@ -345,7 +344,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	require.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        strings.ToLower(fake.LetterN(12)) + "@example.com",
 		PasswordHash: passwordHashed,

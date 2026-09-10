@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -63,7 +62,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	// No OTP: this user has no second factor to present, so an acr naming one can only have come
 	// from the client row rather than from anything the ceremony did.
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,

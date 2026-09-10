@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@consents.test",
 		GivenName:     "Test",
@@ -99,7 +99,7 @@ func TestAPIUserConsentsGet_EmptyConsents(t *testing.T) {
 
 	// Setup: Create test user without consents
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@empty-consents.test",
 		GivenName:  "Test",
@@ -169,7 +169,7 @@ func TestAPIUserConsentsGet_InvalidId(t *testing.T) {
 func TestAPIUserConsentsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-consents.test",
 		GivenName:  "Test",
@@ -202,7 +202,7 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@consent-delete.test",
 		GivenName:     "Test",
@@ -288,7 +288,7 @@ func TestAPIUserConsentDelete_InvalidId(t *testing.T) {
 func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test user and consent
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-consent-delete.test",
 		GivenName:  "Test",
@@ -337,7 +337,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@consent-client-details.test",
 		GivenName:     "Test",

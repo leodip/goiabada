@@ -9,12 +9,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -100,7 +100,7 @@ func TestHandleAPIUserProfilePictureGet_HasPicture(t *testing.T) {
 
 	handler := HandleAPIUserProfilePictureGet(database)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	user := &models.User{Id: 123, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/123/profile-picture", nil)
@@ -118,7 +118,7 @@ func TestHandleAPIUserProfilePictureGet_HasPicture(t *testing.T) {
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["hasPicture"].(bool))
-	assert.Contains(t, response["pictureUrl"].(string), sub.String())
+	assert.Contains(t, response["pictureUrl"].(string), sub)
 
 	database.AssertExpectations(t)
 }
@@ -128,7 +128,7 @@ func TestHandleAPIUserProfilePictureGet_NoPicture(t *testing.T) {
 
 	handler := HandleAPIUserProfilePictureGet(database)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	user := &models.User{Id: 123, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/123/profile-picture", nil)
@@ -222,7 +222,7 @@ func TestHandleAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 
 	handler := HandleAPIUserProfilePicturePost(database, auditLogger)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	user := &models.User{Id: 123, Subject: sub, Enabled: true}
 
 	invalidImageData := []byte("not a valid image")
@@ -249,9 +249,9 @@ func TestHandleAPIUserProfilePicturePost_CreateNew(t *testing.T) {
 
 	handler := HandleAPIUserProfilePicturePost(database, auditLogger)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	user := &models.User{Id: 123, Subject: sub, Enabled: true}
-	adminSub := uuid.New().String()
+	adminSub := fake.UUID()
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
@@ -278,7 +278,7 @@ func TestHandleAPIUserProfilePicturePost_CreateNew(t *testing.T) {
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))
-	assert.Contains(t, response["pictureUrl"].(string), sub.String())
+	assert.Contains(t, response["pictureUrl"].(string), sub)
 
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
@@ -290,7 +290,7 @@ func TestHandleAPIUserProfilePicturePost_UpdateExisting(t *testing.T) {
 
 	handler := HandleAPIUserProfilePicturePost(database, auditLogger)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	user := &models.User{Id: 123, Subject: sub, Enabled: true}
 	existingPicture := &models.UserProfilePicture{
 		Id:          1,
@@ -298,7 +298,7 @@ func TestHandleAPIUserProfilePicturePost_UpdateExisting(t *testing.T) {
 		Picture:     []byte("old picture data"),
 		ContentType: "image/jpeg",
 	}
-	adminSub := uuid.New().String()
+	adminSub := fake.UUID()
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
@@ -399,9 +399,9 @@ func TestHandleAPIUserProfilePictureDelete_Success(t *testing.T) {
 
 	handler := HandleAPIUserProfilePictureDelete(database, auditLogger)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	user := &models.User{Id: 123, Subject: sub, Enabled: true}
-	adminSub := uuid.New().String()
+	adminSub := fake.UUID()
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/users/123/profile-picture", nil)
 	req = setChiURLParam(req, "id", "123")
@@ -434,7 +434,7 @@ func TestHandleAPIUserProfilePictureDelete_DatabaseError(t *testing.T) {
 
 	handler := HandleAPIUserProfilePictureDelete(database, auditLogger)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	user := &models.User{Id: 123, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/users/123/profile-picture", nil)

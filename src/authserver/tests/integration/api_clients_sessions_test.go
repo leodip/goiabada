@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 
 	// Create a client
 	testClient := &models.Client{
-		ClientIdentifier:         "test-client-sessions-" + uuid.New().String()[:8],
+		ClientIdentifier:         "test-client-sessions-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Test Client for Sessions",
 		Enabled:                  true,
@@ -35,7 +35,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 
 	// Create a user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@client-sessions-success.test",
 		GivenName:     "Test",
@@ -47,8 +47,8 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	defer func() { _ = database.DeleteUser(nil, testUser.Id) }()
 
 	// Create sessions
-	s1 := createTestUserSession(t, testUser.Id, uuid.New().String())
-	s2 := createTestUserSession(t, testUser.Id, uuid.New().String())
+	s1 := createTestUserSession(t, testUser.Id, fake.UUID())
+	s2 := createTestUserSession(t, testUser.Id, fake.UUID())
 	defer func() {
 		_ = database.DeleteUserSession(nil, s1.Id)
 		_ = database.DeleteUserSession(nil, s2.Id)
@@ -98,7 +98,7 @@ func TestAPIClientSessionsGet_EmptySessions(t *testing.T) {
 
 	// Create a client without linked sessions
 	testClient := &models.Client{
-		ClientIdentifier:         "test-client-empty-" + uuid.New().String()[:8],
+		ClientIdentifier:         "test-client-empty-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Empty Client",
 		Enabled:                  true,
@@ -165,7 +165,7 @@ func TestAPIClientSessionsGet_InvalidId(t *testing.T) {
 func TestAPIClientSessionsGet_Unauthorized(t *testing.T) {
 	// Create a client
 	testClient := &models.Client{
-		ClientIdentifier:         "test-client-unauth-" + uuid.New().String()[:8],
+		ClientIdentifier:         "test-client-unauth-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Client",
 		Enabled:                  true,
@@ -193,7 +193,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Client
 	testClient := &models.Client{
-		ClientIdentifier:         "test-client-valid-" + uuid.New().String()[:8],
+		ClientIdentifier:         "test-client-valid-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Client",
 		Enabled:                  true,
@@ -208,7 +208,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// User
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@client-valid-sessions.test",
 		GivenName:     "Test",
@@ -221,7 +221,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Valid session
 	valid := &models.UserSession{
-		SessionIdentifier: uuid.New().String(),
+		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-30 * time.Minute),
 		LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		AuthMethods:       "pwd",
@@ -239,7 +239,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Expired session
 	expired := &models.UserSession{
-		SessionIdentifier: uuid.New().String(),
+		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-25 * time.Hour),
 		LastAccessed:      time.Now().UTC().Add(-24 * time.Hour),
 		AuthMethods:       "pwd",
@@ -282,7 +282,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 
 	// Client
 	testClient := &models.Client{
-		ClientIdentifier:         "test-client-page-" + uuid.New().String()[:8],
+		ClientIdentifier:         "test-client-page-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Client",
 		Enabled:                  true,
@@ -297,7 +297,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 
 	// User
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@client-page.test",
 		GivenName:     "Test",
@@ -314,7 +314,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	now := time.Now().UTC()
 	for i := 0; i < total; i++ {
 		s := &models.UserSession{
-			SessionIdentifier: uuid.New().String(),
+			SessionIdentifier: fake.UUID(),
 			Started:           now.Add(-time.Hour),
 			LastAccessed:      now.Add(-time.Minute * 5),
 			AuthMethods:       "pwd",

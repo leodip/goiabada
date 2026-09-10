@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ func TestAPIUserAttributesGet_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@attributes.test",
 		GivenName:     "Test",
@@ -83,7 +83,7 @@ func TestAPIUserAttributesGet_EmptyAttributes(t *testing.T) {
 
 	// Setup: Create test user without attributes
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@empty-attrs.test",
 		GivenName:  "Test",
@@ -153,7 +153,7 @@ func TestAPIUserAttributesGet_InvalidId(t *testing.T) {
 func TestAPIUserAttributesGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-attrs.test",
 		GivenName:  "Test",
@@ -186,7 +186,7 @@ func TestAPIUserAttributeGet_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-get.test",
 		GivenName:  "Test",
@@ -268,7 +268,7 @@ func TestAPIUserAttributeGet_InvalidId(t *testing.T) {
 func TestAPIUserAttributeGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user and attribute
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-attr.test",
 		GivenName:  "Test",
@@ -306,7 +306,7 @@ func TestAPIUserAttributeCreatePost_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-create.test",
 		GivenName:  "Test",
@@ -369,7 +369,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-validation.test",
 		GivenName:  "Test",
@@ -485,7 +485,7 @@ func TestAPIUserAttributeUpdatePut_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-update.test",
 		GivenName:  "Test",
@@ -565,7 +565,7 @@ func TestAPIUserAttributeUpdatePut_ValidationErrors(t *testing.T) {
 
 	// Setup: Create test user and attribute
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-update-validation.test",
 		GivenName:  "Test",
@@ -667,7 +667,7 @@ func TestAPIUserAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 
 	// Setup: Create test user and attribute
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-invalid-body.test",
 		GivenName:  "Test",
@@ -703,7 +703,7 @@ func TestAPIUserAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 func TestAPIUserAttributeUpdatePut_Unauthorized(t *testing.T) {
 	// Setup: Create test user and attribute
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-unauth-update.test",
 		GivenName:  "Test",
@@ -741,7 +741,7 @@ func TestAPIUserAttributeDelete_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-delete.test",
 		GivenName:  "Test",
@@ -820,7 +820,7 @@ func TestAPIUserAttributeDelete_InvalidId(t *testing.T) {
 func TestAPIUserAttributeDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test user and attribute
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-delete-unauth.test",
 		GivenName:  "Test",
@@ -876,7 +876,7 @@ func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-angle.test",
 		GivenName:  "Test",
@@ -929,7 +929,7 @@ func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@attr-verbatim.test",
 		GivenName:  "Test",

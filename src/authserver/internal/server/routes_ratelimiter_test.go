@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -134,15 +133,12 @@ func newRoutesTestServer(t *testing.T) *Server {
 	passwordHash, err := hashutil.HashPassword("the account's real password")
 	assert.NoError(t, err)
 
-	subject, err := uuid.Parse(routesTestSubject)
-	assert.NoError(t, err)
-
 	database := mocks_data.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, routesTestSubject).Return(&models.User{
 		Id:           1,
 		Enabled:      true,
-		Subject:      subject,
+		Subject:      routesTestSubject,
 		Email:        "victim@example.com",
 		PasswordHash: passwordHash,
 		// EmailVerified false with no stored code: the verification comparison is reached

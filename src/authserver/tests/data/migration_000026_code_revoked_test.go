@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -94,7 +93,7 @@ func seedCode000026(t *testing.T, h *isolatedDB) int64 {
 
 	user := &models.User{
 		Enabled:  true,
-		Subject:  uuid.New(),
+		Subject:  fake.UUID(),
 		Username: "mig26_" + random,
 	}
 	require.NoError(t, h.DB.CreateUser(nil, user), "seed user")

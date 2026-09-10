@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
@@ -376,7 +375,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -485,7 +484,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -607,7 +606,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	}
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              fake.Email(),
 		PasswordHash:       passwordHashed,
@@ -790,7 +789,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		}
 
 		user = &models.User{
-			Subject:      uuid.New(),
+			Subject:      fake.UUID(),
 			Enabled:      true,
 			Email:        fake.Email(),
 			PasswordHash: passwordHashed,
@@ -901,7 +900,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		t.Fatal(err)
 	}
 
-	user := &models.User{Subject: uuid.New(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
+	user := &models.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	err = database.CreateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -1209,7 +1208,7 @@ func createTestResource(t *testing.T, identifier, description string) *models.Re
 // Helper function to create a test group
 func createTestGroup(t *testing.T) *models.Group {
 	group := &models.Group{
-		GroupIdentifier:      "test-group-" + uuid.New().String()[:8],
+		GroupIdentifier:      "test-group-" + fake.UUID()[:8],
 		Description:          "Test Group",
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -68,7 +67,7 @@ func createTestUserForProfilePicture(t *testing.T) *models.User {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -136,7 +135,7 @@ func TestAPIAccountProfilePicturePost_Success(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))
-	assert.Contains(t, response["pictureUrl"].(string), user.Subject.String())
+	assert.Contains(t, response["pictureUrl"].(string), user.Subject)
 
 	// Verify the picture was saved
 	getResp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -323,7 +322,7 @@ func TestAPIUserProfilePicturePost_Success(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))
-	assert.Contains(t, response["pictureUrl"].(string), user.Subject.String())
+	assert.Contains(t, response["pictureUrl"].(string), user.Subject)
 
 	// Verify the picture was saved
 	getResp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -418,7 +417,7 @@ func TestUserinfoPicture_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// Now fetch the picture via the userinfo/picture endpoint (no auth required)
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject.String())
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject)
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
 	assert.NoError(t, err)
@@ -441,7 +440,7 @@ func TestUserinfoPicture_Success(t *testing.T) {
 
 func TestUserinfoPicture_NotFound(t *testing.T) {
 	// Use a random UUID that doesn't exist
-	randomUUID := uuid.New().String()
+	randomUUID := fake.UUID()
 	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, randomUUID)
 
 	httpClient := createHttpClient(t)
@@ -474,7 +473,7 @@ func TestUserinfoPicture_UserHasNoPicture(t *testing.T) {
 	// Create a user without a profile picture
 	user := createTestUserForProfilePicture(t)
 
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject.String())
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject)
 
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
@@ -498,7 +497,7 @@ func TestUserinfoPicture_CacheHeaders(t *testing.T) {
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// Fetch the picture and check cache headers
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject.String())
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject)
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
 	assert.NoError(t, err)
@@ -546,7 +545,7 @@ func TestProfilePicture_FullWorkflow(t *testing.T) {
 	assert.True(t, getResponse2["hasPicture"].(bool))
 
 	// 5. Fetch the actual picture via public endpoint
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject.String())
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject)
 	httpClient := createHttpClient(t)
 	pictureResp, err := httpClient.Get(pictureUrl)
 	assert.NoError(t, err)

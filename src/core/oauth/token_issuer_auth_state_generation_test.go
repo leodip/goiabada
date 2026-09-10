@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -54,7 +54,7 @@ func generationTestCode(scope string, sessionIdentifier string, codeGeneration i
 		},
 		User: models.User{
 			Id:                  1,
-			Subject:             uuid.New(),
+			Subject:             fake.UUID(),
 			Username:            "testuser",
 			Email:               "test@example.com",
 			AuthStateGeneration: userGeneration,
@@ -216,7 +216,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 		// handler-to-issuer seam is pinned separately in handler_token's ROPC test.
 		input := &ROPCGrantInput{
 			Client: &models.Client{Id: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
-			User:   &models.User{Id: 1, Subject: uuid.New(), Username: "testuser", AuthStateGeneration: 7},
+			User:   &models.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 7},
 			Scope:  "openid",
 		}
 		tokenStr, _, err := issuer.generateROPCAccessToken(settings, input, input.Scope, now, privKey, "test-kid", nil)
@@ -234,7 +234,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 		// with the current 9 and launders it forward.
 		input := &ROPCGrantInput{
 			Client: &models.Client{Id: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
-			User:   &models.User{Id: 1, Subject: uuid.New(), Username: "testuser", AuthStateGeneration: 9},
+			User:   &models.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 9},
 			Scope:  "openid",
 		}
 		parent := &models.RefreshToken{RefreshTokenType: offlineRefreshTokenType, AuthStateGeneration: 7}
@@ -246,7 +246,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 	t.Run("implicit takes the AuthContext's generation", func(t *testing.T) {
 		input := &ImplicitGrantInput{
 			Client:              &models.Client{Id: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
-			User:                &models.User{Id: 1, Subject: uuid.New(), Username: "testuser", AuthStateGeneration: 9},
+			User:                &models.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 9},
 			Scope:               "openid",
 			AcrLevel:            "urn:goiabada:level1",
 			AuthMethods:         "pwd",
@@ -368,7 +368,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 
 		input := &ROPCGrantInput{
 			Client: &models.Client{Id: 1, ClientIdentifier: "test-client"},
-			User:   &models.User{Id: 1, Subject: uuid.New(), AuthStateGeneration: 7},
+			User:   &models.User{Id: 1, Subject: fake.UUID(), AuthStateGeneration: 7},
 			Scope:  "openid",
 		}
 
@@ -391,7 +391,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		// while the grant was authenticated at 7.
 		input := &ROPCGrantInput{
 			Client: &models.Client{Id: 1, ClientIdentifier: "test-client"},
-			User:   &models.User{Id: 1, Subject: uuid.New(), AuthStateGeneration: 9},
+			User:   &models.User{Id: 1, Subject: fake.UUID(), AuthStateGeneration: 9},
 			Scope:  "openid",
 		}
 		parent := &models.RefreshToken{

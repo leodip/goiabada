@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
@@ -84,7 +83,7 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 	// Setup: Create test users with more unique identifiers to avoid conflicts
 	uniqueSuffix := fake.LetterN(8)
 	user1 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "uniquejohn" + uniqueSuffix + "@searchtest.com",
 		GivenName:     "UniqueJohn",
@@ -379,7 +378,7 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 	var testUsers []*models.User
 	for i := 1; i <= 8; i++ {
 		user := &models.User{
-			Subject:       uuid.New(),
+			Subject:       fake.UUID(),
 			Enabled:       true,
 			Email:         "testuser" + string(rune('0'+i)) + "@pagination.test",
 			GivenName:     "Test",
@@ -453,7 +452,7 @@ func createTestUsers(t *testing.T) []*models.User {
 
 	// Create user 1
 	user1 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "john.doe@test.com",
 		GivenName:     "AAA John",
@@ -466,7 +465,7 @@ func createTestUsers(t *testing.T) []*models.User {
 
 	// Create user 2
 	user2 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "jane.smith@test.com",
 		GivenName:     "AAA Jane",
@@ -479,7 +478,7 @@ func createTestUsers(t *testing.T) []*models.User {
 
 	// Create user 3
 	user3 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       false, // Disabled user
 		Email:         "disabled@test.com",
 		GivenName:     "AAA Disabled",
@@ -501,7 +500,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 
 	// Create user 1 - enabled user
 	user1 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "john.doe." + suffix + "@test.com",
 		GivenName:     "John" + suffix,
@@ -514,7 +513,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 
 	// Create user 2 - enabled user
 	user2 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "jane.smith." + suffix + "@test.com",
 		GivenName:     "Jane" + suffix,
@@ -527,7 +526,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 
 	// Create user 3 - disabled user
 	user3 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       false,
 		Email:         "disabled." + suffix + "@test.com",
 		GivenName:     "Disabled" + suffix,

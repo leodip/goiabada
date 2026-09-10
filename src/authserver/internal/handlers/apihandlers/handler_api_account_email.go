@@ -54,7 +54,7 @@ func HandleAPIAccountEmailPut(
 
 		// Validate email (server-side rules; confirmation is a UI concern)
 		email := strings.ToLower(strings.TrimSpace(req.Email))
-		if err := emailValidator.ValidateEmailChange(email, user.Subject.String()); err != nil {
+		if err := emailValidator.ValidateEmailChange(email, user.Subject); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}

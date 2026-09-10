@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,7 +45,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 
 	// Setup: Create test user and add to group
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@groupdelete.test",
 		GivenName:     "Test",

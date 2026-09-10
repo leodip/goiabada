@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@groups-update.test",
 		GivenName:     "Test",
@@ -114,7 +114,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@empty-groups.test",
 		GivenName:  "Test",
@@ -179,7 +179,7 @@ func TestAPIUserGroupsPut_NonExistentGroup(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@invalid-group.test",
 		GivenName:  "Test",
@@ -256,7 +256,7 @@ func TestAPIUserGroupsPut_InvalidRequestBody(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@invalid-body.test",
 		GivenName:  "Test",
@@ -287,7 +287,7 @@ func TestAPIUserGroupsPut_InvalidRequestBody(t *testing.T) {
 func TestAPIUserGroupsPut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-update.test",
 		GivenName:  "Test",

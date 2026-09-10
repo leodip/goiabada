@@ -3,10 +3,10 @@ package user
 import (
 	"database/sql"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/pkg/errors"
 )
 
@@ -32,7 +32,7 @@ type CreateUserInput struct {
 func (uc *UserCreator) CreateUser(input *CreateUserInput) (*models.User, error) {
 
 	user := &models.User{
-		Subject:       uuid.New(),
+		Subject:       uuidutil.New(),
 		Enabled:       true,
 		Email:         input.Email,
 		EmailVerified: input.EmailVerified,

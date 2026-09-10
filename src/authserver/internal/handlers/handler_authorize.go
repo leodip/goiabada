@@ -555,7 +555,7 @@ func HandleAuthorizeGet(
 
 			// Check id_token_hint sub matching for SSO session reuse (OIDC Core 3.1.2.1)
 			// If hint identifies a different user, force re-authentication instead of SSO
-			if authContext.IdTokenHintSub != "" && userSession.User.Subject.String() != authContext.IdTokenHintSub {
+			if authContext.IdTokenHintSub != "" && userSession.User.Subject != authContext.IdTokenHintSub {
 				// Treat as no valid session — force re-authentication
 				authContext.AuthState = oauth.AuthStateRequiresLevel1
 				err = authHelper.SaveAuthContext(w, r, &authContext)
@@ -679,7 +679,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	// 3a. Check id_token_hint sub matching (OIDC Core 3.1.2.1)
 	// "MUST NOT reply with an ID Token for a different user"
 	if authContext.IdTokenHintSub != "" {
-		if userSession.User.Subject.String() != authContext.IdTokenHintSub {
+		if userSession.User.Subject != authContext.IdTokenHintSub {
 			redirectWithError(constants.ErrorLoginRequired,
 				"The current session user does not match the id_token_hint")
 			return

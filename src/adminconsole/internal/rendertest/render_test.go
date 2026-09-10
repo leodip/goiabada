@@ -297,9 +297,7 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 func TestRender_AdminUsersPaginator(t *testing.T) {
 	out := render(t, "/admin_users.html", map[string]interface{}{
 		"pageResult": adminuserhandlers.PageResult{
-			// Subject is left at its zero UUID: the row only has to render, and
-			// importing google/uuid for it would make adminconsole a direct
-			// consumer of a module it otherwise only inherits.
+			// Subject is left empty: the row only has to render.
 			Users:    []models.User{{Id: 1, Username: "alice", Email: "alice@example.com"}},
 			Total:    73,
 			Query:    "",

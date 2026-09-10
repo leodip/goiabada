@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,7 +22,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 
 	// Create a client and a consent for this user
 	client := &models.Client{
-		ClientIdentifier: "acct-consents-client-" + uuid.New().String()[:8],
+		ClientIdentifier: "acct-consents-client-" + fake.UUID()[:8],
 		Description:      "Account Consents Test Client",
 		Enabled:          true,
 		IsPublic:         true,
@@ -108,7 +108,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 
 	// Create a client and consent for this user
 	client := &models.Client{
-		ClientIdentifier: "acct-consents-del-client-" + uuid.New().String()[:8],
+		ClientIdentifier: "acct-consents-del-client-" + fake.UUID()[:8],
 		Description:      "Account Consents Delete Client",
 		Enabled:          true,
 		IsPublic:         true,
@@ -150,7 +150,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 
 	// Create another user (user2)
 	user2 := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "otheruser@consents.test",
 		GivenName:  "Other",
@@ -162,7 +162,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 
 	// Create client and consent for user2
 	client := &models.Client{
-		ClientIdentifier: "acct-consents-oth-client-" + uuid.New().String()[:8],
+		ClientIdentifier: "acct-consents-oth-client-" + fake.UUID()[:8],
 		Description:      "Other User Client",
 		Enabled:          true,
 		IsPublic:         true,

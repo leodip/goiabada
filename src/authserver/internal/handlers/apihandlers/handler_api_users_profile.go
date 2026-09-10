@@ -76,7 +76,7 @@ func HandleAPIUserProfilePut(
 			ZoneInfoCountryName: zoneInfoCountry,
 			ZoneInfo:            zoneInfo,
 			Locale:              req.Locale,
-			Subject:             user.Subject.String(),
+			Subject:             user.Subject,
 		}
 
 		err = profileValidator.ValidateProfile(input)

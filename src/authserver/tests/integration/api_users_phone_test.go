@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -96,7 +96,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@phone.test",
 		GivenName:     "Test",
@@ -153,7 +153,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 
 	// Setup: Create test user with existing phone number
 	testUser := &models.User{
-		Subject:                       uuid.New(),
+		Subject:                       fake.UUID(),
 		Enabled:                       true,
 		Email:                         "testuser@phone-clear.test",
 		GivenName:                     "Test",
@@ -210,7 +210,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@phone-validation.test",
 		GivenName:     "Test",
@@ -351,7 +351,7 @@ func TestAPIUserPhonePut_InvalidRequestBody(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@phone-invalid-body.test",
 		GivenName:     "Test",
@@ -383,7 +383,7 @@ func TestAPIUserPhonePut_InvalidRequestBody(t *testing.T) {
 func TestAPIUserPhonePut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@phone-unauth.test",
 		GivenName:     "Test",
@@ -416,7 +416,7 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@phone-verified.test",
 		GivenName:     "Test",

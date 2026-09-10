@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
@@ -75,7 +74,7 @@ func createCrossUserUser(t *testing.T, withOtp bool) (*models.User, string) {
 	require.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -330,7 +329,7 @@ func assertCeremonyBoundToUserB(t *testing.T, b *crossUserBrowser, codeVal strin
 	idToken, ok := tokenData["id_token"].(string)
 	require.True(t, ok, "expected an id_token, got %v", tokenData)
 	idClaims := decodeJWTPayload(t, idToken)
-	assert.Equal(t, b.userB.Subject.String(), idClaims["sub"])
+	assert.Equal(t, b.userB.Subject, idClaims["sub"])
 	assert.Equal(t, code.SessionIdentifier, idClaims["sid"],
 		"the id_token's sid must name the session this ceremony bound to")
 

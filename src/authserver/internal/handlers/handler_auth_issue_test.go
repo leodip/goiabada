@@ -11,11 +11,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -53,7 +53,7 @@ func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_user.
 			client.RedirectURIs = []models.RedirectURI{{URI: redirectURI}}
 		}).Return(nil).Maybe()
 	database.On("GetUserById", mock.Anything, mock.Anything).
-		Return(&models.User{Id: 1, Subject: uuid.New()}, nil).Maybe()
+		Return(&models.User{Id: 1, Subject: fake.UUID()}, nil).Maybe()
 	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
 		Return(true).Maybe()
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything).
@@ -1329,7 +1329,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}, nil)
 		database.On("GetUserById", mock.Anything, int64(123)).
-			Return(&models.User{Id: 123, Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111"), Enabled: true}, nil)
+			Return(&models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
 		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *oauth.ImplicitGrantInput) bool {
 			return input.User.Id == int64(123) && input.SessionIdentifier == liveSessionIdentifier
@@ -1786,7 +1786,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		// Mock user lookup
 		mockUser := &models.User{
 			Id:      123,
-			Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+			Subject: "11111111-1111-1111-1111-111111111111",
 			Email:   "test@example.com",
 			Enabled: true,
 		}
@@ -1877,7 +1877,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		mockUser := &models.User{
 			Id:      123,
-			Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+			Subject: "11111111-1111-1111-1111-111111111111",
 			Email:   "test@example.com",
 			Enabled: true,
 		}
@@ -1961,7 +1961,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		mockUser := &models.User{
 			Id:      123,
-			Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+			Subject: "11111111-1111-1111-1111-111111111111",
 			Email:   "test@example.com",
 			Enabled: true,
 		}
@@ -2037,7 +2037,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{Id: 123, Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111")}
+		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &oauth.ImplicitGrantResponse{
@@ -2200,7 +2200,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{Id: 123, Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111")}
+		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenError := errors.New("token generation failed")
@@ -2573,7 +2573,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{Id: 123, Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111")}
+		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &oauth.ImplicitGrantResponse{
@@ -3360,7 +3360,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		// Create authContext with IdTokenHintSub matching the user's subject
-		userSubject := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+		userSubject := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
@@ -3370,7 +3370,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userSubject.String(),
+			IdTokenHintSub: userSubject,
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -3444,8 +3444,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		// Create authContext with IdTokenHintSub for user A
-		userASubject := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
@@ -3455,7 +3455,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userASubject.String(), // Hint says user A
+			IdTokenHintSub: userASubject, // Hint says user A
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
@@ -3525,8 +3525,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		userASubject := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
@@ -3536,7 +3536,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userASubject.String(),
+			IdTokenHintSub: userASubject,
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
@@ -3602,8 +3602,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		userASubject := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
@@ -3613,7 +3613,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userASubject.String(),
+			IdTokenHintSub: userASubject,
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
@@ -3671,8 +3671,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		userASubject := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &oauth.AuthContext{
 			AuthState:      oauth.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
@@ -3682,7 +3682,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userASubject.String(),
+			IdTokenHintSub: userASubject,
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
@@ -3811,8 +3811,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		userASubject := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
 		var savedAuthContext *oauth.AuthContext
 
@@ -3827,7 +3827,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 				ResponseType:   "code",
 				RedirectURI:    "https://example.com/callback",
 				State:          "test-state",
-				IdTokenHintSub: userASubject.String(),
+				IdTokenHintSub: userASubject,
 				Prompt:         "login",
 			}
 		}).Return(func(r *http.Request) *oauth.AuthContext {
@@ -3865,7 +3865,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.Contains(t, location, "state=test-state")
 
 		assert.NotNil(t, savedAuthContext, "AuthContext should have been created")
-		assert.Equal(t, userASubject.String(), savedAuthContext.IdTokenHintSub, "IdTokenHintSub should persist from authorize request")
+		assert.Equal(t, userASubject, savedAuthContext.IdTokenHintSub, "IdTokenHintSub should persist from authorize request")
 		assert.Equal(t, int64(99), savedAuthContext.UserId, "UserId should be set to authenticated user (user B)")
 
 		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
@@ -3986,7 +3986,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 				Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true).Maybe()
 			database.On("GetUserById", mock.Anything, int64(123)).
-				Return(&models.User{Id: 123, Subject: uuid.New(), Enabled: true}, nil).Maybe()
+				Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything).
 				Return(func(scope string, _ *models.User) string { return scope }, nil).Maybe()
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
@@ -4067,7 +4067,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 		ResponseType:   "code",
 		RedirectURI:    "https://example.com/callback",
 		State:          "test-state",
-		IdTokenHintSub: uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").String(),
+		IdTokenHintSub: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 	}
 	authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -4309,7 +4309,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			stubLiveSession(database, 123)
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true)
 
-			user := &models.User{Id: 123, Subject: uuid.New(), Enabled: true}
+			user := &models.User{Id: 123, Subject: fake.UUID(), Enabled: true}
 			database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
 
 			// The field the filter is asked about is the one the issuer will read, and asserting
@@ -4410,7 +4410,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 				database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
 					Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
 				database.On("GetUserById", mock.Anything, int64(123)).
-					Return(&models.User{Id: 123, Subject: uuid.New(), Enabled: true}, nil)
+					Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil)
 				permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", mock.Anything).
 					Return("", errors.New("permission filter sentinel"))
 			},
@@ -4674,7 +4674,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		stubLiveSession(database, 123)
 		userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true)
 
-		user := &models.User{Id: 123, Subject: uuid.New(), Enabled: true}
+		user := &models.User{Id: 123, Subject: fake.UUID(), Enabled: true}
 		database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "backend:read", user).
 			Return("", nil)

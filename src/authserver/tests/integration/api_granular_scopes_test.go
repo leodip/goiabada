@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
@@ -87,7 +86,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 
 	// Create a test user for the tests
 	testUser := &models.User{
-		Subject:   uuid.New(),
+		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
 		GivenName: "TestUser",
@@ -234,7 +233,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 
 	// Create a test user for the tests
 	testUser := &models.User{
-		Subject:   uuid.New(),
+		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
 		GivenName: "TestUser",
@@ -293,7 +292,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 
 	// Create a test user
 	testUser := &models.User{
-		Subject:   uuid.New(),
+		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
 		GivenName: "TestUser",
@@ -352,7 +351,7 @@ func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.
 
 	// Create a test user
 	testUser := &models.User{
-		Subject:   uuid.New(),
+		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
 		GivenName: "TestUser",
@@ -397,7 +396,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 
 	// Create a test user
 	testUser := &models.User{
-		Subject:   uuid.New(),
+		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
 		GivenName: "TestUser",
@@ -606,7 +605,7 @@ func TestGranularScopes_ResourcesRequireSettingsScope(t *testing.T) {
 func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 	// Create a test user
 	testUser := &models.User{
-		Subject:   uuid.New(),
+		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
 		GivenName: "TestUser",

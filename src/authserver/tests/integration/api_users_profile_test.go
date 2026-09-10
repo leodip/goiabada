@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@profile.test",
 		GivenName:     "Test",
@@ -89,7 +89,7 @@ func TestAPIUserProfilePut_PartialUpdate(t *testing.T) {
 
 	// Setup: Create test user with existing data
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@partial.test",
 		GivenName:  "Original",
@@ -136,7 +136,7 @@ func TestAPIUserProfilePut_InvalidGender(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@gender.test",
 		GivenName:  "Test",
@@ -169,7 +169,7 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@valid-gender.test",
 		GivenName:  "Test",
@@ -223,7 +223,7 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@dob.test",
 		GivenName:  "Test",
@@ -304,7 +304,7 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@invalid.test",
 		GivenName:  "Test",
@@ -335,7 +335,7 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 func TestAPIUserProfilePut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth.test",
 		GivenName:  "Test",
@@ -368,7 +368,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@address.test",
 		GivenName:     "Test",
@@ -430,7 +430,7 @@ func TestAPIUserAddressPut_PartialAddress(t *testing.T) {
 
 	// Setup: Create test user with existing address
 	testUser := &models.User{
-		Subject:           uuid.New(),
+		Subject:           fake.UUID(),
 		Enabled:           true,
 		Email:             "testuser@partial-addr.test",
 		GivenName:         "Test",
@@ -480,7 +480,7 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 
 	// Setup: Create test user with existing address data
 	testUser := &models.User{
-		Subject:           uuid.New(),
+		Subject:           fake.UUID(),
 		Enabled:           true,
 		Email:             "testuser@clear-addr.test",
 		GivenName:         "Test",
@@ -529,7 +529,7 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@angle-brackets.test",
 		GivenName:     "Test",
@@ -572,7 +572,7 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@verbatim-address.test",
 		GivenName:     "Test",
@@ -658,7 +658,7 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@invalid-addr.test",
 		GivenName:  "Test",
@@ -689,7 +689,7 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 func TestAPIUserAddressPut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-addr.test",
 		GivenName:  "Test",

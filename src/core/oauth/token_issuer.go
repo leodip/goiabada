@@ -669,7 +669,7 @@ func (t *TokenIssuer) addOpenIdConnectClaimsFromUser(claims jwt.MapClaims, user 
 		// Add picture claim if user has a profile picture
 		hasPicture, err := t.database.UserHasProfilePicture(nil, user.Id)
 		if err == nil && hasPicture {
-			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, user.Subject.String())
+			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, user.Subject)
 		}
 	}
 

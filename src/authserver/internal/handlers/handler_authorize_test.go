@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -19,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -2720,7 +2720,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
-		userSubject := uuid.New()
+		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=expired-jwt-token", nil)
 		assert.NoError(t, err)
 
@@ -2757,13 +2757,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			TokenBase64: "expired-jwt-token",
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
-				"sub": userSubject.String(),
+				"sub": userSubject,
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", "expired-jwt-token", mock.Anything, false).Return(expiredToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.IdTokenHintSub == userSubject.String()
+			return ac.IdTokenHintSub == userSubject
 		})).Return(nil)
 
 		userSession := &models.UserSession{
@@ -2812,7 +2812,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
-		userSubject := uuid.New()
+		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-token", nil)
 		assert.NoError(t, err)
 
@@ -2849,13 +2849,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			TokenBase64: "valid-jwt-token",
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
-				"sub": userSubject.String(),
+				"sub": userSubject,
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.IdTokenHintSub == userSubject.String()
+			return ac.IdTokenHintSub == userSubject
 		})).Return(nil)
 
 		userSession := &models.UserSession{
@@ -2904,8 +2904,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
-		hintSubject := uuid.New()
-		sessionSubject := uuid.New()
+		hintSubject := fake.UUID()
+		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
@@ -2943,13 +2943,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			TokenBase64: "different-user-jwt",
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
-				"sub": hintSubject.String(),
+				"sub": hintSubject,
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.IdTokenHintSub == hintSubject.String()
+			return ac.IdTokenHintSub == hintSubject
 		})).Return(nil)
 
 		userSession := &models.UserSession{
@@ -2997,7 +2997,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
-		userSubject := uuid.New()
+		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=valid-jwt-token", nil)
 		assert.NoError(t, err)
 
@@ -3034,13 +3034,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			TokenBase64: "valid-jwt-token",
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
-				"sub": userSubject.String(),
+				"sub": userSubject,
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.IdTokenHintSub == userSubject.String() && ac.Prompt == "none"
+			return ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
 		})).Return(nil)
 		// The silent-issue path sets the AuthContext again just before code issuance; this
 		// is the assertion that it inherits the session's generation and not the user's.
@@ -3111,8 +3111,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
-		hintSubject := uuid.New()
-		sessionSubject := uuid.New()
+		hintSubject := fake.UUID()
+		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
@@ -3150,13 +3150,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			TokenBase64: "different-user-jwt",
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
-				"sub": hintSubject.String(),
+				"sub": hintSubject,
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.IdTokenHintSub == hintSubject.String() && ac.Prompt == "none"
+			return ac.IdTokenHintSub == hintSubject && ac.Prompt == "none"
 		})).Return(nil)
 
 		userSession := &models.UserSession{
@@ -3213,8 +3213,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
-		hintSubject := uuid.New()
-		sessionSubject := uuid.New()
+		hintSubject := fake.UUID()
+		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
@@ -3250,7 +3250,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			TokenBase64: "different-user-jwt",
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
-				"sub": hintSubject.String(),
+				"sub": hintSubject,
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
@@ -3315,8 +3315,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
-		hintSubject := uuid.New()
-		sessionSubject := uuid.New()
+		hintSubject := fake.UUID()
+		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
@@ -3352,7 +3352,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			TokenBase64: "different-user-jwt",
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
-				"sub": hintSubject.String(),
+				"sub": hintSubject,
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
@@ -3409,8 +3409,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
-		hintSubject := uuid.New()
-		sessionSubject := uuid.New()
+		hintSubject := fake.UUID()
+		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
@@ -3446,7 +3446,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			TokenBase64: "different-user-jwt",
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
-				"sub": hintSubject.String(),
+				"sub": hintSubject,
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)

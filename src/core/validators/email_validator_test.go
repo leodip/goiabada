@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -56,8 +56,8 @@ func TestValidateEmailUpdate(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewEmailValidator(mockDB)
 
-	subject1 := uuid.New()
-	subject2 := uuid.New()
+	subject1 := fake.UUID()
+	subject2 := fake.UUID()
 
 	tests := []struct {
 		name         string
@@ -71,10 +71,10 @@ func TestValidateEmailUpdate(t *testing.T) {
 			input: ValidateEmailInput{
 				Email:             "new@example.com",
 				EmailConfirmation: "new@example.com",
-				Subject:           subject1.String(),
+				Subject:           subject1,
 			},
 			mockSetup: func() {
-				mockDB.On("GetUserBySubject", mock.Anything, subject1.String()).Return(&models.User{Subject: subject1}, nil)
+				mockDB.On("GetUserBySubject", mock.Anything, subject1).Return(&models.User{Subject: subject1}, nil)
 				mockDB.On("GetUserByEmail", mock.Anything, "new@example.com").Return(nil, nil)
 			},
 		},
@@ -83,7 +83,7 @@ func TestValidateEmailUpdate(t *testing.T) {
 			input: ValidateEmailInput{
 				Email:             "",
 				EmailConfirmation: "",
-				Subject:           subject1.String(),
+				Subject:           subject1,
 			},
 			mockSetup:    func() {},
 			expectedCode: i18n.ErrCodeEmailRequired,
@@ -93,7 +93,7 @@ func TestValidateEmailUpdate(t *testing.T) {
 			input: ValidateEmailInput{
 				Email:             "thisemailaddressiswaytoolongandexceedsthemaximumlengthof60characters@example.com",
 				EmailConfirmation: "thisemailaddressiswaytoolongandexceedsthemaximumlengthof60characters@example.com",
-				Subject:           subject1.String(),
+				Subject:           subject1,
 			},
 			mockSetup:    func() {},
 			expectedCode: i18n.ErrCodeEmailTooLong,
@@ -104,7 +104,7 @@ func TestValidateEmailUpdate(t *testing.T) {
 			input: ValidateEmailInput{
 				Email:             "new@example.com",
 				EmailConfirmation: "different@example.com",
-				Subject:           subject1.String(),
+				Subject:           subject1,
 			},
 			mockSetup:    func() {},
 			expectedCode: i18n.ErrCodeEmailConfirmationMismatch,
@@ -114,10 +114,10 @@ func TestValidateEmailUpdate(t *testing.T) {
 			input: ValidateEmailInput{
 				Email:             "existing@example.com",
 				EmailConfirmation: "existing@example.com",
-				Subject:           subject1.String(),
+				Subject:           subject1,
 			},
 			mockSetup: func() {
-				mockDB.On("GetUserBySubject", mock.Anything, subject1.String()).Return(&models.User{Subject: subject1}, nil)
+				mockDB.On("GetUserBySubject", mock.Anything, subject1).Return(&models.User{Subject: subject1}, nil)
 				mockDB.On("GetUserByEmail", mock.Anything, "existing@example.com").Return(&models.User{Subject: subject2}, nil)
 			},
 			expectedCode: i18n.ErrCodeEmailAlreadyRegistered,
@@ -154,17 +154,17 @@ func TestValidateEmailUpdate(t *testing.T) {
 // =============================================================================
 
 func TestValidateEmailChange_Accepted(t *testing.T) {
-	subject := uuid.New()
+	subject := fake.UUID()
 
 	t.Run("address is free", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(
+		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
 			&models.User{Id: 1, Subject: subject}, nil).Once()
 		mockDB.On("GetUserByEmail", mock.Anything, "new@example.com").Return(nil, nil).Once()
 
-		err := validator.ValidateEmailChange("new@example.com", subject.String())
+		err := validator.ValidateEmailChange("new@example.com", subject)
 
 		assert.NoError(t, err)
 	})
@@ -174,10 +174,10 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 		validator := NewEmailValidator(mockDB)
 
 		user := &models.User{Id: 1, Subject: subject}
-		mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(user, nil).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(user, nil).Once()
 		mockDB.On("GetUserByEmail", mock.Anything, "same@example.com").Return(user, nil).Once()
 
-		err := validator.ValidateEmailChange("same@example.com", subject.String())
+		err := validator.ValidateEmailChange("same@example.com", subject)
 
 		assert.NoError(t, err, "keeping your own address must not be reported as taken")
 	})
@@ -189,11 +189,11 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 		email := strings.Repeat("a", 60-len("@example.com")) + "@example.com"
 		assert.Len(t, email, 60)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(
+		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
 			&models.User{Id: 1, Subject: subject}, nil).Once()
 		mockDB.On("GetUserByEmail", mock.Anything, email).Return(nil, nil).Once()
 
-		err := validator.ValidateEmailChange(email, subject.String())
+		err := validator.ValidateEmailChange(email, subject)
 
 		assert.NoError(t, err)
 	})
@@ -203,15 +203,15 @@ func TestValidateEmailChange_AddressTakenByAnotherUser(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewEmailValidator(mockDB)
 
-	subject := uuid.New()
-	otherSubject := uuid.New()
+	subject := fake.UUID()
+	otherSubject := fake.UUID()
 
-	mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(
+	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
 		&models.User{Id: 1, Subject: subject}, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, "taken@example.com").Return(
 		&models.User{Id: 2, Subject: otherSubject}, nil).Once()
 
-	err := validator.ValidateEmailChange("taken@example.com", subject.String())
+	err := validator.ValidateEmailChange("taken@example.com", subject)
 
 	assertLocalizedErrorCode(t, err, i18n.ErrCodeEmailAlreadyRegistered)
 }
@@ -240,7 +240,7 @@ func TestValidateEmailChange_RejectedBeforeAnyLookup(t *testing.T) {
 			// proves the short circuit.
 			validator := NewEmailValidator(mocks_data.NewDatabase(t))
 
-			err := validator.ValidateEmailChange(tc.email, uuid.New().String())
+			err := validator.ValidateEmailChange(tc.email, fake.UUID())
 
 			assertLocalizedErrorCode(t, err, tc.expectedCode)
 		})
@@ -253,7 +253,7 @@ func TestValidateEmailChange_TooLong(t *testing.T) {
 	email := strings.Repeat("a", 50) + "@example.com"
 	assert.Greater(t, len(email), 60)
 
-	err := validator.ValidateEmailChange(email, uuid.New().String())
+	err := validator.ValidateEmailChange(email, fake.UUID())
 
 	assertLocalizedErrorCode(t, err, i18n.ErrCodeEmailTooLong)
 
@@ -265,16 +265,16 @@ func TestValidateEmailChange_TooLong(t *testing.T) {
 }
 
 func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
-	subject := uuid.New()
+	subject := fake.UUID()
 	dbErr := errors.New("database is down")
 
 	t.Run("GetUserBySubject fails", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(nil, dbErr).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(nil, dbErr).Once()
 
-		err := validator.ValidateEmailChange("new@example.com", subject.String())
+		err := validator.ValidateEmailChange("new@example.com", subject)
 
 		assert.Error(t, err)
 		_, isLocalized := err.(*i18n.LocalizedError)
@@ -285,11 +285,11 @@ func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(
+		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
 			&models.User{Id: 1, Subject: subject}, nil).Once()
 		mockDB.On("GetUserByEmail", mock.Anything, "new@example.com").Return(nil, dbErr).Once()
 
-		err := validator.ValidateEmailChange("new@example.com", subject.String())
+		err := validator.ValidateEmailChange("new@example.com", subject)
 
 		assert.Error(t, err)
 		_, isLocalized := err.(*i18n.LocalizedError)
@@ -362,12 +362,12 @@ func TestValidateEmailChange_DoesNotCheckConfirmation(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewEmailValidator(mockDB)
 
-	subject := uuid.New()
-	mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(
+	subject := fake.UUID()
+	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
 		&models.User{Id: 1, Subject: subject}, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, "new@example.com").Return(nil, nil).Once()
 
-	err := validator.ValidateEmailChange("new@example.com", subject.String())
+	err := validator.ValidateEmailChange("new@example.com", subject)
 
 	assert.NoError(t, err)
 }

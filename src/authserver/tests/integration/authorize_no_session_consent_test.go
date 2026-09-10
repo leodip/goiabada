@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -50,7 +49,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -185,7 +184,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -323,7 +322,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -463,7 +462,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -616,7 +615,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	}
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
@@ -778,7 +777,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	}
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
@@ -936,7 +935,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 	userEmail := fake.Email()
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        userEmail,
 		PasswordHash: passwordHashed,
@@ -1089,7 +1088,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 	userEmail := fake.Email()
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        userEmail,
 		PasswordHash: passwordHashed,
@@ -1254,7 +1253,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
@@ -1416,7 +1415,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
@@ -1573,7 +1572,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -1703,7 +1702,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -1830,7 +1829,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	}
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
@@ -1962,7 +1961,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 	userEmail := fake.Email()
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        userEmail,
 		PasswordHash: passwordHashed,
@@ -2101,7 +2100,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
@@ -2237,7 +2236,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,

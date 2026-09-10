@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ func TestAPIUserPermissionsGet_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@permissions.test",
 		GivenName:     "Test",
@@ -128,7 +128,7 @@ func TestAPIUserPermissionsGet_NoPermissions(t *testing.T) {
 
 	// Setup: Create test user without permissions
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@no-permissions.test",
 		GivenName:  "Test",
@@ -161,7 +161,7 @@ func TestAPIUserPermissionsGet_NoPermissions(t *testing.T) {
 func TestAPIUserPermissionsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-permissions.test",
 		GivenName:  "Test",
@@ -194,7 +194,7 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@permissions-put.test",
 		GivenName:     "Test",
@@ -270,7 +270,7 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@remove-all-permissions.test",
 		GivenName:  "Test",
@@ -348,7 +348,7 @@ func TestAPIUserPermissionsPut_PermissionNotFound(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@perm-not-found.test",
 		GivenName:  "Test",
@@ -379,7 +379,7 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@invalid-body.test",
 		GivenName:  "Test",
@@ -410,7 +410,7 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-put.test",
 		GivenName:  "Test",

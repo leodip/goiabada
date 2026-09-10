@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,7 +22,7 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@email.test",
 		GivenName:     "Test",
@@ -75,7 +75,7 @@ func TestAPIUserEmailPut_EmailNormalization(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@normalize.test",
 		GivenName:  "Test",
@@ -120,7 +120,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 
 	// Setup: Create first user with existing email
 	existingUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "existing@duplicate.test",
 		GivenName:  "Existing",
@@ -134,7 +134,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 
 	// Setup: Create second user to test duplicate email
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@duplicate.test",
 		GivenName:  "Test",
@@ -171,7 +171,7 @@ func TestAPIUserEmailPut_InvalidEmail(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@invalid.test",
 		GivenName:  "Test",
@@ -219,7 +219,7 @@ func TestAPIUserEmailPut_SetEmailVerified(t *testing.T) {
 
 	// Setup: Create test user with unverified email and verification code
 	testUser := &models.User{
-		Subject:                        uuid.New(),
+		Subject:                        fake.UUID(),
 		Enabled:                        true,
 		Email:                          "testuser@verified.test",
 		GivenName:                      "Test",
@@ -269,7 +269,7 @@ func TestAPIUserEmailPut_UnsetEmailVerified(t *testing.T) {
 
 	// Setup: Create test user with verified email
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@unverified.test",
 		GivenName:     "Test",
@@ -363,7 +363,7 @@ func TestAPIUserEmailPut_InvalidRequestBody(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@invalid-body.test",
 		GivenName:  "Test",
@@ -394,7 +394,7 @@ func TestAPIUserEmailPut_InvalidRequestBody(t *testing.T) {
 func TestAPIUserEmailPut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-email.test",
 		GivenName:  "Test",
@@ -426,7 +426,7 @@ func TestAPIUserEmailPut_PartialUpdate(t *testing.T) {
 
 	// Setup: Create test user with existing data
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "original@partial.test",
 		GivenName:     "Test",

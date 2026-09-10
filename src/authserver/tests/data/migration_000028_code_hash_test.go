@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -141,7 +141,7 @@ func seedPreMigration000028User(t *testing.T, h *isolatedDB) int64 {
 		falseLit, trueLit = "false", "true"
 	}
 
-	subject := uuid.NewString()
+	subject := fake.UUID()
 	q := fmt.Sprintf(`INSERT INTO users
 		(enabled, subject, username, email_verified, phone_number_verified,
 		 password_hash, otp_enabled)
@@ -161,7 +161,7 @@ func seedPreMigration000028User(t *testing.T, h *isolatedDB) int64 {
 func seedPreMigration000028PreRegistration(t *testing.T, h *isolatedDB) int64 {
 	t.Helper()
 
-	email := uuid.NewString() + "@example.com"
+	email := fake.UUID() + "@example.com"
 	q := fmt.Sprintf(`INSERT INTO pre_registrations (email, password_hash) VALUES ('%s', 'x')`, email)
 	_, err := h.SQL.Exec(q)
 	require.NoError(t, err, "seed pre-registration")

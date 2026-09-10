@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,7 +22,7 @@ func TestAPIUserGet_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@get.test",
 		GivenName:     "Test",
@@ -99,7 +99,7 @@ func TestAPIUserGet_InvalidId(t *testing.T) {
 func TestAPIUserGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@unauth.test",
 		GivenName:     "Test",
@@ -190,7 +190,7 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 
 	// Setup: Create existing user
 	existingUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "duplicate@create.test",
 		GivenName:     "Existing",
@@ -339,7 +339,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 
 	// Setup: Create test user (enabled by default)
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@enabled.test",
 		GivenName:     "Test",
@@ -386,7 +386,7 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 
 	// Setup: Create disabled test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       false,
 		Email:         "disabled@enabled.test",
 		GivenName:     "Disabled",
@@ -461,7 +461,7 @@ func TestAPIUserEnabledPut_InvalidRequestBody(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@invalid.test",
 		GivenName:     "Test",
@@ -497,7 +497,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@delete.test",
 		GivenName:     "Test",
@@ -571,7 +571,7 @@ func TestAPIUserDelete_InvalidId(t *testing.T) {
 func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@delete-unauth.test",
 		GivenName:     "Test",

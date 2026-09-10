@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 // TestBackfillEncryptedOTPSecrets exercises the one-time migration of legacy
@@ -34,9 +34,9 @@ func TestBackfillEncryptedOTPSecrets(t *testing.T) {
 	key := config.GetAESEncryptionKey()
 
 	create := func(u *models.User) *models.User {
-		u.Subject = uuid.New()
-		u.Username = uuid.NewString()
-		u.Email = uuid.NewString() + "@example.com"
+		u.Subject = fake.UUID()
+		u.Username = fake.UUID()
+		u.Email = fake.UUID() + "@example.com"
 		u.PasswordHash = "x"
 		if err := db.CreateUser(nil, u); err != nil {
 			t.Fatalf("CreateUser: %v", err)

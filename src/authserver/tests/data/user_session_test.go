@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
@@ -432,7 +431,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Email:         fake.Email(),
 		EmailVerified: true,
 		PasswordHash:  fake.Password(32),
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		GivenName:     fake.FirstName(),
 		FamilyName:    fake.LastName(),
@@ -630,7 +629,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Email:         fake.Email(),
 		EmailVerified: true,
 		PasswordHash:  fake.Password(32),
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		GivenName:     fake.FirstName(),
 		FamilyName:    fake.LastName(),

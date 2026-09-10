@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -91,7 +90,7 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 
 	// Create another user with a known email
 	otherEmail := "existing_" + strings.ToLower(fake.LetterN(6)) + "@example.com"
-	otherUser := &models.User{Email: otherEmail, Enabled: true, Subject: uuid.New()}
+	otherUser := &models.User{Email: otherEmail, Enabled: true, Subject: fake.UUID()}
 	err := database.CreateUser(nil, otherUser)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteUser(nil, otherUser.Id) }()

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -176,7 +176,7 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 	createdAt := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := time.Date(2024, 2, 3, 4, 5, 6, 0, time.UTC)
 	birthDate := time.Date(1990, 5, 15, 0, 0, 0, 0, time.UTC)
-	subject := uuid.New()
+	subject := fake.UUID()
 
 	user := &models.User{
 		Id:                            7,
@@ -287,6 +287,28 @@ func TestUserResponse_ToUser_RoundTripsTimes(t *testing.T) {
 	assert.False(t, roundTripped.UpdatedAt.Valid, "an absent time must stay invalid")
 	assert.Len(t, roundTripped.Attributes, 1)
 	assert.Equal(t, "k", roundTripped.Attributes[0].Key)
+}
+
+// UserResponse.Subject was a 16-byte named type until #278, reaching JSON through that
+// type's MarshalText and coming back through UnmarshalText. It is a plain string now, and the
+// claim that made the swap safe is that no byte on the wire moved: the field is still the
+// bare canonical 36-character spelling, unquoted-array-free and unwrapped, and openapi.yaml
+// still describes it truthfully as type string, format uuid. A JSON encoder given the wrong
+// type would have produced a 16-element array instead, which is what this pins.
+func TestUserResponse_SubjectIsABareCanonicalString(t *testing.T) {
+	const subject = "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b"
+
+	encoded, err := json.Marshal(&UserResponse{Id: 9, Subject: subject})
+	assert.NoError(t, err)
+
+	assert.Contains(t, string(encoded), `"subject":"`+subject+`"`,
+		"subject must marshal as the bare 36-character string a client already parses")
+
+	var decoded UserResponse
+	assert.NoError(t, json.Unmarshal(encoded, &decoded))
+	assert.Equal(t, subject, decoded.Subject, "the wire form must round-trip unchanged")
+	assert.Equal(t, subject, decoded.ToUser().Subject,
+		"and reach a model unchanged, which is the adminconsole's path back")
 }
 
 func TestToUserResponses_MapsEachUserDistinctly(t *testing.T) {

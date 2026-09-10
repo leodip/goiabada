@@ -3,7 +3,6 @@ package datatests
 import (
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 )
@@ -20,7 +19,7 @@ func createUserWithGivenName(t *testing.T, givenName string) *models.User {
 	t.Helper()
 	user := &models.User{
 		Enabled:   true,
-		Subject:   uuid.New(),
+		Subject:   fake.UUID(),
 		Username:  "u" + fake.LetterN(12),
 		GivenName: givenName,
 		Email:     fake.LetterN(12) + "@example.com",

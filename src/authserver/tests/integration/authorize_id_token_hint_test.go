@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
@@ -34,7 +33,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	assert.NoError(t, err)
 
 	userA := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashedA,
@@ -47,7 +46,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	assert.NoError(t, err)
 
 	userB := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashedB,
@@ -155,7 +154,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 
 	// Verify User A's ID token contains correct subject
 	idClaimsA := decodeJWTPayload(t, idTokenUserA)
-	assert.Equal(t, userA.Subject.String(), idClaimsA["sub"], "ID token should have User A's subject")
+	assert.Equal(t, userA.Subject, idClaimsA["sub"], "ID token should have User A's subject")
 
 	// =========================================================================
 	// Step 4: Start NEW auth request with id_token_hint and prompt=login
@@ -256,7 +255,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -357,7 +356,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 
 	// Verify ID token
 	idClaims := decodeJWTPayload(t, idToken)
-	assert.Equal(t, user.Subject.String(), idClaims["sub"])
+	assert.Equal(t, user.Subject, idClaims["sub"])
 
 	// =========================================================================
 	// Step 4: Start NEW auth with same user using id_token_hint + prompt=login
@@ -434,7 +433,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// Verify new ID token still has same subject
 	newIdToken := tokenData2["id_token"].(string)
 	newIdClaims := decodeJWTPayload(t, newIdToken)
-	assert.Equal(t, user.Subject.String(), newIdClaims["sub"])
+	assert.Equal(t, user.Subject, newIdClaims["sub"])
 }
 
 // TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance verifies that
@@ -446,7 +445,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	assert.NoError(t, err)
 
 	userA := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashedA,
@@ -459,7 +458,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	assert.NoError(t, err)
 
 	userB := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashedB,

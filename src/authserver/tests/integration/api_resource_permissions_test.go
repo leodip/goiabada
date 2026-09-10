@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test resource
-	resource := createTestResource(t, "test-resource-perms-"+uuid.New().String()[:8], "Test Resource for Permissions")
+	resource := createTestResource(t, "test-resource-perms-"+fake.UUID()[:8], "Test Resource for Permissions")
 	defer func() {
 		_ = database.DeleteResource(nil, resource.Id)
 	}()
@@ -85,7 +85,7 @@ func TestAPIResourcePermissionsGet_NoPermissions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test resource without permissions
-	resource := createTestResource(t, "test-resource-no-perms-"+uuid.New().String()[:8], "Test Resource without Permissions")
+	resource := createTestResource(t, "test-resource-no-perms-"+fake.UUID()[:8], "Test Resource without Permissions")
 	defer func() {
 		_ = database.DeleteResource(nil, resource.Id)
 	}()
@@ -242,7 +242,7 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test resource (non-AuthServer)
-	resource := createTestResource(t, "test-non-authserver-"+uuid.New().String()[:8], "Test Non-AuthServer Resource")
+	resource := createTestResource(t, "test-non-authserver-"+fake.UUID()[:8], "Test Non-AuthServer Resource")
 	defer func() {
 		_ = database.DeleteResource(nil, resource.Id)
 	}()
@@ -288,7 +288,7 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 
 func TestAPIResourcePermissionsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test resource
-	resource := createTestResource(t, "test-resource-unauth-"+uuid.New().String()[:8], "Test Resource for Unauthorized Test")
+	resource := createTestResource(t, "test-resource-unauth-"+fake.UUID()[:8], "Test Resource for Unauthorized Test")
 	defer func() {
 		_ = database.DeleteResource(nil, resource.Id)
 	}()
@@ -309,7 +309,7 @@ func TestAPIResourcePermissionsGet_Unauthorized(t *testing.T) {
 
 func TestAPIResourcePermissionsGet_InvalidAccessToken(t *testing.T) {
 	// Setup: Create test resource
-	resource := createTestResource(t, "test-resource-invalid-token-"+uuid.New().String()[:8], "Test Resource for Invalid Token Test")
+	resource := createTestResource(t, "test-resource-invalid-token-"+fake.UUID()[:8], "Test Resource for Invalid Token Test")
 	defer func() {
 		_ = database.DeleteResource(nil, resource.Id)
 	}()
@@ -328,7 +328,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test resource
-	resource := createTestResource(t, "test-resource-many-perms-"+uuid.New().String()[:8], "Test Resource with Many Permissions")
+	resource := createTestResource(t, "test-resource-many-perms-"+fake.UUID()[:8], "Test Resource with Many Permissions")
 	defer func() {
 		_ = database.DeleteResource(nil, resource.Id)
 	}()

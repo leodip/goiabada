@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
@@ -313,7 +312,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -424,7 +423,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	assert.Equal(t, requestNonce2, idClaims["nonce"])
 
 	// Verify sub matches user
-	assert.Equal(t, user.Subject.String(), idClaims["sub"])
+	assert.Equal(t, user.Subject, idClaims["sub"])
 }
 
 func TestPromptNone_SubClaimConsistent(t *testing.T) {
@@ -466,7 +465,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -582,7 +581,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	sub2 := claims2["sub"].(string)
 
 	assert.Equal(t, sub1, sub2, "sub claim should be consistent across tokens")
-	assert.Equal(t, user.Subject.String(), sub1, "sub should match user's subject")
+	assert.Equal(t, user.Subject, sub1, "sub should match user's subject")
 }
 
 func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
@@ -624,7 +623,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -783,7 +782,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -933,7 +932,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -1123,7 +1122,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -1270,7 +1269,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
