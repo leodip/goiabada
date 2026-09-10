@@ -6,8 +6,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
@@ -29,14 +29,14 @@ func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 	if err != nil {
 		keyPair.CreatedAt = originalCreatedAt
 		keyPair.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert keyPair")
+		return errs.Wrap(err, "unable to insert keyPair")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		keyPair.CreatedAt = originalCreatedAt
 		keyPair.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	keyPair.Id = id
@@ -46,7 +46,7 @@ func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
 
 	if keyPair.Id == 0 {
-		return errors.WithStack(errors.New("can't update keyPair with id 0"))
+		return errs.New("can't update keyPair with id 0")
 	}
 
 	originalUpdatedAt := keyPair.UpdatedAt
@@ -62,7 +62,7 @@ func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		keyPair.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update keyPair")
+		return errs.Wrap(err, "unable to update keyPair")
 	}
 
 	return nil
@@ -76,7 +76,7 @@ func (d *CommonDatabase) UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromSta
 	toState string) (bool, error) {
 
 	if keyPairId == 0 {
-		return false, errors.WithStack(errors.New("can't update the state of a keyPair with id 0"))
+		return false, errs.New("can't update the state of a keyPair with id 0")
 	}
 
 	ub := sqlbuilder.NewUpdateBuilder()
@@ -93,12 +93,12 @@ func (d *CommonDatabase) UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromSta
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to update keyPair state")
+		return false, errs.Wrap(err, "unable to update keyPair state")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get rows affected when updating keyPair state")
+		return false, errs.Wrap(err, "unable to get rows affected when updating keyPair state")
 	}
 
 	return rowsAffected == 1, nil
@@ -110,7 +110,7 @@ func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -119,12 +119,12 @@ func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 		addr := keyPairStruct.Addr(&keyPair)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan keyPair")
+			return nil, errs.Wrap(err, "unable to scan keyPair")
 		}
 		return &keyPair, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -155,7 +155,7 @@ func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error)
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -165,13 +165,13 @@ func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error)
 		addr := keyPairStruct.Addr(&keyPair)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan keyPair")
+			return nil, errs.Wrap(err, "unable to scan keyPair")
 		}
 		keyPairs = append(keyPairs, keyPair)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return keyPairs, nil
@@ -196,7 +196,7 @@ func (d *CommonDatabase) GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, erro
 	}
 
 	if keyPair == nil {
-		return nil, errors.WithStack(errors.New("no current signing key found"))
+		return nil, errs.New("no current signing key found")
 	}
 
 	return keyPair, nil
@@ -213,7 +213,7 @@ func (d *CommonDatabase) DeleteKeyPair(tx *sql.Tx, keyPairId int64) error {
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete keyPair")
+		return errs.Wrap(err, "unable to delete keyPair")
 	}
 
 	return nil

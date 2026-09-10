@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.RedirectURI) error {
 	if redirectURI.ClientId == 0 {
-		return errors.WithStack(errors.New("client id must be greater than 0"))
+		return errs.New("client id must be greater than 0")
 	}
 
 	now := time.Now().UTC()
@@ -28,14 +28,14 @@ func (d *MsSQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Redire
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
 	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
 	if err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
-		return errors.Wrap(err, "unable to insert redirectURI")
+		return errs.Wrap(err, "unable to insert redirectURI")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -43,7 +43,7 @@ func (d *MsSQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Redire
 		err = rows.Scan(&redirectURI.Id)
 		if err != nil {
 			redirectURI.CreatedAt = originalCreatedAt
-			return errors.Wrap(err, "unable to scan redirectURI id")
+			return errs.Wrap(err, "unable to scan redirectURI id")
 		}
 	}
 
@@ -52,7 +52,7 @@ func (d *MsSQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Redire
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
-		return errors.Wrap(err, "unable to insert redirectURI")
+		return errs.Wrap(err, "unable to insert redirectURI")
 	}
 
 	return nil

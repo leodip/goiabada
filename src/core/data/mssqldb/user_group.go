@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error {
 	if userGroup.UserId == 0 {
-		return errors.WithStack(errors.New("can't create userGroup with user_id 0"))
+		return errs.New("can't create userGroup with user_id 0")
 	}
 
 	if userGroup.GroupId == 0 {
-		return errors.WithStack(errors.New("can't create userGroup with group_id 0"))
+		return errs.New("can't create userGroup with group_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup)
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -42,7 +42,7 @@ func (d *MsSQLDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup)
 	if err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userGroup")
+		return errs.Wrap(err, "unable to insert userGroup")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -51,7 +51,7 @@ func (d *MsSQLDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup)
 		if err != nil {
 			userGroup.CreatedAt = originalCreatedAt
 			userGroup.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan userGroup id")
+			return errs.Wrap(err, "unable to scan userGroup id")
 		}
 	}
 
@@ -61,7 +61,7 @@ func (d *MsSQLDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup)
 	if err := rows.Err(); err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userGroup")
+		return errs.Wrap(err, "unable to insert userGroup")
 	}
 
 	return nil

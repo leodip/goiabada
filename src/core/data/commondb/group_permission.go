@@ -5,18 +5,18 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
 
 	if groupPermission.GroupId == 0 {
-		return errors.WithStack(errors.New("can't create groupPermission with group_id 0"))
+		return errs.New("can't create groupPermission with group_id 0")
 	}
 
 	if groupPermission.PermissionId == 0 {
-		return errors.WithStack(errors.New("can't create groupPermission with permission_id 0"))
+		return errs.New("can't create groupPermission with permission_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -36,14 +36,14 @@ func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mode
 	if err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert groupPermission")
+		return errs.Wrap(err, "unable to insert groupPermission")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	groupPermission.Id = id
@@ -53,7 +53,7 @@ func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mode
 func (d *CommonDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
 
 	if groupPermission.Id == 0 {
-		return errors.WithStack(errors.New("can't update groupPermission with id 0"))
+		return errs.New("can't update groupPermission with id 0")
 	}
 
 	originalUpdatedAt := groupPermission.UpdatedAt
@@ -69,7 +69,7 @@ func (d *CommonDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *mode
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update groupPermission")
+		return errs.Wrap(err, "unable to update groupPermission")
 	}
 
 	return nil
@@ -81,7 +81,7 @@ func (d *CommonDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sql
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -90,12 +90,12 @@ func (d *CommonDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sql
 		addr := groupPermissionStruct.Addr(&groupPermission)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan groupPermission")
+			return nil, errs.Wrap(err, "unable to scan groupPermission")
 		}
 		return &groupPermission, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -112,7 +112,7 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64)
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -122,13 +122,13 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64)
 		addr := groupPermissionStruct.Addr(&groupPermission)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan groupPermission")
+			return nil, errs.Wrap(err, "unable to scan groupPermission")
 		}
 		groupPermissions = append(groupPermissions, groupPermission)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return groupPermissions, nil
@@ -149,7 +149,7 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []in
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -159,13 +159,13 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []in
 		addr := groupPermissionStruct.Addr(&groupPermission)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan groupPermission")
+			return nil, errs.Wrap(err, "unable to scan groupPermission")
 		}
 		groupPermissions = append(groupPermissions, groupPermission)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return groupPermissions, nil
@@ -215,7 +215,7 @@ func (d *CommonDatabase) DeleteGroupPermission(tx *sql.Tx, groupPermissionId int
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete groupPermission")
+		return errs.Wrap(err, "unable to delete groupPermission")
 	}
 
 	return nil

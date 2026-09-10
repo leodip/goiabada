@@ -16,9 +16,10 @@
 package schemadump
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // Dialect names the engine whose catalog is being read. It is a parameter rather than
@@ -47,7 +48,7 @@ func ParseDialect(s string) (Dialect, error) {
 	case SQLite, MySQL, Postgres, MSSQL:
 		return d, nil
 	default:
-		return "", fmt.Errorf("schemadump: unrecognised database dialect %q", s)
+		return "", errs.Errorf("schemadump: unrecognised database dialect %q", s)
 	}
 }
 
@@ -71,7 +72,7 @@ var identifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func checkIdentifier(kind, name string) error {
 	if !identifier.MatchString(name) {
-		return fmt.Errorf("schemadump: %s name %q is not a plain identifier", kind, name)
+		return errs.Errorf("schemadump: %s name %q is not a plain identifier", kind, name)
 	}
 	return nil
 }

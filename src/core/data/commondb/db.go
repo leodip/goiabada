@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 type CommonDatabase struct {
@@ -39,7 +39,7 @@ func (d *CommonDatabase) BeginTransaction() (*sql.Tx, error) {
 
 	tx, err := d.DB.Begin()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to begin transaction")
+		return nil, errs.Wrap(err, "unable to begin transaction")
 	}
 	return tx, nil
 }
@@ -51,7 +51,7 @@ func (d *CommonDatabase) CommitTransaction(tx *sql.Tx) error {
 
 	err := tx.Commit()
 	if err != nil {
-		return errors.Wrap(err, "unable to commit transaction")
+		return errs.Wrap(err, "unable to commit transaction")
 	}
 	return nil
 }
@@ -63,7 +63,7 @@ func (d *CommonDatabase) RollbackTransaction(tx *sql.Tx) error {
 
 	err := tx.Rollback()
 	if err != nil {
-		return errors.Wrap(err, "unable to rollback transaction")
+		return errs.Wrap(err, "unable to rollback transaction")
 	}
 	return nil
 }
@@ -129,7 +129,7 @@ func (d *CommonDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
 		lastDeadlock = err
 	}
 
-	return errors.Wrapf(lastDeadlock, "transaction aborted as a deadlock victim on all %d attempts", attempts)
+	return errs.Wrapf(lastDeadlock, "transaction aborted as a deadlock victim on all %d attempts", attempts)
 }
 
 // runTransactionOnce is one attempt. Its own function so the rollback is deferred, which is
@@ -203,14 +203,14 @@ func (d *CommonDatabase) ExecSql(tx *sql.Tx, sql string, args ...any) (sql.Resul
 	if tx != nil {
 		result, err := tx.Exec(sql, args...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to execute SQL")
+			return nil, errs.Wrap(err, "unable to execute SQL")
 		}
 		return result, nil
 	}
 
 	result, err := d.DB.Exec(sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to execute SQL")
+		return nil, errs.Wrap(err, "unable to execute SQL")
 	}
 	return result, nil
 }
@@ -231,14 +231,14 @@ func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Row
 	if tx != nil {
 		result, err := tx.Query(sql, args...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to execute SQL")
+			return nil, errs.Wrap(err, "unable to execute SQL")
 		}
 		return result, nil
 	}
 
 	rows, err := d.DB.Query(sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to execute SQL")
+		return nil, errs.Wrap(err, "unable to execute SQL")
 	}
 	return rows, nil
 }
@@ -246,7 +246,7 @@ func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Row
 func (d *CommonDatabase) IsEmpty() (bool, error) {
 	settings, err := d.GetSettingsById(nil, 1)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to check if database is empty")
+		return false, errs.Wrap(err, "failed to check if database is empty")
 	}
 
 	return settings == nil, nil

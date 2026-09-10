@@ -2,11 +2,12 @@ package oauth
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 type TokenExchanger struct{}
@@ -28,7 +29,7 @@ func (te *TokenExchanger) ExchangeCodeForTokens(
 
 	req, err := http.NewRequest("POST", tokenEndpoint, strings.NewReader(data.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return nil, errs.Errorf("error creating request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -36,23 +37,23 @@ func (te *TokenExchanger) ExchangeCodeForTokens(
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error sending request: %v", err)
+		return nil, errs.Errorf("error sending request: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response: %v", err)
+		return nil, errs.Errorf("error reading response: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error response from server: %s", body)
+		return nil, errs.Errorf("error response from server: %s", body)
 	}
 
 	var tokenResponse TokenResponse
 	err = json.Unmarshal(body, &tokenResponse)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, errs.Errorf("error parsing response: %v", err)
 	}
 
 	return &tokenResponse, nil

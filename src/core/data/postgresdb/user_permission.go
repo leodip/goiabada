@@ -5,17 +5,17 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error {
 	if userPermission.UserId == 0 {
-		return errors.WithStack(errors.New("can't create userPermission with user_id 0"))
+		return errs.New("can't create userPermission with user_id 0")
 	}
 
 	if userPermission.PermissionId == 0 {
-		return errors.WithStack(errors.New("can't create userPermission with permission_id 0"))
+		return errs.New("can't create userPermission with permission_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -37,7 +37,7 @@ func (d *PostgresDatabase) CreateUserPermission(tx *sql.Tx, userPermission *mode
 	if err != nil {
 		userPermission.CreatedAt = originalCreatedAt
 		userPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userPermission")
+		return errs.Wrap(err, "unable to insert userPermission")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -46,7 +46,7 @@ func (d *PostgresDatabase) CreateUserPermission(tx *sql.Tx, userPermission *mode
 		if err != nil {
 			userPermission.CreatedAt = originalCreatedAt
 			userPermission.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan userPermission id")
+			return errs.Wrap(err, "unable to scan userPermission id")
 		}
 	}
 
@@ -56,7 +56,7 @@ func (d *PostgresDatabase) CreateUserPermission(tx *sql.Tx, userPermission *mode
 	if err := rows.Err(); err != nil {
 		userPermission.CreatedAt = originalCreatedAt
 		userPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userPermission")
+		return errs.Wrap(err, "unable to insert userPermission")
 	}
 
 	return nil

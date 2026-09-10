@@ -1,11 +1,12 @@
 package migrator
 
 import (
-	"fmt"
 	"io/fs"
 	"regexp"
 	"sort"
 	"strconv"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // migrationFileRe reads a filename exactly the way golang-migrate's source parser read it, from
@@ -39,7 +40,7 @@ type source struct {
 func newSource(fsys fs.FS, dir string) (*source, error) {
 	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read the migrations directory %q: %w", dir, err)
+		return nil, errs.Errorf("unable to read the migrations directory %q: %w", dir, err)
 	}
 
 	s := &source{
@@ -62,7 +63,7 @@ func newSource(fsys fs.FS, dir string) (*source, error) {
 		if err != nil {
 			// Only reachable for a number too large for an int, since the pattern already
 			// admitted nothing but digits.
-			return nil, fmt.Errorf("migration file %q carries an unreadable version number: %w", e.Name(), err)
+			return nil, errs.Errorf("migration file %q carries an unreadable version number: %w", e.Name(), err)
 		}
 
 		half := s.ups
@@ -70,7 +71,7 @@ func newSource(fsys fs.FS, dir string) (*source, error) {
 			half = s.downs
 		}
 		if existing, dup := half[version]; dup {
-			return nil, fmt.Errorf("two %s migrations are numbered %s: %q and %q; one number means one change",
+			return nil, errs.Errorf("two %s migrations are numbered %s: %q and %q; one number means one change",
 				m[3], formatVersion(version), existing, e.Name())
 		}
 		half[version] = e.Name()
@@ -154,7 +155,7 @@ func (s *source) read(half map[int]string, v int) ([]byte, string, bool, error) 
 	}
 	body, err := fs.ReadFile(s.fsys, s.dir+"/"+name)
 	if err != nil {
-		return nil, name, true, fmt.Errorf("unable to read migration file %q: %w", name, err)
+		return nil, name, true, errs.Errorf("unable to read migration file %q: %w", name, err)
 	}
 	return body, name, true, nil
 }

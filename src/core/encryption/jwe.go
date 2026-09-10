@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // The encrypted id_token_hint scheme (see the docs at
@@ -81,17 +81,17 @@ func DeriveIDTokenHintKey(clientSecret string) []byte {
 // documented scheme executable rather than prose (#277).
 func EncryptIDTokenHintJWE(plaintext string, clientSecret string) (string, error) {
 	if len(plaintext) == 0 {
-		return "", errors.WithStack(errors.New("id_token_hint plaintext is empty"))
+		return "", errs.New("id_token_hint plaintext is empty")
 	}
 	if len(clientSecret) == 0 {
-		return "", errors.WithStack(errors.New("client secret is empty"))
+		return "", errs.New("client secret is empty")
 	}
 
 	protected := base64.RawURLEncoding.EncodeToString([]byte(idTokenHintJWEHeader))
 
 	iv := make([]byte, idTokenHintIVLen)
 	if _, err := rand.Read(iv); err != nil {
-		return "", errors.Wrap(err, "could not read a random initialization vector")
+		return "", errs.Wrap(err, "could not read a random initialization vector")
 	}
 
 	gcm, err := idTokenHintGCM(clientSecret)
@@ -122,24 +122,24 @@ func EncryptIDTokenHintJWE(plaintext string, clientSecret string) (string, error
 // own message so the server log tells a malformed hint from a wrong key.
 func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, error) {
 	if len(compactJWE) == 0 {
-		return "", errors.WithStack(errors.New("id_token_hint is empty"))
+		return "", errs.New("id_token_hint is empty")
 	}
 	if len(clientSecret) == 0 {
-		return "", errors.WithStack(errors.New("client secret is empty"))
+		return "", errs.New("client secret is empty")
 	}
 
 	// RFC 7516 section 5.2 step 1: the compact serialization has "exactly four
 	// delimiting period characters".
 	parts := strings.Split(compactJWE, ".")
 	if len(parts) != 5 {
-		return "", errors.Errorf("id_token_hint is not a compact JWE: expected 5 segments, got %d", len(parts))
+		return "", errs.Errorf("id_token_hint is not a compact JWE: expected 5 segments, got %d", len(parts))
 	}
 
 	decoded := make([][]byte, len(parts))
 	for i, part := range parts {
 		raw, err := base64.RawURLEncoding.DecodeString(part)
 		if err != nil {
-			return "", errors.Wrapf(err, "id_token_hint segment %d (%s) is not valid base64url", i, jweSegmentNames[i])
+			return "", errs.Wrapf(err, "id_token_hint segment %d (%s) is not valid base64url", i, jweSegmentNames[i])
 		}
 		// RFC 7515 section 2: base64url "with all trailing '=' characters omitted ...
 		// and without the inclusion of any line breaks, whitespace, or other additional
@@ -148,7 +148,7 @@ func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, erro
 		// the canonical form. Undo this and a hint carrying a stray %0A is accepted,
 		// which is a serialization the RFC does not define (#277).
 		if base64.RawURLEncoding.EncodeToString(raw) != part {
-			return "", errors.Errorf("id_token_hint segment %d (%s) is not canonical base64url", i, jweSegmentNames[i])
+			return "", errs.Errorf("id_token_hint segment %d (%s) is not canonical base64url", i, jweSegmentNames[i])
 		}
 		decoded[i] = raw
 	}
@@ -170,24 +170,24 @@ func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, erro
 	// megabyte to the log per request -- the same defect #159 bounded the request
 	// target for. Drop the precision and that returns (#277).
 	if alg := idTokenHintHeaderString(header, "alg"); alg != "dir" {
-		return "", errors.Errorf("id_token_hint header alg is %.*q, want \"dir\"", maxLoggedHeaderValue, alg)
+		return "", errs.Errorf("id_token_hint header alg is %.*q, want \"dir\"", maxLoggedHeaderValue, alg)
 	}
 	if enc := idTokenHintHeaderString(header, "enc"); enc != "A256GCM" {
-		return "", errors.Errorf("id_token_hint header enc is %.*q, want \"A256GCM\"", maxLoggedHeaderValue, enc)
+		return "", errs.Errorf("id_token_hint header enc is %.*q, want \"A256GCM\"", maxLoggedHeaderValue, enc)
 	}
 	// RFC 7516 section 4.1.3 makes "zip" a parameter an implementation MUST understand
 	// and process. This one does not compress, so it refuses rather than ignores: no
 	// decompression means no decompression bomb and no cap to pick. The documented
 	// scheme has no compression row, so no documented client can hit this (#277).
 	if _, ok := header["zip"]; ok {
-		return "", errors.WithStack(errors.New("id_token_hint header has a zip parameter, which is not supported"))
+		return "", errs.New("id_token_hint header has a zip parameter, which is not supported")
 	}
 	// RFC 7515 section 4.1.11: "If any of the listed extension Header Parameters are
 	// not understood and supported by the recipient, then the JWS is invalid." No
 	// extension is understood here, and the empty list a producer "MUST NOT use" is
 	// refused with the rest (#277).
 	if _, ok := header["crit"]; ok {
-		return "", errors.WithStack(errors.New("id_token_hint header has a crit parameter, and no extension is understood"))
+		return "", errs.New("id_token_hint header has a crit parameter, and no extension is understood")
 	}
 
 	encryptedKey, iv, ciphertext, tag := decoded[1], decoded[2], decoded[3], decoded[4]
@@ -195,7 +195,7 @@ func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, erro
 	// RFC 7516 section 5.2 step 10: "When Direct Key Agreement or Direct Encryption are
 	// employed, verify that the JWE Encrypted Key value is an empty octet sequence."
 	if len(encryptedKey) != 0 {
-		return "", errors.Errorf("id_token_hint encrypted key is %d bytes, want empty with alg dir", len(encryptedKey))
+		return "", errs.Errorf("id_token_hint encrypted key is %d bytes, want empty with alg dir", len(encryptedKey))
 	}
 	// The next three are checked here rather than left to the AEAD. The iv check is not
 	// only cosmetic: crypto/cipher's GCM panics on a nonce that is not its nonce size,
@@ -204,13 +204,13 @@ func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, erro
 	// hint. Explicit checks also tell a malformed hint from a wrong key in the log,
 	// which one shared "decryption failed" could not (#277).
 	if len(iv) != idTokenHintIVLen {
-		return "", errors.Errorf("id_token_hint iv is %d bytes, want %d", len(iv), idTokenHintIVLen)
+		return "", errs.Errorf("id_token_hint iv is %d bytes, want %d", len(iv), idTokenHintIVLen)
 	}
 	if len(tag) != idTokenHintTagLen {
-		return "", errors.Errorf("id_token_hint authentication tag is %d bytes, want %d", len(tag), idTokenHintTagLen)
+		return "", errs.Errorf("id_token_hint authentication tag is %d bytes, want %d", len(tag), idTokenHintTagLen)
 	}
 	if len(ciphertext) == 0 {
-		return "", errors.WithStack(errors.New("id_token_hint ciphertext is empty"))
+		return "", errs.New("id_token_hint ciphertext is empty")
 	}
 
 	gcm, err := idTokenHintGCM(clientSecret)
@@ -229,7 +229,7 @@ func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, erro
 	if err != nil {
 		// Step 16 rejects "without emitting any decrypted output". GCM cannot tell a wrong
 		// key from a tampered segment, so both land on this one message.
-		return "", errors.Wrap(err, "id_token_hint decryption failed")
+		return "", errs.Wrap(err, "id_token_hint decryption failed")
 	}
 
 	return string(plaintext), nil
@@ -242,11 +242,11 @@ func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, erro
 func idTokenHintGCM(clientSecret string) (cipher.AEAD, error) {
 	block, err := aes.NewCipher(DeriveIDTokenHintKey(clientSecret))
 	if err != nil {
-		return nil, errors.Wrap(err, "id_token_hint cipher setup failed")
+		return nil, errs.Wrap(err, "id_token_hint cipher setup failed")
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, errors.Wrap(err, "id_token_hint cipher setup failed")
+		return nil, errs.Wrap(err, "id_token_hint cipher setup failed")
 	}
 	return gcm, nil
 }
@@ -264,7 +264,7 @@ func parseIDTokenHintHeader(raw []byte) (map[string]json.RawMessage, error) {
 	// representation of a completely valid JSON object". encoding/json substitutes
 	// U+FFFD for invalid bytes instead of failing, so the check has to be explicit.
 	if !utf8.Valid(raw) {
-		return nil, errors.WithStack(errors.New("id_token_hint header is not valid UTF-8"))
+		return nil, errs.New("id_token_hint header is not valid UTF-8")
 	}
 
 	// RFC 7515 section 4: a parser "MUST either reject JWSs with duplicate Header
@@ -276,10 +276,10 @@ func parseIDTokenHintHeader(raw []byte) (map[string]json.RawMessage, error) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	tok, err := dec.Token()
 	if err != nil {
-		return nil, errors.Wrap(err, "id_token_hint header is not a JSON object")
+		return nil, errs.Wrap(err, "id_token_hint header is not a JSON object")
 	}
 	if delim, ok := tok.(json.Delim); !ok || delim != '{' {
-		return nil, errors.WithStack(errors.New("id_token_hint header is not a JSON object"))
+		return nil, errs.New("id_token_hint header is not a JSON object")
 	}
 
 	seen := make(map[string]bool)
@@ -290,7 +290,7 @@ func parseIDTokenHintHeader(raw []byte) (map[string]json.RawMessage, error) {
 	for depth > 0 {
 		tok, err := dec.Token()
 		if err != nil {
-			return nil, errors.Wrap(err, "id_token_hint header is not a JSON object")
+			return nil, errs.Wrap(err, "id_token_hint header is not a JSON object")
 		}
 		if delim, ok := tok.(json.Delim); ok {
 			if delim == '{' || delim == '[' {
@@ -314,18 +314,18 @@ func parseIDTokenHintHeader(raw []byte) (map[string]json.RawMessage, error) {
 		if seen[name] {
 			// Bounded for the same reason the alg and enc refusals are: the member name
 			// is the caller's and this error reaches the server log whole (#277).
-			return nil, errors.Errorf("id_token_hint header repeats the member name %.*q", maxLoggedHeaderValue, name)
+			return nil, errs.Errorf("id_token_hint header repeats the member name %.*q", maxLoggedHeaderValue, name)
 		}
 		seen[name] = true
 		expectName = false
 	}
 	if _, err := dec.Token(); err != io.EOF {
-		return nil, errors.WithStack(errors.New("id_token_hint header has trailing data after the JSON object"))
+		return nil, errs.New("id_token_hint header has trailing data after the JSON object")
 	}
 
 	var header map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &header); err != nil {
-		return nil, errors.Wrap(err, "id_token_hint header is not a JSON object")
+		return nil, errs.Wrap(err, "id_token_hint header is not a JSON object")
 	}
 	return header, nil
 }

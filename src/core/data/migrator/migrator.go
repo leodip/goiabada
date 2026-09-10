@@ -23,6 +23,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // Migrator applies one engine's migration set to one database.
@@ -36,7 +38,7 @@ type Migrator struct {
 // than a surprise half way up the chain. It touches the database not at all.
 func New(db *sql.DB, files fs.FS, dir string, eng Engine) (*Migrator, error) {
 	if db == nil {
-		return nil, errors.New("migrator: no database")
+		return nil, errs.New("migrator: no database")
 	}
 	src, err := newSource(files, dir)
 	if err != nil {
@@ -164,13 +166,13 @@ func (m *Migrator) withConn(fn func(ctx context.Context, conn *sql.Conn) error) 
 	ctx := context.Background()
 	conn, err := m.db.Conn(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to take a connection for the migration: %w", err)
+		return errs.Errorf("unable to take a connection for the migration: %w", err)
 	}
 	defer func() {
 		// ErrConnDone is what Close answers for a connection already disposed of by run's
 		// deferred unlock, which is a deliberate outcome rather than a failure.
 		if cerr := conn.Close(); cerr != nil && !errors.Is(cerr, sql.ErrConnDone) {
-			err = errors.Join(err, cerr)
+			err = errs.Join(err, cerr)
 		}
 	}()
 	return fn(ctx, conn)
@@ -200,7 +202,7 @@ func (m *Migrator) run(fn func(ctx context.Context, conn *sql.Conn) error) error
 			}
 			defer func() {
 				if unlockErr := m.eng.unlock(ctx, conn); unlockErr != nil {
-					err = errors.Join(err, unlockErr)
+					err = errs.Join(err, unlockErr)
 					_ = conn.Raw(func(any) error { return driver.ErrBadConn })
 				}
 			}()
@@ -220,7 +222,7 @@ func (m *Migrator) run(fn func(ctx context.Context, conn *sql.Conn) error) error
 func (m *Migrator) readVersion(ctx context.Context, conn *sql.Conn) (int, bool, error) {
 	rows, err := conn.QueryContext(ctx, "SELECT version, dirty FROM "+migrationsTable)
 	if err != nil {
-		return NilVersion, false, fmt.Errorf("unable to read %s: %w", migrationsTable, err)
+		return NilVersion, false, errs.Errorf("unable to read %s: %w", migrationsTable, err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -228,12 +230,12 @@ func (m *Migrator) readVersion(ctx context.Context, conn *sql.Conn) (int, bool, 
 	for rows.Next() {
 		var r RecordedVersion
 		if err := rows.Scan(&r.Version, &r.Dirty); err != nil {
-			return NilVersion, false, fmt.Errorf("unable to read a %s row: %w", migrationsTable, err)
+			return NilVersion, false, errs.Errorf("unable to read a %s row: %w", migrationsTable, err)
 		}
 		recorded = append(recorded, r)
 	}
 	if err := rows.Err(); err != nil {
-		return NilVersion, false, fmt.Errorf("unable to read %s: %w", migrationsTable, err)
+		return NilVersion, false, errs.Errorf("unable to read %s: %w", migrationsTable, err)
 	}
 
 	switch len(recorded) {
@@ -305,7 +307,7 @@ func (m *Migrator) checkCarried(v int) error {
 func (m *Migrator) setVersion(ctx context.Context, conn *sql.Conn, version int, dirty bool) error {
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("unable to start the %s transaction: %w", migrationsTable, err)
+		return errs.Errorf("unable to start the %s transaction: %w", migrationsTable, err)
 	}
 	committed := false
 	defer func() {
@@ -315,19 +317,19 @@ func (m *Migrator) setVersion(ctx context.Context, conn *sql.Conn, version int, 
 	}()
 
 	if _, err := tx.ExecContext(ctx, "DELETE FROM "+migrationsTable); err != nil {
-		return fmt.Errorf("unable to clear %s: %w", migrationsTable, err)
+		return errs.Errorf("unable to clear %s: %w", migrationsTable, err)
 	}
 
 	if version >= 0 || (version == NilVersion && dirty) {
 		insert := fmt.Sprintf("INSERT INTO %s (version, dirty) VALUES (%s, %s)",
 			migrationsTable, m.eng.placeholder(1), m.eng.placeholder(2))
 		if _, err := tx.ExecContext(ctx, insert, version, dirty); err != nil {
-			return fmt.Errorf("unable to record version %s in %s: %w", formatVersion(version), migrationsTable, err)
+			return errs.Errorf("unable to record version %s in %s: %w", formatVersion(version), migrationsTable, err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("unable to commit the %s transaction: %w", migrationsTable, err)
+		return errs.Errorf("unable to commit the %s transaction: %w", migrationsTable, err)
 	}
 	committed = true
 	return nil
@@ -360,7 +362,7 @@ func (m *Migrator) stepsFrom(current, target int) ([]step, error) {
 		if current == NilVersion {
 			first := m.src.first()
 			if first == NilVersion {
-				return nil, errors.New("this binary carries no migrations for this engine")
+				return nil, errs.New("this binary carries no migrations for this engine")
 			}
 			steps = append(steps, step{apply: first, up: true, marker: first})
 			current = first
@@ -368,7 +370,7 @@ func (m *Migrator) stepsFrom(current, target int) ([]step, error) {
 		for current < target {
 			next := m.src.next(current)
 			if next == NilVersion {
-				return nil, fmt.Errorf("this binary carries no migration above %s", formatVersion(current))
+				return nil, errs.Errorf("this binary carries no migration above %s", formatVersion(current))
 			}
 			steps = append(steps, step{apply: next, up: true, marker: next})
 			current = next
@@ -403,7 +405,7 @@ func (m *Migrator) apply(ctx context.Context, conn *sql.Conn, steps []step) erro
 		}
 		if present {
 			if err := m.runFile(ctx, conn, body); err != nil {
-				return fmt.Errorf("migration %s failed: %w; %w", name, err,
+				return errs.Errorf("migration %s failed: %w; %w", name, err,
 					// Below is the source's own predecessor of the marker, never marker minus
 					// one: the sets have gaps, and beneath the first migration there is no
 					// version at all rather than 000000.
@@ -447,7 +449,7 @@ func (m *Migrator) runFile(ctx context.Context, conn *sql.Conn, body []byte) err
 	}
 	if _, err := tx.ExecContext(ctx, string(body)); err != nil {
 		if rerr := tx.Rollback(); rerr != nil && !errors.Is(rerr, sql.ErrTxDone) {
-			return errors.Join(err, rerr)
+			return errs.Join(err, rerr)
 		}
 		return err
 	}

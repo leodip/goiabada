@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) error {
@@ -26,7 +26,7 @@ func (d *MsSQLDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) er
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) er
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert settings")
+		return errs.Wrap(err, "unable to insert settings")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -43,7 +43,7 @@ func (d *MsSQLDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) er
 		if err != nil {
 			settings.CreatedAt = originalCreatedAt
 			settings.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan settings id")
+			return errs.Wrap(err, "unable to scan settings id")
 		}
 	}
 
@@ -53,7 +53,7 @@ func (d *MsSQLDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) er
 	if err := rows.Err(); err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert settings")
+		return errs.Wrap(err, "unable to insert settings")
 	}
 
 	return nil

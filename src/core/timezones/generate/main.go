@@ -22,6 +22,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 const (
@@ -103,17 +105,17 @@ func main() {
 func getLatestVersion() (string, error) {
 	resp, err := http.Get(ianaPageURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch IANA page: %w", err)
+		return "", errs.Errorf("failed to fetch IANA page: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return "", errs.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return "", errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Look for the version in the HTML. The "Latest version" tile links to the
@@ -121,7 +123,7 @@ func getLatestVersion() (string, error) {
 	re := regexp.MustCompile(`/time-zones/releases/(\d{4}[a-z]?)"`)
 	matches := re.FindSubmatch(body)
 	if len(matches) < 2 {
-		return "", fmt.Errorf("could not find tzdata version in %s (fetched %d bytes matching none of %q) - "+
+		return "", errs.Errorf("could not find tzdata version in %s (fetched %d bytes matching none of %q) - "+
 			"the page layout has likely changed, check it and update the regex in getLatestVersion",
 			ianaPageURL, len(body), re.String())
 	}
@@ -132,18 +134,18 @@ func getLatestVersion() (string, error) {
 func downloadAndExtract(url, destDir string) error {
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("failed to download: %w", err)
+		return errs.Errorf("failed to download: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return errs.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	// Create gzip reader
 	gzr, err := gzip.NewReader(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
+		return errs.Errorf("failed to create gzip reader: %w", err)
 	}
 	defer func() { _ = gzr.Close() }()
 
@@ -157,7 +159,7 @@ func downloadAndExtract(url, destDir string) error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("failed to read tar: %w", err)
+			return errs.Errorf("failed to read tar: %w", err)
 		}
 
 		// Only extract regular files we need
@@ -173,15 +175,15 @@ func downloadAndExtract(url, destDir string) error {
 		destPath := filepath.Join(destDir, header.Name)
 		outFile, err := os.Create(destPath)
 		if err != nil {
-			return fmt.Errorf("failed to create file %s: %w", destPath, err)
+			return errs.Errorf("failed to create file %s: %w", destPath, err)
 		}
 
 		if _, err := io.Copy(outFile, tr); err != nil {
 			_ = outFile.Close()
-			return fmt.Errorf("failed to write file %s: %w", destPath, err)
+			return errs.Errorf("failed to write file %s: %w", destPath, err)
 		}
 		if err := outFile.Close(); err != nil {
-			return fmt.Errorf("failed to close file %s: %w", destPath, err)
+			return errs.Errorf("failed to close file %s: %w", destPath, err)
 		}
 
 		fmt.Fprintf(os.Stderr, "  Extracted: %s\n", header.Name)

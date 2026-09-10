@@ -9,7 +9,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
@@ -66,12 +66,12 @@ type KeyPair struct {
 func DecodeKeyPair(authenticationKey, encryptionKey string) (KeyPair, error) {
 	authKey, err := hex.DecodeString(strings.TrimSpace(authenticationKey))
 	if err != nil {
-		return KeyPair{}, errors.Wrap(err, "unable to decode the session authentication key")
+		return KeyPair{}, errs.Wrap(err, "unable to decode the session authentication key")
 	}
 
 	encKey, err := hex.DecodeString(strings.TrimSpace(encryptionKey))
 	if err != nil {
-		return KeyPair{}, errors.Wrap(err, "unable to decode the session encryption key")
+		return KeyPair{}, errs.Wrap(err, "unable to decode the session encryption key")
 	}
 
 	return KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil
@@ -103,12 +103,12 @@ func DecodePreviousKeyPair(authenticationKey, encryptionKey string) (*KeyPair, e
 		return nil, nil
 	}
 	if auth == "" || enc == "" {
-		return nil, errors.New("the previous session key pair needs both the authentication key and the encryption key, or neither")
+		return nil, errs.New("the previous session key pair needs both the authentication key and the encryption key, or neither")
 	}
 
 	pair, err := DecodeKeyPair(auth, enc)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid previous session key pair")
+		return nil, errs.Wrap(err, "invalid previous session key pair")
 	}
 	return &pair, nil
 }
@@ -146,29 +146,29 @@ func newSealer(pair KeyPair) (*sealer, error) {
 	// the startup validators and stays there, and "not empty" cannot disagree with
 	// "exactly 64 and 32 bytes" (#269).
 	if len(pair.AuthenticationKey) == 0 || len(pair.EncryptionKey) == 0 {
-		return nil, errors.New("a session key pair needs a non-empty authentication key and a non-empty encryption key")
+		return nil, errs.New("a session key pair needs a non-empty authentication key and a non-empty encryption key")
 	}
 
 	cookieKey, err := hkdf.Key(sha256.New, pair.EncryptionKey, pair.AuthenticationKey,
 		cookieKeyInfo, sealingKeyBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to derive the session cookie key")
+		return nil, errs.Wrap(err, "unable to derive the session cookie key")
 	}
 
 	dataKey, err := hkdf.Key(sha256.New, pair.EncryptionKey, pair.AuthenticationKey,
 		dataKeyInfo, sealingKeyBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to derive the session data key")
+		return nil, errs.Wrap(err, "unable to derive the session data key")
 	}
 
 	cookieAEAD, err := chacha20poly1305.NewX(cookieKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to build the session cookie cipher")
+		return nil, errs.Wrap(err, "unable to build the session cookie cipher")
 	}
 
 	dataAEAD, err := chacha20poly1305.NewX(dataKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to build the session data cipher")
+		return nil, errs.Wrap(err, "unable to build the session data cipher")
 	}
 
 	return &sealer{cookie: cookieAEAD, data: dataAEAD}, nil
@@ -187,7 +187,7 @@ func newSealer(pair KeyPair) (*sealer, error) {
 func seal(aead cipher.AEAD, name string, plaintext []byte) (string, error) {
 	nonce := make([]byte, nonceBytes)
 	if _, err := io.ReadFull(randReader, nonce); err != nil {
-		return "", errors.Wrap(err, "unable to read from the random number generator")
+		return "", errs.Wrap(err, "unable to read from the random number generator")
 	}
 
 	envelope := make([]byte, 0, envelopeMinBytes+len(plaintext))
@@ -204,15 +204,15 @@ func seal(aead cipher.AEAD, name string, plaintext []byte) (string, error) {
 func open(aead cipher.AEAD, name string, encoded string) ([]byte, error) {
 	envelope, err := base64.RawURLEncoding.DecodeString(encoded)
 	if err != nil {
-		return nil, errors.Wrap(err, "the sealed session value is not valid base64")
+		return nil, errs.Wrap(err, "the sealed session value is not valid base64")
 	}
 
 	if len(envelope) < envelopeMinBytes {
-		return nil, errors.New("the sealed session value is too short to be an envelope")
+		return nil, errs.New("the sealed session value is too short to be an envelope")
 	}
 
 	if envelope[0] != envelopeVersion {
-		return nil, errors.Errorf("unsupported sealed session envelope version %d", envelope[0])
+		return nil, errs.Errorf("unsupported sealed session envelope version %d", envelope[0])
 	}
 
 	nonce := envelope[1 : 1+nonceBytes]
@@ -220,7 +220,7 @@ func open(aead cipher.AEAD, name string, encoded string) ([]byte, error) {
 
 	plaintext, err := aead.Open(nil, nonce, ciphertext, []byte(name))
 	if err != nil {
-		return nil, errors.Wrap(err, "the sealed session value did not open")
+		return nil, errs.Wrap(err, "the sealed session value did not open")
 	}
 	return plaintext, nil
 }

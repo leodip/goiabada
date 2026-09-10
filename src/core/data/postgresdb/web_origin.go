@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin) error {
 	if webOrigin.ClientId == 0 {
-		return errors.WithStack(errors.New("client id must be greater than 0"))
+		return errs.New("client id must be greater than 0")
 	}
 
 	now := time.Now().UTC()
@@ -30,7 +30,7 @@ func (d *PostgresDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrig
 	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
-		return errors.Wrap(err, "unable to insert webOrigin")
+		return errs.Wrap(err, "unable to insert webOrigin")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -38,7 +38,7 @@ func (d *PostgresDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrig
 		err = rows.Scan(&webOrigin.Id)
 		if err != nil {
 			webOrigin.CreatedAt = originalCreatedAt
-			return errors.Wrap(err, "unable to scan webOrigin id")
+			return errs.Wrap(err, "unable to scan webOrigin id")
 		}
 	}
 
@@ -47,7 +47,7 @@ func (d *PostgresDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrig
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
-		return errors.Wrap(err, "unable to insert webOrigin")
+		return errs.Wrap(err, "unable to insert webOrigin")
 	}
 
 	return nil

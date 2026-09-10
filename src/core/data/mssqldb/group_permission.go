@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
 	if groupPermission.GroupId == 0 {
-		return errors.WithStack(errors.New("can't create groupPermission with group_id 0"))
+		return errs.New("can't create groupPermission with group_id 0")
 	}
 
 	if groupPermission.PermissionId == 0 {
-		return errors.WithStack(errors.New("can't create groupPermission with permission_id 0"))
+		return errs.New("can't create groupPermission with permission_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *model
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -42,7 +42,7 @@ func (d *MsSQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *model
 	if err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert groupPermission")
+		return errs.Wrap(err, "unable to insert groupPermission")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -51,7 +51,7 @@ func (d *MsSQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *model
 		if err != nil {
 			groupPermission.CreatedAt = originalCreatedAt
 			groupPermission.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan groupPermission id")
+			return errs.Wrap(err, "unable to scan groupPermission id")
 		}
 	}
 
@@ -61,7 +61,7 @@ func (d *MsSQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *model
 	if err := rows.Err(); err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert groupPermission")
+		return errs.Wrap(err, "unable to insert groupPermission")
 	}
 
 	return nil

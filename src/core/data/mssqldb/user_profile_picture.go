@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
 	if profilePicture.UserId == 0 {
-		return errors.WithStack(errors.New("can't create profile picture with user_id 0"))
+		return errs.New("can't create profile picture with user_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -31,7 +31,7 @@ func (d *MsSQLDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mod
 	// MSSQL doesn't support LastInsertId, use OUTPUT clause instead
 	parts := strings.SplitN(sqlStr, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sqlStr = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -39,7 +39,7 @@ func (d *MsSQLDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mod
 	if err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert profile picture")
+		return errs.Wrap(err, "unable to insert profile picture")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -48,7 +48,7 @@ func (d *MsSQLDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mod
 		if err != nil {
 			profilePicture.CreatedAt = originalCreatedAt
 			profilePicture.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan profile picture id")
+			return errs.Wrap(err, "unable to scan profile picture id")
 		}
 	}
 
@@ -58,7 +58,7 @@ func (d *MsSQLDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mod
 	if err := rows.Err(); err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert profile picture")
+		return errs.Wrap(err, "unable to insert profile picture")
 	}
 
 	return nil

@@ -14,10 +14,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pkg/errors"
 )
 
 type HttpHelper struct {
@@ -79,14 +79,14 @@ func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layo
 	if data != nil && data["_httpStatus"] != nil {
 		httpStatus, ok := data["_httpStatus"].(int)
 		if !ok {
-			return errors.WithStack(errors.New("unable to cast _httpStatus to int"))
+			return errs.New("unable to cast _httpStatus to int")
 		}
 		w.WriteHeader(httpStatus)
 	}
 
 	_, err = buf.WriteTo(w)
 	if err != nil {
-		return errors.WithStack(errors.New("unable to write to response writer"))
+		return errs.New("unable to write to response writer")
 	}
 	return nil
 }
@@ -110,7 +110,7 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 		var ok bool
 		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			return nil, errors.WithStack(errors.New("unable to cast jwtInfo to dtos.JwtInfo"))
+			return nil, errs.New("unable to cast jwtInfo to dtos.JwtInfo")
 		}
 		if jwtInfo.IdToken != nil && jwtInfo.IdToken.Claims["sub"] != nil {
 			// Extract user info from ID token claims instead of database lookup
@@ -210,12 +210,12 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 
 	templ, err := template.New(name).Funcs(templateFuncMap).ParseFS(h.templateFS, templateFiles...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to render template")
+		return nil, errs.Wrap(err, "unable to render template")
 	}
 	var buf bytes.Buffer
 	err = templ.Execute(&buf, data)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to execute template")
+		return nil, errs.Wrap(err, "unable to execute template")
 	}
 	return &buf, nil
 }

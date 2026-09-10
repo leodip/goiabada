@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) error {
@@ -29,7 +29,7 @@ func (d *PostgresDatabase) CreateResource(tx *sql.Tx, resource *models.Resource)
 	if err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert resource")
+		return errs.Wrap(err, "unable to insert resource")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -38,7 +38,7 @@ func (d *PostgresDatabase) CreateResource(tx *sql.Tx, resource *models.Resource)
 		if err != nil {
 			resource.CreatedAt = originalCreatedAt
 			resource.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan resource id")
+			return errs.Wrap(err, "unable to scan resource id")
 		}
 	}
 
@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateResource(tx *sql.Tx, resource *models.Resource)
 	if err := rows.Err(); err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert resource")
+		return errs.Wrap(err, "unable to insert resource")
 	}
 
 	return nil

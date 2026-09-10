@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // advisoryLockIDSalt is golang-migrate's own salt, copied from its database/util.go. It is not a
@@ -131,7 +133,7 @@ func MySQL(dbName string) Engine {
 		lock: func(ctx context.Context, conn *sql.Conn) error {
 			var acquired sql.NullBool
 			if err := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, 10)", resource).Scan(&acquired); err != nil {
-				return fmt.Errorf("unable to take the migration lock: %w", err)
+				return errs.Errorf("unable to take the migration lock: %w", err)
 			}
 			if !acquired.Valid || !acquired.Bool {
 				return ErrLocked
@@ -144,10 +146,10 @@ func MySQL(dbName string) Engine {
 			// this same connection, so anything but 1 means the lock did not come back.
 			var released sql.NullBool
 			if err := conn.QueryRowContext(ctx, "SELECT RELEASE_LOCK(?)", resource).Scan(&released); err != nil {
-				return fmt.Errorf("unable to release the migration lock: %w", err)
+				return errs.Errorf("unable to release the migration lock: %w", err)
 			}
 			if !released.Valid || !released.Bool {
-				return fmt.Errorf("the migration lock was not released: RELEASE_LOCK answered %v", nullBoolString(released))
+				return errs.Errorf("the migration lock was not released: RELEASE_LOCK answered %v", nullBoolString(released))
 			}
 			return nil
 		},
@@ -161,7 +163,7 @@ func Postgres(dbName string) Engine {
 	resource := func(ctx context.Context, conn *sql.Conn) (string, error) {
 		var schema string
 		if err := conn.QueryRowContext(ctx, "SELECT CURRENT_SCHEMA()").Scan(&schema); err != nil {
-			return "", fmt.Errorf("unable to read the current schema: %w", err)
+			return "", errs.Errorf("unable to read the current schema: %w", err)
 		}
 		return advisoryLockID(dbName, schema, migrationsTable), nil
 	}
@@ -175,7 +177,7 @@ func Postgres(dbName string) Engine {
 				return err
 			}
 			if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", id); err != nil {
-				return fmt.Errorf("unable to take the migration lock: %w", err)
+				return errs.Errorf("unable to take the migration lock: %w", err)
 			}
 			return nil
 		},
@@ -190,10 +192,10 @@ func Postgres(dbName string) Engine {
 			// database indefinitely, so it is read.
 			var released sql.NullBool
 			if err := conn.QueryRowContext(ctx, "SELECT pg_advisory_unlock($1)", id).Scan(&released); err != nil {
-				return fmt.Errorf("unable to release the migration lock: %w", err)
+				return errs.Errorf("unable to release the migration lock: %w", err)
 			}
 			if !released.Valid || !released.Bool {
-				return fmt.Errorf("the migration lock was not released: pg_advisory_unlock answered %v", nullBoolString(released))
+				return errs.Errorf("the migration lock was not released: pg_advisory_unlock answered %v", nullBoolString(released))
 			}
 			return nil
 		},
@@ -206,7 +208,7 @@ func SQLServer(dbName string) Engine {
 	resource := func(ctx context.Context, conn *sql.Conn) (string, error) {
 		var schema string
 		if err := conn.QueryRowContext(ctx, "SELECT SCHEMA_NAME()").Scan(&schema); err != nil {
-			return "", fmt.Errorf("unable to read the current schema: %w", err)
+			return "", errs.Errorf("unable to read the current schema: %w", err)
 		}
 		return advisoryLockID(dbName, schema), nil
 	}
@@ -225,13 +227,13 @@ func SQLServer(dbName string) Engine {
 		SELECT @lockResult;`
 			var status int
 			if err := conn.QueryRowContext(ctx, query, id).Scan(&status); err != nil {
-				return fmt.Errorf("unable to take the migration lock: %w", err)
+				return errs.Errorf("unable to take the migration lock: %w", err)
 			}
 			// sp_getapplock answers 0 when the lock was granted and 1 when it was granted after
 			// waiting; every negative value is a failure, and -1 is the timeout this call cannot
 			// reach with LockTimeout = -1.
 			if status < 0 {
-				return fmt.Errorf("unable to take the migration lock: sp_getapplock answered %d", status)
+				return errs.Errorf("unable to take the migration lock: sp_getapplock answered %d", status)
 			}
 			return nil
 		},
@@ -244,7 +246,7 @@ func SQLServer(dbName string) Engine {
 			// does not hold the lock, so the Exec error is the whole signal here.
 			if _, err := conn.ExecContext(ctx,
 				`EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`, id); err != nil {
-				return fmt.Errorf("the migration lock was not released: %w", err)
+				return errs.Errorf("the migration lock was not released: %w", err)
 			}
 			return nil
 		},

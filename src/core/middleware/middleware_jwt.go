@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -13,10 +12,10 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/pkg/errors"
 )
 
 type tokenParser interface {
@@ -146,7 +145,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 
 			sess, err := m.sessionStore.Get(r, m.sessionName)
 			if err != nil {
-				m.errorRenderer.InternalServerError(w, r, errors.Wrap(err, "unable to get the session"))
+				m.errorRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to get the session"))
 				return
 			}
 
@@ -154,7 +153,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 				tokenResponse, ok := sess.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
 				if !ok {
 					m.errorRenderer.InternalServerError(w, r,
-						errors.WithStack(errors.New("unable to cast the session value to TokenResponse")))
+						errs.New("unable to cast the session value to TokenResponse"))
 					return
 				}
 
@@ -167,7 +166,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 						delete(sess.Values, constants.SessionKeyJwt)
 						err := m.sessionStore.Save(r, w, sess)
 						if err != nil {
-							m.errorRenderer.InternalServerError(w, r, errors.Wrap(err, "unable to save the session"))
+							m.errorRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to save the session"))
 							return
 						}
 						next.ServeHTTP(w, r)
@@ -194,7 +193,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 						delete(sess.Values, constants.SessionKeyJwt)
 						err := m.sessionStore.Save(r, w, sess)
 						if err != nil {
-							m.errorRenderer.InternalServerError(w, r, errors.Wrap(err, "unable to save the session"))
+							m.errorRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to save the session"))
 							return
 						}
 
@@ -226,7 +225,7 @@ func (m *MiddlewareJwt) refreshToken(
 	clientSecret := m.clientSecret
 	if strings.TrimSpace(clientID) == "" || strings.TrimSpace(clientSecret) == "" {
 		slog.Error("missing client credentials for refreshToken; skipping refresh")
-		return false, fmt.Errorf("missing client credentials for refresh")
+		return false, errs.Errorf("missing client credentials for refresh")
 	}
 
 	// Prepare the refresh token request
@@ -239,7 +238,7 @@ func (m *MiddlewareJwt) refreshToken(
 	// Create the HTTP request
 	req, err := http.NewRequest("POST", m.authServerBaseURL+"/auth/token", strings.NewReader(data.Encode()))
 	if err != nil {
-		return false, fmt.Errorf("error creating refresh token request: %v", err)
+		return false, errs.Errorf("error creating refresh token request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -250,37 +249,37 @@ func (m *MiddlewareJwt) refreshToken(
 	}
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("error sending refresh token request: %v", err)
+		return false, errs.Errorf("error sending refresh token request: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read the response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, fmt.Errorf("error reading refresh token response: %v", err)
+		return false, errs.Errorf("error reading refresh token response: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("error response from server: %s", body)
+		return false, errs.Errorf("error response from server: %s", body)
 	}
 
 	// Parse the new token response
 	var newTokenResponse oauth.TokenResponse
 	err = json.Unmarshal(body, &newTokenResponse)
 	if err != nil {
-		return false, fmt.Errorf("error parsing refresh token response: %v", err)
+		return false, errs.Errorf("error parsing refresh token response: %v", err)
 	}
 
 	sess, err := m.sessionStore.Get(r, m.sessionName)
 	if err != nil {
-		return false, fmt.Errorf("unable to get session: %v", err)
+		return false, errs.Errorf("unable to get session: %v", err)
 	}
 
 	// Update the session with the new token response
 	sess.Values[constants.SessionKeyJwt] = newTokenResponse
 	err = m.sessionStore.Save(r, w, sess)
 	if err != nil {
-		return false, fmt.Errorf("unable to save the session: %v", err)
+		return false, errs.Errorf("unable to save the session: %v", err)
 	}
 
 	return true, nil
@@ -300,7 +299,7 @@ func (m *MiddlewareJwt) RequiresScope(
 				jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 				if !ok {
 					m.errorRenderer.InternalServerError(w, r,
-						errors.WithStack(errors.New("unable to cast the context value to JwtInfo in RequiresScope middleware")))
+						errs.New("unable to cast the context value to JwtInfo in RequiresScope middleware"))
 					return
 				}
 			}
@@ -323,7 +322,7 @@ func (m *MiddlewareJwt) RequiresScope(
 						m.baseURL+r.RequestURI)
 					if err != nil {
 						m.errorRenderer.InternalServerError(w, r,
-							errors.Wrap(err, "unable to redirect to authorize in RequiresScope middleware"))
+							errs.Wrap(err, "unable to redirect to authorize in RequiresScope middleware"))
 					}
 				}
 				return

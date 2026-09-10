@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
 
 	if profilePicture.UserId == 0 {
-		return errors.WithStack(errors.New("can't create profile picture with user_id 0"))
+		return errs.New("can't create profile picture with user_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -32,14 +32,14 @@ func (d *CommonDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mo
 	if err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert profile picture")
+		return errs.Wrap(err, "unable to insert profile picture")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	profilePicture.Id = id
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mo
 func (d *CommonDatabase) UpdateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
 
 	if profilePicture.Id == 0 {
-		return errors.WithStack(errors.New("can't update profile picture with id 0"))
+		return errs.New("can't update profile picture with id 0")
 	}
 
 	originalUpdatedAt := profilePicture.UpdatedAt
@@ -65,7 +65,7 @@ func (d *CommonDatabase) UpdateUserProfilePicture(tx *sql.Tx, profilePicture *mo
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update profile picture")
+		return errs.Wrap(err, "unable to update profile picture")
 	}
 
 	return nil
@@ -82,7 +82,7 @@ func (d *CommonDatabase) GetUserProfilePictureByUserId(tx *sql.Tx, userId int64)
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -91,12 +91,12 @@ func (d *CommonDatabase) GetUserProfilePictureByUserId(tx *sql.Tx, userId int64)
 		addr := profilePictureStruct.Addr(&profilePicture)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan profile picture")
+			return nil, errs.Wrap(err, "unable to scan profile picture")
 		}
 		return &profilePicture, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -113,7 +113,7 @@ func (d *CommonDatabase) DeleteUserProfilePicture(tx *sql.Tx, userId int64) erro
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete profile picture")
+		return errs.Wrap(err, "unable to delete profile picture")
 	}
 
 	return nil
@@ -129,13 +129,13 @@ func (d *CommonDatabase) UserHasProfilePicture(tx *sql.Tx, userId int64) (bool, 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to query database")
+		return false, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
 	exists := rows.Next()
 	if err := rows.Err(); err != nil {
-		return false, errors.Wrap(err, "unable to read query results")
+		return false, errs.Wrap(err, "unable to read query results")
 	}
 
 	return exists, nil

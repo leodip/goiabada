@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
 	if profilePicture.UserId == 0 {
-		return errors.WithStack(errors.New("can't create profile picture with user_id 0"))
+		return errs.New("can't create profile picture with user_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -32,7 +32,7 @@ func (d *PostgresDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *
 	if err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert profile picture")
+		return errs.Wrap(err, "unable to insert profile picture")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -41,7 +41,7 @@ func (d *PostgresDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *
 		if err != nil {
 			profilePicture.CreatedAt = originalCreatedAt
 			profilePicture.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan profile picture id")
+			return errs.Wrap(err, "unable to scan profile picture id")
 		}
 	}
 
@@ -51,7 +51,7 @@ func (d *PostgresDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *
 	if err := rows.Err(); err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert profile picture")
+		return errs.Wrap(err, "unable to insert profile picture")
 	}
 
 	return nil

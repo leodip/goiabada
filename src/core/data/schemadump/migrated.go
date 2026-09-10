@@ -2,7 +2,8 @@ package schemadump
 
 import (
 	"database/sql"
-	"fmt"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // MigratedVersion reads the migration version of the connected database out of
@@ -20,12 +21,12 @@ import (
 // migration chain, and an empty table is refused, because that is an unmigrated database.
 func MigratedVersion(db *sql.DB, d Dialect) (int, error) {
 	if !d.valid() {
-		return 0, fmt.Errorf("schemadump: unrecognised database dialect %q", d)
+		return 0, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 
 	rows, err := db.Query(`SELECT version, dirty FROM schema_migrations`)
 	if err != nil {
-		return 0, fmt.Errorf("schemadump: read schema_migrations on %s: %w", d, err)
+		return 0, errs.Errorf("schemadump: read schema_migrations on %s: %w", d, err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -36,21 +37,21 @@ func MigratedVersion(db *sql.DB, d Dialect) (int, error) {
 	)
 	for rows.Next() {
 		if err := rows.Scan(&version, &dirty); err != nil {
-			return 0, fmt.Errorf("schemadump: scan schema_migrations on %s: %w", d, err)
+			return 0, errs.Errorf("schemadump: scan schema_migrations on %s: %w", d, err)
 		}
 		found = true
 	}
 	if err := rows.Err(); err != nil {
-		return 0, fmt.Errorf("schemadump: iterate schema_migrations on %s: %w", d, err)
+		return 0, errs.Errorf("schemadump: iterate schema_migrations on %s: %w", d, err)
 	}
 	if !found {
-		return 0, fmt.Errorf("schemadump: schema_migrations on %s holds no row, so the database has never been migrated", d)
+		return 0, errs.Errorf("schemadump: schema_migrations on %s holds no row, so the database has never been migrated", d)
 	}
 	if dirty {
-		return 0, fmt.Errorf("schemadump: schema_migrations on %s records version %d as dirty, so migration %d failed part way and the catalog is not a record of anything", d, version, version)
+		return 0, errs.Errorf("schemadump: schema_migrations on %s records version %d as dirty, so migration %d failed part way and the catalog is not a record of anything", d, version, version)
 	}
 	if version <= 0 {
-		return 0, fmt.Errorf("schemadump: schema_migrations on %s records version %d, which is not a migration this repository has", d, version)
+		return 0, errs.Errorf("schemadump: schema_migrations on %s records version %d, which is not a migration this repository has", d, version)
 	}
 	return version, nil
 }

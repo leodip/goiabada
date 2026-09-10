@@ -8,8 +8,8 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 // dbBackend keeps browser sessions in the database this deployment already runs. It is
@@ -38,7 +38,7 @@ func (b *dbBackend) Load(ctx context.Context, id string) (*Record, error) {
 	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(nil, b.owner,
 		hashSessionId(id), b.now())
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to read the browser session")
+		return nil, errs.Wrap(err, "unable to read the browser session")
 	}
 	if browserSession == nil {
 		return nil, ErrNotFound
@@ -73,7 +73,7 @@ func (b *dbBackend) Create(ctx context.Context, id string, data []byte, authenti
 	}
 
 	if err := b.database.CreateBrowserSession(nil, browserSession); err != nil {
-		return time.Time{}, errors.Wrap(err, "unable to create the browser session")
+		return time.Time{}, errs.Wrap(err, "unable to create the browser session")
 	}
 
 	return expiresAt, nil
@@ -90,7 +90,7 @@ func (b *dbBackend) Update(ctx context.Context, id string, data []byte, authenti
 
 	updated, err := b.database.UpdateBrowserSessionData(nil, b.owner, hash, string(data), now, expiresAt)
 	if err != nil {
-		return time.Time{}, errors.Wrap(err, "unable to update the browser session")
+		return time.Time{}, errs.Wrap(err, "unable to update the browser session")
 	}
 	if !updated {
 		return time.Time{}, ErrNotFound
@@ -110,7 +110,7 @@ func (b *dbBackend) Touch(ctx context.Context, id string, authenticated bool) (t
 
 	touched, err := b.database.TouchBrowserSession(nil, b.owner, hash, now, expiresAt)
 	if err != nil {
-		return time.Time{}, errors.Wrap(err, "unable to touch the browser session")
+		return time.Time{}, errs.Wrap(err, "unable to touch the browser session")
 	}
 	if !touched {
 		return time.Time{}, ErrNotFound
@@ -121,7 +121,7 @@ func (b *dbBackend) Touch(ctx context.Context, id string, authenticated bool) (t
 
 func (b *dbBackend) Delete(ctx context.Context, id string) error {
 	if err := b.database.DeleteBrowserSession(nil, b.owner, hashSessionId(id)); err != nil {
-		return errors.Wrap(err, "unable to delete the browser session")
+		return errs.Wrap(err, "unable to delete the browser session")
 	}
 	return nil
 }
@@ -149,7 +149,7 @@ func (b *dbBackend) expiryFor(ctx context.Context, hash string, authenticated bo
 
 	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(nil, b.owner, hash, now)
 	if err != nil {
-		return time.Time{}, errors.Wrap(err, "unable to read the browser session")
+		return time.Time{}, errs.Wrap(err, "unable to read the browser session")
 	}
 	if browserSession == nil {
 		return time.Time{}, ErrNotFound
@@ -177,10 +177,10 @@ func (b *dbBackend) lifetimes(ctx context.Context) (idleTimeout, maxLifetime tim
 	if !ok || settings == nil {
 		settings, err = b.database.GetSettingsById(nil, 1)
 		if err != nil {
-			return 0, 0, errors.Wrap(err, "unable to read the settings")
+			return 0, 0, errs.Wrap(err, "unable to read the settings")
 		}
 		if settings == nil {
-			return 0, 0, errors.WithStack(errors.New("settings row is missing"))
+			return 0, 0, errs.New("settings row is missing")
 		}
 	}
 

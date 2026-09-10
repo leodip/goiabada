@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/hex"
 	"flag"
-	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 type AuthServerConfig struct {
@@ -323,14 +323,14 @@ func GetAESEncryptionKeyPrevious() []byte {
 func ValidateAESEncryptionKey() error {
 	key := strings.TrimSpace(cfg.AESEncryptionKey)
 	if key == "" {
-		return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY is required. Generate with: openssl rand -hex 32")
+		return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is required. Generate with: openssl rand -hex 32")
 	}
 	keyBytes, err := hex.DecodeString(key)
 	if err != nil {
-		return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
+		return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
 	}
 	if len(keyBytes) != 32 {
-		return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(keyBytes))
+		return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(keyBytes))
 	}
 
 	// The previous key is optional (rotation only), but if present it must be a
@@ -338,10 +338,10 @@ func ValidateAESEncryptionKey() error {
 	if prev := strings.TrimSpace(cfg.AESEncryptionKeyPrevious); prev != "" {
 		prevBytes, err := hex.DecodeString(prev)
 		if err != nil {
-			return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+			return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
 		}
 		if len(prevBytes) != 32 {
-			return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevBytes))
+			return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevBytes))
 		}
 	}
 
@@ -428,27 +428,27 @@ func ValidateAuthServerSessionKeys() error {
 	encKey := cfg.AuthServer.SessionEncryptionKey
 
 	if authKey == "" {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY is required")
+		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY is required")
 	}
 	if encKey == "" {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY is required")
+		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY is required")
 	}
 
 	// Validate hex encoding and length
 	authKeyBytes, err := hex.DecodeString(authKey)
 	if err != nil {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 64", err)
+		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 64", err)
 	}
 	if len(authKeyBytes) != 64 {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes. Generate with: openssl rand -hex 64", len(authKeyBytes))
+		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes. Generate with: openssl rand -hex 64", len(authKeyBytes))
 	}
 
 	encKeyBytes, err := hex.DecodeString(encKey)
 	if err != nil {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
+		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
 	}
 	if len(encKeyBytes) != 32 {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
+		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
 	}
 	// The previous pair is optional and set only while the session keys are being rotated,
 	// but it is accepted as a pair rather than as two variables: one half alone opens
@@ -460,26 +460,26 @@ func ValidateAuthServerSessionKeys() error {
 
 	if prevAuthKey != "" || prevEncKey != "" {
 		if prevAuthKey == "" {
-			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
+			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
 		}
 		if prevEncKey == "" {
-			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
+			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
 		}
 
 		prevAuthKeyBytes, err := hex.DecodeString(prevAuthKey)
 		if err != nil {
-			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
 		}
 		if len(prevAuthKeyBytes) != 64 {
-			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes (128 hex chars), got %d bytes", len(prevAuthKeyBytes))
+			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes (128 hex chars), got %d bytes", len(prevAuthKeyBytes))
 		}
 
 		prevEncKeyBytes, err := hex.DecodeString(prevEncKey)
 		if err != nil {
-			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
 		}
 		if len(prevEncKeyBytes) != 32 {
-			return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevEncKeyBytes))
+			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevEncKeyBytes))
 		}
 	}
 
@@ -515,10 +515,10 @@ func ValidateRemovedAdminConsoleVars() error {
 			if strings.TrimSpace(value) == constants.AdminConsoleClientIdentifier {
 				continue
 			}
-			return fmt.Errorf("%s is set to %q but is no longer configuration: the admin console always authenticates as %q, the client the auth server seeds. Remove %s from the deployment's configuration",
+			return errs.Errorf("%s is set to %q but is no longer configuration: the admin console always authenticates as %q, the client the auth server seeds. Remove %s from the deployment's configuration",
 				removedClientIDVar, value, constants.AdminConsoleClientIdentifier, removedClientIDVar)
 		case removedIssuerVar:
-			return fmt.Errorf("%s is set to %q but is no longer configuration: the admin console takes the issuer from the auth server that stamps it into tokens, so this value is never read. Remove %s from the deployment's configuration",
+			return errs.Errorf("%s is set to %q but is no longer configuration: the admin console takes the issuer from the auth server that stamps it into tokens, so this value is never read. Remove %s from the deployment's configuration",
 				removedIssuerVar, value, removedIssuerVar)
 		}
 	}
@@ -533,27 +533,27 @@ func ValidateAdminConsoleSessionKeys() error {
 	encKey := cfg.AdminConsole.SessionEncryptionKey
 
 	if authKey == "" {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY is required")
+		return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY is required")
 	}
 	if encKey == "" {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY is required")
+		return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY is required")
 	}
 
 	// Validate hex encoding and length
 	authKeyBytes, err := hex.DecodeString(authKey)
 	if err != nil {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 64", err)
+		return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 64", err)
 	}
 	if len(authKeyBytes) != 64 {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes. Generate with: openssl rand -hex 64", len(authKeyBytes))
+		return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes. Generate with: openssl rand -hex 64", len(authKeyBytes))
 	}
 
 	encKeyBytes, err := hex.DecodeString(encKey)
 	if err != nil {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
+		return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
 	}
 	if len(encKeyBytes) != 32 {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
+		return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
 	}
 	// The previous pair is optional and set only while the session keys are being rotated,
 	// but it is accepted as a pair rather than as two variables: one half alone opens
@@ -565,26 +565,26 @@ func ValidateAdminConsoleSessionKeys() error {
 
 	if prevAuthKey != "" || prevEncKey != "" {
 		if prevAuthKey == "" {
-			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
+			return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
 		}
 		if prevEncKey == "" {
-			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is required when GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
+			return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is required when GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
 		}
 
 		prevAuthKeyBytes, err := hex.DecodeString(prevAuthKey)
 		if err != nil {
-			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+			return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
 		}
 		if len(prevAuthKeyBytes) != 64 {
-			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes (128 hex chars), got %d bytes", len(prevAuthKeyBytes))
+			return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes (128 hex chars), got %d bytes", len(prevAuthKeyBytes))
 		}
 
 		prevEncKeyBytes, err := hex.DecodeString(prevEncKey)
 		if err != nil {
-			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+			return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
 		}
 		if len(prevEncKeyBytes) != 32 {
-			return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevEncKeyBytes))
+			return errs.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevEncKeyBytes))
 		}
 	}
 

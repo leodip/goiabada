@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/leodip/goiabada/core/data/migrator"
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 	sqlitedriver "modernc.org/sqlite"
 )
 
@@ -50,7 +50,7 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open database")
+		return nil, errs.Wrap(err, "unable to open database")
 	}
 
 	db.SetMaxOpenConns(1)
@@ -72,7 +72,7 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 	for _, stmt := range pragmaStatements {
 		_, err = db.Exec(stmt)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to execute %s", stmt)
+			return nil, errs.Wrapf(err, "failed to execute %s", stmt)
 		}
 	}
 
@@ -99,18 +99,18 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 		var value interface{}
 		err = db.QueryRow(check.query).Scan(&value)
 		if err != nil {
-			return nil, errors.Wrapf(err, "unable to check %s status", check.name)
+			return nil, errs.Wrapf(err, "unable to check %s status", check.name)
 		}
 		if fmt.Sprintf("%v", value) != fmt.Sprintf("%v", check.expected) {
-			return nil, errors.Errorf("%s is not set correctly. Expected %v, got %v", check.name, check.expected, value)
+			return nil, errs.Errorf("%s is not set correctly. Expected %v, got %v", check.name, check.expected, value)
 		}
 	}
 
 	if err := db.PingContext(context.Background()); err != nil {
 		if errWithCode, ok := err.(*sqlitedriver.Error); ok {
-			err = errors.WithStack(errors.New(sqlitedriver.ErrorCodeString[errWithCode.Code()]))
+			err = errs.New(sqlitedriver.ErrorCodeString[errWithCode.Code()])
 		}
-		return nil, errors.WithStack(fmt.Errorf("sqlite ping: %w", err))
+		return nil, errs.Errorf("sqlite ping: %w", err)
 	}
 
 	slog.Info("connected to sqlite database with required PRAGMA settings")
@@ -186,10 +186,10 @@ const schemaMigrationsIndexDDL = `CREATE UNIQUE INDEX IF NOT EXISTS version_uniq
 // against one empty database cannot make each other fail.
 func (d *SQLiteDatabase) ensureSchemaMigrationsTable() error {
 	if _, err := d.DB.Exec(schemaMigrationsTableDDL); err != nil {
-		return errors.Wrap(err, "unable to create the schema_migrations table")
+		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
 	if _, err := d.DB.Exec(schemaMigrationsIndexDDL); err != nil {
-		return errors.Wrap(err, "unable to create the schema_migrations version index")
+		return errs.Wrap(err, "unable to create the schema_migrations version index")
 	}
 	return nil
 }
@@ -207,7 +207,7 @@ func (d *SQLiteDatabase) NewMigrator() (*migrator.Migrator, error) {
 
 	m, err := migrator.New(d.DB, sqliteMigrationsFs, "migrations", migrator.SQLite())
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create migration instance")
+		return nil, errs.Wrap(err, "unable to create migration instance")
 	}
 	return m, nil
 }
@@ -229,7 +229,7 @@ func (d *SQLiteDatabase) Migrate() error {
 	if err != nil {
 		// StartupRefusal explains the one failure a starting server can be talked out of: a
 		// database a newer release already migrated. Everything else passes through.
-		return errors.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
+		return errs.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
 	}
 
 	return nil

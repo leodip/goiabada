@@ -3,7 +3,7 @@ package commondb
 import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/core/encryption"
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // BackfillEncryptedOTPSecrets migrates any TOTP secrets still held in the legacy
@@ -19,7 +19,7 @@ import (
 // with a partially-migrated 2FA store.
 func (d *CommonDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
 	if len(aesKey) != 32 {
-		return 0, errors.WithStack(errors.New("cannot backfill OTP secrets: AES key must be 32 bytes"))
+		return 0, errs.New("cannot backfill OTP secrets: AES key must be 32 bytes")
 	}
 
 	// Rows needing migration have a non-empty plaintext secret. Migrated rows
@@ -31,7 +31,7 @@ func (d *CommonDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
 
 	rows, err := d.QuerySql(nil, query, args...)
 	if err != nil {
-		return 0, errors.Wrap(err, "unable to query users with plaintext OTP secrets")
+		return 0, errs.Wrap(err, "unable to query users with plaintext OTP secrets")
 	}
 
 	// Collect the rows fully before issuing any UPDATE: some drivers (SQLite is
@@ -46,13 +46,13 @@ func (d *CommonDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
 		var p pending
 		if err := rows.Scan(&p.id, &p.secret); err != nil {
 			_ = rows.Close()
-			return 0, errors.Wrap(err, "unable to scan user OTP secret")
+			return 0, errs.Wrap(err, "unable to scan user OTP secret")
 		}
 		todo = append(todo, p)
 	}
 	if err := rows.Err(); err != nil {
 		_ = rows.Close()
-		return 0, errors.Wrap(err, "error iterating users with plaintext OTP secrets")
+		return 0, errs.Wrap(err, "error iterating users with plaintext OTP secrets")
 	}
 	_ = rows.Close()
 
@@ -60,7 +60,7 @@ func (d *CommonDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
 	for _, p := range todo {
 		encrypted, err := encryption.EncryptText(p.secret, aesKey)
 		if err != nil {
-			return migrated, errors.Wrapf(err, "unable to encrypt OTP secret for user id %d", p.id)
+			return migrated, errs.Wrapf(err, "unable to encrypt OTP secret for user id %d", p.id)
 		}
 
 		ub := sqlbuilder.NewUpdateBuilder()
@@ -73,7 +73,7 @@ func (d *CommonDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
 		uq, uargs := ub.BuildWithFlavor(d.Flavor)
 
 		if _, err := d.ExecSql(nil, uq, uargs...); err != nil {
-			return migrated, errors.Wrapf(err, "unable to store encrypted OTP secret for user id %d", p.id)
+			return migrated, errs.Wrapf(err, "unable to store encrypted OTP secret for user id %d", p.id)
 		}
 		migrated++
 	}

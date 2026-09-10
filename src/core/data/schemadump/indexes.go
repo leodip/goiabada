@@ -3,6 +3,8 @@ package schemadump
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // dumpIndexes reads every index on one table. Each query returns one row per key column,
@@ -74,7 +76,7 @@ func dumpIndexes(db *sql.DB, d Dialect, table string) ([]IndexShape, error) {
 
 	rows, err := db.Query(q)
 	if err != nil {
-		return nil, fmt.Errorf("schemadump: index catalog sweep on %s.%s: %w", d, table, err)
+		return nil, errs.Errorf("schemadump: index catalog sweep on %s.%s: %w", d, table, err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -83,7 +85,7 @@ func dumpIndexes(db *sql.DB, d Dialect, table string) ([]IndexShape, error) {
 	for rows.Next() {
 		var name, uniqueFlag, origin, col string
 		if err := rows.Scan(&name, &uniqueFlag, &origin, &col); err != nil {
-			return nil, fmt.Errorf("schemadump: scan index catalog row on %s.%s: %w", d, table, err)
+			return nil, errs.Errorf("schemadump: scan index catalog row on %s.%s: %w", d, table, err)
 		}
 		pos, seen := byName[name]
 		if !seen {
@@ -96,14 +98,14 @@ func dumpIndexes(db *sql.DB, d Dialect, table string) ([]IndexShape, error) {
 		indexes[pos].Columns = append(indexes[pos].Columns, col)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("schemadump: iterate index catalog on %s.%s: %w", d, table, err)
+		return nil, errs.Errorf("schemadump: iterate index catalog on %s.%s: %w", d, table, err)
 	}
 
 	for _, ix := range indexes {
 		switch ix.Origin {
 		case OriginCreated, OriginUnique, OriginPrimaryKey:
 		default:
-			return nil, fmt.Errorf("schemadump: %s reported index %q on %q with origin %q, which is none of c, u or pk",
+			return nil, errs.Errorf("schemadump: %s reported index %q on %q with origin %q, which is none of c, u or pk",
 				d, ix.Name, table, ix.Origin)
 		}
 	}

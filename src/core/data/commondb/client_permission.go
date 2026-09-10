@@ -5,18 +5,18 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error {
 
 	if clientPermission.ClientId == 0 {
-		return errors.WithStack(errors.New("can't create clientPermission with client_id 0"))
+		return errs.New("can't create clientPermission with client_id 0")
 	}
 
 	if clientPermission.PermissionId == 0 {
-		return errors.WithStack(errors.New("can't create clientPermission with permission_id 0"))
+		return errs.New("can't create clientPermission with permission_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -36,14 +36,14 @@ func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mo
 	if err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert clientPermission")
+		return errs.Wrap(err, "unable to insert clientPermission")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	clientPermission.Id = id
@@ -53,7 +53,7 @@ func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mo
 func (d *CommonDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error {
 
 	if clientPermission.Id == 0 {
-		return errors.WithStack(errors.New("can't update clientPermission with id 0"))
+		return errs.New("can't update clientPermission with id 0")
 	}
 
 	originalUpdatedAt := clientPermission.UpdatedAt
@@ -69,7 +69,7 @@ func (d *CommonDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *mo
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		clientPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update clientPermission")
+		return errs.Wrap(err, "unable to update clientPermission")
 	}
 
 	return nil
@@ -81,7 +81,7 @@ func (d *CommonDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sq
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -90,12 +90,12 @@ func (d *CommonDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sq
 		addr := clientPermissionStruct.Addr(&clientPermission)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan clientPermission")
+			return nil, errs.Wrap(err, "unable to scan clientPermission")
 		}
 		return &clientPermission, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -145,7 +145,7 @@ func (d *CommonDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -155,13 +155,13 @@ func (d *CommonDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int
 		addr := clientPermissionStruct.Addr(&clientPermission)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan clientPermission")
+			return nil, errs.Wrap(err, "unable to scan clientPermission")
 		}
 		clientPermissions = append(clientPermissions, clientPermission)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return clientPermissions, nil
@@ -178,7 +178,7 @@ func (d *CommonDatabase) DeleteClientPermission(tx *sql.Tx, clientPermissionId i
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete clientPermission")
+		return errs.Wrap(err, "unable to delete clientPermission")
 	}
 
 	return nil

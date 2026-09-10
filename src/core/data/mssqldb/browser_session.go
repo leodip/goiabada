@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 // CreateBrowserSession is written here rather than delegated because SQL Server has no
@@ -16,11 +16,11 @@ import (
 func (d *MsSQLDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.BrowserSession) error {
 
 	if browserSession.Owner == "" {
-		return errors.WithStack(errors.New("can't create a browser session with an empty owner"))
+		return errs.New("can't create a browser session with an empty owner")
 	}
 
 	if browserSession.SessionIdHash == "" {
-		return errors.WithStack(errors.New("can't create a browser session with an empty session id hash"))
+		return errs.New("can't create a browser session with an empty session id hash")
 	}
 
 	now := time.Now().UTC()
@@ -38,7 +38,7 @@ func (d *MsSQLDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -46,7 +46,7 @@ func (d *MsSQLDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert browser session")
+		return errs.Wrap(err, "unable to insert browser session")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -55,7 +55,7 @@ func (d *MsSQLDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.
 		if err != nil {
 			browserSession.CreatedAt = originalCreatedAt
 			browserSession.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan browser session id")
+			return errs.Wrap(err, "unable to scan browser session id")
 		}
 	}
 
@@ -65,7 +65,7 @@ func (d *MsSQLDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.
 	if err := rows.Err(); err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert browser session")
+		return errs.Wrap(err, "unable to insert browser session")
 	}
 
 	return nil

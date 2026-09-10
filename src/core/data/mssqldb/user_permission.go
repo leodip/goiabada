@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error {
 	if userPermission.UserId == 0 {
-		return errors.WithStack(errors.New("can't create userPermission with user_id 0"))
+		return errs.New("can't create userPermission with user_id 0")
 	}
 
 	if userPermission.PermissionId == 0 {
-		return errors.WithStack(errors.New("can't create userPermission with permission_id 0"))
+		return errs.New("can't create userPermission with permission_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -42,7 +42,7 @@ func (d *MsSQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.
 	if err != nil {
 		userPermission.CreatedAt = originalCreatedAt
 		userPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userPermission")
+		return errs.Wrap(err, "unable to insert userPermission")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -51,7 +51,7 @@ func (d *MsSQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.
 		if err != nil {
 			userPermission.CreatedAt = originalCreatedAt
 			userPermission.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan userPermission id")
+			return errs.Wrap(err, "unable to scan userPermission id")
 		}
 	}
 
@@ -61,7 +61,7 @@ func (d *MsSQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.
 	if err := rows.Err(); err != nil {
 		userPermission.CreatedAt = originalCreatedAt
 		userPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userPermission")
+		return errs.Wrap(err, "unable to insert userPermission")
 	}
 
 	return nil

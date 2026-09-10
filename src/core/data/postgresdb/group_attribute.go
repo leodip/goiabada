@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
 	if groupAttribute.GroupId == 0 {
-		return errors.WithStack(errors.New("can't create groupAttribute with group_id 0"))
+		return errs.New("can't create groupAttribute with group_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -33,7 +33,7 @@ func (d *PostgresDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *mode
 	if err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert groupAttribute")
+		return errs.Wrap(err, "unable to insert groupAttribute")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -42,7 +42,7 @@ func (d *PostgresDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *mode
 		if err != nil {
 			groupAttribute.CreatedAt = originalCreatedAt
 			groupAttribute.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan groupAttribute id")
+			return errs.Wrap(err, "unable to scan groupAttribute id")
 		}
 	}
 
@@ -52,7 +52,7 @@ func (d *PostgresDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *mode
 	if err := rows.Err(); err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert groupAttribute")
+		return errs.Wrap(err, "unable to insert groupAttribute")
 	}
 
 	return nil

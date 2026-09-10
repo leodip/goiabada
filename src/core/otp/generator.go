@@ -7,7 +7,7 @@ import (
 	"image/png"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 	pquernaotp "github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 )
@@ -38,19 +38,19 @@ func NewOTPSecretGenerator() *OTPSecretGenerator {
 func (g *OTPSecretGenerator) GenerateOTPSecret(email string, appName string) (string, error) {
 
 	if strings.TrimSpace(email) == "" {
-		return "", errors.New("email is empty")
+		return "", errs.New("email is empty")
 	}
 
 	if strings.TrimSpace(appName) == "" {
-		return "", errors.New("app name is empty")
+		return "", errs.New("app name is empty")
 	}
 
 	if len(email) > 64 {
-		return "", errors.New("email is too long")
+		return "", errs.New("email is too long")
 	}
 
 	if len(appName) > 32 {
-		return "", errors.New("app name is too long")
+		return "", errs.New("app name is too long")
 	}
 
 	key, err := totp.Generate(totp.GenerateOpts{
@@ -58,7 +58,7 @@ func (g *OTPSecretGenerator) GenerateOTPSecret(email string, appName string) (st
 		AccountName: email,
 	})
 	if err != nil {
-		return "", errors.Wrap(err, fmt.Sprintf("unable to generate otp for user %v", email))
+		return "", errs.Wrap(err, fmt.Sprintf("unable to generate otp for user %v", email))
 	}
 
 	return key.URL(), nil
@@ -84,12 +84,12 @@ func RenderQRCodeImage(keyURL string) (string, error) {
 
 	img, err := key.Image(qrCodePixels, qrCodePixels)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to generate otp png image")
+		return "", errs.Wrap(err, "unable to generate otp png image")
 	}
 
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
-		return "", errors.Wrap(err, "unable to encode otp png image")
+		return "", errs.Wrap(err, "unable to encode otp png image")
 	}
 	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
 }
@@ -104,20 +104,20 @@ func RenderQRCodeImage(keyURL string) (string, error) {
 // an empty secret and show the user a QR code that enrols them in nothing (#247).
 func parseKeyURL(keyURL string) (*pquernaotp.Key, error) {
 	if strings.TrimSpace(keyURL) == "" {
-		return nil, errors.New("otp key url is empty")
+		return nil, errs.New("otp key url is empty")
 	}
 
 	key, err := pquernaotp.NewKeyFromURL(keyURL)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse otp key url")
+		return nil, errs.Wrap(err, "unable to parse otp key url")
 	}
 
 	if key.Type() != "totp" {
-		return nil, errors.New("otp key url is not a totp key")
+		return nil, errs.New("otp key url is not a totp key")
 	}
 
 	if key.Secret() == "" {
-		return nil, errors.New("otp key url carries no secret")
+		return nil, errs.New("otp key url carries no secret")
 	}
 
 	return key, nil

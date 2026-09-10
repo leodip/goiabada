@@ -7,10 +7,10 @@ import (
 
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/timezones"
-	"github.com/pkg/errors"
 )
 
 type ProfileValidator struct {
@@ -81,7 +81,7 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		// to a user: it means the request carried a stale or forged subject.
 		// Surface it as an error rather than dereferencing nil below.
 		if user == nil {
-			return errors.WithStack(errors.New("subject not found: " + input.Subject))
+			return errs.New("subject not found: " + input.Subject)
 		}
 
 		// Username uniqueness is best-effort, and deliberately so. This is a

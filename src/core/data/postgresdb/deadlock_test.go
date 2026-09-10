@@ -7,7 +7,7 @@ import (
 
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
-	pkgerrors "github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // TestIsDeadlock is PostgreSQL's row of the classifier table RunInTransaction consults. The
@@ -26,7 +26,7 @@ func TestIsDeadlock(t *testing.T) {
 		want bool
 	}{
 		{"the driver's deadlock, as pgx returns it", deadlock, true},
-		{"the same error wrapped once, as ExecSql returns it", pkgerrors.Wrap(deadlock, "unable to execute SQL"), true},
+		{"the same error wrapped once, as ExecSql returns it", errs.Wrap(deadlock, "unable to execute SQL"), true},
 		{"the same error wrapped by the standard library", errors.Join(deadlock), true},
 		{"55P03 lock_not_available: a lock wait that ran out, not a broken cycle", &pgconn.PgError{Code: "55P03"}, false},
 		{"a syntax error from the same driver", &pgconn.PgError{Code: "42601", Message: "syntax error at or near"}, false},

@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession.UserId == 0 {
-		return errors.WithStack(errors.New("user id must be greater than 0"))
+		return errs.New("user id must be greater than 0")
 	}
 
 	now := time.Now().UTC()
@@ -32,14 +32,14 @@ func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserS
 	if err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userSession")
+		return errs.Wrap(err, "unable to insert userSession")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	userSession.Id = id
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserS
 func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession.Id == 0 {
-		return errors.WithStack(errors.New("can't update userSession with id 0"))
+		return errs.New("can't update userSession with id 0")
 	}
 
 	originalUpdatedAt := userSession.UpdatedAt
@@ -65,7 +65,7 @@ func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *models.UserS
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		userSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update userSession")
+		return errs.Wrap(err, "unable to update userSession")
 	}
 
 	return nil
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -86,12 +86,12 @@ func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 		addr := userSessionStruct.Addr(&userSession)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userSession")
+			return nil, errs.Wrap(err, "unable to scan userSession")
 		}
 		return &userSession, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -135,7 +135,7 @@ func (d *CommonDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionId
 
 func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error) {
 	if clientId <= 0 {
-		return nil, 0, errors.WithStack(errors.New("client id must be greater than 0"))
+		return nil, 0, errs.New("client id must be greater than 0")
 	}
 
 	if page < 1 {
@@ -162,7 +162,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "unable to query database")
+		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -172,7 +172,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 		addr := userSessionStruct.Addr(&userSession)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, 0, errors.Wrap(err, "unable to scan userSession")
+			return nil, 0, errs.Wrap(err, "unable to scan userSession")
 		}
 		userSessions = append(userSessions, userSession)
 	}
@@ -185,7 +185,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	sql, args = selectBuilder.Build()
 	rows2, err := d.QuerySql(nil, sql, args...)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "unable to query database")
+		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows2.Close() }()
 
@@ -193,15 +193,15 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	if rows2.Next() {
 		err = rows2.Scan(&total)
 		if err != nil {
-			return nil, 0, errors.Wrap(err, "unable to scan total")
+			return nil, 0, errs.Wrap(err, "unable to scan total")
 		}
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, errors.Wrap(err, "unable to read query results")
+		return nil, 0, errs.Wrap(err, "unable to read query results")
 	}
 	if err := rows2.Err(); err != nil {
-		return nil, 0, errors.Wrap(err, "unable to read count results")
+		return nil, 0, errs.Wrap(err, "unable to read count results")
 	}
 
 	return userSessions, total, nil
@@ -220,7 +220,7 @@ func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models
 
 	users, err := d.GetUsersByIds(tx, userIds)
 	if err != nil {
-		return errors.Wrap(err, "unable to load users")
+		return errs.Wrap(err, "unable to load users")
 	}
 
 	usersById := make(map[int64]models.User)
@@ -231,7 +231,7 @@ func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models
 	for i, userSession := range userSessions {
 		user, ok := usersById[userSession.UserId]
 		if !ok {
-			return errors.Errorf("unable to find user with id %v", userSession.Id)
+			return errs.Errorf("unable to find user with id %v", userSession.Id)
 		}
 		userSessions[i].User = user
 	}
@@ -251,7 +251,7 @@ func (d *CommonDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []mode
 
 	userSessionClients, err := d.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
 	if err != nil {
-		return errors.Wrap(err, "unable to load userSessionClients")
+		return errs.Wrap(err, "unable to load userSessionClients")
 	}
 
 	userSessionClientsByUserSessionId := make(map[int64][]models.UserSessionClient)
@@ -274,7 +274,7 @@ func (d *CommonDatabase) UserSessionLoadClients(tx *sql.Tx, userSession *models.
 
 	userSessionClients, err := d.GetUserSessionClientsByUserSessionId(tx, userSession.Id)
 	if err != nil {
-		return errors.Wrap(err, "unable to load userSessionClients")
+		return errs.Wrap(err, "unable to load userSessionClients")
 	}
 
 	userSession.Clients = userSessionClients
@@ -290,7 +290,7 @@ func (d *CommonDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *models.Use
 
 	user, err := d.GetUserById(tx, userSession.UserId)
 	if err != nil {
-		return errors.Wrap(err, "unable to load user")
+		return errs.Wrap(err, "unable to load user")
 	}
 
 	if user != nil {
@@ -310,7 +310,7 @@ func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mo
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -320,13 +320,13 @@ func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mo
 		addr := userSessionStruct.Addr(&userSession)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userSession")
+			return nil, errs.Wrap(err, "unable to scan userSession")
 		}
 		userSessions = append(userSessions, userSession)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return userSessions, nil
@@ -343,7 +343,7 @@ func (d *CommonDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) erro
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete userSession")
+		return errs.Wrap(err, "unable to delete userSession")
 	}
 
 	return nil
@@ -370,13 +370,13 @@ func (d *CommonDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier str
 	// autocommits and releases the row before the caller can use it, which is the whole of what
 	// this buys.
 	if tx == nil {
-		return false, errors.WithStack(errors.New("acquiring a user session row requires a transaction: an autocommitted statement releases the row before the caller can use it"))
+		return false, errs.New("acquiring a user session row requires a transaction: an autocommitted statement releases the row before the caller can use it")
 	}
 
 	// No row carries an empty session identifier, so the statement would match nothing and report
 	// the session gone for every session there is.
 	if sessionIdentifier == "" {
-		return false, errors.WithStack(errors.New("can't acquire a user session row with an empty session identifier"))
+		return false, errs.New("can't acquire a user session row with an empty session identifier")
 	}
 
 	acquire := sqlbuilder.NewUpdateBuilder()
@@ -387,12 +387,12 @@ func (d *CommonDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier str
 	query, args := acquire.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to acquire user session row")
+		return false, errs.Wrap(err, "unable to acquire user session row")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get the number of rows affected acquiring a user session row")
+		return false, errs.Wrap(err, "unable to get the number of rows affected acquiring a user session row")
 	}
 
 	// Existence is reported rather than only errors, because "the row is gone" is the answer the
@@ -413,7 +413,7 @@ func (d *CommonDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duratio
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete idle sessions")
+		return errs.Wrap(err, "unable to delete idle sessions")
 	}
 
 	return nil
@@ -430,7 +430,7 @@ func (d *CommonDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Dura
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete expired sessions")
+		return errs.Wrap(err, "unable to delete expired sessions")
 	}
 
 	return nil
@@ -446,7 +446,7 @@ func (d *CommonDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Dura
 func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
 
 	if userSessionId == 0 {
-		return errors.WithStack(errors.New("can't promote the generation of user session with id 0"))
+		return errs.New("can't promote the generation of user session with id 0")
 	}
 
 	ub := d.Flavor.NewUpdateBuilder()
@@ -460,7 +460,7 @@ func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId 
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to promote user session generation")
+		return errs.Wrap(err, "unable to promote user session generation")
 	}
 
 	// A promotion that matched nothing is an error, not a no-op. The caller is
@@ -469,10 +469,10 @@ func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId 
 	// applied, so the session is rejected on the next request while its tokens live on.
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "unable to get rows affected when promoting user session generation")
+		return errs.Wrap(err, "unable to get rows affected when promoting user session generation")
 	}
 	if rowsAffected != 1 {
-		return errors.WithStack(errors.New("user session not found when promoting its auth state generation"))
+		return errs.New("user session not found when promoting its auth state generation")
 	}
 
 	return nil
@@ -493,7 +493,7 @@ func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId 
 func (d *CommonDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
 
 	if userSessionId == 0 {
-		return errors.WithStack(errors.New("can't promote the otp config generation of user session with id 0"))
+		return errs.New("can't promote the otp config generation of user session with id 0")
 	}
 
 	ub := d.Flavor.NewUpdateBuilder()
@@ -507,7 +507,7 @@ func (d *CommonDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userS
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to promote user session otp config generation")
+		return errs.Wrap(err, "unable to promote user session otp config generation")
 	}
 
 	// A promotion that matched nothing is an error, not a no-op, as above: the caller has
@@ -515,10 +515,10 @@ func (d *CommonDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userS
 	// to record that leaves the session re-prompted on every later request.
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "unable to get rows affected when promoting user session otp config generation")
+		return errs.Wrap(err, "unable to get rows affected when promoting user session otp config generation")
 	}
 	if rowsAffected != 1 {
-		return errors.WithStack(errors.New("user session not found when promoting its otp config generation"))
+		return errs.New("user session not found when promoting its otp config generation")
 	}
 
 	return nil

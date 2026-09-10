@@ -13,12 +13,12 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/rsautil"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/uuidutil"
-	"github.com/pkg/errors"
 )
 
 type DatabaseSeeder struct {
@@ -97,19 +97,19 @@ func (ds *DatabaseSeeder) Seed() error {
 	// deployment that came up and ran on it (#269).
 	authServerSessionAuthKey, err := encryption.RandomKey(64)
 	if err != nil {
-		return errors.Wrap(err, "unable to generate the auth server session authentication key")
+		return errs.Wrap(err, "unable to generate the auth server session authentication key")
 	}
 	authServerSessionEncKey, err := encryption.RandomKey(32)
 	if err != nil {
-		return errors.Wrap(err, "unable to generate the auth server session encryption key")
+		return errs.Wrap(err, "unable to generate the auth server session encryption key")
 	}
 	adminConsoleSessionAuthKey, err := encryption.RandomKey(64)
 	if err != nil {
-		return errors.Wrap(err, "unable to generate the admin console session authentication key")
+		return errs.Wrap(err, "unable to generate the admin console session authentication key")
 	}
 	adminConsoleSessionEncKey, err := encryption.RandomKey(32)
 	if err != nil {
-		return errors.Wrap(err, "unable to generate the admin console session encryption key")
+		return errs.Wrap(err, "unable to generate the admin console session encryption key")
 	}
 
 	// Use provided OAuth client secret if available, otherwise generate one
@@ -123,7 +123,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	}
 	clientSecretEncrypted, encErr := encryption.EncryptData(clientSecret)
 	if encErr != nil {
-		return errors.Wrap(encErr, "unable to encrypt admin console client secret")
+		return errs.Wrap(encErr, "unable to encrypt admin console client secret")
 	}
 
 	client1 := &models.Client{
@@ -155,11 +155,11 @@ func (ds *DatabaseSeeder) Seed() error {
 		// Prepare directory
 		dir := filepath.Dir(ds.bootstrapEnvOutFile)
 		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return errors.Wrap(err, "unable to create bootstrap env directory")
+			return errs.Wrap(err, "unable to create bootstrap env directory")
 		}
 		f, err := os.OpenFile(ds.bootstrapEnvOutFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 		if err != nil {
-			return errors.Wrap(err, "unable to open bootstrap env file for writing")
+			return errs.Wrap(err, "unable to open bootstrap env file for writing")
 		}
 		// Write the OAuth client secret AND session keys
 		content := bootstrapEnvContent(
@@ -171,7 +171,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		)
 		if _, err := f.WriteString(content); err != nil {
 			_ = f.Close()
-			return errors.Wrap(err, "unable to write bootstrap env file")
+			return errs.Wrap(err, "unable to write bootstrap env file")
 		}
 		_ = f.Sync()
 		_ = f.Close()
@@ -377,13 +377,13 @@ func (ds *DatabaseSeeder) Seed() error {
 
 	privateKey, err := rsautil.GeneratePrivateKey(4096)
 	if err != nil {
-		return errors.Wrap(err, "unable to generate a private key")
+		return errs.Wrap(err, "unable to generate a private key")
 	}
 	privateKeyPEM := rsautil.EncodePrivateKeyToPEM(privateKey)
 
 	publicKeyASN1_DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		return errors.Wrap(err, "unable to marshal public key to PKIX")
+		return errs.Wrap(err, "unable to marshal public key to PKIX")
 	}
 
 	publicKeyPEM := pem.EncodeToMemory(
@@ -401,7 +401,7 @@ func (ds *DatabaseSeeder) Seed() error {
 
 	currentPrivateKeyEncrypted, err := encryption.EncryptData(string(privateKeyPEM))
 	if err != nil {
-		return errors.Wrap(err, "unable to encrypt current signing key")
+		return errs.Wrap(err, "unable to encrypt current signing key")
 	}
 	keyPair := &models.KeyPair{
 		State:             enums.KeyStateCurrent.String(),
@@ -422,13 +422,13 @@ func (ds *DatabaseSeeder) Seed() error {
 	// key pair (next)
 	privateKey, err = rsautil.GeneratePrivateKey(4096)
 	if err != nil {
-		return errors.Wrap(err, "unable to generate a private key")
+		return errs.Wrap(err, "unable to generate a private key")
 	}
 	privateKeyPEM = rsautil.EncodePrivateKeyToPEM(privateKey)
 
 	publicKeyASN1_DER, err = x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		return errors.Wrap(err, "unable to marshal public key to PKIX")
+		return errs.Wrap(err, "unable to marshal public key to PKIX")
 	}
 
 	publicKeyPEM = pem.EncodeToMemory(
@@ -446,7 +446,7 @@ func (ds *DatabaseSeeder) Seed() error {
 
 	nextPrivateKeyEncrypted, err := encryption.EncryptData(string(privateKeyPEM))
 	if err != nil {
-		return errors.Wrap(err, "unable to encrypt next signing key")
+		return errs.Wrap(err, "unable to encrypt next signing key")
 	}
 	keyPair = &models.KeyPair{
 		State:             enums.KeyStateNext.String(),

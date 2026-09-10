@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
@@ -29,7 +29,7 @@ func (d *PostgresDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) er
 	if err != nil {
 		keyPair.CreatedAt = originalCreatedAt
 		keyPair.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert keyPair")
+		return errs.Wrap(err, "unable to insert keyPair")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -38,7 +38,7 @@ func (d *PostgresDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) er
 		if err != nil {
 			keyPair.CreatedAt = originalCreatedAt
 			keyPair.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan keyPair id")
+			return errs.Wrap(err, "unable to scan keyPair id")
 		}
 	}
 
@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) er
 	if err := rows.Err(); err != nil {
 		keyPair.CreatedAt = originalCreatedAt
 		keyPair.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert keyPair")
+		return errs.Wrap(err, "unable to insert keyPair")
 	}
 
 	return nil

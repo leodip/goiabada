@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
@@ -28,14 +28,14 @@ func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *
 	if err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userSessionClient")
+		return errs.Wrap(err, "unable to insert userSessionClient")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	userSessionClient.Id = id
@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *
 func (d *CommonDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
 
 	if userSessionClient.Id == 0 {
-		return errors.WithStack(errors.New("can't update userSessionClient with id 0"))
+		return errs.New("can't update userSessionClient with id 0")
 	}
 
 	originalUpdatedAt := userSessionClient.UpdatedAt
@@ -61,7 +61,7 @@ func (d *CommonDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		userSessionClient.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update userSessionClient")
+		return errs.Wrap(err, "unable to update userSessionClient")
 	}
 
 	return nil
@@ -73,7 +73,7 @@ func (d *CommonDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *s
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -82,12 +82,12 @@ func (d *CommonDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *s
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userSessionClient")
+			return nil, errs.Wrap(err, "unable to scan userSessionClient")
 		}
 		return &userSessionClient, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -106,7 +106,7 @@ func (d *CommonDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionCl
 
 	clients, err := d.GetClientsByIds(tx, clientIds)
 	if err != nil {
-		return errors.Wrap(err, "unable to get clients by ids")
+		return errs.Wrap(err, "unable to get clients by ids")
 	}
 
 	clientsMap := make(map[int64]models.Client)
@@ -117,7 +117,7 @@ func (d *CommonDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionCl
 	for i, userSessionClient := range userSessionClients {
 		client, ok := clientsMap[userSessionClient.ClientId]
 		if !ok {
-			return errors.Errorf("client with id %d not found", userSessionClient.ClientId)
+			return errs.Errorf("client with id %d not found", userSessionClient.ClientId)
 		}
 		userSessionClients[i].Client = client
 	}
@@ -140,7 +140,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userS
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -150,13 +150,13 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userS
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userSessionClient")
+			return nil, errs.Wrap(err, "unable to scan userSessionClient")
 		}
 		userSessionClients = append(userSessionClients, userSessionClient)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return userSessionClients, nil
@@ -173,7 +173,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSe
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -183,13 +183,13 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSe
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userSessionClient")
+			return nil, errs.Wrap(err, "unable to scan userSessionClient")
 		}
 		userSessionClients = append(userSessionClients, userSessionClient)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return userSessionClients, nil
@@ -210,7 +210,7 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClien
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -220,13 +220,13 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClien
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userSessionClient")
+			return nil, errs.Wrap(err, "unable to scan userSessionClient")
 		}
 		userSessionClients = append(userSessionClients, userSessionClient)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return userSessionClients, nil
@@ -259,7 +259,7 @@ func (d *CommonDatabase) DeleteUserSessionClient(tx *sql.Tx, userSessionClientId
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete userSessionClient")
+		return errs.Wrap(err, "unable to delete userSessionClient")
 	}
 
 	return nil

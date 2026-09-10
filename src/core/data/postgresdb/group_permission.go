@@ -5,17 +5,17 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
 	if groupPermission.GroupId == 0 {
-		return errors.WithStack(errors.New("can't create groupPermission with group_id 0"))
+		return errs.New("can't create groupPermission with group_id 0")
 	}
 
 	if groupPermission.PermissionId == 0 {
-		return errors.WithStack(errors.New("can't create groupPermission with permission_id 0"))
+		return errs.New("can't create groupPermission with permission_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -37,7 +37,7 @@ func (d *PostgresDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mo
 	if err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert groupPermission")
+		return errs.Wrap(err, "unable to insert groupPermission")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -46,7 +46,7 @@ func (d *PostgresDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mo
 		if err != nil {
 			groupPermission.CreatedAt = originalCreatedAt
 			groupPermission.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan groupPermission id")
+			return errs.Wrap(err, "unable to scan groupPermission id")
 		}
 	}
 
@@ -56,7 +56,7 @@ func (d *PostgresDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mo
 	if err := rows.Err(); err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert groupPermission")
+		return errs.Wrap(err, "unable to insert groupPermission")
 	}
 
 	return nil

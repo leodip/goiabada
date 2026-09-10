@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
@@ -26,7 +26,7 @@ func (d *MsSQLDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *model
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *model
 	if err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert preRegistration")
+		return errs.Wrap(err, "unable to insert preRegistration")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -43,7 +43,7 @@ func (d *MsSQLDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *model
 		if err != nil {
 			preRegistration.CreatedAt = originalCreatedAt
 			preRegistration.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan preRegistration id")
+			return errs.Wrap(err, "unable to scan preRegistration id")
 		}
 	}
 
@@ -53,7 +53,7 @@ func (d *MsSQLDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *model
 	if err := rows.Err(); err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert preRegistration")
+		return errs.Wrap(err, "unable to insert preRegistration")
 	}
 
 	return nil

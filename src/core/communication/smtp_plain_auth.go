@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"net/smtp"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // RFC 5321 section 4.5.3.1.4: "The maximum total length of a command line including the command
@@ -60,7 +60,7 @@ func (a *plainAuth) Next(_ []byte, more bool) ([]byte, error) {
 		return nil, nil
 	}
 	if a.answered {
-		return nil, errors.WithStack(errors.New("unexpected server challenge"))
+		return nil, errs.New("unexpected server challenge")
 	}
 	a.answered = true
 	return plainResponse(a.username, a.password), nil

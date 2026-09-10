@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error {
 	if auditLog.AuditEvent == "" {
-		return errors.WithStack(errors.New("can't create audit log with empty audit_event"))
+		return errs.New("can't create audit log with empty audit_event")
 	}
 
 	// Always set CreatedAt to current time (ignore any incoming value)
@@ -27,14 +27,14 @@ func (d *PostgresDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog)
 
 	rows, err := d.CommonDB.QuerySql(tx, sqlStr, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to insert audit log")
+		return errs.Wrap(err, "unable to insert audit log")
 	}
 	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&auditLog.Id)
 		if err != nil {
-			return errors.Wrap(err, "unable to scan audit log id")
+			return errs.Wrap(err, "unable to scan audit log id")
 		}
 	}
 
@@ -42,7 +42,7 @@ func (d *PostgresDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog)
 	// returning it from the query, in which case Next() simply reports no row.
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
-		return errors.Wrap(err, "unable to insert audit log")
+		return errs.Wrap(err, "unable to insert audit log")
 	}
 
 	return nil
@@ -55,12 +55,12 @@ func (d *PostgresDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxD
 
 	result, err := d.CommonDB.ExecSql(tx, sqlStr, cutoff)
 	if err != nil {
-		return 0, errors.Wrap(err, "unable to delete old audit logs")
+		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return 0, errors.Wrap(err, "unable to get rows affected")
+		return 0, errs.Wrap(err, "unable to get rows affected")
 	}
 
 	return int(rowsAffected), nil

@@ -7,13 +7,14 @@ import (
 	"crypto/rand"
 	"encoding/gob"
 	"encoding/hex"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 const (
@@ -96,7 +97,7 @@ const (
 // is a fresh session, while any other error means the lookup could not be performed,
 // which is a refused request. Collapsing the second into the first would sign everyone
 // out during a database interruption and leave nothing to diagnose it by (#266).
-var ErrNotFound = errors.New("session not found")
+var ErrNotFound = errs.New("session not found")
 
 // randReader is crypto/rand in production. It is a variable so a test can make the
 // CSPRNG fail, which is the one failure this store must not paper over.
@@ -230,14 +231,14 @@ func NewServerSideStore(backend Backend, authenticatedKey string, secure bool,
 
 	currentSealer, err := newSealer(current)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to build the session store's current keys")
+		return nil, errs.Wrap(err, "unable to build the session store's current keys")
 	}
 
 	var previousSealer *sealer
 	if previous != nil {
 		previousSealer, err = newSealer(*previous)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to build the session store's previous keys")
+			return nil, errs.Wrap(err, "unable to build the session store's previous keys")
 		}
 	}
 
@@ -310,16 +311,16 @@ func (s *ServerSideStore) openWithEither(pick func(*sealer) cipher.AEAD, name, v
 func (s *ServerSideStore) sealSessionData(session *Session) (string, error) {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(session.Values); err != nil {
-		return "", errors.Wrap(err, "unable to encode the browser session")
+		return "", errs.Wrap(err, "unable to encode the browser session")
 	}
 
 	encoded, err := seal(s.current.data, session.Name(), buf.Bytes())
 	if err != nil {
-		return "", errors.Wrap(err, "unable to encode the browser session")
+		return "", errs.Wrap(err, "unable to encode the browser session")
 	}
 
 	if len(encoded) > MaxSessionDataBytes {
-		return "", errors.Errorf(
+		return "", errs.Errorf(
 			"unable to encode the browser session: the value is too long (%d bytes, ceiling %d)",
 			len(encoded), MaxSessionDataBytes)
 	}
@@ -430,7 +431,7 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 		// middleware to ask receives the same error and answers 500 with the cause
 		// logged, which is the refusal this store owes a lookup it could not perform
 		// (#266).
-		return session, errors.Wrap(err, "unable to load the browser session")
+		return session, errs.Wrap(err, "unable to load the browser session")
 	}
 
 	plaintext, err := s.openWithEither(
@@ -490,7 +491,7 @@ func (s *ServerSideStore) touchIfStale(ctx context.Context, session *Session, re
 		if errors.Is(err, ErrNotFound) {
 			return err
 		}
-		return errors.Wrap(err, "unable to touch the browser session")
+		return errs.Wrap(err, "unable to touch the browser session")
 	}
 	return nil
 }
@@ -527,7 +528,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 
 		expiresAt, err := s.Backend.Create(ctx, id, []byte(encoded), authenticated)
 		if err != nil {
-			return errors.Wrap(err, "unable to create the browser session")
+			return errs.Wrap(err, "unable to create the browser session")
 		}
 
 		session.ID = id
@@ -536,7 +537,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 
 	expiresAt, err := s.Backend.Update(ctx, session.ID, []byte(encoded), authenticated)
 	if err != nil {
-		return errors.Wrap(err, "unable to update the browser session")
+		return errs.Wrap(err, "unable to update the browser session")
 	}
 
 	return s.setCookie(w, session, session.ID, expiresAt)
@@ -548,7 +549,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 func (s *ServerSideStore) deleteSession(ctx context.Context, w http.ResponseWriter, session *Session) error {
 	if session.ID != "" {
 		if err := s.Backend.Delete(ctx, session.ID); err != nil {
-			return errors.Wrap(err, "unable to delete the browser session")
+			return errs.Wrap(err, "unable to delete the browser session")
 		}
 		session.ID = ""
 	}
@@ -573,7 +574,7 @@ func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *Session, id 
 		// browser is about to be told nothing about it. That is reported rather than
 		// logged: a save that returns nil having issued no cookie looks like success
 		// and behaves like a silent sign-out on the very next request.
-		return errors.Wrap(err, "unable to encode the browser session identifier")
+		return errs.Wrap(err, "unable to encode the browser session identifier")
 	}
 
 	opts := *session.Options
@@ -681,7 +682,7 @@ func chunkCookieName(logicalName string, n int) string {
 func newSessionId() (string, error) {
 	buf := make([]byte, SessionIdBytes)
 	if _, err := io.ReadFull(randReader, buf); err != nil {
-		return "", errors.Wrap(err, "unable to read from the random number generator")
+		return "", errs.Wrap(err, "unable to read from the random number generator")
 	}
 	return hex.EncodeToString(buf), nil
 }

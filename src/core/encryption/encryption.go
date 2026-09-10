@@ -4,20 +4,19 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 func EncryptText(text string, encryptionKey []byte) ([]byte, error) {
 
 	if len(text) == 0 {
-		return nil, errors.WithStack(errors.New("text to encrypt is empty"))
+		return nil, errs.New("text to encrypt is empty")
 	}
 
 	if len(encryptionKey) != 32 {
-		return nil, errors.WithStack(fmt.Errorf("encryption key must have 32 bytes, but it has %v bytes", len(encryptionKey)))
+		return nil, errs.Errorf("encryption key must have 32 bytes, but it has %v bytes", len(encryptionKey))
 	}
 
 	// create a new AES cipher block
@@ -45,11 +44,11 @@ func EncryptText(text string, encryptionKey []byte) ([]byte, error) {
 
 func DecryptText(encryptedText []byte, encryptionKey []byte) (string, error) {
 	if len(encryptedText) == 0 {
-		return "", errors.WithStack(errors.New("encrypted text is empty"))
+		return "", errs.New("encrypted text is empty")
 	}
 
 	if len(encryptionKey) != 32 {
-		return "", errors.WithStack(fmt.Errorf("encryption key must have 32 bytes, but it has %v bytes", len(encryptionKey)))
+		return "", errs.Errorf("encryption key must have 32 bytes, but it has %v bytes", len(encryptionKey))
 	}
 
 	// create a new AES cipher block
@@ -67,7 +66,7 @@ func DecryptText(encryptedText []byte, encryptionKey []byte) (string, error) {
 	// nonce size
 	nonceSize := gcm.NonceSize()
 	if len(encryptedText) < nonceSize {
-		return "", errors.WithStack(errors.New("encrypted text is too short"))
+		return "", errs.New("encrypted text is too short")
 	}
 
 	// split the nonce and ciphertext

@@ -32,6 +32,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 const (
@@ -108,25 +110,25 @@ func run(doer httpDoer) error {
 
 	list, err := parseCSV(csvBytes)
 	if err != nil {
-		return fmt.Errorf("parse CSV: %w", err)
+		return errs.Errorf("parse CSV: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "Parsed %d upstream rows\n", len(list))
 
 	if err := validateUpstream(list); err != nil {
-		return fmt.Errorf("validate upstream: %w", err)
+		return errs.Errorf("validate upstream: %w", err)
 	}
 
 	list = applySupplements(list)
 
 	if err := validate(list); err != nil {
-		return fmt.Errorf("validate: %w", err)
+		return errs.Errorf("validate: %w", err)
 	}
 
 	sort.Slice(list, func(i, j int) bool { return list[i].Alpha2 < list[j].Alpha2 })
 
 	out, err := render(list, prov)
 	if err != nil {
-		return fmt.Errorf("render: %w", err)
+		return errs.Errorf("render: %w", err)
 	}
 
 	outPath, err := outputPath()
@@ -134,7 +136,7 @@ func run(doer httpDoer) error {
 		return err
 	}
 	if err := os.WriteFile(outPath, out, 0644); err != nil {
-		return fmt.Errorf("write %s: %w", outPath, err)
+		return errs.Errorf("write %s: %w", outPath, err)
 	}
 	fmt.Fprintf(os.Stderr, "Wrote %d countries to %s\n", len(list), outPath)
 	return nil
@@ -148,7 +150,7 @@ func fetchPinned(doer httpDoer) ([]byte, provenance, error) {
 	fmt.Fprintln(os.Stderr, "Resolving upstream commit SHA...")
 	sha, err := resolveSHA(doer)
 	if err != nil {
-		return nil, provenance{}, fmt.Errorf("resolve SHA: %w", err)
+		return nil, provenance{}, errs.Errorf("resolve SHA: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "Pinned commit: %s\n", sha)
 
@@ -156,7 +158,7 @@ func fetchPinned(doer httpDoer) ([]byte, provenance, error) {
 	fmt.Fprintf(os.Stderr, "Fetching %s\n", url)
 	csvBytes, err := fetchCSV(doer, url)
 	if err != nil {
-		return nil, provenance{}, fmt.Errorf("fetch CSV: %w", err)
+		return nil, provenance{}, errs.Errorf("fetch CSV: %w", err)
 	}
 	sum := sha256.Sum256(csvBytes)
 	prov := provenance{CommitSHA: sha, SourceURL: url, CSVSHA256: hex.EncodeToString(sum[:])}
@@ -173,10 +175,10 @@ func resolveSHA(doer httpDoer) (string, error) {
 		SHA string `json:"sha"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return "", fmt.Errorf("decode commit JSON: %w", err)
+		return "", errs.Errorf("decode commit JSON: %w", err)
 	}
 	if !isHex40(payload.SHA) {
-		return "", fmt.Errorf("unexpected commit SHA %q", payload.SHA)
+		return "", errs.Errorf("unexpected commit SHA %q", payload.SHA)
 	}
 	return payload.SHA, nil
 }
@@ -200,7 +202,7 @@ func doGet(doer httpDoer, url string, limit int64) ([]byte, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: unexpected status %d", url, resp.StatusCode)
+		return nil, errs.Errorf("GET %s: unexpected status %d", url, resp.StatusCode)
 	}
 	return readCapped(resp.Body, limit)
 }
@@ -212,7 +214,7 @@ func readCapped(r io.Reader, limit int64) ([]byte, error) {
 		return nil, err
 	}
 	if int64(len(b)) > limit {
-		return nil, fmt.Errorf("response exceeds %d-byte limit", limit)
+		return nil, errs.Errorf("response exceeds %d-byte limit", limit)
 	}
 	return b, nil
 }
@@ -227,7 +229,7 @@ func parseCSV(data []byte) ([]country, error) {
 
 	header, err := r.Read()
 	if err != nil {
-		return nil, fmt.Errorf("read header: %w", err)
+		return nil, errs.Errorf("read header: %w", err)
 	}
 	idx := map[string]int{}
 	for i, h := range header {
@@ -235,7 +237,7 @@ func parseCSV(data []byte) ([]country, error) {
 	}
 	for _, col := range requiredColumns {
 		if _, ok := idx[col]; !ok {
-			return nil, fmt.Errorf("required column %q missing from header", col)
+			return nil, errs.Errorf("required column %q missing from header", col)
 		}
 	}
 	get := func(rec []string, col string) string {
@@ -253,7 +255,7 @@ func parseCSV(data []byte) ([]country, error) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("read record: %w", err)
+			return nil, errs.Errorf("read record: %w", err)
 		}
 		a2 := get(rec, "ISO3166-1-Alpha-2")
 		a3 := get(rec, "ISO3166-1-Alpha-3")
@@ -263,7 +265,7 @@ func parseCSV(data []byte) ([]country, error) {
 		}
 		codes, err := normalizeDial(get(rec, "Dial"))
 		if err != nil {
-			return nil, fmt.Errorf("row %q: %w", a2, err)
+			return nil, errs.Errorf("row %q: %w", a2, err)
 		}
 		list = append(list, country{
 			Name:         name,
@@ -283,7 +285,7 @@ func parseCSV(data []byte) ([]country, error) {
 // masking a new upstream value).
 func validateUpstream(list []country) error {
 	if len(list) != expectedUpstreamCount {
-		return fmt.Errorf("unexpected upstream row count %d (want %d); "+
+		return errs.Errorf("unexpected upstream row count %d (want %d); "+
 			"upstream data may have changed — review supplements before regenerating", len(list), expectedUpstreamCount)
 	}
 	return checkSupplementPreconditions(list)
@@ -295,17 +297,17 @@ func checkSupplementPreconditions(list []country) error {
 	var um *country
 	for i := range list {
 		if list[i].Alpha2 == "XK" {
-			return fmt.Errorf("upstream now provides XK; the XK supplement is now redundant — review generator supplements")
+			return errs.Errorf("upstream now provides XK; the XK supplement is now redundant — review generator supplements")
 		}
 		if list[i].Alpha2 == "UM" {
 			um = &list[i]
 		}
 	}
 	if um == nil {
-		return fmt.Errorf("upstream no longer contains UM; review generator supplements")
+		return errs.Errorf("upstream no longer contains UM; review generator supplements")
 	}
 	if len(um.CallingCodes) != 0 {
-		return fmt.Errorf("upstream now provides a UM dial %v; the UM supplement assumes it is empty — review generator supplements", um.CallingCodes)
+		return errs.Errorf("upstream now provides a UM dial %v; the UM supplement assumes it is empty — review generator supplements", um.CallingCodes)
 	}
 	return nil
 }
@@ -353,7 +355,7 @@ func validate(list []country) error {
 // validateCount guards against silent country loss/addition.
 func validateCount(list []country) error {
 	if len(list) != expectedGeneratedCount {
-		return fmt.Errorf("unexpected country count %d (want %d = 249 upstream + XK); "+
+		return errs.Errorf("unexpected country count %d (want %d = 249 upstream + XK); "+
 			"upstream data may have changed — review before regenerating", len(list), expectedGeneratedCount)
 	}
 	return nil
@@ -367,36 +369,36 @@ func validateRows(list []country) error {
 	seenA3 := map[string]bool{}
 	for _, c := range list {
 		if !isUpperAlpha(c.Alpha2, 2) {
-			return fmt.Errorf("invalid alpha-2 %q (name %q): want 2 upper-case letters", c.Alpha2, c.Name)
+			return errs.Errorf("invalid alpha-2 %q (name %q): want 2 upper-case letters", c.Alpha2, c.Name)
 		}
 		if !isUpperAlpha(c.Alpha3, 3) {
-			return fmt.Errorf("invalid alpha-3 %q (alpha-2 %q): want 3 upper-case letters", c.Alpha3, c.Alpha2)
+			return errs.Errorf("invalid alpha-3 %q (alpha-2 %q): want 3 upper-case letters", c.Alpha3, c.Alpha2)
 		}
 		if seenA2[c.Alpha2] {
-			return fmt.Errorf("duplicate alpha-2 %q", c.Alpha2)
+			return errs.Errorf("duplicate alpha-2 %q", c.Alpha2)
 		}
 		if seenA3[c.Alpha3] {
-			return fmt.Errorf("duplicate alpha-3 %q", c.Alpha3)
+			return errs.Errorf("duplicate alpha-3 %q", c.Alpha3)
 		}
 		seenA2[c.Alpha2] = true
 		seenA3[c.Alpha3] = true
 		if c.Name == "" {
-			return fmt.Errorf("empty name for %q", c.Alpha2)
+			return errs.Errorf("empty name for %q", c.Alpha2)
 		}
 		if len(c.CallingCodes) == 0 {
-			return fmt.Errorf("empty calling-code list for %q", c.Alpha2)
+			return errs.Errorf("empty calling-code list for %q", c.Alpha2)
 		}
 		if len(c.CallingCodes) > maxCallingCodes {
-			return fmt.Errorf("%q has %d calling codes (max %d); phonecountries.Get would panic at runtime",
+			return errs.Errorf("%q has %d calling codes (max %d); phonecountries.Get would panic at runtime",
 				c.Alpha2, len(c.CallingCodes), maxCallingCodes)
 		}
 		seenCode := map[string]bool{}
 		for _, code := range c.CallingCodes {
 			if !isDigits(code) {
-				return fmt.Errorf("invalid calling code %q for %q", code, c.Alpha2)
+				return errs.Errorf("invalid calling code %q for %q", code, c.Alpha2)
 			}
 			if seenCode[code] {
-				return fmt.Errorf("duplicate calling code %q for %q", code, c.Alpha2)
+				return errs.Errorf("duplicate calling code %q for %q", code, c.Alpha2)
 			}
 			seenCode[code] = true
 		}
@@ -430,7 +432,7 @@ func normalizeDial(raw string) ([]string, error) {
 		t := strings.TrimSpace(tok)
 		m := dialTokenRe.FindStringSubmatch(t)
 		if m == nil {
-			return nil, fmt.Errorf("unsupported dial token %q (in %q)", tok, raw)
+			return nil, errs.Errorf("unsupported dial token %q (in %q)", tok, raw)
 		}
 		out = append(out, strings.ReplaceAll(m[1], "-", ""))
 	}
@@ -524,7 +526,7 @@ var countries = []Country{
 
 	formatted, err := format.Source([]byte(sb.String()))
 	if err != nil {
-		return nil, fmt.Errorf("format generated source: %w", err)
+		return nil, errs.Errorf("format generated source: %w", err)
 	}
 	return formatted, nil
 }
@@ -541,7 +543,7 @@ func renderCodes(codes []string) string {
 func outputPath() (string, error) {
 	_, currentFile, _, ok := runtime.Caller(0)
 	if !ok {
-		return "", fmt.Errorf("could not determine current file path")
+		return "", errs.Errorf("could not determine current file path")
 	}
 	return filepath.Join(filepath.Dir(currentFile), "..", "data_generated.go"), nil
 }

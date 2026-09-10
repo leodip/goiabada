@@ -2,7 +2,8 @@ package migrator
 
 import (
 	"errors"
-	"fmt"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // StartupRefusal turns the one runner error a starting server has to explain into the sentences
@@ -28,7 +29,7 @@ func StartupRefusal(err error, goiabadaVersion string) error {
 		return err
 	}
 
-	return fmt.Errorf("this database records schema version %s, which this release of Goiabada does not carry: "+
+	return errs.Errorf("this database records schema version %s, which this release of Goiabada does not carry: "+
 		"the highest %s migration it has is %s, and it is Goiabada %s. "+
 		"A newer release migrated this database. Install that release again, "+
 		"or run its `goiabada-authserver migrate to %s` first to step the schema down to what this one expects: %w",

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
@@ -29,7 +29,7 @@ func (d *PostgresDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient
 	if err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userSessionClient")
+		return errs.Wrap(err, "unable to insert userSessionClient")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -38,7 +38,7 @@ func (d *PostgresDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient
 		if err != nil {
 			userSessionClient.CreatedAt = originalCreatedAt
 			userSessionClient.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan userSessionClient id")
+			return errs.Wrap(err, "unable to scan userSessionClient id")
 		}
 	}
 
@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient
 	if err := rows.Err(); err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userSessionClient")
+		return errs.Wrap(err, "unable to insert userSessionClient")
 	}
 
 	return nil

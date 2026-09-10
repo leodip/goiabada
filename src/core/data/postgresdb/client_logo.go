@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error {
 	if clientLogo.ClientId == 0 {
-		return errors.WithStack(errors.New("can't create client logo with client_id 0"))
+		return errs.New("can't create client logo with client_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -32,7 +32,7 @@ func (d *PostgresDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.Clien
 	if err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert client logo")
+		return errs.Wrap(err, "unable to insert client logo")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -41,7 +41,7 @@ func (d *PostgresDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.Clien
 		if err != nil {
 			clientLogo.CreatedAt = originalCreatedAt
 			clientLogo.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan client logo id")
+			return errs.Wrap(err, "unable to scan client logo id")
 		}
 	}
 
@@ -51,7 +51,7 @@ func (d *PostgresDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.Clien
 	if err := rows.Err(); err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert client logo")
+		return errs.Wrap(err, "unable to insert client logo")
 	}
 
 	return nil

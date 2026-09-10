@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) error {
@@ -28,14 +28,14 @@ func (d *CommonDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) e
 	if err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert resource")
+		return errs.Wrap(err, "unable to insert resource")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	resource.Id = id
@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) e
 func (d *CommonDatabase) UpdateResource(tx *sql.Tx, resource *models.Resource) error {
 
 	if resource.Id == 0 {
-		return errors.WithStack(errors.New("can't update resource with id 0"))
+		return errs.New("can't update resource with id 0")
 	}
 
 	originalUpdatedAt := resource.UpdatedAt
@@ -61,7 +61,7 @@ func (d *CommonDatabase) UpdateResource(tx *sql.Tx, resource *models.Resource) e
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		resource.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update resource")
+		return errs.Wrap(err, "unable to update resource")
 	}
 
 	return nil
@@ -73,7 +73,7 @@ func (d *CommonDatabase) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -82,12 +82,12 @@ func (d *CommonDatabase) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 		addr := resourceStruct.Addr(&resource)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan resource")
+			return nil, errs.Wrap(err, "unable to scan resource")
 		}
 		return &resource, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -146,7 +146,7 @@ func (d *CommonDatabase) GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]m
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -156,13 +156,13 @@ func (d *CommonDatabase) GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]m
 		addr := resourceStruct.Addr(&resource)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan resource")
+			return nil, errs.Wrap(err, "unable to scan resource")
 		}
 		resources = append(resources, resource)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return resources, nil
@@ -177,7 +177,7 @@ func (d *CommonDatabase) GetAllResources(tx *sql.Tx) ([]models.Resource, error) 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -187,13 +187,13 @@ func (d *CommonDatabase) GetAllResources(tx *sql.Tx) ([]models.Resource, error) 
 		addr := resourceStruct.Addr(&resource)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan resource")
+			return nil, errs.Wrap(err, "unable to scan resource")
 		}
 		resources = append(resources, resource)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return resources, nil
@@ -210,7 +210,7 @@ func (d *CommonDatabase) DeleteResource(tx *sql.Tx, resourceId int64) error {
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete resource")
+		return errs.Wrap(err, "unable to delete resource")
 	}
 
 	return nil

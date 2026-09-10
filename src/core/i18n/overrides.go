@@ -1,11 +1,12 @@
 package i18n
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // loadOverrideCatalogs walks $GOIABADA_I18N_OVERRIDES_DIR/catalogs/ and
@@ -34,14 +35,14 @@ func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 				slog.String("dir", catalogsDir))
 			return nil, nil
 		}
-		return nil, fmt.Errorf("i18n: stat override catalogs dir: %w", err)
+		return nil, errs.Errorf("i18n: stat override catalogs dir: %w", err)
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("i18n: override catalogs path %s is not a directory", catalogsDir)
+		return nil, errs.Errorf("i18n: override catalogs path %s is not a directory", catalogsDir)
 	}
 	entries, err := os.ReadDir(catalogsDir)
 	if err != nil {
-		return nil, fmt.Errorf("i18n: read override catalogs dir: %w", err)
+		return nil, errs.Errorf("i18n: read override catalogs dir: %w", err)
 	}
 	var out []catalogFile
 	for _, e := range entries {
@@ -51,7 +52,7 @@ func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 		path := filepath.Join(catalogsDir, e.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("i18n: read override catalog %s: %w", path, err)
+			return nil, errs.Errorf("i18n: read override catalog %s: %w", path, err)
 		}
 		tag, messages, err := parseCatalog(path, data)
 		if err != nil {

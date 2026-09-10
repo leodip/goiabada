@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // unrepresentable is one construct a table can carry that TableShape has no field for.
@@ -279,10 +281,10 @@ func guardTable(db *sql.DB, d Dialect, table string) error {
 		}
 		var n int
 		if err := db.QueryRow(fmt.Sprintf(q, table)).Scan(&n); err != nil {
-			return fmt.Errorf("schemadump: look for %s on %s.%s: %w", check.construct, d, table, err)
+			return errs.Errorf("schemadump: look for %s on %s.%s: %w", check.construct, d, table, err)
 		}
 		if n > 0 {
-			return fmt.Errorf("schemadump: %s.%s carries %s (%d), which the dump cannot represent; widen the shape rather than letting it go unrecorded (#284)",
+			return errs.Errorf("schemadump: %s.%s carries %s (%d), which the dump cannot represent; widen the shape rather than letting it go unrecorded (#284)",
 				d, table, check.construct, n)
 		}
 	}
@@ -313,10 +315,10 @@ func sqliteUnrepresentableInDDL(ddl, table string) error {
 			word := strings.ToUpper(strings.Trim(f, "[]`\"',"))
 			switch {
 			case word == "DEFERRABLE":
-				return fmt.Errorf("schemadump: sqlite.%s declares a DEFERRABLE constraint, which the dump cannot represent (#284)", table)
+				return errs.Errorf("schemadump: sqlite.%s declares a DEFERRABLE constraint, which the dump cannot represent (#284)", table)
 			case strings.HasPrefix(word, "CHECK(") ||
 				(word == "CHECK" && i+1 < len(fields) && strings.HasPrefix(fields[i+1], "(")):
-				return fmt.Errorf("schemadump: sqlite.%s declares a CHECK constraint, which the dump cannot represent (#284)", table)
+				return errs.Errorf("schemadump: sqlite.%s declares a CHECK constraint, which the dump cannot represent (#284)", table)
 			}
 		}
 	}

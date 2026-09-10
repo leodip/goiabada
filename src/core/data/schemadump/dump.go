@@ -2,8 +2,9 @@ package schemadump
 
 import (
 	"database/sql"
-	"fmt"
 	"sort"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // Tables lists every application table in the connected database, sorted.
@@ -17,7 +18,7 @@ import (
 // the whole check worthless.
 func Tables(db *sql.DB, d Dialect) ([]string, error) {
 	if !d.valid() {
-		return nil, fmt.Errorf("schemadump: unrecognised database dialect %q", d)
+		return nil, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 
 	var q string
@@ -41,7 +42,7 @@ func Tables(db *sql.DB, d Dialect) ([]string, error) {
 
 	rows, err := db.Query(q)
 	if err != nil {
-		return nil, fmt.Errorf("schemadump: list tables on %s: %w", d, err)
+		return nil, errs.Errorf("schemadump: list tables on %s: %w", d, err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -49,15 +50,15 @@ func Tables(db *sql.DB, d Dialect) ([]string, error) {
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
-			return nil, fmt.Errorf("schemadump: scan table name on %s: %w", d, err)
+			return nil, errs.Errorf("schemadump: scan table name on %s: %w", d, err)
 		}
 		names = append(names, name)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("schemadump: iterate table names on %s: %w", d, err)
+		return nil, errs.Errorf("schemadump: iterate table names on %s: %w", d, err)
 	}
 	if len(names) == 0 {
-		return nil, fmt.Errorf("schemadump: %s reported no tables at all, which no migrated database can have", d)
+		return nil, errs.Errorf("schemadump: %s reported no tables at all, which no migrated database can have", d)
 	}
 
 	sort.Strings(names)
@@ -100,7 +101,7 @@ func Dump(db *sql.DB, d Dialect) (Schema, error) {
 // where nothing downstream could recover it.
 func DumpTable(db *sql.DB, d Dialect, table string) (TableShape, error) {
 	if !d.valid() {
-		return TableShape{}, fmt.Errorf("schemadump: unrecognised database dialect %q", d)
+		return TableShape{}, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 	if err := checkIdentifier("table", table); err != nil {
 		return TableShape{}, err
@@ -115,7 +116,7 @@ func DumpTable(db *sql.DB, d Dialect, table string) (TableShape, error) {
 	// what stops an empty dump being compared against another empty dump and read as
 	// "nothing changed".
 	if len(columns) == 0 {
-		return TableShape{}, fmt.Errorf("schemadump: %s read no columns for table %q", d, table)
+		return TableShape{}, errs.Errorf("schemadump: %s read no columns for table %q", d, table)
 	}
 
 	// The guard runs before the index and foreign key projections, not after them. Some of
@@ -164,7 +165,7 @@ func DumpTable(db *sql.DB, d Dialect, table string) (TableShape, error) {
 // rather than against a finished schema.
 func DescribeIndex(db *sql.DB, d Dialect, table, index string) (IndexShape, error) {
 	if !d.valid() {
-		return IndexShape{}, fmt.Errorf("schemadump: unrecognised database dialect %q", d)
+		return IndexShape{}, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 	if err := checkIdentifier("table", table); err != nil {
 		return IndexShape{}, err

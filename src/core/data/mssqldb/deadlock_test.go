@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
+	"github.com/leodip/goiabada/core/errs"
 	mssql "github.com/microsoft/go-mssqldb"
-	pkgerrors "github.com/pkg/errors"
 )
 
 // TestIsDeadlock is SQL Server's row of the classifier table RunInTransaction consults.
@@ -28,8 +28,8 @@ func TestIsDeadlock(t *testing.T) {
 	}{
 		{"the driver's deadlock, by value", deadlock, true},
 		{"the driver's deadlock, by pointer", &deadlock, true},
-		{"the value wrapped once, as ExecSql returns it", pkgerrors.Wrap(deadlock, "unable to execute SQL"), true},
-		{"the pointer wrapped once", pkgerrors.Wrap(&deadlock, "unable to execute SQL"), true},
+		{"the value wrapped once, as ExecSql returns it", errs.Wrap(deadlock, "unable to execute SQL"), true},
+		{"the pointer wrapped once", errs.Wrap(&deadlock, "unable to execute SQL"), true},
 		{"the value wrapped by the standard library", errors.Join(deadlock), true},
 		{"1222 lock request time out period exceeded: a lock wait that ran out, not a broken cycle", mssql.Error{Number: 1222}, false},
 		{"1222 by pointer", &mssql.Error{Number: 1222}, false},

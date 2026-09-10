@@ -1,6 +1,6 @@
 package enums
 
-import "github.com/pkg/errors"
+import "github.com/leodip/goiabada/core/errs"
 
 type TokenType int
 
@@ -35,7 +35,7 @@ func AcrLevelFromString(s string) (AcrLevel, error) {
 	case AcrLevel2Mandatory.String():
 		return AcrLevel2Mandatory, nil
 	}
-	return "", errors.WithStack(errors.New("invalid ACR level " + s))
+	return "", errs.New("invalid ACR level " + s)
 }
 
 // acrPriority defines the security strength ordering of ACR levels.
@@ -127,7 +127,7 @@ func PasswordPolicyFromString(s string) (PasswordPolicy, error) {
 	case PasswordPolicyHigh.String():
 		return PasswordPolicyHigh, nil
 	}
-	return PasswordPolicyNone, errors.WithStack(errors.New("invalid password policy " + s))
+	return PasswordPolicyNone, errs.New("invalid password policy " + s)
 }
 
 type KeyState int
@@ -151,7 +151,7 @@ func KeyStateFromString(s string) (KeyState, error) {
 	case KeyStateNext.String():
 		return KeyStateNext, nil
 	}
-	return KeyStateCurrent, errors.WithStack(errors.New("invalid key state " + s))
+	return KeyStateCurrent, errs.New("invalid key state " + s)
 }
 
 type SMTPEncryption int
@@ -179,7 +179,7 @@ func SMTPEncryptionFromString(s string) (SMTPEncryption, error) {
 	case SMTPEncryptionSTARTTLS.String():
 		return SMTPEncryptionSTARTTLS, nil
 	}
-	return SMTPEncryptionNone, errors.WithStack(errors.New("invalid SMTP encryption " + s))
+	return SMTPEncryptionNone, errs.New("invalid SMTP encryption " + s)
 }
 
 type ThreeStateSetting int
@@ -203,5 +203,5 @@ func ThreeStateSettingFromString(s string) (ThreeStateSetting, error) {
 	case ThreeStateSettingDefault.String():
 		return ThreeStateSettingDefault, nil
 	}
-	return ThreeStateSettingOn, errors.WithStack(errors.New("invalid three state setting " + s))
+	return ThreeStateSettingOn, errs.New("invalid three state setting " + s)
 }

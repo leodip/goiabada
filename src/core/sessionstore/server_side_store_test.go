@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"errors"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

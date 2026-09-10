@@ -5,18 +5,18 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error {
 
 	if userGroup.UserId == 0 {
-		return errors.WithStack(errors.New("can't create userGroup with user_id 0"))
+		return errs.New("can't create userGroup with user_id 0")
 	}
 
 	if userGroup.GroupId == 0 {
-		return errors.WithStack(errors.New("can't create userGroup with group_id 0"))
+		return errs.New("can't create userGroup with group_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -36,14 +36,14 @@ func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup
 	if err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userGroup")
+		return errs.Wrap(err, "unable to insert userGroup")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	userGroup.Id = id
@@ -53,7 +53,7 @@ func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup
 func (d *CommonDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error {
 
 	if userGroup.Id == 0 {
-		return errors.WithStack(errors.New("can't update userGroup with id 0"))
+		return errs.New("can't update userGroup with id 0")
 	}
 
 	originalUpdatedAt := userGroup.UpdatedAt
@@ -69,7 +69,7 @@ func (d *CommonDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		userGroup.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update userGroup")
+		return errs.Wrap(err, "unable to update userGroup")
 	}
 
 	return nil
@@ -81,7 +81,7 @@ func (d *CommonDatabase) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -90,12 +90,12 @@ func (d *CommonDatabase) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 		addr := userGroupStruct.Addr(&userGroup)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userGroup")
+			return nil, errs.Wrap(err, "unable to scan userGroup")
 		}
 		return &userGroup, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -132,7 +132,7 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -142,13 +142,13 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]
 		addr := userGroupStruct.Addr(&userGroup)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userGroup")
+			return nil, errs.Wrap(err, "unable to scan userGroup")
 		}
 		userGroups = append(userGroups, userGroup)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return userGroups, nil
@@ -165,7 +165,7 @@ func (d *CommonDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]mode
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -175,13 +175,13 @@ func (d *CommonDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]mode
 		addr := userGroupStruct.Addr(&userGroup)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userGroup")
+			return nil, errs.Wrap(err, "unable to scan userGroup")
 		}
 		userGroups = append(userGroups, userGroup)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return userGroups, nil
@@ -215,7 +215,7 @@ func (d *CommonDatabase) DeleteUserGroup(tx *sql.Tx, userGroupId int64) error {
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete userGroup")
+		return errs.Wrap(err, "unable to delete userGroup")
 	}
 
 	return nil

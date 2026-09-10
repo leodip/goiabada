@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error {
 
 	if clientLogo.ClientId == 0 {
-		return errors.WithStack(errors.New("can't create client logo with client_id 0"))
+		return errs.New("can't create client logo with client_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -32,14 +32,14 @@ func (d *CommonDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientL
 	if err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert client logo")
+		return errs.Wrap(err, "unable to insert client logo")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	clientLogo.Id = id
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientL
 func (d *CommonDatabase) UpdateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error {
 
 	if clientLogo.Id == 0 {
-		return errors.WithStack(errors.New("can't update client logo with id 0"))
+		return errs.New("can't update client logo with id 0")
 	}
 
 	originalUpdatedAt := clientLogo.UpdatedAt
@@ -65,7 +65,7 @@ func (d *CommonDatabase) UpdateClientLogo(tx *sql.Tx, clientLogo *models.ClientL
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		clientLogo.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update client logo")
+		return errs.Wrap(err, "unable to update client logo")
 	}
 
 	return nil
@@ -82,7 +82,7 @@ func (d *CommonDatabase) GetClientLogoByClientId(tx *sql.Tx, clientId int64) (*m
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -91,12 +91,12 @@ func (d *CommonDatabase) GetClientLogoByClientId(tx *sql.Tx, clientId int64) (*m
 		addr := clientLogoStruct.Addr(&clientLogo)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan client logo")
+			return nil, errs.Wrap(err, "unable to scan client logo")
 		}
 		return &clientLogo, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -113,7 +113,7 @@ func (d *CommonDatabase) DeleteClientLogo(tx *sql.Tx, clientId int64) error {
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete client logo")
+		return errs.Wrap(err, "unable to delete client logo")
 	}
 
 	return nil
@@ -129,13 +129,13 @@ func (d *CommonDatabase) ClientHasLogo(tx *sql.Tx, clientId int64) (bool, error)
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to query database")
+		return false, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
 	exists := rows.Next()
 	if err := rows.Err(); err != nil {
-		return false, errors.Wrap(err, "unable to read query results")
+		return false, errs.Wrap(err, "unable to read query results")
 	}
 
 	return exists, nil
