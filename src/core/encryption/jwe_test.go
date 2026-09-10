@@ -334,6 +334,99 @@ func TestDecryptIDTokenHintJWE_AlgorithmAllowlist(t *testing.T) {
 	})
 }
 
+// aliasTrailingBits returns compactJWE with segment i respelled: its final
+// base64url character is swapped for another one that leaves the decoded bytes
+// untouched. That is possible whenever the last character spends unused bits -- a
+// 16-byte tag takes 22 characters to carry 128 bits, so its last character holds 2
+// significant bits and 4 unused ones. RFC 7515 section 2 defines exactly one
+// spelling of a given byte string, Go's decoder accepts both, and the parser's
+// re-encode comparison is the only thing that tells them apart. The helper proves
+// the alias decodes to the same bytes and fails the test when no alias exists, so
+// a row built with it cannot quietly become a tampering case.
+func aliasTrailingBits(t *testing.T, compactJWE string, i int) string {
+	t.Helper()
+	parts := strings.Split(compactJWE, ".")
+	if len(parts) != 5 {
+		t.Fatalf("expected 5 JWE segments, got %d", len(parts))
+	}
+	seg := parts[i]
+	if seg == "" {
+		t.Fatalf("segment %d is empty, nothing to respell", i)
+	}
+	want, err := base64.RawURLEncoding.DecodeString(seg)
+	if err != nil {
+		t.Fatalf("segment %d is not raw base64url: %v", i, err)
+	}
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+	for _, c := range []byte(alphabet) {
+		if c == seg[len(seg)-1] {
+			continue
+		}
+		alias := seg[:len(seg)-1] + string(c)
+		got, err := base64.RawURLEncoding.DecodeString(alias)
+		if err != nil || !bytes.Equal(got, want) {
+			continue
+		}
+		return replaceSegment(t, compactJWE, i, alias)
+	}
+	t.Fatalf("segment %d has no second spelling: its last character spends no unused bits", i)
+	return ""
+}
+
+// TestDecryptIDTokenHintJWE_DiagnosticsAreBounded pins what keeps a refusal cheap
+// for the server. Three refusals quote a string the caller chose -- an unsupported
+// alg, an unsupported enc, a repeated member name -- and the logout handler logs
+// that error verbatim, on a log record of its own that the request logger's
+// maxLoggedTarget never reaches. Unbounded, an unauthenticated caller who knows any
+// client_id writes about a megabyte to the log per request, which is the defect
+// #159 bounded the request target for and which this second record would otherwise
+// reopen (#277).
+func TestDecryptIDTokenHintJWE_DiagnosticsAreBounded(t *testing.T) {
+	key := DeriveIDTokenHintKey(testClientSecret)
+
+	// The ceiling these have to stay under is middleware's maxLoggedTarget, the whole
+	// rendered request target's budget. Written out rather than imported, because
+	// core/encryption does not depend on core/middleware; that number moving would
+	// make this bound looser or tighter than the neighbouring one, never wrong.
+	const logRecordCeiling = 4096
+
+	cases := []struct {
+		name   string
+		header func(value string) string
+	}{
+		{"unsupported alg", func(v string) string { return `{"alg":"` + v + `","enc":"A256GCM"}` }},
+		{"unsupported enc", func(v string) string { return `{"alg":"dir","enc":"` + v + `"}` }},
+		{"repeated member name", func(v string) string {
+			return `{"` + v + `":1,"` + v + `":2,"alg":"dir","enc":"A256GCM"}`
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var lengths []int
+			for _, size := range []int{1000, 200000} {
+				jwe := buildJWE(t, testInner, key, jweOpts{header: tc.header(strings.Repeat("A", size))})
+				_, err := DecryptIDTokenHintJWE(jwe, testClientSecret)
+				if err == nil {
+					t.Fatalf("expected refusal for a %d-character value", size)
+				}
+				if got := len(err.Error()); got > logRecordCeiling {
+					t.Errorf("a %d-character value produced a %d-byte error, want at most %d",
+						size, got, logRecordCeiling)
+				}
+				lengths = append(lengths, len(err.Error()))
+			}
+			// Identical, not merely small. What makes the refusal cheap is that the
+			// message does not track the caller's input at all, and a bound that happens
+			// to sit under the ceiling for these two sizes would not say that.
+			if lengths[0] != lengths[1] {
+				t.Errorf("the error tracks the input: %d bytes at 1000 characters, %d bytes at 200000",
+					lengths[0], lengths[1])
+			}
+		})
+	}
+}
+
 func assertRefused(t *testing.T, compactJWE, secret, wantErr string) {
 	t.Helper()
 	got, err := DecryptIDTokenHintJWE(compactJWE, secret)
@@ -383,6 +476,13 @@ func TestDecryptIDTokenHintJWE_InvalidInput(t *testing.T) {
 		{"trailing newline after the compact form", baseline + "\n", testClientSecret,
 			"segment 4 (authentication tag) is not canonical base64url"},
 		{"trailing CRLF after the compact form", baseline + "\r\n", testClientSecret,
+			"segment 4 (authentication tag) is not canonical base64url"},
+		// keep this: reverses the library. Non-zero unused trailing bits are the other
+		// spelling Go's decoder accepts besides the line breaks above, so this row and
+		// those are together what the re-encode comparison is for. aliasTrailingBits
+		// proves this tag decodes to the very bytes the baseline's does, which is what
+		// makes the row pin canonicality rather than tampering (decision 5).
+		{"non-zero trailing bits in the tag segment", aliasTrailingBits(t, baseline, 4), testClientSecret,
 			"segment 4 (authentication tag) is not canonical base64url"},
 
 		// --- the protected header is UTF-8 and a JSON object (RFC 7516 5.2 step 3) ---
