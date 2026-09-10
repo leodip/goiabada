@@ -33,7 +33,7 @@ func HandleAdminGetPermissionsGet(
 		resourceIdStr := r.URL.Query().Get("resourceId")
 		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -41,7 +41,7 @@ func HandleAdminGetPermissionsGet(
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resourceId)
 		if err != nil {
 			slog.Error("Admin Console: Error getting permissions from API", "error", err, "resourceId", resourceId)
-			httpHelper.JsonError(w, r, err)
+			HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

@@ -90,7 +90,7 @@ func HandleAccountEmailSendVerificationPost(
 
 		resp, err := apiClient.SendAccountEmailVerification(jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

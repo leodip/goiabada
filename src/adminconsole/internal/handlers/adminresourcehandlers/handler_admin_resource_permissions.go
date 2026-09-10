@@ -115,13 +115,13 @@ func HandleAdminResourcePermissionsPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("resourceId is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		// Get JWT info
@@ -132,18 +132,18 @@ func HandleAdminResourcePermissionsPost(
 		}
 		resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
-			httpHelper.JsonError(w, r, errs.New("resource not found"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		var data SavePermissionsInput
 		err = json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -169,7 +169,7 @@ func HandleAdminResourcePermissionsPost(
 				httpHelper.EncodeJson(w, r, result)
 				return
 			}
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -213,7 +213,7 @@ func HandleAdminResourceValidatePermissionPost(
 		var data map[string]string
 		err := json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 

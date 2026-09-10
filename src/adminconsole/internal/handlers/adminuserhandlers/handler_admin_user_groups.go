@@ -105,13 +105,13 @@ func HandleAdminUserGroupsPost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("userId is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -124,14 +124,14 @@ func HandleAdminUserGroupsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data GroupsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -143,7 +143,7 @@ func HandleAdminUserGroupsPost(
 		// Call API to update user groups (this handles all the business logic including audit logging)
 		_, _, err = apiClient.UpdateUserGroups(jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

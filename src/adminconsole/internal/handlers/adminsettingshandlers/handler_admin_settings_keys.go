@@ -126,13 +126,13 @@ func HandleAdminSettingsKeysRevokePost(
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		id, ok := data["id"].(float64)
 		if !ok {
-			httpHelper.JsonError(w, r, errs.Errorf("unable to cast id to float64"))
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -145,7 +145,7 @@ func HandleAdminSettingsKeysRevokePost(
 
 		// Let the API enforce state=previous and handle auditing
 		if err := apiClient.DeleteSettingsKey(jwtInfo.TokenResponse.AccessToken, int64(id)); err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

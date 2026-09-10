@@ -2,7 +2,6 @@ package adminclienthandlers
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +18,11 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// The error surface here answers through the console's shared JSON writers rather than the
+// hand-rolled {"success": false, "error": <message>} these handlers wrote until #279, which put an
+// internal message on the wire at 500 with nothing in the log, answered 401 for the middleware
+// invariant the other 100 sites answer 500 for, and rendered the HTML 500 page into a fetch() that
+// was about to call response.json(). The success bodies are unchanged.
 func HandleAdminClientLogoGet(
 	httpHelper handlers.HttpHelper,
 	apiClient apiclient.ApiClient,
@@ -82,72 +86,38 @@ func HandleAdminClientLogoPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   "Unauthorized",
-			})
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
 		clientIdStr := chi.URLParam(r, "clientId")
 		clientId, err := strconv.ParseInt(clientIdStr, 10, 64)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   "Invalid client ID",
-			})
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   "Failed to parse form: " + err.Error(),
-			})
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		file, header, err := r.FormFile("picture")
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   "No picture file provided",
-			})
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 		defer func() { _ = file.Close() }()
 
 		logoData, err := io.ReadAll(file)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, errs.Wrap(err, "failed to read logo data"))
+			httpHelper.JsonError(w, r, errs.Wrap(err, "failed to read logo data"))
 			return
 		}
 
 		response, err := apiClient.UploadClientLogo(jwtInfo.TokenResponse.AccessToken, clientId, logoData, header.Filename)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				w.WriteHeader(apiErr.StatusCode)
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   apiErr.Message,
-				})
-			} else {
-				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   err.Error(),
-				})
-			}
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -160,49 +130,26 @@ func HandleAdminClientLogoPost(
 }
 
 func HandleAdminClientLogoDelete(
+	httpHelper handlers.HttpHelper,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   "Unauthorized",
-			})
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
 		clientIdStr := chi.URLParam(r, "clientId")
 		clientId, err := strconv.ParseInt(clientIdStr, 10, 64)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   "Invalid client ID",
-			})
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		err = apiClient.DeleteClientLogo(jwtInfo.TokenResponse.AccessToken, clientId)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				w.WriteHeader(apiErr.StatusCode)
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   apiErr.Message,
-				})
-			} else {
-				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   err.Error(),
-				})
-			}
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

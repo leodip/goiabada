@@ -73,19 +73,19 @@ func HandleAccountManageConsentsRevokePost(
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		consentId, ok := data["consentId"].(float64)
 		if !ok || consentId == 0 {
-			httpHelper.JsonError(w, r, errs.New("could not find consent id to revoke"))
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		// Call API to revoke
 		if err := apiClient.RevokeAccountConsent(jwtInfo.TokenResponse.AccessToken, int64(consentId)); err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

@@ -78,13 +78,13 @@ func HandleAdminUserAttributesRemovePost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("userId is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -97,29 +97,29 @@ func HandleAdminUserAttributesRemovePost(
 
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
-			httpHelper.JsonError(w, r, errs.New("user not found"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		attributes, err := apiClient.GetUserAttributesByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("attribute id is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -132,13 +132,13 @@ func HandleAdminUserAttributesRemovePost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errs.New("attribute not found"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		err = apiClient.DeleteUserAttribute(jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

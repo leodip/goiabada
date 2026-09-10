@@ -132,7 +132,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		// Profile picture page and API routes
 		r.Get("/picture", accounthandlers.HandleAccountPictureGet(httpHelper, apiClient))
 		r.Post("/picture", accounthandlers.HandleAccountProfilePicturePost(httpHelper, apiClient))
-		r.Delete("/picture", accounthandlers.HandleAccountProfilePictureDelete(apiClient))
+		r.Delete("/picture", accounthandlers.HandleAccountProfilePictureDelete(httpHelper, apiClient))
 	})
 
 	// Admin routes
@@ -164,7 +164,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Post("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeletePost(httpHelper, apiClient))
 		r.Get("/clients/{clientId}/logo", adminclienthandlers.HandleAdminClientLogoGet(httpHelper, apiClient))
 		r.Post("/clients/{clientId}/logo", adminclienthandlers.HandleAdminClientLogoPost(httpHelper, apiClient))
-		r.Delete("/clients/{clientId}/logo", adminclienthandlers.HandleAdminClientLogoDelete(apiClient))
+		r.Delete("/clients/{clientId}/logo", adminclienthandlers.HandleAdminClientLogoDelete(httpHelper, apiClient))
 		r.Get("/clients/new", adminclienthandlers.HandleAdminClientNewGet(httpHelper))
 		r.Post("/clients/new", adminclienthandlers.HandleAdminClientNewPost(httpHelper, apiClient))
 
@@ -245,7 +245,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		// User profile picture page and API routes
 		r.Get("/users/{userId}/picture", adminuserhandlers.HandleAdminUserPictureGet(httpHelper, apiClient))
 		r.Post("/users/{userId}/picture", adminuserhandlers.HandleAdminUserProfilePicturePost(httpHelper, apiClient))
-		r.Delete("/users/{userId}/picture", adminuserhandlers.HandleAdminUserProfilePictureDelete(apiClient))
+		r.Delete("/users/{userId}/picture", adminuserhandlers.HandleAdminUserProfilePictureDelete(httpHelper, apiClient))
 
 		// Settings routes
 		r.Get("/settings/general", adminsettingshandlers.HandleAdminSettingsGeneralGet(httpHelper, s.sessionStore, apiClient))

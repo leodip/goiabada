@@ -121,13 +121,13 @@ func HandleAdminClientUserSessionsPost(
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			httpHelper.NotFound(w, r)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.NotFound(w, r)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		// Get JWT info from context to extract access token
@@ -138,24 +138,24 @@ func HandleAdminClientUserSessionsPost(
 		}
 		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if clientResp == nil {
-			httpHelper.JsonError(w, r, errs.Errorf("client %v not found", id))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			httpHelper.JsonError(w, r, errs.New("could not find user session id to revoke"))
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -197,7 +197,7 @@ func HandleAdminClientUserSessionsPost(
 		// Delete the session via API (authserver performs audit)
 		err = apiClient.DeleteUserSessionById(jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
