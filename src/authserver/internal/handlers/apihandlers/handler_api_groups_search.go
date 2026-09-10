@@ -1,13 +1,12 @@
 package apihandlers
 
 import (
-	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // HandleAPIGroupsSearchGet
@@ -32,8 +31,7 @@ func HandleAPIGroupsSearchGet(
 		// Ensure permission exists
 		perm, err := database.GetPermissionById(nil, permId)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting permission by ID for annotation", "error", err, "permissionId", permId)
-			writeJSONError(w, "Failed to validate permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permission by ID for annotation"), "permissionId", permId)
 			return
 		}
 		if perm == nil {
@@ -58,8 +56,7 @@ func HandleAPIGroupsSearchGet(
 		// Fetch groups with server-side pagination
 		groups, total, err := database.GetAllGroupsPaginated(nil, page, size)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting groups paginated", "error", err, "page", page, "size", size)
-			writeJSONError(w, "Failed to get groups", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting groups paginated"), "page", page, "size", size)
 			return
 		}
 
@@ -75,8 +72,7 @@ func HandleAPIGroupsSearchGet(
 			// Load permissions for all groups in batch
 			gp, err := database.GetGroupPermissionsByGroupIds(nil, groupIds)
 			if err != nil {
-				slog.Error("AuthServer API: Database error getting group permissions by group IDs", "error", err, "groupCount", len(groupIds))
-				writeJSONError(w, "Failed to load group permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group permissions by group IDs"), "groupCount", len(groupIds))
 				return
 			}
 
@@ -107,8 +103,6 @@ func HandleAPIGroupsSearchGet(
 			Page:   page,
 			Size:   size,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

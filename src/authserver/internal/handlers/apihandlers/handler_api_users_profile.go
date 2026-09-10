@@ -50,7 +50,7 @@ func HandleAPIUserProfilePut(
 		// Get user from database
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -121,7 +121,7 @@ func HandleAPIUserProfilePut(
 		// Update user in database
 		err = database.UpdateUser(nil, user)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -144,11 +144,7 @@ func HandleAPIUserProfilePut(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -184,7 +180,7 @@ func HandleAPIUserAddressPut(
 		// Get user from database
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -220,7 +216,7 @@ func HandleAPIUserAddressPut(
 		// Update user in database
 		err = database.UpdateUser(nil, user)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -243,10 +239,6 @@ func HandleAPIUserAddressPut(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

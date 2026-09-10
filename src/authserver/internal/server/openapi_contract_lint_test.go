@@ -35,7 +35,9 @@ import (
 // happen loses nothing) and a status produced by a value computed at run time would be
 // missed. No handler in this module does the latter today: writeJSONError is always called
 // with an http.Status constant, which TestAPIHandlers_WriteStatusesAsConstants below is
-// what keeps true.
+// what keeps true. The two helpers that carry a status implicitly rather than as an
+// argument, writeValidationError at 400 and writeInternalServerError at 500, are read by
+// name in statusesWrittenIn, as is writeJSON, whose buffered encode can fail into a 500.
 //
 // What it does not check: response bodies, schemas, parameters, or whether an operation's
 // description is true. Those stay hand-maintained.
@@ -556,6 +558,21 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 				// undocumented with every test in this file still passing.
 				if f.Name == "writeValidationError" {
 					out[400] = true
+				}
+				// writeInternalServerError names no constant either: it is the API's one
+				// 500 by construction, and after #279 decision 7 it is how every 500 on
+				// this surface is written, so without this line the scan would read the
+				// handlers as unable to fail at all and the reverse test would order
+				// every declared 500 out of the spec.
+				if f.Name == "writeInternalServerError" {
+					out[500] = true
+				}
+				// writeJSON buffers the encode before it writes anything, and answers 500
+				// through the primitive above when the encode fails. That arm lives in the
+				// helper rather than in the handler, so the caller names no constant for a
+				// failure it can still produce (#279 decision 8).
+				if f.Name == "writeJSON" {
+					out[500] = true
 				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {

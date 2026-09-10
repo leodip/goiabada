@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
@@ -15,6 +16,8 @@ import (
 func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestId := middleware.GetReqID(r.Context())
+
 			// Fetch settings from cache (auto-refreshes if expired)
 			publicSettings, err := settingsCache.Get()
 			if err != nil {
@@ -27,7 +30,7 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 				// one carries a core/errs stack. The cache does not cache a failure, so an auth
 				// server that is down produces one of these per request, and the stack is the
 				// same frames every time.
-				slog.Error("unable to fetch settings from the auth server", "error", err.Error())
+				slog.Error("unable to fetch settings from the auth server", "error", err.Error(), "request_id", requestId)
 				http.Error(w, i18n.T(r.Context(), "adminconsole.error.settings_unavailable"), http.StatusInternalServerError)
 				return
 			}
@@ -49,7 +52,7 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 			// moved ahead of this middleware on the application branch. Server.initMiddleware
 			// records why that reorder is safe.
 			if publicSettings.Issuer == "" {
-				slog.Error("the auth server did not report an issuer; it may be running an older version")
+				slog.Error("the auth server did not report an issuer; it may be running an older version", "request_id", requestId)
 				http.Error(w, i18n.T(r.Context(), "adminconsole.error.issuer_missing"), http.StatusInternalServerError)
 				return
 			}

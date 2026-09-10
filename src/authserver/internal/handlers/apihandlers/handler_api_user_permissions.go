@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -33,8 +33,7 @@ func HandleAPIUserPermissionsGet(
 
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: failed to get user by ID", "error", err, "userId", id)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get user by ID"), "userId", id)
 			return
 		}
 		if user == nil {
@@ -44,8 +43,7 @@ func HandleAPIUserPermissionsGet(
 
 		err = database.UserLoadPermissions(nil, user)
 		if err != nil {
-			slog.Error("AuthServer API: failed to load user permissions", "error", err, "userId", user.Id)
-			writeJSONError(w, "Failed to load user permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user permissions"), "userId", user.Id)
 			return
 		}
 
@@ -53,8 +51,7 @@ func HandleAPIUserPermissionsGet(
 		for i := range user.Permissions {
 			resource, err := database.GetResourceById(nil, user.Permissions[i].ResourceId)
 			if err != nil {
-				slog.Error("AuthServer API: failed to load resource information", "error", err, "userId", user.Id, "resourceId", user.Permissions[i].ResourceId)
-				writeJSONError(w, "Failed to load resource information", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load resource information"), "userId", user.Id, "resourceId", user.Permissions[i].ResourceId)
 				return
 			}
 			if resource != nil {
@@ -67,9 +64,7 @@ func HandleAPIUserPermissionsGet(
 			Permissions: api.ToPermissionResponses(user.Permissions),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -93,8 +88,7 @@ func HandleAPIUserPermissionsPut(
 
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: failed to get user by ID", "error", err, "userId", id)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get user by ID"), "userId", id)
 			return
 		}
 		if user == nil {
@@ -111,8 +105,7 @@ func HandleAPIUserPermissionsPut(
 		// Load current user permissions
 		err = database.UserLoadPermissions(nil, user)
 		if err != nil {
-			slog.Error("AuthServer API: failed to load current user permissions", "error", err, "userId", user.Id)
-			writeJSONError(w, "Failed to load current permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load current user permissions"), "userId", user.Id)
 			return
 		}
 
@@ -120,8 +113,7 @@ func HandleAPIUserPermissionsPut(
 		for _, permissionId := range request.PermissionIds {
 			permission, err := database.GetPermissionById(nil, permissionId)
 			if err != nil {
-				slog.Error("AuthServer API: failed to get permission by ID during validation", "error", err, "userId", user.Id, "permissionId", permissionId)
-				writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get permission by ID during validation"), "userId", user.Id, "permissionId", permissionId)
 				return
 			}
 			if permission == nil {
@@ -143,8 +135,7 @@ func HandleAPIUserPermissionsPut(
 			if !found {
 				permission, err := database.GetPermissionById(nil, permissionId)
 				if err != nil {
-					slog.Error("AuthServer API: failed to retrieve permission for user permission creation", "error", err, "userId", user.Id, "permissionId", permissionId)
-					writeJSONError(w, "Failed to retrieve permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to retrieve permission for user permission creation"), "userId", user.Id, "permissionId", permissionId)
 					return
 				}
 
@@ -153,8 +144,7 @@ func HandleAPIUserPermissionsPut(
 					PermissionId: permission.Id,
 				})
 				if err != nil {
-					slog.Error("AuthServer API: failed to create user permission", "error", err, "userId", user.Id, "permissionId", permission.Id)
-					writeJSONError(w, "Failed to create user permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to create user permission"), "userId", user.Id, "permissionId", permission.Id)
 					return
 				}
 
@@ -185,15 +175,13 @@ func HandleAPIUserPermissionsPut(
 		for _, permissionId := range toDelete {
 			userPermission, err := database.GetUserPermissionByUserIdAndPermissionId(nil, user.Id, permissionId)
 			if err != nil {
-				slog.Error("AuthServer API: failed to find user permission for deletion", "error", err, "userId", user.Id, "permissionId", permissionId)
-				writeJSONError(w, "Failed to find user permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to find user permission for deletion"), "userId", user.Id, "permissionId", permissionId)
 				return
 			}
 
 			err = database.DeleteUserPermission(nil, userPermission.Id)
 			if err != nil {
-				slog.Error("AuthServer API: failed to delete user permission", "error", err, "userId", user.Id, "permissionId", permissionId)
-				writeJSONError(w, "Failed to delete user permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to delete user permission"), "userId", user.Id, "permissionId", permissionId)
 				return
 			}
 
@@ -206,8 +194,6 @@ func HandleAPIUserPermissionsPut(
 
 		// Return success response
 		response := api.SuccessResponse{Success: true}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

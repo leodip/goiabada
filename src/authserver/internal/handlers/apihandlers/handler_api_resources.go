@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"sort"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
@@ -24,8 +24,7 @@ func HandleAPIResourcesGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		resources, err := database.GetAllResources(nil)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting all resources", "error", err)
-			writeJSONError(w, "Failed to retrieve resources", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting all resources"))
 			return
 		}
 
@@ -38,9 +37,7 @@ func HandleAPIResourcesGet(
 			Resources: api.ToResourceResponses(resources),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -86,8 +83,7 @@ func HandleAPIResourceCreatePost(
 		// Check uniqueness
 		existing, err := database.GetResourceByResourceIdentifier(nil, createReq.ResourceIdentifier)
 		if err != nil {
-			slog.Error("AuthServer API: Database error checking resource by identifier", "error", err, "resourceIdentifier", createReq.ResourceIdentifier)
-			writeJSONError(w, "Failed to check resource existence", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking resource by identifier"), "resourceIdentifier", createReq.ResourceIdentifier)
 			return
 		}
 		if existing != nil {
@@ -101,8 +97,7 @@ func HandleAPIResourceCreatePost(
 			Description:        strings.TrimSpace(createReq.Description),
 		}
 		if err := database.CreateResource(nil, resource); err != nil {
-			slog.Error("AuthServer API: Database error creating resource", "error", err, "resourceIdentifier", resource.ResourceIdentifier)
-			writeJSONError(w, "Failed to create resource", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating resource"), "resourceIdentifier", resource.ResourceIdentifier)
 			return
 		}
 
@@ -117,9 +112,7 @@ func HandleAPIResourceCreatePost(
 		response := api.CreateResourceResponse{
 			Resource: *api.ToResourceResponse(resource),
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusCreated, response)
 	}
 }
 
@@ -143,8 +136,7 @@ func HandleAPIResourceGet(
 
 		resource, err := database.GetResourceById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting resource by ID", "error", err, "resourceId", id)
-			writeJSONError(w, "Failed to get resource", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID"), "resourceId", id)
 			return
 		}
 		if resource == nil {
@@ -155,9 +147,7 @@ func HandleAPIResourceGet(
 		response := api.GetResourceResponse{
 			Resource: *api.ToResourceResponse(resource),
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -184,8 +174,7 @@ func HandleAPIResourceUpdatePut(
 
 		resource, err := database.GetResourceById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting resource by ID for update", "error", err, "resourceId", id)
-			writeJSONError(w, "Failed to get resource", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for update"), "resourceId", id)
 			return
 		}
 		if resource == nil {
@@ -226,8 +215,7 @@ func HandleAPIResourceUpdatePut(
 		// Uniqueness check (excluding this resource)
 		existing, err := database.GetResourceByResourceIdentifier(nil, updateReq.ResourceIdentifier)
 		if err != nil {
-			slog.Error("AuthServer API: Database error checking resource by identifier for update", "error", err, "resourceIdentifier", updateReq.ResourceIdentifier, "resourceId", resource.Id)
-			writeJSONError(w, "Failed to check resource existence", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking resource by identifier for update"), "resourceIdentifier", updateReq.ResourceIdentifier, "resourceId", resource.Id)
 			return
 		}
 		if existing != nil && existing.Id != resource.Id {
@@ -248,8 +236,7 @@ func HandleAPIResourceUpdatePut(
 		resource.Description = strings.TrimSpace(updateReq.Description)
 
 		if err := database.UpdateResource(nil, resource); err != nil {
-			slog.Error("AuthServer API: Database error updating resource", "error", err, "resourceId", resource.Id, "resourceIdentifier", resource.ResourceIdentifier)
-			writeJSONError(w, "Failed to update resource", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating resource"), "resourceId", resource.Id, "resourceIdentifier", resource.ResourceIdentifier)
 			return
 		}
 
@@ -264,9 +251,7 @@ func HandleAPIResourceUpdatePut(
 		response := api.UpdateResourceResponse{
 			Resource: *api.ToResourceResponse(resource),
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -292,8 +277,7 @@ func HandleAPIResourceDelete(
 
 		resource, err := database.GetResourceById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting resource by ID for deletion", "error", err, "resourceId", id)
-			writeJSONError(w, "Failed to get resource", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for deletion"), "resourceId", id)
 			return
 		}
 		if resource == nil {
@@ -307,8 +291,7 @@ func HandleAPIResourceDelete(
 		}
 
 		if err := database.DeleteResource(nil, resource.Id); err != nil {
-			slog.Error("AuthServer API: Database error deleting resource", "error", err, "resourceId", resource.Id, "resourceIdentifier", resource.ResourceIdentifier)
-			writeJSONError(w, "Failed to delete resource", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting resource"), "resourceId", resource.Id, "resourceIdentifier", resource.ResourceIdentifier)
 			return
 		}
 
@@ -319,8 +302,6 @@ func HandleAPIResourceDelete(
 		})
 
 		resp := api.SuccessResponse{Success: true}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

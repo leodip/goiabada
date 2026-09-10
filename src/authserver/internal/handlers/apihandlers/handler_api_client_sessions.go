@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -37,7 +36,7 @@ func HandleAPIClientSessionsGet(
 		// Ensure client exists
 		client, err := database.GetClientById(nil, clientId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
@@ -65,13 +64,13 @@ func HandleAPIClientSessionsGet(
 		// Fetch sessions linked to the client
 		userSessions, _, err := database.GetUserSessionsByClientIdPaginated(nil, client.Id, page, size)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		// Load clients for sessions to extract identifiers
 		if err := database.UserSessionsLoadClients(nil, userSessions); err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -88,7 +87,7 @@ func HandleAPIClientSessionsGet(
 
 			// Ensure nested clients are loaded to fill client identifiers
 			if err := database.UserSessionClientsLoadClients(nil, us.Clients); err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -139,11 +138,6 @@ func HandleAPIClientSessionsGet(
 			Sessions: enhanced,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

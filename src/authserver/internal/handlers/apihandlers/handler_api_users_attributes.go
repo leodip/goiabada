@@ -39,7 +39,7 @@ func HandleAPIUserAttributesGet(
 		// Check if user exists
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -50,7 +50,7 @@ func HandleAPIUserAttributesGet(
 		// Get user attributes
 		attributes, err := database.GetUserAttributesByUserId(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -60,11 +60,7 @@ func HandleAPIUserAttributesGet(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -91,7 +87,7 @@ func HandleAPIUserAttributeGet(
 		// Get user attribute from database
 		attribute, err := database.GetUserAttributeById(nil, attributeId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if attribute == nil {
@@ -105,11 +101,7 @@ func HandleAPIUserAttributeGet(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -138,7 +130,7 @@ func HandleAPIUserAttributeCreatePost(
 		// Validate user exists
 		user, err := database.GetUserById(nil, req.UserId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -176,7 +168,7 @@ func HandleAPIUserAttributeCreatePost(
 
 		err = database.CreateUserAttribute(nil, userAttribute)
 		if err != nil {
-			writeJSONError(w, "Failed to create user attribute", "USER_ATTRIBUTE_CREATION_FAILED", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -200,12 +192,7 @@ func HandleAPIUserAttributeCreatePost(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusCreated, response)
 	}
 }
 
@@ -241,7 +228,7 @@ func HandleAPIUserAttributeUpdatePut(
 		// Get existing attribute
 		attribute, err := database.GetUserAttributeById(nil, attributeId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if attribute == nil {
@@ -283,7 +270,7 @@ func HandleAPIUserAttributeUpdatePut(
 		// Update attribute in database
 		err = database.UpdateUserAttribute(nil, attribute)
 		if err != nil {
-			writeJSONError(w, "Failed to update user attribute", "USER_ATTRIBUTE_UPDATE_FAILED", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -307,11 +294,7 @@ func HandleAPIUserAttributeUpdatePut(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -339,7 +322,7 @@ func HandleAPIUserAttributeDelete(
 		// Check if attribute exists before deleting
 		attribute, err := database.GetUserAttributeById(nil, attributeId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if attribute == nil {
@@ -350,7 +333,7 @@ func HandleAPIUserAttributeDelete(
 		// Delete attribute from database
 		err = database.DeleteUserAttribute(nil, attributeId)
 		if err != nil {
-			writeJSONError(w, "Failed to delete user attribute", "USER_ATTRIBUTE_DELETE_FAILED", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -374,10 +357,6 @@ func HandleAPIUserAttributeDelete(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

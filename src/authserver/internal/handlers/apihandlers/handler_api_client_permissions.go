@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -33,8 +33,7 @@ func HandleAPIClientPermissionsGet(
 
 		client, err := database.GetClientById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting client by ID for permissions", "error", err, "clientId", id)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for permissions"), "clientId", id)
 			return
 		}
 		if client == nil {
@@ -43,15 +42,13 @@ func HandleAPIClientPermissionsGet(
 		}
 
 		if err := database.ClientLoadPermissions(nil, client); err != nil {
-			slog.Error("AuthServer API: Database error loading client permissions", "error", err, "clientId", client.Id)
-			writeJSONError(w, "Failed to load client permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client permissions"), "clientId", client.Id)
 			return
 		}
 
 		if client.Permissions != nil {
 			if err := database.PermissionsLoadResources(nil, client.Permissions); err != nil {
-				slog.Error("AuthServer API: Database error loading permission resources", "error", err, "clientId", client.Id)
-				writeJSONError(w, "Failed to load client permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading permission resources"), "clientId", client.Id)
 				return
 			}
 		}
@@ -61,9 +58,7 @@ func HandleAPIClientPermissionsGet(
 			Permissions: api.ToPermissionResponses(client.Permissions),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -90,8 +85,7 @@ func HandleAPIClientPermissionsPut(
 
 		client, err := database.GetClientById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting client by ID for permissions update", "error", err, "clientId", id)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for permissions update"), "clientId", id)
 			return
 		}
 		if client == nil {
@@ -124,8 +118,7 @@ func HandleAPIClientPermissionsPut(
 
 		// Load current permissions
 		if err := database.ClientLoadPermissions(nil, client); err != nil {
-			slog.Error("AuthServer API: Database error loading current client permissions", "error", err, "clientId", client.Id)
-			writeJSONError(w, "Failed to load current permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading current client permissions"), "clientId", client.Id)
 			return
 		}
 
@@ -133,8 +126,7 @@ func HandleAPIClientPermissionsPut(
 		for _, permissionId := range request.PermissionIds {
 			permission, err := database.GetPermissionById(nil, permissionId)
 			if err != nil {
-				slog.Error("AuthServer API: Database error getting permission by ID for validation", "error", err, "permissionId", permissionId, "clientId", client.Id)
-				writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permission by ID for validation"), "permissionId", permissionId, "clientId", client.Id)
 				return
 			}
 			if permission == nil {
@@ -155,8 +147,7 @@ func HandleAPIClientPermissionsPut(
 			if !found {
 				permission, err := database.GetPermissionById(nil, permissionId)
 				if err != nil {
-					slog.Error("AuthServer API: Database error retrieving permission for client assignment", "error", err, "permissionId", permissionId, "clientId", client.Id)
-					writeJSONError(w, "Failed to retrieve permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error retrieving permission for client assignment"), "permissionId", permissionId, "clientId", client.Id)
 					return
 				}
 
@@ -164,8 +155,7 @@ func HandleAPIClientPermissionsPut(
 					ClientId:     client.Id,
 					PermissionId: permission.Id,
 				}); err != nil {
-					slog.Error("AuthServer API: Database error creating client permission", "error", err, "clientId", client.Id, "permissionId", permission.Id)
-					writeJSONError(w, "Failed to create client permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating client permission"), "clientId", client.Id, "permissionId", permission.Id)
 					return
 				}
 			}
@@ -189,8 +179,7 @@ func HandleAPIClientPermissionsPut(
 		for _, permissionId := range toDelete {
 			clientPermission, err := database.GetClientPermissionByClientIdAndPermissionId(nil, client.Id, permissionId)
 			if err != nil {
-				slog.Error("AuthServer API: Database error getting client permission for deletion", "error", err, "clientId", client.Id, "permissionId", permissionId)
-				writeJSONError(w, "Failed to find client permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client permission for deletion"), "clientId", client.Id, "permissionId", permissionId)
 				return
 			}
 			if clientPermission == nil {
@@ -199,8 +188,7 @@ func HandleAPIClientPermissionsPut(
 			}
 
 			if err := database.DeleteClientPermission(nil, clientPermission.Id); err != nil {
-				slog.Error("AuthServer API: Database error deleting client permission", "error", err, "clientPermissionId", clientPermission.Id, "clientId", client.Id, "permissionId", permissionId)
-				writeJSONError(w, "Failed to delete client permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting client permission"), "clientPermissionId", clientPermission.Id, "clientId", client.Id, "permissionId", permissionId)
 				return
 			}
 		}
@@ -213,8 +201,6 @@ func HandleAPIClientPermissionsPut(
 
 		// Respond success
 		resp := api.SuccessResponse{Success: true}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

@@ -3,7 +3,6 @@ package apihandlers
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
@@ -37,8 +37,7 @@ func HandleAPIPermissionsByResourceGet(
 
 		permissions, err := database.GetPermissionsByResourceId(nil, resourceId)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting permissions", "error", err, "resourceId", resourceId)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permissions"), "resourceId", resourceId)
 			return
 		}
 
@@ -51,7 +50,7 @@ func HandleAPIPermissionsByResourceGet(
 		if len(permissions) > 0 {
 			err = database.PermissionsLoadResources(nil, permissions)
 			if err != nil {
-				writeJSONError(w, "Failed to load resource information", "INTERNAL_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -67,9 +66,7 @@ func HandleAPIPermissionsByResourceGet(
 			Permissions: api.ToPermissionResponses(permissions),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -96,8 +93,7 @@ func HandleAPIResourcePermissionsPut(
 
 		resource, err := database.GetResourceById(nil, resourceId)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting resource by ID for permissions update", "error", err, "resourceId", resourceId)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for permissions update"), "resourceId", resourceId)
 			return
 		}
 		if resource == nil {
@@ -169,8 +165,7 @@ func HandleAPIResourcePermissionsPut(
 		// Load existing permissions once
 		existing, err := database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting existing permissions", "error", err, "resourceId", resource.Id)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting existing permissions"), "resourceId", resource.Id)
 			return
 		}
 
@@ -188,8 +183,9 @@ func HandleAPIResourcePermissionsPut(
 				// Check if the built-in permission exists in the database
 				existingPerm, found := existingByIdentifier[builtInIdentifier]
 				if !found {
-					slog.Error("AuthServer API: Built-in permission missing from system resource", "builtInIdentifier", builtInIdentifier, "resourceId", resource.Id)
-					writeJSONError(w, fmt.Sprintf("Required built-in permission '%s' is missing from the system resource. Database may be corrupted or mis-seeded.", builtInIdentifier), "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r,
+						errs.Errorf("AuthServer API: built-in permission %q is missing from the system resource; the database may be corrupted or mis-seeded", builtInIdentifier),
+						"builtInIdentifier", builtInIdentifier, "resourceId", resource.Id)
 					return
 				}
 
@@ -234,8 +230,7 @@ func HandleAPIResourcePermissionsPut(
 				cur.PermissionIdentifier = p.PermissionIdentifier
 				cur.Description = p.Description
 				if err := database.UpdatePermission(nil, &cur); err != nil {
-					slog.Error("AuthServer API: Database error updating permission", "error", err, "permissionId", cur.Id)
-					writeJSONError(w, "Failed to update permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating permission"), "permissionId", cur.Id)
 					return
 				}
 				// reflect change in maps
@@ -257,8 +252,7 @@ func HandleAPIResourcePermissionsPut(
 					Description:          p.Description,
 				}
 				if err := database.CreatePermission(nil, perm); err != nil {
-					slog.Error("AuthServer API: Database error creating permission", "error", err, "resourceId", resource.Id)
-					writeJSONError(w, "Failed to create permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating permission"), "resourceId", resource.Id)
 					return
 				}
 				existingByIdentifier[perm.PermissionIdentifier] = *perm
@@ -270,8 +264,7 @@ func HandleAPIResourcePermissionsPut(
 		// Reload current permissions to be safe
 		current, err := database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting current permissions for deletion", "error", err, "resourceId", resource.Id)
-			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting current permissions for deletion"), "resourceId", resource.Id)
 			return
 		}
 		desiredIdentifiers := map[string]bool{}
@@ -281,8 +274,7 @@ func HandleAPIResourcePermissionsPut(
 		for _, existingPerm := range current {
 			if !desiredIdentifiers[existingPerm.PermissionIdentifier] {
 				if err := database.DeletePermission(nil, existingPerm.Id); err != nil {
-					slog.Error("AuthServer API: Database error deleting permission", "error", err, "permissionId", existingPerm.Id)
-					writeJSONError(w, "Failed to delete permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting permission"), "permissionId", existingPerm.Id)
 					return
 				}
 			}
@@ -296,9 +288,7 @@ func HandleAPIResourcePermissionsPut(
 
 		// Respond success
 		resp := api.SuccessResponse{Success: true}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 

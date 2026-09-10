@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -37,7 +36,7 @@ func HandleAPIUserSessionsGet(
 		// Check if user exists
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -48,14 +47,14 @@ func HandleAPIUserSessionsGet(
 		// Get user sessions
 		userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		// Load client information for sessions
 		err = database.UserSessionsLoadClients(nil, userSessions)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -110,7 +109,7 @@ func HandleAPIUserSessionsGet(
 			// Load client information
 			err = database.UserSessionClientsLoadClients(nil, us.Clients)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -130,11 +129,7 @@ func HandleAPIUserSessionsGet(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -163,7 +158,7 @@ func HandleAPIUserSessionDelete(
 		// Check if session exists
 		userSession, err := database.GetUserSessionById(nil, sessionId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if userSession == nil {
@@ -178,7 +173,7 @@ func HandleAPIUserSessionDelete(
 		// opens one.
 		result, err := handlers.TerminateUserSessionTx(database, userSession)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -197,10 +192,6 @@ func HandleAPIUserSessionDelete(
 			Success: true,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

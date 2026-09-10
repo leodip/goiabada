@@ -1,13 +1,13 @@
 package apihandlers
 
 import (
-	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 func HandleAPIAuditLogsGet(
@@ -44,8 +44,7 @@ func HandleAPIAuditLogsGet(
 		// Get audit logs
 		auditLogs, total, err := database.GetAuditLogsPaginated(nil, page, size, auditEvent)
 		if err != nil {
-			slog.Error("AuthServer API: failed to get audit logs", "error", err, "page", page, "size", size, "auditEvent", auditEvent)
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get audit logs"), "page", page, "size", size, "auditEvent", auditEvent)
 			return
 		}
 
@@ -67,8 +66,6 @@ func HandleAPIAuditLogsGet(
 			Size:      size,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

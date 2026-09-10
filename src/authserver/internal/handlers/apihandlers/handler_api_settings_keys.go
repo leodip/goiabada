@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -25,7 +25,7 @@ func HandleAPISettingsKeysGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		allSigningKeys, err := database.GetAllSigningKeys(nil)
 		if err != nil {
-			writeJSONError(w, "Failed to get signing keys", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -71,9 +71,7 @@ func HandleAPISettingsKeysGet(
 		}
 
 		resp := api.GetSettingsKeysResponse{Keys: ordered}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, resp)
+		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -102,9 +100,7 @@ func HandleAPISettingsKeysRotatePost(
 				"loggedInUser": authHelper.GetLoggedInSubject(r),
 			})
 
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(api.SuccessResponse{Success: true})
+			writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
 
 		case errors.Is(err, oauth.ErrRotationInProgress):
 			// 409 rather than 200: this call rotated nothing. Reporting success would have the
@@ -119,8 +115,7 @@ func HandleAPISettingsKeysRotatePost(
 				http.StatusInternalServerError)
 
 		default:
-			writeJSONError(w, "Failed to rotate signing keys", "INTERNAL_ERROR",
-				http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to rotate signing keys"))
 		}
 	}
 }
@@ -141,7 +136,7 @@ func HandleAPISettingsKeyDelete(
 
 		kp, err := database.GetKeyPairById(nil, id)
 		if err != nil {
-			writeJSONError(w, "Failed to load key", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if kp == nil {
@@ -151,7 +146,7 @@ func HandleAPISettingsKeyDelete(
 
 		keyState, err := enums.KeyStateFromString(kp.State)
 		if err != nil {
-			writeJSONError(w, "Invalid key state", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if keyState != enums.KeyStatePrevious {
@@ -160,7 +155,7 @@ func HandleAPISettingsKeyDelete(
 		}
 
 		if err := database.DeleteKeyPair(nil, kp.Id); err != nil {
-			writeJSONError(w, "Failed to delete key", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -169,8 +164,6 @@ func HandleAPISettingsKeyDelete(
 			"keyId":        kp.KeyIdentifier,
 		})
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(api.SuccessResponse{Success: true})
+		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
 	}
 }

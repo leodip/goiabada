@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
@@ -38,7 +37,7 @@ func HandleAPIClientLogoPost(
 		// Get client from database
 		client, err := database.GetClientById(nil, clientId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -74,7 +73,7 @@ func HandleAPIClientLogoPost(
 		// Read file data
 		fileData, err := io.ReadAll(file)
 		if err != nil {
-			writeJSONError(w, "Failed to read file", "READ_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -88,7 +87,7 @@ func HandleAPIClientLogoPost(
 		// Check if client already has a logo
 		existingLogo, err := database.GetClientLogoByClientId(nil, clientId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -108,7 +107,7 @@ func HandleAPIClientLogoPost(
 		}
 
 		if err != nil {
-			writeJSONError(w, "Failed to save client logo", "SAVE_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -131,8 +130,7 @@ func HandleAPIClientLogoPost(
 			"pictureUrl": config.GetAuthServer().BaseURL + "/client/logo/" + client.ClientIdentifier,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -158,7 +156,7 @@ func HandleAPIClientLogoDelete(
 		// Get client from database
 		client, err := database.GetClientById(nil, clientId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -170,7 +168,7 @@ func HandleAPIClientLogoDelete(
 		// Delete the logo
 		err = database.DeleteClientLogo(nil, clientId)
 		if err != nil {
-			writeJSONError(w, "Failed to delete client logo", "DELETE_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -192,8 +190,7 @@ func HandleAPIClientLogoDelete(
 			"success": true,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -218,7 +215,7 @@ func HandleAPIClientLogoGet(
 		// Get client from database
 		client, err := database.GetClientById(nil, clientId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -230,7 +227,7 @@ func HandleAPIClientLogoGet(
 		// Check if client has a logo
 		hasLogo, err := database.ClientHasLogo(nil, clientId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -242,7 +239,6 @@ func HandleAPIClientLogoGet(
 			response["logoUrl"] = config.GetAuthServer().BaseURL + "/client/logo/" + client.ClientIdentifier
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

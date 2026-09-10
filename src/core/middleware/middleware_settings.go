@@ -17,8 +17,14 @@ func MiddlewareSettings(database data.Database) func(next http.Handler) http.Han
 			ctx := r.Context()
 			settings, err := database.GetSettingsById(nil, 1)
 			if err != nil {
-				slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, middleware.GetReqID(r.Context())))
-				http.Error(w, fmt.Sprintf("fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", middleware.GetReqID(r.Context())), http.StatusInternalServerError)
+				// Plain text, because this runs before any helper that could render a page:
+				// the settings it is fetching are what the error page's layout reads. The
+				// sentence is unchanged; the log line is decision 9's shape, with the stack
+				// riding inside the error attribute rather than formatted into the message
+				// (#279).
+				requestId := middleware.GetReqID(r.Context())
+				slog.Error("fatal failure in GetSettings() middleware", "error", err, "request_id", requestId)
+				http.Error(w, fmt.Sprintf("fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", requestId), http.StatusInternalServerError)
 				return
 			}
 			ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)

@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/dtos"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 type HandlerPublicSettings struct {
@@ -19,22 +20,24 @@ func NewHandlerPublicSettings(database data.Database) *HandlerPublicSettings {
 }
 
 func (h *HandlerPublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Only allow GET requests
+	// Only allow GET requests. This endpoint answers JSON, so its refusals answer JSON too:
+	// until now a caller that mis-spelled the method, or hit a settings failure, got
+	// text/plain from a route it had every reason to parse (#279 decision 17).
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		apiresponse.WriteError(w, "Method not allowed", "METHOD_NOT_ALLOWED", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Get settings from database
 	settings, err := h.database.GetSettingsById(nil, 1)
 	if err != nil {
-		http.Error(w, "Unable to retrieve settings", http.StatusInternalServerError)
+		apiresponse.WriteInternalServerError(w, r, errs.Wrap(err, "unable to retrieve the settings"))
 		return
 	}
 	// GetSettingsById returns (nil, nil) when the row is absent, so this guard is
 	// what stops an unauthenticated request from panicking the handler.
 	if settings == nil {
-		http.Error(w, "Unable to retrieve settings", http.StatusInternalServerError)
+		apiresponse.WriteInternalServerError(w, r, errs.New("the settings row is absent"))
 		return
 	}
 
@@ -58,10 +61,5 @@ func (h *HandlerPublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Issuer:      settings.Issuer,
 	}
 
-	// Set content type and return JSON
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Unable to encode response", http.StatusInternalServerError)
-		return
-	}
+	apiresponse.WriteJSON(w, r, http.StatusOK, response)
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
@@ -48,7 +49,7 @@ func HandleAPIUserGet(
 		// Get user from database
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -63,11 +64,7 @@ func HandleAPIUserGet(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -109,7 +106,7 @@ func HandleAPIUserPasswordPut(
 		// Get existing user
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -127,7 +124,7 @@ func HandleAPIUserPasswordPut(
 		// Hash password
 		passwordHash, err := hashutil.HashPassword(req.NewPassword)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -142,7 +139,7 @@ func HandleAPIUserPasswordPut(
 			return database.SetUserPasswordHash(tx, user.Id, passwordHash)
 		})
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -164,7 +161,7 @@ func HandleAPIUserPasswordPut(
 		// Get the updated user to return
 		updatedUser, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -174,11 +171,7 @@ func HandleAPIUserPasswordPut(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -219,7 +212,7 @@ func HandleAPIUserOTPPut(
 		// Get existing user
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -238,7 +231,7 @@ func HandleAPIUserOTPPut(
 		// branch (#111 decisions 4 and 13); disableUserOTP carries the reasoning.
 		err = disableUserOTP(database, user)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -250,7 +243,7 @@ func HandleAPIUserOTPPut(
 		// Get the updated user to return
 		updatedUser, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -260,11 +253,7 @@ func HandleAPIUserOTPPut(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -317,7 +306,7 @@ func HandleAPIUserCreatePost(
 		// Check for duplicate email
 		existingUser, err := database.GetUserByEmail(nil, req.Email)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if existingUser != nil {
@@ -362,7 +351,7 @@ func HandleAPIUserCreatePost(
 			// Hash password
 			passwordHash, err = hashutil.HashPassword(req.Password)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 		}
@@ -386,7 +375,7 @@ func HandleAPIUserCreatePost(
 			if strings.Contains(err.Error(), "email") && strings.Contains(strings.ToLower(err.Error()), "already") {
 				writeJSONError(w, "This email address is already registered", "EMAIL_ALREADY_EXISTS", http.StatusConflict)
 			} else {
-				writeJSONError(w, "Failed to create user", "USER_CREATION_FAILED", http.StatusInternalServerError)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to create user"))
 			}
 			return
 		}
@@ -409,7 +398,7 @@ func HandleAPIUserCreatePost(
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
 			verificationCodeEncrypted, err := encryption.EncryptData(verificationCode)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -418,7 +407,7 @@ func HandleAPIUserCreatePost(
 			// proves a submitted code matches, where the hash only locates the row.
 			verificationCodeHash, err := hashutil.HashString(verificationCode)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -429,7 +418,7 @@ func HandleAPIUserCreatePost(
 			createdUser.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
 			err = database.UpdateUser(nil, createdUser)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -450,7 +439,7 @@ func HandleAPIUserCreatePost(
 			emailReq := r.WithContext(i18n.EmailContext(r.Context(), createdUser.Locale))
 			buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 
@@ -461,7 +450,7 @@ func HandleAPIUserCreatePost(
 			}
 			err = emailSender.SendEmail(r.Context(), input)
 			if err != nil {
-				writeJSONError(w, "Failed to send email", "EMAIL_SEND_FAILED", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 		}
@@ -472,12 +461,7 @@ func HandleAPIUserCreatePost(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusCreated, response)
 	}
 }
 
@@ -518,7 +502,7 @@ func HandleAPIUserEnabledPut(
 		// Get existing user
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -585,13 +569,13 @@ func HandleAPIUserEnabledPut(
 			// Enabling. Narrow write, no revocation, no new event. Uses the same
 			// compare-and-set so this direction does not stay on the full-row UpdateUser.
 			if _, err = database.TrySetUserEnabled(nil, userId, false, true); err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 		} else {
 			result, transitioned, err = disableWithRevocation()
 			if err != nil {
-				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				writeInternalServerError(w, r, err)
 				return
 			}
 		}
@@ -612,7 +596,7 @@ func HandleAPIUserEnabledPut(
 		// Get the updated user to return
 		updatedUser, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -622,11 +606,7 @@ func HandleAPIUserEnabledPut(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -654,7 +634,7 @@ func HandleAPIUserDelete(
 		// Check if user exists before deleting
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -666,7 +646,7 @@ func HandleAPIUserDelete(
 		// Delete user from database
 		err = database.DeleteUser(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -689,10 +669,6 @@ func HandleAPIUserDelete(
 		}
 
 		// Set content type and encode response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
@@ -38,8 +38,7 @@ func HandleAPIGroupAttributesGet(
 		// Verify group exists
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group by ID for attributes", "error", err, "groupId", id)
-			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for attributes"), "groupId", id)
 			return
 		}
 		if group == nil {
@@ -50,8 +49,7 @@ func HandleAPIGroupAttributesGet(
 		// Get group attributes
 		attributes, err := database.GetGroupAttributesByGroupId(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group attributes by group ID", "error", err, "groupId", id)
-			writeJSONError(w, "Failed to get group attributes", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group attributes by group ID"), "groupId", id)
 			return
 		}
 
@@ -64,9 +62,7 @@ func HandleAPIGroupAttributesGet(
 			response.Attributes = []api.GroupAttributeResponse{}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -97,8 +93,7 @@ func HandleAPIGroupAttributeGet(
 		// Get group attribute
 		attribute, err := database.GetGroupAttributeById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group attribute by ID", "error", err, "attributeId", id)
-			writeJSONError(w, "Failed to get group attribute", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group attribute by ID"), "attributeId", id)
 			return
 		}
 		if attribute == nil {
@@ -110,9 +105,7 @@ func HandleAPIGroupAttributeGet(
 			Attribute: *api.ToGroupAttributeResponse(attribute),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -166,7 +159,7 @@ func HandleAPIGroupAttributeCreatePost(
 		// Verify group exists
 		group, err := database.GetGroupById(nil, createReq.GroupId)
 		if err != nil {
-			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if group == nil {
@@ -185,8 +178,7 @@ func HandleAPIGroupAttributeCreatePost(
 
 		err = database.CreateGroupAttribute(nil, groupAttribute)
 		if err != nil {
-			slog.Error("AuthServer API: Database error creating group attribute", "error", err, "groupId", groupAttribute.GroupId, "key", groupAttribute.Key)
-			writeJSONError(w, "Failed to create group attribute", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating group attribute"), "groupId", groupAttribute.GroupId, "key", groupAttribute.Key)
 			return
 		}
 
@@ -203,9 +195,7 @@ func HandleAPIGroupAttributeCreatePost(
 			Attribute: *api.ToGroupAttributeResponse(groupAttribute),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusCreated, response)
 	}
 }
 
@@ -239,8 +229,7 @@ func HandleAPIGroupAttributeUpdatePut(
 		// Get existing attribute
 		attribute, err := database.GetGroupAttributeById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group attribute by ID", "error", err, "attributeId", id)
-			writeJSONError(w, "Failed to get group attribute", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group attribute by ID"), "attributeId", id)
 			return
 		}
 		if attribute == nil {
@@ -283,7 +272,7 @@ func HandleAPIGroupAttributeUpdatePut(
 		// Get group for audit log
 		group, err := database.GetGroupById(nil, attribute.GroupId)
 		if err != nil {
-			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -295,8 +284,7 @@ func HandleAPIGroupAttributeUpdatePut(
 
 		err = database.UpdateGroupAttribute(nil, attribute)
 		if err != nil {
-			slog.Error("AuthServer API: Database error updating group attribute", "error", err, "attributeId", attribute.Id, "groupId", attribute.GroupId, "key", attribute.Key)
-			writeJSONError(w, "Failed to update group attribute", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating group attribute"), "attributeId", attribute.Id, "groupId", attribute.GroupId, "key", attribute.Key)
 			return
 		}
 
@@ -313,9 +301,7 @@ func HandleAPIGroupAttributeUpdatePut(
 			Attribute: *api.ToGroupAttributeResponse(attribute),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -348,8 +334,7 @@ func HandleAPIGroupAttributeDelete(
 		// Get existing attribute for audit log
 		attribute, err := database.GetGroupAttributeById(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error getting group attribute by ID", "error", err, "attributeId", id)
-			writeJSONError(w, "Failed to get group attribute", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group attribute by ID"), "attributeId", id)
 			return
 		}
 		if attribute == nil {
@@ -360,15 +345,14 @@ func HandleAPIGroupAttributeDelete(
 		// Get group for audit log
 		group, err := database.GetGroupById(nil, attribute.GroupId)
 		if err != nil {
-			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		// Delete attribute
 		err = database.DeleteGroupAttribute(nil, id)
 		if err != nil {
-			slog.Error("AuthServer API: Database error deleting group attribute", "error", err, "attributeId", id, "groupId", attribute.GroupId, "key", attribute.Key)
-			writeJSONError(w, "Failed to delete group attribute", "INTERNAL_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting group attribute"), "attributeId", id, "groupId", attribute.GroupId, "key", attribute.Key)
 			return
 		}
 
@@ -385,8 +369,6 @@ func HandleAPIGroupAttributeDelete(
 			Success: true,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		httpHelper.EncodeJson(w, r, response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

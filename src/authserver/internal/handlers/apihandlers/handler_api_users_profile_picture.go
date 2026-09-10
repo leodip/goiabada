@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
@@ -38,7 +37,7 @@ func HandleAPIUserProfilePicturePost(
 		// Get user from database
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -74,7 +73,7 @@ func HandleAPIUserProfilePicturePost(
 		// Read file data
 		data, err := io.ReadAll(file)
 		if err != nil {
-			writeJSONError(w, "Failed to read file", "READ_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -88,7 +87,7 @@ func HandleAPIUserProfilePicturePost(
 		// Check if user already has a profile picture
 		existingPicture, err := database.GetUserProfilePictureByUserId(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -108,7 +107,7 @@ func HandleAPIUserProfilePicturePost(
 		}
 
 		if err != nil {
-			writeJSONError(w, "Failed to save profile picture", "SAVE_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -131,8 +130,7 @@ func HandleAPIUserProfilePicturePost(
 			"pictureUrl": config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -158,7 +156,7 @@ func HandleAPIUserProfilePictureDelete(
 		// Get user from database
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -170,7 +168,7 @@ func HandleAPIUserProfilePictureDelete(
 		// Delete the profile picture
 		err = database.DeleteUserProfilePicture(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Failed to delete profile picture", "DELETE_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -192,8 +190,7 @@ func HandleAPIUserProfilePictureDelete(
 			"success": true,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
@@ -218,7 +215,7 @@ func HandleAPIUserProfilePictureGet(
 		// Get user from database
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -230,7 +227,7 @@ func HandleAPIUserProfilePictureGet(
 		// Check if user has profile picture
 		hasPicture, err := database.UserHasProfilePicture(nil, userId)
 		if err != nil {
-			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -242,7 +239,6 @@ func HandleAPIUserProfilePictureGet(
 			response["pictureUrl"] = config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		writeJSON(w, r, http.StatusOK, response)
 	}
 }

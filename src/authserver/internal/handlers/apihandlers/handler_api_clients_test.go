@@ -248,7 +248,6 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 			revokedPayload = args.Get(1).(map[string]interface{})
 		}).Return().Once()
 	auditLogger.On("Log", constants.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
-	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientAuthenticationPut(httpHelper, authHelper, database, auditLogger)
@@ -319,7 +318,6 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 
 	auditLogger.On("Log", constants.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
-	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientAuthenticationPut(httpHelper, authHelper, database, auditLogger)
@@ -403,7 +401,6 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
 	auditLogger.On("Log", constants.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
-	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(httpHelper, authHelper, database, auditLogger)
@@ -447,10 +444,13 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Contains(t, rr.Body.String(), "Failed to update web origins")
+	assert.Contains(t, rr.Body.String(), "INTERNAL_SERVER_ERROR")
 	database.AssertExpectations(t)
 	// The driver's error is reachable through what the body returned, and the failure names the
-	// origin it was writing, which is what the handler's log line carries.
+	// origin it was writing, which is what the handler's one log line carries. Which step failed
+	// stopped being a wire distinction when every 500 here moved onto one code and one sentence
+	// (#279 decision 7); it is still a distinction an operator can act on, so it is asserted
+	// where it now lives.
 	assert.ErrorIs(t, stub.bodyErr, diskFull)
 	var failure *webOriginsWriteFailure
 	require.ErrorAs(t, stub.bodyErr, &failure)
@@ -481,8 +481,11 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Contains(t, rr.Body.String(), "Failed to load client web origins")
+	assert.Contains(t, rr.Body.String(), "INTERNAL_SERVER_ERROR")
+	// The step is still named, on the error rather than on the wire: it is carried out of the
+	// transaction body so nothing is written from an attempt that might be rerun.
 	assert.ErrorIs(t, stub.bodyErr, loadErr)
+	assert.Contains(t, stub.bodyErr.Error(), "Database error loading client web origins before update")
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
 	auditLogger.AssertNotCalled(t, "Log", constants.AuditUpdatedWebOrigins, mock.Anything)
@@ -530,7 +533,6 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
 	auditLogger.On("Log", constants.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
-	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(httpHelper, authHelper, database, auditLogger)
@@ -540,7 +542,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	// One answer. A 500 written by the first attempt would sit in the body ahead of the 200's
 	// JSON, and the recorder would show it.
-	assert.NotContains(t, rr.Body.String(), "INTERNAL_ERROR")
+	assert.NotContains(t, rr.Body.String(), "INTERNAL_SERVER_ERROR")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 	httpHelper.AssertExpectations(t)
@@ -564,8 +566,7 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Contains(t, rr.Body.String(), "Failed to update web origins")
-	assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_ERROR"), "exactly one error response")
+	assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
 	database.AssertExpectations(t)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }

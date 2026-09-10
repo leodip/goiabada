@@ -70,12 +70,14 @@ func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testi
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 
+	// The detail is in the log, not on the wire: every 500 on this surface answers the one
+	// code and the one sentence, and the identifier that is missing goes to the operator as a
+	// structured attribute (#279 decision 7).
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	msg := response["error_description"].(string)
-	assert.Contains(t, msg, "missing from the system resource")
-	assert.Contains(t, msg, constants.ManagePermissionIdentifier)
+	assert.Equal(t, "INTERNAL_SERVER_ERROR", response["error_code"])
+	assert.Contains(t, response["error_description"], "An unexpected server error has occurred")
 
 	database.AssertExpectations(t)
 }
