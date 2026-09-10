@@ -3,7 +3,6 @@ package integrationtests
 import (
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
@@ -37,7 +36,7 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -86,7 +85,7 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -135,7 +134,7 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -187,7 +186,7 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -240,7 +239,7 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,

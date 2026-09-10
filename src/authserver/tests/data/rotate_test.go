@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 // TestRotateEncryptionKeyIfNeeded exercises env-to-env key rotation (issue #83):
@@ -48,22 +48,22 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	const otpEnrolment = "otpauth://totp/Goiabada:u@example.com?secret=JBSWY3DPEHPK3PXP"
 
 	if err := db.CreateKeyPair(nil, &models.KeyPair{
-		State: "current", KeyIdentifier: uuid.NewString(), Type: "RSA", Algorithm: "RS256",
+		State: "current", KeyIdentifier: fake.UUID(), Type: "RSA", Algorithm: "RS256",
 		PrivateKeyPEM: encA(pem), // canary, encrypted under keyA
 	}); err != nil {
 		t.Fatalf("CreateKeyPair: %v", err)
 	}
 	client := &models.Client{
-		ClientIdentifier:      "c-" + uuid.NewString(),
+		ClientIdentifier:      "c-" + fake.UUID(),
 		ClientSecretEncrypted: encA(clientSec),
 	}
 	if err := db.CreateClient(nil, client); err != nil {
 		t.Fatalf("CreateClient: %v", err)
 	}
 	user := &models.User{
-		Subject:                      uuid.New(),
-		Username:                     uuid.NewString(),
-		Email:                        uuid.NewString() + "@example.com",
+		Subject:                      fake.UUID(),
+		Username:                     fake.UUID(),
+		Email:                        fake.UUID() + "@example.com",
 		PasswordHash:                 "x",
 		OtpEnrollmentSecretEncrypted: encA(otpEnrolment),
 	}

@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -62,7 +61,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -175,7 +174,7 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,

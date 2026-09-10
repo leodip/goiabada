@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
@@ -84,7 +83,7 @@ func TestUnique_UserEmail(t *testing.T) {
 
 	duplicate := &models.User{
 		Enabled:  true,
-		Subject:  uuid.New(),
+		Subject:  fake.UUID(),
 		Username: fake.Username(),
 		Email:    existing.Email,
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,7 +87,7 @@ func seedPreMigration000027User(t *testing.T, h *isolatedDB) int64 {
 		falseLit, trueLit = "false", "true"
 	}
 
-	subject := uuid.NewString()
+	subject := fake.UUID()
 	q := fmt.Sprintf(`INSERT INTO users
 		(enabled, subject, username, email_verified, phone_number_verified,
 		 password_hash, otp_enabled)

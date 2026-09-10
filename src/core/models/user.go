@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/encryption"
 )
 
@@ -14,7 +13,7 @@ type User struct {
 	CreatedAt                            sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt                            sql.NullTime `db:"updated_at"`
 	Enabled                              bool         `db:"enabled"`
-	Subject                              uuid.UUID    `db:"subject"`
+	Subject                              string       `db:"subject"`
 	Username                             string       `db:"username"`
 	GivenName                            string       `db:"given_name"`
 	MiddleName                           string       `db:"middle_name"`

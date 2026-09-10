@@ -824,10 +824,11 @@ func TestOpenAPI_EveryRefResolves(t *testing.T) {
 // of the contract a caller has already generated against, and an internal Go name is not.
 //
 // The check covers presence, not type. A named type that marshals to a scalar cannot be typed
-// from the Go source lexically: api.UserResponse.Subject is a uuid.UUID, so a type check would
-// call the spec's correct "string" a mismatch against an "object" it inferred from the
-// selector. Carrying a type map for the handful of such types buys less than the one live
-// case costs to explain, so type agreement stays a question for the census.
+// from the Go source lexically: the declared type is a selector, so a type check would infer
+// "object" and call the spec's correct "string" a mismatch. No field in api/ is such a type
+// today -- the last one, UserResponse.Subject, became a plain string in #278 -- but carrying a
+// type map against the next one buys less than it costs, so type agreement stays a question
+// for the census rather than a check here.
 //
 // A schema that no operation reaches is not this test's subject: TestOpenAPI_EveryRefResolves
 // owns reachability, and this one owns content.

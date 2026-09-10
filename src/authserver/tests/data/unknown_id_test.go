@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,7 +149,7 @@ type byValueReader struct {
 }
 
 func byValueReaders() []byValueReader {
-	randomUUID := func() string { return uuid.New().String() }
+	randomUUID := func() string { return fake.UUID() }
 	randomWord := func() string { return "missing_" + fake.LetterN(16) }
 
 	return []byValueReader{

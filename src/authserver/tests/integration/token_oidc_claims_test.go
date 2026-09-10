@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
@@ -336,7 +335,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 	// below asserts on either value, only that the claim carries what was
 	// stored (#272).
 	user := &models.User{
-		Subject:             uuid.New(),
+		Subject:             fake.UUID(),
 		Enabled:             true,
 		Email:               fake.Email(),
 		EmailVerified:       true,

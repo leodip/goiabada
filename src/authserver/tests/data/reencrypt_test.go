@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 // TestReencryptDataToNewKey verifies the startup re-encryption migration (issue
@@ -60,7 +60,7 @@ func TestReencryptDataToNewKey(t *testing.T) {
 	}
 
 	client := &models.Client{
-		ClientIdentifier:      "reencrypt-client-" + uuid.NewString(),
+		ClientIdentifier:      "reencrypt-client-" + fake.UUID(),
 		ClientSecretEncrypted: encOld(clientSec),
 	}
 	if err := db.CreateClient(nil, client); err != nil {
@@ -68,9 +68,9 @@ func TestReencryptDataToNewKey(t *testing.T) {
 	}
 
 	user := &models.User{
-		Subject:                        uuid.New(),
-		Username:                       uuid.NewString(),
-		Email:                          uuid.NewString() + "@example.com",
+		Subject:                        fake.UUID(),
+		Username:                       fake.UUID(),
+		Email:                          fake.UUID() + "@example.com",
 		PasswordHash:                   "x",
 		OTPSecretEncrypted:             encOld(otpSeed),
 		EmailVerificationCodeEncrypted: encOld(emailCode),
@@ -81,7 +81,7 @@ func TestReencryptDataToNewKey(t *testing.T) {
 	}
 
 	preReg := &models.PreRegistration{
-		Email:                     uuid.NewString() + "@example.com",
+		Email:                     fake.UUID() + "@example.com",
 		PasswordHash:              "x",
 		VerificationCodeEncrypted: encOld(preRegCode),
 	}
@@ -92,7 +92,7 @@ func TestReencryptDataToNewKey(t *testing.T) {
 	// RSA key pair stored as PLAINTEXT PEM (the pre-#83 state).
 	keyPair := &models.KeyPair{
 		State:         "current",
-		KeyIdentifier: uuid.NewString(),
+		KeyIdentifier: fake.UUID(),
 		Type:          "RSA",
 		Algorithm:     "RS256",
 		PrivateKeyPEM: []byte(pemPlain),

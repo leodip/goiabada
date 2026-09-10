@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/rsautil"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/pkg/errors"
 )
 
@@ -226,7 +227,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	passwordHash, _ := hashutil.HashPassword(adminPassword)
 
 	user := &models.User{
-		Subject: uuid.New(),
+		Subject: uuidutil.New(),
 		// Lowercased at the write, exactly as every other path that stores an email does.
 		// Without it GOIABADA_ADMIN_EMAIL reaches the column verbatim, and an operator who
 		// sets Admin@Example.com gets an admin who cannot sign in at all on SQLite or

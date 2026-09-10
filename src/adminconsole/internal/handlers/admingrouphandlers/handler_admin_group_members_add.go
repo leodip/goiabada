@@ -126,7 +126,7 @@ func HandleAdminGroupMembersSearchGet(
 		for _, user := range users {
 			usersResult = append(usersResult, UserResult{
 				Id:           user.Id,
-				Subject:      user.Subject.String(),
+				Subject:      user.Subject,
 				Username:     user.Username,
 				Email:        user.Email,
 				GivenName:    user.GivenName,

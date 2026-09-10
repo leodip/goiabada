@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -241,10 +241,10 @@ func migration000021Fixtures() []migFixture {
 func seedMigrationFixture(t *testing.T, h *isolatedDB, f migFixture) int64 {
 	t.Helper()
 	u := &models.User{
-		Subject: uuid.New(),
+		Subject: fake.UUID(),
 		// username is varchar(32); the fixture label is unique and short.
 		Username:                      f.label,
-		Email:                         uuid.NewString() + "@example.com",
+		Email:                         fake.UUID() + "@example.com",
 		PasswordHash:                  "x",
 		PhoneNumberCountryUniqueId:    f.uid,
 		PhoneNumberCountryCallingCode: f.cc,

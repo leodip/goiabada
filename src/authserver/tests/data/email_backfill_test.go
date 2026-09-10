@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,7 +108,7 @@ func TestBackfillLowercaseEmails(t *testing.T) {
 	for i, c := range cases {
 		user := &models.User{
 			Enabled:  true,
-			Subject:  uuid.New(),
+			Subject:  fake.UUID(),
 			Username: fmt.Sprintf("emailbackfill%d", i),
 			Email:    c.seed,
 		}
@@ -208,9 +208,9 @@ func TestBackfillLowercaseEmails_DisablingALoserRevokesItsAuthState(t *testing.T
 	// The loser is seeded first, so it holds the lower id and the survivor rule has to reach
 	// past id order to pick the lowercase row. Both rows exist on every engine only because
 	// migration 000040 made idx_email case-sensitive.
-	loser := &models.User{Enabled: true, Subject: uuid.New(), Username: "revokeloser", Email: "Revoke@x.com"}
+	loser := &models.User{Enabled: true, Subject: fake.UUID(), Username: "revokeloser", Email: "Revoke@x.com"}
 	require.NoError(t, h.DB.CreateUser(nil, loser), "seed the mixed-case loser")
-	survivor := &models.User{Enabled: true, Subject: uuid.New(), Username: "revokesurvivor", Email: "revoke@x.com"}
+	survivor := &models.User{Enabled: true, Subject: fake.UUID(), Username: "revokesurvivor", Email: "revoke@x.com"}
 	require.NoError(t, h.DB.CreateUser(nil, survivor), "seed the lowercase survivor")
 
 	clientId := seedClient000035(t, h, "revoke-backfill-client")
@@ -317,7 +317,7 @@ func seedSessionForBackfill(t *testing.T, h *isolatedDB, userId int64) *models.U
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	session := &models.UserSession{
-		SessionIdentifier: uuid.NewString(),
+		SessionIdentifier: fake.UUID(),
 		Started:           now,
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
@@ -339,7 +339,7 @@ func seedSessionForBackfill(t *testing.T, h *isolatedDB, userId int64) *models.U
 func seedCodeForBackfill(t *testing.T, h *isolatedDB, clientId, userId int64) *models.Code {
 	t.Helper()
 
-	suffix := uuid.NewString()
+	suffix := fake.UUID()
 	code := &models.Code{
 		ClientId:            clientId,
 		UserId:              userId,
@@ -355,7 +355,7 @@ func seedCodeForBackfill(t *testing.T, h *isolatedDB, clientId, userId int64) *m
 		UserAgent:           "backfill-fixture",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
-		SessionIdentifier:   uuid.NewString(),
+		SessionIdentifier:   fake.UUID(),
 		AcrLevel:            enums.AcrLevel1.String(),
 		AuthMethods:         "pwd",
 	}
@@ -374,7 +374,7 @@ func seedRefreshTokenForBackfill(t *testing.T, h *isolatedDB, clientId, userId, 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	token := &models.RefreshToken{
 		ClientId:         sql.NullInt64{Int64: clientId, Valid: true},
-		RefreshTokenJti:  uuid.NewString(),
+		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Bearer",
 		Scope:            "openid profile offline_access",
 		IssuedAt:         sql.NullTime{Time: now, Valid: true},
@@ -451,9 +451,9 @@ func TestBackfillLowercaseEmails_DisablingALoserIsAudited(t *testing.T) {
 		require.Equalf(t, int64(1), settings.Id,
 			"the pass reads settings id 1, so a fixture whose row landed at %d would prove nothing", settings.Id)
 
-		loser := &models.User{Enabled: true, Subject: uuid.New(), Username: "auditloser", Email: "Audited@x.com"}
+		loser := &models.User{Enabled: true, Subject: fake.UUID(), Username: "auditloser", Email: "Audited@x.com"}
 		require.NoError(t, h.DB.CreateUser(nil, loser), "seed the mixed-case loser")
-		survivor := &models.User{Enabled: true, Subject: uuid.New(), Username: "auditsurvivor", Email: "audited@x.com"}
+		survivor := &models.User{Enabled: true, Subject: fake.UUID(), Username: "auditsurvivor", Email: "audited@x.com"}
 		require.NoError(t, h.DB.CreateUser(nil, survivor), "seed the lowercase survivor")
 
 		clientId := seedClient000035(t, h, "audit-backfill-client")

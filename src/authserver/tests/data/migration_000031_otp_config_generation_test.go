@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -161,7 +161,7 @@ func seedPreMigration000031User(t *testing.T, h *isolatedDB, otpEnabled bool) in
 	// here can do because they seed one user. SQL Server's unique indexes treat two NULLs as
 	// equal, so a second NULL-email row is a duplicate key there and nowhere else, and this
 	// test needs two users: one with an authenticator and one without.
-	subject := uuid.NewString()
+	subject := fake.UUID()
 	q := fmt.Sprintf(`INSERT INTO users
 		(enabled, subject, username, email, email_verified, phone_number_verified,
 		 password_hash, otp_enabled)
@@ -194,7 +194,7 @@ func seedPreMigration000031Session(t *testing.T, h *isolatedDB, userId int64, fl
 	}
 
 	const ts = "'2026-01-01 00:00:00'"
-	identifier := uuid.NewString()
+	identifier := fake.UUID()
 	q := fmt.Sprintf(`INSERT INTO user_sessions
 		(session_identifier, started, last_accessed, auth_methods, acr_level, auth_time,
 		 ip_address, device_name, device_type, device_os, level2_auth_config_has_changed, user_id)

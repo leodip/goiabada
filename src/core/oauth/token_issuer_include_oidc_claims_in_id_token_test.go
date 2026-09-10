@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -33,7 +33,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -92,7 +92,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 
 	// Standard claims
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, sub.String(), claims["sub"])
+	assert.Equal(t, sub, claims["sub"])
 	assert.Equal(t, input.Client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, input.Nonce, claims["nonce"])
 
@@ -139,7 +139,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-456"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -187,7 +187,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 
 	// Standard claims should still be present
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, sub.String(), claims["sub"])
+	assert.Equal(t, sub, claims["sub"])
 	assert.Equal(t, input.Client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, input.Nonce, claims["nonce"])
 
@@ -224,7 +224,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-789"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -266,7 +266,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, sub.String(), claims["sub"])
+	assert.Equal(t, sub, claims["sub"])
 
 	// OIDC profile scope claims should be present
 	assert.Equal(t, input.User.GivenName, claims["given_name"])
@@ -289,7 +289,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-321"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -331,7 +331,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, sub.String(), claims["sub"])
+	assert.Equal(t, sub, claims["sub"])
 
 	// OIDC scope claims should NOT be present
 	assert.NotContains(t, claims, "given_name")
@@ -352,7 +352,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-groups"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -431,7 +431,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Fu
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-full-flow"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -499,7 +499,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Fu
 	// Verify ID token does NOT have OIDC claims
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
-	assert.Equal(t, user.Subject.String(), idClaims["sub"])
+	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
@@ -540,7 +540,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Cl
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-override-flow"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -630,7 +630,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -667,7 +667,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 
 	// Standard claims present
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, sub.String(), claims["sub"])
+	assert.Equal(t, sub, claims["sub"])
 
 	// No OIDC scope claims (because scope doesn't include them)
 	assert.NotContains(t, claims, "email")
@@ -690,7 +690,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -727,7 +727,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 
 	// Standard claims present
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, sub.String(), claims["sub"])
+	assert.Equal(t, sub, claims["sub"])
 
 	// No OIDC scope claims (because scope doesn't include them)
 	assert.NotContains(t, claims, "email")
@@ -748,7 +748,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -791,7 +791,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 
 	// Standard claims
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, sub.String(), claims["sub"])
+	assert.Equal(t, sub, claims["sub"])
 
 	// Email scope claims SHOULD be present
 	assert.Equal(t, input.User.Email, claims["email"])
@@ -824,7 +824,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	userId := int64(999)
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -867,7 +867,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 
 	// Standard claims
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, sub.String(), claims["sub"])
+	assert.Equal(t, sub, claims["sub"])
 
 	// Profile claims should be present
 	assert.Equal(t, input.User.GivenName, claims["given_name"])
@@ -875,7 +875,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 
 	// Picture claim SHOULD be present (user has profile picture)
 	// URL format: {baseURL}/userinfo/picture/{userSubject}
-	expectedPictureURL := fmt.Sprintf("http://localhost:8081/userinfo/picture/%s", sub.String())
+	expectedPictureURL := fmt.Sprintf("http://localhost:8081/userinfo/picture/%s", sub)
 	assert.Equal(t, expectedPictureURL, claims["picture"])
 }
 
@@ -892,7 +892,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -941,7 +941,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 
 	// Standard claims
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, sub.String(), claims["sub"])
+	assert.Equal(t, sub, claims["sub"])
 
 	// Email claims SHOULD be present (non-empty)
 	assert.Equal(t, input.User.Email, claims["email"])

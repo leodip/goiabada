@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
@@ -284,7 +283,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	jti := uuid.New().String()
+	jti := fake.UUID()
 	exp := now.AddDate(-5, 0, 0)
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
@@ -293,7 +292,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	claims["aud"] = settings.Issuer
 	claims["typ"] = "Refresh"
 	claims["exp"] = exp.Unix()
-	claims["sub"] = uuid.New().String()
+	claims["sub"] = fake.UUID()
 
 	keyPair, err := database.GetCurrentSigningKey(nil)
 	if err != nil {
@@ -462,7 +461,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -594,7 +593,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	passwordHashed, err := hashutil.HashPassword(password)
 	assert.NoError(t, err)
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,

@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -221,7 +221,7 @@ func TestValidateProfile_EmptyInputIsValid(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestValidateProfile_UsernameFormat(t *testing.T) {
-	subject := uuid.New()
+	subject := fake.UUID()
 
 	testCases := []struct {
 		name         string
@@ -256,12 +256,12 @@ func TestValidateProfile_UsernameFormat(t *testing.T) {
 			// The format check runs after the uniqueness lookups, so both are
 			// always reached when a username is present.
 			user := &models.User{Id: 1, Subject: subject}
-			mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(user, nil).Once()
+			mockDB.On("GetUserBySubject", mock.Anything, subject).Return(user, nil).Once()
 			mockDB.On("GetUserByUsername", mock.Anything, tc.username).Return(nil, nil).Once()
 
 			err := validator.ValidateProfile(&ValidateProfileInput{
 				Username: tc.username,
-				Subject:  subject.String(),
+				Subject:  subject,
 			})
 
 			if tc.expectedCode == "" {
@@ -277,17 +277,17 @@ func TestValidateProfile_UsernameTakenByAnotherUser(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewProfileValidator(mockDB)
 
-	subject := uuid.New()
-	otherSubject := uuid.New()
+	subject := fake.UUID()
+	otherSubject := fake.UUID()
 
-	mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(
+	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
 		&models.User{Id: 1, Subject: subject}, nil).Once()
 	mockDB.On("GetUserByUsername", mock.Anything, "jdoe").Return(
 		&models.User{Id: 2, Subject: otherSubject}, nil).Once()
 
 	err := validator.ValidateProfile(&ValidateProfileInput{
 		Username: "jdoe",
-		Subject:  subject.String(),
+		Subject:  subject,
 	})
 
 	assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileUsernameTaken)
@@ -298,33 +298,33 @@ func TestValidateProfile_UsernameOwnedBySameUserIsAllowed(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewProfileValidator(mockDB)
 
-	subject := uuid.New()
+	subject := fake.UUID()
 	user := &models.User{Id: 1, Subject: subject}
 
-	mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(user, nil).Once()
+	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(user, nil).Once()
 	mockDB.On("GetUserByUsername", mock.Anything, "jdoe").Return(user, nil).Once()
 
 	err := validator.ValidateProfile(&ValidateProfileInput{
 		Username: "jdoe",
-		Subject:  subject.String(),
+		Subject:  subject,
 	})
 
 	assert.NoError(t, err)
 }
 
 func TestValidateProfile_UsernameLookupErrorsPropagate(t *testing.T) {
-	subject := uuid.New()
+	subject := fake.UUID()
 	dbErr := errors.New("database is down")
 
 	t.Run("GetUserBySubject fails", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewProfileValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(nil, dbErr).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(nil, dbErr).Once()
 
 		err := validator.ValidateProfile(&ValidateProfileInput{
 			Username: "jdoe",
-			Subject:  subject.String(),
+			Subject:  subject,
 		})
 
 		assert.Error(t, err)
@@ -336,13 +336,13 @@ func TestValidateProfile_UsernameLookupErrorsPropagate(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewProfileValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(
+		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
 			&models.User{Id: 1, Subject: subject}, nil).Once()
 		mockDB.On("GetUserByUsername", mock.Anything, "jdoe").Return(nil, dbErr).Once()
 
 		err := validator.ValidateProfile(&ValidateProfileInput{
 			Username: "jdoe",
-			Subject:  subject.String(),
+			Subject:  subject,
 		})
 
 		assert.Error(t, err)
@@ -767,10 +767,10 @@ func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewProfileValidator(mockDB)
 
-	subject := uuid.New()
+	subject := fake.UUID()
 	user := &models.User{Id: 1, Subject: subject}
 
-	mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(user, nil).Once()
+	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(user, nil).Once()
 	mockDB.On("GetUserByUsername", mock.Anything, "jdoe").Return(user, nil).Once()
 
 	err := validator.ValidateProfile(&ValidateProfileInput{
@@ -785,7 +785,7 @@ func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
 		ZoneInfoCountryName: "Brazil",
 		ZoneInfo:            "America/Sao_Paulo",
 		Locale:              "pt-BR",
-		Subject:             subject.String(),
+		Subject:             subject,
 	})
 
 	assert.NoError(t, err)

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -13,7 +12,7 @@ type UserResponse struct {
 	CreatedAt                     *time.Time              `json:"createdAt"`
 	UpdatedAt                     *time.Time              `json:"updatedAt"`
 	Enabled                       bool                    `json:"enabled"`
-	Subject                       uuid.UUID               `json:"subject"`
+	Subject                       string                  `json:"subject"`
 	Username                      string                  `json:"username"`
 	GivenName                     string                  `json:"givenName"`
 	MiddleName                    string                  `json:"middleName"`

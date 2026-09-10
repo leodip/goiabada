@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
@@ -387,7 +386,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 
 	// Setup: Create test user and add to group
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@updatemembercount.test",
 		GivenName:     "Test",

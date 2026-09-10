@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +23,7 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 
 	// Create an extra client and a couple of sessions linked to it for richer output
 	testClient := &models.Client{
-		ClientIdentifier:         "acct-sess-client-" + uuid.New().String()[:8],
+		ClientIdentifier:         "acct-sess-client-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Account Sessions Client",
 		Enabled:                  true,
@@ -36,8 +36,8 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
 
-	s1 := createTestUserSession(t, user.Id, uuid.New().String())
-	s2 := createTestUserSession(t, user.Id, uuid.New().String())
+	s1 := createTestUserSession(t, user.Id, fake.UUID())
+	s2 := createTestUserSession(t, user.Id, fake.UUID())
 	defer func() {
 		_ = database.DeleteUserSession(nil, s1.Id)
 		_ = database.DeleteUserSession(nil, s2.Id)
@@ -81,7 +81,7 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
 	valid := &models.UserSession{
-		SessionIdentifier: uuid.New().String(),
+		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-30 * time.Minute),
 		LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		AuthMethods:       "pwd",
@@ -98,7 +98,7 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 	defer func() { _ = database.DeleteUserSession(nil, valid.Id) }()
 
 	expired := &models.UserSession{
-		SessionIdentifier: uuid.New().String(),
+		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-25 * time.Hour),
 		LastAccessed:      time.Now().UTC().Add(-24 * time.Hour),
 		AuthMethods:       "pwd",
@@ -133,7 +133,7 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 func TestAPIAccountSessionDelete_Success(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
-	session := createTestUserSession(t, user.Id, uuid.New().String())
+	session := createTestUserSession(t, user.Id, fake.UUID())
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
@@ -157,12 +157,12 @@ func TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
 	// Create another user and a session for them
-	other := &models.User{Subject: uuid.New(), Enabled: true, Email: "other-" + uuid.New().String()[:8] + "@acctsess.test"}
+	other := &models.User{Subject: fake.UUID(), Enabled: true, Email: "other-" + fake.UUID()[:8] + "@acctsess.test"}
 	err := database.CreateUser(nil, other)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteUser(nil, other.Id) }()
 
-	otherSession := createTestUserSession(t, other.Id, uuid.New().String())
+	otherSession := createTestUserSession(t, other.Id, fake.UUID())
 	defer func() { _ = database.DeleteUserSession(nil, otherSession.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(otherSession.Id, 10)

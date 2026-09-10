@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -44,7 +43,7 @@ func TestUpdateUser(t *testing.T) {
 
 	// Update all fields
 	user.Enabled = !user.Enabled
-	user.Subject = uuid.New()
+	user.Subject = fake.UUID()
 	user.Username = "updated_" + fake.Username()
 	user.GivenName = "Updated" + fake.FirstName()
 	user.MiddleName = "Updated" + fake.MiddleName()
@@ -138,14 +137,14 @@ func TestGetUserByUsername(t *testing.T) {
 func TestGetUserBySubject(t *testing.T) {
 	user := createTestUser(t)
 
-	retrievedUser, err := database.GetUserBySubject(nil, user.Subject.String())
+	retrievedUser, err := database.GetUserBySubject(nil, user.Subject)
 	if err != nil {
 		t.Fatalf("Failed to get user by subject: %v", err)
 	}
 
 	compareUsers(t, user, retrievedUser)
 
-	nonExistentUser, err := database.GetUserBySubject(nil, uuid.New().String())
+	nonExistentUser, err := database.GetUserBySubject(nil, fake.UUID())
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user, got: %v", err)
 	}
@@ -315,7 +314,7 @@ func createSearchUser(t *testing.T, givenName string, username string) *models.U
 	t.Helper()
 	user := &models.User{
 		Enabled:   true,
-		Subject:   uuid.New(),
+		Subject:   fake.UUID(),
 		Username:  username,
 		GivenName: givenName,
 		Email:     fake.LetterN(12) + "@example.com",
@@ -440,7 +439,7 @@ func createTestUser(t *testing.T) *models.User {
 func createTestUserOn(t *testing.T, db data.Database) *models.User {
 	user := &models.User{
 		Enabled:                              fake.Bool(),
-		Subject:                              uuid.New(),
+		Subject:                              fake.UUID(),
 		Username:                             fake.Username(),
 		GivenName:                            fake.FirstName(),
 		MiddleName:                           fake.MiddleName(),
@@ -608,7 +607,7 @@ func TestUpdateUser_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	// Re-created rather than updated: writing it is exactly what UpdateUser must
 	// not do, so the nonzero value has to arrive through an insert.
 	user.Id = 0
-	user.Subject = uuid.New()
+	user.Subject = fake.UUID()
 	user.Username = "gen_" + fake.LetterN(8)
 	user.Email = fake.LetterN(8) + "@example.com"
 	if err := database.CreateUser(nil, user); err != nil {
@@ -1280,7 +1279,7 @@ func codeHashOf(t *testing.T, code string) string {
 func createUserWithResetCode(t *testing.T) (*models.User, string) {
 	t.Helper()
 	user := createTestUser(t)
-	hash := codeHashOf(t, uuid.NewString())
+	hash := codeHashOf(t, fake.UUID())
 	user.ForgotPasswordCodeEncrypted = []byte("PENDINGRESETCODE")
 	user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 	user.ForgotPasswordCodeHash = hash
@@ -1318,7 +1317,7 @@ func TestGetUserByForgotPasswordCodeHash(t *testing.T) {
 	// 2. A hash no row carries is a miss, not an error. The handler renders the same
 	// indistinguishable page for a miss as for a wrong code, so a spurious error here
 	// would surface as a 500 and tell an attacker the difference.
-	missing, err := database.GetUserByForgotPasswordCodeHash(nil, codeHashOf(t, uuid.NewString()))
+	missing, err := database.GetUserByForgotPasswordCodeHash(nil, codeHashOf(t, fake.UUID()))
 	if err != nil {
 		t.Errorf("a hash no row carries must not be an error, got: %v", err)
 	}
@@ -1423,7 +1422,7 @@ func TestSetUserPasswordHash_ClearsCodeHash(t *testing.T) {
 // snapshot, so it would block. transaction_test.go documents both. The outside read here
 // happens only after the transaction is finished, which needs no second connection.
 func TestGetUserByForgotPasswordCodeHash_Transaction(t *testing.T) {
-	hash := codeHashOf(t, uuid.NewString())
+	hash := codeHashOf(t, fake.UUID())
 
 	// The user is created BEFORE the transaction opens. sqlite runs with
 	// SetMaxOpenConns(1), so a pooled write while a transaction holds that one connection
@@ -1533,7 +1532,7 @@ func TestTryConsumeForgotPasswordCode(t *testing.T) {
 
 	// 18. A real hash the row does not carry changes nothing either.
 	other, otherHash := createUserWithResetCode(t)
-	wrong, err := database.TryConsumeForgotPasswordCode(nil, other.Id, codeHashOf(t, uuid.NewString()), "wrongpassword")
+	wrong, err := database.TryConsumeForgotPasswordCode(nil, other.Id, codeHashOf(t, fake.UUID()), "wrongpassword")
 	if err != nil {
 		t.Fatalf("a claim with a non-matching hash errored: %v", err)
 	}
@@ -1791,7 +1790,7 @@ func TestGetUserByEmailIsCaseSensitive(t *testing.T) {
 // commondb.engineFoldedTheMatch.
 func TestGetUserBySubjectIsCaseSensitive(t *testing.T) {
 	user := createTestUser(t)
-	subject := user.Subject.String()
+	subject := user.Subject
 
 	for _, tc := range []struct {
 		name   string
@@ -1828,7 +1827,7 @@ func createUserWithEmail(t *testing.T, email string) *models.User {
 
 	user := &models.User{
 		Enabled:      true,
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Username:     "case_" + fake.LetterN(10),
 		Email:        email,
 		PasswordHash: fake.Password(60),

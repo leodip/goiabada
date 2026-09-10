@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/otp"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -464,7 +464,7 @@ func seedExtraSessionForOTPTest(t *testing.T, userId int64) *models.UserSession 
 
 	now := time.Now().UTC()
 	session := &models.UserSession{
-		SessionIdentifier:   uuid.New().String(),
+		SessionIdentifier:   fake.UUID(),
 		Started:             now,
 		LastAccessed:        now,
 		AuthMethods:         "pwd otp",

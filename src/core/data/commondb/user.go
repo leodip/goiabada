@@ -339,11 +339,11 @@ func (d *CommonDatabase) GetUserBySubject(tx *sql.Tx, subject string) (*models.U
 	// The engine may have folded a value this lookup did not ask for; see
 	// engineFoldedTheMatch. OpenID Connect Core section 2 makes sub case sensitive.
 	//
-	// Subject.String() is the stored spelling rather than a normalisation of it: the column
-	// is only ever written from a uuid.UUID, whose Value() is String(), so every row holds
-	// the canonical lowercase hyphenated form. Comparing the parsed value would otherwise
-	// be exactly the re-normalisation this guard must not do.
-	if user != nil && engineFoldedTheMatch(user.Subject.String(), subject) {
+	// user.Subject is the stored spelling rather than a normalisation of it: the column is
+	// only ever written from uuidutil.New, which emits the canonical lowercase hyphenated
+	// form, so every row holds that form already. Parsing and re-emitting the value here
+	// would be exactly the re-normalisation this guard must not do (#278).
+	if user != nil && engineFoldedTheMatch(user.Subject, subject) {
 		return nil, nil
 	}
 

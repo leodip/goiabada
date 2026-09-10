@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/handlerhelpers"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/require"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
@@ -1671,7 +1671,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	client := &models.Client{Id: 1, ClientIdentifier: "test_client"}
-	user := &models.User{Id: 42, Subject: uuid.New(), AuthStateGeneration: 7}
+	user := &models.User{Id: 42, Subject: fake.UUID(), AuthStateGeneration: 7}
 
 	tokenValidator.On("ValidateTokenRequest", mock.Anything,
 		mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
@@ -1770,7 +1770,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Return()
 		} else {
 			client := &models.Client{Id: 1, ClientIdentifier: "app"}
-			user := &models.User{Id: 42, Subject: uuid.New()}
+			user := &models.User{Id: 42, Subject: fake.UUID()}
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything).
 				Return(&validators.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
 			tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything).

@@ -159,7 +159,7 @@ func HandleIssueGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			if user == nil || user.Subject.String() != authContext.IdTokenHintSub {
+			if user == nil || user.Subject != authContext.IdTokenHintSub {
 				// Cannot issue tokens for a different user than the hint identifies.
 				//
 				// An error redirect carries the client it is answering, so its provenance has to

@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/leodip/goiabada/core/data/mysqldb"
 	"github.com/leodip/goiabada/core/data/postgresdb"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,12 +69,12 @@ func rawSQLHandle(t *testing.T) *sql.DB {
 // timestamps so nothing here depends on the wall clock: every case below states its own
 // times and the engine compares against the value it was handed.
 func newBrowserSession(owner string, now time.Time, ttl time.Duration) *models.BrowserSession {
-	id := uuid.New().String() + uuid.New().String()
+	id := fake.UUID() + fake.UUID()
 	return &models.BrowserSession{
 		Owner:         owner,
 		SessionId:     id,
 		SessionIdHash: sha256Hex(id),
-		Data:          "ciphertext-" + uuid.New().String(),
+		Data:          "ciphertext-" + fake.UUID(),
 		LastAccessed:  now,
 		ExpiresAt:     now.Add(ttl),
 	}
@@ -161,7 +161,7 @@ func TestBrowserSession_ColumnHoldsTheHashAndNeverTheIdentifier(t *testing.T) {
 func TestBrowserSession_TwoOwnersMayHoldTheSameHash(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 
-	shared := uuid.New().String() + uuid.New().String()
+	shared := fake.UUID() + fake.UUID()
 	hash := sha256Hex(shared)
 
 	authServer := &models.BrowserSession{

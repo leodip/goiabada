@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/useragent"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -109,9 +109,11 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 
 	// The identifier must be a fresh UUID, since it is what the browser cookie
 	// carries and what every later lookup keys on.
-	parsed, parseErr := uuid.Parse(result.SessionIdentifier)
+	parsed, parseErr := uuidutil.Parse(result.SessionIdentifier)
 	assert.NoError(t, parseErr, "the session identifier must be a valid UUID")
-	assert.NotEqual(t, uuid.Nil, parsed)
+	// uuidutil.Parse accepts the nil UUID, so "non-empty" would pass against a hard-coded
+	// one. Compare against the nil spelling itself.
+	assert.NotEqual(t, "00000000-0000-0000-0000-000000000000", parsed)
 
 	// Started, LastAccessed and AuthTime are all stamped with the same UTC now.
 	for name, value := range map[string]time.Time{

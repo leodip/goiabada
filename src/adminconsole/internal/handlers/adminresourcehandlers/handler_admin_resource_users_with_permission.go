@@ -476,7 +476,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 		for _, u := range annotatedUsers {
 			usersResult = append(usersResult, UserResult{
 				Id:            u.Id,
-				Subject:       u.Subject.String(),
+				Subject:       u.Subject,
 				Username:      u.Username,
 				Email:         u.Email,
 				GivenName:     u.GivenName,

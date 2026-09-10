@@ -12,11 +12,11 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -132,12 +132,12 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
-		sub := uuid.New()
+		sub := fake.UUID()
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"sub":   sub.String(),
+				"sub":   sub,
 				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
 			},
 		}
@@ -146,7 +146,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		user := &models.User{Id: 1, Subject: sub, Enabled: false}
-		database.On("GetUserBySubject", (*sql.Tx)(nil), sub.String()).Return(user, nil)
+		database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
 
 		auditLogger.On("Log", constants.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == user.Id
@@ -171,11 +171,11 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
-		sub := uuid.New()
+		sub := fake.UUID()
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"sub":   sub.String(),
+				"sub":   sub,
 				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier + " profile email address phone groups attributes",
 			},
 		}
@@ -223,7 +223,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			Attributes:          []models.UserAttribute{userAttr},
 		}
 
-		database.On("GetUserBySubject", (*sql.Tx)(nil), sub.String()).Return(user, nil)
+		database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
 		database.On("UserLoadGroups", (*sql.Tx)(nil), user).Return(nil)
 		database.On("GroupsLoadAttributes", (*sql.Tx)(nil), user.Groups).Return(nil)
 		database.On("UserLoadAttributes", (*sql.Tx)(nil), user).Return(nil)

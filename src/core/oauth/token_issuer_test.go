@@ -14,9 +14,10 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/encryption"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -64,7 +65,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -156,7 +157,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
-	assert.Equal(t, user.Subject.String(), idClaims["sub"])
+	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
@@ -174,7 +175,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	authTime := time.Unix(int64(authTimeUnix), 0)
 	assert.Equal(t, now.Add(-300*time.Second).Unix(), authTime.Unix(), fmt.Sprintf("auth_time should be 300 seconds ago: %s", authTime))
 
-	_, err = uuid.Parse(idClaims["jti"].(string))
+	_, err = uuidutil.Parse(idClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.GetFullName(), idClaims["name"])
@@ -217,7 +218,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
-	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
+	assert.Equal(t, user.Subject, accessClaims["sub"])
 	assert.Equal(t, "authserver", accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
@@ -236,7 +237,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -60*time.Second, "updated_at should be 60 seconds ago")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
-	_, err = uuid.Parse(accessClaims["jti"].(string))
+	_, err = uuidutil.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.GetFullName(), accessClaims["name"])
@@ -279,7 +280,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	// validate Refresh token --------------------------------------------
 
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
-	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
+	assert.Equal(t, user.Subject, refreshClaims["sub"])
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["aud"])
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["iss"])
 	assert.Equal(t, "Offline", refreshClaims["typ"])
@@ -290,7 +291,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 7200*time.Second, "offline_access_max_lifetime should be 7200 seconds from now")
 
-	_, err = uuid.Parse(refreshClaims["jti"].(string))
+	_, err = uuidutil.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -314,7 +315,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -376,7 +377,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", idClaims["iss"])
-	assert.Equal(t, user.Subject.String(), idClaims["sub"])
+	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
@@ -388,14 +389,14 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0, "iat should be now")
 	assertTimeClaimWithinRange(t, idClaims, "nbf", 0, "nbf should be now")
 
-	_, err = uuid.Parse(idClaims["jti"].(string))
+	_, err = uuidutil.Parse(idClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	// validate Access token --------------------------------------------
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", accessClaims["iss"])
-	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
+	assert.Equal(t, user.Subject, accessClaims["sub"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
@@ -408,13 +409,13 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0, "iat should be now")
 	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0, "nbf should be now")
 
-	_, err = uuid.Parse(accessClaims["jti"].(string))
+	_, err = uuidutil.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	// validate Refresh token --------------------------------------------
 
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
-	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
+	assert.Equal(t, user.Subject, refreshClaims["sub"])
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["aud"])
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
 	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
@@ -424,7 +425,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0, "iat should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0, "nbf should be now")
 
-	_, err = uuid.Parse(refreshClaims["jti"].(string))
+	_, err = uuidutil.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -447,7 +448,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -528,7 +529,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
-	assert.Equal(t, user.Subject.String(), idClaims["sub"])
+	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
@@ -541,7 +542,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assertTimeClaimWithinRange(t, idClaims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
 	assertTimeClaimWithinRange(t, idClaims, "updated_at", -24*time.Hour, "updated_at should be 24 hours ago")
 
-	_, err = uuid.Parse(idClaims["jti"].(string))
+	_, err = uuidutil.Parse(idClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.Email, idClaims["email"])
@@ -559,7 +560,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
-	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
+	assert.Equal(t, user.Subject, accessClaims["sub"])
 	assert.Equal(t, []interface{}{"authserver", "resource1", "resource2"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
@@ -573,7 +574,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
 	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -24*time.Hour, "updated_at should be 24 hours ago")
 
-	_, err = uuid.Parse(accessClaims["jti"].(string))
+	_, err = uuidutil.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.Email, accessClaims["email"])
@@ -591,7 +592,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	// validate Refresh token --------------------------------------------
 
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
-	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
+	assert.Equal(t, user.Subject, refreshClaims["sub"])
 	assert.Equal(t, settings.Issuer, refreshClaims["aud"])
 	assert.Equal(t, settings.Issuer, refreshClaims["iss"])
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
@@ -602,7 +603,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 
-	_, err = uuid.Parse(refreshClaims["jti"].(string))
+	_, err = uuidutil.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -625,7 +626,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -683,7 +684,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
-	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
+	assert.Equal(t, user.Subject, accessClaims["sub"])
 	assert.Equal(t, []interface{}{"resource1", "resource2"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
@@ -701,7 +702,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -30*time.Second, "auth_time should be 30 seconds ago")
 
-	_, err = uuid.Parse(accessClaims["jti"].(string))
+	_, err = uuidutil.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, "resource1:read resource2:write offline_access", accessClaims["scope"])
@@ -709,7 +710,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	assert.NotContains(t, accessClaims, "name")
 
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
-	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
+	assert.Equal(t, user.Subject, refreshClaims["sub"])
 	assert.Equal(t, settings.Issuer, refreshClaims["aud"])
 	assert.Equal(t, settings.Issuer, refreshClaims["iss"])
 	assert.Equal(t, "Offline", refreshClaims["typ"])
@@ -720,7 +721,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 3000*time.Second, "exp should be 3000 seconds from now")
 	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 6000*time.Second, "offline_access_max_lifetime should be 6000 seconds from now")
 
-	_, err = uuid.Parse(refreshClaims["jti"].(string))
+	_, err = uuidutil.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -743,7 +744,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -803,7 +804,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
-	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
+	assert.Equal(t, user.Subject, accessClaims["sub"])
 	assert.Equal(t, "resource1", accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
@@ -816,7 +817,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -30*time.Second, "auth_time should be 30 seconds ago")
 
-	_, err = uuid.Parse(accessClaims["jti"].(string))
+	_, err = uuidutil.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, "resource1:read", accessClaims["scope"])
@@ -824,7 +825,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	assert.NotContains(t, accessClaims, "name")
 
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
-	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
+	assert.Equal(t, user.Subject, refreshClaims["sub"])
 	assert.Equal(t, settings.Issuer, refreshClaims["aud"])
 	assert.Equal(t, settings.Issuer, refreshClaims["iss"])
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
@@ -834,7 +835,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 
-	_, err = uuid.Parse(refreshClaims["jti"].(string))
+	_, err = uuidutil.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -851,7 +852,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -901,7 +902,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	claims := verifyAndDecodeToken(t, accessToken, publicKeyBytes)
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, constants.AuthServerResourceIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
@@ -914,7 +915,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 900*time.Second, "exp should be 900 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.GetFullName(), claims["name"])
@@ -940,7 +941,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-456"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -980,7 +981,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	claims := verifyAndDecodeToken(t, accessToken, publicKeyBytes)
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, []interface{}{"resource1", "resource2"}, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
@@ -993,7 +994,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, "resource1:read resource2:write", claims["scope"])
@@ -1015,7 +1016,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-789"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1075,7 +1076,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	claims := verifyAndDecodeToken(t, accessToken, publicKeyBytes)
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, constants.AuthServerResourceIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
@@ -1088,7 +1089,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -900*time.Second, "auth_time should be 900 seconds ago")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.GetFullName(), claims["name"])
@@ -1127,7 +1128,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-invalid"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1174,7 +1175,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1245,7 +1246,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
@@ -1257,7 +1258,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.GetFullName(), claims["name"])
@@ -1305,7 +1306,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-456"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1344,7 +1345,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
@@ -1356,7 +1357,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 300*time.Second, "exp should be 300 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.NotContains(t, claims, "name")
@@ -1378,7 +1379,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-789"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1426,7 +1427,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
@@ -1438,7 +1439,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, "exp should be 1200 seconds from now (client override)")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -120*time.Second, "auth_time should be 120 seconds ago")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.GetFullName(), claims["name"])
@@ -1463,7 +1464,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1507,7 +1508,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, settings.Issuer, claims["aud"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, "Offline", claims["typ"])
 	assert.Equal(t, code.Scope, claims["scope"])
 
@@ -1516,7 +1517,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -1533,7 +1534,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-456"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1581,7 +1582,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, settings.Issuer, claims["aud"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, "Refresh", claims["typ"])
 	assert.Equal(t, code.Scope, claims["scope"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
@@ -1590,7 +1591,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 1800*time.Second, "exp should be 1800 seconds from now")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -1607,7 +1608,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-789"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1656,7 +1657,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, settings.Issuer, claims["aud"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, "Offline", claims["typ"])
 	assert.Equal(t, code.Scope, claims["scope"])
 
@@ -1665,7 +1666,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 24*time.Hour, "offline_access_max_lifetime should match existing refresh token")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -1687,7 +1688,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	}
 
 	initialTime := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-max-lifetime"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1748,7 +1749,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, settings.Issuer, claims["aud"])
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, "Offline", claims["typ"])
 	assert.Equal(t, code.Scope, claims["scope"])
 
@@ -1757,7 +1758,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", time.Duration(expectedRemainingTime)*time.Second, "exp should be close to the remaining time in the max lifetime")
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", time.Duration(expectedRemainingTime)*time.Second, "offline_access_max_lifetime is not correct")
 
-	_, err = uuid.Parse(claims["jti"].(string))
+	_, err = uuidutil.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -1994,7 +1995,7 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 			assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 			assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
 
-			_, err = uuid.Parse(claims["jti"].(string))
+			_, err = uuidutil.Parse(claims["jti"].(string))
 			assert.NoError(t, err)
 
 			mockDB.AssertExpectations(t)
@@ -2055,7 +2056,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -2104,7 +2105,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 			"iat":    now.Add(-1 * time.Hour).Unix(),
 			"iss":    "https://test-issuer.com",
 			"aud":    "https://test-issuer.com",
-			"sub":    sub.String(),
+			"sub":    sub,
 			"typ":    "Refresh",
 			"sid":    sessionIdentifier,
 			"client": client.ClientIdentifier,
@@ -2160,7 +2161,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
-	assert.Equal(t, user.Subject.String(), idClaims["sub"])
+	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
@@ -2175,7 +2176,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.Equal(t, user.GetFullName(), idClaims["name"])
 	assert.Equal(t, user.Username, idClaims["preferred_username"])
 	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), idClaims["profile"])
-	_, err = uuid.Parse(idClaims["jti"].(string))
+	_, err = uuidutil.Parse(idClaims["jti"].(string))
 	assert.NoError(t, err)
 	assertTimeClaimWithinRange(t, idClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
 
@@ -2183,7 +2184,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
-	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
+	assert.Equal(t, user.Subject, accessClaims["sub"])
 	assert.ElementsMatch(t, []string{constants.AuthServerResourceIdentifier, "resource1"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
@@ -2196,7 +2197,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.Equal(t, user.Username, accessClaims["preferred_username"])
 	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), accessClaims["profile"])
 	assert.Equal(t, "openid profile resource1:read authserver:userinfo", accessClaims["scope"])
-	_, err = uuid.Parse(accessClaims["jti"].(string))
+	_, err = uuidutil.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
 	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
 
@@ -2209,12 +2210,12 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
 
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
-	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
+	assert.Equal(t, user.Subject, refreshClaims["sub"])
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["aud"])
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["iss"])
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
 	assert.Equal(t, "openid profile resource1:read", refreshClaims["scope"])
-	_, err = uuid.Parse(refreshClaims["jti"].(string))
+	_, err = uuidutil.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err)
 	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
 
@@ -2258,7 +2259,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	now := time.Now().UTC()
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-offline"
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -2317,7 +2318,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 			"iat":    now.Add(-1 * time.Hour).Unix(),
 			"iss":    "https://test-issuer.com",
 			"aud":    "https://test-issuer.com",
-			"sub":    sub.String(),
+			"sub":    sub,
 			"typ":    "Offline",
 			"client": client.ClientIdentifier,
 		},
@@ -2364,7 +2365,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
-	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
+	assert.Equal(t, user.Subject, accessClaims["sub"])
 	assert.Equal(t, "resource1", accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
@@ -2384,14 +2385,14 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
-	_, err = uuid.Parse(accessClaims["jti"].(string))
+	_, err = uuidutil.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err, "Access token jti should be a valid UUID")
 
 	// validate Refresh token --------------------------------------------
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
 
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
-	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
+	assert.Equal(t, user.Subject, refreshClaims["sub"])
 	assert.Equal(t, settings.Issuer, refreshClaims["aud"])
 	assert.Equal(t, settings.Issuer, refreshClaims["iss"])
 	assert.Equal(t, "Offline", refreshClaims["typ"])
@@ -2400,7 +2401,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
 	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
-	_, err = uuid.Parse(refreshClaims["jti"].(string))
+	_, err = uuidutil.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err, "Refresh token jti should be a valid UUID")
 
 	// validate Refresh token passed to CreateRefreshToken --------------------------------------------
@@ -2720,7 +2721,7 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-implicit"
 	authenticatedAt := time.Now().UTC().Add(-5 * time.Minute)
 
@@ -2776,7 +2777,7 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 	// Decode and verify access token claims
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
-	assert.Equal(t, sub.String(), accessClaims["sub"])
+	assert.Equal(t, sub, accessClaims["sub"])
 	assert.Equal(t, input.AcrLevel, accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(input.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
@@ -2798,7 +2799,7 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-idtoken"
 	authenticatedAt := time.Now().UTC().Add(-5 * time.Minute)
 
@@ -2855,7 +2856,7 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 	// Decode and verify id_token claims
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
-	assert.Equal(t, sub.String(), idClaims["sub"])
+	assert.Equal(t, sub, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, input.AcrLevel, idClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(input.AuthMethods), idClaims["amr"])
@@ -2887,7 +2888,7 @@ func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-both"
 	authenticatedAt := time.Now().UTC().Add(-5 * time.Minute)
 
@@ -2943,12 +2944,12 @@ func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 	// Decode and verify access token
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
-	assert.Equal(t, sub.String(), accessClaims["sub"])
+	assert.Equal(t, sub, accessClaims["sub"])
 
 	// Decode and verify id_token
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
-	assert.Equal(t, sub.String(), idClaims["sub"])
+	assert.Equal(t, sub, idClaims["sub"])
 	assert.Equal(t, "nonce-for-both", idClaims["nonce"])
 
 	// Verify at_hash IS present (since access token was also issued)
@@ -2976,7 +2977,7 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	privateKeyBytes := getTestPrivateKey(t)
 
 	client := &models.Client{
@@ -3032,7 +3033,7 @@ func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T)
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
@@ -3093,7 +3094,7 @@ func TestGenerateTokenResponseForImplicit_WithGroupsAndAttributes(t *testing.T) 
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
@@ -3256,7 +3257,7 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "test-client",
@@ -3312,7 +3313,7 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	// Verify access token claims
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", accessClaims["iss"])
-	assert.Equal(t, sub.String(), accessClaims["sub"])
+	assert.Equal(t, sub, accessClaims["sub"])
 	assert.Equal(t, "urn:goiabada:pwd", accessClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, accessClaims["amr"])
 	// ROPC is sessionless, on BOTH tokens. This replaced an assert.Nil on the same claim:
@@ -3324,7 +3325,7 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	// Verify id_token claims
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", idClaims["iss"])
-	assert.Equal(t, sub.String(), idClaims["sub"])
+	assert.Equal(t, sub, idClaims["sub"])
 	assert.Equal(t, "urn:goiabada:pwd", idClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, idClaims["amr"])
 	// The ID token is where the browser session used to leak, so this is the assertion that
@@ -3355,7 +3356,7 @@ func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "test-client",
@@ -3436,7 +3437,7 @@ func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
@@ -3516,7 +3517,7 @@ func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
@@ -3590,7 +3591,7 @@ func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
@@ -3673,7 +3674,7 @@ func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
@@ -3757,7 +3758,7 @@ func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
@@ -3821,7 +3822,7 @@ func TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey(t *testing.T) 
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
@@ -3872,7 +3873,7 @@ func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testin
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
@@ -3940,7 +3941,7 @@ func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:                       1,
 		ClientIdentifier:         "test-client",
@@ -4010,7 +4011,7 @@ func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	client := &models.Client{
 		Id:                       1,
 		ClientIdentifier:         "test-client",
@@ -4167,7 +4168,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
 	client := &models.Client{
@@ -4372,7 +4373,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	sub := uuid.New()
+	sub := fake.UUID()
 	sessionIdentifier := "test-session-amr-absent"
 
 	client := &models.Client{
@@ -4570,7 +4571,7 @@ func TestCreateTokenInputFromCode(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	code := &models.Code{
 		Scope:             "openid profile email",
@@ -4607,7 +4608,7 @@ func TestCreateTokenInputFromImplicit(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	implicitInput := &ImplicitGrantInput{
 		Client: &models.Client{
@@ -4643,7 +4644,7 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	ropcInput := &ROPCGrantInput{
 		Client: &models.Client{
@@ -4688,7 +4689,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	t.Run("Invalid scope format - no colon", func(t *testing.T) {
 		input := &TokenGenerationInput{
@@ -4749,7 +4750,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	input := &TokenGenerationInput{
 		User: &models.User{
@@ -4791,7 +4792,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	t.Run("With nonce and sid", func(t *testing.T) {
 		input := &TokenGenerationInput{
@@ -4861,7 +4862,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	t.Run("With access token - at_hash included", func(t *testing.T) {
 		input := &TokenGenerationInput{
@@ -4931,7 +4932,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	user := &models.User{
 		Subject:   userSubject,
@@ -4994,7 +4995,7 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	user := &models.User{
 		Id:        1,
@@ -5062,7 +5063,7 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 
 	// Verify access token claims
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
-	assert.Equal(t, userSubject.String(), accessClaims["sub"])
+	assert.Equal(t, userSubject, accessClaims["sub"])
 	assert.Equal(t, "urn:goiabada:pwd", accessClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, accessClaims["amr"])
 	// From the parent (7), not the reloaded user (9).
@@ -5072,7 +5073,7 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 
 	// Verify id token claims
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
-	assert.Equal(t, userSubject.String(), idClaims["sub"])
+	assert.Equal(t, userSubject, idClaims["sub"])
 	assert.Equal(t, "ropc-client", idClaims["aud"])
 	assert.NotContains(t, idClaims, "sid", "a ROPC ID token must never carry a session identifier")
 
@@ -5106,7 +5107,7 @@ func TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	user := &models.User{
 		Id:        1,
@@ -5173,7 +5174,7 @@ func TestTokenGenerationInput_AllFieldsCopied(t *testing.T) {
 
 	now := time.Now().UTC()
 	authTime := now.Add(-10 * time.Minute)
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	// Test with Code - ensure all fields transferred
 	code := &models.Code{
@@ -5223,7 +5224,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	t.Run("Uses client override when set", func(t *testing.T) {
 		input := &TokenGenerationInput{
@@ -5285,7 +5286,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
-	userSubject := uuid.New()
+	userSubject := fake.UUID()
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -360,7 +360,7 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 func seedClient000039(t *testing.T, h *isolatedDB) *models.Client {
 	t.Helper()
 	client := &models.Client{
-		ClientIdentifier:         "c-" + uuid.NewString()[:8],
+		ClientIdentifier:         "c-" + fake.UUID()[:8],
 		Description:              "seeded by migration 000039's test",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -373,10 +373,10 @@ func seedClient000039(t *testing.T, h *isolatedDB) *models.Client {
 func seedUser000039(t *testing.T, h *isolatedDB) *models.User {
 	t.Helper()
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
-		Email:        uuid.NewString() + "@example.com",
-		Username:     "u-" + uuid.NewString()[:8],
+		Email:        fake.UUID() + "@example.com",
+		Username:     "u-" + fake.UUID()[:8],
 		PasswordHash: "x",
 	}
 	require.NoError(t, h.DB.CreateUser(nil, user), "seed user")
@@ -391,7 +391,7 @@ func seedCode000039(t *testing.T, h *isolatedDB, client *models.Client, user *mo
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	code := &models.Code{
-		CodeHash:            "hash-" + uuid.NewString(),
+		CodeHash:            "hash-" + fake.UUID(),
 		ClientId:            client.Id,
 		UserId:              user.Id,
 		CodeChallenge:       challenge,
@@ -422,7 +422,7 @@ func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape models.RefreshTok
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	token := shape
-	token.RefreshTokenJti = "jti-" + uuid.NewString()
+	token.RefreshTokenJti = "jti-" + fake.UUID()
 	token.PreviousRefreshTokenJti = "previous-jti-value"
 	token.FirstRefreshTokenJti = "first-jti-value"
 	token.SessionIdentifier = "session-identifier-value"
@@ -447,7 +447,7 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *models.C
 	t.Helper()
 
 	code := &models.Code{
-		CodeHash:            "hash-" + uuid.NewString(),
+		CodeHash:            "hash-" + fake.UUID(),
 		ClientId:            client.Id,
 		UserId:              user.Id,
 		CodeChallenge:       sql.NullString{},
@@ -456,7 +456,7 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *models.C
 		RedirectURI:         "https://example.com/cb",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
-		SessionIdentifier:   uuid.NewString(),
+		SessionIdentifier:   fake.UUID(),
 		AcrLevel:            "urn:goiabada:level1",
 		AuthMethods:         "pwd",
 	}

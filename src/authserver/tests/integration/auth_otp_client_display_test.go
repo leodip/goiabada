@@ -3,7 +3,6 @@ package integrationtests
 import (
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
@@ -45,7 +44,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
@@ -107,7 +106,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
@@ -170,7 +169,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:            uuid.New(),
+		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
@@ -222,7 +221,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -275,7 +274,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -329,7 +328,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,

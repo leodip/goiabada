@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +33,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 
 	// Setup: Create test users and add to group
 	testUser1 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "member1@group.test",
 		GivenName:     "Member",
@@ -47,7 +47,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	}()
 
 	testUser2 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "member2@group.test",
 		GivenName:     "Member",
@@ -160,7 +160,7 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 
 	for i := 1; i <= 3; i++ {
 		user := &models.User{
-			Subject:    uuid.New(),
+			Subject:    fake.UUID(),
 			Enabled:    true,
 			Email:      "paguser" + strconv.Itoa(i) + "@group.test",
 			GivenName:  "Page",
@@ -259,7 +259,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "newmember@group.test",
 		GivenName:  "New",
@@ -317,7 +317,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 
 	// Setup: Create test user and add to group
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "duplicate@group.test",
 		GivenName:  "Duplicate",
@@ -440,7 +440,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 
 	// Setup: Create test user and add to group
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "removeme@group.test",
 		GivenName:  "Remove",
@@ -494,7 +494,7 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 
 	// Setup: Create test user (not in group)
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "notingroup@group.test",
 		GivenName:  "Not",

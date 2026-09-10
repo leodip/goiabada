@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -136,7 +136,7 @@ func assertKeyPairsStateIndex000030(t *testing.T, h *isolatedDB, phase string) {
 func insertKeyPair000030SQL(state string) string {
 	return fmt.Sprintf(
 		`INSERT INTO key_pairs (state, key_identifier, type, algorithm)
-		 VALUES ('%s', '%s', 'RSA', 'RS256')`, state, uuid.NewString())
+		 VALUES ('%s', '%s', 'RSA', 'RS256')`, state, fake.UUID())
 }
 
 // seedKeyPair000030 inserts one key_pairs row in state and returns its id. Callers

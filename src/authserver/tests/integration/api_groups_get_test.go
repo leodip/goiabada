@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -302,7 +302,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 
 	// Setup: Create test users
 	testUser1 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser1@membercount.test",
 		GivenName:     "Test",
@@ -316,7 +316,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	}()
 
 	testUser2 := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser2@membercount.test",
 		GivenName:     "Test",

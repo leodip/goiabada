@@ -61,7 +61,7 @@ func HandleAPIUserEmailPut(
 		input := &validators.ValidateEmailInput{
 			Email:             strings.ToLower(strings.TrimSpace(req.Email)),
 			EmailConfirmation: strings.ToLower(strings.TrimSpace(req.Email)),
-			Subject:           user.Subject.String(),
+			Subject:           user.Subject,
 		}
 
 		err = emailValidator.ValidateEmailUpdate(input)

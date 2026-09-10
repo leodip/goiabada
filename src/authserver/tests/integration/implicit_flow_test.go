@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -95,7 +94,7 @@ func createTestUserForImplicit(t *testing.T) (*models.User, string) {
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
+		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
@@ -268,7 +267,7 @@ func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	assert.NoError(t, err)
 	assert.Contains(t, string(payload), requestNonce, "id_token should contain the nonce")
-	assert.Contains(t, string(payload), user.Subject.String(), "id_token should contain user subject")
+	assert.Contains(t, string(payload), user.Subject, "id_token should contain user subject")
 }
 
 // TestImplicitFlow_IdTokenTokenResponseType tests implicit flow with response_type=id_token token
@@ -708,7 +707,7 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 	assert.True(t, ok)
 
 	// Verify claims
-	assert.Equal(t, user.Subject.String(), claims["sub"])
+	assert.Equal(t, user.Subject, claims["sub"])
 	// Note: aud in access token is the resource server ("authserver"), not the client
 	assert.NotEmpty(t, claims["aud"])
 	assert.NotEmpty(t, claims["iat"])

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +22,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@sessions.test",
 		GivenName:     "Test",
@@ -37,7 +37,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 
 	// Setup: Create test client (inline createTestClientForSessions)
 	testClient := &models.Client{
-		ClientIdentifier:         "test-client-sessions-" + uuid.New().String()[:8],
+		ClientIdentifier:         "test-client-sessions-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Test Client for Sessions",
 		Enabled:                  true,
@@ -53,8 +53,8 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	}()
 
 	// Setup: Create test sessions
-	session1 := createTestUserSession(t, testUser.Id, uuid.New().String())
-	session2 := createTestUserSession(t, testUser.Id, uuid.New().String())
+	session1 := createTestUserSession(t, testUser.Id, fake.UUID())
+	session2 := createTestUserSession(t, testUser.Id, fake.UUID())
 	defer func() {
 		_ = database.DeleteUserSession(nil, session1.Id)
 		_ = database.DeleteUserSession(nil, session2.Id)
@@ -120,7 +120,7 @@ func TestAPIUserSessionsGet_EmptySessions(t *testing.T) {
 
 	// Setup: Create test user without sessions
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@empty-sessions.test",
 		GivenName:     "Test",
@@ -191,7 +191,7 @@ func TestAPIUserSessionsGet_InvalidId(t *testing.T) {
 func TestAPIUserSessionsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@unauth-sessions.test",
 		GivenName:  "Test",
@@ -223,7 +223,7 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@no-clients.test",
 		GivenName:     "Test",
@@ -237,7 +237,7 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 	}()
 
 	// Setup: Create test session without client relationship
-	session := createTestUserSession(t, testUser.Id, uuid.New().String())
+	session := createTestUserSession(t, testUser.Id, fake.UUID())
 	defer func() {
 		_ = database.DeleteUserSession(nil, session.Id)
 	}()
@@ -267,7 +267,7 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@session-delete.test",
 		GivenName:     "Test",
@@ -281,7 +281,7 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 	}()
 
 	// Setup: Create test session
-	session := createTestUserSession(t, testUser.Id, uuid.New().String())
+	session := createTestUserSession(t, testUser.Id, fake.UUID())
 
 	// Test: Delete user session
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
@@ -398,7 +398,7 @@ func TestAPIUserSessionDelete_InvalidId(t *testing.T) {
 func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test user and session
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@session-delete-unauth.test",
 		GivenName:  "Test",
@@ -410,7 +410,7 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 		_ = database.DeleteUser(nil, testUser.Id)
 	}()
 
-	session := createTestUserSession(t, testUser.Id, uuid.New().String())
+	session := createTestUserSession(t, testUser.Id, fake.UUID())
 	defer func() {
 		_ = database.DeleteUserSession(nil, session.Id)
 	}()
@@ -437,7 +437,7 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 	// Setup: Create test user and session
 	testUser := &models.User{
-		Subject:    uuid.New(),
+		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      "testuser@session-delete-invalid-token.test",
 		GivenName:  "Test",
@@ -449,7 +449,7 @@ func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 		_ = database.DeleteUser(nil, testUser.Id)
 	}()
 
-	session := createTestUserSession(t, testUser.Id, uuid.New().String())
+	session := createTestUserSession(t, testUser.Id, fake.UUID())
 	defer func() {
 		_ = database.DeleteUserSession(nil, session.Id)
 	}()
@@ -475,7 +475,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Setup: Create test user
 	testUser := &models.User{
-		Subject:       uuid.New(),
+		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "testuser@valid-sessions.test",
 		GivenName:     "Test",
@@ -490,7 +490,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Setup: Create a valid session (recently accessed)
 	validSession := &models.UserSession{
-		SessionIdentifier: uuid.New().String(),
+		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-time.Minute * 30), // Started 30 minutes ago
 		LastAccessed:      time.Now().UTC().Add(-time.Minute * 5),  // Last accessed 5 minutes ago
 		AuthMethods:       "pwd",
@@ -510,7 +510,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Setup: Create an expired session (very old last access)
 	expiredSession := &models.UserSession{
-		SessionIdentifier: uuid.New().String(),
+		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-time.Hour * 25), // Started 25 hours ago
 		LastAccessed:      time.Now().UTC().Add(-time.Hour * 24), // Last accessed 24 hours ago (expired)
 		AuthMethods:       "pwd",
