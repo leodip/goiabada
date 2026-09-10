@@ -263,9 +263,10 @@ func TestServerSideStore_CSPRNGFailureFailsTheSave(t *testing.T) {
 
 			err = store.Save(req, w, session)
 
-			// The alternative, which stringutil.GenerateSecurityRandomString takes, is to
-			// return the empty string. Every session would then share one identifier, or
-			// every seal one nonce.
+			// What must never happen is a session saved with an identifier or a nonce that
+			// did not come from the CSPRNG. This store refuses it with an error, because a
+			// save has one to return; stringutil.GenerateSecurityRandomString has no error
+			// return and refuses it by ending the process instead (#211, #278).
 			require.Error(t, err)
 			assert.Empty(t, w.Result().Cookies(), "no cookie may be issued without an identifier")
 			assert.Equal(t, 0, backend.creates)
