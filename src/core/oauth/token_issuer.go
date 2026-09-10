@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oidc"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/pkg/errors"
 
 	"slices"
@@ -222,7 +222,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 
 	claims := make(jwt.MapClaims)
 
-	jti := uuid.New().String()
+	jti := uuidutil.New()
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
@@ -406,7 +406,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	claims["sub"] = client.ClientIdentifier
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
-	claims["jti"] = uuid.New().String()
+	claims["jti"] = uuidutil.New()
 
 	audCollection := []string{}
 	for _, scope := range scopes {
@@ -701,7 +701,7 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
-	claims["jti"] = uuid.New().String()
+	claims["jti"] = uuidutil.New()
 	claims["acr"] = input.AcrLevel
 	// Omit amr rather than signing an empty array. OIDC Core 1.0 section 2 makes amr OPTIONAL, so
 	// absent says nothing about how the user authenticated, where "amr": [] positively asserts that
@@ -843,7 +843,7 @@ func (t *TokenIssuer) generateIdTokenCore(settings *models.Settings, input *Toke
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
-	claims["jti"] = uuid.New().String()
+	claims["jti"] = uuidutil.New()
 	claims["acr"] = input.AcrLevel
 	// Omitted when no method was recorded, for the reason given in generateAccessTokenCore (#240).
 	if len(input.AuthMethods) > 0 {
@@ -1278,7 +1278,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, inp
 
 	claims := make(jwt.MapClaims)
 
-	jti := uuid.New().String()
+	jti := uuidutil.New()
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()

@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"encoding/pem"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/rsautil"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/pkg/errors"
 )
 
@@ -161,7 +161,7 @@ func (r *SigningKeyRotator) generateNextKey() (*models.KeyPair, error) {
 	}
 	publicKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: publicKeyASN1DER})
 
-	kid := uuid.New().String()
+	kid := uuidutil.New()
 	publicKeyJWK, err := rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to marshal JWK")

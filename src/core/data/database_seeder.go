@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
@@ -394,7 +393,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		},
 	)
 
-	kid := uuid.New().String()
+	kid := uuidutil.New()
 	publicKeyJWK, err := rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
 	if err != nil {
 		return err
@@ -439,7 +438,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		},
 	)
 
-	kid = uuid.New().String()
+	kid = uuidutil.New()
 	publicKeyJWK, err = rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
 	if err != nil {
 		return err
