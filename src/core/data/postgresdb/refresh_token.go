@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
@@ -29,7 +29,7 @@ func (d *PostgresDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.R
 	if err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert refreshToken")
+		return errs.Wrap(err, "unable to insert refreshToken")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -38,7 +38,7 @@ func (d *PostgresDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.R
 		if err != nil {
 			refreshToken.CreatedAt = originalCreatedAt
 			refreshToken.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan refreshToken id")
+			return errs.Wrap(err, "unable to scan refreshToken id")
 		}
 	}
 
@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.R
 	if err := rows.Err(); err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert refreshToken")
+		return errs.Wrap(err, "unable to insert refreshToken")
 	}
 
 	return nil

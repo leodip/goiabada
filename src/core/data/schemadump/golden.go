@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // The golden file is the checked record of what one engine's migration chain builds, and the
@@ -107,16 +109,16 @@ func maskedDefaultName(c ColumnShape) string {
 func Encode(g Golden) ([]byte, error) {
 	d, schema := g.Dialect, g.Schema
 	if !d.valid() {
-		return nil, fmt.Errorf("schemadump: unrecognised database dialect %q", d)
+		return nil, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 	if len(schema) == 0 {
-		return nil, fmt.Errorf("schemadump: refusing to encode an empty schema for %s, which no migrated database can have", d)
+		return nil, errs.Errorf("schemadump: refusing to encode an empty schema for %s, which no migrated database can have", d)
 	}
 	// A migration version of zero is an unmigrated database, and a negative one is a bug in
 	// whatever read it. Neither is a record of a catalog anybody chose, and both would encode
 	// into a file the version rule then reads as an honest claim.
 	if g.Migrated <= 0 {
-		return nil, fmt.Errorf("schemadump: refusing to encode the %s dump at migration version %d, which is not a migrated database", d, g.Migrated)
+		return nil, errs.Errorf("schemadump: refusing to encode the %s dump at migration version %d, which is not a migrated database", d, g.Migrated)
 	}
 
 	var b bytes.Buffer
@@ -134,7 +136,7 @@ func Encode(g Golden) ([]byte, error) {
 
 	for _, entry := range tables {
 		if len(entry.Table.Columns) == 0 {
-			return nil, fmt.Errorf("schemadump: refusing to encode table %q with no columns on %s", entry.Name, d)
+			return nil, errs.Errorf("schemadump: refusing to encode table %q with no columns on %s", entry.Name, d)
 		}
 
 		b.WriteString("\n")
@@ -157,7 +159,7 @@ func Encode(g Golden) ([]byte, error) {
 		sort.Slice(indexes, func(i, j int) bool { return lessIndex(indexes[i], indexes[j]) })
 		for _, ix := range indexes {
 			if len(ix.Columns) == 0 {
-				return nil, fmt.Errorf("schemadump: refusing to encode index %q on %q with no key columns on %s", ix.Name, entry.Name, d)
+				return nil, errs.Errorf("schemadump: refusing to encode index %q on %q with no key columns on %s", ix.Name, entry.Name, d)
 			}
 			writeRecord(&b, "index", entry.Name, maskedIndexName(ix),
 				field("columns", strings.Join(ix.Columns, ",")),
@@ -256,11 +258,11 @@ func Parse(b []byte) (Golden, error) {
 		text := scanner.Text()
 		if strings.HasPrefix(text, "# goiabada schema dump") {
 			if haveHdr {
-				return Golden{}, fmt.Errorf("schemadump: golden file line %d: a second header", line)
+				return Golden{}, errs.Errorf("schemadump: golden file line %d: a second header", line)
 			}
 			d, migrated, err := parseHeader(text)
 			if err != nil {
-				return Golden{}, fmt.Errorf("schemadump: golden file line %d: %w", line, err)
+				return Golden{}, errs.Errorf("schemadump: golden file line %d: %w", line, err)
 			}
 			g.Dialect, g.Migrated, haveHdr = d, migrated, true
 			continue
@@ -269,24 +271,24 @@ func Parse(b []byte) (Golden, error) {
 			continue
 		}
 		if !haveHdr {
-			return Golden{}, fmt.Errorf("schemadump: golden file line %d: a record before the header", line)
+			return Golden{}, errs.Errorf("schemadump: golden file line %d: a record before the header", line)
 		}
 		if err := parseRecord(text, &schema, byName); err != nil {
-			return Golden{}, fmt.Errorf("schemadump: golden file line %d: %w", line, err)
+			return Golden{}, errs.Errorf("schemadump: golden file line %d: %w", line, err)
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return Golden{}, fmt.Errorf("schemadump: reading the golden file: %w", err)
+		return Golden{}, errs.Errorf("schemadump: reading the golden file: %w", err)
 	}
 	if !haveHdr {
-		return Golden{}, fmt.Errorf("schemadump: the golden file carries no header")
+		return Golden{}, errs.Errorf("schemadump: the golden file carries no header")
 	}
 	if len(schema) == 0 {
-		return Golden{}, fmt.Errorf("schemadump: the %s golden file records no tables at all", g.Dialect)
+		return Golden{}, errs.Errorf("schemadump: the %s golden file records no tables at all", g.Dialect)
 	}
 	for _, e := range schema {
 		if len(e.Table.Columns) == 0 {
-			return Golden{}, fmt.Errorf("schemadump: the %s golden file records table %q with no columns", g.Dialect, e.Name)
+			return Golden{}, errs.Errorf("schemadump: the %s golden file records table %q with no columns", g.Dialect, e.Name)
 		}
 	}
 	g.Schema = schema
@@ -312,18 +314,18 @@ func parseHeader(text string) (Dialect, int, error) {
 		}
 	}
 	if version != strconv.Itoa(goldenVersion) {
-		return "", 0, fmt.Errorf("golden file format version %q, but this build writes and reads version %d", version, goldenVersion)
+		return "", 0, errs.Errorf("golden file format version %q, but this build writes and reads version %d", version, goldenVersion)
 	}
 	d := Dialect(engine)
 	if !d.valid() {
-		return "", 0, fmt.Errorf("golden file names engine %q, which is none of the four dialects", engine)
+		return "", 0, errs.Errorf("golden file names engine %q, which is none of the four dialects", engine)
 	}
 	if migrated == "" {
-		return "", 0, fmt.Errorf("golden file header carries no migrated= field, which version %d requires", goldenVersion)
+		return "", 0, errs.Errorf("golden file header carries no migrated= field, which version %d requires", goldenVersion)
 	}
 	n, err := strconv.Atoi(migrated)
 	if err != nil || n <= 0 {
-		return "", 0, fmt.Errorf("golden file header records migrated=%q, which is not a positive migration version", migrated)
+		return "", 0, errs.Errorf("golden file header records migrated=%q, which is not a positive migration version", migrated)
 	}
 	return d, n, nil
 }
@@ -336,25 +338,25 @@ func parseRecord(text string, schema *Schema, byName map[string]int) error {
 	kind := parts[0]
 	want := positionalCount(kind)
 	if len(parts) < 1+want {
-		return fmt.Errorf("a %s record with %d fields, which is too few", kind, len(parts)-1)
+		return errs.Errorf("a %s record with %d fields, which is too few", kind, len(parts)-1)
 	}
 
 	names := make([]string, want)
 	for i := 0; i < want; i++ {
 		n, err := strconv.Unquote(parts[1+i])
 		if err != nil {
-			return fmt.Errorf("a %s record whose name %q is not a quoted string", kind, parts[1+i])
+			return errs.Errorf("a %s record whose name %q is not a quoted string", kind, parts[1+i])
 		}
 		names[i] = n
 	}
 	fields, err := parseFields(parts[1+want:])
 	if err != nil {
-		return fmt.Errorf("a %s record: %w", kind, err)
+		return errs.Errorf("a %s record: %w", kind, err)
 	}
 
 	if kind == "table" {
 		if _, seen := byName[names[0]]; seen {
-			return fmt.Errorf("table %q declared twice", names[0])
+			return errs.Errorf("table %q declared twice", names[0])
 		}
 		byName[names[0]] = len(*schema)
 		*schema = append(*schema, TableEntry{Name: names[0]})
@@ -363,7 +365,7 @@ func parseRecord(text string, schema *Schema, byName map[string]int) error {
 
 	pos, seen := byName[names[0]]
 	if !seen {
-		return fmt.Errorf("a %s record for table %q, which no table line introduced", kind, names[0])
+		return errs.Errorf("a %s record for table %q, which no table line introduced", kind, names[0])
 	}
 	shape := &(*schema)[pos].Table
 
@@ -400,12 +402,12 @@ func parseRecord(text string, schema *Schema, byName map[string]int) error {
 			return err
 		}
 		if columns == "" {
-			return fmt.Errorf("index %q on %q records no key columns", names[1], names[0])
+			return errs.Errorf("index %q on %q records no key columns", names[1], names[0])
 		}
 		switch IndexOrigin(origin) {
 		case OriginCreated, OriginUnique, OriginPrimaryKey:
 		default:
-			return fmt.Errorf("index %q on %q records origin %q, which is none of c, u or pk", names[1], names[0], origin)
+			return errs.Errorf("index %q on %q records origin %q, which is none of c, u or pk", names[1], names[0], origin)
 		}
 		shape.Indexes = append(shape.Indexes, IndexShape{
 			Name: names[1], Exists: true, Unique: unique,
@@ -422,7 +424,7 @@ func parseRecord(text string, schema *Schema, byName map[string]int) error {
 			Column: names[1], RefTable: refTable, RefColumn: refColumn, OnDelete: onDelete,
 		})
 	default:
-		return fmt.Errorf("record kind %q, which is none of table, column, index or foreign_key", kind)
+		return errs.Errorf("record kind %q, which is none of table, column, index or foreign_key", kind)
 	}
 	return nil
 }
@@ -437,10 +439,10 @@ func parseFields(parts []string) (recordFields, error) {
 	for _, p := range parts {
 		key, value, ok := strings.Cut(p, "=")
 		if !ok {
-			return nil, fmt.Errorf("field %q carries no =", p)
+			return nil, errs.Errorf("field %q carries no =", p)
 		}
 		if _, dup := fields[key]; dup {
-			return nil, fmt.Errorf("field %q given twice", key)
+			return nil, errs.Errorf("field %q given twice", key)
 		}
 		fields[key] = value
 	}
@@ -450,11 +452,11 @@ func parseFields(parts []string) (recordFields, error) {
 func (f recordFields) text(key string) (string, error) {
 	raw, ok := f[key]
 	if !ok {
-		return "", fmt.Errorf("no %s field", key)
+		return "", errs.Errorf("no %s field", key)
 	}
 	v, err := strconv.Unquote(raw)
 	if err != nil {
-		return "", fmt.Errorf("the %s field %q is not a quoted string", key, raw)
+		return "", errs.Errorf("the %s field %q is not a quoted string", key, raw)
 	}
 	return v, nil
 }
@@ -462,7 +464,7 @@ func (f recordFields) text(key string) (string, error) {
 func (f recordFields) boolean(key string) (bool, error) {
 	raw, ok := f[key]
 	if !ok {
-		return false, fmt.Errorf("no %s field", key)
+		return false, errs.Errorf("no %s field", key)
 	}
 	// Only the two spellings Encode writes. ParseBool would also take "1", "T" and "TRUE",
 	// which nothing produces here and which would let a hand-edited file read as canonical.
@@ -472,7 +474,7 @@ func (f recordFields) boolean(key string) (bool, error) {
 	case "false":
 		return false, nil
 	}
-	return false, fmt.Errorf("the %s field is %q rather than true or false", key, raw)
+	return false, errs.Errorf("the %s field is %q rather than true or false", key, raw)
 }
 
 func firstError(errs ...error) error {
@@ -497,7 +499,7 @@ func firstError(errs ...error) error {
 // that one takes a *testing.T and fails a test, and this one has to answer a command.
 func GoldenPath(d Dialect) (string, error) {
 	if !d.valid() {
-		return "", fmt.Errorf("schemadump: unrecognised database dialect %q", d)
+		return "", errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 	root, err := SourceRoot()
 	if err != nil {
@@ -516,7 +518,7 @@ var sourceRootModules = []string{"core", "authserver", "adminconsole", filepath.
 func SourceRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("schemadump: getting the working directory: %w", err)
+		return "", errs.Errorf("schemadump: getting the working directory: %w", err)
 	}
 	for {
 		if holdsEveryModule(dir) {
@@ -524,7 +526,7 @@ func SourceRoot() (string, error) {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return "", fmt.Errorf("schemadump: no directory above the working directory holds all of %s",
+			return "", errs.Errorf("schemadump: no directory above the working directory holds all of %s",
 				strings.Join(sourceRootModules, ", "))
 		}
 		dir = parent

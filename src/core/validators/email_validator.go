@@ -4,8 +4,8 @@ import (
 	"regexp"
 
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/pkg/errors"
 )
 
 type EmailValidator struct {
@@ -79,7 +79,7 @@ func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error 
 	// a user: it means the request carried a stale or forged subject. Surface it
 	// as an error rather than dereferencing nil below.
 	if user == nil {
-		return errors.WithStack(errors.New("subject not found: " + input.Subject))
+		return errs.New("subject not found: " + input.Subject)
 	}
 
 	userByEmail, err := val.database.GetUserByEmail(nil, input.Email)
@@ -122,7 +122,7 @@ func (val *EmailValidator) ValidateEmailChange(email string, subject string) err
 	// skipping the uniqueness check and letting one account claim an address that
 	// belongs to another.
 	if user == nil {
-		return errors.WithStack(errors.New("subject not found: " + subject))
+		return errs.New("subject not found: " + subject)
 	}
 
 	userByEmail, err := val.database.GetUserByEmail(nil, email)

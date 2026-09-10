@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // JWKSTokenParser validates tokens using the auth server JWKS endpoint.
@@ -92,7 +92,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateTokenString(token string, _ *rsa.Pub
 		if pub := tp.getPublicKeyFromCache(kid); pub != nil {
 			return pub, nil
 		}
-		return nil, errors.New("public key not found for token kid")
+		return nil, errs.New("public key not found for token kid")
 	}
 
 	if _, err := jwt.ParseWithClaims(token, claims, keyFunc, opts...); err != nil {
@@ -136,7 +136,7 @@ func (tp *JWKSTokenParser) refreshJwks() error {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		slog.Error("failed to fetch JWKS", "status", resp.StatusCode)
-		return errors.New("failed to fetch JWKS")
+		return errs.New("failed to fetch JWKS")
 	}
 	var jwks Jwks
 	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
@@ -150,7 +150,7 @@ func (tp *JWKSTokenParser) refreshJwks() error {
 
 func jwkToRSAPublicKey(j Jwk) (*rsa.PublicKey, error) {
 	if j.Kty != "RSA" {
-		return nil, errors.New("unsupported JWK kty")
+		return nil, errs.New("unsupported JWK kty")
 	}
 	nBytes, err := base64.RawURLEncoding.DecodeString(j.N)
 	if err != nil {

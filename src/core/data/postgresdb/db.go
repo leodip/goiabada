@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"log/slog"
@@ -15,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/leodip/goiabada/core/data/migrator"
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 //go:embed migrations/*.sql
@@ -58,7 +59,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 	// Open with database/sql for commondb compatibility
 	db, err := sql.Open("pgx", dbURL)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open database")
+		return nil, errs.Wrap(err, "unable to open database")
 	}
 
 	if dbConfig.Create {
@@ -76,7 +77,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 			dbConfig.Host,
 			dbConfig.Port))
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to connect to default database")
+			return nil, errs.Wrap(err, "unable to connect to default database")
 		}
 		defer func() { _ = defaultDB.Close() }()
 
@@ -99,7 +100,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		// the question.
 		if err := db.Ping(); err != nil {
 			_ = db.Close()
-			return nil, errors.Wrap(err, "unable to connect to database")
+			return nil, errs.Wrap(err, "unable to connect to database")
 		}
 	}
 
@@ -160,7 +161,7 @@ func databaseExists(ctx context.Context, q rowQuerier, name string) (bool, error
 	var found int
 	if err := q.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM pg_database WHERE datname = $1", name).Scan(&found); err != nil {
-		return false, errors.Wrap(err, "unable to check whether the database exists")
+		return false, errs.Wrap(err, "unable to check whether the database exists")
 	}
 	return found > 0, nil
 }
@@ -209,13 +210,13 @@ func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 
 	conn, err := maintenanceDB.Conn(ctx)
 	if err != nil {
-		return errors.Wrap(err, "unable to pin a connection for the database creation lock")
+		return errs.Wrap(err, "unable to pin a connection for the database creation lock")
 	}
 	defer func() { _ = conn.Close() }()
 
 	key := AdvisoryLockKey(name)
 	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", key); err != nil {
-		return errors.Wrap(err, "unable to take the database creation lock")
+		return errs.Wrap(err, "unable to take the database creation lock")
 	}
 	defer func() {
 		_, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", key)
@@ -234,7 +235,7 @@ func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 	// createdb by hand inside the window, and it costs one condition.
 	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %s;", QuoteIdentifier(name))); err != nil &&
 		!strings.Contains(err.Error(), "already exists") {
-		return errors.Wrap(err, "unable to create database")
+		return errs.Wrap(err, "unable to create database")
 	}
 	return nil
 }
@@ -310,7 +311,7 @@ const schemaMigrationsTableDDL = "CREATE TABLE IF NOT EXISTS schema_migrations "
 // there yet.
 func (d *PostgresDatabase) ensureSchemaMigrationsTable() error {
 	if _, err := d.DB.Exec(schemaMigrationsTableDDL); err != nil {
-		return errors.Wrap(err, "unable to create the schema_migrations table")
+		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
 	return nil
 }
@@ -328,7 +329,7 @@ func (d *PostgresDatabase) NewMigrator() (*migrator.Migrator, error) {
 
 	m, err := migrator.New(d.DB, postgresMigrationsFs, "migrations", migrator.Postgres(d.dbConfig.Name))
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create migration instance")
+		return nil, errs.Wrap(err, "unable to create migration instance")
 	}
 	return m, nil
 }
@@ -350,7 +351,7 @@ func (d *PostgresDatabase) Migrate() error {
 	if err != nil {
 		// StartupRefusal explains the one failure a starting server can be talked out of: a
 		// database a newer release already migrated. Everything else passes through.
-		return errors.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
+		return errs.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
 	}
 
 	return nil

@@ -6,7 +6,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/core/encryption"
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // aesProtectedColumns lists the (table, column) pairs holding AES-GCM ciphertext
@@ -31,7 +31,7 @@ var aesProtectedColumns = []struct{ table, column string }{
 // cleanly (fail-closed). See issue #83.
 func (d *CommonDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
 	if len(oldKey) != 32 || len(newKey) != 32 {
-		return errors.WithStack(errors.New("re-encryption requires 32-byte old and new keys"))
+		return errs.New("re-encryption requires 32-byte old and new keys")
 	}
 
 	// Opened through RunInTransaction, so a deadlock reruns the body (#301); every read and
@@ -54,7 +54,7 @@ func (d *CommonDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
 // it errors (misconfiguration) rather than risk corrupting data.
 func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error) {
 	if len(currentKey) != 32 {
-		return false, errors.WithStack(errors.New("rotation requires a 32-byte current key"))
+		return false, errs.New("rotation requires a 32-byte current key")
 	}
 	if len(previousKey) != 32 || bytes.Equal(previousKey, currentKey) {
 		return false, nil
@@ -62,7 +62,7 @@ func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []b
 
 	keys, err := d.GetAllSigningKeys(nil)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to load signing keys for rotation check")
+		return false, errs.Wrap(err, "unable to load signing keys for rotation check")
 	}
 	var canary []byte
 	for _, k := range keys {
@@ -79,8 +79,8 @@ func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []b
 		return false, nil // already encrypted under the current key
 	}
 	if _, err := encryption.DecryptText(canary, previousKey); err != nil {
-		return false, errors.WithStack(errors.New(
-			"data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS"))
+		return false, errs.New(
+			"data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
 	}
 
 	if err := d.ReencryptDataToNewKey(previousKey, currentKey); err != nil {
@@ -92,11 +92,11 @@ func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []b
 func (d *CommonDatabase) reencryptAll(tx *sql.Tx, oldKey, newKey []byte) error {
 	for _, c := range aesProtectedColumns {
 		if err := d.reencryptStringColumn(tx, c.table, c.column, oldKey, newKey); err != nil {
-			return errors.Wrapf(err, "re-encrypting %s.%s", c.table, c.column)
+			return errs.Wrapf(err, "re-encrypting %s.%s", c.table, c.column)
 		}
 	}
 	if err := d.reencryptPrivateKeys(tx, oldKey, newKey); err != nil {
-		return errors.Wrap(err, "re-encrypting RSA private keys")
+		return errs.Wrap(err, "re-encrypting RSA private keys")
 	}
 
 	// Blank the legacy key column so subsequent startups skip the migration. The
@@ -107,7 +107,7 @@ func (d *CommonDatabase) reencryptAll(tx *sql.Tx, oldKey, newKey []byte) error {
 	ub.Set(ub.Assign("aes_encryption_key", []byte{}))
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	if _, err := d.ExecSql(tx, query, args...); err != nil {
-		return errors.Wrap(err, "unable to blank legacy aes_encryption_key column")
+		return errs.Wrap(err, "unable to blank legacy aes_encryption_key column")
 	}
 	return nil
 }
@@ -150,7 +150,7 @@ func (d *CommonDatabase) reencryptStringColumn(tx *sql.Tx, table, column string,
 	for _, it := range items {
 		plaintext, err := encryption.DecryptText(it.ct, oldKey)
 		if err != nil {
-			return errors.Wrapf(err, "decrypt %s id %d", column, it.id)
+			return errs.Wrapf(err, "decrypt %s id %d", column, it.id)
 		}
 		newCt, err := encryption.EncryptText(plaintext, newKey)
 		if err != nil {
@@ -211,7 +211,7 @@ func (d *CommonDatabase) reencryptPrivateKeys(tx *sql.Tx, oldKey, newKey []byte)
 		} else {
 			pt, err := encryption.DecryptText(it.pem, oldKey) // ciphertext under oldKey: rotate
 			if err != nil {
-				return errors.Wrapf(err, "decrypt private key id %d", it.id)
+				return errs.Wrapf(err, "decrypt private key id %d", it.id)
 			}
 			plaintextPEM = pt
 		}

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data/migrator"
@@ -607,7 +607,7 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error
 		database, err = mssqldb.NewMsSQLDatabase(mssqlConfig, logSQL)
 	default:
 		msg := fmt.Sprintf("unsupported database type: %s (string length %d). supported types are: mysql, sqlite, postgres, mssql", dbType, len(dbType))
-		return nil, errors.WithStack(errors.New(msg))
+		return nil, errs.New(msg)
 	}
 
 	if err != nil {
@@ -634,7 +634,7 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 	// closed rather than encrypting with a bad key.
 	envKey := config.GetAESEncryptionKey()
 	if len(envKey) != 32 {
-		return nil, errors.WithStack(errors.New("GOIABADA_AES_ENCRYPTION_KEY must be set to a 32-byte hex key"))
+		return nil, errs.New("GOIABADA_AES_ENCRYPTION_KEY must be set to a 32-byte hex key")
 	}
 
 	if err := runStartupDataTasks(database, envKey, config.GetAESEncryptionKeyPrevious()); err != nil {
@@ -663,7 +663,7 @@ func runStartupDataTasks(database Database, envKey []byte, previousKey []byte) e
 
 	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
-		return errors.Wrap(err, "unable to load settings for encryption migration")
+		return errs.Wrap(err, "unable to load settings for encryption migration")
 	}
 
 	// Existing installs historically stored the data key in the DB. If it is
@@ -674,7 +674,7 @@ func runStartupDataTasks(database Database, envKey []byte, previousKey []byte) e
 	// skipped and the seeder encrypts directly with the env key.
 	if settings != nil && len(settings.AESEncryptionKeyLegacy) == 32 {
 		if err := database.ReencryptDataToNewKey(settings.AESEncryptionKeyLegacy, envKey); err != nil {
-			return errors.Wrap(err, "failed to migrate data-at-rest encryption to GOIABADA_AES_ENCRYPTION_KEY")
+			return errs.Wrap(err, "failed to migrate data-at-rest encryption to GOIABADA_AES_ENCRYPTION_KEY")
 		}
 		slog.Info("migrated data-at-rest encryption (secrets and RSA signing keys) to GOIABADA_AES_ENCRYPTION_KEY")
 	}
@@ -686,7 +686,7 @@ func runStartupDataTasks(database Database, envKey []byte, previousKey []byte) e
 	if len(previousKey) == 32 {
 		rotated, err := database.RotateEncryptionKeyIfNeeded(envKey, previousKey)
 		if err != nil {
-			return errors.Wrap(err, "AES data key rotation failed")
+			return errs.Wrap(err, "AES data key rotation failed")
 		}
 		if rotated {
 			slog.Info("rotated data-at-rest encryption to the new GOIABADA_AES_ENCRYPTION_KEY")
@@ -697,7 +697,7 @@ func runStartupDataTasks(database Database, envKey []byte, previousKey []byte) e
 	// the env key. Fail-closed, idempotent, resumable; a no-op on a fresh DB.
 	migrated, err := database.BackfillEncryptedOTPSecrets(envKey)
 	if err != nil {
-		return errors.Wrap(err, "failed to encrypt legacy plaintext OTP secrets")
+		return errs.Wrap(err, "failed to encrypt legacy plaintext OTP secrets")
 	}
 	if migrated > 0 {
 		slog.Info(fmt.Sprintf("encrypted %d legacy plaintext OTP secret(s) at rest", migrated))
@@ -713,7 +713,7 @@ func runStartupDataTasks(database Database, envKey []byte, previousKey []byte) e
 	// things on four engines.
 	lowercased, disabled, err := database.BackfillLowercaseEmails()
 	if err != nil {
-		return errors.Wrap(err, "failed to lowercase legacy user email addresses")
+		return errs.Wrap(err, "failed to lowercase legacy user email addresses")
 	}
 	if lowercased > 0 || disabled > 0 {
 		slog.Info(fmt.Sprintf("lowercased %d legacy user email address(es); disabled %d that differed from another only by case",

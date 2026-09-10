@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
@@ -29,7 +29,7 @@ func (d *PostgresDatabase) CreateClient(tx *sql.Tx, client *models.Client) error
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert client")
+		return errs.Wrap(err, "unable to insert client")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -38,7 +38,7 @@ func (d *PostgresDatabase) CreateClient(tx *sql.Tx, client *models.Client) error
 		if err != nil {
 			client.CreatedAt = originalCreatedAt
 			client.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan client id")
+			return errs.Wrap(err, "unable to scan client id")
 		}
 	}
 
@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateClient(tx *sql.Tx, client *models.Client) error
 	if err := rows.Err(); err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert client")
+		return errs.Wrap(err, "unable to insert client")
 	}
 
 	return nil

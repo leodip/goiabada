@@ -3,6 +3,8 @@ package schemadump
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // dumpForeignKeys reads one table's foreign keys as the tuple ForeignKeyShape documents.
@@ -53,7 +55,7 @@ func dumpForeignKeys(db *sql.DB, d Dialect, table string) ([]ForeignKeyShape, er
 
 	rows, err := db.Query(q)
 	if err != nil {
-		return nil, fmt.Errorf("schemadump: foreign key catalog lookup on %s.%s: %w", d, table, err)
+		return nil, errs.Errorf("schemadump: foreign key catalog lookup on %s.%s: %w", d, table, err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -61,12 +63,12 @@ func dumpForeignKeys(db *sql.DB, d Dialect, table string) ([]ForeignKeyShape, er
 	for rows.Next() {
 		var col, refTable, refCol, onDelete string
 		if err := rows.Scan(&col, &refTable, &refCol, &onDelete); err != nil {
-			return nil, fmt.Errorf("schemadump: scan foreign key catalog row on %s.%s: %w", d, table, err)
+			return nil, errs.Errorf("schemadump: scan foreign key catalog row on %s.%s: %w", d, table, err)
 		}
 		fks = append(fks, ForeignKeyShape{Column: col, RefTable: refTable, RefColumn: refCol, OnDelete: onDelete})
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("schemadump: iterate foreign key catalog on %s.%s: %w", d, table, err)
+		return nil, errs.Errorf("schemadump: iterate foreign key catalog on %s.%s: %w", d, table, err)
 	}
 	return fks, nil
 }

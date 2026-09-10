@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
 	if userSession.UserId == 0 {
-		return errors.WithStack(errors.New("user id must be greater than 0"))
+		return errs.New("user id must be greater than 0")
 	}
 
 	now := time.Now().UTC()
@@ -33,7 +33,7 @@ func (d *PostgresDatabase) CreateUserSession(tx *sql.Tx, userSession *models.Use
 	if err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userSession")
+		return errs.Wrap(err, "unable to insert userSession")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -42,7 +42,7 @@ func (d *PostgresDatabase) CreateUserSession(tx *sql.Tx, userSession *models.Use
 		if err != nil {
 			userSession.CreatedAt = originalCreatedAt
 			userSession.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan userSession id")
+			return errs.Wrap(err, "unable to scan userSession id")
 		}
 	}
 
@@ -52,7 +52,7 @@ func (d *PostgresDatabase) CreateUserSession(tx *sql.Tx, userSession *models.Use
 	if err := rows.Err(); err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userSession")
+		return errs.Wrap(err, "unable to insert userSession")
 	}
 
 	return nil

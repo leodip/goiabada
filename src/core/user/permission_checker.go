@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oidc"
-	"github.com/pkg/errors"
 )
 
 type PermissionChecker struct {
@@ -45,7 +45,7 @@ func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) 
 
 	parts := strings.Split(scope, ":")
 	if len(parts) != 2 {
-		return false, errors.WithStack(errors.New("invalid scope format: " + scope + ". expected format: resource_identifier:permission_identifier"))
+		return false, errs.New("invalid scope format: " + scope + ". expected format: resource_identifier:permission_identifier")
 	}
 	resourceIdentifier := parts[0]
 	permissionIdentifier := parts[1]
@@ -108,7 +108,7 @@ func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) 
 func (pc *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User) (string, error) {
 
 	if user == nil {
-		return "", errors.WithStack(errors.New("user is nil"))
+		return "", errs.New("user is nil")
 	}
 
 	newScope := ""
@@ -128,7 +128,7 @@ func (pc *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(scope strin
 
 		parts := strings.Split(scopeStr, ":")
 		if len(parts) != 2 {
-			return "", errors.WithStack(errors.New("invalid scope format: " + scopeStr))
+			return "", errs.New("invalid scope format: " + scopeStr)
 		} else {
 
 			userHasPermission, err := pc.UserHasScopePermission(user.Id, scopeStr)

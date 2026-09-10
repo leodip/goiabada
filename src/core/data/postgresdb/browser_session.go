@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 // CreateBrowserSession is written here rather than delegated because PostgreSQL has no
@@ -14,11 +14,11 @@ import (
 func (d *PostgresDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.BrowserSession) error {
 
 	if browserSession.Owner == "" {
-		return errors.WithStack(errors.New("can't create a browser session with an empty owner"))
+		return errs.New("can't create a browser session with an empty owner")
 	}
 
 	if browserSession.SessionIdHash == "" {
-		return errors.WithStack(errors.New("can't create a browser session with an empty session id hash"))
+		return errs.New("can't create a browser session with an empty session id hash")
 	}
 
 	now := time.Now().UTC()
@@ -40,7 +40,7 @@ func (d *PostgresDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *mode
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert browser session")
+		return errs.Wrap(err, "unable to insert browser session")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -49,7 +49,7 @@ func (d *PostgresDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *mode
 		if err != nil {
 			browserSession.CreatedAt = originalCreatedAt
 			browserSession.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan browser session id")
+			return errs.Wrap(err, "unable to scan browser session id")
 		}
 	}
 
@@ -59,7 +59,7 @@ func (d *PostgresDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *mode
 	if err := rows.Err(); err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert browser session")
+		return errs.Wrap(err, "unable to insert browser session")
 	}
 
 	return nil

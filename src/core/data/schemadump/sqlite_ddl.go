@@ -2,8 +2,9 @@ package schemadump
 
 import (
 	"database/sql"
-	"fmt"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // sqliteColumnFacts are the two things about a SQLite column that exist only in the
@@ -22,7 +23,7 @@ func sqliteTableDDL(db *sql.DB, table string) (string, error) {
 	var ddl string
 	err := db.QueryRow(`SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&ddl)
 	if err != nil {
-		return "", fmt.Errorf("schemadump: read the CREATE TABLE text for %q out of sqlite_schema: %w", table, err)
+		return "", errs.Errorf("schemadump: read the CREATE TABLE text for %q out of sqlite_schema: %w", table, err)
 	}
 	return ddl, nil
 }

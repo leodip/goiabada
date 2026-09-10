@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/constants"
@@ -16,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 

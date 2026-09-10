@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error {
 
 	if auditLog.AuditEvent == "" {
-		return errors.WithStack(errors.New("can't create audit log with empty audit_event"))
+		return errs.New("can't create audit log with empty audit_event")
 	}
 
 	// Always set CreatedAt to current time (ignore any incoming value)
@@ -26,12 +26,12 @@ func (d *CommonDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) e
 	sql, args := insertBuilder.Build()
 	result, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to insert audit log")
+		return errs.Wrap(err, "unable to insert audit log")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	auditLog.Id = id
@@ -62,7 +62,7 @@ func (d *CommonDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) e
 func (d *CommonDatabase) insertAuditLogWithoutId(tx *sql.Tx, auditLog *models.AuditLog) error {
 
 	if auditLog.AuditEvent == "" {
-		return errors.WithStack(errors.New("can't create audit log with empty audit_event"))
+		return errs.New("can't create audit log with empty audit_event")
 	}
 
 	// Always set CreatedAt to current time (ignore any incoming value), as CreateAuditLog does
@@ -75,7 +75,7 @@ func (d *CommonDatabase) insertAuditLogWithoutId(tx *sql.Tx, auditLog *models.Au
 
 	sqlStr, args := insertBuilder.Build()
 	if _, err := d.ExecSql(tx, sqlStr, args...); err != nil {
-		return errors.Wrap(err, "unable to insert audit log")
+		return errs.Wrap(err, "unable to insert audit log")
 	}
 
 	return nil
@@ -92,12 +92,12 @@ func (d *CommonDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDel
 	sql, args := deleteBuilder.Build()
 	result, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return 0, errors.Wrap(err, "unable to delete old audit logs")
+		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return 0, errors.Wrap(err, "unable to get rows affected")
+		return 0, errs.Wrap(err, "unable to get rows affected")
 	}
 
 	return int(rowsAffected), nil
@@ -132,7 +132,7 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "unable to query database")
+		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -142,7 +142,7 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 		addr := auditLogStruct.Addr(&auditLog)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, 0, errors.Wrap(err, "unable to scan audit log")
+			return nil, 0, errs.Wrap(err, "unable to scan audit log")
 		}
 		auditLogs = append(auditLogs, auditLog)
 	}
@@ -157,7 +157,7 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 	countSql, countArgs := countBuilder.Build()
 	countRows, err := d.QuerySql(tx, countSql, countArgs...)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "unable to query count")
+		return nil, 0, errs.Wrap(err, "unable to query count")
 	}
 	defer func() { _ = countRows.Close() }()
 
@@ -165,15 +165,15 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 	if countRows.Next() {
 		err = countRows.Scan(&total)
 		if err != nil {
-			return nil, 0, errors.Wrap(err, "unable to scan count")
+			return nil, 0, errs.Wrap(err, "unable to scan count")
 		}
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, errors.Wrap(err, "unable to read query results")
+		return nil, 0, errs.Wrap(err, "unable to read query results")
 	}
 	if err := countRows.Err(); err != nil {
-		return nil, 0, errors.Wrap(err, "unable to read count results")
+		return nil, 0, errs.Wrap(err, "unable to read count results")
 	}
 
 	return auditLogs, total, nil

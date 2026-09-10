@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 const (
@@ -133,7 +134,7 @@ func (b *httpBackend) Delete(ctx context.Context, id string) error {
 func (b *httpBackend) post(ctx context.Context, operation string, requestBody interface{}, out interface{}) error {
 	encoded, err := json.Marshal(requestBody)
 	if err != nil {
-		return errors.Wrap(err, "unable to encode the browser session request")
+		return errs.Wrap(err, "unable to encode the browser session request")
 	}
 
 	// Two independent budgets, deliberately not one. A dropped connection and an expired
@@ -186,16 +187,16 @@ func (b *httpBackend) post(ctx context.Context, operation string, requestBody in
 func (b *httpBackend) attempt(ctx context.Context, operation string, encoded []byte) (int, []byte, error) {
 	token, err := b.tokens.Token(ctx)
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "unable to obtain a token for the browser session endpoint")
+		return 0, nil, errs.Wrap(err, "unable to obtain a token for the browser session endpoint")
 	}
 	if strings.TrimSpace(token) == "" {
-		return 0, nil, errors.WithStack(errors.New("the browser session endpoint token source returned an empty token"))
+		return 0, nil, errs.New("the browser session endpoint token source returned an empty token")
 	}
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		b.baseURL+sessionEndpointPrefix+operation, bytes.NewReader(encoded))
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "unable to build the browser session request")
+		return 0, nil, errs.Wrap(err, "unable to build the browser session request")
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
@@ -203,7 +204,7 @@ func (b *httpBackend) attempt(ctx context.Context, operation string, encoded []b
 
 	response, err := b.client.Do(request)
 	if err != nil {
-		return 0, nil, &transportError{errors.Wrap(err, "the browser session endpoint could not be reached")}
+		return 0, nil, &transportError{errs.Wrap(err, "the browser session endpoint could not be reached")}
 	}
 	defer func() { _ = response.Body.Close() }()
 
@@ -223,7 +224,7 @@ func (b *httpBackend) attempt(ctx context.Context, operation string, encoded []b
 	// round 2, finding 2).
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxSessionResponseBytes))
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "unable to read the browser session response")
+		return 0, nil, errs.Wrap(err, "unable to read the browser session response")
 	}
 
 	return response.StatusCode, body, nil
@@ -258,8 +259,8 @@ func decodeSessionResponse(operation string, status int, body []byte, out interf
 	case status == http.StatusNotFound:
 		return ErrNotFound
 	case status < 200 || status > 299:
-		return errors.WithStack(errors.Errorf(
-			"the browser session endpoint answered %d to %s", status, operation))
+		return errs.Errorf(
+			"the browser session endpoint answered %d to %s", status, operation)
 	}
 
 	if out == nil {
@@ -267,7 +268,7 @@ func decodeSessionResponse(operation string, status int, body []byte, out interf
 	}
 
 	if err := json.Unmarshal(body, out); err != nil {
-		return errors.Wrapf(err, "unable to decode the browser session response to %s", operation)
+		return errs.Wrapf(err, "unable to decode the browser session response to %s", operation)
 	}
 	return nil
 }

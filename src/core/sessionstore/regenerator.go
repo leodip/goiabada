@@ -3,7 +3,7 @@ package sessionstore
 import (
 	"net/http"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // Regenerator is implemented by a store whose identifier can be replaced without losing
@@ -51,12 +51,12 @@ func (s *ServerSideStore) Regenerate(w http.ResponseWriter, r *http.Request, ses
 
 	expiresAt, err := s.Backend.Create(ctx, newId, []byte(encoded), authenticated)
 	if err != nil {
-		return errors.Wrap(err, "unable to create the rotated browser session")
+		return errs.Wrap(err, "unable to create the rotated browser session")
 	}
 
 	if oldId := session.ID; oldId != "" {
 		if err := s.Backend.Delete(ctx, oldId); err != nil {
-			return errors.Wrap(err, "unable to delete the browser session being rotated away")
+			return errs.Wrap(err, "unable to delete the browser session being rotated away")
 		}
 	}
 

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 // A browser session is keyed on (owner, session_id_hash), the table's unique index,
@@ -21,11 +21,11 @@ import (
 func (d *CommonDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.BrowserSession) error {
 
 	if browserSession.Owner == "" {
-		return errors.WithStack(errors.New("can't create a browser session with an empty owner"))
+		return errs.New("can't create a browser session with an empty owner")
 	}
 
 	if browserSession.SessionIdHash == "" {
-		return errors.WithStack(errors.New("can't create a browser session with an empty session id hash"))
+		return errs.New("can't create a browser session with an empty session id hash")
 	}
 
 	now := time.Now().UTC()
@@ -45,14 +45,14 @@ func (d *CommonDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert browser session")
+		return errs.Wrap(err, "unable to insert browser session")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	browserSession.Id = id
@@ -76,11 +76,11 @@ func (d *CommonDatabase) GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, ow
 	now time.Time) (*models.BrowserSession, error) {
 
 	if owner == "" {
-		return nil, errors.WithStack(errors.New("can't get a browser session with an empty owner"))
+		return nil, errs.New("can't get a browser session with an empty owner")
 	}
 
 	if sessionIdHash == "" {
-		return nil, errors.WithStack(errors.New("can't get a browser session with an empty session id hash"))
+		return nil, errs.New("can't get a browser session with an empty session id hash")
 	}
 
 	browserSessionStruct := sqlbuilder.NewStruct(new(models.BrowserSession)).
@@ -96,7 +96,7 @@ func (d *CommonDatabase) GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, ow
 	query, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, query, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -105,12 +105,12 @@ func (d *CommonDatabase) GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, ow
 		addr := browserSessionStruct.Addr(&browserSession)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan browser session")
+			return nil, errs.Wrap(err, "unable to scan browser session")
 		}
 		return &browserSession, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -141,11 +141,11 @@ func (d *CommonDatabase) UpdateBrowserSessionData(tx *sql.Tx, owner, sessionIdHa
 	now, expiresAt time.Time) (bool, error) {
 
 	if owner == "" {
-		return false, errors.WithStack(errors.New("can't update a browser session with an empty owner"))
+		return false, errs.New("can't update a browser session with an empty owner")
 	}
 
 	if sessionIdHash == "" {
-		return false, errors.WithStack(errors.New("can't update a browser session with an empty session id hash"))
+		return false, errs.New("can't update a browser session with an empty session id hash")
 	}
 
 	ub := sqlbuilder.NewUpdateBuilder()
@@ -165,12 +165,12 @@ func (d *CommonDatabase) UpdateBrowserSessionData(tx *sql.Tx, owner, sessionIdHa
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to update browser session data")
+		return false, errs.Wrap(err, "unable to update browser session data")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get rows affected when updating browser session data")
+		return false, errs.Wrap(err, "unable to get rows affected when updating browser session data")
 	}
 
 	return rowsAffected == 1, nil
@@ -191,11 +191,11 @@ func (d *CommonDatabase) TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash st
 	now, expiresAt time.Time) (bool, error) {
 
 	if owner == "" {
-		return false, errors.WithStack(errors.New("can't touch a browser session with an empty owner"))
+		return false, errs.New("can't touch a browser session with an empty owner")
 	}
 
 	if sessionIdHash == "" {
-		return false, errors.WithStack(errors.New("can't touch a browser session with an empty session id hash"))
+		return false, errs.New("can't touch a browser session with an empty session id hash")
 	}
 
 	ub := sqlbuilder.NewUpdateBuilder()
@@ -214,12 +214,12 @@ func (d *CommonDatabase) TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash st
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to touch browser session")
+		return false, errs.Wrap(err, "unable to touch browser session")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get rows affected when touching browser session")
+		return false, errs.Wrap(err, "unable to get rows affected when touching browser session")
 	}
 
 	if rowsAffected == 1 {
@@ -243,7 +243,7 @@ func (d *CommonDatabase) TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash st
 	// already about to throw the session away (#266).
 	browserSession, err := d.GetBrowserSessionByOwnerAndSessionIdHash(tx, owner, sessionIdHash, now)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to confirm the browser session after touching it")
+		return false, errs.Wrap(err, "unable to confirm the browser session after touching it")
 	}
 
 	return browserSession != nil, nil
@@ -255,11 +255,11 @@ func (d *CommonDatabase) TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash st
 func (d *CommonDatabase) DeleteBrowserSession(tx *sql.Tx, owner, sessionIdHash string) error {
 
 	if owner == "" {
-		return errors.WithStack(errors.New("can't delete a browser session with an empty owner"))
+		return errs.New("can't delete a browser session with an empty owner")
 	}
 
 	if sessionIdHash == "" {
-		return errors.WithStack(errors.New("can't delete a browser session with an empty session id hash"))
+		return errs.New("can't delete a browser session with an empty session id hash")
 	}
 
 	browserSessionStruct := sqlbuilder.NewStruct(new(models.BrowserSession)).
@@ -274,7 +274,7 @@ func (d *CommonDatabase) DeleteBrowserSession(tx *sql.Tx, owner, sessionIdHash s
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete browser session")
+		return errs.Wrap(err, "unable to delete browser session")
 	}
 
 	return nil
@@ -295,7 +295,7 @@ func (d *CommonDatabase) DeleteExpiredBrowserSessions(tx *sql.Tx, now time.Time)
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete expired browser sessions")
+		return errs.Wrap(err, "unable to delete expired browser sessions")
 	}
 
 	return nil

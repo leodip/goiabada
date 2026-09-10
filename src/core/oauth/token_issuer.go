@@ -14,10 +14,10 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/leodip/goiabada/core/uuidutil"
-	"github.com/pkg/errors"
 
 	"slices"
 )
@@ -117,7 +117,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
 
 	now := time.Now().UTC()
@@ -323,7 +323,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 	token.Header["kid"] = keyIdentifier
 	rt, err := token.SignedString(signingKey)
 	if err != nil {
-		return "", 0, errors.Wrap(err, "unable to sign refresh_token")
+		return "", 0, errs.Wrap(err, "unable to sign refresh_token")
 	}
 	refreshExpiresIn := claims["exp"].(int64) - now.Unix()
 
@@ -345,7 +345,7 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now tim
 		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
 		return exp, nil
 	}
-	return 0, errors.WithStack(fmt.Errorf("invalid refresh token type: %v", refreshTokenType))
+	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
 func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now time.Time, settings *models.Settings,
@@ -366,13 +366,13 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 		if userSession == nil {
 			// The session backing this Refresh token no longer exists (e.g. it was
 			// concurrently torn down). Fail cleanly instead of dereferencing nil.
-			return 0, errors.WithStack(fmt.Errorf("user session %q not found while computing refresh token max lifetime", sessionIdentifier))
+			return 0, errs.Errorf("user session %q not found while computing refresh token max lifetime", sessionIdentifier)
 		}
 		maxLifetime := userSession.Started.Add(
 			time.Duration(time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil
 	}
-	return 0, errors.WithStack(fmt.Errorf("invalid refresh token type: %v", refreshTokenType))
+	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
 func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client,
@@ -393,7 +393,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 
 	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
 
 	now := time.Now().UTC()
@@ -415,7 +415,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 		}
 		parts := strings.Split(scope, ":")
 		if len(parts) != 2 {
-			return nil, errors.WithStack(fmt.Errorf("invalid scope: %v", scope))
+			return nil, errs.Errorf("invalid scope: %v", scope)
 		}
 		if !slices.Contains(audCollection, parts[0]) {
 			audCollection = append(audCollection, parts[0])
@@ -423,7 +423,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	}
 	switch {
 	case len(audCollection) == 0:
-		return nil, errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
+		return nil, errs.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
 	case len(audCollection) == 1:
 		claims["aud"] = audCollection[0]
 	default:
@@ -437,7 +437,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	token.Header["kid"] = keyPair.KeyIdentifier
 	accessToken, err := token.SignedString(privKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to sign access_token")
+		return nil, errs.Wrap(err, "unable to sign access_token")
 	}
 	tokenResponse.AccessToken = accessToken
 	return &tokenResponse, nil
@@ -474,7 +474,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
 
 	now := time.Now().UTC()
@@ -573,7 +573,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 
 	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
 
 	now := time.Now().UTC()
@@ -736,7 +736,7 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 		if !oidc.IsOfflineAccessScope(s) {
 			parts := strings.Split(s, ":")
 			if len(parts) != 2 {
-				return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
+				return "", "", errs.Errorf("invalid scope: %v", s)
 			}
 			if !slices.Contains(audCollection, parts[0]) {
 				audCollection = append(audCollection, parts[0])
@@ -745,7 +745,7 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 	}
 	switch {
 	case len(audCollection) == 0:
-		return "", "", errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
+		return "", "", errs.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
 	case len(audCollection) == 1:
 		claims["aud"] = audCollection[0]
 	case len(audCollection) > 1:
@@ -825,7 +825,7 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 	token.Header["kid"] = keyIdentifier
 	accessToken, err := token.SignedString(signingKey)
 	if err != nil {
-		return "", "", errors.Wrap(err, "unable to sign access_token")
+		return "", "", errs.Wrap(err, "unable to sign access_token")
 	}
 	return accessToken, scope, nil
 }
@@ -929,7 +929,7 @@ func (t *TokenIssuer) generateIdTokenCore(settings *models.Settings, input *Toke
 	token.Header["kid"] = keyIdentifier
 	idToken, err := token.SignedString(signingKey)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to sign id_token")
+		return "", errs.Wrap(err, "unable to sign id_token")
 	}
 	return idToken, nil
 }
@@ -1036,7 +1036,7 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 
 	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
 
 	now := time.Now().UTC()
@@ -1170,7 +1170,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 
 	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
 
 	now := time.Now().UTC()
@@ -1346,7 +1346,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, inp
 	token.Header["kid"] = keyIdentifier
 	rt, err := token.SignedString(signingKey)
 	if err != nil {
-		return "", 0, errors.Wrap(err, "unable to sign refresh_token")
+		return "", 0, errs.Wrap(err, "unable to sign refresh_token")
 	}
 	refreshExpiresIn := claims["exp"].(int64) - now.Unix()
 

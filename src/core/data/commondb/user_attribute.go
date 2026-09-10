@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models.UserAttribute) error {
 
 	if userAttribute.UserId == 0 {
-		return errors.WithStack(errors.New("can't create userAttribute with user_id 0"))
+		return errs.New("can't create userAttribute with user_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -32,14 +32,14 @@ func (d *CommonDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models.U
 	if err != nil {
 		userAttribute.CreatedAt = originalCreatedAt
 		userAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userAttribute")
+		return errs.Wrap(err, "unable to insert userAttribute")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		userAttribute.CreatedAt = originalCreatedAt
 		userAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	userAttribute.Id = id
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models.U
 func (d *CommonDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *models.UserAttribute) error {
 
 	if userAttribute.Id == 0 {
-		return errors.WithStack(errors.New("can't update userAttribute with id 0"))
+		return errs.New("can't update userAttribute with id 0")
 	}
 
 	originalUpdatedAt := userAttribute.UpdatedAt
@@ -65,7 +65,7 @@ func (d *CommonDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *models.U
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		userAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update userAttribute")
+		return errs.Wrap(err, "unable to update userAttribute")
 	}
 
 	return nil
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbu
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -86,12 +86,12 @@ func (d *CommonDatabase) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbu
 		addr := userAttributeStruct.Addr(&userAttribute)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userAttribute")
+			return nil, errs.Wrap(err, "unable to scan userAttribute")
 		}
 		return &userAttribute, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -124,7 +124,7 @@ func (d *CommonDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -134,13 +134,13 @@ func (d *CommonDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]
 		addr := userAttributeStruct.Addr(&userAttribute)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan userAttribute")
+			return nil, errs.Wrap(err, "unable to scan userAttribute")
 		}
 		userAttributes = append(userAttributes, userAttribute)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return userAttributes, nil
@@ -157,7 +157,7 @@ func (d *CommonDatabase) DeleteUserAttribute(tx *sql.Tx, userAttributeId int64) 
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete userAttribute")
+		return errs.Wrap(err, "unable to delete userAttribute")
 	}
 
 	return nil

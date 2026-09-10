@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
@@ -29,7 +29,7 @@ func (d *PostgresDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 	if err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert group")
+		return errs.Wrap(err, "unable to insert group")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -38,7 +38,7 @@ func (d *PostgresDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 		if err != nil {
 			group.CreatedAt = originalCreatedAt
 			group.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan group id")
+			return errs.Wrap(err, "unable to scan group id")
 		}
 	}
 
@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 	if err := rows.Err(); err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert group")
+		return errs.Wrap(err, "unable to insert group")
 	}
 
 	return nil

@@ -21,8 +21,8 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -68,14 +68,14 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 	if len(settings.SMTPPasswordEncrypted) > 0 {
 		decryptedPassword, err := encryption.DecryptData(settings.SMTPPasswordEncrypted)
 		if err != nil {
-			return errors.Wrap(err, "unable to decrypt the SMTP password")
+			return errs.Wrap(err, "unable to decrypt the SMTP password")
 		}
 		password = decryptedPassword
 	}
 
 	smtpEnc, err := enums.SMTPEncryptionFromString(settings.SMTPEncryption)
 	if err != nil {
-		return errors.Wrap(err, "unable to parse the SMTP encryption")
+		return errs.Wrap(err, "unable to parse the SMTP encryption")
 	}
 
 	// Build the whole message before dialing, so a bad address or a failed entropy read costs no
@@ -83,7 +83,7 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 	from := &mail.Address{Name: settings.SMTPFromName, Address: settings.SMTPFromEmail}
 	to, err := mail.ParseAddress(input.To)
 	if err != nil {
-		return errors.Wrap(err, "invalid recipient address")
+		return errs.Wrap(err, "invalid recipient address")
 	}
 	message, err := e.buildMessage(from, to, input)
 	if err != nil {
@@ -115,18 +115,18 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 		conn, err = netDialer.DialContext(ctx, "tcp", addr)
 	}
 	if err != nil {
-		return errors.Wrap(err, "unable to connect to SMTP server")
+		return errs.Wrap(err, "unable to connect to SMTP server")
 	}
 
 	if err := conn.SetDeadline(time.Now().Add(convTimeout)); err != nil {
 		_ = conn.Close()
-		return errors.Wrap(err, "unable to connect to SMTP server")
+		return errs.Wrap(err, "unable to connect to SMTP server")
 	}
 
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
 		_ = conn.Close()
-		return errors.Wrap(err, "unable to connect to SMTP server")
+		return errs.Wrap(err, "unable to connect to SMTP server")
 	}
 	defer func() { _ = client.Close() }()
 
@@ -136,40 +136,40 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 		// and a silent downgrade here is indistinguishable from a STARTTLS-stripping attacker
 		// (#274).
 		if ok, _ := client.Extension("STARTTLS"); !ok {
-			return errors.Wrap(errors.New("the SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS"),
+			return errs.Wrap(errs.New("the SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS"),
 				"unable to send SMTP message")
 		}
 		// StartTLS re-issues EHLO, per RFC 3207 section 4.2: everything learned before the
 		// handshake has to be discarded.
 		if err := client.StartTLS(tlsConfig); err != nil {
-			return errors.Wrap(err, "unable to send SMTP message")
+			return errs.Wrap(err, "unable to send SMTP message")
 		}
 	}
 
 	if len(settings.SMTPUsername) > 0 {
 		if err := authenticate(client, host, smtpEnc, settings.SMTPUsername, password); err != nil {
-			return errors.Wrap(err, "unable to send SMTP message")
+			return errs.Wrap(err, "unable to send SMTP message")
 		}
 	}
 
 	if err := client.Mail(from.Address); err != nil {
-		return errors.Wrap(err, "unable to send SMTP message")
+		return errs.Wrap(err, "unable to send SMTP message")
 	}
 	if err := client.Rcpt(to.Address); err != nil {
-		return errors.Wrap(err, "unable to send SMTP message")
+		return errs.Wrap(err, "unable to send SMTP message")
 	}
 	w, err := client.Data()
 	if err != nil {
-		return errors.Wrap(err, "unable to send SMTP message")
+		return errs.Wrap(err, "unable to send SMTP message")
 	}
 	if _, err := w.Write(message); err != nil {
-		return errors.Wrap(err, "unable to send SMTP message")
+		return errs.Wrap(err, "unable to send SMTP message")
 	}
 	if err := w.Close(); err != nil {
-		return errors.Wrap(err, "unable to send SMTP message")
+		return errs.Wrap(err, "unable to send SMTP message")
 	}
 	if err := client.Quit(); err != nil {
-		return errors.Wrap(err, "unable to send SMTP message")
+		return errs.Wrap(err, "unable to send SMTP message")
 	}
 
 	return nil
@@ -184,7 +184,7 @@ func authenticate(client *smtp.Client, host string, smtpEnc enums.SMTPEncryption
 		// The operator configured credentials, so a server offering no authentication is the
 		// wrong host, the wrong port, or a STARTTLS-only server reached as None. Sending
 		// unauthenticated instead would hide all three (#274).
-		return errors.WithStack(errors.New("SMTP credentials are configured but the server offers no authentication"))
+		return errs.New("SMTP credentials are configured but the server offers no authentication")
 	}
 	offered := strings.Fields(strings.ToUpper(mechs))
 
@@ -206,7 +206,7 @@ func authenticate(client *smtp.Client, host string, smtpEnc enums.SMTPEncryption
 	// no counterpart to and whose message names no setting (#274).
 	secure := smtpEnc != enums.SMTPEncryptionNone || isLocalHost(host)
 	if (mechanism == "PLAIN" || mechanism == "LOGIN") && !secure {
-		return errors.WithStack(errors.New("the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS"))
+		return errs.New("the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS")
 	}
 
 	var auth smtp.Auth
@@ -227,10 +227,10 @@ func authenticate(client *smtp.Client, host string, smtpEnc enums.SMTPEncryption
 		// legitimately offers a login, so it is not gated above.
 		auth = smtp.CRAMMD5Auth(username, password)
 	default:
-		return errors.WithStack(errors.New("the SMTP server offers none of PLAIN, LOGIN or CRAM-MD5 (offered: " + strings.TrimSpace(mechs) + ")"))
+		return errs.New("the SMTP server offers none of PLAIN, LOGIN or CRAM-MD5 (offered: " + strings.TrimSpace(mechs) + ")")
 	}
 
-	return errors.WithStack(client.Auth(auth))
+	return errs.WithStack(client.Auth(auth))
 }
 
 // isLocalHost reports whether the password would stay on this machine. The three names are
@@ -269,10 +269,10 @@ func (e *EmailSender) buildMessage(from, to *mail.Address, input *SendEmailInput
 	// line limit, and a rendered HTML line can exceed it. net/smtp's data writer dot-stuffs.
 	qp := quotedprintable.NewWriter(&b)
 	if _, err := qp.Write([]byte(input.HtmlBody)); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errs.WithStack(err)
 	}
 	if err := qp.Close(); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errs.WithStack(err)
 	}
 
 	return b.Bytes(), nil
@@ -293,7 +293,7 @@ func (e *EmailSender) newMessageID(fromAddress string) (string, error) {
 	// It is still an error rather than an empty left-hand side: `<@domain>` would be emitted on
 	// every send, which is worse than no Message-ID at all.
 	if _, err := io.ReadFull(reader, raw); err != nil {
-		return "", errors.Wrap(err, "unable to generate a Message-ID")
+		return "", errs.Wrap(err, "unable to generate a Message-ID")
 	}
 
 	domain := fromAddress
@@ -336,8 +336,8 @@ func writeFoldedHeader(b *bytes.Buffer, name, value string) error {
 		// catalog string with at most a 30-character app name in it, so this is a bound on the
 		// package's API rather than a path a deployment can reach (#274).
 		if 1+len(token) > maxHeaderLineHardBytes {
-			return errors.WithStack(errors.New("the " + name + " header contains a word of " +
-				strconv.Itoa(len(token)) + " bytes, which cannot be folded under RFC 5322 section 2.1.1's 998-byte line limit"))
+			return errs.New("the " + name + " header contains a word of " +
+				strconv.Itoa(len(token)) + " bytes, which cannot be folded under RFC 5322 section 2.1.1's 998-byte line limit")
 		}
 		// Fold unless the line has nothing on it yet: a single token longer than a whole line
 		// cannot be split here, and folding before it would loop forever.

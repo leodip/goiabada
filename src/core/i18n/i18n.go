@@ -20,7 +20,6 @@ package i18n
 import (
 	"context"
 	"embed"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -28,6 +27,7 @@ import (
 	"text/template"
 
 	"github.com/BurntSushi/toml"
+	"github.com/leodip/goiabada/core/errs"
 	"golang.org/x/text/language"
 )
 
@@ -170,13 +170,13 @@ func compileTemplates(b *Bundle) {
 func parseCatalog(name string, data []byte) (language.Tag, map[string]string, error) {
 	var parsed map[string]any
 	if err := toml.Unmarshal(data, &parsed); err != nil {
-		return language.Tag{}, nil, fmt.Errorf("i18n: parse %s: %w", name, err)
+		return language.Tag{}, nil, errs.Errorf("i18n: parse %s: %w", name, err)
 	}
 	out := make(map[string]string, len(parsed))
 	for k, v := range parsed {
 		s, ok := v.(string)
 		if !ok {
-			return language.Tag{}, nil, fmt.Errorf(
+			return language.Tag{}, nil, errs.Errorf(
 				"i18n: %s: key %q is a %T, not a string; catalog values are plain strings and [table] sections are not supported",
 				name, k, v)
 		}
@@ -219,7 +219,7 @@ func mergeTags(base, extras []language.Tag) []language.Tag {
 func loadEmbeddedCatalogs() ([]catalogFile, error) {
 	entries, err := fs.ReadDir(embeddedCatalogs, "catalogs")
 	if err != nil {
-		return nil, fmt.Errorf("i18n: read embedded catalogs dir: %w", err)
+		return nil, errs.Errorf("i18n: read embedded catalogs dir: %w", err)
 	}
 	var out []catalogFile
 	for _, e := range entries {
@@ -229,7 +229,7 @@ func loadEmbeddedCatalogs() ([]catalogFile, error) {
 		path := "catalogs/" + e.Name()
 		data, err := fs.ReadFile(embeddedCatalogs, path)
 		if err != nil {
-			return nil, fmt.Errorf("i18n: read %s: %w", path, err)
+			return nil, errs.Errorf("i18n: read %s: %w", path, err)
 		}
 		tag, messages, err := parseCatalog(path, data)
 		if err != nil {

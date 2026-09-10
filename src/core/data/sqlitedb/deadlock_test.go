@@ -7,8 +7,8 @@ import (
 
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/leodip/goiabada/core/errs"
 	mssql "github.com/microsoft/go-mssqldb"
-	pkgerrors "github.com/pkg/errors"
 )
 
 // TestIsDeadlock is SQLite's row of the classifier table RunInTransaction consults, and every
@@ -24,7 +24,7 @@ func TestIsDeadlock(t *testing.T) {
 		{"nil", nil},
 		{"sql.ErrNoRows", sql.ErrNoRows},
 		{"a plain error", errors.New("database is locked")},
-		{"a wrapped plain error", pkgerrors.Wrap(errors.New("database is locked"), "unable to execute SQL")},
+		{"a wrapped plain error", errs.Wrap(errors.New("database is locked"), "unable to execute SQL")},
 		{"PostgreSQL's deadlock", &pgconn.PgError{Code: "40P01"}},
 		{"MySQL's deadlock", &mysqldriver.MySQLError{Number: 1213}},
 		{"SQL Server's deadlock, by value", mssql.Error{Number: 1205}},

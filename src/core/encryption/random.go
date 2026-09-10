@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"io"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // randReader is crypto/rand in production. It is a variable so a test can make the
@@ -21,7 +21,7 @@ var randReader io.Reader = rand.Reader
 func RandomKey(n int) ([]byte, error) {
 	buf := make([]byte, n)
 	if _, err := io.ReadFull(randReader, buf); err != nil {
-		return nil, errors.Wrap(err, "unable to read from the random number generator")
+		return nil, errs.Wrap(err, "unable to read from the random number generator")
 	}
 	return buf, nil
 }

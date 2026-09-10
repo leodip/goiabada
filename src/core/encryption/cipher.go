@@ -1,6 +1,6 @@
 package encryption
 
-import "github.com/pkg/errors"
+import "github.com/leodip/goiabada/core/errs"
 
 // dataCipher holds the process-wide data-at-rest encryption key, set once at
 // startup via InitDataCipher. EncryptData/DecryptData use it so callers do not
@@ -18,7 +18,7 @@ var dataCipher []byte
 // the cipher.
 func InitDataCipher(key []byte) error {
 	if len(key) != 32 {
-		return errors.WithStack(errors.New("data encryption key must be 32 bytes"))
+		return errs.New("data encryption key must be 32 bytes")
 	}
 	dataCipher = key
 	return nil
@@ -33,7 +33,7 @@ func IsDataCipherInitialized() bool {
 // key set by InitDataCipher.
 func EncryptData(plaintext string) ([]byte, error) {
 	if len(dataCipher) != 32 {
-		return nil, errors.WithStack(errors.New("data cipher not initialized: call encryption.InitDataCipher at startup"))
+		return nil, errs.New("data cipher not initialized: call encryption.InitDataCipher at startup")
 	}
 	return EncryptText(plaintext, dataCipher)
 }
@@ -42,7 +42,7 @@ func EncryptData(plaintext string) ([]byte, error) {
 // set by InitDataCipher.
 func DecryptData(ciphertext []byte) (string, error) {
 	if len(dataCipher) != 32 {
-		return "", errors.WithStack(errors.New("data cipher not initialized: call encryption.InitDataCipher at startup"))
+		return "", errs.New("data cipher not initialized: call encryption.InitDataCipher at startup")
 	}
 	return DecryptText(ciphertext, dataCipher)
 }

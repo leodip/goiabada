@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error {
 	if userConsent.ClientId == 0 {
-		return errors.WithStack(errors.New("client id must be greater than 0"))
+		return errs.New("client id must be greater than 0")
 	}
 
 	if userConsent.UserId == 0 {
-		return errors.WithStack(errors.New("user id must be greater than 0"))
+		return errs.New("user id must be greater than 0")
 	}
 
 	now := time.Now().UTC()
@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.UserCo
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -42,7 +42,7 @@ func (d *MsSQLDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.UserCo
 	if err != nil {
 		userConsent.CreatedAt = originalCreatedAt
 		userConsent.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userConsent")
+		return errs.Wrap(err, "unable to insert userConsent")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -51,7 +51,7 @@ func (d *MsSQLDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.UserCo
 		if err != nil {
 			userConsent.CreatedAt = originalCreatedAt
 			userConsent.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan userConsent id")
+			return errs.Wrap(err, "unable to scan userConsent id")
 		}
 	}
 
@@ -61,7 +61,7 @@ func (d *MsSQLDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.UserCo
 	if err := rows.Err(); err != nil {
 		userConsent.CreatedAt = originalCreatedAt
 		userConsent.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userConsent")
+		return errs.Wrap(err, "unable to insert userConsent")
 	}
 
 	return nil

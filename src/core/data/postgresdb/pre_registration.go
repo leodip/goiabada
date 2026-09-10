@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
@@ -29,7 +29,7 @@ func (d *PostgresDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mo
 	if err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert preRegistration")
+		return errs.Wrap(err, "unable to insert preRegistration")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -38,7 +38,7 @@ func (d *PostgresDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mo
 		if err != nil {
 			preRegistration.CreatedAt = originalCreatedAt
 			preRegistration.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan preRegistration id")
+			return errs.Wrap(err, "unable to scan preRegistration id")
 		}
 	}
 
@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mo
 	if err := rows.Err(); err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert preRegistration")
+		return errs.Wrap(err, "unable to insert preRegistration")
 	}
 
 	return nil

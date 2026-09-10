@@ -12,12 +12,12 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/useragent"
 	"github.com/leodip/goiabada/core/uuidutil"
-	"github.com/pkg/errors"
 )
 
 type UserSessionManager struct {
@@ -143,7 +143,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 
 	sess, err := u.sessionStore.Get(r, u.sessionName)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get the session")
+		return nil, errs.Wrap(err, "unable to get the session")
 	}
 
 	sess.Values[constants.SessionKeySessionIdentifier] = userSession.SessionIdentifier
@@ -167,7 +167,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// changes no outcome an attacker could use.
 	if regenerator, ok := u.sessionStore.(sessionstore.Regenerator); ok {
 		if err := regenerator.Regenerate(w, r, sess); err != nil {
-			return nil, errors.Wrap(err, "unable to rotate the browser session identifier")
+			return nil, errs.Wrap(err, "unable to rotate the browser session identifier")
 		}
 		return userSession, nil
 	}
@@ -294,7 +294,7 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 		return userSession, nil
 	}
 
-	return nil, errors.WithStack(errors.New("Unexpected: can't bump user session because user session is nil"))
+	return nil, errs.New("Unexpected: can't bump user session because user session is nil")
 }
 
 // WillRaisePrivilege reports whether bumping a session with these values would raise its

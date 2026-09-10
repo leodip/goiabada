@@ -4,7 +4,7 @@ import (
 	"net/smtp"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // loginAuth implements the AUTH LOGIN mechanism, which the standard library does not carry:
@@ -58,5 +58,5 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 		a.answered++
 		return []byte(a.password), nil
 	}
-	return nil, errors.WithStack(errors.New("unexpected server challenge"))
+	return nil, errs.New("unexpected server challenge")
 }

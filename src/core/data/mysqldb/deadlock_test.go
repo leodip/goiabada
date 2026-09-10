@@ -7,7 +7,7 @@ import (
 
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
-	pkgerrors "github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // TestIsDeadlock is MySQL's row of the classifier table RunInTransaction consults. The case
@@ -26,7 +26,7 @@ func TestIsDeadlock(t *testing.T) {
 		want bool
 	}{
 		{"the driver's deadlock, as go-sql-driver returns it", deadlock, true},
-		{"the same error wrapped once, as ExecSql returns it", pkgerrors.Wrap(deadlock, "unable to execute SQL"), true},
+		{"the same error wrapped once, as ExecSql returns it", errs.Wrap(deadlock, "unable to execute SQL"), true},
 		{"the same error wrapped by the standard library", errors.Join(deadlock), true},
 		{"1205 ER_LOCK_WAIT_TIMEOUT: a lock wait that ran out, not a broken cycle", &mysqldriver.MySQLError{Number: 1205}, false},
 		{"a syntax error from the same driver", &mysqldriver.MySQLError{Number: 1064, Message: "You have an error in your SQL syntax"}, false},

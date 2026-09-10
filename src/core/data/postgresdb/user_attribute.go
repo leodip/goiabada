@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models.UserAttribute) error {
 	if userAttribute.UserId == 0 {
-		return errors.WithStack(errors.New("can't create userAttribute with user_id 0"))
+		return errs.New("can't create userAttribute with user_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -33,7 +33,7 @@ func (d *PostgresDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models
 	if err != nil {
 		userAttribute.CreatedAt = originalCreatedAt
 		userAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userAttribute")
+		return errs.Wrap(err, "unable to insert userAttribute")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -42,7 +42,7 @@ func (d *PostgresDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models
 		if err != nil {
 			userAttribute.CreatedAt = originalCreatedAt
 			userAttribute.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan userAttribute id")
+			return errs.Wrap(err, "unable to scan userAttribute id")
 		}
 	}
 
@@ -52,7 +52,7 @@ func (d *PostgresDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models
 	if err := rows.Err(); err != nil {
 		userAttribute.CreatedAt = originalCreatedAt
 		userAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert userAttribute")
+		return errs.Wrap(err, "unable to insert userAttribute")
 	}
 
 	return nil

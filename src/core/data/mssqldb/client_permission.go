@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error {
 	if clientPermission.ClientId == 0 {
-		return errors.WithStack(errors.New("can't create clientPermission with client_id 0"))
+		return errs.New("can't create clientPermission with client_id 0")
 	}
 
 	if clientPermission.PermissionId == 0 {
-		return errors.WithStack(errors.New("can't create clientPermission with permission_id 0"))
+		return errs.New("can't create clientPermission with permission_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mod
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -42,7 +42,7 @@ func (d *MsSQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mod
 	if err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert clientPermission")
+		return errs.Wrap(err, "unable to insert clientPermission")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -51,7 +51,7 @@ func (d *MsSQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mod
 		if err != nil {
 			clientPermission.CreatedAt = originalCreatedAt
 			clientPermission.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan clientPermission id")
+			return errs.Wrap(err, "unable to scan clientPermission id")
 		}
 	}
 
@@ -61,7 +61,7 @@ func (d *MsSQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mod
 	if err := rows.Err(); err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert clientPermission")
+		return errs.Wrap(err, "unable to insert clientPermission")
 	}
 
 	return nil

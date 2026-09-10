@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *PostgresDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.RedirectURI) error {
 	if redirectURI.ClientId == 0 {
-		return errors.WithStack(errors.New("client id must be greater than 0"))
+		return errs.New("client id must be greater than 0")
 	}
 
 	now := time.Now().UTC()
@@ -30,7 +30,7 @@ func (d *PostgresDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Red
 	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
 	if err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
-		return errors.Wrap(err, "unable to insert redirectURI")
+		return errs.Wrap(err, "unable to insert redirectURI")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -38,7 +38,7 @@ func (d *PostgresDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Red
 		err = rows.Scan(&redirectURI.Id)
 		if err != nil {
 			redirectURI.CreatedAt = originalCreatedAt
-			return errors.Wrap(err, "unable to scan redirectURI id")
+			return errs.Wrap(err, "unable to scan redirectURI id")
 		}
 	}
 
@@ -47,7 +47,7 @@ func (d *PostgresDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Red
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
-		return errors.Wrap(err, "unable to insert redirectURI")
+		return errs.Wrap(err, "unable to insert redirectURI")
 	}
 
 	return nil

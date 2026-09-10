@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"embed"
-	goerrors "errors"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -15,8 +15,8 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/core/errs"
 	mssql "github.com/microsoft/go-mssqldb"
-	"github.com/pkg/errors"
 )
 
 //go:embed migrations/*.sql
@@ -65,14 +65,14 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 		// Connect to master database first
 		masterDB, err := sql.Open("sqlserver", connStringMaster.String())
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to open master database")
+			return nil, errs.Wrap(err, "unable to open master database")
 		}
 		defer func() { _ = masterDB.Close() }() // Ensure we close the master connection
 
 		// Test the connection
 		err = masterDB.Ping()
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to connect to master database")
+			return nil, errs.Wrap(err, "unable to connect to master database")
 		}
 
 		if err := createDatabaseUnderAppLock(masterDB, dbConfig.Name); err != nil {
@@ -98,7 +98,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	// Connect to the actual database
 	db, err := sql.Open("sqlserver", connString.String())
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open database")
+		return nil, errs.Wrap(err, "unable to open database")
 	}
 
 	// Test the connection to the application database. This is also what makes an absent
@@ -107,7 +107,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	err = db.Ping()
 	if err != nil {
 		_ = db.Close()
-		return nil, errors.Wrap(err, "unable to connect to database")
+		return nil, errs.Wrap(err, "unable to connect to database")
 	}
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLServer, logSQL)
@@ -227,7 +227,7 @@ func createDatabaseUnderAppLock(masterDB *sql.DB, name string) error {
 
 	conn, err := masterDB.Conn(ctx)
 	if err != nil {
-		return errors.Wrap(err, "unable to pin a connection for the database creation lock")
+		return errs.Wrap(err, "unable to pin a connection for the database creation lock")
 	}
 	defer func() { _ = conn.Close() }()
 
@@ -236,17 +236,17 @@ func createDatabaseUnderAppLock(masterDB *sql.DB, name string) error {
 		SELECT @lockResult;`
 	var status int
 	if err := conn.QueryRowContext(ctx, takeLock, CreateDatabaseResource).Scan(&status); err != nil {
-		return errors.Wrap(err, "unable to take the database creation lock")
+		return errs.Wrap(err, "unable to take the database creation lock")
 	}
 	if status < 0 {
-		return errors.Errorf("unable to take the database creation lock: sp_getapplock returned %d", status)
+		return errs.Errorf("unable to take the database creation lock: sp_getapplock returned %d", status)
 	}
 	defer func() {
 		_, _ = conn.ExecContext(ctx, `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`, CreateDatabaseResource)
 	}()
 
 	if _, err := conn.ExecContext(ctx, createDatabaseCommand); err != nil {
-		return errors.Wrap(err, "unable to create database")
+		return errs.Wrap(err, "unable to create database")
 	}
 	return nil
 }
@@ -261,7 +261,7 @@ func databaseExists(ctx context.Context, masterDB *sql.DB, name string) (bool, e
 	var found int
 	if err := masterDB.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM sys.databases WHERE name = @p1", name).Scan(&found); err != nil {
-		return false, errors.Wrap(err, "unable to check whether the database exists")
+		return false, errs.Wrap(err, "unable to check whether the database exists")
 	}
 	return found > 0, nil
 }
@@ -339,20 +339,20 @@ func (d *MsSQLDatabase) ensureSchemaMigrationsTable() (err error) {
 
 	conn, err := d.DB.Conn(ctx)
 	if err != nil {
-		return errors.Wrap(err, "unable to pin a connection for the migration lock")
+		return errs.Wrap(err, "unable to pin a connection for the migration lock")
 	}
 	defer func() {
 		// ErrConnDone is what Close answers for a connection the deferred unlock below already
 		// disposed of, which is a deliberate outcome rather than a failure.
-		if cerr := conn.Close(); cerr != nil && !goerrors.Is(cerr, sql.ErrConnDone) {
-			err = goerrors.Join(err, cerr)
+		if cerr := conn.Close(); cerr != nil && !errors.Is(cerr, sql.ErrConnDone) {
+			err = errs.Join(err, cerr)
 		}
 	}()
 
 	// The lock waits indefinitely, which is what the library did too: the holder is another
 	// process's pre-create or migration, and both are short.
 	if err := eng.Lock(ctx, conn); err != nil {
-		return errors.Wrap(err, "unable to take the migration lock")
+		return errs.Wrap(err, "unable to take the migration lock")
 	}
 	defer func() {
 		// The same two obligations Migrator.run carries, for the same reasons, because this is
@@ -362,13 +362,13 @@ func (d *MsSQLDatabase) ensureSchemaMigrationsTable() (err error) {
 		// to the pool, where the next borrower would carry a migration lock for the life of the
 		// process. driver.ErrBadConn is how database/sql is told to discard it (#268).
 		if unlockErr := eng.Unlock(ctx, conn); unlockErr != nil {
-			err = goerrors.Join(err, errors.Wrap(unlockErr, "unable to release the migration lock"))
+			err = errs.Join(err, errs.Wrap(unlockErr, "unable to release the migration lock"))
 			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
 		}
 	}()
 
 	if _, err := conn.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
-		return errors.Wrap(err, "unable to create the schema_migrations table")
+		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
 	return nil
 }
@@ -386,7 +386,7 @@ func (d *MsSQLDatabase) NewMigrator() (*migrator.Migrator, error) {
 
 	m, err := migrator.New(d.DB, mssqlMigrationsFs, "migrations", migrator.SQLServer(d.dbConfig.Name))
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create migration instance")
+		return nil, errs.Wrap(err, "unable to create migration instance")
 	}
 	return m, nil
 }
@@ -408,7 +408,7 @@ func (d *MsSQLDatabase) Migrate() error {
 	if err != nil {
 		// StartupRefusal explains the one failure a starting server can be talked out of: a
 		// database a newer release already migrated. Everything else passes through.
-		return errors.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
+		return errs.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
 	}
 
 	return nil

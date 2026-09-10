@@ -34,6 +34,7 @@ import (
 	"github.com/leodip/goiabada/core/data/postgresdb"
 	"github.com/leodip/goiabada/core/data/schemadump"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
+	"github.com/leodip/goiabada/core/errs"
 	_ "github.com/microsoft/go-mssqldb"
 )
 
@@ -77,7 +78,7 @@ func (t target) withOverrides() (target, error) {
 	if v, ok := os.LookupEnv(prefix + "PORT"); ok {
 		port, err := strconv.Atoi(v)
 		if err != nil {
-			return t, fmt.Errorf("%sPORT is %q, which is not a port number: %w", prefix, v, err)
+			return t, errs.Errorf("%sPORT is %q, which is not a port number: %w", prefix, v, err)
 		}
 		t.port = port
 	}
@@ -115,7 +116,7 @@ func run() error {
 		fmt.Printf("dumping %s...\n", t.dialect)
 		encoded, err := dumpOne(t)
 		if err != nil {
-			return fmt.Errorf("%s: %w", t.dialect, err)
+			return errs.Errorf("%s: %w", t.dialect, err)
 		}
 		dumps[t.dialect] = encoded
 	}
@@ -149,7 +150,7 @@ func dumpOne(t target) ([]byte, error) {
 	defer cleanup()
 
 	if err := db.Migrate(); err != nil {
-		return nil, fmt.Errorf("migrate the scratch database to head: %w", err)
+		return nil, errs.Errorf("migrate the scratch database to head: %w", err)
 	}
 	// Read off the database that was just migrated rather than counted from the files on
 	// disk, so the header records what the chain actually reached. The two agree unless a
@@ -182,7 +183,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 		// in-memory database cannot provide it. The whole directory goes at cleanup.
 		dir, err := os.MkdirTemp("", "goiabada-schemadump-")
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("create a scratch directory: %w", err)
+			return nil, nil, nil, errs.Errorf("create a scratch directory: %w", err)
 		}
 		db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{
 			Type: "sqlite", DSN: filepath.Join(dir, "schemadump.db"),
@@ -239,7 +240,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 					name, name, name), name)
 		}, nil
 	}
-	return nil, nil, nil, fmt.Errorf("unrecognised dialect %q", t.dialect)
+	return nil, nil, nil, errs.Errorf("unrecognised dialect %q", t.dialect)
 }
 
 // dropDatabase removes a scratch database, reporting a failure rather than returning it: it
@@ -290,25 +291,25 @@ func scratchName(d schemadump.Dialect) string {
 func writeAtomically(path string, content []byte) error {
 	f, err := os.CreateTemp(filepath.Dir(path), ".schema.golden-*")
 	if err != nil {
-		return fmt.Errorf("create a temporary file beside %s: %w", path, err)
+		return errs.Errorf("create a temporary file beside %s: %w", path, err)
 	}
 	tmp := f.Name()
 	defer func() { _ = os.Remove(tmp) }() // a no-op once the rename below succeeded
 
 	if _, err := f.Write(content); err != nil {
 		_ = f.Close()
-		return fmt.Errorf("write %s: %w", tmp, err)
+		return errs.Errorf("write %s: %w", tmp, err)
 	}
 	if err := f.Close(); err != nil {
-		return fmt.Errorf("close %s: %w", tmp, err)
+		return errs.Errorf("close %s: %w", tmp, err)
 	}
 	// CreateTemp makes the file 0600, which would make the committed file's mode differ
 	// from every other file in the tree.
 	if err := os.Chmod(tmp, 0o644); err != nil {
-		return fmt.Errorf("chmod %s: %w", tmp, err)
+		return errs.Errorf("chmod %s: %w", tmp, err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		return fmt.Errorf("rename %s into place: %w", tmp, err)
+		return errs.Errorf("rename %s into place: %w", tmp, err)
 	}
 	return nil
 }

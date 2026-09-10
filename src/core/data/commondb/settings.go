@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) error {
@@ -28,14 +28,14 @@ func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) e
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert settings")
+		return errs.Wrap(err, "unable to insert settings")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	settings.Id = id
@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) e
 func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) error {
 
 	if settings.Id == 0 {
-		return errors.WithStack(errors.New("can't update settings with id 0"))
+		return errs.New("can't update settings with id 0")
 	}
 
 	originalUpdatedAt := settings.UpdatedAt
@@ -61,7 +61,7 @@ func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) e
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		settings.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update settings")
+		return errs.Wrap(err, "unable to update settings")
 	}
 
 	return nil
@@ -73,7 +73,7 @@ func (d *CommonDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -82,12 +82,12 @@ func (d *CommonDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 		addr := settingsStruct.Addr(&settings)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan settings")
+			return nil, errs.Wrap(err, "unable to scan settings")
 		}
 		return &settings, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -146,12 +146,12 @@ func (d *CommonDatabase) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimable
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to claim the cleanup run")
+		return false, errs.Wrap(err, "unable to claim the cleanup run")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get rows affected when claiming the cleanup run")
+		return false, errs.Wrap(err, "unable to get rows affected when claiming the cleanup run")
 	}
 
 	return rowsAffected == 1, nil

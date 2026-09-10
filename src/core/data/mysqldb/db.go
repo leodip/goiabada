@@ -3,6 +3,7 @@ package mysqldb
 import (
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/leodip/goiabada/core/data/migrator"
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 //go:embed migrations/*.sql
@@ -61,7 +62,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 	if dbConfig.Create {
 		tempDB, err := sql.Open("mysql", dsnWithoutDBname)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to open database")
+			return nil, errs.Wrap(err, "unable to open database")
 		}
 		defer func() { _ = tempDB.Close() }()
 
@@ -85,7 +86,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;", quoteIdentifier(dbConfig.Name))
 		_, err = tempDB.Exec(createDatabaseCommand)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to create database")
+			return nil, errs.Wrap(err, "unable to create database")
 		}
 	} else {
 		// The operator says the database is already there, so nothing is created and the
@@ -97,7 +98,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 
 	db, err := sql.Open("mysql", dsnWithDBname)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open database")
+		return nil, errs.Wrap(err, "unable to open database")
 	}
 
 	if !dbConfig.Create {
@@ -108,7 +109,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		// arm, where the CREATE DATABASE above already forces it (#293).
 		if err := db.Ping(); err != nil {
 			_ = db.Close()
-			return nil, errors.Wrap(err, "unable to connect to database")
+			return nil, errs.Wrap(err, "unable to connect to database")
 		}
 	}
 
@@ -168,7 +169,7 @@ const schemaMigrationsTableDDL = "CREATE TABLE IF NOT EXISTS schema_migrations "
 // starting against one empty database cannot both create it.
 func (d *MySQLDatabase) ensureSchemaMigrationsTable() error {
 	if _, err := d.DB.Exec(schemaMigrationsTableDDL); err != nil {
-		return errors.Wrap(err, "unable to create the schema_migrations table")
+		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
 	return nil
 }
@@ -186,7 +187,7 @@ func (d *MySQLDatabase) NewMigrator() (*migrator.Migrator, error) {
 
 	m, err := migrator.New(d.DB, mysqlMigrationsFs, "migrations", migrator.MySQL(d.dbConfig.Name))
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create migration instance")
+		return nil, errs.Wrap(err, "unable to create migration instance")
 	}
 	return m, nil
 }
@@ -208,7 +209,7 @@ func (d *MySQLDatabase) Migrate() error {
 	if err != nil {
 		// StartupRefusal explains the one failure a starting server can be talked out of: a
 		// database a newer release already migrated. Everything else passes through.
-		return errors.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
+		return errs.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
 	}
 
 	return nil

@@ -8,20 +8,20 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/rsautil"
 	"github.com/leodip/goiabada/core/uuidutil"
-	"github.com/pkg/errors"
 )
 
 // ErrRotationInProgress means a compare-and-set transitioned no row, so another rotation
 // had already moved the key this one read. The caller lost the race and nothing was
 // committed.
-var ErrRotationInProgress = errors.New("another signing key rotation is in progress")
+var ErrRotationInProgress = errs.New("another signing key rotation is in progress")
 
 // ErrKeySetIncomplete means the current or the next key is missing. The rotation refused
 // before writing anything, so the key set is exactly as it was found.
-var ErrKeySetIncomplete = errors.New("expected current and next signing keys to exist")
+var ErrKeySetIncomplete = errs.New("expected current and next signing keys to exist")
 
 // SigningKeyRotator performs the current -> previous -> deleted transition of the signing
 // keys, as one transaction whose every refusal happens before the commit.
@@ -106,7 +106,7 @@ func (r *SigningKeyRotator) Rotate() error {
 		// The guard runs before any write. It used to run after the delete below, so a
 		// deployment with no next key lost its previous key and was then refused (#251).
 		if currentKey == nil || nextKey == nil {
-			return errors.WithStack(ErrKeySetIncomplete)
+			return errs.WithStack(ErrKeySetIncomplete)
 		}
 
 		// The delete stays ahead of the demotion. Demoting while the old previous row is
@@ -124,7 +124,7 @@ func (r *SigningKeyRotator) Rotate() error {
 			return err
 		}
 		if !moved {
-			return errors.WithStack(ErrRotationInProgress)
+			return errs.WithStack(ErrRotationInProgress)
 		}
 
 		moved, err = r.database.UpdateKeyPairState(tx, nextKey.Id,
@@ -133,7 +133,7 @@ func (r *SigningKeyRotator) Rotate() error {
 			return err
 		}
 		if !moved {
-			return errors.WithStack(ErrRotationInProgress)
+			return errs.WithStack(ErrRotationInProgress)
 		}
 
 		return r.database.CreateKeyPair(tx, newNextKey)
@@ -145,26 +145,26 @@ func (r *SigningKeyRotator) generateNextKey() (*models.KeyPair, error) {
 
 	privateKey, err := rsautil.GeneratePrivateKey(r.keySizeBits)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to generate a private key")
+		return nil, errs.Wrap(err, "unable to generate a private key")
 	}
 	privateKeyPEM := rsautil.EncodePrivateKeyToPEM(privateKey)
 
 	// Encrypt the private key at rest (issue #83) before storing it.
 	privateKeyPEMEncrypted, err := encryption.EncryptData(string(privateKeyPEM))
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to encrypt the private key")
+		return nil, errs.Wrap(err, "unable to encrypt the private key")
 	}
 
 	publicKeyASN1DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to marshal public key to PKIX")
+		return nil, errs.Wrap(err, "unable to marshal public key to PKIX")
 	}
 	publicKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: publicKeyASN1DER})
 
 	kid := uuidutil.New()
 	publicKeyJWK, err := rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to marshal JWK")
+		return nil, errs.Wrap(err, "unable to marshal JWK")
 	}
 
 	return &models.KeyPair{

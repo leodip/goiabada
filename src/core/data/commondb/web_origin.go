@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin) error {
 
 	if webOrigin.ClientId == 0 {
-		return errors.WithStack(errors.New("client id must be greater than 0"))
+		return errs.New("client id must be greater than 0")
 	}
 
 	now := time.Now().UTC()
@@ -29,13 +29,13 @@ func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin
 	result, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
-		return errors.Wrap(err, "unable to insert webOrigin")
+		return errs.Wrap(err, "unable to insert webOrigin")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	webOrigin.Id = id
@@ -48,7 +48,7 @@ func (d *CommonDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -57,12 +57,12 @@ func (d *CommonDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 		addr := webOriginStruct.Addr(&webOrigin)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan webOrigin")
+			return nil, errs.Wrap(err, "unable to scan webOrigin")
 		}
 		return &webOrigin, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -95,7 +95,7 @@ func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -105,13 +105,13 @@ func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 		addr := webOriginStruct.Addr(&webOrigin)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan webOrigin")
+			return nil, errs.Wrap(err, "unable to scan webOrigin")
 		}
 		webOrigins = append(webOrigins, webOrigin)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return webOrigins, nil
@@ -127,7 +127,7 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -137,13 +137,13 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error
 		addr := webOriginStruct.Addr(&webOrigin)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan webOrigin")
+			return nil, errs.Wrap(err, "unable to scan webOrigin")
 		}
 		webOrigins = append(webOrigins, webOrigin)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return webOrigins, nil
@@ -169,19 +169,19 @@ func (d *CommonDatabase) WebOriginExists(tx *sql.Tx, origin string) (bool, error
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to query database")
+		return false, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
 	var count int
 	if rows.Next() {
 		if err := rows.Scan(&count); err != nil {
-			return false, errors.Wrap(err, "unable to scan web origin count")
+			return false, errs.Wrap(err, "unable to scan web origin count")
 		}
 	}
 
 	if err := rows.Err(); err != nil {
-		return false, errors.Wrap(err, "unable to read query results")
+		return false, errs.Wrap(err, "unable to read query results")
 	}
 
 	return count > 0, nil
@@ -198,7 +198,7 @@ func (d *CommonDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete webOrigin")
+		return errs.Wrap(err, "unable to delete webOrigin")
 	}
 
 	return nil

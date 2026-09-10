@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
@@ -28,14 +28,14 @@ func (d *CommonDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 	if err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert group")
+		return errs.Wrap(err, "unable to insert group")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	group.Id = id
@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 func (d *CommonDatabase) UpdateGroup(tx *sql.Tx, group *models.Group) error {
 
 	if group.Id == 0 {
-		return errors.WithStack(errors.New("can't update group with id 0"))
+		return errs.New("can't update group with id 0")
 	}
 
 	originalUpdatedAt := group.UpdatedAt
@@ -61,7 +61,7 @@ func (d *CommonDatabase) UpdateGroup(tx *sql.Tx, group *models.Group) error {
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		group.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update group")
+		return errs.Wrap(err, "unable to update group")
 	}
 
 	return nil
@@ -73,7 +73,7 @@ func (d *CommonDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Se
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -82,12 +82,12 @@ func (d *CommonDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Se
 		addr := groupStruct.Addr(&group)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan group")
+			return nil, errs.Wrap(err, "unable to scan group")
 		}
 		return &group, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -124,7 +124,7 @@ func (d *CommonDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -134,13 +134,13 @@ func (d *CommonDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.
 		addr := groupStruct.Addr(&group)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan group")
+			return nil, errs.Wrap(err, "unable to scan group")
 		}
 		groups = append(groups, group)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return groups, nil
@@ -154,7 +154,7 @@ func (d *CommonDatabase) GroupLoadPermissions(tx *sql.Tx, group *models.Group) e
 
 	groupPermissions, err := d.GetGroupPermissionsByGroupIds(tx, []int64{group.Id})
 	if err != nil {
-		return errors.Wrap(err, "unable to get group permissions")
+		return errs.Wrap(err, "unable to get group permissions")
 	}
 
 	permissionIds := make([]int64, len(groupPermissions))
@@ -164,7 +164,7 @@ func (d *CommonDatabase) GroupLoadPermissions(tx *sql.Tx, group *models.Group) e
 
 	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
 	if err != nil {
-		return errors.Wrap(err, "unable to get permissions")
+		return errs.Wrap(err, "unable to get permissions")
 	}
 
 	group.Permissions = make([]models.Permission, len(permissions))
@@ -186,7 +186,7 @@ func (d *CommonDatabase) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group
 
 	groupPermissions, err := d.GetGroupPermissionsByGroupIds(tx, groupIds)
 	if err != nil {
-		return errors.Wrap(err, "unable to get group permissions")
+		return errs.Wrap(err, "unable to get group permissions")
 	}
 
 	permissionIds := make([]int64, len(groupPermissions))
@@ -196,7 +196,7 @@ func (d *CommonDatabase) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group
 
 	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
 	if err != nil {
-		return errors.Wrap(err, "unable to get permissions")
+		return errs.Wrap(err, "unable to get permissions")
 	}
 
 	permissionsMap := make(map[int64]models.Permission)
@@ -233,7 +233,7 @@ func (d *CommonDatabase) GroupsLoadAttributes(tx *sql.Tx, groups []models.Group)
 
 	groupAttributes, err := d.GetGroupAttributesByGroupIds(tx, groupIds)
 	if err != nil {
-		return errors.Wrap(err, "unable to get group attributes")
+		return errs.Wrap(err, "unable to get group attributes")
 	}
 
 	groupAttributesMap := make(map[int64][]models.GroupAttribute)
@@ -280,7 +280,7 @@ func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -290,13 +290,13 @@ func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 		addr := groupStruct.Addr(&group)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan group")
+			return nil, errs.Wrap(err, "unable to scan group")
 		}
 		groups = append(groups, group)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return groups, nil
@@ -322,7 +322,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "unable to query database")
+		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -332,7 +332,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 		addr := groupStruct.Addr(&group)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, 0, errors.Wrap(err, "unable to scan group")
+			return nil, 0, errs.Wrap(err, "unable to scan group")
 		}
 		groups = append(groups, group)
 	}
@@ -343,7 +343,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	sql, args = selectBuilder.Build()
 	rows2, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "unable to query database")
+		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows2.Close() }()
 
@@ -351,15 +351,15 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	if rows2.Next() {
 		err = rows2.Scan(&total)
 		if err != nil {
-			return nil, 0, errors.Wrap(err, "unable to scan count")
+			return nil, 0, errs.Wrap(err, "unable to scan count")
 		}
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, errors.Wrap(err, "unable to read query results")
+		return nil, 0, errs.Wrap(err, "unable to read query results")
 	}
 	if err := rows2.Err(); err != nil {
-		return nil, 0, errors.Wrap(err, "unable to read count results")
+		return nil, 0, errs.Wrap(err, "unable to read count results")
 	}
 
 	return groups, total, nil
@@ -367,7 +367,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 
 func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error) {
 	if groupId <= 0 {
-		return nil, 0, errors.WithStack(errors.New("group id must be greater than 0"))
+		return nil, 0, errs.New("group id must be greater than 0")
 	}
 
 	if page < 1 {
@@ -393,7 +393,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "unable to query database")
+		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -403,7 +403,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 		addr := userStruct.Addr(&user)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, 0, errors.Wrap(err, "unable to scan user")
+			return nil, 0, errs.Wrap(err, "unable to scan user")
 		}
 		users = append(users, user)
 	}
@@ -416,7 +416,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	sql, args = selectBuilder.Build()
 	rows2, err := d.QuerySql(nil, sql, args...)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "unable to query database")
+		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows2.Close() }()
 
@@ -424,15 +424,15 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	if rows2.Next() {
 		err = rows2.Scan(&total)
 		if err != nil {
-			return nil, 0, errors.Wrap(err, "unable to scan count")
+			return nil, 0, errs.Wrap(err, "unable to scan count")
 		}
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, errors.Wrap(err, "unable to read query results")
+		return nil, 0, errs.Wrap(err, "unable to read query results")
 	}
 	if err := rows2.Err(); err != nil {
-		return nil, 0, errors.Wrap(err, "unable to read count results")
+		return nil, 0, errs.Wrap(err, "unable to read count results")
 	}
 
 	return users, total, nil
@@ -440,7 +440,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 
 func (d *CommonDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, error) {
 	if groupId <= 0 {
-		return 0, errors.WithStack(errors.New("group id must be greater than 0"))
+		return 0, errs.New("group id must be greater than 0")
 	}
 
 	selectBuilder := d.Flavor.NewSelectBuilder()
@@ -450,7 +450,7 @@ func (d *CommonDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, erro
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return 0, errors.Wrap(err, "unable to query database")
+		return 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -458,12 +458,12 @@ func (d *CommonDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, erro
 	if rows.Next() {
 		err = rows.Scan(&count)
 		if err != nil {
-			return 0, errors.Wrap(err, "unable to scan count")
+			return 0, errs.Wrap(err, "unable to scan count")
 		}
 		return count, nil
 	}
 	if err := rows.Err(); err != nil {
-		return 0, errors.Wrap(err, "unable to read query results")
+		return 0, errs.Wrap(err, "unable to read query results")
 	}
 
 	return 0, nil
@@ -480,7 +480,7 @@ func (d *CommonDatabase) DeleteGroup(tx *sql.Tx, groupId int64) error {
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete group")
+		return errs.Wrap(err, "unable to delete group")
 	}
 
 	return nil

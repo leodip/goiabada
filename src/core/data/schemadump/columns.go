@@ -3,6 +3,8 @@ package schemadump
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // dumpColumns reads one table's columns. Every branch returns the same nine values in the
@@ -110,7 +112,7 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 
 	rows, err := db.Query(q)
 	if err != nil {
-		return nil, fmt.Errorf("schemadump: column catalog lookup on %s.%s: %w", d, table, err)
+		return nil, errs.Errorf("schemadump: column catalog lookup on %s.%s: %w", d, table, err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -118,7 +120,7 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 	for rows.Next() {
 		var name, typ, nullable, def, hasDefault, collation, defName, defSystemNamed, generated string
 		if err := rows.Scan(&name, &typ, &nullable, &def, &hasDefault, &collation, &defName, &defSystemNamed, &generated); err != nil {
-			return nil, fmt.Errorf("schemadump: scan column catalog row on %s.%s: %w", d, table, err)
+			return nil, errs.Errorf("schemadump: scan column catalog row on %s.%s: %w", d, table, err)
 		}
 		cols = append(cols, ColumnShape{
 			Name: name, Type: typ, Nullable: nullable == "1", Default: def,
@@ -129,7 +131,7 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 		})
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("schemadump: iterate column catalog on %s.%s: %w", d, table, err)
+		return nil, errs.Errorf("schemadump: iterate column catalog on %s.%s: %w", d, table, err)
 	}
 
 	if d == SQLite && len(cols) > 0 {

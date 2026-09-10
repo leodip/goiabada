@@ -10,7 +10,7 @@ import (
 
 	b64 "encoding/base64"
 
-	"github.com/pkg/errors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 func GeneratePrivateKey(bitSize int) (*rsa.PrivateKey, error) {
@@ -75,7 +75,7 @@ func MarshalRSAPublicKeyToJWK(publicKey *rsa.PublicKey, kid string) ([]byte, err
 
 	publicKeyJWK, err := json.MarshalIndent(jwt, "", "  ")
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to marshal public key to JSON")
+		return nil, errs.Wrap(err, "unable to marshal public key to JSON")
 	}
 	return publicKeyJWK, nil
 }

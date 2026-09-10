@@ -10,8 +10,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 // emailRow is one users row as the lowercase backfill reads it: the address, the id that
@@ -91,7 +91,7 @@ func (d *CommonDatabase) BackfillLowercaseEmails() (int, int, error) {
 
 	rows, err := d.QuerySql(nil, query, args...)
 	if err != nil {
-		return 0, 0, errors.Wrap(err, "unable to query users for the lowercase email backfill")
+		return 0, 0, errs.Wrap(err, "unable to query users for the lowercase email backfill")
 	}
 
 	// Rows sharing a lowercased address are one group, and the whole of the collision policy is
@@ -104,7 +104,7 @@ func (d *CommonDatabase) BackfillLowercaseEmails() (int, int, error) {
 		var email string
 		if err := rows.Scan(&id, &email); err != nil {
 			_ = rows.Close()
-			return 0, 0, errors.Wrap(err, "unable to scan user email")
+			return 0, 0, errs.Wrap(err, "unable to scan user email")
 		}
 		lowered := strings.ToLower(email)
 		if email == lowered {
@@ -114,7 +114,7 @@ func (d *CommonDatabase) BackfillLowercaseEmails() (int, int, error) {
 	}
 	if err := rows.Err(); err != nil {
 		_ = rows.Close()
-		return 0, 0, errors.Wrap(err, "error iterating users for the lowercase email backfill")
+		return 0, 0, errs.Wrap(err, "error iterating users for the lowercase email backfill")
 	}
 	_ = rows.Close()
 
@@ -194,7 +194,7 @@ func (d *CommonDatabase) convergeEmailGroup(lowered string, candidates []int64) 
 			moved, err := d.trySetUserEmail(survivor.id, survivor.email, lowered)
 			if err != nil {
 				return rowsLowercased, rowsDisabled,
-					errors.Wrapf(err, "unable to lowercase the email of user id %d", survivor.id)
+					errs.Wrapf(err, "unable to lowercase the email of user id %d", survivor.id)
 			}
 			if moved {
 				rowsLowercased++
@@ -219,7 +219,7 @@ func (d *CommonDatabase) convergeEmailGroup(lowered string, candidates []int64) 
 				transitioned, err := d.disableAndRevoke(member.id, member.email)
 				if err != nil {
 					return rowsLowercased, rowsDisabled,
-						errors.Wrapf(err, "unable to disable duplicate email user id %d", member.id)
+						errs.Wrapf(err, "unable to disable duplicate email user id %d", member.id)
 				}
 				if !transitioned {
 					stale = true
@@ -282,7 +282,7 @@ func (d *CommonDatabase) readEmailGroup(lowered string, candidates []int64) ([]e
 
 	rows, err := d.QuerySql(nil, query, args...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to look up the users holding email %q", lowered)
+		return nil, errs.Wrapf(err, "unable to look up the users holding email %q", lowered)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -290,7 +290,7 @@ func (d *CommonDatabase) readEmailGroup(lowered string, candidates []int64) ([]e
 	for rows.Next() {
 		var r emailRow
 		if err := rows.Scan(&r.id, &r.email, &r.enabled); err != nil {
-			return nil, errors.Wrapf(err, "unable to scan a user holding email %q", lowered)
+			return nil, errs.Wrapf(err, "unable to scan a user holding email %q", lowered)
 		}
 		if strings.ToLower(r.email) != lowered {
 			continue
@@ -298,7 +298,7 @@ func (d *CommonDatabase) readEmailGroup(lowered string, candidates []int64) ([]e
 		members = append(members, r)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "error iterating users holding email %q", lowered)
+		return nil, errs.Wrapf(err, "error iterating users holding email %q", lowered)
 	}
 
 	return members, nil
@@ -335,7 +335,7 @@ func (d *CommonDatabase) trySetUserEmail(userId int64, expected string, desired 
 	// only issues this when desired differs from expected, so a matching row always changes.
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get rows affected when lowercasing a user email")
+		return false, errs.Wrap(err, "unable to get rows affected when lowercasing a user email")
 	}
 
 	return rowsAffected == 1, nil
@@ -640,12 +640,12 @@ func (d *CommonDatabase) tryDisableUserWithEmail(tx *sql.Tx, userId int64, expec
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to disable the user holding a duplicate email")
+		return false, errs.Wrap(err, "unable to disable the user holding a duplicate email")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get rows affected when disabling a duplicate email user")
+		return false, errs.Wrap(err, "unable to get rows affected when disabling a duplicate email user")
 	}
 
 	return rowsAffected == 1, nil

@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
 
 	if groupAttribute.GroupId == 0 {
-		return errors.WithStack(errors.New("can't create groupAttribute with group_id 0"))
+		return errs.New("can't create groupAttribute with group_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -32,14 +32,14 @@ func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models
 	if err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert groupAttribute")
+		return errs.Wrap(err, "unable to insert groupAttribute")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	groupAttribute.Id = id
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models
 func (d *CommonDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
 
 	if groupAttribute.Id == 0 {
-		return errors.WithStack(errors.New("can't update groupAttribute with id 0"))
+		return errs.New("can't update groupAttribute with id 0")
 	}
 
 	originalUpdatedAt := groupAttribute.UpdatedAt
@@ -65,7 +65,7 @@ func (d *CommonDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update groupAttribute")
+		return errs.Wrap(err, "unable to update groupAttribute")
 	}
 
 	return nil
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlb
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -86,12 +86,12 @@ func (d *CommonDatabase) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlb
 		addr := groupAttributeStruct.Addr(&groupAttribute)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan groupAttribute")
+			return nil, errs.Wrap(err, "unable to scan groupAttribute")
 		}
 		return &groupAttribute, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -128,7 +128,7 @@ func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -138,13 +138,13 @@ func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int
 		addr := groupAttributeStruct.Addr(&groupAttribute)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan groupAttribute")
+			return nil, errs.Wrap(err, "unable to scan groupAttribute")
 		}
 		groupAttributes = append(groupAttributes, groupAttribute)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return groupAttributes, nil
@@ -161,7 +161,7 @@ func (d *CommonDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -171,13 +171,13 @@ func (d *CommonDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) 
 		addr := groupAttributeStruct.Addr(&groupAttribute)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan groupAttribute")
+			return nil, errs.Wrap(err, "unable to scan groupAttribute")
 		}
 		groupAttributes = append(groupAttributes, groupAttribute)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return groupAttributes, nil
@@ -194,7 +194,7 @@ func (d *CommonDatabase) DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete groupAttribute")
+		return errs.Wrap(err, "unable to delete groupAttribute")
 	}
 
 	return nil

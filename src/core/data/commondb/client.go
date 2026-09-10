@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
@@ -28,14 +28,14 @@ func (d *CommonDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert client")
+		return errs.Wrap(err, "unable to insert client")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	client.Id = id
@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
 func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 
 	if client.Id == 0 {
-		return errors.WithStack(errors.New("can't update client with id 0"))
+		return errs.New("can't update client with id 0")
 	}
 
 	originalUpdatedAt := client.UpdatedAt
@@ -61,7 +61,7 @@ func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		client.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update client")
+		return errs.Wrap(err, "unable to update client")
 	}
 
 	return nil
@@ -95,11 +95,11 @@ func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 func (d *CommonDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 
 	if tx == nil {
-		return errors.WithStack(errors.New("acquiring a client row requires a transaction: an autocommitted statement releases the row before the caller can read it"))
+		return errs.New("acquiring a client row requires a transaction: an autocommitted statement releases the row before the caller can read it")
 	}
 
 	if clientId == 0 {
-		return errors.WithStack(errors.New("can't acquire a client row with an id of 0"))
+		return errs.New("can't acquire a client row with an id of 0")
 	}
 
 	acquire := sqlbuilder.NewUpdateBuilder()
@@ -109,7 +109,7 @@ func (d *CommonDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 
 	query, args := acquire.BuildWithFlavor(d.Flavor)
 	if _, err := d.ExecSql(tx, query, args...); err != nil {
-		return errors.Wrap(err, "unable to acquire client row")
+		return errs.Wrap(err, "unable to acquire client row")
 	}
 
 	// A client that is not there affects no rows and is not reported here. There is nothing to
@@ -155,11 +155,11 @@ func (d *CommonDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, error) {
 
 	if tx == nil {
-		return false, errors.WithStack(errors.New("making a client public requires a transaction: the row must be held between acquiring it and classifying the write"))
+		return false, errs.New("making a client public requires a transaction: the row must be held between acquiring it and classifying the write")
 	}
 
 	if clientId == 0 {
-		return false, errors.WithStack(errors.New("can't make a client public with an id of 0"))
+		return false, errs.New("can't make a client public with an id of 0")
 	}
 
 	if err := d.AcquireClientRow(tx, clientId); err != nil {
@@ -182,12 +182,12 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 	query, args := classify.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to make client public")
+		return false, errs.Wrap(err, "unable to make client public")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get rows affected when making client public")
+		return false, errs.Wrap(err, "unable to get rows affected when making client public")
 	}
 	if rowsAffected == 1 {
 		return true, nil
@@ -202,7 +202,7 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 		return false, err
 	}
 	if client == nil {
-		return false, errors.WithStack(errors.New("can't make a client public: no client with that id"))
+		return false, errs.New("can't make a client public: no client with that id")
 	}
 	return false, nil
 }
@@ -213,7 +213,7 @@ func (d *CommonDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -222,12 +222,12 @@ func (d *CommonDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 		addr := clientStruct.Addr(&client)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan client")
+			return nil, errs.Wrap(err, "unable to scan client")
 		}
 		return &client, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -279,7 +279,7 @@ func (d *CommonDatabase) ClientLoadRedirectURIs(tx *sql.Tx, client *models.Clien
 	var err error
 	client.RedirectURIs, err = d.GetRedirectURIsByClientId(tx, client.Id)
 	if err != nil {
-		return errors.Wrap(err, "unable to get redirect URIs")
+		return errs.Wrap(err, "unable to get redirect URIs")
 	}
 
 	return nil
@@ -294,7 +294,7 @@ func (d *CommonDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client)
 	var err error
 	client.WebOrigins, err = d.GetWebOriginsByClientId(tx, client.Id)
 	if err != nil {
-		return errors.Wrap(err, "unable to get web origins")
+		return errs.Wrap(err, "unable to get web origins")
 	}
 
 	return nil
@@ -315,7 +315,7 @@ func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]model
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -325,13 +325,13 @@ func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]model
 		addr := clientStruct.Addr(&client)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan client")
+			return nil, errs.Wrap(err, "unable to scan client")
 		}
 		clients = append(clients, client)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return clients, nil
@@ -371,7 +371,7 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -381,13 +381,13 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 		addr := clientStruct.Addr(&client)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan client")
+			return nil, errs.Wrap(err, "unable to scan client")
 		}
 		clients = append(clients, client)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return clients, nil
@@ -419,7 +419,7 @@ func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 		sql, args := deleteBuilder.Build()
 		_, err := d.ExecSql(tx, sql, args...)
 		if err != nil {
-			return errors.Wrap(err, "unable to delete client")
+			return errs.Wrap(err, "unable to delete client")
 		}
 
 		return nil

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *MsSQLDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) error {
@@ -26,7 +26,7 @@ func (d *MsSQLDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) er
 
 	parts := strings.SplitN(sql, "VALUES", 2)
 	if len(parts) != 2 {
-		return errors.New("unexpected SQL format from sqlbuilder")
+		return errs.New("unexpected SQL format from sqlbuilder")
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) er
 	if err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert resource")
+		return errs.Wrap(err, "unable to insert resource")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -43,7 +43,7 @@ func (d *MsSQLDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) er
 		if err != nil {
 			resource.CreatedAt = originalCreatedAt
 			resource.UpdatedAt = originalUpdatedAt
-			return errors.Wrap(err, "unable to scan resource id")
+			return errs.Wrap(err, "unable to scan resource id")
 		}
 	}
 
@@ -53,7 +53,7 @@ func (d *MsSQLDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) er
 	if err := rows.Err(); err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert resource")
+		return errs.Wrap(err, "unable to insert resource")
 	}
 
 	return nil

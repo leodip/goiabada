@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
@@ -28,14 +28,14 @@ func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 	if err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert refreshToken")
+		return errs.Wrap(err, "unable to insert refreshToken")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	refreshToken.Id = id
@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
 
 	if refreshToken.Id == 0 {
-		return errors.WithStack(errors.New("can't update refreshToken with id 0"))
+		return errs.New("can't update refreshToken with id 0")
 	}
 
 	originalUpdatedAt := refreshToken.UpdatedAt
@@ -61,7 +61,7 @@ func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		refreshToken.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update refreshToken")
+		return errs.Wrap(err, "unable to update refreshToken")
 	}
 
 	return nil
@@ -86,7 +86,7 @@ func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 func (d *CommonDatabase) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int64) (bool, error) {
 
 	if refreshTokenId == 0 {
-		return false, errors.WithStack(errors.New("can't mark refresh token with id 0 as revoked"))
+		return false, errs.New("can't mark refresh token with id 0 as revoked")
 	}
 
 	ub := d.Flavor.NewUpdateBuilder()
@@ -103,12 +103,12 @@ func (d *CommonDatabase) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId in
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to mark refresh token as revoked")
+		return false, errs.Wrap(err, "unable to mark refresh token as revoked")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get rows affected when marking refresh token as revoked")
+		return false, errs.Wrap(err, "unable to get rows affected when marking refresh token as revoked")
 	}
 
 	return rowsAffected == 1, nil
@@ -138,7 +138,7 @@ func (d *CommonDatabase) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId in
 func (d *CommonDatabase) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
 
 	if firstRefreshTokenJti == "" {
-		return 0, errors.WithStack(errors.New("can't revoke a refresh token family with an empty first refresh token jti"))
+		return 0, errs.New("can't revoke a refresh token family with an empty first refresh token jti")
 	}
 
 	ub := d.Flavor.NewUpdateBuilder()
@@ -155,12 +155,12 @@ func (d *CommonDatabase) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJ
 	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSql(tx, query, args...)
 	if err != nil {
-		return 0, errors.Wrap(err, "unable to revoke refresh token family")
+		return 0, errs.Wrap(err, "unable to revoke refresh token family")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return 0, errors.Wrap(err, "unable to get rows affected when revoking refresh token family")
+		return 0, errs.Wrap(err, "unable to get rows affected when revoking refresh token family")
 	}
 
 	return rowsAffected, nil
@@ -172,7 +172,7 @@ func (d *CommonDatabase) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbui
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -181,12 +181,12 @@ func (d *CommonDatabase) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbui
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan refreshToken")
+			return nil, errs.Wrap(err, "unable to scan refreshToken")
 		}
 		return &refreshToken, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -221,7 +221,7 @@ func (d *CommonDatabase) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.R
 
 	code, err := d.GetCodeById(tx, refreshToken.CodeId.Int64)
 	if err != nil {
-		return errors.Wrap(err, "unable to load code")
+		return errs.Wrap(err, "unable to load code")
 	}
 
 	if code != nil {
@@ -245,7 +245,7 @@ func (d *CommonDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.R
 
 	user, err := d.GetUserById(tx, refreshToken.UserId.Int64)
 	if err != nil {
-		return errors.Wrap(err, "unable to load user")
+		return errs.Wrap(err, "unable to load user")
 	}
 
 	if user != nil {
@@ -269,7 +269,7 @@ func (d *CommonDatabase) RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models
 
 	client, err := d.GetClientById(tx, refreshToken.ClientId.Int64)
 	if err != nil {
-		return errors.Wrap(err, "unable to load client")
+		return errs.Wrap(err, "unable to load client")
 	}
 
 	if client != nil {
@@ -306,7 +306,7 @@ func (d *CommonDatabase) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -316,13 +316,13 @@ func (d *CommonDatabase) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan refreshToken")
+			return nil, errs.Wrap(err, "unable to scan refreshToken")
 		}
 		refreshTokens = append(refreshTokens, &refreshToken)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return refreshTokens, nil
@@ -351,7 +351,7 @@ func (d *CommonDatabase) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, session
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -361,13 +361,13 @@ func (d *CommonDatabase) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, session
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan refreshToken")
+			return nil, errs.Wrap(err, "unable to scan refreshToken")
 		}
 		refreshTokens = append(refreshTokens, &refreshToken)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return refreshTokens, nil
@@ -384,7 +384,7 @@ func (d *CommonDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) er
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete refreshToken")
+		return errs.Wrap(err, "unable to delete refreshToken")
 	}
 
 	return nil
@@ -419,7 +419,7 @@ func (d *CommonDatabase) deleteRefreshTokensByColumn(tx *sql.Tx, column string, 
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrapf(err, "unable to delete refresh tokens by %v", column)
+		return errs.Wrapf(err, "unable to delete refresh tokens by %v", column)
 	}
 
 	return nil
@@ -464,7 +464,7 @@ func (d *CommonDatabase) DeleteExpiredRefreshTokens(tx *sql.Tx) error {
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete expired refresh tokens")
+		return errs.Wrap(err, "unable to delete expired refresh tokens")
 	}
 
 	return nil
@@ -503,7 +503,7 @@ func (d *CommonDatabase) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*
 	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -513,14 +513,14 @@ func (d *CommonDatabase) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan refreshToken")
+			return nil, errs.Wrap(err, "unable to scan refreshToken")
 		}
 		refreshTokens = append(refreshTokens, &refreshToken)
 	}
 	// Without this a mid-stream failure would return a PARTIAL token set as success,
 	// and the caller would commit a revocation sweep that missed rows it never saw.
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return refreshTokens, nil
@@ -561,7 +561,7 @@ func (d *CommonDatabase) GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) 
 	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -571,14 +571,14 @@ func (d *CommonDatabase) GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) 
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan refreshToken")
+			return nil, errs.Wrap(err, "unable to scan refreshToken")
 		}
 		refreshTokens = append(refreshTokens, &refreshToken)
 	}
 	// Without this a mid-stream failure would return a PARTIAL token set as success,
 	// and the flip would commit a revocation sweep that missed rows it never saw.
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return refreshTokens, nil
@@ -621,7 +621,7 @@ func (d *CommonDatabase) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshToken
 	sql, args := ub.BuildWithFlavor(d.Flavor)
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to promote refresh token generations")
+		return errs.Wrap(err, "unable to promote refresh token generations")
 	}
 
 	return nil

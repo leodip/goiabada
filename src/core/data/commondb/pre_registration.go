@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
@@ -28,14 +28,14 @@ func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mode
 	if err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert preRegistration")
+		return errs.Wrap(err, "unable to insert preRegistration")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	preRegistration.Id = id
@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mode
 func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
 
 	if preRegistration.Id == 0 {
-		return errors.WithStack(errors.New("can't update preRegistration with id 0"))
+		return errs.New("can't update preRegistration with id 0")
 	}
 
 	originalUpdatedAt := preRegistration.UpdatedAt
@@ -61,7 +61,7 @@ func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *mode
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update preRegistration")
+		return errs.Wrap(err, "unable to update preRegistration")
 	}
 
 	return nil
@@ -73,7 +73,7 @@ func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sql
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -82,12 +82,12 @@ func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sql
 		addr := preRegistrationStruct.Addr(&preRegistration)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan preRegistration")
+			return nil, errs.Wrap(err, "unable to scan preRegistration")
 		}
 		return &preRegistration, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -120,7 +120,7 @@ func (d *CommonDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete preRegistration")
+		return errs.Wrap(err, "unable to delete preRegistration")
 	}
 
 	return nil

@@ -5,9 +5,9 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/uuidutil"
-	"github.com/pkg/errors"
 )
 
 type UserCreator struct {
@@ -61,7 +61,7 @@ func (uc *UserCreator) CreateUser(input *CreateUserInput) (*models.User, error) 
 	}
 
 	if accountPermission == nil {
-		return nil, errors.WithStack(errors.New("unable to find the account permission"))
+		return nil, errs.New("unable to find the account permission")
 	}
 
 	user.Permissions = []models.Permission{*accountPermission}

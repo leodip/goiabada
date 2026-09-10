@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *models.Permission) error {
 
 	if permission.ResourceId == 0 {
-		return errors.WithStack(errors.New("can't create permission with resource_id 0"))
+		return errs.New("can't create permission with resource_id 0")
 	}
 
 	now := time.Now().UTC()
@@ -32,14 +32,14 @@ func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *models.Permiss
 	if err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to insert permission")
+		return errs.Wrap(err, "unable to insert permission")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to get last insert id")
+		return errs.Wrap(err, "unable to get last insert id")
 	}
 
 	permission.Id = id
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *models.Permiss
 func (d *CommonDatabase) UpdatePermission(tx *sql.Tx, permission *models.Permission) error {
 
 	if permission.Id == 0 {
-		return errors.WithStack(errors.New("can't update permission with id 0"))
+		return errs.New("can't update permission with id 0")
 	}
 
 	originalUpdatedAt := permission.UpdatedAt
@@ -65,7 +65,7 @@ func (d *CommonDatabase) UpdatePermission(tx *sql.Tx, permission *models.Permiss
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
 		permission.UpdatedAt = originalUpdatedAt
-		return errors.Wrap(err, "unable to update permission")
+		return errs.Wrap(err, "unable to update permission")
 	}
 
 	return nil
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuild
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -86,12 +86,12 @@ func (d *CommonDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuild
 		addr := permissionStruct.Addr(&permission)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan permission")
+			return nil, errs.Wrap(err, "unable to scan permission")
 		}
 		return &permission, nil
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return nil, nil
@@ -124,7 +124,7 @@ func (d *CommonDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -134,13 +134,13 @@ func (d *CommonDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64
 		addr := permissionStruct.Addr(&permission)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan permission")
+			return nil, errs.Wrap(err, "unable to scan permission")
 		}
 		permissions = append(permissions, permission)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return permissions, nil
@@ -159,7 +159,7 @@ func (d *CommonDatabase) PermissionsLoadResources(tx *sql.Tx, permissions []mode
 
 	resources, err := d.GetResourcesByIds(tx, resourceIds)
 	if err != nil {
-		return errors.Wrap(err, "unable to get resources for permissions")
+		return errs.Wrap(err, "unable to get resources for permissions")
 	}
 
 	resourceMap := make(map[int64]models.Resource, len(resources))
@@ -189,7 +189,7 @@ func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
+		return nil, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -199,13 +199,13 @@ func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) 
 		addr := permissionStruct.Addr(&permission)
 		err = rows.Scan(addr...)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan permission")
+			return nil, errs.Wrap(err, "unable to scan permission")
 		}
 		permissions = append(permissions, permission)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "unable to read query results")
+		return nil, errs.Wrap(err, "unable to read query results")
 	}
 
 	return permissions, nil
@@ -222,7 +222,7 @@ func (d *CommonDatabase) DeletePermission(tx *sql.Tx, permissionId int64) error 
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete permission")
+		return errs.Wrap(err, "unable to delete permission")
 	}
 
 	return nil
