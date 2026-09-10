@@ -82,6 +82,79 @@ func TestInternalServerError(t *testing.T) {
 	assert.True(t, strings.HasSuffix(w.Body.String(), "</html>"))
 }
 
+// NotFound owns the answer to a stale or malformed URL, so this row owns the status, the page and
+// the headers it carries; its silence is pinned in http_helper_logging_test.go (#279 decision 11).
+func TestNotFound(t *testing.T) {
+	httpHelper := NewHttpHelper(&mocks.TestFS{
+		FileContents: map[string]string{
+			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
+			"not_found.html":              "{{define \"content\"}}Not found{{end}}",
+		},
+	})
+
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), constants.ContextKeySettings, &models.Settings{})
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
+	r.Get("/admin/clients/{clientId}/settings", func(w http.ResponseWriter, r *http.Request) {
+		httpHelper.NotFound(w, r)
+	})
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/admin/clients/not-a-number/settings", nil))
+
+	// Read the snapshot the client receives rather than the recorder's live header map, for the
+	// reason TestInternalServerError states (#247).
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	assert.Equal(t, http.StatusNotFound, res.StatusCode)
+	assert.Equal(t, "<html>Not found</html>", w.Body.String())
+	assert.Equal(t, "text/html; charset=UTF-8", res.Header.Get("Content-Type"))
+	assertNoStore(t, res.Header)
+
+	// Nothing of the request survives onto the page: no request id, because there is no log line to
+	// join it to, and no echo of the id that was rejected.
+	assert.NotContains(t, w.Body.String(), "not-a-number")
+}
+
+// A render failure is a real server fault, and it is the one path out of NotFound that is not a
+// 404. The template FS here has the layout the error page needs and no not_found.html at all, so
+// ParseFS fails and the fallback is exercised for its own reason rather than by a stub.
+func TestNotFound_RenderFailureAnswers500(t *testing.T) {
+	httpHelper := NewHttpHelper(&mocks.TestFS{
+		FileContents: map[string]string{
+			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
+			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
+		},
+	})
+
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), constants.ContextKeySettings, &models.Settings{})
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		httpHelper.NotFound(w, r)
+	})
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
+	assert.Contains(t, w.Body.String(), "Error:")
+}
+
 func TestRenderTemplate(t *testing.T) {
 	templateFS := &mocks.TestFS{
 		FileContents: map[string]string{

@@ -65,6 +65,40 @@ func render(t *testing.T, page string, bind map[string]interface{}) string {
 	return out
 }
 
+// The 404 page, end to end: the real HttpHelper.NotFound over the real embedded template FS, at the
+// HTTP seam. Everything else in this file renders a bind through RenderTemplateToBuffer, which
+// cannot see a status; this one has to, because the status is half of what decision 11 changed and
+// the console is invisible to the integration tier, which drives the auth server and only ever
+// mentions the console's base URL as a string to assert against (#279).
+func TestRender_NotFoundPage(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/admin/clients/not-a-number/settings", nil)
+	settings := &models.Settings{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
+	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
+	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
+
+	w := httptest.NewRecorder()
+	handlerhelpers.NewHttpHelper(web.TemplateFS()).NotFound(w, req)
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	assert.Equal(t, "text/html; charset=UTF-8", res.Header.Get("Content-Type"))
+
+	out := w.Body.String()
+	assert.Containsf(t, out, `lang="pt-BR"`, "the 404 page's <html lang> is not localized")
+	assert.Contains(t, out, "Não encontrado (404)")
+
+	visible := regexp.MustCompile(`(?s)<script.*?</script>`).ReplaceAllString(out, "")
+	if leak := rawKeyRe.FindString(visible); leak != "" {
+		t.Errorf("raw i18n key leaked into the 404 page: %q", leak)
+	}
+
+	// Nothing of the rejected URL reaches the page, and no request id: there is no log line for one
+	// to join it to, which is the whole of decision 11's "no log line".
+	assert.NotContains(t, out, "not-a-number")
+}
+
 func TestRender_AccountPhone(t *testing.T) {
 	bind := map[string]interface{}{
 		"selectedPhoneCountryUniqueId": "",

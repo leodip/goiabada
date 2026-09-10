@@ -144,6 +144,70 @@ func errorPageHelper() *HttpHelper {
 	})
 }
 
+func notFoundPageHelper() *HttpHelper {
+	return NewHttpHelper(&mocks.TestFS{
+		FileContents: map[string]string{
+			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
+			"not_found.html":              "{{define \"content\"}}Not found{{end}}",
+			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
+		},
+	})
+}
+
+// Decision 11's other half, and the half no status assertion can see. The console reaches NotFound
+// from 203 sites that used to answer 500, and every one of them wrote a log record with a stack: if
+// this method logged, the change would trade one page for the same volume of noise, and an operator
+// grepping for ERROR would still be reading other people's stale bookmarks. Empty rather than "no
+// ERROR record": a warn or an info line at this volume is the same defect (#279 decision 11).
+func TestNotFound_LogsNothing(t *testing.T) {
+	logs := captureLogs(t)
+	httpHelper := notFoundPageHelper()
+
+	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
+		httpHelper.NotFound(w, r)
+	})
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+
+	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+	assert.Empty(t, logs.all(), "a stale or malformed URL is not an event an operator has to read")
+}
+
+// The silence is scoped to the 404. A render failure inside NotFound is a server fault reaching
+// InternalServerError, and it keeps the whole of decision 9's record: one line, the error value, and
+// the request id the page shows. errorPageHelper has no not_found.html, so ParseFS fails for its own
+// reason.
+func TestNotFound_RenderFailureStillLogsOnce(t *testing.T) {
+	logs := captureLogs(t)
+	httpHelper := errorPageHelper()
+
+	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
+		httpHelper.NotFound(w, r)
+	})
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+
+	require.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+
+	record, ok := theOneErrorRecord(t, logs)
+	if !ok {
+		return
+	}
+	assert.Equal(t, "internal server error", record.Message)
+
+	logged, isError := loggedErrorOf(t, record)
+	if !isError {
+		return
+	}
+	assert.Contains(t, logged.Error(), "unable to render template")
+
+	requestId, isString := attrsOf(record)["request_id"].(string)
+	assert.True(t, isString, "request_id must be a string attribute")
+	assert.Contains(t, w.Body.String(), "Error: "+requestId)
+}
+
 func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
 	logs := captureLogs(t)
 	httpHelper := errorPageHelper()

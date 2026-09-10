@@ -28,13 +28,13 @@ func HandleAdminClientSettingsGet(
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("clientId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 		// Get JWT info from context to extract access token
@@ -50,7 +50,7 @@ func HandleAdminClientSettingsGet(
 			return
 		}
 		if clientResp == nil {
-			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", id))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -123,13 +123,13 @@ func HandleAdminClientSettingsPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("clientId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -153,7 +153,7 @@ func HandleAdminClientSettingsPost(
 			return
 		}
 		if clientResp == nil {
-			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", id))
+			httpHelper.NotFound(w, r)
 			return
 		}
 

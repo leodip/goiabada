@@ -26,12 +26,12 @@ func HandleAdminResourceUsersWithPermissionGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -49,7 +49,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -75,7 +75,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 		}
 		selectedPermission, err := strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -91,7 +91,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 				}
 			}
 			if !found {
-				httpHelper.InternalServerError(w, r, errs.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
+				httpHelper.NotFound(w, r)
 				return
 			}
 		}
@@ -176,12 +176,12 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -198,7 +198,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -295,12 +295,12 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -317,7 +317,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -343,7 +343,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 		}
 		selectedPermission, err := strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -358,7 +358,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 			}
 		}
 		if !found {
-			httpHelper.InternalServerError(w, r, errs.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -395,12 +395,12 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -417,7 +417,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -443,7 +443,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 		}
 		selectedPermission, err := strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 		// check if permission belongs to resource
@@ -455,7 +455,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			}
 		}
 		if !found {
-			httpHelper.InternalServerError(w, r, errs.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -495,12 +495,12 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -517,7 +517,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 

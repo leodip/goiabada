@@ -50,8 +50,9 @@ func (s *stubApiClient) GetSettingsGeneral(accessToken string) (*api.SettingsGen
 // the bind correctly, which is what these cases are for.
 type stubHttpHelper struct {
 	handlers.HttpHelper
-	bind map[string]interface{}
-	err  error
+	bind     map[string]interface{}
+	err      error
+	notFound bool
 }
 
 func (s *stubHttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string,
@@ -63,6 +64,11 @@ func (s *stubHttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, 
 func (s *stubHttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	s.err = err
 	w.WriteHeader(http.StatusInternalServerError)
+}
+
+func (s *stubHttpHelper) NotFound(w http.ResponseWriter, r *http.Request) {
+	s.notFound = true
+	w.WriteHeader(http.StatusNotFound)
 }
 
 // The auth server refuses a redirect URI with a 400 whose description names the offending

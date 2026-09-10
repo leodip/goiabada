@@ -319,6 +319,52 @@ func (_c *HttpHelper_LookupFromUrlQueryOrFormPost_Call) RunAndReturn(run func(r 
 	return _c
 }
 
+// NotFound provides a mock function for the type HttpHelper
+func (_mock *HttpHelper) NotFound(w http.ResponseWriter, r *http.Request) {
+	_mock.Called(w, r)
+	return
+}
+
+// HttpHelper_NotFound_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NotFound'
+type HttpHelper_NotFound_Call struct {
+	*mock.Call
+}
+
+// NotFound is a helper method to define mock.On call
+//   - w http.ResponseWriter
+//   - r *http.Request
+func (_e *HttpHelper_Expecter) NotFound(w any, r any) *HttpHelper_NotFound_Call {
+	return &HttpHelper_NotFound_Call{Call: _e.mock.On("NotFound", w, r)}
+}
+
+func (_c *HttpHelper_NotFound_Call) Run(run func(w http.ResponseWriter, r *http.Request)) *HttpHelper_NotFound_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 http.ResponseWriter
+		if args[0] != nil {
+			arg0 = args[0].(http.ResponseWriter)
+		}
+		var arg1 *http.Request
+		if args[1] != nil {
+			arg1 = args[1].(*http.Request)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *HttpHelper_NotFound_Call) Return() *HttpHelper_NotFound_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *HttpHelper_NotFound_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request)) *HttpHelper_NotFound_Call {
+	_c.Run(run)
+	return _c
+}
+
 // RenderTemplate provides a mock function for the type HttpHelper
 func (_mock *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string, data map[string]interface{}) error {
 	ret := _mock.Called(w, r, layoutName, templateName, data)

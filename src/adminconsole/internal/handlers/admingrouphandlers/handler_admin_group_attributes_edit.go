@@ -24,25 +24,25 @@ func HandleAdminGroupAttributesEditGet(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		groupId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		idStr = chi.URLParam(r, "attributeId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("attributeId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		attributeId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -60,7 +60,7 @@ func HandleAdminGroupAttributesEditGet(
 			return
 		}
 		if group == nil {
-			httpHelper.InternalServerError(w, r, errs.New("group not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -71,7 +71,7 @@ func HandleAdminGroupAttributesEditGet(
 			return
 		}
 		if attribute == nil || attribute.GroupId != group.Id {
-			httpHelper.InternalServerError(w, r, errs.New("attribute not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -97,25 +97,25 @@ func HandleAdminGroupAttributesEditPost(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		groupId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		idStr = chi.URLParam(r, "attributeId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("attributeId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		attributeId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -133,7 +133,7 @@ func HandleAdminGroupAttributesEditPost(
 			return
 		}
 		if group == nil {
-			httpHelper.InternalServerError(w, r, errs.New("group not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -144,7 +144,7 @@ func HandleAdminGroupAttributesEditPost(
 			return
 		}
 		if currentAttribute == nil || currentAttribute.GroupId != group.Id {
-			httpHelper.InternalServerError(w, r, errs.New("attribute not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
