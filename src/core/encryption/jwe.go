@@ -45,6 +45,13 @@ const (
 	// bits, regardless of the key size."
 	idTokenHintIVLen  = 12
 	idTokenHintTagLen = 16
+
+	// maxLoggedHeaderValue bounds each caller-chosen header string a refusal below
+	// quotes into its message. It is a rune count, which %q then escapes, so the worst
+	// case is 128 astral runes rendering as \U0010FFFF: about 1.3 KB, comfortably
+	// inside the 4096 the request logger allows a whole request target. A real "alg"
+	// or "enc" is under ten characters, so nothing legitimate is ever clipped.
+	maxLoggedHeaderValue = 128
 )
 
 // jweSegmentNames names the five compact-serialization segments of RFC 7516
@@ -154,11 +161,19 @@ func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, erro
 	// RFC 7516 section 5.2's closing paragraph: "unless the algorithms used in the JWE
 	// are acceptable to the application, it SHOULD consider the JWE to be invalid".
 	// Both are exact string compares, and neither value selects any code path below.
+	//
+	// Both diagnostics quote with a precision, as does the duplicate-name refusal in
+	// parseIDTokenHintHeader: those three are the only refusals here that interpolate a
+	// string the caller chose. The logout handler logs this error verbatim, on a record
+	// of its own that the request logger's maxLoggedTarget never reaches, so an
+	// unquoted %q lets an unauthenticated caller who knows any client_id write about a
+	// megabyte to the log per request -- the same defect #159 bounded the request
+	// target for. Drop the precision and that returns (#277).
 	if alg := idTokenHintHeaderString(header, "alg"); alg != "dir" {
-		return "", errors.Errorf("id_token_hint header alg is %q, want \"dir\"", alg)
+		return "", errors.Errorf("id_token_hint header alg is %.*q, want \"dir\"", maxLoggedHeaderValue, alg)
 	}
 	if enc := idTokenHintHeaderString(header, "enc"); enc != "A256GCM" {
-		return "", errors.Errorf("id_token_hint header enc is %q, want \"A256GCM\"", enc)
+		return "", errors.Errorf("id_token_hint header enc is %.*q, want \"A256GCM\"", maxLoggedHeaderValue, enc)
 	}
 	// RFC 7516 section 4.1.3 makes "zip" a parameter an implementation MUST understand
 	// and process. This one does not compress, so it refuses rather than ignores: no
@@ -297,7 +312,9 @@ func parseIDTokenHintHeader(raw []byte) (map[string]json.RawMessage, error) {
 		}
 		name, _ := tok.(string)
 		if seen[name] {
-			return nil, errors.Errorf("id_token_hint header repeats the member name %q", name)
+			// Bounded for the same reason the alg and enc refusals are: the member name
+			// is the caller's and this error reaches the server log whole (#277).
+			return nil, errors.Errorf("id_token_hint header repeats the member name %.*q", maxLoggedHeaderValue, name)
 		}
 		seen[name] = true
 		expectName = false
