@@ -417,7 +417,8 @@ func HandleResetPasswordPost(
 		err := passwordValidator.ValidatePassword(r.Context(), password)
 		if err != nil {
 			// i18n surface: A — browser-flow form rerender.
-			if locErr, ok := err.(*i18n.LocalizedError); ok {
+			var locErr *i18n.LocalizedError
+			if errors.As(err, &locErr) {
 				renderError(locErr.Localize(r.Context()))
 			} else {
 				renderError(err.Error())

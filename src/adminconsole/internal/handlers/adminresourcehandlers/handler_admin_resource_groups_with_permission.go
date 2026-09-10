@@ -334,7 +334,8 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds}
 		if err := apiClient.UpdateGroupPermissions(accessToken, group.Id, req); err != nil {
 			// Provide clean error to UI if API returned structured error
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
 				return
 			}
@@ -474,7 +475,8 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds}
 		if err := apiClient.UpdateGroupPermissions(accessToken, group.Id, req); err != nil {
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
 				return
 			}

@@ -81,7 +81,8 @@ func HandleAdminUserProfilePicturePost(
 		response, err := apiClient.UploadUserProfilePicture(jwtInfo.TokenResponse.AccessToken, userId, pictureData, header.Filename)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				w.WriteHeader(apiErr.StatusCode)
 				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
@@ -139,7 +140,8 @@ func HandleAdminUserProfilePictureDelete(
 		err = apiClient.DeleteUserProfilePicture(jwtInfo.TokenResponse.AccessToken, userId)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				w.WriteHeader(apiErr.StatusCode)
 				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,

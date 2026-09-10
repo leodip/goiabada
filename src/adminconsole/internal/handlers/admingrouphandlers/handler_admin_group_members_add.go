@@ -94,7 +94,8 @@ func HandleAdminGroupMembersSearchGet(
 
 		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
 			} else {
 				httpHelper.JsonError(w, r, err)
@@ -114,7 +115,8 @@ func HandleAdminGroupMembersSearchGet(
 
 		users, _, err := apiClient.SearchUsersWithGroupAnnotation(jwtInfo.TokenResponse.AccessToken, query, group.Id, 1, 15)
 		if err != nil {
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
 			} else {
 				httpHelper.JsonError(w, r, err)
@@ -181,7 +183,8 @@ func HandleAdminGroupMembersAddPost(
 
 		err = apiClient.AddUserToGroup(jwtInfo.TokenResponse.AccessToken, id, userId)
 		if err != nil {
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
 			} else {
 				httpHelper.JsonError(w, r, err)

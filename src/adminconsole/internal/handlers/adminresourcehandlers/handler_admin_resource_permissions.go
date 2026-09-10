@@ -163,7 +163,8 @@ func HandleAdminResourcePermissionsPost(
 		}
 		updateReq := &api.UpdateResourcePermissionsRequest{Permissions: upserts}
 		if err := apiClient.UpdateResourcePermissions(jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); err != nil {
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				result.Error = apiErr.Message
 				httpHelper.EncodeJson(w, r, result)
 				return

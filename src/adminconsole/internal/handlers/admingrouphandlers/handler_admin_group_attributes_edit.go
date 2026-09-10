@@ -185,7 +185,8 @@ func HandleAdminGroupAttributesEditPost(
 		_, err = apiClient.UpdateGroupAttribute(jwtInfo.TokenResponse.AccessToken, attributeId, updateReq)
 		if err != nil {
 			// Handle API errors by extracting the message for display
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				renderError(apiErr.Message)
 				return
 			}

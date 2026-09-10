@@ -155,7 +155,8 @@ func HandleAdminUserAuthenticationPost(
 			_, err := apiClient.UpdateUserPassword(accessToken, id, passwordReq)
 			if err != nil {
 				// Check if it's a validation error
-				if apiErr, ok := err.(*apiclient.APIError); ok && apiErr.StatusCode == 400 {
+				var apiErr *apiclient.APIError
+				if errors.As(err, &apiErr) && apiErr.StatusCode == 400 {
 					renderError(apiErr.Message)
 					return
 				}

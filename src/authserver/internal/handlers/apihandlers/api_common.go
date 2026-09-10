@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/leodip/goiabada/core/api"
@@ -35,13 +36,22 @@ func writeJSONError(w http.ResponseWriter, message, code string, statusCode int)
 // already on the error. Consumers route on the HTTP status code.
 //
 // i18n surface: C — admin/account API.
+//
+// Two errors.As tests rather than a type switch, in the switch's own order, so a validator's error
+// keeps its code and its localized text after anything on the way up has wrapped it. A type switch
+// reads only the outermost value, so a single wrap sent the whole thing to the default arm, where
+// the code flattens to VALIDATION_ERROR and the description becomes the wrapped Error() string
+// with the wrapper's prefix on it (#279 decision 6).
 func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
-	switch e := err.(type) {
-	case *i18n.LocalizedError:
-		writeJSONError(w, e.Localize(r.Context()), e.Code, http.StatusBadRequest)
-	case *customerrors.ErrorDetail:
-		writeJSONError(w, e.GetDescription(), "VALIDATION_ERROR", http.StatusBadRequest)
-	default:
-		writeJSONError(w, err.Error(), "VALIDATION_ERROR", http.StatusBadRequest)
+	var localizedErr *i18n.LocalizedError
+	if errors.As(err, &localizedErr) {
+		writeJSONError(w, localizedErr.Localize(r.Context()), localizedErr.Code, http.StatusBadRequest)
+		return
 	}
+	var errorDetail *customerrors.ErrorDetail
+	if errors.As(err, &errorDetail) {
+		writeJSONError(w, errorDetail.GetDescription(), "VALIDATION_ERROR", http.StatusBadRequest)
+		return
+	}
+	writeJSONError(w, err.Error(), "VALIDATION_ERROR", http.StatusBadRequest)
 }

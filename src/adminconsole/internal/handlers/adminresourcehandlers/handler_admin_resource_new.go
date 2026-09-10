@@ -68,7 +68,8 @@ func HandleAdminResourceNewPost(
 
 		_, err := apiClient.CreateResource(jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				renderError(apiErr.Message)
 				return
 			}

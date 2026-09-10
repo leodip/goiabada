@@ -171,8 +171,8 @@ func HandleAuthorizeGet(
 			// refined from ui_locales above. Anything that is not a LocalizedError is a database
 			// failure from inside the validator, which answered 500 before this change too
 			// (#213 decision 9).
-			localizedErr, ok := err.(*i18n.LocalizedError)
-			if ok {
+			var localizedErr *i18n.LocalizedError
+			if errors.As(err, &localizedErr) {
 				renderErrorUi(localizedErr.Localize(r.Context()), http.StatusOK)
 				return
 			} else {
@@ -407,8 +407,8 @@ func HandleAuthorizeGet(
 			HasRequestURI: r.Form.Has("request_uri"),
 		})
 		if err != nil {
-			valError, ok := err.(*customerrors.ErrorDetail)
-			if ok {
+			var valError *customerrors.ErrorDetail
+			if errors.As(err, &valError) {
 				answerValidationError(valError)
 				return
 			}
@@ -434,8 +434,8 @@ func HandleAuthorizeGet(
 		})
 
 		if err != nil {
-			valError, ok := err.(*customerrors.ErrorDetail)
-			if ok {
+			var valError *customerrors.ErrorDetail
+			if errors.As(err, &valError) {
 				answerValidationError(valError)
 				return
 			} else {
@@ -447,8 +447,8 @@ func HandleAuthorizeGet(
 		err = authorizeValidator.ValidateScopes(authContext.Scope)
 
 		if err != nil {
-			valError, ok := err.(*customerrors.ErrorDetail)
-			if ok {
+			var valError *customerrors.ErrorDetail
+			if errors.As(err, &valError) {
 				answerValidationError(valError)
 				return
 			} else {
@@ -460,8 +460,8 @@ func HandleAuthorizeGet(
 		// Validate and normalize the prompt parameter
 		normalizedPrompt, err := authorizeValidator.ValidatePrompt(r.FormValue("prompt"))
 		if err != nil {
-			valError, ok := err.(*customerrors.ErrorDetail)
-			if ok {
+			var valError *customerrors.ErrorDetail
+			if errors.As(err, &valError) {
 				answerValidationError(valError)
 				return
 			} else {
@@ -476,8 +476,8 @@ func HandleAuthorizeGet(
 		hintSub, err := validateIdTokenHint(idTokenHint, tokenParser, settings)
 		if err != nil {
 			// id_token_hint validation errors are redirected to client
-			valError, ok := err.(*customerrors.ErrorDetail)
-			if ok {
+			var valError *customerrors.ErrorDetail
+			if errors.As(err, &valError) {
 				answerValidationError(valError)
 				return
 			}

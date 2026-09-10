@@ -66,7 +66,8 @@ func HandleAccountProfilePicturePost(
 		response, err := apiClient.UploadAccountProfilePicture(jwtInfo.TokenResponse.AccessToken, pictureData, header.Filename)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				w.WriteHeader(apiErr.StatusCode)
 				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
@@ -111,7 +112,8 @@ func HandleAccountProfilePictureDelete(
 		err := apiClient.DeleteAccountProfilePicture(jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				w.WriteHeader(apiErr.StatusCode)
 				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,

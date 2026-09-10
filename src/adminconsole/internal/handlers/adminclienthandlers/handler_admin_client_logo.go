@@ -133,7 +133,8 @@ func HandleAdminClientLogoPost(
 		response, err := apiClient.UploadClientLogo(jwtInfo.TokenResponse.AccessToken, clientId, logoData, header.Filename)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				w.WriteHeader(apiErr.StatusCode)
 				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
@@ -187,7 +188,8 @@ func HandleAdminClientLogoDelete(
 		err = apiClient.DeleteClientLogo(jwtInfo.TokenResponse.AccessToken, clientId)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				w.WriteHeader(apiErr.StatusCode)
 				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,

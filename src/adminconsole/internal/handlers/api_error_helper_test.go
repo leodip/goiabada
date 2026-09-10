@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -95,4 +96,49 @@ func TestHandleAPIErrorJson_GenericBranchForOtherStatuses(t *testing.T) {
 
 	assert.Same(t, apiErr, *captured,
 		"a status outside the forwarded set must reach JsonError unwrapped, for its generic branch")
+}
+
+// TestHandleAPIErrorJson_ForwardsAWrappedAPIError is decision 6's regression guard at this helper.
+// The three tests above hand it the *APIError itself, which is what the api client returns today, so
+// they pass against a bare type assertion as well as against errors.As. This one does not: the
+// moment anything between the api client and the handler adds context to the error, the assertion
+// stops seeing the 409 and the administrator gets "An unexpected server error has occurred" for a
+// race they could have retried (#279).
+func TestHandleAPIErrorJson_ForwardsAWrappedAPIError(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	captured := captureJsonError(httpHelper)
+
+	HandleAPIErrorJson(httpHelper, httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/admin/settings/keys/rotate", nil),
+		errs.Wrap(&apiclient.APIError{
+			Code:       "ROTATION_IN_PROGRESS",
+			Message:    "Another key rotation is in progress",
+			StatusCode: http.StatusConflict,
+		}, "unable to rotate the signing keys"))
+
+	detail, ok := (*captured).(*customerrors.ErrorDetail)
+	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+	assert.Equal(t, "ROTATION_IN_PROGRESS", detail.GetCode())
+	assert.Equal(t, "Another key rotation is in progress", detail.GetDescription())
+	assert.Equal(t, http.StatusConflict, detail.GetHttpStatusCode())
+}
+
+// TestHandleAPIErrorWithCallback_RendersAWrappedBadRequest is the same guard on the form path, which
+// routes on the same type through its own assertion. A 400 here is the API telling the administrator
+// what is wrong with the form they just submitted, so a wrap losing it replaces that sentence with a
+// 500 page and discards the form.
+func TestHandleAPIErrorWithCallback_RendersAWrappedBadRequest(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	rendered := ""
+	HandleAPIErrorWithCallback(httpHelper, httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/admin/clients/1/settings", nil),
+		errs.Wrap(&apiclient.APIError{
+			Code:       "VALIDATION_ERROR",
+			Message:    "Invalid client identifier",
+			StatusCode: http.StatusBadRequest,
+		}, "unable to save the client"),
+		func(message string) { rendered = message })
+
+	assert.Equal(t, "Invalid client identifier", rendered)
 }

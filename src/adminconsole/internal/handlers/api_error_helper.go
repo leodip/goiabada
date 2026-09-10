@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -10,7 +11,8 @@ import (
 
 // HandleAPIError - for simple operations without forms (delete, etc.)
 func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
-	if apiErr, ok := err.(*apiclient.APIError); ok {
+	var apiErr *apiclient.APIError
+	if errors.As(err, &apiErr) {
 		httpHelper.InternalServerError(w, r, fmt.Errorf("API error: %s (Code: %s, StatusCode: %d)", apiErr.Message, apiErr.Code, apiErr.StatusCode))
 	} else {
 		httpHelper.InternalServerError(w, r, err)
@@ -24,7 +26,8 @@ func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reques
 // anything else escalates to InternalServerError. The English description
 // from the API response is surfaced verbatim.
 func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error, renderErrorFunc func(string)) {
-	if apiErr, ok := err.(*apiclient.APIError); ok {
+	var apiErr *apiclient.APIError
+	if errors.As(err, &apiErr) {
 		if apiErr.StatusCode == http.StatusBadRequest {
 			renderErrorFunc(apiErr.Message)
 			return
@@ -57,7 +60,8 @@ func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r 
 // escaping is load-bearing rather than defensive, because showModalDialog assigns the
 // description to innerHTML.
 func HandleAPIErrorJson(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
-	if apiErr, ok := err.(*apiclient.APIError); ok &&
+	var apiErr *apiclient.APIError
+	if errors.As(err, &apiErr) &&
 		(apiErr.StatusCode == http.StatusBadRequest || apiErr.StatusCode == http.StatusConflict) {
 		httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
 			apiErr.Code, apiErr.Message, apiErr.StatusCode))

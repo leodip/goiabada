@@ -135,7 +135,8 @@ func HandleAdminUserEmailPost(
 		updatedUser, err := apiClient.UpdateUserEmail(jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
 			// Handle API validation errors by displaying them in template
-			if apiErr, ok := err.(*apiclient.APIError); ok && apiErr.StatusCode == 400 {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) && apiErr.StatusCode == 400 {
 				bind := map[string]interface{}{
 					"user":          user,
 					"email":         updateReq.Email,

@@ -139,7 +139,8 @@ func HandleAccountOtpPost(
 				Password: password,
 			}
 			if _, err := apiClient.UpdateAccountOTP(jwtInfo.TokenResponse.AccessToken, req); err != nil {
-				if apiErr, ok := err.(*apiclient.APIError); ok && isHandledAccountOTPError(apiErr.Code) {
+				var apiErr *apiclient.APIError
+				if errors.As(err, &apiErr) && isHandledAccountOTPError(apiErr.Code) {
 					renderDisableError(apiErr.Message)
 					return
 				}
@@ -165,7 +166,8 @@ func HandleAccountOtpPost(
 				OtpCode:  otpCode,
 			}
 			if _, err := apiClient.UpdateAccountOTP(jwtInfo.TokenResponse.AccessToken, req); err != nil {
-				if apiErr, ok := err.(*apiclient.APIError); ok {
+				var apiErr *apiclient.APIError
+				if errors.As(err, &apiErr) {
 					// An enrolment that has already succeeded, from another tab or another
 					// client, reloads the page instead of redrawing the form. Redrawing it
 					// would call the enrolment endpoint, which refuses for this same reason,
