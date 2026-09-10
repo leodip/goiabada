@@ -157,12 +157,6 @@ func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *ht
 	}
 	if continuationId == "" {
 		continuationId = stringutil.GenerateSecurityRandomString(continuationIdLength)
-		// GenerateSecurityRandomString answers "" when the system CSPRNG is unavailable.
-		// Writing that would put an empty id in the marker, which the POST refuses
-		// outright, so failing here is the same outcome with a stack trace attached.
-		if continuationId == "" {
-			return "", errors.WithStack(errors.New("unable to generate a link marker continuation id"))
-		}
 	}
 
 	jsonData, err := json.Marshal(&LinkMarker{
