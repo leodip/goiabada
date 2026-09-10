@@ -35,7 +35,6 @@ func HandleAPISettingsAuditLogsGet(
 
 // HandleAPISettingsAuditLogsPut - PUT /api/v1/admin/settings/audit-logs
 func HandleAPISettingsAuditLogsPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,

@@ -19,7 +19,6 @@ import (
 
 // HandleAPISettingsKeysGet - GET /api/v1/admin/settings/keys
 func HandleAPISettingsKeysGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

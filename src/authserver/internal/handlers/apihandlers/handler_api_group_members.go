@@ -15,7 +15,6 @@ import (
 )
 
 func HandleAPIGroupMembersGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -80,7 +79,6 @@ func HandleAPIGroupMembersGet(
 }
 
 func HandleAPIGroupMemberAddPost(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
@@ -167,7 +165,6 @@ func HandleAPIGroupMemberAddPost(
 }
 
 func HandleAPIGroupMemberDelete(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,

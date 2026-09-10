@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
@@ -20,7 +19,6 @@ import (
 // HandleAPIAccountLogoutRequestPost - POST /api/v1/account/logout-request
 // Returns a prepared logout instruction (form_post preferred) or a redirect URL.
 func HandleAPIAccountLogoutRequestPost(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

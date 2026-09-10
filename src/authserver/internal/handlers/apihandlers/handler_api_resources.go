@@ -43,7 +43,6 @@ func HandleAPIResourcesGet(
 
 // HandleAPIResourceCreatePost - POST /api/v1/admin/resources
 func HandleAPIResourceCreatePost(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
@@ -118,7 +117,6 @@ func HandleAPIResourceCreatePost(
 
 // HandleAPIResourceGet - GET /api/v1/admin/resources/{id}
 func HandleAPIResourceGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +151,6 @@ func HandleAPIResourceGet(
 
 // HandleAPIResourceUpdatePut - PUT /api/v1/admin/resources/{id}
 func HandleAPIResourceUpdatePut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
@@ -257,7 +254,6 @@ func HandleAPIResourceUpdatePut(
 
 // HandleAPIResourceDelete - DELETE /api/v1/admin/resources/{id}
 func HandleAPIResourceDelete(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,

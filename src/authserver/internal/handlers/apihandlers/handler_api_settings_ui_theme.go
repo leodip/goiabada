@@ -36,7 +36,6 @@ func HandleAPISettingsUIThemeGet(
 
 // HandleAPISettingsUIThemePut - PUT /api/v1/admin/settings/ui-theme
 func HandleAPISettingsUIThemePut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
