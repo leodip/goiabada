@@ -41,7 +41,7 @@ func HandleAPIAccountProfilePicturePost(
 		}
 
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -79,7 +79,7 @@ func HandleAPIAccountProfilePicturePost(
 		// Validate the image
 		result := imaging.ValidateProfilePicture(pictureData, maxFileSize)
 		if !result.Valid {
-			writeJSONError(w, result.Error, "INVALID_IMAGE", http.StatusBadRequest)
+			writeJSONError(w, result.Error, "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -153,7 +153,7 @@ func HandleAPIAccountProfilePictureDelete(
 		}
 
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -204,7 +204,7 @@ func HandleAPIAccountProfilePictureGet(
 		}
 
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

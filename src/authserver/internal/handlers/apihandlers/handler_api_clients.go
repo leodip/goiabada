@@ -282,7 +282,7 @@ func HandleAPIClientCreatePost(
 
 		var req api.CreateClientRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
@@ -421,7 +421,7 @@ func HandleAPIClientUpdatePut(
 
 		var updateReq api.UpdateClientSettingsRequest
 		if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
@@ -625,7 +625,7 @@ func HandleAPIClientAuthenticationPut(
 
 		var req api.UpdateClientAuthenticationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
@@ -770,7 +770,7 @@ func HandleAPIClientOAuth2FlowsPut(
 
 		var req api.UpdateClientOAuth2FlowsRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
@@ -864,7 +864,7 @@ func HandleAPIClientRedirectURIsPut(
 
 		var req api.UpdateClientRedirectURIsRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
@@ -1015,7 +1015,7 @@ func HandleAPIClientWebOriginsPut(
 
 		var req api.UpdateClientWebOriginsRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
@@ -1205,7 +1205,7 @@ func HandleAPIClientTokensPut(
 
 		var req api.UpdateClientTokensRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 

@@ -23,13 +23,13 @@ func HandleAPIUserSessionsGet(
 		// Get user ID from URL parameter
 		idStr := chi.URLParam(r, "id")
 		if idStr == "" {
-			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID format", "INVALID_USER_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -40,7 +40,7 @@ func HandleAPIUserSessionsGet(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -145,13 +145,13 @@ func HandleAPIUserSessionDelete(
 		// Get session ID from URL parameter
 		idStr := chi.URLParam(r, "id")
 		if idStr == "" {
-			writeJSONError(w, "User session ID is required", "USER_SESSION_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User session ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		sessionId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user session ID format", "INVALID_USER_SESSION_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user session ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -162,7 +162,7 @@ func HandleAPIUserSessionDelete(
 			return
 		}
 		if userSession == nil {
-			writeJSONError(w, "User session not found", "USER_SESSION_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User session not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

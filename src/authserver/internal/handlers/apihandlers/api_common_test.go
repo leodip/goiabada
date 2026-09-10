@@ -91,3 +91,62 @@ func TestWriteValidationError(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteJSONError_GenericConditionEnvelopes is seam 4's retired-code table: one row per
+// condition decision 18 flattened, naming the survivor and the status it rides on.
+//
+// The rows carry the sentence as well as the code, because that is the half of the flattening that
+// could have gone wrong without anything failing. Fifteen spellings became three, and every one of
+// the 115 sites kept the message it already wrote: an operator reading "Invalid user ID" and a
+// console forwarding it to a person see exactly what they saw before, and the code stopped being
+// fifteen names for three conditions. A change that flattened the description alongside the code
+// would pass a status assertion and lose the only part of the body a human reads.
+//
+// api_error_code_lint_test.go is what stops a fourth spelling appearing; this is what says the
+// three mean what they say.
+func TestWriteJSONError_GenericConditionEnvelopes(t *testing.T) {
+	tests := []struct {
+		name        string
+		description string
+		code        string
+		status      int
+		retired     string // one of the spellings this row replaced, for the reader
+	}{
+		{
+			name:        "a rejected value",
+			description: "Invalid user ID",
+			code:        "VALIDATION_ERROR",
+			status:      http.StatusBadRequest,
+			retired:     "INVALID_USER_ID",
+		},
+		{
+			name:        "a body that will not parse",
+			description: "Invalid request body",
+			code:        "INVALID_REQUEST_BODY",
+			status:      http.StatusBadRequest,
+			retired:     "INVALID_REQUEST",
+		},
+		{
+			name:        "an absent entity",
+			description: "User not found",
+			code:        "NOT_FOUND",
+			status:      http.StatusNotFound,
+			retired:     "USER_NOT_FOUND",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			writeJSONError(rr, test.description, test.code, test.status)
+
+			assert.Equal(t, test.status, rr.Code)
+			assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, test.code, code)
+			assert.NotEqual(t, test.retired, code, "the retired spelling must not come back")
+			assert.Equal(t, test.description, description,
+				"flattening the code must not flatten the sentence a person reads")
+		})
+	}
+}

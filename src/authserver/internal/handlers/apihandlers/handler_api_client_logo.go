@@ -24,13 +24,13 @@ func HandleAPIClientLogoPost(
 		// Parse client ID from URL
 		idStr := chi.URLParam(r, "id")
 		if len(idStr) == 0 {
-			writeJSONError(w, "Client ID is required", "CLIENT_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		clientId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid client ID", "INVALID_CLIENT_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -42,7 +42,7 @@ func HandleAPIClientLogoPost(
 		}
 
 		if client == nil {
-			writeJSONError(w, "Client not found", "CLIENT_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -80,7 +80,7 @@ func HandleAPIClientLogoPost(
 		// Validate the image
 		result := imaging.ValidateProfilePicture(fileData, maxFileSize)
 		if !result.Valid {
-			writeJSONError(w, result.Error, "INVALID_IMAGE", http.StatusBadRequest)
+			writeJSONError(w, result.Error, "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -143,13 +143,13 @@ func HandleAPIClientLogoDelete(
 		// Parse client ID from URL
 		idStr := chi.URLParam(r, "id")
 		if len(idStr) == 0 {
-			writeJSONError(w, "Client ID is required", "CLIENT_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		clientId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid client ID", "INVALID_CLIENT_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -161,7 +161,7 @@ func HandleAPIClientLogoDelete(
 		}
 
 		if client == nil {
-			writeJSONError(w, "Client not found", "CLIENT_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -202,13 +202,13 @@ func HandleAPIClientLogoGet(
 		// Parse client ID from URL
 		idStr := chi.URLParam(r, "id")
 		if len(idStr) == 0 {
-			writeJSONError(w, "Client ID is required", "CLIENT_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		clientId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid client ID", "INVALID_CLIENT_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -220,7 +220,7 @@ func HandleAPIClientLogoGet(
 		}
 
 		if client == nil {
-			writeJSONError(w, "Client not found", "CLIENT_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

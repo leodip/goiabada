@@ -262,7 +262,7 @@ func TestHandleAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_IMAGE", response["error_code"])
+	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
 func TestHandleAPIAccountProfilePicturePost_CreateNew(t *testing.T) {

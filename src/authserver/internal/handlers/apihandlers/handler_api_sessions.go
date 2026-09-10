@@ -35,6 +35,10 @@ import (
 // so a status written from inside a helper is invisible to the scan and openapi.yaml could
 // drift under it with every test still passing. It also makes each operation's surface
 // exact, which is why create declares no 404 and delete declares no 404 either.
+//
+// readSessionRequest is the one exception, and it pays that scan's price the way the other
+// implicit-status helpers do: it answers its own 400, and statusesWrittenIn reads it by
+// name so the five callers keep their documented 400 (#279).
 
 // maxSessionRequestBytes bounds a request body. The largest real payload is an admin
 // console session holding a full token set, which measures about 13 KB of ciphertext, and
@@ -68,19 +72,26 @@ func adminConsoleSessions(database data.Database) sessionstore.Backend {
 	return sessionstore.NewDatabaseBackend(database, constants.AdminConsoleSessionName)
 }
 
-// readSessionRequest decodes a bounded JSON body and checks the identifier is present. It
-// reports whether the request is usable; the caller writes the 400, so the status stays
-// visible in the handler that can answer it.
-func readSessionRequest(r *http.Request, w http.ResponseWriter, target interface{}, id func() string) (message, code string, ok bool) {
+// readSessionRequest decodes a bounded JSON body, checks the identifier is present, and answers
+// the 400 itself when either fails, reporting whether the request is usable.
+//
+// It used to return (message, code, ok) for five callers that each wrote the identical
+// writeJSONError line. Writing it here is what keeps every error code on this surface a literal in
+// the code position of a writeJSONError call, which is the one rule the survivor-table lint in
+// api_error_code_lint_test.go can check; a code arriving through a variable is a code nothing
+// holds to the table (#279).
+func readSessionRequest(r *http.Request, w http.ResponseWriter, target interface{}, id func() string) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, maxSessionRequestBytes)
 
 	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
-		return "Invalid request body", "INVALID_REQUEST_BODY", false
+		writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
+		return false
 	}
 	if strings.TrimSpace(id()) == "" {
-		return "Session id is required", "SESSION_ID_REQUIRED", false
+		writeJSONError(w, "Session id is required", "VALIDATION_ERROR", http.StatusBadRequest)
+		return false
 	}
-	return "", "", true
+	return true
 }
 
 func writeSessionJSON(w http.ResponseWriter, r *http.Request, body interface{}) {
@@ -104,15 +115,14 @@ func HandleAPISessionLoadPost(database data.Database) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionLoadRequest
-		if message, code, ok := readSessionRequest(r, w, &req, func() string { return req.Id }); !ok {
-			writeJSONError(w, message, code, http.StatusBadRequest)
+		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
 			return
 		}
 
 		record, err := backend.Load(r.Context(), req.Id)
 		if err != nil {
 			if errors.Is(err, sessionstore.ErrNotFound) {
-				writeJSONError(w, "Session not found", "SESSION_NOT_FOUND", http.StatusNotFound)
+				writeJSONError(w, "Session not found", "NOT_FOUND", http.StatusNotFound)
 				return
 			}
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to load a browser session"))
@@ -135,8 +145,7 @@ func HandleAPISessionCreatePost(database data.Database) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionWriteRequest
-		if message, code, ok := readSessionRequest(r, w, &req, func() string { return req.Id }); !ok {
-			writeJSONError(w, message, code, http.StatusBadRequest)
+		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
 			return
 		}
 
@@ -160,15 +169,14 @@ func HandleAPISessionUpdatePost(database data.Database) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionWriteRequest
-		if message, code, ok := readSessionRequest(r, w, &req, func() string { return req.Id }); !ok {
-			writeJSONError(w, message, code, http.StatusBadRequest)
+		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
 			return
 		}
 
 		expiresAt, err := backend.Update(r.Context(), req.Id, []byte(req.Data), req.Authenticated)
 		if err != nil {
 			if errors.Is(err, sessionstore.ErrNotFound) {
-				writeJSONError(w, "Session not found", "SESSION_NOT_FOUND", http.StatusNotFound)
+				writeJSONError(w, "Session not found", "NOT_FOUND", http.StatusNotFound)
 				return
 			}
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to update a browser session"))
@@ -189,15 +197,14 @@ func HandleAPISessionTouchPost(database data.Database) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionTouchRequest
-		if message, code, ok := readSessionRequest(r, w, &req, func() string { return req.Id }); !ok {
-			writeJSONError(w, message, code, http.StatusBadRequest)
+		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
 			return
 		}
 
 		expiresAt, err := backend.Touch(r.Context(), req.Id, req.Authenticated)
 		if err != nil {
 			if errors.Is(err, sessionstore.ErrNotFound) {
-				writeJSONError(w, "Session not found", "SESSION_NOT_FOUND", http.StatusNotFound)
+				writeJSONError(w, "Session not found", "NOT_FOUND", http.StatusNotFound)
 				return
 			}
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to touch a browser session"))
@@ -218,8 +225,7 @@ func HandleAPISessionDeletePost(database data.Database) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionLoadRequest
-		if message, code, ok := readSessionRequest(r, w, &req, func() string { return req.Id }); !ok {
-			writeJSONError(w, message, code, http.StatusBadRequest)
+		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
 			return
 		}
 

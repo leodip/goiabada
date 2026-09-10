@@ -931,7 +931,7 @@ paths:
 
         Note: while GET takes the sessionIdentifier, DELETE takes the numeric session id at the
         same position. It does not accept the identifier: a value that is not an integer is
-        refused with 400 and error_code INVALID_USER_SESSION_ID.
+        refused with 400 and error_code VALIDATION_ERROR.
       operationId: deleteUserSession
       parameters:
         - name: sessionIdentifier

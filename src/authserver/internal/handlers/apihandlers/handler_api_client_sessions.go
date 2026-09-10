@@ -24,12 +24,12 @@ func HandleAPIClientSessionsGet(
 		// Parse client ID
 		idStr := chi.URLParam(r, "id")
 		if idStr == "" {
-			writeJSONError(w, "Client ID is required", "CLIENT_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		clientId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid client ID format", "INVALID_CLIENT_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid client ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -40,7 +40,7 @@ func HandleAPIClientSessionsGet(
 			return
 		}
 		if client == nil {
-			writeJSONError(w, "Client not found", "CLIENT_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

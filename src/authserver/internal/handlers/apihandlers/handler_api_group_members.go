@@ -101,7 +101,7 @@ func HandleAPIGroupMemberAddPost(
 		var addReq api.AddGroupMemberRequest
 		err = json.NewDecoder(r.Body).Decode(&addReq)
 		if err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
@@ -123,7 +123,7 @@ func HandleAPIGroupMemberAddPost(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -214,7 +214,7 @@ func HandleAPIGroupMemberDelete(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
