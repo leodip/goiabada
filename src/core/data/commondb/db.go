@@ -22,6 +22,18 @@ type CommonDatabase struct {
 	// deadlock and every failure is returned on the first attempt, which is what a handle
 	// built directly on this type gets by default rather than by remembering to opt out (#301).
 	IsDeadlock func(error) bool
+
+	// IsUniqueViolation reports whether an error is the engine refusing a write because a unique
+	// index already holds that value. Each dialect sets it in its constructor, because only the
+	// driver knows its own error type and its own number: SQLite 2067, MySQL 1062, PostgreSQL
+	// SQLSTATE 23505, SQL Server 2627 for a UNIQUE constraint and 2601 for a unique index. Left
+	// nil, nothing is a unique violation and every failure surfaces untagged, which is what a
+	// handle built directly on this type gets by default rather than by remembering to opt out.
+	//
+	// WrapSQLError is the only consumer: a classified failure leaves the data layer carrying
+	// ErrUniqueViolation, so no caller above it ever sees a driver number or a driver sentence
+	// (#279).
+	IsUniqueViolation func(error) bool
 }
 
 func NewCommonDatabase(db *sql.DB, flavor sqlbuilder.Flavor, logSQL bool) *CommonDatabase {
@@ -168,6 +180,40 @@ func (d *CommonDatabase) deadlock(err error) bool {
 	return d.IsDeadlock != nil && d.IsDeadlock(err)
 }
 
+// uniqueViolation consults the dialect's classifier, treating none as "nothing is a unique
+// violation".
+func (d *CommonDatabase) uniqueViolation(err error) bool {
+	return d.IsUniqueViolation != nil && d.IsUniqueViolation(err)
+}
+
+// WrapSQLError wraps a failure the driver reported with msg, tagging a unique-key violation with
+// the ErrUniqueViolation sentinel first. Nil in, nil out.
+//
+// It is the one place a driver's dialect-specific refusal becomes something the rest of the tree
+// can match: above this, a caller asks errors.Is(err, data.ErrUniqueViolation) and never a number,
+// a type or a sentence. The driver's own error stays in the tree and is still reachable through
+// errors.As, for the rare caller that needs to know which key was violated.
+//
+// The message on the tagged branch reads "<msg>: unique constraint violation: <driver text>": the
+// prefix is the only change to what this layer has always printed. errs.Errorf carries both %w
+// verbs, so the sentinel and the driver error are both unwrappable and the tree still holds exactly
+// one stack, the origin's, since neither operand brought one.
+//
+// Exported because two engine packages need it: PostgreSQL and SQL Server insert through
+// INSERT ... RETURNING / OUTPUT INSERTED and then re-check rows.Err(), because those drivers can
+// defer a constraint violation to the result set rather than returning it from the query. That arm
+// lives in their own packages and would otherwise be the one path on which the sentinel never
+// appears (#279).
+func (d *CommonDatabase) WrapSQLError(err error, msg string) error {
+	if err == nil {
+		return nil
+	}
+	if d.uniqueViolation(err) {
+		return errs.Wrap(errs.Errorf("%w: %w", ErrUniqueViolation, err), msg)
+	}
+	return errs.Wrap(err, msg)
+}
+
 // inTransaction runs fn inside a transaction: the caller's when one was supplied,
 // otherwise one of its own that it commits or rolls back. It lets a method that
 // needs several statements be atomic without forcing every caller to open a
@@ -203,14 +249,14 @@ func (d *CommonDatabase) ExecSql(tx *sql.Tx, sql string, args ...any) (sql.Resul
 	if tx != nil {
 		result, err := tx.Exec(sql, args...)
 		if err != nil {
-			return nil, errs.Wrap(err, "unable to execute SQL")
+			return nil, d.WrapSQLError(err, "unable to execute SQL")
 		}
 		return result, nil
 	}
 
 	result, err := d.DB.Exec(sql, args...)
 	if err != nil {
-		return nil, errs.Wrap(err, "unable to execute SQL")
+		return nil, d.WrapSQLError(err, "unable to execute SQL")
 	}
 	return result, nil
 }
@@ -231,14 +277,14 @@ func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Row
 	if tx != nil {
 		result, err := tx.Query(sql, args...)
 		if err != nil {
-			return nil, errs.Wrap(err, "unable to execute SQL")
+			return nil, d.WrapSQLError(err, "unable to execute SQL")
 		}
 		return result, nil
 	}
 
 	rows, err := d.DB.Query(sql, args...)
 	if err != nil {
-		return nil, errs.Wrap(err, "unable to execute SQL")
+		return nil, d.WrapSQLError(err, "unable to execute SQL")
 	}
 	return rows, nil
 }

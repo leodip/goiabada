@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,9 +14,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	mocks_communication "github.com/leodip/goiabada/core/communication/mocks"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/data"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
@@ -381,4 +384,118 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	httpHelper.AssertExpectations(t)
 	database.AssertExpectations(t)
 	emailSender.AssertExpectations(t)
+}
+
+// TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409 covers the branch decision 15 built the
+// unique-key sentinel for.
+//
+// HandleAPIUserCreatePost pre-checks the address with GetUserByEmail and answers 409 from that,
+// which is the ordinary case and what the integration suite exercises. This is the race that check
+// cannot close: a concurrent create takes the address between the read and the write, the engine
+// refuses the insert, and the data layer tags the failure with data.ErrUniqueViolation.
+//
+// Before #279 the branch tested the driver's sentence for the words "email" and "already", which
+// matched none of the four engines' duplicate-key messages, so every lost race answered 500 and the
+// caller was told to report a bug rather than to pick another address.
+//
+// The error is wrapped twice on the way here, as it is in production -- ExecSql tags, CreateUser
+// wraps, the user creator wraps -- because a bare type assertion or a comparison against the
+// outermost error would pass on an untouched sentinel and fail on the real one.
+func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	database := mocks_data.NewDatabase(t)
+	userCreator := mocks_users.NewUserCreator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	emailSender := mocks_communication.NewEmailSender(t)
+
+	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
+		validators.NewEmailValidator(database),
+		validators.NewProfileValidator(database),
+		validators.NewPasswordValidator(),
+		auditLogger, emailSender)
+
+	body, err := json.Marshal(map[string]interface{}{
+		"email":           "taken@example.com",
+		"setPasswordType": "now",
+		"password":        "a-long-enough-password-1",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+		&models.Settings{AppName: "TestApp"}))
+
+	// The pre-check passes: at this instant nobody holds the address.
+	database.On("GetUserByEmail", mock.Anything, "taken@example.com").Return(nil, nil)
+	// By the time the insert runs, somebody does.
+	lostRace := errs.Wrap(errs.Wrap(
+		errs.Wrap(errs.Errorf("%w: %w", data.ErrUniqueViolation,
+			errors.New("Duplicate entry 'taken@example.com' for key 'users.idx_email'")),
+			"unable to execute SQL"),
+		"unable to insert user"), "unable to create user")
+	userCreator.On("CreateUser", mock.Anything).Return(nil, lostRace)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusConflict, rr.Code, rr.Body.String())
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+	assert.Equal(t, "EMAIL_ALREADY_EXISTS", resp["error_code"],
+		"the caller routes on the status, but the code is what tells it which field to change")
+
+	httpHelper.AssertExpectations(t)
+	database.AssertExpectations(t)
+	userCreator.AssertExpectations(t)
+}
+
+// TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500 is the other side of that branch, and
+// it is what stops the 409 from becoming the answer to every failed create. A caller told 409 will
+// retry with a different address; told 500, it reports the failure, which is the right thing to do
+// when the write failed for a reason no address change fixes.
+func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	database := mocks_data.NewDatabase(t)
+	userCreator := mocks_users.NewUserCreator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	emailSender := mocks_communication.NewEmailSender(t)
+
+	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
+		validators.NewEmailValidator(database),
+		validators.NewProfileValidator(database),
+		validators.NewPasswordValidator(),
+		auditLogger, emailSender)
+
+	body, err := json.Marshal(map[string]interface{}{
+		"email":           "fresh@example.com",
+		"setPasswordType": "now",
+		"password":        "a-long-enough-password-1",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+		&models.Settings{AppName: "TestApp"}))
+
+	database.On("GetUserByEmail", mock.Anything, "fresh@example.com").Return(nil, nil)
+	userCreator.On("CreateUser", mock.Anything).Return(nil,
+		errs.Wrap(errs.New("connection refused"), "unable to execute SQL"))
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+	assert.Equal(t, "INTERNAL_SERVER_ERROR", resp["error_code"])
+
+	httpHelper.AssertExpectations(t)
+	database.AssertExpectations(t)
+	userCreator.AssertExpectations(t)
 }

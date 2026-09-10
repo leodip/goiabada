@@ -67,8 +67,8 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		//
 		// Serialized, because PostgreSQL's CREATE DATABASE does NOT tolerate being raced. With
 		// the database absent, 7 of 8 concurrent creators fail with `duplicate key value
-		// violates unique constraint "pg_database_datname_index"` (SQLSTATE 23505), whose text
-		// does not contain "already exists" and so is not tolerated below: the loser returns
+		// violates unique constraint "pg_database_datname_index"` (SQLSTATE 23505), which is not
+		// the 42P04 isDuplicateDatabase tolerates below: the loser returns
 		// "unable to create database" and the process exits. Two replicas starting together
 		// against a fresh server is an ordinary topology, not a hypothetical one (#293).
 		defaultDB, err := sql.Open("pgx", fmt.Sprintf("postgres://%v:%v@%v:%v/postgres",
@@ -106,6 +106,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.PostgreSQL, logSQL)
 	commonDb.IsDeadlock = isDeadlock
+	commonDb.IsUniqueViolation = isUniqueViolation
 
 	postgresDb := PostgresDatabase{
 		DB:       db,
@@ -234,7 +235,7 @@ func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 	// process, which cannot be in here at the same time, but it still covers an operator running
 	// createdb by hand inside the window, and it costs one condition.
 	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %s;", QuoteIdentifier(name))); err != nil &&
-		!strings.Contains(err.Error(), "already exists") {
+		!isDuplicateDatabase(err) {
 		return errs.Wrap(err, "unable to create database")
 	}
 	return nil
@@ -282,6 +283,44 @@ func (d *PostgresDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
 func isDeadlock(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "40P01"
+}
+
+// PostgreSQL reports both of the conditions this file classifies as a SQLSTATE, and both were
+// observed rather than remembered.
+//
+// pgUniqueViolation, 23505, is what a write colliding with a unique index returns: the probe
+// recorded `*pgconn.PgError "duplicate key value violates unique constraint" (SQLSTATE 23505)`.
+// pgDuplicateDatabase, 42P04, is what CREATE DATABASE returns when the name is taken (#279).
+//
+// The two are not interchangeable, and the comment in createDatabaseUnderAdvisoryLock says why:
+// racing CREATE DATABASE statements do NOT lose with 42P04, they lose with 23505 on
+// pg_database_datname_index. That is the reason the create is serialised by an advisory lock, and
+// it is the reason isDuplicateDatabase accepts only 42P04 (#293).
+const (
+	pgUniqueViolation   = "23505"
+	pgDuplicateDatabase = "42P04"
+)
+
+// isUniqueViolation is PostgreSQL's row of the unique-key classifier table WrapSQLError consults.
+//
+// pgconn.PgError has pointer receivers, so the pointer is the only form that is an error and the
+// only form the driver returns; there is no value form to check.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation
+}
+
+// isDuplicateDatabase reports whether err is PostgreSQL refusing a CREATE DATABASE because that
+// name already exists.
+//
+// It replaces a strings.Contains for "already exists" on the driver's English sentence. The text
+// was never the engine's contract: it is localised by lc_messages, so an operator running a server
+// with a non-English locale got a create failure the code did not recognise, and the process
+// exited on a database that was already there. The SQLSTATE is the same five characters in every
+// locale (#279).
+func isDuplicateDatabase(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgDuplicateDatabase
 }
 
 func (d *PostgresDatabase) CommitTransaction(tx *sql.Tx) error {

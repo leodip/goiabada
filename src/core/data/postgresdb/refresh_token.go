@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.R
 	if err := rows.Err(); err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert refreshToken")
+		return d.CommonDB.WrapSQLError(err, "unable to insert refreshToken")
 	}
 
 	return nil

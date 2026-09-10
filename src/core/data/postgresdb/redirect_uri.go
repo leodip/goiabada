@@ -47,7 +47,7 @@ func (d *PostgresDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Red
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
-		return errs.Wrap(err, "unable to insert redirectURI")
+		return d.CommonDB.WrapSQLError(err, "unable to insert redirectURI")
 	}
 
 	return nil

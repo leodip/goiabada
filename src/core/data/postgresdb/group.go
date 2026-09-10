@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 	if err := rows.Err(); err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert group")
+		return d.CommonDB.WrapSQLError(err, "unable to insert group")
 	}
 
 	return nil

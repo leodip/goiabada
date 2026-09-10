@@ -52,7 +52,7 @@ func (d *PostgresDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *mode
 	if err := rows.Err(); err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert groupAttribute")
+		return d.CommonDB.WrapSQLError(err, "unable to insert groupAttribute")
 	}
 
 	return nil

@@ -53,7 +53,7 @@ func (d *MsSQLDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.Refr
 	if err := rows.Err(); err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert refreshToken")
+		return d.CommonDB.WrapSQLError(err, "unable to insert refreshToken")
 	}
 
 	return nil

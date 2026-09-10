@@ -51,7 +51,7 @@ func (d *PostgresDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.Clien
 	if err := rows.Err(); err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert client logo")
+		return d.CommonDB.WrapSQLError(err, "unable to insert client logo")
 	}
 
 	return nil

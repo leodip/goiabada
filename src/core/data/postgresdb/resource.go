@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateResource(tx *sql.Tx, resource *models.Resource)
 	if err := rows.Err(); err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert resource")
+		return d.CommonDB.WrapSQLError(err, "unable to insert resource")
 	}
 
 	return nil

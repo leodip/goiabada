@@ -56,7 +56,7 @@ func (d *PostgresDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.Use
 	if err := rows.Err(); err != nil {
 		userConsent.CreatedAt = originalCreatedAt
 		userConsent.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userConsent")
+		return d.CommonDB.WrapSQLError(err, "unable to insert userConsent")
 	}
 
 	return nil

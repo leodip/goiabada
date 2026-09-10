@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/leodip/goiabada/core/data/mysqldb"
@@ -525,6 +526,15 @@ type Database interface {
 	DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error
 	UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error
 }
+
+// ErrUniqueViolation is the sentinel a write reports when the engine refused it because a unique
+// index already holds that value, and it is what a caller above the data layer matches with
+// errors.Is. Its documentation is on the declaration.
+//
+// It is an alias rather than the declaration because of the import direction: commondb is where the
+// translation happens and this package is what imports commondb, not the other way round. Callers
+// spell it data.ErrUniqueViolation, which is the name they already have an import for (#279).
+var ErrUniqueViolation = commondb.ErrUniqueViolation
 
 // MigratorProvider is the one thing a caller needs beyond Database to step a schema by hand: a
 // migrator built over this engine's embedded migration set. All four concrete engine types have

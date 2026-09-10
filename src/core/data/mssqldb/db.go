@@ -112,6 +112,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLServer, logSQL)
 	commonDb.IsDeadlock = isDeadlock
+	commonDb.IsUniqueViolation = isUniqueViolation
 
 	mssqlDb := MsSQLDatabase{
 		DB:       db,
@@ -286,6 +287,32 @@ func isDeadlock(err error) bool {
 	}
 	var byPointer *mssql.Error
 	return errors.As(err, &byPointer) && byPointer.Number == 1205
+}
+
+// SQL Server spells a unique-key collision two ways depending on what enforces the key, and both
+// were observed rather than remembered. 2627 is "Violation of UNIQUE KEY constraint", which the
+// probe recorded for a UNIQUE constraint; 2601 is "Cannot insert duplicate key row ... with unique
+// index", which a separate probe recorded for a unique index. Goiabada's schema uses both shapes on
+// this engine, so a classifier accepting only one is right on the tables that were tested and
+// silent on the rest (#279).
+const (
+	mssqlUniqueConstraint = 2627
+	mssqlUniqueIndex      = 2601
+)
+
+// isUniqueViolation is SQL Server's row of the unique-key classifier table WrapSQLError consults.
+//
+// mssql.Error has VALUE receivers, so both the value and the pointer are errors and the driver
+// hands out one shape from one path and the other from another; errors.As matches only the shape it
+// was asked for, so both are checked, exactly as isDeadlock above does and for the same reason.
+func isUniqueViolation(err error) bool {
+	var byValue mssql.Error
+	if errors.As(err, &byValue) {
+		return byValue.Number == mssqlUniqueConstraint || byValue.Number == mssqlUniqueIndex
+	}
+	var byPointer *mssql.Error
+	return errors.As(err, &byPointer) &&
+		(byPointer.Number == mssqlUniqueConstraint || byPointer.Number == mssqlUniqueIndex)
 }
 
 func (d *MsSQLDatabase) CommitTransaction(tx *sql.Tx) error {

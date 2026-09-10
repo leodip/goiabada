@@ -61,7 +61,7 @@ func (d *MsSQLDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup)
 	if err := rows.Err(); err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userGroup")
+		return d.CommonDB.WrapSQLError(err, "unable to insert userGroup")
 	}
 
 	return nil

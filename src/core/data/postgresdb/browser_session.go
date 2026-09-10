@@ -59,7 +59,7 @@ func (d *PostgresDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *mode
 	if err := rows.Err(); err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert browser session")
+		return d.CommonDB.WrapSQLError(err, "unable to insert browser session")
 	}
 
 	return nil

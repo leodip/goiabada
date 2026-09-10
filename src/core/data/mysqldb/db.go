@@ -115,6 +115,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.MySQL, logSQL)
 	commonDb.IsDeadlock = isDeadlock
+	commonDb.IsUniqueViolation = isUniqueViolation
 
 	mysqlDb := MySQLDatabase{
 		DB:       db,
@@ -139,6 +140,20 @@ func (d *MySQLDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
 func isDeadlock(err error) bool {
 	var mysqlErr *mysqldriver.MySQLError
 	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1213
+}
+
+// mysqlDuplicateEntry is ER_DUP_ENTRY, the error MySQL returns when a write collides with a unique
+// index. Observed rather than remembered: the probe recorded `*mysql.MySQLError "Error 1062
+// (23000): Duplicate entry 'a@b' for key 'zzprobe279.email'"` with Number 1062 (#279).
+const mysqlDuplicateEntry = 1062
+
+// isUniqueViolation is MySQL's row of the unique-key classifier table WrapSQLError consults.
+//
+// mysql.MySQLError has pointer receivers, so the pointer is the only form that is an error and the
+// only form the driver returns; there is no value form to check.
+func isUniqueViolation(err error) bool {
+	var mysqlErr *mysqldriver.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlDuplicateEntry
 }
 
 func (d *MySQLDatabase) CommitTransaction(tx *sql.Tx) error {

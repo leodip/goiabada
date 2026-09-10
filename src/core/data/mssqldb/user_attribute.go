@@ -57,7 +57,7 @@ func (d *MsSQLDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models.Us
 	if err := rows.Err(); err != nil {
 		userAttribute.CreatedAt = originalCreatedAt
 		userAttribute.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userAttribute")
+		return d.CommonDB.WrapSQLError(err, "unable to insert userAttribute")
 	}
 
 	return nil

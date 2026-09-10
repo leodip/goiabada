@@ -50,7 +50,7 @@ func (d *MsSQLDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) er
 	// returning it from the query, in which case Next() simply reports no row.
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
-		return errs.Wrap(err, "unable to insert audit log")
+		return d.CommonDB.WrapSQLError(err, "unable to insert audit log")
 	}
 
 	return nil

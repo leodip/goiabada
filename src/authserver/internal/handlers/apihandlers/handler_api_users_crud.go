@@ -371,8 +371,19 @@ func HandleAPIUserCreatePost(
 			FamilyName:    req.FamilyName,
 		})
 		if err != nil {
-			// Check if it's a duplicate email error from UserCreator
-			if strings.Contains(err.Error(), "email") && strings.Contains(strings.ToLower(err.Error()), "already") {
+			// The address check above answers the ordinary case; this is the race it cannot
+			// close, where a concurrent create takes the address between that read and this
+			// write. The engine refuses the insert and the data layer tags it, so the answer is
+			// 409 here too rather than a 500 the caller cannot act on.
+			//
+			// The users table carries two unique keys, email and subject, but subject is a fresh
+			// UUID this request just generated, so email is the only one a create can realistically
+			// collide on.
+			//
+			// This replaces a test for the words "email" and "already" in the driver's sentence,
+			// which matched none of the four engines' actual duplicate-key messages and so had
+			// never fired: every lost race answered 500 (#279).
+			if errors.Is(err, data.ErrUniqueViolation) {
 				writeJSONError(w, "This email address is already registered", "EMAIL_ALREADY_EXISTS", http.StatusConflict)
 			} else {
 				writeInternalServerError(w, r, errs.Wrap(err, "failed to create user"))
