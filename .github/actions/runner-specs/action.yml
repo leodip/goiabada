@@ -1,0 +1,59 @@
+# Records the hardware behind a container-based test job, so a slow run can be
+# told apart from a slow change, and so the GitHub-hosted tier can be compared
+# with a paid runner service on the same numbers.
+#
+# Everything here runs inside the golang:*-bookworm job container, which sees
+# the whole VM: /proc reports the host's CPUs and memory, and the cgroup files
+# say whether anything narrower was imposed. The three benchmarks are the
+# workloads the test tiers spend their time on. Hashing stands in for CPU-bound
+# Go tests, the sequential write for building and extracting images, and the
+# 4k dsync loop for the per-statement fsync that every database engine does on
+# DDL, which is what made the mysql data tier four times slower on a bad host
+# in September 2026. All three use coreutils only, so they run on any Linux
+# runner unchanged. Together they take well under ten seconds.
+
+name: Runner specs
+description: Print the runner's CPU, memory, disk mounts and three short benchmarks to the log and the job summary.
+
+runs:
+  using: composite
+  steps:
+    - name: Runner specs
+      shell: bash
+      run: |
+        set -uo pipefail
+        model=$(sed -n 's/^model name\s*: //p' /proc/cpuinfo | head -1)
+        cores=$(nproc)
+        cpu_max=$(cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo "n/a")
+        mem_total=$(awk '/MemTotal/ {printf "%.1f GiB", $2/1048576}' /proc/meminfo)
+        mem_max=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo "n/a")
+        [ "$mem_max" != "max" ] && [ "$mem_max" != "n/a" ] && mem_max=$(awk -v b="$mem_max" 'BEGIN {printf "%.1f GiB", b/1073741824}')
+        root_fs=$(df -hT / | awk 'NR==2 {print $2 " " $3 " total, " $5 " free"}')
+        tmp_fs=$(df -hT /tmp | awk 'NR==2 {print $2 " " $3 " total, " $5 " free"}')
+
+        # CPU: SHA-256 over 1 GiB of zeros, single core.
+        start=$(date +%s.%N)
+        head -c 1073741824 /dev/zero | sha256sum >/dev/null
+        cpu_mbs=$(awk -v s="$start" -v e="$(date +%s.%N)" 'BEGIN {printf "%.0f MB/s", 1024/(e-s)}')
+
+        # Disk, sequential: 256 MiB written and fsynced once.
+        seq_mbs=$(dd if=/dev/zero of=/tmp/runner-specs-seq bs=1M count=256 conv=fsync 2>&1 | sed -n 's/.*, //p')
+
+        # Disk, fsync latency: 1000 writes of 4 KiB, each synced before the next.
+        start=$(date +%s.%N)
+        dd if=/dev/zero of=/tmp/runner-specs-sync bs=4k count=1000 oflag=dsync status=none
+        fsync_ms=$(awk -v s="$start" -v e="$(date +%s.%N)" 'BEGIN {printf "%.2f ms", (e-s)}')
+        rm -f /tmp/runner-specs-seq /tmp/runner-specs-sync
+
+        {
+          echo "| Runner specs | |"
+          echo "|---|---|"
+          echo "| CPU | $model |"
+          echo "| Cores visible / cgroup cpu.max | $cores / $cpu_max |"
+          echo "| Memory total / cgroup memory.max | $mem_total / $mem_max |"
+          echo "| Root filesystem | $root_fs |"
+          echo "| /tmp filesystem | $tmp_fs |"
+          echo "| SHA-256, 1 GiB, one core | $cpu_mbs |"
+          echo "| Sequential write, 256 MiB + fsync | $seq_mbs |"
+          echo "| 4 KiB dsync write, mean of 1000 | $fsync_ms |"
+        } | tee -a "$GITHUB_STEP_SUMMARY"

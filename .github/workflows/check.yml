@@ -473,6 +473,7 @@ jobs:
         image: axllent/mailpit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/runner-specs
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -513,6 +514,7 @@ jobs:
         image: axllent/mailpit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/runner-specs
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -546,6 +548,7 @@ jobs:
         image: axllent/mailpit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/runner-specs
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
@@ -574,14 +577,18 @@ jobs:
           MSSQL_TCP_PORT: 11433
         # Longer retries than the others: MSSQL routinely takes 30-60s to pass
         # a health check.
+        # uid 10001 is the mssql user the image runs sqlservr as. A bare
+        # tmpfs is root-owned and the server cannot create its .system
+        # directory in it; the mysql and postgres entrypoints chown theirs.
         options: >-
-          --tmpfs /var/opt/mssql
+          --tmpfs /var/opt/mssql:uid=10001,gid=0
           --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -Q 'SELECT 1'"
           --health-interval 5s --health-timeout 5s --health-retries 40
       mailpit:
         image: axllent/mailpit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/runner-specs
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
