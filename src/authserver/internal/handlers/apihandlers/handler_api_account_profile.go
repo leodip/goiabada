@@ -41,7 +41,7 @@ func HandleAPIAccountProfileGet(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -84,7 +84,7 @@ func HandleAPIAccountProfilePut(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

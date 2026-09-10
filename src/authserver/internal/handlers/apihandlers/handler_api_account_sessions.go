@@ -40,7 +40,7 @@ func HandleAPIAccountSessionsGet(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -148,7 +148,7 @@ func HandleAPIAccountSessionDelete(
 		sessionIdStr := chi.URLParam(r, "id")
 		sessionId, err := strconv.ParseInt(sessionIdStr, 10, 64)
 		if err != nil || sessionId <= 0 {
-			writeJSONError(w, "User session ID is required", "USER_SESSION_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User session ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -159,7 +159,7 @@ func HandleAPIAccountSessionDelete(
 			return
 		}
 		if us == nil {
-			writeJSONError(w, "User session not found", "USER_SESSION_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User session not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

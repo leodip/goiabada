@@ -25,13 +25,13 @@ func HandleAPIUserEmailVerificationCodePost(
 
 		userIdStr := chi.URLParam(r, "id")
 		if userIdStr == "" {
-			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -41,7 +41,7 @@ func HandleAPIUserEmailVerificationCodePost(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

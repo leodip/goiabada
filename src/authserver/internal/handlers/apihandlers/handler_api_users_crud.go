@@ -36,13 +36,13 @@ func HandleAPIUserGet(
 		// Get user ID from URL parameter
 		userIdStr := chi.URLParam(r, "id")
 		if userIdStr == "" {
-			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -54,7 +54,7 @@ func HandleAPIUserGet(
 		}
 
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -80,13 +80,13 @@ func HandleAPIUserPasswordPut(
 		// Get user ID from URL parameter
 		userIdStr := chi.URLParam(r, "id")
 		if userIdStr == "" {
-			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -99,7 +99,7 @@ func HandleAPIUserPasswordPut(
 
 		// Validate required fields
 		if req.NewPassword == "" {
-			writeJSONError(w, "New password is required", "PASSWORD_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "New password is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -110,7 +110,7 @@ func HandleAPIUserPasswordPut(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -186,13 +186,13 @@ func HandleAPIUserOTPPut(
 		// Get user ID from URL parameter
 		userIdStr := chi.URLParam(r, "id")
 		if userIdStr == "" {
-			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -205,7 +205,7 @@ func HandleAPIUserOTPPut(
 
 		// Check if trying to enable OTP (not supported)
 		if req.Enabled {
-			writeJSONError(w, "Enabling OTP is not supported through this endpoint", "OTP_ENABLE_NOT_SUPPORTED", http.StatusBadRequest)
+			writeJSONError(w, "Enabling OTP is not supported through this endpoint", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -216,7 +216,7 @@ func HandleAPIUserOTPPut(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -283,7 +283,7 @@ func HandleAPIUserCreatePost(
 
 		// Validate required fields
 		if req.Email == "" {
-			writeJSONError(w, "Email is required", "EMAIL_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "Email is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -337,7 +337,7 @@ func HandleAPIUserCreatePost(
 		var passwordHash string
 		if req.SetPasswordType == "now" || !settings.SMTPEnabled {
 			if req.Password == "" {
-				writeJSONError(w, "Password is required", "PASSWORD_REQUIRED", http.StatusBadRequest)
+				writeJSONError(w, "Password is required", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
@@ -482,13 +482,13 @@ func HandleAPIUserEnabledPut(
 		// Get user ID from URL parameter
 		userIdStr := chi.URLParam(r, "id")
 		if userIdStr == "" {
-			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -506,7 +506,7 @@ func HandleAPIUserEnabledPut(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -621,13 +621,13 @@ func HandleAPIUserDelete(
 		// Get user ID from URL parameter
 		userIdStr := chi.URLParam(r, "id")
 		if userIdStr == "" {
-			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -639,7 +639,7 @@ func HandleAPIUserDelete(
 		}
 
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

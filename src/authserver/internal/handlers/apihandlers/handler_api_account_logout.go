@@ -32,7 +32,7 @@ func HandleAPIAccountLogoutRequestPost(
 		// Parse request
 		var req api.AccountLogoutRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 

@@ -48,7 +48,7 @@ func HandleAPIAccountPhonePut(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -75,7 +75,7 @@ func HandleAPIAccountPhonePut(
 				}
 			}
 			if !found {
-				writeJSONError(w, "Phone country is invalid: "+input.PhoneCountryUniqueId, "INVALID_PHONE_COUNTRY", http.StatusBadRequest)
+				writeJSONError(w, "Phone country is invalid: "+input.PhoneCountryUniqueId, "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		}

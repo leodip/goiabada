@@ -243,6 +243,12 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 
 // TestAPISessions_BadRequests: a body that is not JSON, and one with no identifier, are
 // both refused before anything is looked up.
+//
+// The codes are asserted as well as the statuses because readSessionRequest now writes both
+// refusals itself, where it used to hand a message and a code back to five callers that each wrote
+// the same line. It also carries the flattening: a missing identifier answered
+// SESSION_ID_REQUIRED and now answers VALIDATION_ERROR, one of the three generic codes the API
+// answers a 4xx condition with (#279 decision 18).
 func TestAPISessions_BadRequests(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, constants.BrowserSessionsPermissionIdentifier)
 	defer func() {
@@ -257,12 +263,18 @@ func TestAPISessions_BadRequests(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = malformed.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, malformed.StatusCode)
+	var malformedBody api.ErrorResponse
+	_ = json.NewDecoder(malformed.Body).Decode(&malformedBody)
+	assert.Equal(t, "INVALID_REQUEST_BODY", malformedBody.ErrorCode)
 
 	for _, operation := range []string{"load", "create", "update", "touch", "delete"} {
 		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{Id: "  "})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "operation %s", operation)
+			var errResp api.ErrorResponse
+			_ = json.NewDecoder(resp.Body).Decode(&errResp)
+			assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode, "operation %s", operation)
 		}()
 	}
 }

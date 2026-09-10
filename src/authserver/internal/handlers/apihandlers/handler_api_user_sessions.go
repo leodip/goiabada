@@ -18,7 +18,7 @@ func HandleAPIUserSessionGet(
 		// Get session identifier from URL parameter
 		sessionIdentifier := chi.URLParam(r, "sessionIdentifier")
 		if sessionIdentifier == "" {
-			writeJSONError(w, "Session identifier is required", "SESSION_IDENTIFIER_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "Session identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -30,7 +30,7 @@ func HandleAPIUserSessionGet(
 		}
 
 		if userSession == nil {
-			writeJSONError(w, "User session not found", "USER_SESSION_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User session not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

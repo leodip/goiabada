@@ -35,9 +35,10 @@ import (
 // happen loses nothing) and a status produced by a value computed at run time would be
 // missed. No handler in this module does the latter today: writeJSONError is always called
 // with an http.Status constant, which TestAPIHandlers_WriteStatusesAsConstants below is
-// what keeps true. The two helpers that carry a status implicitly rather than as an
-// argument, writeValidationError at 400 and writeInternalServerError at 500, are read by
-// name in statusesWrittenIn, as is writeJSON, whose buffered encode can fail into a 500.
+// what keeps true. The helpers that carry a status implicitly rather than as an argument
+// are read by name in statusesWrittenIn: writeValidationError at 400,
+// writeInternalServerError at 500, writeJSON at 500 for a buffered encode that fails, and
+// readSessionRequest at 400 for a body it cannot decode.
 //
 // What it does not check: response bodies, schemas, parameters, or whether an operation's
 // description is true. Those stay hand-maintained.
@@ -573,6 +574,14 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 				// failure it can still produce (#279 decision 8).
 				if f.Name == "writeJSON" {
 					out[500] = true
+				}
+				// readSessionRequest answers its own 400 for a body that will not decode and
+				// for a missing session id, so the five session handlers that call it name no
+				// constant for the refusal they can still produce. It writes the code as a
+				// literal rather than returning one, which is what holds it to the survivor
+				// table in api_error_code_lint_test.go (#279 decision 18).
+				if f.Name == "readSessionRequest" {
+					out[400] = true
 				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {

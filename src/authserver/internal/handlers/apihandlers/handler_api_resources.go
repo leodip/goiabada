@@ -51,7 +51,7 @@ func HandleAPIResourceCreatePost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		var createReq api.CreateResourceRequest
 		if err := json.NewDecoder(r.Body).Decode(&createReq); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
@@ -181,7 +181,7 @@ func HandleAPIResourceUpdatePut(
 
 		var updateReq api.UpdateResourceRequest
 		if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 

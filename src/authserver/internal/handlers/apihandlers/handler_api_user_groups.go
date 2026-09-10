@@ -23,13 +23,13 @@ func HandleAPIUserGroupsGet(
 
 		idStr := chi.URLParam(r, "id")
 		if len(idStr) == 0 {
-			writeJSONError(w, "User ID is required", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -39,7 +39,7 @@ func HandleAPIUserGroupsGet(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -79,20 +79,20 @@ func HandleAPIUserGroupsPut(
 
 		idStr := chi.URLParam(r, "id")
 		if len(idStr) == 0 {
-			writeJSONError(w, "User ID is required", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		var request api.UpdateUserGroupsRequest
 		err = json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
@@ -102,7 +102,7 @@ func HandleAPIUserGroupsPut(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

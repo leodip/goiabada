@@ -45,11 +45,11 @@ func HandleAPIAccountPasswordPut(
 
 		// Validate required fields
 		if strings.TrimSpace(req.CurrentPassword) == "" {
-			writeJSONError(w, "Current password is required.", "CURRENT_PASSWORD_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "Current password is required.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if strings.TrimSpace(req.NewPassword) == "" {
-			writeJSONError(w, "New password is required.", "PASSWORD_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "New password is required.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -60,7 +60,7 @@ func HandleAPIAccountPasswordPut(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

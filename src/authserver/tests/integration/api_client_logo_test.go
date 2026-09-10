@@ -172,7 +172,7 @@ func TestAPIClientLogoPost_InvalidImage(t *testing.T) {
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_IMAGE", response["error_code"])
+	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
 func TestAPIClientLogoPost_Unauthorized(t *testing.T) {

@@ -28,13 +28,13 @@ func HandleAPIUserEmailPut(
 		// Parse user ID from URL
 		idStr := chi.URLParam(r, "id")
 		if len(idStr) == 0 {
-			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		userId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -53,7 +53,7 @@ func HandleAPIUserEmailPut(
 		}
 
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

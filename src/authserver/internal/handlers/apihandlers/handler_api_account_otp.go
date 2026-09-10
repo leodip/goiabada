@@ -89,7 +89,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -156,7 +156,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 					return
 				}
 				if user == nil {
-					writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+					writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 					return
 				}
 				if user.OTPEnabled {
@@ -268,7 +268,7 @@ func HandleAPIAccountOTPPut(
 			return
 		}
 		if user == nil {
-			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
