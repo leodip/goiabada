@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -17,7 +18,7 @@ func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId in
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -25,13 +26,13 @@ func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId in
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -40,7 +41,7 @@ func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId in
 
 	var response api.GetUserSessionsResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	return response.Sessions, nil
@@ -51,7 +52,7 @@ func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId i
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -59,13 +60,13 @@ func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId i
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -74,11 +75,11 @@ func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId i
 
 	var response api.SuccessResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		return errs.Errorf("failed to decode response: %w", err)
 	}
 
 	if !response.Success {
-		return fmt.Errorf("API returned success=false")
+		return errs.Errorf("API returned success=false")
 	}
 
 	return nil
@@ -104,20 +105,20 @@ func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clien
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -126,7 +127,7 @@ func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clien
 
 	var response api.GetUserSessionsResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	return response.Sessions, nil
@@ -137,7 +138,7 @@ func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier 
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -145,13 +146,13 @@ func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -160,7 +161,7 @@ func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier 
 
 	var response api.GetUserSessionResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	// Convert response to models.UserSession
@@ -200,20 +201,20 @@ func (c *AuthServerClient) GetAccountSessions(accessToken string) ([]api.Enhance
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -222,7 +223,7 @@ func (c *AuthServerClient) GetAccountSessions(accessToken string) ([]api.Enhance
 
 	var response api.GetUserSessionsResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	return response.Sessions, nil
@@ -233,20 +234,20 @@ func (c *AuthServerClient) DeleteAccountSession(accessToken string, sessionId in
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -255,10 +256,10 @@ func (c *AuthServerClient) DeleteAccountSession(accessToken string, sessionId in
 
 	var response api.SuccessResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		return errs.Errorf("failed to decode response: %w", err)
 	}
 	if !response.Success {
-		return fmt.Errorf("API returned success=false")
+		return errs.Errorf("API returned success=false")
 	}
 	return nil
 }
@@ -268,7 +269,7 @@ func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -276,13 +277,13 @@ func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -291,7 +292,7 @@ func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]
 
 	var response api.GetUserConsentsResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	// Convert API response to models
@@ -332,7 +333,7 @@ func (c *AuthServerClient) DeleteUserConsent(accessToken string, consentId int64
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -340,13 +341,13 @@ func (c *AuthServerClient) DeleteUserConsent(accessToken string, consentId int64
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {

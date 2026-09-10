@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pkg/errors"
 )
 
 // SessionIdentifierToContext lifts the session identifier out of the validated JWT
@@ -28,7 +28,7 @@ func SessionIdentifierToContext(errorRenderer custom_middleware.ServerErrorRende
 				jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 				if !ok {
 					errorRenderer.InternalServerError(w, r,
-						errors.WithStack(errors.New("unable to cast the context value to JwtInfo in SessionIdentifierToContext")))
+						errs.New("unable to cast the context value to JwtInfo in SessionIdentifierToContext"))
 					return
 				}
 

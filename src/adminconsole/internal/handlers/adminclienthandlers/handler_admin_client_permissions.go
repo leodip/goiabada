@@ -2,19 +2,18 @@ package adminclienthandlers
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
-
-	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -29,7 +28,7 @@ func HandleAdminClientPermissionsGet(
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("clientId is required"))
 			return
 		}
 
@@ -41,7 +40,7 @@ func HandleAdminClientPermissionsGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -51,7 +50,7 @@ func HandleAdminClientPermissionsGet(
 			return
 		}
 		if clientResp == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", id))
 			return
 		}
 
@@ -135,7 +134,7 @@ func HandleAdminClientPermissionsPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -144,7 +143,7 @@ func HandleAdminClientPermissionsPost(
 		if err := apiClient.UpdateClientPermissions(jwtInfo.TokenResponse.AccessToken, data.ClientId, req); err != nil {
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
+				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
 				return
 			}
 			httpHelper.JsonError(w, r, err)

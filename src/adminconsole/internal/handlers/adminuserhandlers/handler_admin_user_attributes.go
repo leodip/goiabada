@@ -4,12 +4,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/pkg/errors"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -22,7 +21,7 @@ func HandleAdminUserAttributesGet(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("userId is required"))
 			return
 		}
 
@@ -35,7 +34,7 @@ func HandleAdminUserAttributesGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -45,7 +44,7 @@ func HandleAdminUserAttributesGet(
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 
@@ -79,7 +78,7 @@ func HandleAdminUserAttributesRemovePost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errs.New("userId is required"))
 			return
 		}
 
@@ -92,7 +91,7 @@ func HandleAdminUserAttributesRemovePost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -102,7 +101,7 @@ func HandleAdminUserAttributesRemovePost(
 			return
 		}
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.JsonError(w, r, errs.New("user not found"))
 			return
 		}
 
@@ -114,7 +113,7 @@ func HandleAdminUserAttributesRemovePost(
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute id is required")))
+			httpHelper.JsonError(w, r, errs.New("attribute id is required"))
 			return
 		}
 
@@ -133,7 +132,7 @@ func HandleAdminUserAttributesRemovePost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute not found")))
+			httpHelper.JsonError(w, r, errs.New("attribute not found"))
 			return
 		}
 

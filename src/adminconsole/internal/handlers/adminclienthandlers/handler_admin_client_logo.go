@@ -2,6 +2,7 @@ package adminclienthandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,11 +11,11 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -27,7 +28,7 @@ func HandleAdminClientLogoGet(
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("clientId is required"))
 			return
 		}
 
@@ -39,7 +40,7 @@ func HandleAdminClientLogoGet(
 
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -49,7 +50,7 @@ func HandleAdminClientLogoGet(
 			return
 		}
 		if clientResp == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", id))
 			return
 		}
 
@@ -126,7 +127,7 @@ func HandleAdminClientLogoPost(
 
 		logoData, err := io.ReadAll(file)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, errors.Wrap(err, "failed to read logo data"))
+			httpHelper.InternalServerError(w, r, errs.Wrap(err, "failed to read logo data"))
 			return
 		}
 

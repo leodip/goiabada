@@ -1,17 +1,17 @@
 package admingrouphandlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
-
-	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -24,7 +24,7 @@ func HandleAdminGroupAttributesEditGet(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -36,7 +36,7 @@ func HandleAdminGroupAttributesEditGet(
 
 		idStr = chi.URLParam(r, "attributeId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("attributeId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("attributeId is required"))
 			return
 		}
 
@@ -49,7 +49,7 @@ func HandleAdminGroupAttributesEditGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -60,7 +60,7 @@ func HandleAdminGroupAttributesEditGet(
 			return
 		}
 		if group == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.InternalServerError(w, r, errs.New("group not found"))
 			return
 		}
 
@@ -71,7 +71,7 @@ func HandleAdminGroupAttributesEditGet(
 			return
 		}
 		if attribute == nil || attribute.GroupId != group.Id {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("attribute not found")))
+			httpHelper.InternalServerError(w, r, errs.New("attribute not found"))
 			return
 		}
 
@@ -97,7 +97,7 @@ func HandleAdminGroupAttributesEditPost(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -109,7 +109,7 @@ func HandleAdminGroupAttributesEditPost(
 
 		idStr = chi.URLParam(r, "attributeId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("attributeId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("attributeId is required"))
 			return
 		}
 
@@ -122,7 +122,7 @@ func HandleAdminGroupAttributesEditPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -133,7 +133,7 @@ func HandleAdminGroupAttributesEditPost(
 			return
 		}
 		if group == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.InternalServerError(w, r, errs.New("group not found"))
 			return
 		}
 
@@ -144,7 +144,7 @@ func HandleAdminGroupAttributesEditPost(
 			return
 		}
 		if currentAttribute == nil || currentAttribute.GroupId != group.Id {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("attribute not found")))
+			httpHelper.InternalServerError(w, r, errs.New("attribute not found"))
 			return
 		}
 

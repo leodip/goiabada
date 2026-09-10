@@ -3,13 +3,13 @@ package apiclient
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // ClientLogoInfo contains client logo metadata
@@ -31,7 +31,7 @@ func (c *AuthServerClient) GetAllClients(accessToken string) ([]api.ClientRespon
 	// Create request
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -41,14 +41,14 @@ func (c *AuthServerClient) GetAllClients(accessToken string) ([]api.ClientRespon
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -59,7 +59,7 @@ func (c *AuthServerClient) GetAllClients(accessToken string) ([]api.ClientRespon
 	// Parse response
 	var response api.GetClientsResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return response.Clients, nil
@@ -72,7 +72,7 @@ func (c *AuthServerClient) GetClientById(accessToken string, clientId int64) (*a
 	// Create request
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -82,14 +82,14 @@ func (c *AuthServerClient) GetClientById(accessToken string, clientId int64) (*a
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -100,7 +100,7 @@ func (c *AuthServerClient) GetClientById(accessToken string, clientId int64) (*a
 	// Parse response
 	var response api.GetClientResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return &response.Client, nil
@@ -113,13 +113,13 @@ func (c *AuthServerClient) CreateClient(accessToken string, request *api.CreateC
 	// Marshal request body
 	bodyBytes, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Create request
 	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -129,14 +129,14 @@ func (c *AuthServerClient) CreateClient(accessToken string, request *api.CreateC
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -147,7 +147,7 @@ func (c *AuthServerClient) CreateClient(accessToken string, request *api.CreateC
 	// Parse response
 	var response api.CreateClientResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return &response.Client, nil
@@ -160,13 +160,13 @@ func (c *AuthServerClient) UpdateClient(accessToken string, clientId int64, requ
 	// Marshal request body
 	bodyBytes, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Create request
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -176,14 +176,14 @@ func (c *AuthServerClient) UpdateClient(accessToken string, clientId int64, requ
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -194,7 +194,7 @@ func (c *AuthServerClient) UpdateClient(accessToken string, clientId int64, requ
 	// Parse response
 	var response api.UpdateClientResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return &response.Client, nil
@@ -207,13 +207,13 @@ func (c *AuthServerClient) UpdateClientAuthentication(accessToken string, client
 	// Marshal request body
 	bodyBytes, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Create request
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -223,14 +223,14 @@ func (c *AuthServerClient) UpdateClientAuthentication(accessToken string, client
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -241,7 +241,7 @@ func (c *AuthServerClient) UpdateClientAuthentication(accessToken string, client
 	// Parse response
 	var response api.UpdateClientResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return &response.Client, nil
@@ -254,13 +254,13 @@ func (c *AuthServerClient) UpdateClientOAuth2Flows(accessToken string, clientId 
 	// Marshal request body
 	bodyBytes, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Create request
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -270,14 +270,14 @@ func (c *AuthServerClient) UpdateClientOAuth2Flows(accessToken string, clientId 
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -288,7 +288,7 @@ func (c *AuthServerClient) UpdateClientOAuth2Flows(accessToken string, clientId 
 	// Parse response
 	var response api.UpdateClientResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return &response.Client, nil
@@ -301,7 +301,7 @@ func (c *AuthServerClient) DeleteClient(accessToken string, clientId int64) erro
 	// Create request
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -311,14 +311,14 @@ func (c *AuthServerClient) DeleteClient(accessToken string, clientId int64) erro
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -337,13 +337,13 @@ func (c *AuthServerClient) UpdateClientRedirectURIs(accessToken string, clientId
 	// Marshal request body
 	bodyBytes, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Create request
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -353,14 +353,14 @@ func (c *AuthServerClient) UpdateClientRedirectURIs(accessToken string, clientId
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -371,7 +371,7 @@ func (c *AuthServerClient) UpdateClientRedirectURIs(accessToken string, clientId
 	// Parse response
 	var response api.UpdateClientResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return &response.Client, nil
@@ -385,13 +385,13 @@ func (c *AuthServerClient) UpdateClientWebOrigins(accessToken string, clientId i
 	// Marshal request body
 	bodyBytes, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Create request
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -401,14 +401,14 @@ func (c *AuthServerClient) UpdateClientWebOrigins(accessToken string, clientId i
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -419,7 +419,7 @@ func (c *AuthServerClient) UpdateClientWebOrigins(accessToken string, clientId i
 	// Parse response
 	var response api.UpdateClientResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return &response.Client, nil
@@ -433,13 +433,13 @@ func (c *AuthServerClient) UpdateClientTokens(accessToken string, clientId int64
 	// Marshal request body
 	bodyBytes, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errs.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Create request
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -449,14 +449,14 @@ func (c *AuthServerClient) UpdateClientTokens(accessToken string, clientId int64
 	// Make request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	// Handle non-2xx responses
@@ -467,7 +467,7 @@ func (c *AuthServerClient) UpdateClientTokens(accessToken string, clientId int64
 	// Parse response
 	var response api.UpdateClientResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return &response.Client, nil
@@ -478,7 +478,7 @@ func (c *AuthServerClient) GetClientLogo(accessToken string, clientId int64) (*C
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -486,13 +486,13 @@ func (c *AuthServerClient) GetClientLogo(accessToken string, clientId int64) (*C
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -501,7 +501,7 @@ func (c *AuthServerClient) GetClientLogo(accessToken string, clientId int64) (*C
 
 	var logoInfo ClientLogoInfo
 	if err := json.Unmarshal(respBody, &logoInfo); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	return &logoInfo, nil
@@ -515,20 +515,20 @@ func (c *AuthServerClient) UploadClientLogo(accessToken string, clientId int64, 
 
 	part, err := writer.CreateFormFile("picture", filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create form file: %w", err)
+		return nil, errs.Errorf("failed to create form file: %w", err)
 	}
 
 	if _, err := part.Write(logoData); err != nil {
-		return nil, fmt.Errorf("failed to write logo data: %w", err)
+		return nil, errs.Errorf("failed to write logo data: %w", err)
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close multipart writer: %w", err)
+		return nil, errs.Errorf("failed to close multipart writer: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", fullURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -536,13 +536,13 @@ func (c *AuthServerClient) UploadClientLogo(accessToken string, clientId int64, 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -551,7 +551,7 @@ func (c *AuthServerClient) UploadClientLogo(accessToken string, clientId int64, 
 
 	var uploadResp ClientLogoUploadResponse
 	if err := json.Unmarshal(body, &uploadResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
 	return &uploadResp, nil
@@ -562,20 +562,20 @@ func (c *AuthServerClient) DeleteClientLogo(accessToken string, clientId int64) 
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {

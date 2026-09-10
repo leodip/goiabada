@@ -1,13 +1,10 @@
 package adminresourcehandlers
 
 import (
-	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -15,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -28,7 +26,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -40,7 +38,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 		// Access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -51,7 +49,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
 			return
 		}
 
@@ -93,7 +91,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 				}
 			}
 			if !found {
-				httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id)))
+				httpHelper.InternalServerError(w, r, errs.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
 				return
 			}
 		}
@@ -178,7 +176,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -189,7 +187,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -200,13 +198,13 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errs.New("userId is required"))
 			return
 		}
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
@@ -221,13 +219,13 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			return
 		}
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.JsonError(w, r, errs.New("user not found"))
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			httpHelper.JsonError(w, r, errs.New("permissionId is required"))
 			return
 		}
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
@@ -256,7 +254,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			}
 		}
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
+			httpHelper.JsonError(w, r, errs.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
 			return
 		}
 
@@ -268,7 +266,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			}
 		}
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("user %v does not have permission %v", user.Id, permissionId)))
+			httpHelper.JsonError(w, r, errs.Errorf("user %v does not have permission %v", user.Id, permissionId))
 			return
 		}
 
@@ -297,7 +295,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -308,7 +306,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -319,7 +317,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
 			return
 		}
 
@@ -360,7 +358,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 			}
 		}
 		if !found {
-			httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id)))
+			httpHelper.InternalServerError(w, r, errs.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
 			return
 		}
 
@@ -397,7 +395,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -408,7 +406,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -419,7 +417,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
 			return
 		}
 
@@ -457,7 +455,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			}
 		}
 		if !found {
-			httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id)))
+			httpHelper.InternalServerError(w, r, errs.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
 			return
 		}
 
@@ -497,7 +495,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -508,7 +506,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -519,13 +517,13 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errs.New("userId is required"))
 			return
 		}
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
@@ -540,13 +538,13 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			return
 		}
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.JsonError(w, r, errs.New("user not found"))
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			httpHelper.JsonError(w, r, errs.New("permissionId is required"))
 			return
 		}
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
@@ -584,13 +582,13 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			}
 		}
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
+			httpHelper.JsonError(w, r, errs.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
 			return
 		}
 
 		for _, permission := range currentPerms {
 			if permission.Id == permissionId {
-				httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("user %v already has permission %v", user.Id, permissionId)))
+				httpHelper.JsonError(w, r, errs.Errorf("user %v already has permission %v", user.Id, permissionId))
 				return
 			}
 		}

@@ -7,8 +7,8 @@ import (
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/pkg/errors"
 )
 
 func HandleAuthCallbackPost(
@@ -25,7 +25,7 @@ func HandleAuthCallbackPost(
 		}
 
 		if sess.Values[constants.SessionKeyState] == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("expecting state in the session, but it was nil")))
+			httpHelper.InternalServerError(w, r, errs.New("expecting state in the session, but it was nil"))
 			return
 		}
 
@@ -42,18 +42,18 @@ func HandleAuthCallbackPost(
 		// deployment. This path is also CSRF-exempt, so a cross-origin POST does reach it (#202).
 		state := r.PostFormValue("state")
 		if stateFromSess != state {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("state from session is different from state posted")))
+			httpHelper.InternalServerError(w, r, errs.New("state from session is different from state posted"))
 			return
 		}
 
 		if sess.Values[constants.SessionKeyCodeVerifier] == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("expecting code verifier in the session, but it was nil")))
+			httpHelper.InternalServerError(w, r, errs.New("expecting code verifier in the session, but it was nil"))
 			return
 		}
 		codeVerifier := sess.Values[constants.SessionKeyCodeVerifier].(string)
 
 		if sess.Values[constants.SessionKeyRedirectURI] == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("expecting redirect URI in the session, but it was nil")))
+			httpHelper.InternalServerError(w, r, errs.New("expecting redirect URI in the session, but it was nil"))
 			return
 		}
 
@@ -64,9 +64,9 @@ func HandleAuthCallbackPost(
 			error := r.PostFormValue("error")
 			errorDescription := r.PostFormValue("error_description")
 			if len(error) > 0 {
-				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(error+" - "+errorDescription)))
+				httpHelper.InternalServerError(w, r, errs.New(error+" - "+errorDescription))
 			} else {
-				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("expecting code, but it was empty")))
+				httpHelper.InternalServerError(w, r, errs.New("expecting code, but it was empty"))
 			}
 			return
 		}
@@ -86,26 +86,26 @@ func HandleAuthCallbackPost(
 		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(code, redirectURI, clientID,
 			clientSecret, codeVerifier, baseUrl+"/auth/token")
 		if err != nil {
-			httpHelper.InternalServerError(w, r, errors.Wrap(err, "could not exchange code for tokens"))
+			httpHelper.InternalServerError(w, r, errs.Wrap(err, "could not exchange code for tokens"))
 			return
 		}
 
 		jwtInfo, err := tokenParser.DecodeAndValidateTokenResponse(tokenResponse)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, errors.Wrap(err, "error parsing token response"))
+			httpHelper.InternalServerError(w, r, errs.Wrap(err, "error parsing token response"))
 			return
 		}
 
 		if sess.Values[constants.SessionKeyNonce] != nil {
 			nonce := sess.Values[constants.SessionKeyNonce].(string)
 			if !jwtInfo.IdToken.IsNonceValid(nonce) {
-				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("nonce from session is different from the one in id token")))
+				httpHelper.InternalServerError(w, r, errs.New("nonce from session is different from the one in id token"))
 				return
 			}
 		}
 
 		if sess.Values[constants.SessionKeyRedirectBack] == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("expecting referrer but it was nil")))
+			httpHelper.InternalServerError(w, r, errs.New("expecting referrer but it was nil"))
 			return
 		}
 		redirectBack := sess.Values[constants.SessionKeyRedirectBack].(string)

@@ -1,12 +1,11 @@
 package admingrouphandlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -14,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -28,7 +28,7 @@ func HandleAdminGroupSettingsGet(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -41,7 +41,7 @@ func HandleAdminGroupSettingsGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -49,7 +49,7 @@ func HandleAdminGroupSettingsGet(
 		if err != nil {
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
-				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+				httpHelper.InternalServerError(w, r, errs.New("group not found"))
 				return
 			}
 			httpHelper.InternalServerError(w, r, err)
@@ -98,7 +98,7 @@ func HandleAdminGroupSettingsPost(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -111,7 +111,7 @@ func HandleAdminGroupSettingsPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 

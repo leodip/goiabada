@@ -5,14 +5,13 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/pkg/errors"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/stringutil"
@@ -28,7 +27,7 @@ func HandleAdminClientAuthenticationGet(
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("clientId is required"))
 			return
 		}
 
@@ -40,7 +39,7 @@ func HandleAdminClientAuthenticationGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
@@ -49,7 +48,7 @@ func HandleAdminClientAuthenticationGet(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", id))
 			return
 		}
 
@@ -105,7 +104,7 @@ func HandleAdminClientAuthenticationPost(
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("clientId is required"))
 			return
 		}
 
@@ -118,7 +117,7 @@ func HandleAdminClientAuthenticationPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
@@ -127,7 +126,7 @@ func HandleAdminClientAuthenticationPost(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", id))
 			return
 		}
 
@@ -142,7 +141,7 @@ func HandleAdminClientAuthenticationPost(
 		case "confidential":
 			isPublic = false
 		default:
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid value for publicConfidential")))
+			httpHelper.InternalServerError(w, r, errs.New("invalid value for publicConfidential"))
 			return
 		}
 

@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -17,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -36,7 +35,7 @@ func HandleAdminUserProfileGet(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("userId is required"))
 			return
 		}
 
@@ -48,7 +47,7 @@ func HandleAdminUserProfileGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -58,7 +57,7 @@ func HandleAdminUserProfileGet(
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 
@@ -107,7 +106,7 @@ func HandleAdminUserProfilePost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("userId is required"))
 			return
 		}
 
@@ -120,7 +119,7 @@ func HandleAdminUserProfilePost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -132,7 +131,7 @@ func HandleAdminUserProfilePost(
 		if zoneInfoValue != "" {
 			zoneInfoParts := strings.Split(zoneInfoValue, "___")
 			if len(zoneInfoParts) != 2 {
-				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid zoneInfo")))
+				httpHelper.InternalServerError(w, r, errs.New("invalid zoneInfo"))
 				return
 			}
 			zoneInfoCountry = zoneInfoParts[0]

@@ -4,12 +4,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/pkg/errors"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -22,7 +21,7 @@ func HandleAdminGroupAttributesGet(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
 			return
 		}
 
@@ -35,7 +34,7 @@ func HandleAdminGroupAttributesGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 
@@ -46,7 +45,7 @@ func HandleAdminGroupAttributesGet(
 			return
 		}
 		if group == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.InternalServerError(w, r, errs.New("group not found"))
 			return
 		}
 
@@ -81,7 +80,7 @@ func HandleAdminGroupAttributesRemovePost(
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute id is required")))
+			httpHelper.JsonError(w, r, errs.New("attribute id is required"))
 			return
 		}
 
@@ -94,7 +93,7 @@ func HandleAdminGroupAttributesRemovePost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
 

@@ -2,18 +2,18 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // HandleAPIError - for simple operations without forms (delete, etc.)
 func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
 	var apiErr *apiclient.APIError
 	if errors.As(err, &apiErr) {
-		httpHelper.InternalServerError(w, r, fmt.Errorf("API error: %s (Code: %s, StatusCode: %d)", apiErr.Message, apiErr.Code, apiErr.StatusCode))
+		httpHelper.InternalServerError(w, r, errs.Errorf("API error: %s (Code: %s, StatusCode: %d)", apiErr.Message, apiErr.Code, apiErr.StatusCode))
 	} else {
 		httpHelper.InternalServerError(w, r, err)
 	}
@@ -32,7 +32,7 @@ func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r 
 			renderErrorFunc(apiErr.Message)
 			return
 		}
-		httpHelper.InternalServerError(w, r, fmt.Errorf("API error: %s (Code: %s, StatusCode: %d)", apiErr.Message, apiErr.Code, apiErr.StatusCode))
+		httpHelper.InternalServerError(w, r, errs.Errorf("API error: %s (Code: %s, StatusCode: %d)", apiErr.Message, apiErr.Code, apiErr.StatusCode))
 	} else {
 		httpHelper.InternalServerError(w, r, err)
 	}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/chzyer/readline"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/leodip/goiabada/core/errs"
 	_ "github.com/lib/pq"
 	_ "github.com/microsoft/go-mssqldb"
 )
@@ -1170,10 +1171,10 @@ func promptPassword(rl *readline.Instance, prompt, defaultValue string) string {
 
 func validateURL(urlStr string) error {
 	if urlStr == "" {
-		return fmt.Errorf("URL cannot be empty")
+		return errs.Errorf("URL cannot be empty")
 	}
 	if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
-		return fmt.Errorf("URL must start with http:// or https://")
+		return errs.Errorf("URL must start with http:// or https://")
 	}
 	hostname := strings.TrimPrefix(urlStr, "https://")
 	hostname = strings.TrimPrefix(hostname, "http://")
@@ -1198,104 +1199,104 @@ func isASCIILowerAlphaNum(c rune) bool {
 
 func validateHostname(hostname string) error {
 	if hostname == "" {
-		return fmt.Errorf("hostname cannot be empty")
+		return errs.Errorf("hostname cannot be empty")
 	}
 	if len(hostname) > 253 {
-		return fmt.Errorf("hostname too long (max 253 characters)")
+		return errs.Errorf("hostname too long (max 253 characters)")
 	}
 	for i, c := range hostname {
 		if !isASCIIAlphaNum(c) && c != '-' && c != '.' {
-			return fmt.Errorf("invalid character '%c' at position %d (only a-z, 0-9, '-', '.' allowed)", c, i)
+			return errs.Errorf("invalid character '%c' at position %d (only a-z, 0-9, '-', '.' allowed)", c, i)
 		}
 	}
 	if hostname[0] == '-' || hostname[0] == '.' {
-		return fmt.Errorf("hostname cannot start with '%c'", hostname[0])
+		return errs.Errorf("hostname cannot start with '%c'", hostname[0])
 	}
 	if hostname[len(hostname)-1] == '-' || hostname[len(hostname)-1] == '.' {
-		return fmt.Errorf("hostname cannot end with '%c'", hostname[len(hostname)-1])
+		return errs.Errorf("hostname cannot end with '%c'", hostname[len(hostname)-1])
 	}
 	return nil
 }
 
 func validateEmail(email string) error {
 	if email == "" {
-		return fmt.Errorf("email cannot be empty")
+		return errs.Errorf("email cannot be empty")
 	}
 	atIndex := strings.Index(email, "@")
 	if atIndex == -1 {
-		return fmt.Errorf("email must contain '@'")
+		return errs.Errorf("email must contain '@'")
 	}
 	if atIndex == 0 {
-		return fmt.Errorf("email must have text before '@'")
+		return errs.Errorf("email must have text before '@'")
 	}
 	if atIndex == len(email)-1 {
-		return fmt.Errorf("email must have text after '@'")
+		return errs.Errorf("email must have text after '@'")
 	}
 	if strings.Count(email, "@") > 1 {
-		return fmt.Errorf("email must contain only one '@'")
+		return errs.Errorf("email must contain only one '@'")
 	}
 	domain := email[atIndex+1:]
 	if !strings.Contains(domain, ".") {
-		return fmt.Errorf("email domain must contain '.'")
+		return errs.Errorf("email domain must contain '.'")
 	}
 	return nil
 }
 
 func validatePort(port string) error {
 	if port == "" {
-		return fmt.Errorf("port cannot be empty")
+		return errs.Errorf("port cannot be empty")
 	}
 	portNum := 0
 	for _, c := range port {
 		if c < '0' || c > '9' {
-			return fmt.Errorf("port must be a number")
+			return errs.Errorf("port must be a number")
 		}
 		portNum = portNum*10 + int(c-'0')
 	}
 	if portNum < 1 || portNum > 65535 {
-		return fmt.Errorf("port must be between 1 and 65535")
+		return errs.Errorf("port must be between 1 and 65535")
 	}
 	return nil
 }
 
 func validateNamespace(ns string) error {
 	if ns == "" {
-		return fmt.Errorf("namespace cannot be empty")
+		return errs.Errorf("namespace cannot be empty")
 	}
 	if len(ns) > 63 {
-		return fmt.Errorf("namespace too long (max 63 characters)")
+		return errs.Errorf("namespace too long (max 63 characters)")
 	}
 	for i, c := range ns {
 		if !isASCIILowerAlphaNum(c) && c != '-' {
-			return fmt.Errorf("invalid character '%c' at position %d (only lowercase a-z, 0-9, '-' allowed)", c, i)
+			return errs.Errorf("invalid character '%c' at position %d (only lowercase a-z, 0-9, '-' allowed)", c, i)
 		}
 	}
 	if ns[0] >= '0' && ns[0] <= '9' {
-		return fmt.Errorf("namespace must start with a letter")
+		return errs.Errorf("namespace must start with a letter")
 	}
 	if ns[0] == '-' {
-		return fmt.Errorf("namespace cannot start with '-'")
+		return errs.Errorf("namespace cannot start with '-'")
 	}
 	if ns[len(ns)-1] == '-' {
-		return fmt.Errorf("namespace cannot end with '-'")
+		return errs.Errorf("namespace cannot end with '-'")
 	}
 	return nil
 }
 
 func validateDatabaseName(name string) error {
 	if name == "" {
-		return fmt.Errorf("database name cannot be empty")
+		return errs.Errorf("database name cannot be empty")
 	}
 	if len(name) > 63 {
-		return fmt.Errorf("database name too long (max 63 characters)")
+		return errs.Errorf("database name too long (max 63 characters)")
 	}
 	for i, c := range name {
 		if !isASCIIAlphaNum(c) && c != '_' {
-			return fmt.Errorf("invalid character '%c' at position %d (only a-z, A-Z, 0-9, '_' allowed)", c, i)
+			return errs.Errorf("invalid character '%c' at position %d (only a-z, A-Z, 0-9, '_' allowed)", c, i)
 		}
 	}
 	if name[0] >= '0' && name[0] <= '9' {
-		return fmt.Errorf("database name must start with a letter")
+		return errs.Errorf("database name must start with a letter")
 	}
 	return nil
 }
