@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/urlutil"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -192,7 +192,7 @@ func TestURL(t *testing.T) {
 func TestUUID(t *testing.T) {
 	for i := 0; i < draws; i++ {
 		got := UUID()
-		if _, err := uuid.Parse(got); err != nil {
+		if _, err := uuidutil.Parse(got); err != nil {
 			t.Fatalf("UUID(): %q does not parse: %v", got, err)
 		}
 	}
