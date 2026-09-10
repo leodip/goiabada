@@ -22,13 +22,13 @@ func HandleAdminGroupDeleteGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -45,7 +45,7 @@ func HandleAdminGroupDeleteGet(
 			return
 		}
 		if group == nil {
-			httpHelper.InternalServerError(w, r, errs.New("group not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -73,13 +73,13 @@ func HandleAdminGroupDeletePost(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -96,7 +96,7 @@ func HandleAdminGroupDeletePost(
 			return
 		}
 		if group == nil {
-			httpHelper.InternalServerError(w, r, errs.New("group not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 

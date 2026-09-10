@@ -28,13 +28,13 @@ func HandleAdminResourceGroupsWithPermissionGet(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 		// Get JWT info from context to extract access token
@@ -51,7 +51,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -80,7 +80,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		var selectedPermission int64
 		selectedPermission, err = strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -97,7 +97,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			}
 
 			if !found {
-				httpHelper.InternalServerError(w, r, errs.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
+				httpHelper.NotFound(w, r)
 				return
 			}
 		}
@@ -224,13 +224,13 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 		// Get JWT info from context to extract access token
@@ -247,7 +247,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -360,13 +360,13 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 		// Get JWT info from context to extract access token
@@ -383,7 +383,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 

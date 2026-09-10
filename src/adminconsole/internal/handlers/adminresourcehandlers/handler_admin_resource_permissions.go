@@ -30,13 +30,13 @@ func HandleAdminResourcePermissionsGet(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("resourceId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 		// Get JWT info from context to extract access token
@@ -52,7 +52,7 @@ func HandleAdminResourcePermissionsGet(
 			return
 		}
 		if resource == nil {
-			httpHelper.InternalServerError(w, r, errs.New("resource not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 

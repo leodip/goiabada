@@ -10,9 +10,20 @@ import (
 )
 
 // HandleAPIError - for simple operations without forms (delete, etc.)
+//
+// A 404 is answered with the 404 page. This is the console's live "the entity is gone" path and
+// the only one that fires: every apiclient method funnels a non-2xx through parseAPIError, so the
+// admin API's NOT_FOUND arrives here as an *apiclient.APIError rather than as the (nil, nil) the
+// callers' own `== nil` guards were written for. Until this arm existed, following a stale link or
+// a bookmark to a deleted user told the administrator the server had broken, and spent a stack, a
+// log record and a request id saying so (#279).
 func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
 	var apiErr *apiclient.APIError
 	if errors.As(err, &apiErr) {
+		if apiErr.StatusCode == http.StatusNotFound {
+			httpHelper.NotFound(w, r)
+			return
+		}
 		httpHelper.InternalServerError(w, r, errs.Errorf("API error: %s (Code: %s, StatusCode: %d)", apiErr.Message, apiErr.Code, apiErr.StatusCode))
 	} else {
 		httpHelper.InternalServerError(w, r, err)
@@ -22,14 +33,19 @@ func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reques
 // HandleAPIErrorWithCallback - for form operations that can show validation errors.
 //
 // Routes on HTTP status: 400 Bad Request is treated as a user-correctable
-// validation failure and surfaced back to the form via renderErrorFunc;
-// anything else escalates to InternalServerError. The English description
+// validation failure and surfaced back to the form via renderErrorFunc; 404 Not Found means the
+// thing the form edits no longer exists, so there is no form to re-render and the 404 page is the
+// answer (#279); anything else escalates to InternalServerError. The English description
 // from the API response is surfaced verbatim.
 func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error, renderErrorFunc func(string)) {
 	var apiErr *apiclient.APIError
 	if errors.As(err, &apiErr) {
 		if apiErr.StatusCode == http.StatusBadRequest {
 			renderErrorFunc(apiErr.Message)
+			return
+		}
+		if apiErr.StatusCode == http.StatusNotFound {
+			httpHelper.NotFound(w, r)
 			return
 		}
 		httpHelper.InternalServerError(w, r, errs.Errorf("API error: %s (Code: %s, StatusCode: %d)", apiErr.Message, apiErr.Code, apiErr.StatusCode))

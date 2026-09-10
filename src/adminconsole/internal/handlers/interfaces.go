@@ -17,6 +17,7 @@ import (
 
 type HttpHelper interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
+	NotFound(w http.ResponseWriter, r *http.Request)
 	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) error
 	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,

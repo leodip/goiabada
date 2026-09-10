@@ -27,13 +27,13 @@ func HandleAdminUserPhoneGet(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("userId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -52,7 +52,7 @@ func HandleAdminUserPhoneGet(
 		}
 
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errs.New("user not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -107,13 +107,13 @@ func HandleAdminUserPhonePost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("userId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 

@@ -21,13 +21,13 @@ func HandleAdminGroupAttributesGet(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("groupId is required"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.NotFound(w, r)
 			return
 		}
 
@@ -45,7 +45,7 @@ func HandleAdminGroupAttributesGet(
 			return
 		}
 		if group == nil {
-			httpHelper.InternalServerError(w, r, errs.New("group not found"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 

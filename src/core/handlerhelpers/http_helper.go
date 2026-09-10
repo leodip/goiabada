@@ -59,6 +59,27 @@ func (h *HttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// NotFound renders the 404 page, and logs nothing.
+//
+// The silence is the point. A URL whose id does not parse, whose id is absent, or that names an
+// entity the API says is gone is a fact about the request, not a fault an operator has to
+// investigate: answering it with the 500 page spent a stack, a log record and a request id on a
+// stale bookmark, and told the administrator that the server had broken. RFC 9110 section 15.5.5:
+// 404 "indicates that the origin server did not find a current representation for the target
+// resource or is not willing to disclose that one exists" (#279).
+//
+// A render failure is a real server fault and falls through to InternalServerError, which owns
+// every header as well as the status: RenderTemplate buffers the page before it touches the
+// response, so nothing has been written when it returns an error.
+func (h *HttpHelper) NotFound(w http.ResponseWriter, r *http.Request) {
+	err := h.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/not_found.html", map[string]interface{}{
+		"_httpStatus": http.StatusNotFound,
+	})
+	if err != nil {
+		h.InternalServerError(w, r, err)
+	}
+}
+
 func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) error {
 

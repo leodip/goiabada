@@ -142,3 +142,111 @@ func TestHandleAPIErrorWithCallback_RendersAWrappedBadRequest(t *testing.T) {
 
 	assert.Equal(t, "Invalid client identifier", rendered)
 }
+
+// The 404 arm is the one decision 11 is actually about. The console's own `if resp == nil` guards
+// were written for a (nil, nil) the api client never returns: every method funnels a non-2xx through
+// parseAPIError, so an administrator following a link to a deleted client arrives here holding a 404
+// *APIError, and before this arm existed the answer was a 500 page with a stack in the log.
+//
+// The table runs both HTML helpers over the same statuses, because the 404 has to join the form
+// path's 400 rather than displace it, and everything else has to stay a 500 (#279 decision 11).
+func TestHandleAPIError_RoutesOnStatus(t *testing.T) {
+	testCases := []struct {
+		name         string
+		err          error
+		wantNotFound bool
+	}{
+		{
+			name:         "a 404 is answered with the 404 page",
+			err:          &apiclient.APIError{Code: "NOT_FOUND", Message: "Client not found", StatusCode: http.StatusNotFound},
+			wantNotFound: true,
+		},
+		{
+			name:         "a wrapped 404 is still answered with the 404 page",
+			err:          errs.Wrap(&apiclient.APIError{Code: "NOT_FOUND", Message: "Client not found", StatusCode: http.StatusNotFound}, "unable to load the client"),
+			wantNotFound: true,
+		},
+		{
+			name: "a 500 from the API stays a 500",
+			err:  &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError},
+		},
+		{
+			name: "a 403 from the API stays a 500",
+			err:  &apiclient.APIError{Code: "FORBIDDEN", Message: "insufficient permissions", StatusCode: http.StatusForbidden},
+		},
+		{
+			name: "a 400 from the API stays a 500 on this helper, which has no form to re-render",
+			err:  &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "Invalid client identifier", StatusCode: http.StatusBadRequest},
+		},
+		{
+			name: "a transport error stays a 500",
+			err:  errs.New("connection refused"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			if testCase.wantNotFound {
+				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
+			} else {
+				httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+			}
+
+			HandleAPIError(httpHelper, httptest.NewRecorder(),
+				httptest.NewRequest(http.MethodGet, "/admin/clients/42/settings", nil), testCase.err)
+
+			httpHelper.AssertExpectations(t)
+		})
+	}
+}
+
+// The form path's own table. A 400 still re-renders the form with the API's sentence, which is what
+// #122 established; a 404 means the thing the form edits is gone, so there is no form to re-render.
+func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
+	testCases := []struct {
+		name         string
+		err          error
+		wantNotFound bool
+		wantRendered string
+	}{
+		{
+			name:         "a 404 is answered with the 404 page and never reaches the form",
+			err:          &apiclient.APIError{Code: "NOT_FOUND", Message: "Client not found", StatusCode: http.StatusNotFound},
+			wantNotFound: true,
+		},
+		{
+			name:         "a 400 still re-renders the form with the API's sentence",
+			err:          &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "Invalid client identifier", StatusCode: http.StatusBadRequest},
+			wantRendered: "Invalid client identifier",
+		},
+		{
+			name: "a 500 from the API stays a 500",
+			err:  &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError},
+		},
+		{
+			name: "a transport error stays a 500",
+			err:  errs.New("connection refused"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			switch {
+			case testCase.wantNotFound:
+				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
+			case testCase.wantRendered == "":
+				httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+			}
+
+			rendered := ""
+			HandleAPIErrorWithCallback(httpHelper, httptest.NewRecorder(),
+				httptest.NewRequest(http.MethodPost, "/admin/clients/42/settings", nil), testCase.err,
+				func(message string) { rendered = message })
+
+			assert.Equal(t, testCase.wantRendered, rendered)
+			httpHelper.AssertExpectations(t)
+		})
+	}
+}
