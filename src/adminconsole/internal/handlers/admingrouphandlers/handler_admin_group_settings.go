@@ -47,7 +47,8 @@ func HandleAdminGroupSettingsGet(
 
 		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			if apiErr, ok := err.(*apiclient.APIError); ok && apiErr.StatusCode == http.StatusNotFound {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
 				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
 				return
 			}
@@ -147,7 +148,8 @@ func HandleAdminGroupSettingsPost(
 		// Call API to update group
 		_, err = apiClient.UpdateGroup(jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				// Show validation errors from API
 				renderError(apiErr.Message)
 				return

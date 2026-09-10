@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/validators"
@@ -40,10 +42,10 @@ import (
 // have produced, conformed, which is also why the log line that writer emits on that branch is
 // emitted here instead: the branch it now takes does not log.
 func jsonErrorConformed(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
-	errorDetail, ok := err.(*customerrors.ErrorDetail)
-	if !ok {
+	var errorDetail *customerrors.ErrorDetail
+	if !errors.As(err, &errorDetail) {
 		requestId := middleware.GetReqID(r.Context())
-		slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
+		slog.Error("internal server error", "error", errs.WithStack(err), "request_id", requestId)
 		errorDetail = customerrors.NewErrorDetailWithHttpStatusCode("server_error",
 			fmt.Sprintf(genericServerErrorDescription, requestId), http.StatusInternalServerError)
 	}
@@ -157,7 +159,8 @@ func HandleTokenPost(
 			// has authenticated against the used code (client_id, redirect_uri,
 			// client_secret/PKCE), so revocation here cannot be triggered by
 			// an unauthenticated attacker.
-			if reused, ok := err.(*customerrors.AuthCodeReusedError); ok {
+			var reused *customerrors.AuthCodeReusedError
+			if errors.As(err, &reused) {
 				if revokeErr := revokeAndAuditAuthCodeReuse(database, auditLogger, reused.Code); revokeErr != nil {
 					httpHelper.InternalServerError(w, r, revokeErr)
 					return
@@ -166,7 +169,7 @@ func HandleTokenPost(
 				return
 			}
 			// Check if user is disabled and log audit event
-			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrUserDisabled) {
+			if errors.Is(err, customerrors.ErrUserDisabled) {
 				auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 					"clientId": input.ClientId,
 				})
@@ -185,9 +188,7 @@ func HandleTokenPost(
 			// validator discards the client model on failure. Unlike that event, this one is
 			// reached only below client authentication and PKCE, so the identifier here has
 			// been proved rather than merely asserted.
-			if errDetail, ok := err.(*customerrors.ErrorDetail); ok &&
-				errDetail.IsError(customerrors.ErrCodeRedirectURIDeregistered) {
-
+			if errors.Is(err, customerrors.ErrCodeRedirectURIDeregistered) {
 				auditLogger.Log(constants.AuditRedemptionRefusedRedirectURI, map[string]interface{}{
 					"clientIdentifier": input.ClientId,
 				})
@@ -240,9 +241,10 @@ func HandleTokenPost(
 			// ErrClientDisabled is the one exception, and it is the reason this is not a
 			// bare code test: that check runs before the grant-type switch and before any
 			// credential is read, so it is an invalid_grant that guessed nothing.
-			if errDetail, ok := err.(*customerrors.ErrorDetail); ok &&
+			var errDetail *customerrors.ErrorDetail
+			if errors.As(err, &errDetail) &&
 				input.GrantType == "password" && errDetail.GetCode() == "invalid_grant" &&
-				!errDetail.IsError(customerrors.ErrClientDisabled) {
+				!errors.Is(err, customerrors.ErrClientDisabled) {
 
 				credentialFailures.RecordCredentialFailure(r)
 				auditLogger.Log(constants.AuditROPCAuthFailed, map[string]interface{}{
@@ -257,7 +259,7 @@ func HandleTokenPost(
 				})
 			}
 
-			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.GetCode() == "invalid_scope" {
+			if errors.As(err, &errDetail) && errDetail.GetCode() == "invalid_scope" {
 				auditLogger.Log(constants.AuditTokenScopeDenied, map[string]interface{}{
 					// clientIdentifier, the string from the request, not the numeric clientId the
 					// issuance events use: the validator discards the client model on failure. See

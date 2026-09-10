@@ -147,7 +147,8 @@ func HandleAdminGroupPermissionsPost(
 		err = apiClient.UpdateGroupPermissions(jwtInfo.TokenResponse.AccessToken, data.GroupId, updateReq)
 		if err != nil {
 			// Handle API errors by extracting the message for display
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
 				return
 			}

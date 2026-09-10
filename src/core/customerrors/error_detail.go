@@ -10,7 +10,7 @@ var (
 	ErrNoAuthContext = NewErrorDetail("no_auth_context", "no auth context in session")
 	ErrUserDisabled  = NewErrorDetailWithHttpStatusCode("invalid_grant", "The user account is disabled.", 400)
 	// ErrClientDisabled is a comparison target, like ErrUserDisabled: the token validator
-	// constructs this same value and IsError matches it by value.
+	// constructs this same value and errors.Is matches it by value through Is below.
 	//
 	// It exists because it is the one invalid_grant a password grant can produce without any
 	// credential having been read. The check runs before the grant-type switch, so treating
@@ -20,7 +20,8 @@ var (
 	ErrClientDisabled = NewErrorDetailWithHttpStatusCode("invalid_grant", "Client is disabled.", 400)
 	// ErrCodeRedirectURIDeregistered is a comparison target, like the two above: the token
 	// validator constructs this same value when redeeming an authorization code whose own
-	// redirect URI is no longer registered on the client, and IsError matches it by value.
+	// redirect URI is no longer registered on the client, and errors.Is matches it by value
+	// through Is below.
 	// That is what makes the audit decision and the wire message one fact rather than two
 	// that can drift (#241 decision 10).
 	//
@@ -108,7 +109,7 @@ func (e *ErrorDetail) Error() string {
 //
 // It clones the details map rather than round-tripping through GetCode, GetHttpStatusCode,
 // GetWWWAuthenticate and the four-argument constructor. The round-trip reads correct today and
-// silently drops any detail key added later, and IsError compares len(details) as well as every
+// silently drops any detail key added later, and Is compares len(details) as well as every
 // entry, so a dropped key would quietly change an equality that ErrUserDisabled and ErrClientDisabled
 // are compared by (#213).
 func (e *ErrorDetail) WithDescription(description string) *ErrorDetail {
@@ -151,17 +152,31 @@ func (e *ErrorDetail) GetWWWAuthenticate() string {
 	return e.details["wwwAuthenticate"]
 }
 
-func (e *ErrorDetail) IsError(target *ErrorDetail) bool {
-	if target == nil {
+// Is reports whether e carries the same details as target, which is what makes
+// errors.Is(err, ErrUserDisabled) match a copy the token validator rebuilt rather than the sentinel
+// value itself. ErrUserDisabled, ErrClientDisabled and ErrCodeRedirectURIDeregistered are never
+// returned by identity: the validator constructs an equal value at the point of failure, so without
+// this method errors.Is would fall back to == and match none of the three. ErrNoAuthContext is
+// returned by identity and would match either way.
+//
+// Every entry is compared, and the lengths first, so a detail key added later cannot quietly widen
+// an equality: two ErrorDetails agreeing on code and description but differing in httpStatusCode
+// are different errors, which is the distinction ErrUserDisabled and ErrClientDisabled turn on.
+//
+// It replaces IsError, whose signature took a *ErrorDetail and so could only be called after a
+// bare type assertion had already found one. A target of any other type is not this error (#279).
+func (e *ErrorDetail) Is(target error) bool {
+	targetDetail, ok := target.(*ErrorDetail)
+	if !ok || targetDetail == nil {
 		return false
 	}
 
-	if len(e.details) != len(target.details) {
+	if len(e.details) != len(targetDetail.details) {
 		return false
 	}
 
 	for key, value := range e.details {
-		targetValue, exists := target.details[key]
+		targetValue, exists := targetDetail.details[key]
 		if !exists || value != targetValue {
 			return false
 		}

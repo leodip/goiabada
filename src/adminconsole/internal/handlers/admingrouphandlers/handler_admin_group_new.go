@@ -74,7 +74,8 @@ func HandleAdminGroupNewPost(
 		// Call API to create group
 		_, err := apiClient.CreateGroup(jwtInfo.TokenResponse.AccessToken, createReq)
 		if err != nil {
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				// Show validation errors from API
 				renderError(apiErr.Message)
 				return

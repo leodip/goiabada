@@ -6779,7 +6779,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		require.True(t, ok)
 		// Matched the way HandleTokenPost matches it, by value against the sentinel, because
 		// that equality is what ties the audit row to the wire message (#241 decision 10).
-		assert.True(t, customErr.IsError(customerrors.ErrCodeRedirectURIDeregistered))
+		assert.True(t, errors.Is(err, customerrors.ErrCodeRedirectURIDeregistered))
 		assert.Equal(t, "invalid_grant", customErr.GetCode())
 		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
 		// Legible rather than the flat "Code is invalid." the refusals above it give. The
@@ -6796,9 +6796,9 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*customerrors.ErrorDetail)
-		require.True(t, ok)
-		assert.True(t, customErr.IsError(customerrors.ErrCodeRedirectURIDeregistered))
+		// errors.Is alone: matching the sentinel already establishes the value is an
+		// *ErrorDetail carrying exactly its details, which is what ErrorDetail.Is compares.
+		assert.True(t, errors.Is(err, customerrors.ErrCodeRedirectURIDeregistered))
 	})
 
 	t.Run("a loopback code still matches its registered portless URI", func(t *testing.T) {

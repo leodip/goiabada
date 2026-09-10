@@ -30,7 +30,7 @@ func HandleAuthOtpGet(
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
+			if errors.Is(err, customerrors.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
 				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -184,7 +184,7 @@ func HandleAuthOtpPost(
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
+			if errors.Is(err, customerrors.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
 				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
 				http.Redirect(w, r, profileUrl, http.StatusFound)

@@ -143,7 +143,8 @@ func HandleAdminResourceSettingsPost(
 		_, err = apiClient.UpdateResource(jwtInfo.TokenResponse.AccessToken, id, req)
 		if err != nil {
 			// Show validation errors from API
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				renderError(apiErr.Message)
 				return
 			}

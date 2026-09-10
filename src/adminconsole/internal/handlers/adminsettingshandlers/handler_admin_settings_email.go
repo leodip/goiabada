@@ -259,7 +259,8 @@ func HandleAdminSettingsEmailSendTestPost(
 		err := apiClient.SendTestEmail(jwtInfo.TokenResponse.AccessToken, &api.SendTestEmailRequest{To: destinationEmail})
 		if err != nil {
 			// Prefer to render form error for known API error codes
-			if apiErr, ok := err.(*apiclient.APIError); ok {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) {
 				switch apiErr.Code {
 				case "VALIDATION_ERROR", "SMTP_NOT_ENABLED", "SEND_FAILED":
 					renderError(apiErr.Message)

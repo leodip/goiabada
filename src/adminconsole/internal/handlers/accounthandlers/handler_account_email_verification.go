@@ -134,7 +134,8 @@ func HandleAccountEmailVerificationPost(
 
 		if _, err := apiClient.VerifyAccountEmail(jwtInfo.TokenResponse.AccessToken, req); err != nil {
 			// Handle invalid/expired code gracefully as validation error
-			if apiErr, ok := err.(*apiclient.APIError); ok && apiErr.Code == "INVALID_OR_EXPIRED_VERIFICATION_CODE" {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) && apiErr.Code == "INVALID_OR_EXPIRED_VERIFICATION_CODE" {
 				settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 				bind := map[string]interface{}{
 					"savedSuccessfully": false,

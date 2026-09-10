@@ -3,6 +3,7 @@ package handlerhelpers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -30,9 +31,17 @@ func NewHttpHelper(templateFS fs.FS) *HttpHelper {
 	}
 }
 
+// InternalServerError logs err once, with a stack and the request id the page shows, and renders
+// the 500 page.
+//
+// errs.WithStack is applied here rather than at the 876 call sites, which is what lets every one of
+// them pass err bare: it is the identity on anything this tree constructed, so the only value it
+// changes is a bare error from the standard library or a dependency, which would otherwise log with
+// no frames at all. The attributes are structured, and the stack rides inside the error attribute
+// because slog's default handler formats an error value with %+v (#279 decisions 9 and 10).
 func (h *HttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	requestId := middleware.GetReqID(r.Context())
-	slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
+	slog.Error("internal server error", "error", errs.WithStack(err), "request_id", requestId)
 
 	// The status travels in the bind map rather than through an early WriteHeader. Committing it
 	// first freezes the header map, so every header RenderTemplate sets afterwards is silently
@@ -235,8 +244,12 @@ func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error
 	errorStr := ""
 	errorDescriptionStr := ""
 
-	errorDetail, ok := err.(*customerrors.ErrorDetail)
-	if ok {
+	// errors.As rather than a bare assertion, so an *ErrorDetail still decides the status after
+	// anything on the way up has wrapped it. The assertion this replaces was correct only while the
+	// unwritten rule "never wrap a wire error" held, and a wrap turned a validator's 400 into a 500
+	// with the sentence in the log instead of on the wire (#279 decision 6).
+	var errorDetail *customerrors.ErrorDetail
+	if errors.As(err, &errorDetail) {
 		// error detail
 		statusCode := errorDetail.GetHttpStatusCode()
 		if statusCode == 0 {
@@ -257,7 +270,7 @@ func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error
 	} else {
 		// any other error
 		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
+		slog.Error("internal server error", "error", errs.WithStack(err), "request_id", requestId)
 		errorStr = "server_error"
 		errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
 	}
