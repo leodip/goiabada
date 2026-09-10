@@ -56,7 +56,7 @@ func (d *PostgresDatabase) CreateUserPermission(tx *sql.Tx, userPermission *mode
 	if err := rows.Err(); err != nil {
 		userPermission.CreatedAt = originalCreatedAt
 		userPermission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userPermission")
+		return d.CommonDB.WrapSQLError(err, "unable to insert userPermission")
 	}
 
 	return nil

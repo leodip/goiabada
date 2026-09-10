@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) er
 	if err := rows.Err(); err != nil {
 		keyPair.CreatedAt = originalCreatedAt
 		keyPair.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert keyPair")
+		return d.CommonDB.WrapSQLError(err, "unable to insert keyPair")
 	}
 
 	return nil

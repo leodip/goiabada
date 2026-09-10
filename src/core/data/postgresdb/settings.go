@@ -48,7 +48,7 @@ func (d *PostgresDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings)
 	if err := rows.Err(); err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert settings")
+		return d.CommonDB.WrapSQLError(err, "unable to insert settings")
 	}
 
 	return nil

@@ -55,7 +55,7 @@ func (d *PostgresDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *
 	if err := rows.Err(); err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert clientPermission")
+		return d.CommonDB.WrapSQLError(err, "unable to insert clientPermission")
 	}
 
 	return nil

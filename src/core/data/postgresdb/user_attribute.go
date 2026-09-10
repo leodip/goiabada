@@ -52,7 +52,7 @@ func (d *PostgresDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models
 	if err := rows.Err(); err != nil {
 		userAttribute.CreatedAt = originalCreatedAt
 		userAttribute.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userAttribute")
+		return d.CommonDB.WrapSQLError(err, "unable to insert userAttribute")
 	}
 
 	return nil

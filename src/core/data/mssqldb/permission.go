@@ -57,7 +57,7 @@ func (d *MsSQLDatabase) CreatePermission(tx *sql.Tx, permission *models.Permissi
 	if err := rows.Err(); err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert permission")
+		return d.CommonDB.WrapSQLError(err, "unable to insert permission")
 	}
 
 	return nil

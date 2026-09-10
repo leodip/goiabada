@@ -53,7 +53,7 @@ func (d *MsSQLDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *model
 	if err := rows.Err(); err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert preRegistration")
+		return d.CommonDB.WrapSQLError(err, "unable to insert preRegistration")
 	}
 
 	return nil

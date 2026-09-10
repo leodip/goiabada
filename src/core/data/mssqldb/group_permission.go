@@ -61,7 +61,7 @@ func (d *MsSQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *model
 	if err := rows.Err(); err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert groupPermission")
+		return d.CommonDB.WrapSQLError(err, "unable to insert groupPermission")
 	}
 
 	return nil

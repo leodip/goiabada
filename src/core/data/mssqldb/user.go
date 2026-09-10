@@ -53,7 +53,7 @@ func (d *MsSQLDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 	if err := rows.Err(); err != nil {
 		user.CreatedAt = originalCreatedAt
 		user.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert user")
+		return d.CommonDB.WrapSQLError(err, "unable to insert user")
 	}
 
 	return nil

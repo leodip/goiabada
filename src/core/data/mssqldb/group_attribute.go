@@ -57,7 +57,7 @@ func (d *MsSQLDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.
 	if err := rows.Err(); err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert groupAttribute")
+		return d.CommonDB.WrapSQLError(err, "unable to insert groupAttribute")
 	}
 
 	return nil

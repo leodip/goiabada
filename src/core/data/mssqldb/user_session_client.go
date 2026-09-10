@@ -53,7 +53,7 @@ func (d *MsSQLDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *m
 	if err := rows.Err(); err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userSessionClient")
+		return d.CommonDB.WrapSQLError(err, "unable to insert userSessionClient")
 	}
 
 	return nil

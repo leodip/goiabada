@@ -61,7 +61,7 @@ func (d *MsSQLDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
 	if err := rows.Err(); err != nil {
 		code.CreatedAt = originalCreatedAt
 		code.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert code")
+		return d.CommonDB.WrapSQLError(err, "unable to insert code")
 	}
 
 	return nil

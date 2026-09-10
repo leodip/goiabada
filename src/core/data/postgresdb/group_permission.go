@@ -56,7 +56,7 @@ func (d *PostgresDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mo
 	if err := rows.Err(); err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert groupPermission")
+		return d.CommonDB.WrapSQLError(err, "unable to insert groupPermission")
 	}
 
 	return nil

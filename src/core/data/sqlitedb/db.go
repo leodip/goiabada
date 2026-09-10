@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -116,6 +117,7 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 	slog.Info("connected to sqlite database with required PRAGMA settings")
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLite, logSQL)
 	commonDb.IsDeadlock = isDeadlock
+	commonDb.IsUniqueViolation = isUniqueViolation
 	sqliteDb := SQLiteDatabase{
 		DB:       db,
 		CommonDB: commonDb,
@@ -136,6 +138,47 @@ func (d *SQLiteDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
 // pool has one connection (SetMaxOpenConns(1) above), so no two transactions of this process
 // ever overlap and there is no cycle for the engine to break (#301).
 func isDeadlock(error) bool {
+	return false
+}
+
+// SQLite is the one engine that gives "a key already holds that value" three different extended
+// result codes, depending on which kind of key was collided with. All three were observed rather
+// than remembered, by running the statements against an in-memory database; the same statements
+// are TestIsUniqueViolation's rows, so the numbers below are checked rather than trusted.
+//
+//	2067 SQLITE_CONSTRAINT_UNIQUE      a UNIQUE column constraint or a CREATE UNIQUE INDEX
+//	1555 SQLITE_CONSTRAINT_PRIMARYKEY  a PRIMARY KEY, of any type, composite or WITHOUT ROWID
+//	2579 SQLITE_CONSTRAINT_ROWID       an explicitly supplied rowid that is taken
+//
+// All three are accepted, because on the other three engines one number covers all of them:
+// MySQL's 1062 says "Duplicate entry ... for key 'PRIMARY'", PostgreSQL's 23505 is unique_violation
+// for a primary key too, and SQL Server's 2627 is "Violation of PRIMARY KEY constraint" as readily
+// as of a UNIQUE one. Accepting only 2067 would make SQLite the single engine on which a primary-key
+// collision is not a unique-key violation, which is the kind of divergence #279 exists to remove.
+//
+// The primary code these extend, SQLITE_CONSTRAINT (19), is deliberately absent: it also covers NOT
+// NULL, CHECK and foreign-key refusals, none of which is a lost race for a key, and all of which a
+// caller answering 409 would then tell the client to retry forever.
+const (
+	sqliteConstraintUnique     = 2067
+	sqliteConstraintPrimaryKey = 1555
+	sqliteConstraintRowid      = 2579
+)
+
+// isUniqueViolation is SQLite's row of the unique-key classifier table WrapSQLError consults.
+//
+// modernc.org/sqlite returns *sqlite.Error, with pointer receivers, so the pointer is the only form
+// that is an error. errors.As rather than a type assertion, because by the time a caller asks, the
+// error has been wrapped by whatever ran the statement.
+func isUniqueViolation(err error) bool {
+	var sqliteErr *sqlitedriver.Error
+	if !errors.As(err, &sqliteErr) {
+		return false
+	}
+	switch sqliteErr.Code() {
+	case sqliteConstraintUnique, sqliteConstraintPrimaryKey, sqliteConstraintRowid:
+		return true
+	}
 	return false
 }
 

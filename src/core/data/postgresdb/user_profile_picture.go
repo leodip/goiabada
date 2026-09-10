@@ -51,7 +51,7 @@ func (d *PostgresDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *
 	if err := rows.Err(); err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert profile picture")
+		return d.CommonDB.WrapSQLError(err, "unable to insert profile picture")
 	}
 
 	return nil

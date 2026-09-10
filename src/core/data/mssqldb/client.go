@@ -53,7 +53,7 @@ func (d *MsSQLDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
 	if err := rows.Err(); err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert client")
+		return d.CommonDB.WrapSQLError(err, "unable to insert client")
 	}
 
 	return nil

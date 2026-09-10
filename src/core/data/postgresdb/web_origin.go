@@ -47,7 +47,7 @@ func (d *PostgresDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrig
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
-		return errs.Wrap(err, "unable to insert webOrigin")
+		return d.CommonDB.WrapSQLError(err, "unable to insert webOrigin")
 	}
 
 	return nil

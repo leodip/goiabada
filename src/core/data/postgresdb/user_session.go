@@ -52,7 +52,7 @@ func (d *PostgresDatabase) CreateUserSession(tx *sql.Tx, userSession *models.Use
 	if err := rows.Err(); err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userSession")
+		return d.CommonDB.WrapSQLError(err, "unable to insert userSession")
 	}
 
 	return nil
