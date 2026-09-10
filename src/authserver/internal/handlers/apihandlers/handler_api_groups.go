@@ -18,7 +18,6 @@ import (
 )
 
 func HandleAPIGroupsGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -57,7 +56,6 @@ func HandleAPIGroupsGet(
 }
 
 func HandleAPIGroupCreatePost(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
@@ -140,7 +138,6 @@ func HandleAPIGroupCreatePost(
 }
 
 func HandleAPIGroupGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -184,7 +181,6 @@ func HandleAPIGroupGet(
 }
 
 func HandleAPIGroupUpdatePut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
@@ -294,7 +290,6 @@ func HandleAPIGroupUpdatePut(
 }
 
 func HandleAPIGroupDelete(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,

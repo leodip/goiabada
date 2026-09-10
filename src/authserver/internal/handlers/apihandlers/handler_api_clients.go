@@ -117,7 +117,6 @@ func applyPublicClientInvariants(client *models.Client) {
 
 // HandleAPIClientsGet - GET /api/v1/admin/clients
 func HandleAPIClientsGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -156,7 +155,6 @@ func HandleAPIClientsGet(
 
 // HandleAPIClientGet - GET /api/v1/admin/clients/{id}
 func HandleAPIClientGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -222,7 +220,6 @@ func HandleAPIClientGet(
 
 // HandleAPIClientDelete - DELETE /api/v1/admin/clients/{id}
 func HandleAPIClientDelete(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
@@ -275,7 +272,6 @@ func HandleAPIClientDelete(
 
 // HandleAPIClientCreatePost - POST /api/v1/admin/clients
 func HandleAPIClientCreatePost(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
@@ -394,7 +390,6 @@ func HandleAPIClientCreatePost(
 
 // HandleAPIClientUpdatePut - PUT /api/v1/admin/clients/{id}
 func HandleAPIClientUpdatePut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
@@ -601,7 +596,6 @@ func HandleAPIClientUpdatePut(
 // HandleAPIClientAuthenticationPut - PUT /api/v1/admin/clients/{id}/authentication
 // Changes client's public/confidential mode and client secret.
 func HandleAPIClientAuthenticationPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
@@ -747,7 +741,6 @@ func validateClientSecret(secret string) error {
 // HandleAPIClientOAuth2FlowsPut - PUT /api/v1/admin/clients/{id}/oauth2-flows
 // Updates which OAuth2 flows are enabled for the client.
 func HandleAPIClientOAuth2FlowsPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
@@ -824,7 +817,6 @@ func HandleAPIClientOAuth2FlowsPut(
 // Replaces the full set of redirect URIs for the client. The server validates
 // inputs, enforces business rules, computes add/remove, and returns the updated client.
 func HandleAPIClientRedirectURIsPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
@@ -985,7 +977,6 @@ const maxWebOriginLength = 256
 // canonicalized to the exact string a browser sends in an Origin header, or refused, so a stored
 // origin is always one CORS can match.
 func HandleAPIClientWebOriginsPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
@@ -1185,7 +1176,6 @@ func (f *webOriginsWriteFailure) Unwrap() error { return f.err }
 // HandleAPIClientTokensPut - PUT /api/v1/admin/clients/{id}/tokens
 // Updates token-related settings for a client.
 func HandleAPIClientTokensPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,

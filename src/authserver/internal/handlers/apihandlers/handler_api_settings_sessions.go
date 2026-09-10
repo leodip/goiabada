@@ -35,7 +35,6 @@ func HandleAPISettingsSessionsGet(
 
 // HandleAPISettingsSessionsPut - PUT /api/v1/admin/settings/sessions
 func HandleAPISettingsSessionsPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,

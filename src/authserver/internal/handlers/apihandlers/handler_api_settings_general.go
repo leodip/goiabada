@@ -48,7 +48,6 @@ func HandleAPISettingsGeneralGet(
 
 // HandleAPISettingsGeneralPut - PUT /api/v1/admin/settings/general
 func HandleAPISettingsGeneralPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,

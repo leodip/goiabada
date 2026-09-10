@@ -38,7 +38,6 @@ func HandleAPISettingsTokensGet(
 
 // HandleAPISettingsTokensPut - PUT /api/v1/admin/settings/tokens
 func HandleAPISettingsTokensPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,

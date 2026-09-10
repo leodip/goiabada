@@ -19,18 +19,16 @@ import (
 // emitAuthError writes the §6.3 admin/account API error envelope in English.
 // Bearer-token failures on /api/v1/* are a machine surface (Surface B/C):
 // responses do not localize. RFC 6750 §3 prescribes a WWW-Authenticate
-// Bearer header for 401/403 token failures, which we set when bearer=true.
+// Bearer header for 401/403 token failures, which we always set.
 //
 // i18n surface: B — machine.
-func emitAuthError(w http.ResponseWriter, code, description string, statusCode int, bearer bool) {
-	if bearer {
-		errorParam := "invalid_token"
-		if statusCode == http.StatusForbidden {
-			errorParam = "insufficient_scope"
-		}
-		w.Header().Set("WWW-Authenticate",
-			`Bearer error="`+errorParam+`", error_description="`+description+`"`)
+func emitAuthError(w http.ResponseWriter, code, description string, statusCode int) {
+	errorParam := "invalid_token"
+	if statusCode == http.StatusForbidden {
+		errorParam = "insufficient_scope"
 	}
+	w.Header().Set("WWW-Authenticate",
+		`Bearer error="`+errorParam+`", error_description="`+description+`"`)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	_ = json.NewEncoder(w).Encode(api.ErrorResponse{
@@ -46,19 +44,19 @@ func RequireBearerTokenScope(requiredScope string) func(http.Handler) http.Handl
 			// Get token from context (set by JwtAuthorizationHeaderToContext middleware)
 			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
 			if bearerTokenValue == nil {
-				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized, true)
+				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized)
 				return
 			}
 
 			jwtToken, ok := bearerTokenValue.(oauth.JwtToken)
 			if !ok {
-				emitAuthError(w, "INVALID_TOKEN_FORMAT", "Invalid token format.", http.StatusUnauthorized, true)
+				emitAuthError(w, "INVALID_TOKEN_FORMAT", "Invalid token format.", http.StatusUnauthorized)
 				return
 			}
 
 			// Validate scope
 			if !jwtToken.HasScope(requiredScope) {
-				emitAuthError(w, "INSUFFICIENT_SCOPE", "Insufficient scope.", http.StatusForbidden, true)
+				emitAuthError(w, "INSUFFICIENT_SCOPE", "Insufficient scope.", http.StatusForbidden)
 				return
 			}
 
@@ -76,13 +74,13 @@ func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) ht
 			// Get token from context (set by JwtAuthorizationHeaderToContext middleware)
 			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
 			if bearerTokenValue == nil {
-				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized, true)
+				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized)
 				return
 			}
 
 			jwtToken, ok := bearerTokenValue.(oauth.JwtToken)
 			if !ok {
-				emitAuthError(w, "INVALID_TOKEN_FORMAT", "Invalid token format.", http.StatusUnauthorized, true)
+				emitAuthError(w, "INVALID_TOKEN_FORMAT", "Invalid token format.", http.StatusUnauthorized)
 				return
 			}
 
@@ -96,7 +94,7 @@ func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) ht
 			}
 
 			if !hasRequiredScope {
-				emitAuthError(w, "INSUFFICIENT_SCOPE", "Insufficient scope.", http.StatusForbidden, true)
+				emitAuthError(w, "INSUFFICIENT_SCOPE", "Insufficient scope.", http.StatusForbidden)
 				return
 			}
 
@@ -143,13 +141,13 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 			// response shapes for the two "no usable token" cases.
 			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
 			if bearerTokenValue == nil {
-				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized, true)
+				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized)
 				return
 			}
 
 			jwtToken, ok := bearerTokenValue.(oauth.JwtToken)
 			if !ok {
-				emitAuthError(w, "INVALID_TOKEN_FORMAT", "Invalid token format.", http.StatusUnauthorized, true)
+				emitAuthError(w, "INVALID_TOKEN_FORMAT", "Invalid token format.", http.StatusUnauthorized)
 				return
 			}
 
@@ -163,7 +161,7 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 				// reason, which is how every other guard in this file distinguishes its cases.
 				emitAuthError(w, "USER_CONTEXT_REQUIRED",
 					"This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted.",
-					http.StatusForbidden, true)
+					http.StatusForbidden)
 				return
 			}
 

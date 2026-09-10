@@ -15,7 +15,6 @@ import (
 
 // GET /api/v1/account/consents
 func HandleAPIAccountConsentsGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +58,6 @@ func HandleAPIAccountConsentsGet(
 
 // DELETE /api/v1/account/consents/{id}
 func HandleAPIAccountConsentDelete(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {

@@ -50,7 +50,6 @@ func HandleAPISettingsEmailGet(
 
 // HandleAPISettingsEmailPut - PUT /api/v1/admin/settings/email
 func HandleAPISettingsEmailPut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	emailValidator handlers.EmailValidator,
@@ -221,7 +220,6 @@ func HandleAPISettingsEmailPut(
 
 // HandleAPISettingsEmailSendTestPost - POST /api/v1/admin/settings/email/send-test
 func HandleAPISettingsEmailSendTestPost(
-	httpHelper handlers.HttpHelper,
 	emailValidator handlers.EmailValidator,
 	emailSender handlers.EmailSender,
 	authHelper handlers.AuthHelper,

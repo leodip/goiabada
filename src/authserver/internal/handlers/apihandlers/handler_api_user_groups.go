@@ -16,7 +16,6 @@ import (
 )
 
 func HandleAPIUserGroupsGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -71,7 +70,6 @@ func HandleAPIUserGroupsGet(
 }
 
 func HandleAPIUserGroupsPut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,

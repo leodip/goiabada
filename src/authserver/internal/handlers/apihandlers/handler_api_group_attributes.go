@@ -17,7 +17,6 @@ import (
 )
 
 func HandleAPIGroupAttributesGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -67,7 +66,6 @@ func HandleAPIGroupAttributesGet(
 }
 
 func HandleAPIGroupAttributeGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -110,7 +108,6 @@ func HandleAPIGroupAttributeGet(
 }
 
 func HandleAPIGroupAttributeCreatePost(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
@@ -200,7 +197,6 @@ func HandleAPIGroupAttributeCreatePost(
 }
 
 func HandleAPIGroupAttributeUpdatePut(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
@@ -306,7 +302,6 @@ func HandleAPIGroupAttributeUpdatePut(
 }
 
 func HandleAPIGroupAttributeDelete(
-	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
