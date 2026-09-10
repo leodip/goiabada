@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/uuidutil"
 )
 
 const (
@@ -154,10 +154,12 @@ func URL() string {
 	return "https://" + strings.ToLower(LetterN(10)) + ".example.com/" + strings.ToLower(LetterN(6))
 }
 
-// UUID returns a random UUID string. Nothing in the fixtures parses one; they
-// are session identifiers, JTIs and key identifiers written straight to a column.
+// UUID returns a random UUID string. It is the fixture-side name for the
+// generator production uses, uuidutil.New, so a fixture and a real subject are
+// drawn the same way and a test cannot pass on a value production could never
+// have written (#278).
 func UUID() string {
-	return uuid.NewString()
+	return uuidutil.New()
 }
 
 // Username returns "user" followed by 12 lowercase letters: 16 characters, well
