@@ -49,8 +49,12 @@ func (e *withStack) Unwrap() error { return e.err }
 // Format prints the message for %v and %s, and for %+v the message followed by the frames of the
 // tree's owner. A tree with no owner prints its message and nothing else, never a synthetic ":0"
 // frame.
+//
+// The writes are deliberately unchecked, as fmt's own Formatter implementations are: fmt.State is
+// the printer's buffer, it records a write failure itself and reports it to whoever called Printf,
+// and there is nothing an error formatter could usefully do with the error besides drop it.
 func (e *withStack) Format(s fmt.State, verb rune) {
-	io.WriteString(s, e.err.Error())
+	_, _ = io.WriteString(s, e.err.Error())
 	if verb != 'v' || !s.Flag('+') {
 		return
 	}
@@ -61,7 +65,7 @@ func (e *withStack) Format(s fmt.State, verb rune) {
 	frames := runtime.CallersFrames(ws.pcs)
 	for {
 		f, more := frames.Next()
-		fmt.Fprintf(s, "\n%s\n\t%s:%d", f.Function, f.File, f.Line)
+		_, _ = fmt.Fprintf(s, "\n%s\n\t%s:%d", f.Function, f.File, f.Line)
 		if !more {
 			break
 		}
@@ -95,10 +99,8 @@ func owner(err error) *withStack {
 	return nil
 }
 
-// callers records the frames above it, skipping runtime.Callers, callers itself, and skip more.
-// The skip is passed in rather than fixed so an exported constructor's first frame is its own
-// caller whatever the depth of the internal call layers between them: a hard-coded
-// runtime.Callers(3) is right for one call shape and silently wrong for the next one added.
+// callers records the frames above it, skipping runtime.Callers, callers itself, and skip more,
+// so the first frame recorded is the caller of whichever exported constructor is capturing.
 func callers(skip int) []uintptr {
 	var pcs [32]uintptr
 	n := runtime.Callers(2+skip, pcs[:])
@@ -106,8 +108,14 @@ func callers(skip int) []uintptr {
 }
 
 // stack is the rule every constructor applies to the value it has just built, and the single
-// place rule 3 lives. skip counts the frames between the exported constructor and its caller.
-func stack(err error, skip int) error {
+// place rule 3 lives.
+//
+// The skip of 2 counts stack itself and the exported constructor that called it, so the first
+// recorded frame is that constructor's caller. It holds only because every exported constructor
+// calls stack directly from its own body and none delegates to another: that is why Wrapf
+// formats and wraps itself rather than calling Wrap. A constructor added on top of another one
+// would report the wrong origin, so add it beside these and not above them (#279).
+func stack(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -122,7 +130,7 @@ func stack(err error, skip int) error {
 	if owner(err) != nil {
 		return &withStack{err: err}
 	}
-	return &withStack{err: err, pcs: callers(skip + 2)}
+	return &withStack{err: err, pcs: callers(2)}
 }
 
 // New returns an error with msg and the caller's stack. It is stdlib errors.New plus rule 3.
@@ -130,7 +138,7 @@ func New(msg string) error { return &withStack{err: errors.New(msg), pcs: caller
 
 // Errorf formats an error the way fmt.Errorf does, %w included, and applies rule 3: a chain that
 // already carries a stack inherits it rather than capturing a second one.
-func Errorf(format string, a ...any) error { return stack(fmt.Errorf(format, a...), 0) }
+func Errorf(format string, a ...any) error { return stack(fmt.Errorf(format, a...)) }
 
 // Wrap returns an error prefixing msg to err's message, "msg: err", which is byte-identical to
 // github.com/pkg/errors' text. Nil in, nil out: 24 call sites return Wrap unconditionally and
@@ -139,7 +147,7 @@ func Wrap(err error, msg string) error {
 	if err == nil {
 		return nil
 	}
-	return stack(fmt.Errorf("%s: %w", msg, err), 0)
+	return stack(fmt.Errorf("%s: %w", msg, err))
 }
 
 // Wrapf is Wrap with a formatted message. It formats and wraps directly rather than calling Wrap,
@@ -148,14 +156,14 @@ func Wrapf(err error, format string, a ...any) error {
 	if err == nil {
 		return nil
 	}
-	return stack(fmt.Errorf("%s: %w", fmt.Sprintf(format, a...), err), 0)
+	return stack(fmt.Errorf("%s: %w", fmt.Sprintf(format, a...), err))
 }
 
 // WithStack attaches the caller's stack to err when its tree has none, and is otherwise the
 // identity. Nil in, nil out. It is what the 500 writers call on whatever they are handed, so a
 // bare stdlib error still logs with a stack.
-func WithStack(err error) error { return stack(err, 0) }
+func WithStack(err error) error { return stack(err) }
 
 // Join is errors.Join under rule 3, so a join of bare errors is stacked where it was made rather
 // than wherever a writer first saw it. Nil in, nil out, as errors.Join is.
-func Join(errs ...error) error { return stack(errors.Join(errs...), 0) }
+func Join(errs ...error) error { return stack(errors.Join(errs...)) }
