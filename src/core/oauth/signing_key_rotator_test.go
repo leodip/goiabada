@@ -8,6 +8,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -128,7 +129,12 @@ func TestSigningKeyRotator_Rotate_Success(t *testing.T) {
 	assert.Equal(t, enums.KeyStateNext.String(), created.State)
 	assert.Equal(t, "RSA", created.Type)
 	assert.Equal(t, "RS256", created.Algorithm)
-	assert.NotEmpty(t, created.KeyIdentifier)
+	// The kid is a canonical v4 the generator produced, not merely a non-empty string: it is
+	// published in the JWKS and every token header names it, so a malformed or duplicated one
+	// would make a signed token unverifiable (#278).
+	parsedKid, err := uuidutil.Parse(created.KeyIdentifier)
+	require.NoError(t, err)
+	assert.Equal(t, created.KeyIdentifier, parsedKid)
 	assert.NotEmpty(t, created.PrivateKeyPEM)
 	assert.NotEmpty(t, created.PublicKeyPEM)
 	assert.NotEmpty(t, created.PublicKeyASN1_DER)

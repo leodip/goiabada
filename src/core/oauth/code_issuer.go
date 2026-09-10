@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/pkg/errors"
 )
 
@@ -72,7 +72,7 @@ func (ci *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *CreateCodeInput) (*model
 	}
 	scope = strings.TrimSpace(scope)
 
-	authCode := strings.ReplaceAll(uuid.New().String(), "-", "") + stringutil.GenerateSecurityRandomString(96)
+	authCode := strings.ReplaceAll(uuidutil.New(), "-", "") + stringutil.GenerateSecurityRandomString(96)
 	authCodeHash, err := hashutil.HashString(authCode)
 	if err != nil {
 		return nil, err

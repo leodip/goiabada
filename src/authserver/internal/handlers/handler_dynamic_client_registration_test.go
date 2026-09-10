@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestValidateRedirectURI is the source of truth for what the DCR endpoint accepts as a
@@ -180,4 +183,22 @@ func TestValidateRedirectURI(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGenerateDCRClientIdentifier_IsThePrefixAndAUUID pins the identifier a self-registering
+// client is issued: the cosmetic dcr_ prefix the doc comment describes, then a canonical v4 from
+// the generator. The identifier is what the client authenticates as from then on and what the
+// clients.client_identifier unique index is taken against, so a value that is short, uppercase
+// or not fresh is a collision or a lookup miss (#278).
+func TestGenerateDCRClientIdentifier_IsThePrefixAndAUUID(t *testing.T) {
+	first := generateDCRClientIdentifier()
+
+	rest, found := strings.CutPrefix(first, "dcr_")
+	require.True(t, found, "identifier %q must carry the dcr_ prefix", first)
+
+	parsed, err := uuidutil.Parse(rest)
+	require.NoError(t, err)
+	assert.Equal(t, rest, parsed, "the generator must emit the canonical lowercase form")
+
+	assert.NotEqual(t, first, generateDCRClientIdentifier(), "each call must draw a fresh value")
 }

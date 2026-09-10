@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/useragent"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/pkg/errors"
 )
 
@@ -78,7 +78,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	}
 
 	userSession := &models.UserSession{
-		SessionIdentifier: uuid.New().String(),
+		SessionIdentifier: uuidutil.New(),
 		Started:           utcNow,
 		LastAccessed:      utcNow,
 		IpAddress:         ipWithoutPort,

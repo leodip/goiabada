@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -18,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/urlutil"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -375,7 +375,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 // trustworthy, since it never was; it keeps the prefix and the column from drifting apart for
 // the human reading them, which is the only thing the prefix is for (#108, decision 16).
 func generateDCRClientIdentifier() string {
-	return "dcr_" + uuid.NewString()
+	return "dcr_" + uuidutil.New()
 }
 
 // containsGrantType checks if grant type is in the list

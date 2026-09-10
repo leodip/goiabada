@@ -9,10 +9,34 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// assertAuthCodeShape pins what CreateAuthCode emits: a canonical v4 with its hyphens stripped,
+// followed by 96 characters of the security alphabet, 128 in all. The prefix is 32 hex digits
+// because a UUID is what produces it, so re-inserting the hyphens has to give something the
+// generator's own parser accepts. Nothing about the code's format may change while its consumers
+// hash a fixed-width secret (#278): the library swap kept the bytes, and this says so.
+func assertAuthCodeShape(t *testing.T, authCode string) {
+	t.Helper()
+
+	require.Len(t, authCode, 128)
+
+	hyphenated := authCode[0:8] + "-" + authCode[8:12] + "-" + authCode[12:16] + "-" +
+		authCode[16:20] + "-" + authCode[20:32]
+	parsed, err := uuidutil.Parse(hyphenated)
+	require.NoError(t, err, "the first 32 characters must be a canonical UUID with its hyphens removed")
+	assert.Equal(t, hyphenated, parsed, "the generator must emit lowercase")
+
+	const securityAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
+	for i, r := range authCode[32:] {
+		assert.Contains(t, securityAlphabet, string(r),
+			"character %d of the random suffix is outside the security alphabet", i)
+	}
+}
 
 func TestCreateAuthCode(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
@@ -65,7 +89,7 @@ func TestCreateAuthCode(t *testing.T) {
 	assert.Equal(t, input.AuthMethods, code.AuthMethods)
 	assert.Equal(t, input.SessionIdentifier, code.SessionIdentifier)
 	assert.False(t, code.Used)
-	assert.NotEmpty(t, code.Code)
+	assertAuthCodeShape(t, code.Code)
 	assert.NotEmpty(t, code.CodeHash)
 	assert.WithinDuration(t, time.Now(), code.AuthenticatedAt, time.Second)
 
