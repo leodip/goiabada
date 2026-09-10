@@ -496,12 +496,17 @@ jobs:
       # containers cannot override a container's command. Verified against the
       # image directly. Presenting the devcontainer's exact hostname and port is
       # what lets run-tests.sh run here unchanged.
+      # Each server's data directory sits on a tmpfs, so InnoDB, WAL and the
+      # SQL Server log never fsync to the runner's virtual disk. The data tier
+      # drops and rebuilds the schema per migration test, and on a slow Azure
+      # host those fsyncs took the mysql tier from under 2 minutes to 8.
       mysql-server:
         image: mysql:latest
         env:
           MYSQL_ROOT_PASSWORD: mySqlPass123
           MYSQL_TCP_PORT: 13306
         options: >-
+          --tmpfs /var/lib/mysql
           --health-cmd "mysqladmin ping -uroot -pmySqlPass123 --port=13306 --protocol=tcp"
           --health-interval 3s --health-timeout 3s --health-retries 30
       mailpit:
@@ -534,6 +539,7 @@ jobs:
           POSTGRES_DB: goiabada
           PGPORT: 15432
         options: >-
+          --tmpfs /var/lib/postgresql
           --health-cmd "pg_isready -U postgres -p 15432"
           --health-interval 3s --health-timeout 3s --health-retries 30
       mailpit:
@@ -569,6 +575,7 @@ jobs:
         # Longer retries than the others: MSSQL routinely takes 30-60s to pass
         # a health check.
         options: >-
+          --tmpfs /var/opt/mssql
           --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -Q 'SELECT 1'"
           --health-interval 5s --health-timeout 5s --health-retries 40
       mailpit:
