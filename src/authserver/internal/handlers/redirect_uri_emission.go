@@ -3,8 +3,8 @@ package handlers
 import (
 	"log/slog"
 
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/urlutil"
-	"github.com/pkg/errors"
 )
 
 // checkRedirectURIEmittable is the last-resort assertion in front of every place this package
@@ -44,5 +44,5 @@ func checkRedirectURIEmittable(site string, redirectURI string) error {
 	slog.Error("refusing to emit an authorization response to a redirect URI that is not an absolute URI, so a gate upstream of this emitter was bypassed",
 		"site", site)
 
-	return errors.WithStack(errors.New("refusing to emit an authorization response to a redirect URI that is not an absolute URI, at " + site))
+	return errs.New("refusing to emit an authorization response to a redirect URI that is not an absolute URI, at " + site)
 }

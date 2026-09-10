@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/pkg/errors"
 )
 
 // The browser session endpoint: the network transport of sessionstore.Backend, for the

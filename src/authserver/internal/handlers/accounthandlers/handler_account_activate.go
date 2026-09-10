@@ -1,13 +1,12 @@
 package accounthandlers
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/config"
@@ -108,13 +107,13 @@ func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession se
 	}
 
 	if preRegistration == nil {
-		httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("could not find pre registration")))
+		httpHelper.InternalServerError(w, r, errs.New("could not find pre registration"))
 		return
 	}
 
 	verificationCode, err := encryption.DecryptData(preRegistration.VerificationCodeEncrypted)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to decrypt verification code")))
+		httpHelper.InternalServerError(w, r, errs.New("unable to decrypt verification code"))
 		return
 	}
 
@@ -122,7 +121,7 @@ func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession se
 	// that the row is located by hash, and kept so the comparison stays load-bearing rather than
 	// decorative. The address comes from the resolved row, since the request no longer has one.
 	if verificationCode != code {
-		httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("email %v is trying to activate the account with the wrong code", preRegistration.Email)))
+		httpHelper.InternalServerError(w, r, errs.Errorf("email %v is trying to activate the account with the wrong code", preRegistration.Email))
 		return
 	}
 

@@ -3,12 +3,13 @@ package handlers
 import (
 	"crypto/subtle"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -322,7 +323,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 
 	storedCode, err := encryption.DecryptData(user.ForgotPasswordCodeEncrypted)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, errors.Wrap(err, "unable to decrypt forgot password code"))
+		httpHelper.InternalServerError(w, r, errs.Wrap(err, "unable to decrypt forgot password code"))
 		return
 	}
 

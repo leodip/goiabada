@@ -3,6 +3,7 @@ package apihandlers
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pkg/errors"
 )
 
 // HandleAPISettingsKeysGet - GET /api/v1/admin/settings/keys

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,8 +10,8 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pkg/errors"
 )
 
 func HandleAuthLevel2Get(
@@ -34,7 +35,7 @@ func HandleAuthLevel2Get(
 
 		requiredState := oauth.AuthStateRequiresLevel2
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
 			return
 		}
 
@@ -47,7 +48,7 @@ func HandleAuthLevel2Get(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
+			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
 			return
 		}
 
@@ -64,7 +65,7 @@ func HandleAuthLevel2Get(
 		// "every handler nil-checks except this one" is the kind of gap that regresses
 		// (#242 decision 5).
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 
@@ -117,7 +118,7 @@ func HandleAuthLevel2Get(
 			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/otp", http.StatusFound)
 		default:
 			// we should never reach this point
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid targetAcrLevel: "+targetAcrLevel.String())))
+			httpHelper.InternalServerError(w, r, errs.New("invalid targetAcrLevel: "+targetAcrLevel.String()))
 		}
 	}
 }

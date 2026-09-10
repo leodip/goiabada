@@ -11,11 +11,11 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/urlutil"
-	"github.com/pkg/errors"
 )
 
 func HandleAccountLogoutGet(
@@ -133,23 +133,23 @@ func decryptIDTokenHint(idTokenHint, clientID string, database data.Database) (s
 	client, err := database.GetClientByClientIdentifier(nil, clientID)
 	if err != nil {
 		slog.Error("logout: client lookup failed", "clientId", clientID, "err", err)
-		return "", errors.Wrap(err, "unable to look up the client named by client_id")
+		return "", errs.Wrap(err, "unable to look up the client named by client_id")
 	}
 	if client == nil {
 		slog.Error("logout: client_id names no client", "clientId", clientID)
-		return "", errors.New("client_id names no client")
+		return "", errs.New("client_id names no client")
 	}
 
 	clientSecret, err := encryption.DecryptData(client.ClientSecretEncrypted)
 	if err != nil {
 		slog.Error("logout: client secret decrypt failed", "err", err)
-		return "", errors.Wrap(err, "unable to decrypt the client secret")
+		return "", errs.Wrap(err, "unable to decrypt the client secret")
 	}
 
 	decryptedToken, err := encryption.DecryptIDTokenHintJWE(idTokenHint, clientSecret)
 	if err != nil {
 		slog.Error("logout: id_token_hint decrypt failed", "err", err)
-		return "", errors.Wrap(err, "unable to decrypt the id_token_hint")
+		return "", errs.Wrap(err, "unable to decrypt the id_token_hint")
 	}
 
 	return decryptedToken, nil
@@ -982,7 +982,7 @@ func buildPostLogoutRedirect(registeredURI string, state string, statePresent bo
 
 	location, err := writeResponseParams(registeredURI, params, nil)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to parse post-logout redirect URI")
+		return "", errs.Wrap(err, "unable to parse post-logout redirect URI")
 	}
 
 	return location, nil

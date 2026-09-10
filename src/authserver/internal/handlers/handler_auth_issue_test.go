@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -13,10 +14,10 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil/fake"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -437,7 +438,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// branch: a failed clear writes no cookie, so the browser keeps the auth context whether
 		// this answers 500 or redirects, and the client is owed its error response either way
 		// (#141 decision 7). It used to get nothing at all.
-		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		authHelper.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -500,7 +501,7 @@ func TestHandleIssueGet(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		authHelper.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort.
@@ -607,7 +608,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// A database fault must not read as a terminated session, and must not read as a
 		// live one either: no code is minted and no restart is offered.
-		dbError := errors.New("session lookup failed")
+		dbError := errs.New("session lookup failed")
 		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, dbError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -667,7 +668,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// fate indeterminate and the client must be told nothing rather than handed a code that
 		// may not exist. Everything that attests to the write sits below the commit for this
 		// reason, which is why neither the audit nor the clear runs (#139).
-		commitError := errors.New("commit failed")
+		commitError := errs.New("commit failed")
 		expectRunInTransactionThenFail(database, issuanceTx, commitError)
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 
@@ -897,7 +898,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		})
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).
-			Return(nil, errors.WithStack(oauth.ErrIssuingClientGone)).Once()
+			Return(nil, errs.WithStack(oauth.ErrIssuingClientGone)).Once()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateRequiresLevel1
@@ -951,7 +952,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubLiveSession(database, 123)
 
-		boom := errors.New("the insert failed")
+		boom := errs.New("the insert failed")
 		stub := expectRunInTransaction(database, issuanceTx)
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).Return(nil, boom).Once()
@@ -1027,7 +1028,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// statement that did not run has not established that the session is gone, so answering the
 	// browser as though it had would restart a ceremony whose session is in fact alive.
 	t.Run("The acquisition or the begin fails, so the ceremony answers 500 and nothing is inserted", func(t *testing.T) {
-		boom := errors.New("connection refused")
+		boom := errs.New("connection refused")
 
 		// setup returns the stub when the body runs, nil when the helper refuses to open, so the
 		// loop can assert the body handed boom to the helper wherever there was a body.
@@ -2203,7 +2204,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
-		tokenError := errors.New("token generation failed")
+		tokenError := errs.New("token generation failed")
 		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, true, false).Return(nil, tokenError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -2481,7 +2482,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
-		dbError := errors.New("database connection failed")
+		dbError := errs.New("database connection failed")
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(nil, dbError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -2527,7 +2528,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
 
-		dbError := errors.New("user database error")
+		dbError := errs.New("user database error")
 		database.On("GetUserById", mock.Anything, int64(123)).Return(nil, dbError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -2585,7 +2586,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 
-		clearError := errors.New("failed to clear auth context")
+		clearError := errs.New("failed to clear auth context")
 		authHelper.On("ClearAuthContext", rr, req).Return(clearError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -3551,7 +3552,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
 		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		authHelper.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -3625,7 +3626,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			Enabled: true,
 		}, nil)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		authHelper.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
@@ -4392,7 +4393,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			name: "the registration load fails",
 			arm: func(database *mocks_data.Database, _ *mocks_user.PermissionChecker, client *models.Client) {
 				database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), client).
-					Return(errors.New("registration read sentinel"))
+					Return(errs.New("registration read sentinel"))
 			},
 			wantErr: "registration read sentinel",
 			why: "an unreadable registration list is not an answer, and the gate is the first thing in " +
@@ -4412,7 +4413,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 				database.On("GetUserById", mock.Anything, int64(123)).
 					Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil)
 				permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", mock.Anything).
-					Return("", errors.New("permission filter sentinel"))
+					Return("", errs.New("permission filter sentinel"))
 			},
 			wantErr: "permission filter sentinel",
 			why: "the empty-string return is the REFUSAL signal on this seam, so a filter that errors " +
@@ -4540,7 +4541,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// keeps a replayable auth context, which is the lesser of the two: a replay arrives back at
 		// this same gate and is refused again for as long as the registration is gone.
 		authHelper.On("ClearAuthContext", rr, req).
-			Return(errors.New("the session store is unreachable"))
+			Return(errs.New("the session store is unreachable"))
 
 		// This expectation IS the assertion. A handler that returned after the failed clear never
 		// reaches the render, and the mock then fails the case for an unmet expectation.
@@ -4610,7 +4611,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// redirect here would deliver the browser to the very host the gate just refused.
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
 			"/auth_redirect_blocked.html", mock.Anything).
-			Return(errors.New("the interstitial template is unreadable"))
+			Return(errs.New("the interstitial template is unreadable"))
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "the interstitial template is unreadable")
 		})).Once()
@@ -4706,7 +4707,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// handler does next. The client is still owed its error response, and server_error is the
 		// code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
 		authHelper.On("ClearAuthContext", rr, req).
-			Return(errors.New("the session store is unreachable"))
+			Return(errs.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -4755,7 +4756,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		armEmptiedScope(t, "form_post", database, authHelper, auditLogger, userSessionManager, permissionChecker, req)
 
 		authHelper.On("ClearAuthContext", rr, req).
-			Return(errors.New("the session store is unreachable"))
+			Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it. Without this expectation the handler would

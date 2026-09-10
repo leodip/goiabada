@@ -10,9 +10,9 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/imaging"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
 )
 
 // HandleAPIAccountProfilePicturePost - POST /api/v1/account/profile-picture
@@ -150,7 +150,7 @@ func HandleAPIAccountProfilePictureDelete(
 		// Get user from database
 		user, err := database.GetUserBySubject(nil, sub)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, errors.Wrap(err, "failed to get user"))
+			httpHelper.InternalServerError(w, r, errs.Wrap(err, "failed to get user"))
 			return
 		}
 

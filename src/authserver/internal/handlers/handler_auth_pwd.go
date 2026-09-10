@@ -1,19 +1,19 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
@@ -42,7 +42,7 @@ func HandleAuthPwdGet(
 
 		requiredState := oauth.AuthStateLevel1Password
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
 			return
 		}
 
@@ -73,7 +73,7 @@ func HandleAuthPwdGet(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			httpHelper.InternalServerError(w, r, errs.New("client not found"))
 			return
 		}
 
@@ -144,7 +144,7 @@ func HandleAuthPwdPost(
 
 		requiredState := oauth.AuthStateLevel1Password
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
 			return
 		}
 
@@ -172,7 +172,7 @@ func HandleAuthPwdPost(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			httpHelper.InternalServerError(w, r, errs.New("client not found"))
 			return
 		}
 

@@ -2,11 +2,10 @@ package accounthandlers
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/communication"
@@ -15,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
@@ -30,7 +30,7 @@ func HandleAccountRegisterGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if !settings.SelfRegistrationEnabled {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
+			httpHelper.InternalServerError(w, r, errs.New("trying to access self registration page but self registration is not enabled in settings"))
 			return
 		}
 
@@ -58,7 +58,7 @@ func HandleAccountRegisterPost(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if !settings.SelfRegistrationEnabled {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
+			httpHelper.InternalServerError(w, r, errs.New("trying to access self registration page but self registration is not enabled in settings"))
 			return
 		}
 

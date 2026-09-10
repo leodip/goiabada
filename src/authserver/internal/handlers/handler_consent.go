@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -10,12 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
@@ -77,7 +77,7 @@ func HandleConsentGet(
 
 		requiredState := oauth.AuthStateRequiresConsent
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
 			return
 		}
 
@@ -87,7 +87,7 @@ func HandleConsentGet(
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 
@@ -97,7 +97,7 @@ func HandleConsentGet(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			httpHelper.InternalServerError(w, r, errs.New("client not found"))
 			return
 		}
 
@@ -206,7 +206,7 @@ func HandleConsentPost(
 
 		requiredState := oauth.AuthStateRequiresConsent
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
 			return
 		}
 
@@ -288,7 +288,7 @@ func HandleConsentPost(
 					return
 				}
 				if client == nil {
-					httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
+					httpHelper.InternalServerError(w, r, errs.New("client not found"))
 					return
 				}
 
@@ -298,7 +298,7 @@ func HandleConsentPost(
 					return
 				}
 				if user == nil {
-					httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+					httpHelper.InternalServerError(w, r, errs.New("user not found"))
 					return
 				}
 

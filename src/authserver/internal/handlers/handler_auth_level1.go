@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -12,8 +13,8 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pkg/errors"
 )
 
 func HandleAuthLevel1Get(
@@ -36,7 +37,7 @@ func HandleAuthLevel1Get(
 
 		requiredState := oauth.AuthStateRequiresLevel1
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
 			return
 		}
 
@@ -77,7 +78,7 @@ func HandleAuthLevel1CompletedGet(
 		requiredStates := []string{oauth.AuthStateLevel1PasswordCompleted, oauth.AuthStateLevel1ExistingSession}
 		if !slices.Contains(requiredStates, authContext.AuthState) {
 			errorMsg := fmt.Sprintf("authContext.AuthState '%s' does not match any required state", authContext.AuthState)
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(errorMsg)))
+			httpHelper.InternalServerError(w, r, errs.New(errorMsg))
 			return
 		}
 
@@ -129,7 +130,7 @@ func HandleAuthLevel1CompletedGet(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
+			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
 			return
 		}
 
