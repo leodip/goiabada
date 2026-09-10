@@ -401,27 +401,47 @@ func TestDecryptIDTokenHintJWE_DiagnosticsAreBounded(t *testing.T) {
 		}},
 	}
 
+	// %q's precision counts runes of input, not bytes of output, so what the ceiling
+	// has to survive is the rune that renders longest. An astral one escapes to
+	// \U0010FFFF: ten bytes for one rune of the budget, which is the expansion
+	// maxLoggedHeaderValue is chosen against. ASCII alone leaves that untested and the
+	// limit free to move -- raised to 1000 it keeps every ASCII row green while an
+	// astral header renders past 10 KB. Both alphabets are valid UTF-8, so both reach
+	// the quoting rather than stopping at the parser's UTF-8 gate.
+	alphabets := []struct {
+		name string
+		unit string
+	}{
+		{"ascii", "A"},
+		{"astral", "\U0010FFFF"},
+	}
+
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var lengths []int
-			for _, size := range []int{1000, 200000} {
-				jwe := buildJWE(t, testInner, key, jweOpts{header: tc.header(strings.Repeat("A", size))})
-				_, err := DecryptIDTokenHintJWE(jwe, testClientSecret)
-				if err == nil {
-					t.Fatalf("expected refusal for a %d-character value", size)
-				}
-				if got := len(err.Error()); got > logRecordCeiling {
-					t.Errorf("a %d-character value produced a %d-byte error, want at most %d",
-						size, got, logRecordCeiling)
-				}
-				lengths = append(lengths, len(err.Error()))
-			}
-			// Identical, not merely small. What makes the refusal cheap is that the
-			// message does not track the caller's input at all, and a bound that happens
-			// to sit under the ceiling for these two sizes would not say that.
-			if lengths[0] != lengths[1] {
-				t.Errorf("the error tracks the input: %d bytes at 1000 characters, %d bytes at 200000",
-					lengths[0], lengths[1])
+			for _, alphabet := range alphabets {
+				t.Run(alphabet.name, func(t *testing.T) {
+					var lengths []int
+					for _, size := range []int{1000, 200000} {
+						value := strings.Repeat(alphabet.unit, size)
+						jwe := buildJWE(t, testInner, key, jweOpts{header: tc.header(value)})
+						_, err := DecryptIDTokenHintJWE(jwe, testClientSecret)
+						if err == nil {
+							t.Fatalf("expected refusal for a %d-rune value", size)
+						}
+						if got := len(err.Error()); got > logRecordCeiling {
+							t.Errorf("a %d-rune value produced a %d-byte error, want at most %d",
+								size, got, logRecordCeiling)
+						}
+						lengths = append(lengths, len(err.Error()))
+					}
+					// Identical, not merely small. What makes the refusal cheap is that the
+					// message does not track the caller's input at all, and a bound that
+					// happens to sit under the ceiling for these two sizes would not say that.
+					if lengths[0] != lengths[1] {
+						t.Errorf("the error tracks the input: %d bytes at 1000 runes, %d bytes at 200000",
+							lengths[0], lengths[1])
+					}
+				})
 			}
 		})
 	}
