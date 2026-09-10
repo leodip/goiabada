@@ -250,3 +250,64 @@ func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
 		})
 	}
 }
+
+// The two writers below are #279 decisions 11 and 12 answered for an AJAX request. Both own a
+// status and a silence: JsonError does not log an *ErrorDetail, so neither spends a stack, a log
+// record and a request id on a stale link or a malformed body the way the 500 they replace did.
+//
+// The status is the whole claim, so it is what these assert. A row that read only the code would
+// still pass if the constructor lost its status, and JsonError answers 500 for an *ErrorDetail
+// whose status is zero -- which is the exact regression, silently.
+
+func TestJsonNotFound_Answers404WithoutLogging(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	captured := captureJsonError(httpHelper)
+
+	JsonNotFound(httpHelper, httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/admin/users/42/attributes/7/remove", nil))
+
+	detail, ok := (*captured).(*customerrors.ErrorDetail)
+	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+	assert.Equal(t, http.StatusNotFound, detail.GetHttpStatusCode())
+	assert.Equal(t, "not_found", detail.GetCode())
+	assert.NotEmpty(t, detail.GetDescription())
+}
+
+func TestJsonBadRequestBody_Answers400WithoutLogging(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	captured := captureJsonError(httpHelper)
+
+	JsonBadRequestBody(httpHelper, httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/admin/users/42/consents", nil))
+
+	detail, ok := (*captured).(*customerrors.ErrorDetail)
+	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+	assert.Equal(t, "invalid_request_body", detail.GetCode())
+	assert.NotEmpty(t, detail.GetDescription())
+}
+
+// TestHandleAPIErrorJson_AnswersNotFound is decision 11's AJAX half. Until it existed, an
+// administrator clicking a row another administrator had just deleted was told the server had
+// broken: a 404 from the API fell past the forwarded set into the generic arm, so it answered 500
+// with a stack and a request id. It answers the console's own 404 sentence rather than forwarding
+// the API's, which is what the page beside it shows.
+func TestHandleAPIErrorJson_AnswersNotFound(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	captured := captureJsonError(httpHelper)
+
+	HandleAPIErrorJson(httpHelper, httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/admin/users/42/attributes/7/remove", nil),
+		&apiclient.APIError{
+			Code:       "NOT_FOUND",
+			Message:    "User not found",
+			StatusCode: http.StatusNotFound,
+		})
+
+	detail, ok := (*captured).(*customerrors.ErrorDetail)
+	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+	assert.Equal(t, http.StatusNotFound, detail.GetHttpStatusCode())
+	assert.Equal(t, "not_found", detail.GetCode())
+	assert.NotContains(t, detail.GetDescription(), "User not found",
+		"the API's own sentence is not forwarded; the console shows the sentence its 404 page shows")
+}

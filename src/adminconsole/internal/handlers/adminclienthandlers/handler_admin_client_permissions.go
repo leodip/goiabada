@@ -2,7 +2,6 @@ package adminclienthandlers
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"sort"
@@ -120,14 +119,14 @@ func HandleAdminClientPermissionsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data PermissionsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -141,12 +140,7 @@ func HandleAdminClientPermissionsPost(
 		// Call Auth Server API to update client permissions
 		req := &api.UpdateClientPermissionsRequest{PermissionIds: data.AssignedPermissionsIds}
 		if err := apiClient.UpdateClientPermissions(jwtInfo.TokenResponse.AccessToken, data.ClientId, req); err != nil {
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
-				return
-			}
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

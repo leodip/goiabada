@@ -84,13 +84,13 @@ func HandleAccountSessionsEndSesssionPost(
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, errs.Wrap(err, "could not decode request body"))
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			httpHelper.JsonError(w, r, errs.New("could not find user session id to revoke"))
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -128,7 +128,7 @@ func HandleAccountSessionsEndSesssionPost(
 
 		// Delete session via API (server validates ownership and audits)
 		if err := apiClient.DeleteAccountSession(jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

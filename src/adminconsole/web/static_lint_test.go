@@ -190,3 +190,66 @@ func TestUtilsJS_EscapeHtmlEscapes(t *testing.T) {
 		}
 	}
 }
+
+// imageUploadJS returns the real embedded static/image-upload.js, for the same reason utilsJS
+// reads through staticFS: it is the byte stream the browser is served.
+func imageUploadJS(t *testing.T) string {
+	t.Helper()
+	b, err := staticFS.ReadFile("static/image-upload.js")
+	if err != nil {
+		t.Fatalf("reading static/image-upload.js: %v", err)
+	}
+	return string(b)
+}
+
+// TestImageUploadJS_ReadsErrorDescription pins the browser half of the picture and logo upload
+// change in #279.
+//
+// The three upload handlers used to write their own {"success": false, "error": <sentence>} body,
+// and this script read data.error to fill the modal. They now answer through the console's shared
+// JSON writers, whose body is RFC 6749 5.2's shape: error carries the machine code ("not_found",
+// "invalid_request_body", "server_error") and error_description carries the sentence. So a read of
+// data.error alone still works, still shows something, and shows the administrator the word
+// "server_error" where a sentence used to be.
+//
+// Nothing in any tier can observe that. The Go tests for these handlers assert the *ErrorDetail the
+// handler hands the writer, which is the right seam and stops one layer short of the browser, and
+// this repository has no JavaScript test runner. Reverting the script alone therefore leaves every
+// tier green while the modal degrades to a bare code, which is exactly the shape of regression a
+// lint exists for.
+//
+// The claim is lexical and narrow: each !response.ok branch reads error_description before it falls
+// back to error. Restructuring the branches, or reaching the value under another name, is out of
+// reach here and is the change's author's to re-cover.
+func TestImageUploadJS_ReadsErrorDescription(t *testing.T) {
+	content := imageUploadJS(t)
+
+	// Both fetch chains, upload and delete, parse the error body the same way.
+	const wantReads = 2
+	reads := strings.Count(content, "data.error_description || data.error")
+	if reads != wantReads {
+		t.Errorf("static/image-upload.js: found %d reads of "+
+			"`data.error_description || data.error`, want %d (the upload branch and the delete "+
+			"branch). The shared JSON writers put the code in `error` and the sentence in "+
+			"`error_description`, so a branch reading `error` alone shows the administrator a "+
+			"bare code such as \"server_error\" (#279)", reads, wantReads)
+	}
+
+	// A bare data.error read, outside the fallback above, is the regression this guards.
+	for i := 0; ; {
+		j := strings.Index(content[i:], "data.error")
+		if j < 0 {
+			break
+		}
+		at := i + j
+		rest := content[at:]
+		if !strings.HasPrefix(rest, "data.error_description") &&
+			!strings.HasPrefix(rest, "data.error ||") &&
+			!strings.HasPrefix(rest, "data.error |") {
+			line := 1 + strings.Count(content[:at], "\n")
+			t.Errorf("static/image-upload.js:%d: a read of data.error that is not preceded by "+
+				"data.error_description; the sentence lives in error_description (#279)", line)
+		}
+		i = at + len("data.error")
+	}
+}

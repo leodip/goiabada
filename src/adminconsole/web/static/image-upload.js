@@ -282,7 +282,11 @@
         .then(response => {
             if (!response.ok) {
                 return response.json().then(data => {
-                    throw new Error(data.error || t('js.image_upload.upload_failed'));
+                    // error_description first: these endpoints now answer through the console's
+                    // shared JSON writers, whose body is RFC 6749 5.2's {error, error_description}
+                    // -- error is the code ("not_found"), the sentence is in error_description.
+                    // The || chain keeps this working against either shape (#279).
+                    throw new Error(data.error_description || data.error || t('js.image_upload.upload_failed'));
                 });
             }
             return response.json();
@@ -343,7 +347,8 @@
         .then(response => {
             if (!response.ok) {
                 return response.json().then(data => {
-                    throw new Error(data.error || t('js.image_upload.delete_failed'));
+                    // See the upload path above: error_description carries the sentence.
+                    throw new Error(data.error_description || data.error || t('js.image_upload.delete_failed'));
                 });
             }
             return response.json();

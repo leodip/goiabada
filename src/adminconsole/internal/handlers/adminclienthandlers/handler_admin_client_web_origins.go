@@ -157,14 +157,14 @@ func HandleAdminClientWebOriginsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data WebOriginsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 

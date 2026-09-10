@@ -80,13 +80,13 @@ func HandleAdminGroupAttributesRemovePost(
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("attribute id is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -100,7 +100,7 @@ func HandleAdminGroupAttributesRemovePost(
 		// Delete group attribute via API (audit logging handled by AuthServer)
 		err = apiClient.DeleteGroupAttribute(jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

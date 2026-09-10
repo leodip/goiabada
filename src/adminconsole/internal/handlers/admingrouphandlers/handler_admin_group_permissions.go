@@ -2,7 +2,6 @@ package admingrouphandlers
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"sort"
@@ -120,14 +119,14 @@ func HandleAdminGroupPermissionsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data PermissionsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -145,13 +144,7 @@ func HandleAdminGroupPermissionsPost(
 
 		err = apiClient.UpdateGroupPermissions(jwtInfo.TokenResponse.AccessToken, data.GroupId, updateReq)
 		if err != nil {
-			// Handle API errors by extracting the message for display
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
-				return
-			}
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

@@ -1,7 +1,6 @@
 package admingrouphandlers
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -74,13 +73,13 @@ func HandleAdminGroupMembersSearchGet(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("groupId is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -93,16 +92,11 @@ func HandleAdminGroupMembersSearchGet(
 
 		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
-			} else {
-				httpHelper.JsonError(w, r, err)
-			}
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
-			httpHelper.JsonError(w, r, errs.New("group not found"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -114,12 +108,7 @@ func HandleAdminGroupMembersSearchGet(
 
 		users, _, err := apiClient.SearchUsersWithGroupAnnotation(jwtInfo.TokenResponse.AccessToken, query, group.Id, 1, 15)
 		if err != nil {
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
-			} else {
-				httpHelper.JsonError(w, r, err)
-			}
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -151,25 +140,25 @@ func HandleAdminGroupMembersAddPost(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("groupId is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		userIdStr := r.URL.Query().Get("userId")
 		if len(userIdStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("userId is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -182,12 +171,7 @@ func HandleAdminGroupMembersAddPost(
 
 		err = apiClient.AddUserToGroup(jwtInfo.TokenResponse.AccessToken, id, userId)
 		if err != nil {
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
-			} else {
-				httpHelper.JsonError(w, r, err)
-			}
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

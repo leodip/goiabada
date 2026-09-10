@@ -1,7 +1,6 @@
 package admingrouphandlers
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 
@@ -22,25 +21,25 @@ func HandleAdminGroupMembersRemoveUserPost(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("groupId is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			httpHelper.JsonError(w, r, errs.New("userId is required"))
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -53,12 +52,7 @@ func HandleAdminGroupMembersRemoveUserPost(
 
 		err = apiClient.RemoveUserFromGroup(jwtInfo.TokenResponse.AccessToken, id, userId)
 		if err != nil {
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				httpHelper.JsonError(w, r, errs.Errorf("%s", apiErr.Message))
-			} else {
-				httpHelper.JsonError(w, r, err)
-			}
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
