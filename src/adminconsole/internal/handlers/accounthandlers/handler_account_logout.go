@@ -54,7 +54,7 @@ func HandleAccountLogoutGet(
 
 		_, redirectResp, err := apiClient.CreateAccountLogoutRequest(accessToken, req)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		// Always use redirect mode

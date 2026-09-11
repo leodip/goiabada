@@ -1,7 +1,6 @@
 package adminresourcehandlers
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -69,12 +68,7 @@ func HandleAdminResourceNewPost(
 
 		_, err := apiClient.CreateResource(jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				renderError(apiErr.Message)
-				return
-			}
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

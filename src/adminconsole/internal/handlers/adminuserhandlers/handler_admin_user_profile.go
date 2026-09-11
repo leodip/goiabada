@@ -161,7 +161,7 @@ func HandleAdminUserProfilePost(
 				// Get user data for form display
 				user, userErr := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 				if userErr != nil {
-					httpHelper.InternalServerError(w, r, userErr)
+					handlers.HandleAPIError(httpHelper, w, r, userErr)
 					return
 				}
 

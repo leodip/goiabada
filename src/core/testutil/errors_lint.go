@@ -30,11 +30,15 @@ import (
 //     call that runs it has no package selector left to resolve.
 //   - errs.WithStack(errs.New(...)) or errs.WithStack(errs.Errorf(...)). Both inner constructors
 //     already capture, so the outer call is a no-op that reads like a decision.
-//   - Any errs constructor in a package-level var initializer, which is the exemption below read
+//   - Any errs constructor a package-level var initializer runs, which is the exemption below read
 //     in the other direction. This one is not hypothetical: #279's own core sweep moved four
 //     sentinels from errors.New onto errs.New, and nothing here saw it, so five
 //     errs.WithStack(<sentinel>) return sites silently recorded nothing and two distinct
-//     compare-and-set failures in signing_key_rotator.go printed the same init stack.
+//     compare-and-set failures in signing_key_rotator.go printed the same init stack. "Runs"
+//     rather than "contains": an immediately invoked function literal and a helper declared in the
+//     same file are followed into, and a constructor bound to a package variable is refused at the
+//     binding, because all three run on the init goroutine while leaving the initializer looking
+//     ordinary. packageLevelVarCalls carries the reasoning and the boundary.
 //
 // One exemption is a rule rather than a concession: a package-level var initializer keeps stdlib
 // errors.New. A sentinel is built once during init, so a stack captured there records the
@@ -327,7 +331,7 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 		importPaths[name] = path
 	}
 
-	sentinels := packageLevelVarCalls(file)
+	sentinels, initSelectors := packageLevelVarCalls(file)
 	callees := calleeSelectors(file)
 
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -344,17 +348,27 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 			if !resolved {
 				return true
 			}
-			what := ""
+			what, fix := "", ""
 			switch {
 			case pkg == "errors" && (fn == "New" || fn == "Join"):
-				what = "stdlib errors." + fn
+				what, fix = "stdlib errors."+fn, "use errs."+fn
 			case pkg == "fmt" && fn == "Errorf":
-				what = "fmt.Errorf"
+				what, fix = "fmt.Errorf", "use errs.Errorf"
+			case pkg == errsImportPath && errsConstructors[fn] && initSelectors[sel]:
+				// The mirror image of the package-level rule below, and only in that position: an
+				// errs constructor bound to a package variable is called through a bare identifier
+				// with no selector left to resolve, so "var newErr = errs.New" followed by
+				// "var ErrX = newErr(...)" builds a sentinel carrying init's frames and the call
+				// rule cannot see it. Elsewhere the same value is fine, because the stack it
+				// captures is its caller's, which is the whole point of errs; that is why this
+				// arm asks where the name is bound rather than refusing the constructor as a
+				// value everywhere (#279).
+				what, fix = "errs."+fn, "call it where the error is made; bound to a package variable it can be run during package initialization, and its stack would be init's"
 			default:
 				return true
 			}
 			uses = append(uses, legacyErrorUse{file: rel, line: fset.Position(sel.Pos()).Line,
-				what: what + " as a value", fix: "use errs." + fn})
+				what: what + " as a value", fix: fix})
 			return true
 		}
 
@@ -472,11 +486,70 @@ func defaultImportName(path string) string {
 }
 
 // packageLevelVarCalls collects the calls that are evaluated during package initialization, which
-// is the one place a stackless stdlib error is correct. The walk stops at a function literal: a
-// func assigned to a package variable runs when it is called, not at init, so its body is
-// ordinary production code.
-func packageLevelVarCalls(file *ast.File) map[*ast.CallExpr]bool {
+// is the one place a stackless stdlib error is correct and the one place an errs constructor is
+// not.
+//
+// Reaching them takes more than the initializer expression itself, because "runs at init" is a
+// property of what the initializer eventually calls and not of where the call is written. Three
+// shapes put an errs constructor on the init goroutine while leaving the initializer looking
+// innocent, and all three ran during review with nothing reported:
+//
+//	var errFoo = func() error { return errs.New("x") }()   // immediately invoked
+//	var newErr = errs.New                                  // the constructor as a value
+//	var errBar = build()                                   // a helper in this same file
+//
+// So the walk follows an immediately invoked function literal into its body, and a call to a
+// function declared in this file into that function's body, transitively. A function literal that
+// is only assigned runs when it is called rather than at init, and is still not followed. The
+// second shape is caught elsewhere, by refusing an errs constructor named without being called.
+//
+// The boundary is one file, which is what keeps this a parsing test: a helper in another package,
+// or a constructor reached through a value this walk cannot resolve, needs type and call
+// information to follow and is out of scope here, stated rather than discovered later.
+func packageLevelVarCalls(file *ast.File) (map[*ast.CallExpr]bool, map[*ast.SelectorExpr]bool) {
+	declared := map[string]*ast.FuncDecl{}
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if ok && fn.Recv == nil && fn.Body != nil {
+			declared[fn.Name.Name] = fn
+		}
+	}
+
 	exempt := map[*ast.CallExpr]bool{}
+	selectors := map[*ast.SelectorExpr]bool{}
+	entered := map[string]bool{}
+
+	var walk func(node ast.Node)
+	walk = func(node ast.Node) {
+		ast.Inspect(node, func(n ast.Node) bool {
+			switch it := n.(type) {
+			case *ast.SelectorExpr:
+				selectors[it] = true
+				return true
+			case *ast.FuncLit:
+				// Reached as a value rather than as a callee: it runs when something calls it.
+				return false
+			case *ast.CallExpr:
+				exempt[it] = true
+				switch callee := unparen(it.Fun).(type) {
+				case *ast.FuncLit:
+					walk(callee.Body)
+				case *ast.Ident:
+					if fn, isLocal := declared[callee.Name]; isLocal && !entered[callee.Name] {
+						entered[callee.Name] = true
+						walk(fn.Body)
+					}
+				}
+				// The arguments are still init-time expressions, so keep descending into them.
+				for _, arg := range it.Args {
+					walk(arg)
+				}
+				return false
+			}
+			return true
+		})
+	}
+
 	for _, decl := range file.Decls {
 		gen, ok := decl.(*ast.GenDecl)
 		if !ok || gen.Tok != token.VAR {
@@ -488,17 +561,9 @@ func packageLevelVarCalls(file *ast.File) map[*ast.CallExpr]bool {
 				continue
 			}
 			for _, expr := range value.Values {
-				ast.Inspect(expr, func(n ast.Node) bool {
-					if _, isFuncLit := n.(*ast.FuncLit); isFuncLit {
-						return false
-					}
-					if call, isCall := n.(*ast.CallExpr); isCall {
-						exempt[call] = true
-					}
-					return true
-				})
+				walk(expr)
 			}
 		}
 	}
-	return exempt
+	return exempt, selectors
 }

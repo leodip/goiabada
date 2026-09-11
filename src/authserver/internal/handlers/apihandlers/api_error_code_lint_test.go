@@ -277,7 +277,7 @@ func stringConstsIn(f *ast.File) map[string]string {
 // pass-through.
 func collectAPIErrorCodes(fset *token.FileSet, f *ast.File, rel string, consts map[string]string) ([]emittedAPICode, []string) {
 	var codes []emittedAPICode
-	var problems []string
+	problems := writerValues(fset, f, rel)
 
 	record := func(expr ast.Expr, enclosing, position string) {
 		line := fset.Position(expr.Pos()).Line
@@ -340,15 +340,82 @@ func collectAPIErrorCodes(fset *token.FileSet, f *ast.File, rel string, consts m
 	return codes, problems
 }
 
-// calleeName is the function's own name, whether it was called bare or through a package qualifier.
+// calleeName is the function's own name, whether it was called bare, through a package qualifier,
+// or through parentheses. (writeJSONError)(...) writes exactly what writeJSONError(...) writes, and
+// a collector reading only the bare form is one pair of brackets away from seeing nothing.
 func calleeName(fun ast.Expr) (string, bool) {
-	switch f := fun.(type) {
+	switch f := unparenExpr(fun).(type) {
 	case *ast.Ident:
 		return f.Name, true
 	case *ast.SelectorExpr:
 		return f.Sel.Name, true
 	}
 	return "", false
+}
+
+// unparenExpr strips the parentheses around an expression.
+func unparenExpr(e ast.Expr) ast.Expr {
+	for {
+		paren, ok := e.(*ast.ParenExpr)
+		if !ok {
+			return e
+		}
+		e = paren.X
+	}
+}
+
+// writerValues reports each place a writer named in apiErrorCodeArg is named without being called.
+// A writer stored in a variable and called through it leaves a bare identifier the collector cannot
+// resolve, so the codes it writes are invisible to the survivor table -- the same hole a
+// parenthesized callee opened, one indirection further along. Refusing the value is the answer
+// rather than following it, which would mean tracking every assignment, parameter and field it
+// passes through; nothing on this surface names one today.
+func writerValues(fset *token.FileSet, f *ast.File, rel string) []string {
+	callees := map[*ast.Ident]bool{}
+	selectors := map[*ast.SelectorExpr]bool{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch fun := unparenExpr(call.Fun).(type) {
+		case *ast.Ident:
+			callees[fun] = true
+		case *ast.SelectorExpr:
+			selectors[fun] = true
+		}
+		return true
+	})
+
+	var problems []string
+	report := func(pos token.Pos, name string) {
+		problems = append(problems, rel+":"+strconv.Itoa(fset.Position(pos).Line)+": "+name+
+			" is named here without being called, so any code it later writes is invisible to the "+
+			"survivor table. Call it where the code is written (#279 decision 18).")
+	}
+	declared := map[*ast.Ident]bool{}
+	for _, decl := range f.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok {
+			declared[fn.Name] = true
+		}
+	}
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch it := n.(type) {
+		case *ast.SelectorExpr:
+			if _, known := apiErrorCodeArg[it.Sel.Name]; known && !selectors[it] {
+				report(it.Pos(), it.Sel.Name)
+			}
+			// The selector's own Sel is this name, not an independent mention of it, so the
+			// Ident arm below must not see it a second time.
+			return false
+		case *ast.Ident:
+			if _, known := apiErrorCodeArg[it.Name]; known && !callees[it] && !declared[it] {
+				report(it.Pos(), it.Name)
+			}
+		}
+		return true
+	})
+	return problems
 }
 
 // isErrorResponseType reports whether a composite literal builds api.ErrorResponse, written either
@@ -439,6 +506,35 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 	writeJSONError(w, errorDetail.GetDescription(), "VALIDATION_ERROR", http.StatusBadRequest)
 }`,
 			codes: []string{"VALIDATION_ERROR"},
+		},
+		{
+			// The three shapes the final review's round 3 got three retired codes past the
+			// collector with. A parenthesized callee writes exactly what the bare one writes, and
+			// a writer stored in a value writes it one indirection later with no name left to
+			// resolve; the first is now read as the call it is, the second two are refused at the
+			// point the writer is named.
+			name: "a parenthesized writer is still a writer",
+			src: `package p
+func HandleX() { (writeJSONError)(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound) }`,
+			codes: []string{"USER_NOT_FOUND"},
+		},
+		{
+			name: "a writer stored in a value is refused where it is named",
+			src: `package p
+func HandleX() {
+	write := writeJSONError
+	write(w, "Client not found", "CLIENT_NOT_FOUND", http.StatusNotFound)
+}`,
+			problems: 1,
+		},
+		{
+			name: "a package-qualified writer stored in a value is refused the same way",
+			src: `package p
+func HandleX() {
+	write := apiresponse.WriteError
+	write(w, "Attribute not found", "ATTRIBUTE_NOT_FOUND", http.StatusNotFound)
+}`,
+			problems: 1,
 		},
 		{
 			name: "a code-shaped literal somewhere else is not a code",

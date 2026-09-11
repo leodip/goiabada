@@ -52,7 +52,7 @@ func HandleAdminGroupSettingsGet(
 				httpHelper.NotFound(w, r)
 				return
 			}
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -148,14 +148,7 @@ func HandleAdminGroupSettingsPost(
 		// Call API to update group
 		_, err = apiClient.UpdateGroup(jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				// Show validation errors from API
-				renderError(apiErr.Message)
-				return
-			}
-			// Handle other errors
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 
