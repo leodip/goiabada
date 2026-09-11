@@ -216,13 +216,17 @@ func blindAPIErrorCatch(body *ast.BlockStmt) *ast.IfStmt {
 		if !ok || blind != nil {
 			return blind == nil
 		}
-		call, ok := branch.Cond.(*ast.CallExpr)
+		// Parentheses are stripped on both the condition and the callee: (errors.As(err, &e))
+		// and (errors.As)(err, &e) catch exactly what the bare form catches, and a rule reading
+		// only the bare form is one pair of brackets away from being silent on the widest catch
+		// there is. The constructor lint lost the same bypass twice, in rounds 2 and 3.
+		call, ok := ast.Unparen(branch.Cond).(*ast.CallExpr)
 		if !ok {
 			// A condition that is not the bare As call tests something else beside it, which is
 			// the narrowing this rule asks for.
 			return true
 		}
-		if sel, isSelector := call.Fun.(*ast.SelectorExpr); !isSelector || sel.Sel.Name != "As" {
+		if sel, isSelector := ast.Unparen(call.Fun).(*ast.SelectorExpr); !isSelector || sel.Sel.Name != "As" {
 			return true
 		}
 		if !inspectsAPIErrorStatus(branch.Body) {
@@ -286,6 +290,16 @@ func guardAnswersTheRequest(body *ast.BlockStmt) bool {
 // in it. Anywhere rather than on every path, because a handler may answer a code a caller acts on
 // first; what the rule holds is that the fall-through is the classifier and not a writer chosen by
 // hand.
+//
+// ceiling: "anywhere" is existence, not ownership. A classifier call on one branch satisfies this
+// for a sibling branch that answers the failure itself, and a classifier called for a different
+// error satisfies it for the guarded one, so a hand-picked writer can still coexist with a
+// delegating fall-through. Every one of the 213 production guards is the canonical top-level shape
+// today and none exploits either gap, which is why this ships as a parse. Revisit when a guard
+// needs a shape this cannot read, or when the rule is asked to hold code nobody on this repository
+// wrote: closing it means control-flow analysis over the guard and matching the classifier's error
+// argument against the one the guard caught, which is a type-checked pass rather than a parse
+// (#279).
 func guardReachesClassifier(body *ast.BlockStmt) bool {
 	found := false
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -307,4 +321,73 @@ func guardReachesClassifier(body *ast.BlockStmt) bool {
 		return !found
 	})
 	return found
+}
+
+// TestHandlers_BlindCatchRuleTable holds blindAPIErrorCatch to its rule over source text, which is
+// the only place the parenthesised forms can be exercised: no production guard is written that way
+// today, so the walk above would pass whether or not the rule could see them.
+//
+// The brackets matter because they are free to add and silent to the reader. The constructor lint
+// in core/testutil lost exactly this bypass twice -- rounds 2 and 3 of #279's final review -- once
+// on the callee and once on the value, so the third report of it is a rule rather than a
+// coincidence.
+func TestHandlers_BlindCatchRuleTable(t *testing.T) {
+	testCases := []struct {
+		name  string
+		body  string
+		blind bool
+	}{
+		{
+			name:  "a bare catch that reads nothing is blind",
+			body:  "if errors.As(err, &apiErr) { httpHelper.JsonError(w, r, err); return }",
+			blind: true,
+		},
+		{
+			name:  "the same catch in brackets is the same catch",
+			body:  "if (errors.As(err, &apiErr)) { httpHelper.JsonError(w, r, err); return }",
+			blind: true,
+		},
+		{
+			name:  "brackets around the callee, which calls what the bare form calls",
+			body:  "if (errors.As)(err, &apiErr) { httpHelper.JsonError(w, r, err); return }",
+			blind: true,
+		},
+		{
+			name:  "a catch that names a StatusCode peels one condition off the front",
+			body:  "if errors.As(err, &apiErr) { if apiErr.StatusCode == 409 { return } }",
+			blind: false,
+		},
+		{
+			name:  "a catch that names a Code does too",
+			body:  "if errors.As(err, &apiErr) { if apiErr.Code == \"SMTP_NOT_ENABLED\" { return } }",
+			blind: false,
+		},
+		{
+			name:  "a condition testing something beside the As call is already narrowed",
+			body:  "if errors.As(err, &apiErr) && apiErr.StatusCode == 400 { return }",
+			blind: false,
+		},
+		{
+			name:  "a guard with no As call in it at all",
+			body:  "httpHelper.JsonError(w, r, err)",
+			blind: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			src := "package p\nfunc f() {\n" + testCase.body + "\n}\n"
+			fset := token.NewFileSet()
+			file, err := parser.ParseFile(fset, "fixture.go", src, 0)
+			if err != nil {
+				t.Fatalf("parsing the fixture: %v", err)
+			}
+			fn := file.Decls[0].(*ast.FuncDecl)
+
+			blind := blindAPIErrorCatch(fn.Body) != nil
+			if blind != testCase.blind {
+				t.Errorf("blindAPIErrorCatch = %v, want %v, for:\n\t%s", blind, testCase.blind, testCase.body)
+			}
+		})
+	}
 }
