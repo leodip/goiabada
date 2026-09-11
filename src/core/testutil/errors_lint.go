@@ -24,7 +24,10 @@ import (
 //     under %+v. Retiring it is the whole of #279, and the import is how it comes back.
 //   - A call to stdlib errors.New, errors.Join or fmt.Errorf. Those produce an error with no
 //     stack at all, so the 500 it eventually reaches logs a message and nothing to find it by.
-//     errs.New, errs.Join and errs.Errorf are drop-in and capture at the caller.
+//     errs.New, errs.Join and errs.Errorf are drop-in and capture at the caller. One of those
+//     three named without being called is the same finding: a constructor assigned to a variable
+//     or passed as a callback reaches the same stackless error one indirection later, and the
+//     call that runs it has no package selector left to resolve.
 //   - errs.WithStack(errs.New(...)) or errs.WithStack(errs.Errorf(...)). Both inner constructors
 //     already capture, so the outer call is a no-op that reads like a decision.
 //   - Any errs constructor in a package-level var initializer, which is the exemption below read
@@ -45,7 +48,12 @@ import (
 // Resolution is by import path, not by the name written at the call site: core/data/mssqldb/db.go
 // imports stdlib errors as goerrors, and a check that matched the literal text "errors." would
 // walk straight past it while also catching every unrelated package that happens to be called
-// errors.
+// errors. Parentheses around a callee are stripped for the same reason, since (errors.New)("x")
+// constructs exactly what errors.New("x") constructs.
+//
+// The boundary is one file's own imports, which is what makes this a parsing test and not a type
+// check: an unrelated package re-exporting a stdlib constructor under its own name would need
+// interprocedural analysis to reach, and is out of scope here.
 //
 // Passing dirs restricts the walk to those subdirectories of the source root, forward slashes and
 // relative to it ("core", "authserver"). That is what lets the sweep land one module at a time:
@@ -320,8 +328,36 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 	}
 
 	sentinels := packageLevelVarCalls(file)
+	callees := calleeSelectors(file)
 
 	ast.Inspect(file, func(n ast.Node) bool {
+		// A constructor handed round as a value reaches the same stackless error one indirection
+		// later, and the call that eventually runs it has no selector left to resolve, so the
+		// rule below walks past it. Refusing the selector is the answer rather than following the
+		// value to its call, which would mean tracking every assignment, parameter and field it
+		// passes through. Nothing in this tree does it today; it is one keystroke away (#279).
+		if sel, isSelector := n.(*ast.SelectorExpr); isSelector {
+			if callees[sel] {
+				return true
+			}
+			pkg, fn, resolved := qualifiedSelector(sel, importPaths)
+			if !resolved {
+				return true
+			}
+			what := ""
+			switch {
+			case pkg == "errors" && (fn == "New" || fn == "Join"):
+				what = "stdlib errors." + fn
+			case pkg == "fmt" && fn == "Errorf":
+				what = "fmt.Errorf"
+			default:
+				return true
+			}
+			uses = append(uses, legacyErrorUse{file: rel, line: fset.Position(sel.Pos()).Line,
+				what: what + " as a value", fix: "use errs." + fn})
+			return true
+		}
+
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
@@ -352,7 +388,7 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 			if len(call.Args) != 1 {
 				return true
 			}
-			inner, ok := call.Args[0].(*ast.CallExpr)
+			inner, ok := unparen(call.Args[0]).(*ast.CallExpr)
 			if !ok {
 				return true
 			}
@@ -374,11 +410,17 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 // name. A selector whose left side is not an imported package name, a method on a value or a
 // deeper expression, is not one of ours.
 func qualifiedCall(call *ast.CallExpr, importPaths map[string]string) (string, string, bool) {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := unparen(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return "", "", false
 	}
-	ident, ok := sel.X.(*ast.Ident)
+	return qualifiedSelector(sel, importPaths)
+}
+
+// qualifiedSelector is the same resolution for a selector reached anywhere, whether it is being
+// called or passed around as a value.
+func qualifiedSelector(sel *ast.SelectorExpr, importPaths map[string]string) (string, string, bool) {
+	ident, ok := unparen(sel.X).(*ast.Ident)
 	if !ok {
 		return "", "", false
 	}
@@ -387,6 +429,37 @@ func qualifiedCall(call *ast.CallExpr, importPaths map[string]string) (string, s
 		return "", "", false
 	}
 	return path, sel.Sel.Name, true
+}
+
+// calleeSelectors collects the selector each call actually invokes, so the walk above can tell
+// errors.New("x"), which it classifies as a call, from errors.New handed round as a value, which
+// it classifies separately. Without it every direct call would be reported twice.
+func calleeSelectors(file *ast.File) map[*ast.SelectorExpr]bool {
+	callees := map[*ast.SelectorExpr]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		if sel, isSelector := unparen(call.Fun).(*ast.SelectorExpr); isSelector {
+			callees[sel] = true
+		}
+		return true
+	})
+	return callees
+}
+
+// unparen strips the parentheses around an expression. (errors.New)("x") calls exactly what
+// errors.New("x") calls, and a rule reading only the bare form is one pair of brackets away from
+// being silent on it.
+func unparen(expr ast.Expr) ast.Expr {
+	for {
+		paren, ok := expr.(*ast.ParenExpr)
+		if !ok {
+			return expr
+		}
+		expr = paren.X
+	}
 }
 
 // defaultImportName is the name an unaliased import binds, which for every path in this tree is

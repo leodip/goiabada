@@ -3553,10 +3553,10 @@ components:
     InternalServerError:
       description: |
         The request failed inside the server, most often a storage error.
-        error_code is INTERNAL_SERVER_ERROR, except on key rotation, which also
-        answers KEY_SET_INCOMPLETE. The description carries no detail about the
-        failure, only the request id an operator can find the log line by.
-        Retrying is reasonable.
+        error_code is INTERNAL_SERVER_ERROR: no detail about the failure, only
+        the request id an operator can find the log line by, and retrying is
+        reasonable. Key rotation's 500 also answers KEY_SET_INCOMPLETE, which
+        names its cause and no retry clears.
       content:
         application/json:
           schema:
