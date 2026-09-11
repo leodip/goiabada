@@ -47,15 +47,15 @@ func originWrapf() error     { return Wrapf(sql.ErrConnDone, "origin %d", 1) }
 func originWithStack() error { return WithStack(sql.ErrConnDone) }
 func originJoin() error      { return Join(errors.New("close failed"), errors.New("unlock failed")) }
 
-// bareSentinel and stackedSentinel stand in for a package-level var declared each way. Both are
-// package level, so stackedSentinel's frames really are init's, which is the point.
-var bareSentinel = errors.New("bare sentinel")
-var stackedSentinel = buildStackedSentinel()
+// errBareSentinel and errStackedSentinel stand in for a package-level var declared each way.
+// Both are package level, so errStackedSentinel's frames really are init's, which is the point.
+var errBareSentinel = errors.New("bare sentinel")
+var errStackedSentinel = buildStackedSentinel()
 
 func buildStackedSentinel() error { return New("stacked sentinel") }
 
-func raiseBareSentinel() error    { return WithStack(bareSentinel) }
-func raiseStackedSentinel() error { return WithStack(stackedSentinel) }
+func raiseBareSentinel() error    { return WithStack(errBareSentinel) }
+func raiseStackedSentinel() error { return WithStack(errStackedSentinel) }
 
 func branchA() error { return New("branch a") }
 func branchB() error { return New("branch b") }
