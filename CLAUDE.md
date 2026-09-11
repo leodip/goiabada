@@ -166,17 +166,19 @@ it accepts:
 | `/auth/issue` | `handler_auth_issue.go` | Issues authorization code, redirects to client |
 
 ### AuthContext field rule
-A field on `AuthContext` that accumulates across hops and is not recomputed on every hop must be
-discarded when the ceremony restarts, because a restart sends the browser back to `requires_level_1`
+A field on `AuthContext` that accumulates across hops and is not overwritten before it is next read
+must be discarded when the ceremony restarts, because a restart sends the browser back to `requires_level_1`
 with the abandoned attempt's values still on the context. There are two restart routes:
 `HandleAuthCompletedGet` when no session is reusable and level 1 was never completed, and
 `refuseIssuanceUnusableSession` at `/auth/issue` when the bound session is gone, expired or foreign
 and the request is not `prompt=none`. `AuthMethods` is the one field breaking the rule today:
 `AddAuthMethod` appends to it, nothing recomputes it, and it survives both routes onto the session
 row the second pass creates, so a restarted ceremony can mint `amr` values the second pass never
-earned (#140 fixes this; delete this sentence when it lands). Every other field is either recomputed
-on every hop (`AuthenticatedAt`, `OtpConfigGeneration`, `AcrLevel`, `OTPKeyURL`) or, like
-`ConsentedScope`, coherent by construction rather than by rule. The request-derived fields are
+earned (#140 fixes this; delete this sentence when it lands). No other field is recomputed at every hop
+either; each is instead overwritten before anything reads it again on every path out of a restart —
+`AuthenticatedAt` and `OtpConfigGeneration` at `/auth/pwd`, `AcrLevel` by `SetAcrLevel` at
+`/auth/completed`, `OTPKeyURL` on every arm of `/auth/otp`, the only hops that read it — while
+`ConsentedScope` is coherent by construction rather than by rule. The request-derived fields are
 written once and only at `/auth/authorize` — the composite literal in `HandleAuthorizeGet` plus
 `TargetAcrLevel`, set immediately after validation and nowhere else — which #248 pins with a test.
 
