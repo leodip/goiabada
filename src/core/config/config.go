@@ -287,7 +287,11 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 		"GOIABADA_AUTHSERVER_SET_COOKIE_SECURE",
 		"GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE",
 	) {
-		slog.Warn("config: " + k + " is removed and ignored; the Secure cookie flag is now derived automatically from an https base URL")
+		// This is the one record in the tree the installed handler never sees: config.Init runs
+		// before logging.Install, because the level and format it installs are read from this
+		// very config. So it prints under Go's built-in handler, at its shape (#320).
+		slog.Warn("a removed setting is present in the environment and is ignored, because the secure cookie flag is now derived from an https base url",
+			"setting", k)
 	}
 }
 

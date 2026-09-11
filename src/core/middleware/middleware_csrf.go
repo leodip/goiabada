@@ -228,14 +228,18 @@ func MiddlewareCsrf() func(next http.Handler) http.Handler {
 			// never interpolated into the message.
 			explanation, remedy := explainCsrfFailure(r)
 
-			slog.Warn(explanation,
+			// The message is a literal and the sentence explainCsrfFailure built is an attribute:
+			// a variable message cannot be grepped for, and a collector counting CSRF refusals
+			// had to know all four wordings to find them (#320 decision 4).
+			slog.WarnContext(r.Context(), "cross-origin request refused",
+				"explanation", explanation,
 				"remedy", remedy,
-				"reason", err,
+				"error", err,
 				"method", r.Method,
 				"path", r.URL.Path,
-				"requestHost", r.Host,
-				"originHeader", headerOrPlaceholder(r, "Origin"),
-				"secFetchSite", headerOrPlaceholder(r, "Sec-Fetch-Site"),
+				"request_host", r.Host,
+				"origin_header", headerOrPlaceholder(r, "Origin"),
+				"sec_fetch_site", headerOrPlaceholder(r, "Sec-Fetch-Site"),
 			)
 
 			// The reason stays in the log. It describes the deployment's origin handling,
@@ -302,7 +306,7 @@ func explainCsrfFailure(r *http.Request) (explanation, remedy string) {
 				"Sec-Fetch-Site header to decide it. Every browser has sent Sec-Fetch-Site since 2023, so this is " +
 				"an out-of-date browser, a non-browser client, or a reverse proxy rewriting Host into something " +
 				"the browser never asked for.",
-			"Compare the Origin and requestHost fields below. If they differ only by proxy rewriting, configure the proxy to preserve the original Host header. If they are genuinely different sites, this rejection is the control working."
+			"Compare the origin_header and request_host fields below. If they differ only by proxy rewriting, configure the proxy to preserve the original Host header. If they are genuinely different sites, this rejection is the control working."
 	}
 
 	return "CSRF rejected a state-changing request.", "See the reason field."

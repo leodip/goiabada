@@ -233,7 +233,7 @@ func (d *CommonDatabase) convergeEmailGroup(lowered string, candidates []int64) 
 				// the row afterwards. The account was already unreachable through both credential
 				// paths, since neither ever looks up a mixed-case address.
 				slog.Warn("disabled a user whose email differs from another only by case",
-					"userId", member.id, "email", member.email, "conflictsWith", lowered)
+					"user_id", member.id, "email", member.email, "conflicts_with", lowered)
 			}
 		}
 
@@ -558,7 +558,7 @@ func (d *CommonDatabase) auditRevokedUserAuthState(userId int64, swept revocatio
 	// settings would be the one event an operator could not turn off, or could not turn on.
 	settings, err := d.GetSettingsById(nil, 1)
 	if err != nil {
-		slog.Error("failed to read settings for audit logging",
+		slog.Error("unable to read settings for audit logging",
 			"error", err, "event", constants.AuditRevokedUserAuthState)
 		return
 	}
@@ -570,7 +570,7 @@ func (d *CommonDatabase) auditRevokedUserAuthState(userId int64, swept revocatio
 		// event that had nothing to attest. Warn rather than fail: an unauditable revocation
 		// is still a revocation that already committed.
 		slog.Warn("no settings row, so a revocation could not be audited",
-			"event", constants.AuditRevokedUserAuthState, "userId", userId)
+			"event", constants.AuditRevokedUserAuthState, "user_id", userId)
 		return
 	}
 
@@ -581,7 +581,7 @@ func (d *CommonDatabase) auditRevokedUserAuthState(userId int64, swept revocatio
 	if settings.AuditLogsInDatabaseEnabled {
 		detailsJSON, err := json.Marshal(details)
 		if err != nil {
-			slog.Error("failed to marshal audit event details for DB",
+			slog.Error("unable to marshal the audit event details for the database",
 				"error", err, "event", constants.AuditRevokedUserAuthState)
 			return
 		}
@@ -597,7 +597,7 @@ func (d *CommonDatabase) auditRevokedUserAuthState(userId int64, swept revocatio
 			AuditEvent: constants.AuditRevokedUserAuthState,
 			Details:    string(detailsJSON),
 		}); err != nil {
-			slog.Error("failed to persist audit log to database",
+			slog.Error("unable to persist the audit log row to the database",
 				"error", err, "event", constants.AuditRevokedUserAuthState)
 		}
 	}

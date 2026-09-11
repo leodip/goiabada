@@ -1,15 +1,14 @@
 package handlerhelpers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"testing"
 
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
@@ -18,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -124,15 +124,29 @@ func TestGetLoggedInSubject(t *testing.T) {
 		ctx := context.WithValue(req.Context(), constants.ContextKeyJwtInfo, "invalid")
 		req = req.WithContext(ctx)
 
-		// Capture log output
-		var buf bytes.Buffer
-		log.SetOutput(&buf)
-		defer log.SetOutput(os.Stderr)
+		logged := testutil.CaptureSlog(t)
 
 		subject := helper.GetLoggedInSubject(req)
 
 		assert.Empty(t, subject)
-		assert.Contains(t, buf.String(), "ERROR unable to cast jwtInfo")
+
+		// A record rather than a line of text, which is what the stack move bought. This
+		// used to concatenate debug.Stack() into the message and assert on the rendered
+		// "ERROR unable to cast jwtInfo" prefix, an assertion only the built-in handler's
+		// format could satisfy: it passed under log.SetOutput and would have failed the
+		// moment either server installed a handler (#320).
+		records := logged.Records()
+		require.Len(t, records, 1)
+		assert.Equal(t, slog.LevelError, records[0].Level)
+		assert.Equal(t, "unable to cast jwtInfo", records[0].Message)
+
+		// The stack the message used to carry, now inside the error attribute where every
+		// handler prints it with %+v. Asserting on this function's own frame, so a plain
+		// errors.New here would fail rather than merely logging less.
+		err, isError := records[0].Attrs["error"].(error)
+		require.True(t, isError, "the error attribute must be an error value, not a string")
+		assert.Contains(t, fmt.Sprintf("%+v", err), "GetLoggedInSubject",
+			"the errs stack must name the frame the cast failed in")
 	})
 
 	t.Run("NoIdToken", func(t *testing.T) {

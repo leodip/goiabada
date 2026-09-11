@@ -135,7 +135,7 @@ func (tp *JWKSTokenParser) refreshJwks() error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		slog.Error("failed to fetch JWKS", "status", resp.StatusCode)
+		slog.Error("unable to fetch the jwks document", "status", resp.StatusCode)
 		return errs.New("failed to fetch JWKS")
 	}
 	var jwks Jwks

@@ -43,11 +43,11 @@ type DatabaseConfig struct {
 
 func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, error) {
 
-	slog.Info("using database mssql")
-	slog.Info(fmt.Sprintf("db username: %v", dbConfig.Username))
-	slog.Info(fmt.Sprintf("db host: %v", dbConfig.Host))
-	slog.Info(fmt.Sprintf("db port: %v", dbConfig.Port))
-	slog.Info(fmt.Sprintf("db name: %v", dbConfig.Name))
+	// One record where five used to be, and no password: the connection string is assembled
+	// below from the same four values, so a startup problem is read off this line rather than
+	// off four consecutive ones that a collector had no way to join (#320 decision 6).
+	slog.Info("using database", "type", "mssql", "username", dbConfig.Username,
+		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
 
 	// SQL Server connection string format
 	queryParams := url.Values{}
@@ -83,7 +83,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 		// never opened, let alone pinged. That matters more here than on the other two engines:
 		// an Azure SQL contained user cannot reach master at all, so the ping above would stop
 		// a start that has everything it needs inside the application database (#293).
-		slog.Info("db create: disabled, the database must already exist (GOIABADA_DB_CREATE=false)")
+		slog.Info("database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
 	}
 
 	// Now connect to the actual database

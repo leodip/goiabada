@@ -41,7 +41,10 @@ func NewHttpHelper(templateFS fs.FS) *HttpHelper {
 // because slog's default handler formats an error value with %+v (#279 decisions 9 and 10).
 func (h *HttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	requestId := middleware.GetReqID(r.Context())
-	slog.Error("internal server error", "error", errs.WithStack(err), "request_id", requestId)
+	// No request_id attribute: the installed handler reads it off the context this call passes
+	// it, so naming it here would write it twice (#320 decision 2). requestId is still read,
+	// because the page below shows it to whoever hit the error.
+	slog.ErrorContext(r.Context(), "internal server error", "error", errs.WithStack(err))
 
 	// The status travels in the bind map rather than through an early WriteHeader. Committing it
 	// first freezes the header map, so every header RenderTemplate sets afterwards is silently
@@ -297,13 +300,13 @@ func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error
 		// handler_token.go's jsonErrorConformed, has already written the record and already put
 		// the request id in the description it hands over (#279 decisions 9 and 12).
 		if errorDetail.GetHttpStatusCode() == 0 {
-			slog.Error("internal server error", "error", errs.WithStack(err), "request_id", requestId)
+			slog.ErrorContext(r.Context(), "internal server error", "error", errs.WithStack(err))
 			errorDescriptionStr = fmt.Sprintf("%s Request Id: %v", errorDescriptionStr, requestId)
 		}
 	} else {
 		// any other error
 		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error("internal server error", "error", errs.WithStack(err), "request_id", requestId)
+		slog.ErrorContext(r.Context(), "internal server error", "error", errs.WithStack(err))
 		errorStr = "server_error"
 		errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
 	}

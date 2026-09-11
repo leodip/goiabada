@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"log/slog"
 	"net/url"
@@ -137,7 +136,7 @@ var templateFuncMap = template.FuncMap{
 		// terminate the script).
 		enc.SetEscapeHTML(true)
 		if err := enc.Encode(m); err != nil {
-			slog.Error("JSBootstrap: encode failed", "err", err)
+			slog.ErrorContext(ctx, "unable to encode the js i18n bootstrap", "error", err)
 			return template.HTML("<script>window.i18n={};</script>")
 		}
 		// enc.Encode appends a trailing newline; trim it.
@@ -168,7 +167,7 @@ var templateFuncMap = template.FuncMap{
 	"addUrlParam": func(u string, k string, v interface{}) string {
 		parsedUrl, err := url.Parse(u)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("unable to parse url %v", u))
+			slog.Warn("unable to parse url", "url", u)
 			return u
 		}
 		query := parsedUrl.Query()

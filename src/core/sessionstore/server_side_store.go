@@ -416,8 +416,8 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 
 	id, err := s.OpenCookie(name, cookie.Value)
 	if err != nil {
-		slog.Debug("browser session cookie did not decode, starting a fresh session",
-			"sessionName", name)
+		slog.DebugContext(requestContext(r), "browser session cookie did not decode, starting a fresh session",
+			"session_name", name)
 		return session, nil
 	}
 
@@ -444,14 +444,14 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 	plaintext, err := s.openWithEither(
 		func(sl *sealer) cipher.AEAD { return sl.data }, name, string(record.Data))
 	if err != nil {
-		slog.Warn("stored browser session data did not decode, starting a fresh session",
-			"error", err, "sessionName", name)
+		slog.WarnContext(requestContext(r), "stored browser session data did not decode, starting a fresh session",
+			"error", err, "session_name", name)
 		return session, nil
 	}
 
 	if err := gob.NewDecoder(bytes.NewReader(plaintext)).Decode(&session.Values); err != nil {
-		slog.Warn("stored browser session data did not decode, starting a fresh session",
-			"error", err, "sessionName", name)
+		slog.WarnContext(requestContext(r), "stored browser session data did not decode, starting a fresh session",
+			"error", err, "session_name", name)
 		return session, nil
 	}
 

@@ -106,8 +106,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 		}
 
 		if err := tryParse(pubKey); err != nil {
-			// DEBUG: Log the initial parse error
-			slog.Debug("TokenParser: Initial parse failed", "error", err)
+			slog.Debug("unable to parse the token with the current key", "error", err)
 
 			// Check if this is a claims validation error (not a signature error)
 			// If the token has valid signature but invalid claims (e.g., expired),
@@ -123,7 +122,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 				errors.Is(err, jwt.ErrTokenInvalidId)
 
 			if isClaimsError {
-				slog.Debug("TokenParser: Error is claims-related, not trying fallback keys")
+				slog.Debug("the error is claims-related, so no fallback key is tried")
 				return nil, err
 			}
 
@@ -135,7 +134,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 			if derr != nil {
 				return nil, err
 			}
-			slog.Debug("TokenParser: Trying fallback keys", "count", len(allKeys))
+			slog.Debug("trying the fallback keys", "count", len(allKeys))
 
 			var lastErr = err
 			for i, kp := range allKeys {
@@ -146,21 +145,24 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 					continue
 				}
 				if parsedPk.Equal(pubKey) {
-					slog.Debug("TokenParser: Skipping key - same as current", "index", i, "keyId", kp.Id)
+					slog.Debug("skipping a fallback key that is the current one",
+						"index", i, "key_id", kp.Id)
 					continue
 				}
-				slog.Debug("TokenParser: Trying fallback key", "index", i, "keyId", kp.Id, "state", kp.State, "keyIdentifier", kp.KeyIdentifier)
+				slog.Debug("trying a fallback key", "index", i, "key_id", kp.Id,
+					"state", kp.State, "key_identifier", kp.KeyIdentifier)
 				if perr2 := tryParse(parsedPk); perr2 == nil {
 					// success with a fallback key
-					slog.Debug("TokenParser: Success with fallback key", "index", i, "keyId", kp.Id)
+					slog.Debug("parsed the token with a fallback key", "index", i, "key_id", kp.Id)
 					result.Claims = claims
 					return result, nil
 				} else {
-					slog.Debug("TokenParser: Failed with fallback key", "index", i, "keyId", kp.Id, "error", perr2)
+					slog.Debug("unable to parse the token with a fallback key",
+						"index", i, "key_id", kp.Id, "error", perr2)
 					lastErr = perr2
 				}
 			}
-			slog.Debug("TokenParser: All keys exhausted. Returning last error", "error", lastErr)
+			slog.Debug("every key is exhausted, returning the last error", "error", lastErr)
 			return nil, lastErr
 		}
 		result.Claims = claims

@@ -40,11 +40,11 @@ type DatabaseConfig struct {
 
 func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, error) {
 
-	slog.Info("using database mysql")
-	slog.Info(fmt.Sprintf("db username: %v", dbConfig.Username))
-	slog.Info(fmt.Sprintf("db host: %v", dbConfig.Host))
-	slog.Info(fmt.Sprintf("db port: %v", dbConfig.Port))
-	slog.Info(fmt.Sprintf("db name: %v", dbConfig.Name))
+	// One record where five used to be, and no password: the DSN is assembled below from the
+	// same four values, so a startup problem is read off this line rather than off four
+	// consecutive ones that a collector had no way to join (#320 decision 6).
+	slog.Info("using database", "type", "mysql", "username", dbConfig.Username,
+		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
 
 	dsnWithoutDBname := fmt.Sprintf("%v:%v@tcp(%v:%v)/?charset=utf8mb4&parseTime=True&loc=UTC",
 		dbConfig.Username,
@@ -93,7 +93,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		// maintenance connection above is never opened: a login with rights only inside the
 		// application schema is enough to start (#293). Logged because the operator who set
 		// this weeks ago needs the missing-database error below connected back to it.
-		slog.Info("db create: disabled, the database must already exist (GOIABADA_DB_CREATE=false)")
+		slog.Info("database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
 	}
 
 	db, err := sql.Open("mysql", dsnWithDBname)

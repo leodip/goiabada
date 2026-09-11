@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"runtime/debug"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -56,8 +56,12 @@ func (s *AuthHelper) GetLoggedInSubject(r *http.Request) string {
 		var ok bool
 		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
-			stackBytes := debug.Stack()
-			slog.Error("unable to cast jwtInfo\n" + string(stackBytes))
+			// The stack rides inside the error attribute rather than being concatenated into
+			// the message by debug.Stack(): errs.New captures it here, at the origin, and every
+			// handler prints it with %+v, so the record stays one line of structured fields in
+			// a JSON stream instead of a multi-line blob no collector could parse (#320, #279).
+			slog.ErrorContext(r.Context(), "unable to cast jwtInfo",
+				"error", errs.New("unable to cast jwtInfo"))
 			return ""
 		}
 		if jwtInfo.IdToken != nil {

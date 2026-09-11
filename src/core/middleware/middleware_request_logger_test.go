@@ -658,10 +658,13 @@ func TestMiddlewareRequestLogger_TheClipIsLossy(t *testing.T) {
 		request.Header.Set(chimiddleware.RequestIDHeader, requestId)
 		handler.ServeHTTP(httptest.NewRecorder(), request)
 
-		line := buf.Text()
+		// request_id is the last attribute on the line now, because the installed handler
+		// appends it to the record rather than the call site naming it first (#320
+		// decision 2). So the value runs to the end of the line.
+		line := strings.TrimRight(buf.Text(), "\n")
 		start := strings.Index(line, "request_id=")
 		assert.NotEqual(t, -1, start)
-		logged = append(logged, line[start:strings.Index(line[start:], " method=")+start])
+		logged = append(logged, line[start:])
 	}
 
 	assert.Equal(t, logged[0], logged[1], "the two distinct ids render to one logged value")

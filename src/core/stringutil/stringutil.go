@@ -2,6 +2,7 @@ package stringutil
 
 import (
 	"crypto/rand"
+	"fmt"
 	"io"
 	"log/slog"
 	"strconv"
@@ -98,7 +99,11 @@ func ConvertToString(v interface{}) string {
 	case float64:
 		return strconv.FormatFloat(val, 'f', -1, 64)
 	default:
-		slog.Warn("ConvertToString: unsupported type", "type", val)
+		// The type rather than val, which is what this record has always claimed to carry and
+		// never did: "type" held the value itself, so an unconvertible value of an unknown
+		// type was written into the log under a key naming what it is not (#320 decision 3).
+		slog.Warn("unable to convert a value to a string, the type is not supported",
+			"type", fmt.Sprintf("%T", v))
 		return ""
 	}
 }
