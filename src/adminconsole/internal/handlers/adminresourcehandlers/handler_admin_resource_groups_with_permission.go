@@ -46,7 +46,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 
 		resource, err := apiClient.GetResourceById(accessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -56,7 +56,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -112,7 +112,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			// No permissions in resource; paginate groups client-side and mark all as false
 			allGroups, err := apiClient.GetAllGroups(accessToken)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 			total = len(allGroups)
@@ -147,7 +147,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		} else {
 			annotatedGroups, total2, err := apiClient.SearchGroupsWithPermissionAnnotation(accessToken, selectedPermission, pageInt, pageSize)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 			total = total2
@@ -159,7 +159,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 				pageInt = clamped
 				annotatedGroups, total2, err = apiClient.SearchGroupsWithPermissionAnnotation(accessToken, selectedPermission, pageInt, pageSize)
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					handlers.HandleAPIError(httpHelper, w, r, err)
 					return
 				}
 				total = total2
@@ -242,7 +242,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		resource, err := apiClient.GetResourceById(accessToken, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -286,7 +286,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -372,7 +372,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 
 		resource, err := apiClient.GetResourceById(accessToken, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -416,7 +416,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

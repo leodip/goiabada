@@ -46,7 +46,7 @@ func HandleAdminUserPermissionsGet(
 		// Get user permissions via API
 		user, userPermissions, err := apiClient.GetUserPermissions(accessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -63,7 +63,7 @@ func HandleAdminUserPermissionsGet(
 		// Get all resources via API
 		resources, err := apiClient.GetAllResources(accessToken)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

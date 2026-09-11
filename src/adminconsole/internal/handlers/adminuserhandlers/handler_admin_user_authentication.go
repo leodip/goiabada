@@ -1,7 +1,6 @@
 package adminuserhandlers
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -47,7 +46,7 @@ func HandleAdminUserAuthenticationGet(
 
 		user, err := apiClient.GetUserById(accessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -116,7 +115,7 @@ func HandleAdminUserAuthenticationPost(
 
 		user, err := apiClient.GetUserById(accessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -154,13 +153,7 @@ func HandleAdminUserAuthenticationPost(
 			}
 			_, err := apiClient.UpdateUserPassword(accessToken, id, passwordReq)
 			if err != nil {
-				// Check if it's a validation error
-				var apiErr *apiclient.APIError
-				if errors.As(err, &apiErr) && apiErr.StatusCode == 400 {
-					renderError(apiErr.Message)
-					return
-				}
-				httpHelper.InternalServerError(w, r, err)
+				handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 				return
 			}
 		}
@@ -174,7 +167,7 @@ func HandleAdminUserAuthenticationPost(
 				}
 				_, err := apiClient.UpdateUserOTP(accessToken, id, otpReq)
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					handlers.HandleAPIError(httpHelper, w, r, err)
 					return
 				}
 			}

@@ -157,6 +157,42 @@ var (
 )
 `)
 
+	// The same rule reached through the three indirections a package initializer has. All of them
+	// run on the init goroutine and all three were silent while the rule read only the initializer
+	// expression, which is what the final review's round 3 established: the exemption is about
+	// what runs at init, not about what is written in the initializer.
+	//
+	//   - an immediately invoked function literal, which is a function body that does run at init;
+	//   - a constructor bound to a package name and called through that name, which leaves a bare
+	//     identifier with no selector for the rule to resolve. Caught as a value, at the binding,
+	//     which is the position that can be pointed at;
+	//   - a function declared in the same file and called by an initializer, followed
+	//     transitively.
+	write("core/caught/package_var_iife.go", `package caught
+
+import "github.com/leodip/goiabada/core/errs"
+
+var ErrFromIIFE = func() error { return errs.New("x") }()
+`)
+	write("core/caught/package_var_alias.go", `package caught
+
+import "github.com/leodip/goiabada/core/errs"
+
+var newErr = errs.New
+
+var ErrFromAlias = newErr("x")
+`)
+	write("core/caught/package_var_helper.go", `package caught
+
+import "github.com/leodip/goiabada/core/errs"
+
+func buildSentinel() error { return errs.New("x") }
+
+func viaAnother() error { return buildSentinel() }
+
+var ErrFromHelper = viaAnother()
+`)
+
 	// A dot import binds New, Join and Errorf unqualified, so nothing is left for a rule that
 	// reads pkg.Fn(...) and the whole file walks past it. The import is the finding, so all three
 	// forms below are caught at line 3 and the call on the line after it needs no separate row.
@@ -297,7 +333,7 @@ func broken( {
 
 	uses, files, err := findLegacyErrorUses(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 24, files,
+	assert.Equal(t, 27, files,
 		"every non-test, parseable, production-reachable fixture outside core/errs and mocks is parsed")
 	assert.Equal(t, []string{
 		"core/caught/aliased_import.go:3 " + `import "github.com/pkg/errors"`,
@@ -309,10 +345,13 @@ func broken( {
 		"core/caught/dot_import_fmt.go:3 " + `dot import of "fmt"`,
 		"core/caught/fmt_errorf.go:5 fmt.Errorf",
 		"core/caught/goerrors_alias.go:5 stdlib errors.New",
+		"core/caught/package_var_alias.go:5 errs.New as a value",
 		"core/caught/package_var_errs.go:6 errs.New in a package-level var",
 		"core/caught/package_var_errs.go:7 errs.Errorf in a package-level var",
 		"core/caught/package_var_errs.go:8 errs.Wrap in a package-level var",
 		"core/caught/package_var_funclit.go:5 stdlib errors.New",
+		"core/caught/package_var_helper.go:5 errs.New in a package-level var",
+		"core/caught/package_var_iife.go:5 errs.New in a package-level var",
 		"core/caught/paren_callee.go:5 stdlib errors.New",
 		"core/caught/plain_import.go:3 " + `import "github.com/pkg/errors"`,
 		"core/caught/redundant_withstack.go:5 errs.WithStack(errs.New(...))",

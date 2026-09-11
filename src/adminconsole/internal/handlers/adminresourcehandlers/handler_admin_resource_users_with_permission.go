@@ -45,7 +45,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 
 		resource, err := apiClient.GetResourceById(accessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -55,7 +55,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		// filter out the userinfo permission if the resource is authserver
@@ -104,7 +104,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 		if selectedPermission > 0 {
 			usersWithPermission, total, err = apiClient.GetUsersByPermission(accessToken, selectedPermission, pageInt, pageSize)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 
@@ -115,7 +115,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 				pageInt = clamped
 				usersWithPermission, total, err = apiClient.GetUsersByPermission(accessToken, selectedPermission, pageInt, pageSize)
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					handlers.HandleAPIError(httpHelper, w, r, err)
 					return
 				}
 			}
@@ -194,7 +194,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 
 		resource, err := apiClient.GetResourceById(accessToken, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -236,7 +236,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		// filter out the userinfo permission if the resource is authserver
@@ -313,7 +313,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 
 		resource, err := apiClient.GetResourceById(accessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -323,7 +323,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		// filter out the userinfo permission if the resource is authserver
@@ -413,7 +413,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		resource, err := apiClient.GetResourceById(accessToken, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -423,7 +423,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		// filter out the userinfo permission if the resource is authserver
@@ -513,7 +513,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 
 		resource, err := apiClient.GetResourceById(accessToken, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -555,7 +555,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		// filter out the userinfo permission if the resource is authserver

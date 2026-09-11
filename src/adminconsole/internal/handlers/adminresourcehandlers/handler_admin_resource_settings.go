@@ -1,7 +1,6 @@
 package adminresourcehandlers
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -142,13 +141,7 @@ func HandleAdminResourceSettingsPost(
 		// Call API
 		_, err = apiClient.UpdateResource(jwtInfo.TokenResponse.AccessToken, id, req)
 		if err != nil {
-			// Show validation errors from API
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				renderError(apiErr.Message)
-				return
-			}
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

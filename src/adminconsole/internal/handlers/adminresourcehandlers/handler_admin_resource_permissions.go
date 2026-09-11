@@ -163,8 +163,12 @@ func HandleAdminResourcePermissionsPost(
 		}
 		updateReq := &api.UpdateResourcePermissionsRequest{Permissions: upserts}
 		if err := apiClient.UpdateResourcePermissions(jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); err != nil {
+			// 400 only, which is the API refusing a permission identifier or description the
+			// administrator typed: the page draws it in its own modal from result.Error, so it
+			// has to arrive as a 200 with that field set. Every other status is the classifier's
+			// (#279 decision 13).
 			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
+			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusBadRequest {
 				result.Error = apiErr.Message
 				httpHelper.EncodeJson(w, r, result)
 				return
