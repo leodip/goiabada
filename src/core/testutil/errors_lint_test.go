@@ -66,6 +66,43 @@ import "errors"
 func stdlibJoin(a, b error) error { return errors.Join(a, b) }
 `)
 
+	// The same three constructors reached without a direct pkg.Fn(...) call. Each produces the
+	// identical stackless error one indirection later, and each walked straight past the rule
+	// until the final review demonstrated all four (#279).
+	write("core/caught/value_new.go", `package caught
+
+import "errors"
+
+func valueNew() error {
+	mk := errors.New
+	return mk("x")
+}
+`)
+	write("core/caught/value_join.go", `package caught
+
+import "errors"
+
+func valueJoin(a, b error) error {
+	join := errors.Join
+	return join(a, b)
+}
+`)
+	write("core/caught/callback_errorf.go", `package caught
+
+import "fmt"
+
+func apply(f func(string, ...any) error) error { return f("x %s", "y") }
+
+func callbackErrorf() error { return apply(fmt.Errorf) }
+`)
+	// One pair of brackets, and the callee is no longer a bare selector.
+	write("core/caught/paren_callee.go", `package caught
+
+import "errors"
+
+func parenCallee() error { return (errors.New)("x") }
+`)
+
 	// Resolution is by import path: this is core/data/mssqldb/db.go's shape, and a check matching
 	// the literal text "errors." walks straight past it.
 	write("core/caught/goerrors_alias.go", `package caught
@@ -228,6 +265,22 @@ import . "github.com/leodip/goiabada/core/uuidutil"
 func dotOther() string { return New() }
 `)
 
+	// The value rule names three constructors, not the two packages: errs.New is the replacement
+	// and carries a stack wherever it is called from, and errors.Is matches rather than
+	// constructs. Refusing either would be this rule's error message on a style opinion.
+	write("core/passed/constructor_values.go", `package passed
+
+import (
+	"errors"
+
+	"github.com/leodip/goiabada/core/errs"
+)
+
+func errsValue() func(string) error { return errs.New }
+
+func matcherValue() func(error, error) bool { return errors.Is }
+`)
+
 	// New on a package that is not stdlib errors.
 	write("core/passed/other_new.go", `package passed
 
@@ -244,12 +297,13 @@ func broken( {
 
 	uses, files, err := findLegacyErrorUses(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 19, files,
+	assert.Equal(t, 24, files,
 		"every non-test, parseable, production-reachable fixture outside core/errs and mocks is parsed")
 	assert.Equal(t, []string{
 		"core/caught/aliased_import.go:3 " + `import "github.com/pkg/errors"`,
 		"core/caught/build_linux.go:7 stdlib errors.New",
 		"core/caught/build_linux_or_not_production.go:7 stdlib errors.New",
+		"core/caught/callback_errorf.go:7 fmt.Errorf as a value",
 		"core/caught/dot_import_errors.go:3 " + `dot import of "errors"`,
 		"core/caught/dot_import_errs.go:3 " + `dot import of "github.com/leodip/goiabada/core/errs"`,
 		"core/caught/dot_import_fmt.go:3 " + `dot import of "fmt"`,
@@ -259,6 +313,7 @@ func broken( {
 		"core/caught/package_var_errs.go:7 errs.Errorf in a package-level var",
 		"core/caught/package_var_errs.go:8 errs.Wrap in a package-level var",
 		"core/caught/package_var_funclit.go:5 stdlib errors.New",
+		"core/caught/paren_callee.go:5 stdlib errors.New",
 		"core/caught/plain_import.go:3 " + `import "github.com/pkg/errors"`,
 		"core/caught/redundant_withstack.go:5 errs.WithStack(errs.New(...))",
 		"core/caught/redundant_withstack.go:7 errs.WithStack(errs.Errorf(...))",
@@ -266,12 +321,14 @@ func broken( {
 		"core/caught/renamed_errs.go:7 errs.WithStack(errs.Errorf(...))",
 		"core/caught/stdlib_join.go:5 stdlib errors.Join",
 		"core/caught/stdlib_new.go:5 stdlib errors.New",
+		"core/caught/value_join.go:6 stdlib errors.Join as a value",
+		"core/caught/value_new.go:6 stdlib errors.New as a value",
 	}, describe(uses))
 
 	// The per-module scoping stages 2, 4 and 5 lean on: the same rule, one subtree at a time.
 	scoped, scopedFiles, err := findLegacyErrorUses(root, []string{"core/passed"})
 	require.NoError(t, err)
-	assert.Equal(t, 4, scopedFiles)
+	assert.Equal(t, 5, scopedFiles)
 	assert.Empty(t, describe(scoped), "the caught subtree is outside the named directory")
 }
 
