@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -26,11 +27,14 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 				// needs and the person looking at the page cannot act on, and until now it went
 				// only to the browser and was never logged at all.
 				//
-				// err.Error() rather than err: slog renders an error value with %+v, and this
-				// one carries a core/errs stack. The cache does not cache a failure, so an auth
-				// server that is down produces one of these per request, and the stack is the
-				// same frames every time.
-				slog.Error("unable to fetch settings from the auth server", "error", err.Error(), "request_id", requestId)
+				// The error value, not err.Error(): slog's default handler renders it with %+v,
+				// so the core/errs stack it carries reaches the record. This site logged the
+				// text instead, to keep the volume down when the auth server is down and the
+				// cache, which does not cache a failure, produces one of these per request. That
+				// traded the one thing a 500 is logged for -- where in the cache's paths it
+				// failed -- against a line length, and left the console the only surface in the
+				// tree whose 500 record had no frames (#279 decisions 9 and 17).
+				slog.Error("unable to fetch settings from the auth server", "error", err, "request_id", requestId)
 				http.Error(w, i18n.T(r.Context(), "adminconsole.error.settings_unavailable"), http.StatusInternalServerError)
 				return
 			}
@@ -52,7 +56,12 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 			// moved ahead of this middleware on the application branch. Server.initMiddleware
 			// records why that reorder is safe.
 			if publicSettings.Issuer == "" {
-				slog.Error("the auth server did not report an issuer; it may be running an older version", "request_id", requestId)
+				// Decision 9's shape needs an error value to carry a stack, and this arm refuses
+				// a successful response rather than handling a failure, so it raises its own.
+				// Without it this is the one 500 in the tree logged with nothing to locate it by.
+				slog.Error("unable to read the auth server's issuer",
+					"error", errs.New("the auth server did not report an issuer; it may be running an older version"),
+					"request_id", requestId)
 				http.Error(w, i18n.T(r.Context(), "adminconsole.error.issuer_missing"), http.StatusInternalServerError)
 				return
 			}

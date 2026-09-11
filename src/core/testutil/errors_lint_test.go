@@ -120,6 +120,28 @@ var (
 )
 `)
 
+	// A dot import binds New, Join and Errorf unqualified, so nothing is left for a rule that
+	// reads pkg.Fn(...) and the whole file walks past it. The import is the finding, so all three
+	// forms below are caught at line 3 and the call on the line after it needs no separate row.
+	write("core/caught/dot_import_errors.go", `package caught
+
+import . "errors"
+
+func dotNew() error { return New("x") }
+`)
+	write("core/caught/dot_import_fmt.go", `package caught
+
+import . "fmt"
+
+func dotErrorf() error { return Errorf("x %d", 1) }
+`)
+	write("core/caught/dot_import_errs.go", `package caught
+
+import . "github.com/leodip/goiabada/core/errs"
+
+var ErrDotGone = New("gone")
+`)
+
 	// Build constraints that can still be true in a production build. "linux" says nothing about
 	// production, and "linux || !production" is true on every production Linux build, so a check
 	// that evaluated production alone would exempt both.
@@ -196,6 +218,16 @@ func toolsOnly() error { return errors.New("x") }
 	// Parsing is what tells a literal from a live import; a text search reports this one.
 	write("core/passed/benign_sentinel_lint_test.go", "package passed\n\nconst fixture = `import \"github.com/pkg/errors\"`\n\nfunc spellsIt() string { return fixture }\n")
 
+	// The dot-import rule names three packages rather than the form: a dot import of anything
+	// else hides no constructor this file refuses, and refusing it would be a style rule wearing
+	// this one's error message.
+	write("core/passed/dot_import_other.go", `package passed
+
+import . "github.com/leodip/goiabada/core/uuidutil"
+
+func dotOther() string { return New() }
+`)
+
 	// New on a package that is not stdlib errors.
 	write("core/passed/other_new.go", `package passed
 
@@ -212,12 +244,15 @@ func broken( {
 
 	uses, files, err := findLegacyErrorUses(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 15, files,
+	assert.Equal(t, 19, files,
 		"every non-test, parseable, production-reachable fixture outside core/errs and mocks is parsed")
 	assert.Equal(t, []string{
 		"core/caught/aliased_import.go:3 " + `import "github.com/pkg/errors"`,
 		"core/caught/build_linux.go:7 stdlib errors.New",
 		"core/caught/build_linux_or_not_production.go:7 stdlib errors.New",
+		"core/caught/dot_import_errors.go:3 " + `dot import of "errors"`,
+		"core/caught/dot_import_errs.go:3 " + `dot import of "github.com/leodip/goiabada/core/errs"`,
+		"core/caught/dot_import_fmt.go:3 " + `dot import of "fmt"`,
 		"core/caught/fmt_errorf.go:5 fmt.Errorf",
 		"core/caught/goerrors_alias.go:5 stdlib errors.New",
 		"core/caught/package_var_errs.go:6 errs.New in a package-level var",
@@ -236,7 +271,7 @@ func broken( {
 	// The per-module scoping stages 2, 4 and 5 lean on: the same rule, one subtree at a time.
 	scoped, scopedFiles, err := findLegacyErrorUses(root, []string{"core/passed"})
 	require.NoError(t, err)
-	assert.Equal(t, 3, scopedFiles)
+	assert.Equal(t, 4, scopedFiles)
 	assert.Empty(t, describe(scoped), "the caught subtree is outside the named directory")
 }
 

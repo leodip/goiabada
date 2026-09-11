@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"context"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -208,4 +211,97 @@ func TestMiddlewareSettingsCache_TheFetchErrorStaysOutOfTheResponse(t *testing.T
 	assert.NotContains(t, body, baseURL, "the response must not name the auth server's address")
 	assert.NotContains(t, body, "connection refused")
 	assert.NotContains(t, body, "dial tcp")
+}
+
+// ---- decision 17's other half: what these two 500s put in the log ----------------------------
+//
+// Both refusals answer in plain text rather than through the console's error page, which decision
+// 17 keeps: the page reads settings off the context, and settings are the thing that is missing.
+// What it does not excuse is a 500 nobody can locate. The fetch arm logged err.Error(), so slog
+// received a string and the core/errs stack the API client had already captured went nowhere; the
+// issuer arm logged no error value at all. Both are one defect, a record that says a request failed
+// and nothing about where, and it made the console the only surface in the tree whose 500 record had
+// no frames (#279 decisions 9 and 17).
+
+// recordingHandler keeps every record as slog received it, which is the only way to tell an error
+// value from its text: a handler's output is a string either way.
+type recordingHandler struct{ records *[]slog.Record }
+
+func (h recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h recordingHandler) Handle(_ context.Context, record slog.Record) error {
+	*h.records = append(*h.records, record.Clone())
+	return nil
+}
+
+func (h recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h recordingHandler) WithGroup(string) slog.Handler { return h }
+
+// theOneLoggedError runs fn holding slog's default logger, requires exactly one ERROR record
+// carrying request_id, and returns its error attribute as an error value.
+func theOneLoggedError(t *testing.T, fn func()) error {
+	t.Helper()
+
+	var records []slog.Record
+	previous := slog.Default()
+	slog.SetDefault(slog.New(recordingHandler{records: &records}))
+	defer slog.SetDefault(previous)
+
+	fn()
+
+	var errorRecords []slog.Record
+	for _, record := range records {
+		if record.Level == slog.LevelError {
+			errorRecords = append(errorRecords, record)
+		}
+	}
+	require.Len(t, errorRecords, 1, "a 500 is logged exactly once, out of %d records", len(records))
+
+	var logged error
+	requestIdSeen := false
+	errorRecords[0].Attrs(func(attr slog.Attr) bool {
+		switch attr.Key {
+		case "error":
+			logged, _ = attr.Value.Resolve().Any().(error)
+		case "request_id":
+			requestIdSeen = true
+		}
+		return true
+	})
+	assert.True(t, requestIdSeen, "the record must carry request_id, which is what joins it to the request log")
+	require.NotNil(t, logged, "the error attribute must carry the error value itself, not its text")
+	return logged
+}
+
+// stackFrameCount counts the "\n\tfile:line" pairs %+v printed, which is how many frames the error
+// carries. Counted rather than matched: frame text is paths and line numbers, and those drift with
+// every edit made above them.
+func stackFrameCount(err error) int {
+	return strings.Count(fmt.Sprintf("%+v", err), "\n\t")
+}
+
+func TestMiddlewareSettingsCache_TheFetchRefusalLogsTheStackedErrorValue(t *testing.T) {
+	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
+	baseURL := server.URL
+	server.Close()
+
+	var recorder *httptest.ResponseRecorder
+	logged := theOneLoggedError(t, func() { recorder, _ = runSettingsChain(t, baseURL) })
+
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.Positive(t, stackFrameCount(logged),
+		"the API client captured a stack; logging the text is what threw it away")
+}
+
+func TestMiddlewareSettingsCache_TheIssuerRefusalLogsAStackedErrorOfItsOwn(t *testing.T) {
+	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false}`)
+
+	var recorder *httptest.ResponseRecorder
+	logged := theOneLoggedError(t, func() { recorder, _ = runSettingsChain(t, server.URL) })
+
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.Contains(t, logged.Error(), "issuer")
+	assert.Positive(t, stackFrameCount(logged),
+		"this arm refuses a successful response, so it has to raise its own error to be locatable")
 }

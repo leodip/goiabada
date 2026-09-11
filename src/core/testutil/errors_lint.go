@@ -99,6 +99,14 @@ var errsConstructors = map[string]bool{
 	"New": true, "Errorf": true, "Wrap": true, "Wrapf": true, "WithStack": true, "Join": true,
 }
 
+// dotImportHidesTheRule lists the packages whose constructors this file refuses or restricts, and
+// which a dot import would therefore make invisible to it: stdlib errors and fmt spell the refused
+// New, Join and Errorf, and core/errs spells the constructors a package-level var may not call.
+// github.com/pkg/errors is absent because its import is already the finding, whatever it is named.
+var dotImportHidesTheRule = map[string]bool{
+	"errors": true, "fmt": true, errsImportPath: true,
+}
+
 // findLegacyErrorUses parses every non-test Go file under root, or under the named subdirectories
 // of root, and reports each refused construction along with the number of files it parsed.
 func findLegacyErrorUses(root string, dirs []string) ([]legacyErrorUse, int, error) {
@@ -288,7 +296,24 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 		if spec.Name != nil {
 			name = spec.Name.Name
 		}
-		if name == "_" || name == "." {
+		if name == "." {
+			// A dot import binds the package's exported names unqualified, so errors.New is
+			// written New and there is no selector left for qualifiedCall to resolve: the whole
+			// rule below walks straight past the file. Refusing the import is the answer rather
+			// than resolving unqualified calls, which would also have to model every local
+			// declaration that shadows one. Nothing in this tree dot-imports any of the three,
+			// and doing so could only hide a construction this rule exists to refuse (#279).
+			if dotImportHidesTheRule[path] {
+				uses = append(uses, legacyErrorUse{
+					file: rel,
+					line: fset.Position(spec.Pos()).Line,
+					what: `dot import of "` + path + `"`,
+					fix:  "import it under its own name; a dot import hides its constructors from this rule",
+				})
+			}
+			continue
+		}
+		if name == "_" {
 			continue
 		}
 		importPaths[name] = path

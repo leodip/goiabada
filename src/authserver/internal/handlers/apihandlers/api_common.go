@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
@@ -34,6 +35,21 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
 // logged nothing at all (#279 decision 7).
 func writeInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
 	apiresponse.WriteInternalServerError(w, r, err, attrs...)
+}
+
+// writeInternalServerErrorWithCode is writeInternalServerError for a 500 whose error_code a caller
+// acts on and which therefore cannot flatten to INTERNAL_SERVER_ERROR. It keeps that code and the
+// sentence the OpenAPI document promises, and takes the half of decision 7 that has nothing to do
+// with the code: one structured record with the stack, and the same request id in the body, so an
+// operator can join a caller's report to a log line.
+//
+// Key rotation's KEY_SET_INCOMPLETE is the only such 500 on this surface. It answered with neither
+// half, which made it the one 500 here that was invisible in the log and uncorrelated on the wire
+// (#279 decision 7).
+func writeInternalServerErrorWithCode(w http.ResponseWriter, r *http.Request, err error, message, code string) {
+	requestId := apiresponse.LogInternalServerError(r, err)
+	writeJSONError(w, fmt.Sprintf("%s. Request Id: %v", message, requestId), code,
+		http.StatusInternalServerError)
 }
 
 // writeValidationError emits a 400 Bad Request envelope from a validation

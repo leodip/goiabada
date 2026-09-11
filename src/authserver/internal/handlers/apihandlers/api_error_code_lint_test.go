@@ -124,17 +124,21 @@ var apiErrorCodeArg = map[string]int{
 	"writeJSONError": 2,
 	"WriteError":     2,
 	"emitAuthError":  1,
+	// (w, r, err, message, code): the 500 that keeps an operation code a caller acts on. Its own
+	// body forwards that code to writeJSONError, so it is a forwarder below as well.
+	"writeInternalServerErrorWithCode": 4,
 }
 
 // apiErrorCodeForwarders are the functions whose code argument is their caller's, so a non-literal
 // in the code position there is the design rather than a hole in it. Every other function must
 // write a literal.
 var apiErrorCodeForwarders = map[string]bool{
-	"writeJSONError":           true,
-	"writeValidationError":     true,
-	"WriteError":               true,
-	"WriteInternalServerError": true,
-	"emitAuthError":            true,
+	"writeJSONError":                   true,
+	"writeValidationError":             true,
+	"writeInternalServerErrorWithCode": true,
+	"WriteError":                       true,
+	"WriteInternalServerError":         true,
+	"emitAuthError":                    true,
 }
 
 // emittedAPICode is one error_code written on this surface, located.

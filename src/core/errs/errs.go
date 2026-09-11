@@ -46,18 +46,26 @@ func (e *withStack) Error() string { return e.err.Error() }
 
 func (e *withStack) Unwrap() error { return e.err }
 
-// Format prints the message for %v and %s, and for %+v the message followed by the frames of the
-// tree's owner. A tree with no owner prints its message and nothing else, never a synthetic ":0"
-// frame.
+// Format prints, for %+v alone, the message followed by the frames of the tree's owner. A tree
+// with no owner prints its message and nothing else, never a synthetic ":0" frame.
+//
+// Every other directive formats the message exactly as fmt would format that string: fmt.FormatString
+// rebuilds the directive the printer parsed, flags, width and precision included, so %q quotes, %x
+// hex-encodes and %20.8s pads and truncates. Implementing fmt.Formatter takes fmt's own verb
+// handling away from the value, and this type is what every error in this tree now is, so a Format
+// that answered every verb with the bare message would make %q print unquoted text everywhere at
+// once. An unsupported verb reaches fmt's own badVerb marker for the message string rather than
+// printing as if it were fine (#279).
 //
 // The writes are deliberately unchecked, as fmt's own Formatter implementations are: fmt.State is
 // the printer's buffer, it records a write failure itself and reports it to whoever called Printf,
 // and there is nothing an error formatter could usefully do with the error besides drop it.
 func (e *withStack) Format(s fmt.State, verb rune) {
-	_, _ = io.WriteString(s, e.err.Error())
 	if verb != 'v' || !s.Flag('+') {
+		_, _ = fmt.Fprintf(s, fmt.FormatString(s, verb), e.err.Error())
 		return
 	}
+	_, _ = io.WriteString(s, e.err.Error())
 	ws := owner(e)
 	if ws == nil {
 		return
