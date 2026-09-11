@@ -218,7 +218,7 @@ The authorization code is generated and delivered to the client using the respon
 
 The code is then exchanged for tokens at the token endpoint.
 
-The `auth_time` claim in the resulting ID token reflects when the authorization code was created, except for `prompt=none`, which preserves the original authentication time from the session for consistency.
+The `auth_time` claim in the resulting ID token is the moment the user last entered a credential, not the moment the code was issued. A session reused without re-authentication, including `prompt=none`, keeps the session's time.
 
 ## How parameters interact
 

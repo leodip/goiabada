@@ -46,6 +46,8 @@ The AMR claim in the ID token contains all methods used during authentication. F
 - Password only: `"amr": ["pwd"]`
 - Password + OTP: `"amr": ["pwd", "otp"]`
 
+Goiabada never emits the `mfa` value. Check `amr` for the methods and `acr` for the level: `["pwd", "otp"]` already tells you two factors were used.
+
 ## Configuring ACR levels
 
 ### Default ACR per client
@@ -146,6 +148,8 @@ If the session's ACR is **lower** than the requested ACR, the user must perform 
 - Result: User must enter their OTP code
 
 After step-up, the session's ACR is upgraded to the higher level. This upgrade persists for the session lifetime. The user won't need to step up again for the same or lower ACR levels.
+
+The `auth_time` claim moves too: it becomes the time the OTP was entered, not the time of the first sign-in. Only `prompt=none` and plain session reuse keep the earlier time, and no claim carries the first factor's time after a step-up.
 
 <Aside type="note">
 ACR levels can only be **upgraded** during a session, never downgraded. Once a user authenticates at `level2_mandatory`, their session stays at that level until it expires.
