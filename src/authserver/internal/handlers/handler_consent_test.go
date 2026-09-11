@@ -170,9 +170,7 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState is not requires_consent"
-		})).Return()
+		expectAuthStateMismatch(t, httpHelper, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
@@ -501,9 +499,7 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState is not requires_consent"
-		})).Return()
+		expectAuthStateMismatch(t, httpHelper, rr, req)
 
 		handler.ServeHTTP(rr, req)
 

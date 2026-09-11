@@ -37,7 +37,7 @@ func HandleAuthLevel1Get(
 
 		requiredState := oauth.AuthStateRequiresLevel1
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
+			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
 		}
 

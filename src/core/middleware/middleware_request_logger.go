@@ -576,10 +576,13 @@ func MiddlewareRequestLogger(enabled bool) func(next http.Handler) http.Handler 
 					"target", target,
 					// Already resolved to a bare client IP by MiddlewareRealIP.
 					"ip", fieldForLog(r.RemoteAddr),
-					// Written raw. This is 0 both for a panicking request and for a
-					// handler that returns without writing, which is what chi logged
-					// too. Normalising it to 200 would make the line say 200 for a
-					// request that failed; the panic half is #203.
+					// Written raw. A panicking request reports 500, because this
+					// middleware is mounted above Recoverer in both servers, so the
+					// status Recoverer writes goes through the wrapped writer here
+					// (#203). It is still 0 for a handler that returns without
+					// writing anything, which is what chi logged too; normalising
+					// that to 200 would make the line say 200 for a request that
+					// never answered.
 					"status", wrapped.Status(),
 					"bytes", wrapped.BytesWritten(),
 					"duration", time.Since(started),

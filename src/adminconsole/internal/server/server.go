@@ -204,20 +204,25 @@ func (s *Server) initMiddleware() chi.Router {
 		config.GetAdminConsole().TrustedProxies,
 	))
 
-	// Recoverer
-	s.router.Use(middleware.Recoverer)
-
-	// HTTP request logging. Replaces chi's middleware.Logger, which wrote the raw
-	// request target to stdout, query string and all, so any credential a client
-	// put in a query string landed in the log in full (#159). The redaction lives
-	// in the middleware.
+	// HTTP request logging, mounted ABOVE Recoverer. Replaces chi's middleware.Logger, which
+	// wrote the raw request target to stdout, query string and all, so any credential a client
+	// put in a query string landed in the log in full (#159). The redaction lives in the
+	// middleware.
 	//
-	// Mounted unconditionally: MiddlewareRequestLogger returns the next handler
-	// untouched when the flag is off, so the chain has one shape either way. It
-	// stays here in the chain, after Recoverer and before StripSlashes, on
-	// purpose: earlier would put a component outside the only middleware that
-	// catches its panics, and StripSlashes edits r.URL.Path in place, which is
-	// why the middleware renders the target before calling the next handler.
+	// Mounted unconditionally: MiddlewareRequestLogger returns the next handler untouched
+	// when the flag is off, so the chain has one shape either way.
+	//
+	// It sits above Recoverer rather than below it so that a panicking request is recorded
+	// as the 500 the client actually received. Below, the logger's wrapped writer never saw
+	// a status, because Recoverer's WriteHeader(500) went to the writer above it, and the
+	// record said status=0 for every panic: the one request an operator most needs to find
+	// was the one indistinguishable from a handler that wrote nothing. The trade, accepted
+	// with #203: a panic inside the logger itself is no longer caught, so it drops the
+	// connection instead of answering 500. The logger is bounded formatting over values it
+	// has already clipped, and a panic in it would be a bug to fix rather than to absorb.
+	//
+	// It stays before StripSlashes, which edits r.URL.Path in place, which is why the
+	// middleware renders the target before calling the next handler.
 	logHttpRequests := config.GetAdminConsole().LogHttpRequests
 	if logHttpRequests {
 		slog.Info("http request logging enabled")
@@ -225,6 +230,10 @@ func (s *Server) initMiddleware() chi.Router {
 		slog.Info("http request logging disabled")
 	}
 	s.router.Use(custom_middleware.MiddlewareRequestLogger(logHttpRequests))
+
+	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
+	// wrapped writer and lands in the record (#203).
+	s.router.Use(middleware.Recoverer)
 
 	// Strip slashes
 	s.router.Use(middleware.StripSlashes)

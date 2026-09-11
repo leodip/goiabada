@@ -102,6 +102,24 @@ import "errors"
 var makeErr = func() error { return errors.New("x") }
 `)
 
+	// The exemption read in the other direction: a sentinel must keep stdlib errors.New, so an
+	// errs constructor in the same position is refused. This is the shape that got past the rule
+	// while it was only written down, in four real sentinels (#279 decision 5).
+	//
+	// One row per constructor that attaches frames, and errs.Wrap is here despite being an odd
+	// thing to write at init: the point of enumerating them is that no constructor is a way
+	// around the rule.
+	write("core/caught/package_var_errs.go", `package caught
+
+import "github.com/leodip/goiabada/core/errs"
+
+var (
+	ErrGone     = errs.New("gone")
+	ErrTemplate = errs.Errorf("template %s missing", "x")
+	ErrWrapped  = errs.Wrap(ErrGone, "wrapped")
+)
+`)
+
 	// Build constraints that can still be true in a production build. "linux" says nothing about
 	// production, and "linux || !production" is true on every production Linux build, so a check
 	// that evaluated production alone would exempt both.
@@ -194,7 +212,7 @@ func broken( {
 
 	uses, files, err := findLegacyErrorUses(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 14, files,
+	assert.Equal(t, 15, files,
 		"every non-test, parseable, production-reachable fixture outside core/errs and mocks is parsed")
 	assert.Equal(t, []string{
 		"core/caught/aliased_import.go:3 " + `import "github.com/pkg/errors"`,
@@ -202,6 +220,9 @@ func broken( {
 		"core/caught/build_linux_or_not_production.go:7 stdlib errors.New",
 		"core/caught/fmt_errorf.go:5 fmt.Errorf",
 		"core/caught/goerrors_alias.go:5 stdlib errors.New",
+		"core/caught/package_var_errs.go:6 errs.New in a package-level var",
+		"core/caught/package_var_errs.go:7 errs.Errorf in a package-level var",
+		"core/caught/package_var_errs.go:8 errs.Wrap in a package-level var",
 		"core/caught/package_var_funclit.go:5 stdlib errors.New",
 		"core/caught/plain_import.go:3 " + `import "github.com/pkg/errors"`,
 		"core/caught/redundant_withstack.go:5 errs.WithStack(errs.New(...))",

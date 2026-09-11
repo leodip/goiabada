@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
@@ -1635,4 +1637,24 @@ func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *mode
 	// Note: caller is responsible for closing this response
 
 	return resp
+}
+
+// assertStateMismatchPage reads the page a state mismatch renders and holds it to the catalog
+// entry that belongs to the condition, not merely to "some error page".
+//
+// The distinction is the point. The ceremony-mismatch page beside it says another sign-in was
+// started in this browser, which is a different diagnosis and a different remedy from "you went
+// back to a step the server has finished with", and a check that accepted either would let the
+// two be confused (#279 decision 21).
+func assertStateMismatchPage(t *testing.T, resp *http.Response) {
+	t.Helper()
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	require.NoError(t, err)
+
+	body := doc.Text()
+	assert.Contains(t, body, i18n.T(context.Background(), "auth_error.state_mismatch.title"))
+	assert.Contains(t, body, i18n.T(context.Background(), "auth_error.state_mismatch.message"))
+	assert.NotContains(t, body, i18n.T(context.Background(), "auth_error.ceremony_mismatch.message"),
+		"a state mismatch is not a ceremony mismatch, and the pages must not be interchangeable")
 }

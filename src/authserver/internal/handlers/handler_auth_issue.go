@@ -48,7 +48,7 @@ func HandleIssueGet(
 
 		requiredState := oauth.AuthStateReadyToIssueCode
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
+			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
 		}
 

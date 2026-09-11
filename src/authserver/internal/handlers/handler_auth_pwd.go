@@ -42,7 +42,7 @@ func HandleAuthPwdGet(
 
 		requiredState := oauth.AuthStateLevel1Password
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
+			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
@@ -144,7 +144,7 @@ func HandleAuthPwdPost(
 
 		requiredState := oauth.AuthStateLevel1Password
 		if authContext.AuthState != requiredState {
-			httpHelper.InternalServerError(w, r, errs.New("authContext.AuthState is not "+requiredState))
+			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
 		}
 

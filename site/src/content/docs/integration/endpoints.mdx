@@ -623,8 +623,8 @@ Request with scopes `profile` and `email`:
 ### Error responses
 
 - **401 Unauthorized** - Missing or invalid access token
+- **401 Unauthorized** - `invalid_token`: the user account is disabled or no longer exists
 - **403 Forbidden** - Access token lacks `authserver:userinfo` scope
-- **500 Internal Server Error** - User account is disabled or not found
 
 ## /client/logo/\{clientIdentifier\} (GET)
 

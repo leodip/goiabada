@@ -823,11 +823,17 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	errorMsg := doc.Find("p.text-error").Text()
 	assert.Contains(t, errorMsg, "Incorrect OTP Code")
 
-	// Verify that the user can't proceed to the next step
+	// Verify that the user can't proceed to the next step.
+	//
+	// 400 and not 500: the ceremony is on level2_otp and this asks for the step after it, which
+	// is a request the server will not process rather than a server fault. Before #279 decision
+	// 21 every one of these answered a 500 page with a stack and a request id, and the ordinary
+	// way to reach one is the browser's Back button.
 	resp = loadPage(t, httpClient, config.GetAuthServer().BaseURL+"/auth/completed")
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assertStateMismatchPage(t, resp)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsNotRequired_OtpIsIncorrect(t *testing.T) {
@@ -943,9 +949,15 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	errorMsg := doc.Find("p.text-error").Text()
 	assert.Contains(t, errorMsg, "Incorrect OTP Code")
 
-	// Verify that the user can't proceed to the next step
+	// Verify that the user can't proceed to the next step.
+	//
+	// 400 and not 500: the ceremony is on level2_otp and this asks for the step after it, which
+	// is a request the server will not process rather than a server fault. Before #279 decision
+	// 21 every one of these answered a 500 page with a stack and a request id, and the ordinary
+	// way to reach one is the browser's Back button.
 	resp = loadPage(t, httpClient, config.GetAuthServer().BaseURL+"/auth/completed")
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assertStateMismatchPage(t, resp)
 }

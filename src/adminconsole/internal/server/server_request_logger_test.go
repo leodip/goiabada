@@ -84,6 +84,12 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 		*handlerRan = true
 		w.WriteHeader(http.StatusOK)
 	})
+	// The route the panic case drives, registered beside the one above so the panic travels
+	// back up the whole real chain rather than a shortened one.
+	s.router.Get("/admin/panic", func(http.ResponseWriter, *http.Request) {
+		*handlerRan = true
+		panic("a handler panicked")
+	})
 	return s
 }
 
@@ -139,5 +145,39 @@ func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 	if !handlerRan || recorder.Code != http.StatusOK {
 		t.Errorf("handlerRan = %v, status = %d: the request must still be served with the flag off",
 			handlerRan, recorder.Code)
+	}
+}
+
+// #203, the admin console's half. Same claim and same reason as the auth server's case: before
+// this change the logger sat above Recoverer's 500, so the wrapped writer never saw a status and
+// every panicking request was recorded as status=0, indistinguishable from a handler that
+// answered nothing at all.
+func TestInitMiddleware_APanickingRequestIsRecordedAs500(t *testing.T) {
+	handlerRan := false
+	server := newLoggerTestServer(t, true, &handlerRan)
+	logged := captureSlog(t)
+
+	recorder := httptest.NewRecorder()
+	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/panic", nil))
+
+	// The panic really happened and really was recovered, or the assertions below would be
+	// satisfied by a route that never panicked at all.
+	if !handlerRan || recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("handlerRan = %v, status = %d, want true and %d: the panicking handler must run "+
+			"and Recoverer must still answer the client 500",
+			handlerRan, recorder.Code, http.StatusInternalServerError)
+	}
+
+	output := logged.String()
+	if got := strings.Count(output, `msg="http request"`); got != 1 {
+		t.Fatalf("got %d request log records, want 1: a panicking request must still be logged", got)
+	}
+	if !strings.Contains(output, "status=500") {
+		t.Errorf("the record must say status=500, which means the logger is mounted above "+
+			"Recoverer (#203):\n%s", output)
+	}
+	if strings.Contains(output, "status=0") {
+		t.Errorf("status=0 is the old order: Recoverer's 500 never reached the logger's wrapped "+
+			"writer:\n%s", output)
 	}
 }

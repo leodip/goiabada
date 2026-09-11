@@ -116,9 +116,7 @@ func TestHandleIssueGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState is not ready_to_issue_code"
-		})).Return()
+		expectAuthStateMismatch(t, httpHelper, rr, req)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -3189,6 +3187,17 @@ func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 	assert.Contains(t, err.Error(), "unable to execute template")
 	assert.Empty(t, w.Body.String(), "a failed render must leave the response body untouched")
 	assert.NotContains(t, w.Body.String(), "test_code", "the authorization code must not reach a half-written page")
+
+	// The other half, and the half #160 actually reported: not merely that the body is empty,
+	// but that the caller's answer still reaches the client. Rendering straight to w commits an
+	// implicit 200 the moment the first byte is written, so the InternalServerError the caller
+	// makes of the error above would change nothing and the client would be told 200 for a page
+	// that was never finished. The same assertion as
+	// TestRedirToClientWithError_FormPostExecutionFailureLeavesResponseUncommitted, which is the
+	// error emitter's twin of this arm (#279 decision 19).
+	w.WriteHeader(http.StatusInternalServerError)
+	assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode,
+		"the caller must still be able to answer 500 after the form_post render failed")
 }
 
 // Both emitters decide whether to put a "state" key in the form_post bind map at all, and stage 2

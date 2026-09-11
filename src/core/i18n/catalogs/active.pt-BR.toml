@@ -91,6 +91,8 @@
 "auth_error.page_title" = "Erro"
 "auth_error.ceremony_mismatch.title" = "Esta solicitação não está mais ativa"
 "auth_error.ceremony_mismatch.message" = "Esta página pertence a uma solicitação de acesso que não é mais a que está em andamento. Outra foi iniciada neste navegador, portanto este formulário não pode mais ser enviado. Volte para o aplicativo em que você estava entrando e comece de novo."
+"auth_error.state_mismatch.title" = "Esta etapa não está mais disponível"
+"auth_error.state_mismatch.message" = "Esta página pertence a uma etapa do acesso pela qual você já passou, portanto não pode mais ser usada. Voltar no navegador leva a uma página que o servidor já concluiu. Volte para o aplicativo em que você estava entrando e comece de novo."
 "auth_error.rate_limited.title" = "Tentativas em excesso"
 "auth_error.rate_limited.message" = "Chegaram muitas solicitações deste navegador, ou para esta conta, em pouco tempo. Aguarde alguns minutos e tente novamente."
 "auth_error.unable_to_authorize.title" = "Não foi possível autorizar"

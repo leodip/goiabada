@@ -578,6 +578,42 @@ func TestMiddlewareRequestLogger_RecordsStatusAndBytes(t *testing.T) {
 	assert.Contains(t, buf.String(), "bytes=5")
 }
 
+// The two halves of #203 at this seam, which is where the ordering rule actually lives: the
+// middleware reports whatever the writer beneath it wrote, so it says 500 for a panic only when
+// Recoverer is beneath it. Both servers mount it that way and their own cases pin that; this owns
+// the property those cases depend on.
+func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) {
+	panicking := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("a handler panicked")
+	})
+
+	t.Run("Recoverer beneath the logger", func(t *testing.T) {
+		buf := captureSlog(t)
+
+		handler := MiddlewareRequestLogger(true)(chimiddleware.Recoverer(panicking))
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
+
+		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+		assert.Contains(t, buf.String(), "status=500")
+	})
+
+	// The order this change replaced, kept as a case because it is the whole reason the change
+	// exists: Recoverer's WriteHeader goes to the writer above the logger's wrapper, so the
+	// wrapper is asked for a status nobody ever set through it.
+	t.Run("Recoverer above the logger", func(t *testing.T) {
+		buf := captureSlog(t)
+
+		handler := chimiddleware.Recoverer(MiddlewareRequestLogger(true)(panicking))
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
+
+		assert.Equal(t, http.StatusInternalServerError, recorder.Code,
+			"the client is answered 500 either way; only the record differs")
+		assert.Contains(t, buf.String(), "status=0")
+	})
+}
+
 func TestMiddlewareRequestLogger_RequestId(t *testing.T) {
 	t.Run("present when chi's RequestID ran ahead of the logger", func(t *testing.T) {
 		buf := captureSlog(t)
