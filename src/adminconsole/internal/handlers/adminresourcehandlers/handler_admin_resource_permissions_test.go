@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/validators"
@@ -97,4 +99,65 @@ func TestValidatePermissionPost_TheIdentifierIsValidatedRaw(t *testing.T) {
 
 	result = validatePermissionResponse(t, "valid", "")
 	assert.True(t, result.Valid)
+}
+
+// wrappingIdentifierValidator returns the refusal a real validator would, with one errs.Wrap over
+// it, which is the one thing the type switch this replaced could not see through.
+type wrappingIdentifierValidator struct{ err error }
+
+func (v *wrappingIdentifierValidator) ValidateIdentifier(identifier string, enforceMinLength bool) error {
+	return v.err
+}
+
+// Decision 6: a wire-meaning error is matched with errors.As, never a bare assertion, and a type
+// switch is a bare assertion wearing different syntax -- both read the dynamic type and both miss a
+// wrapped value. This endpoint used a type switch, so anything that wrapped the validator's refusal
+// on the way here fell to the default arm and answered a 500 with the administrator's own reason in
+// the log instead of in the form. Nothing wraps it today; the rule exists so that staying true is
+// not a property of every future caller remembering not to.
+func TestValidatePermissionPost_AWrappedRefusalStillReachesTheForm(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "a wrapped LocalizedError",
+			err:  errs.Wrap(i18n.NewLocalizedError(i18n.ErrCodeIdentifierInvalidFormat, nil), "validating"),
+			want: i18n.NewLocalizedError(i18n.ErrCodeIdentifierInvalidFormat, nil).Localize(context.Background()),
+		},
+		{
+			name: "a wrapped ErrorDetail",
+			err:  errs.Wrap(customerrors.NewErrorDetail("invalid", "That identifier is taken."), "validating"),
+			want: "That identifier is taken.",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			body, err := json.Marshal(map[string]string{
+				"permissionIdentifier": "some-permission",
+				"description":          "",
+			})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/admin/resources/validate-permission", bytes.NewReader(body))
+			rec := httptest.NewRecorder()
+
+			handler := HandleAdminResourceValidatePermissionPost(
+				handlerhelpers.NewHttpHelper(nil),
+				&wrappingIdentifierValidator{err: testCase.err},
+			)
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code,
+				"a rejected value is the form's answer, not a server fault")
+
+			var result ValidatePermissionResult
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &result))
+			assert.False(t, result.Valid)
+			assert.Equal(t, testCase.want, result.Error,
+				"the reason has to reach the form; a type switch loses it to the 500 arm")
+		})
+	}
 }

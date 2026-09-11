@@ -163,16 +163,12 @@ func HandleAdminResourcePermissionsPost(
 		}
 		updateReq := &api.UpdateResourcePermissionsRequest{Permissions: upserts}
 		if err := apiClient.UpdateResourcePermissions(jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); err != nil {
-			// 400 only, which is the API refusing a permission identifier or description the
-			// administrator typed: the page draws it in its own modal from result.Error, so it
-			// has to arrive as a 200 with that field set. Every other status is the classifier's
-			// (#279 decision 13).
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusBadRequest {
-				result.Error = apiErr.Message
-				httpHelper.EncodeJson(w, r, result)
-				return
-			}
+			// Forward the API's status rather than dressing a 400 as a 200 carrying result.Error.
+			// The administrator still reads the API's sentence either way: sendAjaxRequest draws
+			// error_description from any non-2xx into this same modal, and escapes it on the way
+			// in, where the 200 path passed the value straight to showModalDialog, which assigns
+			// innerHTML. Answering 200 also reported a save that had not happened to anything
+			// reading the status rather than the body (#279 decision 13).
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
@@ -240,12 +236,18 @@ func HandleAdminResourceValidatePermissionPost(
 		err = identifierValidator.ValidateIdentifier(permissionIdentifier, true)
 		if err != nil {
 			// i18n surface: A — admin browser-flow, JSON to in-page handler.
-			switch e := err.(type) {
-			case *i18n.LocalizedError:
-				result.Error = e.Localize(r.Context())
+			// errors.As in the switch's own order, not a type switch: both read the dynamic type,
+			// so anything that wrapped the validator's result on the way here would fall through
+			// to default and answer a 500 with the sentence in the log rather than in the form
+			// (#279 decision 6).
+			var localizedErr *i18n.LocalizedError
+			var errorDetail *customerrors.ErrorDetail
+			switch {
+			case errors.As(err, &localizedErr):
+				result.Error = localizedErr.Localize(r.Context())
 				httpHelper.EncodeJson(w, r, result)
-			case *customerrors.ErrorDetail:
-				result.Error = e.GetDescription()
+			case errors.As(err, &errorDetail):
+				result.Error = errorDetail.GetDescription()
 				httpHelper.EncodeJson(w, r, result)
 			default:
 				httpHelper.JsonError(w, r, err)

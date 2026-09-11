@@ -94,11 +94,17 @@ func HandleAccountRegisterPost(
 		err := emailValidator.ValidateEmailAddress(email)
 		if err != nil {
 			// i18n surface: A — browser-flow form rerender.
-			switch e := err.(type) {
-			case *i18n.LocalizedError:
-				renderError(e.Localize(r.Context()))
-			case *customerrors.ErrorDetail:
-				renderError(e.GetDescription())
+			// errors.As in the switch's own order, not a type switch: both read the dynamic type,
+			// so anything that wrapped the validator's result on the way here would fall through
+			// to default and answer a 500 page rather than redrawing the form with the reason
+			// (#279 decision 6).
+			var localizedErr *i18n.LocalizedError
+			var errorDetail *customerrors.ErrorDetail
+			switch {
+			case errors.As(err, &localizedErr):
+				renderError(localizedErr.Localize(r.Context()))
+			case errors.As(err, &errorDetail):
+				renderError(errorDetail.GetDescription())
 			default:
 				httpHelper.InternalServerError(w, r, err)
 			}

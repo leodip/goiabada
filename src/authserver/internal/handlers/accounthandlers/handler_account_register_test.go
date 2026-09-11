@@ -23,7 +23,9 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 
 	"github.com/stretchr/testify/assert"
@@ -743,4 +745,68 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		// Ensure no pre-registration is created on the no-verification path
 		database.AssertNotCalled(t, "CreatePreRegistration")
 	})
+}
+
+// Decision 6: a wire-meaning error is matched with errors.As, never a bare assertion. A type
+// switch is a bare assertion in different syntax -- both read the dynamic type, and both fall to
+// the default arm on a wrapped value. This handler used one, so a wrap anywhere between the
+// validator and here turned "please enter a valid email address" into a 500 page with the
+// administrator's reason in the log. Nothing wraps it today, which is exactly why a test has to
+// hold it: the old shape was correct only while that stayed true.
+func TestHandleAccountRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "a wrapped ErrorDetail",
+			err: errs.Wrap(customerrors.NewErrorDetail("", "Please enter a valid email address."),
+				"validating the email address"),
+			want: "Please enter a valid email address.",
+		},
+		{
+			name: "a wrapped LocalizedError",
+			err: errs.Wrap(i18n.NewLocalizedError(i18n.ErrCodeHandlerEmailRequired, nil),
+				"validating the email address"),
+			want: i18n.NewLocalizedError(i18n.ErrCodeHandlerEmailRequired, nil).Localize(context.Background()),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			database := mocks_data.NewDatabase(t)
+			userCreator := mocks_users.NewUserCreator(t)
+			emailValidator := mocks_validators.NewEmailValidator(t)
+			passwordValidator := mocks_validators.NewPasswordValidator(t)
+			emailSender := mocks_communication.NewEmailSender(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator,
+				passwordValidator, emailSender, auditLogger)
+
+			form := url.Values{}
+			form.Add("email", "invalid-email")
+			req, _ := http.NewRequest("POST", "/register", strings.NewReader(form.Encode()))
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			rr := httptest.NewRecorder()
+
+			ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
+				&models.Settings{SelfRegistrationEnabled: true})
+			req = req.WithContext(ctx)
+
+			emailValidator.On("ValidateEmailAddress", "invalid-email").Return(testCase.err)
+			httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
+				"/account_register.html", mock.Anything).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusOK, rr.Code)
+			httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html",
+				"/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+					return data["error"] == testCase.want
+				}))
+		})
+	}
 }

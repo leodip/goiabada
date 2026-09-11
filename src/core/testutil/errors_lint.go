@@ -503,9 +503,17 @@ func defaultImportName(path string) string {
 // is only assigned runs when it is called rather than at init, and is still not followed. The
 // second shape is caught elsewhere, by refusing an errs constructor named without being called.
 //
-// The boundary is one file, which is what keeps this a parsing test: a helper in another package,
-// or a constructor reached through a value this walk cannot resolve, needs type and call
-// information to follow and is out of scope here, stated rather than discovered later.
+// ceiling: the boundary is one file, which is what keeps this a parsing test, and it cuts both
+// ways. Three shapes run at init and are not reported, all three demonstrated at the final review:
+// a helper declared in another file of this same package, a function literal bound to a package
+// variable and called by a second initializer, and a method. And the second shape above is refused
+// at its binding whether or not an initializer ever calls it, so a constructor parked in a
+// package-level registry and invoked only at runtime is reported though it captures its caller's
+// frames correctly. Both directions are the same missing fact -- whether init reaches the call --
+// which a parse cannot decide and a package-wide type and call graph decides for free. No
+// production initializer in this tree is any of the four today. Revisit when one needs to be, or
+// when a sentinel escapes into a released binary: closing it means running this over
+// go/packages-loaded type information rather than one parsed file (#279).
 func packageLevelVarCalls(file *ast.File) (map[*ast.CallExpr]bool, map[*ast.SelectorExpr]bool) {
 	declared := map[string]*ast.FuncDecl{}
 	for _, decl := range file.Decls {
