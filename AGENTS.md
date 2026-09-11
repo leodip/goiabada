@@ -97,7 +97,7 @@ Programmatic client registration for MCP servers, native apps, etc.
 
 ## Authentication Flow (Authorization Code)
 
-The auth code flow uses a state machine tracked in `AuthContext` (stored in session cookie).
+The auth code flow uses a state machine tracked in `AuthContext` (stored in the server-side session store, keyed by a cookie (#266)).
 
 ### ACR Levels (Authentication Context Class Reference)
 Defined in `src/core/enums/enums.go`:
@@ -108,20 +108,49 @@ Defined in `src/core/enums/enums.go`:
 Target ACR determined by: `acr_values` param in authorize request → falls back to `Client.DefaultAcrLevel`
 
 ### Auth States (State Machine)
-Defined in `src/core/oauth/auth_context.go`. States transition in this order:
+The values below are the string constants declared in `src/core/oauth/auth_context.go`, and
+`AssertAgentDocs` in `core/testutil/agentdocs.go` holds this section's roster to them: a state
+declared there with no row here, or a row here naming no constant, fails every module's unit tier.
+There is no single order: a ceremony's path depends on the target ACR, the session, and `prompt`.
 
-1. **`AuthStateInitial`** - Entry point at `/auth/authorize`
-2. **`AuthStateRequiresLevel1`** - No valid session, needs level1 auth
-3. **`AuthStateLevel1Password`** - User at password form
-4. **`AuthStateLevel1PasswordCompleted`** - Password verified, deciding next step
-5. **`AuthStateRequiresLevel2`** - Level2 auth needed (based on ACR)
-6. **`AuthStateLevel2OTP`** - User at OTP form (or enrollment)
-7. **`AuthStateLevel2OTPCompleted`** - OTP verified
-8. **`AuthStateAuthenticationCompleted`** - All auth done, checking consent
-9. **`AuthStateRequiresConsent`** - Showing consent screen (if `client.ConsentRequired` or `offline_access` scope)
-10. **`AuthStateReadyToIssueCode`** - Ready to issue code and redirect to client
+| State | Assigned by | When |
+|---|---|---|
+| `initial` | `HandleAuthorizeGet` | the composite literal, before validation. Dead: no gate accepts it, so it is only ever overwritten. #248 part 2 deletes it |
+| `requires_level_1` | `HandleAuthorizeGet` | four sites: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
+| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted` (restart route 1) |
+| | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, and not `prompt=none` (restart route 2) |
+| `level1_password` | `HandleAuthLevel1Get` | unconditional |
+| `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
+| `level1_existing_session` | `HandleAuthorizeGet` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
+| `requires_level_2` | `HandleAuthLevel1CompletedGet` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1 |
+| `level2_otp` | `HandleAuthLevel2Get` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
+| `level2_otp_completed` | nobody | Dead: declared and assigned nowhere. #248 part 2 deletes it |
+| `authentication_completed` | `HandleAuthLevel1CompletedGet` | no step-up needed |
+| | `HandleAuthLevel2Get` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
+| | `HandleAuthOtpPost` | OTP verified or enrolled |
+| `requires_consent` | `HandleAuthCompletedGet` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope |
+| `ready_to_issue_code` | `handlePromptNone` | every silent check passed, skipping every hop between |
+| | `HandleAuthCompletedGet` | no consent needed |
+| | `HandleConsentGet` | scope already fully consented, no `offline_access`, no `prompt=consent` |
+| | `HandleConsentPost` | approved with at least one scope |
 
-**Shortcut for existing session**: If user has valid session, flow goes `AuthStateInitial` → `AuthStateLevel1ExistingSession` → `AuthStateLevel1PasswordCompleted` (skipping password entry), then continues from step 4.
+Each route then gates on the state it finds, and answers `rejectAuthStateMismatch` when it is not one
+it accepts:
+
+| Route | Method | Accepts | On mismatch |
+|---|---|---|---|
+| `/auth/authorize` | GET, POST | anything, mints a new context | n/a |
+| `/auth/level1` | GET | `requires_level_1` | 400 |
+| `/auth/pwd` | GET | `level1_password` | 400 |
+| `/auth/pwd` | POST | ceremony id first, then `level1_password` | 400, 400 |
+| `/auth/level1completed` | GET | `level1_password_completed`, `level1_existing_session` | **500**, the one gate c499ec51 missed when it converted the other ten to 400. #248 part 1 |
+| `/auth/level2` | GET | `requires_level_2` | 400 |
+| `/auth/otp` | GET | `level2_otp` | 400 |
+| `/auth/otp` | POST | ceremony id first, then `level2_otp` | 400, 400 |
+| `/auth/completed` | GET | `authentication_completed` | 400 |
+| `/auth/consent` | GET | `requires_consent` | 400 |
+| `/auth/consent` | POST | ceremony id first, then `requires_consent` | 400, 400 |
+| `/auth/issue` | GET | `ready_to_issue_code` | 400 |
 
 ### Flow Handlers (in order)
 | Handler | File | Purpose |
@@ -135,6 +164,21 @@ Defined in `src/core/oauth/auth_context.go`. States transition in this order:
 | `/auth/completed` | `handler_auth_completed.go` | Final auth check, scope filtering, consent check, session bump/create |
 | `/auth/consent` | `handler_consent.go` | User consent screen (if required) |
 | `/auth/issue` | `handler_auth_issue.go` | Issues authorization code, redirects to client |
+
+### AuthContext field rule
+A field on `AuthContext` that accumulates across hops and is not recomputed on every hop must be
+discarded when the ceremony restarts, because a restart sends the browser back to `requires_level_1`
+with the abandoned attempt's values still on the context. There are two restart routes:
+`HandleAuthCompletedGet` when no session is reusable and level 1 was never completed, and
+`refuseIssuanceUnusableSession` at `/auth/issue` when the bound session is gone, expired or foreign
+and the request is not `prompt=none`. `AuthMethods` is the one field breaking the rule today:
+`AddAuthMethod` appends to it, nothing recomputes it, and it survives both routes onto the session
+row the second pass creates, so a restarted ceremony can mint `amr` values the second pass never
+earned (#140 fixes this; delete this sentence when it lands). Every other field is either recomputed
+on every hop (`AuthenticatedAt`, `OtpConfigGeneration`, `AcrLevel`, `OTPKeyURL`) or, like
+`ConsentedScope`, coherent by construction rather than by rule. The request-derived fields are
+written once and only at `/auth/authorize` — the composite literal in `HandleAuthorizeGet` plus
+`TargetAcrLevel`, set immediately after validation and nowhere else — which #248 pins with a test.
 
 ### Deferred error redirects (#213)
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
