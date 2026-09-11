@@ -1,9 +1,7 @@
 package server
 
 import (
-	"bytes"
 	"database/sql"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,16 +43,6 @@ func withLogHttpRequests(t *testing.T, enabled bool) {
 	t.Cleanup(func() {
 		config.GetAuthServer().LogHttpRequests = previous
 	})
-}
-
-// captureSlog redirects the default logger into a buffer for the test.
-func captureSlog(t *testing.T) *bytes.Buffer {
-	t.Helper()
-	buf := &bytes.Buffer{}
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	return buf
 }
 
 // newLoggerTestServer builds a Server by hand, runs the real initMiddleware, and registers one
@@ -99,7 +88,7 @@ const loggerTestTarget = "/auth/authorize?client_id=admin-console&response_type=
 func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, true, &handlerRan)
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, loggerTestTarget, nil))
@@ -109,7 +98,7 @@ func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 	assert.True(t, handlerRan, "the request must still reach the handler")
 	assert.Equal(t, http.StatusOK, recorder.Code)
 
-	output := logged.String()
+	output := logged.Text()
 	assert.Equal(t, 1, strings.Count(output, `msg="http request"`),
 		"the request logger must be mounted on the auth server, and write exactly one record")
 
@@ -128,12 +117,12 @@ func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, false, &handlerRan)
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, loggerTestTarget, nil))
 
-	assert.Equal(t, 0, strings.Count(logged.String(), `msg="http request"`),
+	assert.Equal(t, 0, strings.Count(logged.Text(), `msg="http request"`),
 		"nothing is logged when GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS is off")
 	// The other half: a middleware that dropped the request would also log nothing.
 	assert.True(t, handlerRan, "the request must still reach the handler with the flag off")
@@ -151,7 +140,7 @@ func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 func TestInitMiddleware_APanickingRequestIsRecordedAs500(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, true, &handlerRan)
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/panic", nil))
@@ -162,7 +151,7 @@ func TestInitMiddleware_APanickingRequestIsRecordedAs500(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code,
 		"Recoverer must still answer the client 500")
 
-	output := logged.String()
+	output := logged.Text()
 	assert.Equal(t, 1, strings.Count(output, `msg="http request"`),
 		"a panicking request must still produce exactly one record")
 	assert.Contains(t, output, "status=500",

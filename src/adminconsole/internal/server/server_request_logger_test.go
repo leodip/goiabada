@@ -1,8 +1,6 @@
 package server
 
 import (
-	"bytes"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/testutil"
 )
 
 // TestInitMiddleware_RequestLoggerIsRegistered makes the claim the unit table in
@@ -44,16 +43,6 @@ func withLogHttpRequests(t *testing.T, enabled bool) {
 	t.Cleanup(func() {
 		config.GetAdminConsole().LogHttpRequests = previous
 	})
-}
-
-// captureSlog redirects the default logger into a buffer for the test.
-func captureSlog(t *testing.T) *bytes.Buffer {
-	t.Helper()
-	buf := &bytes.Buffer{}
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	return buf
 }
 
 // newLoggerTestServer builds a Server by hand, runs the real initMiddleware, and registers one
@@ -96,7 +85,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, true, &handlerRan)
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, loggerTestTarget, nil))
@@ -108,7 +97,7 @@ func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 			handlerRan, recorder.Code, http.StatusOK)
 	}
 
-	output := logged.String()
+	output := logged.Text()
 	if got := strings.Count(output, `msg="http request"`); got != 1 {
 		t.Fatalf("got %d request log records, want 1: MiddlewareRequestLogger must be mounted on "+
 			"the admin console", got)
@@ -132,12 +121,12 @@ func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, false, &handlerRan)
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, loggerTestTarget, nil))
 
-	if got := strings.Count(logged.String(), `msg="http request"`); got != 0 {
+	if got := strings.Count(logged.Text(), `msg="http request"`); got != 0 {
 		t.Errorf("got %d request log records, want 0: nothing is logged when "+
 			"GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS is off", got)
 	}
@@ -155,7 +144,7 @@ func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 func TestInitMiddleware_APanickingRequestIsRecordedAs500(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, true, &handlerRan)
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/panic", nil))
@@ -168,7 +157,7 @@ func TestInitMiddleware_APanickingRequestIsRecordedAs500(t *testing.T) {
 			handlerRan, recorder.Code, http.StatusInternalServerError)
 	}
 
-	output := logged.String()
+	output := logged.Text()
 	if got := strings.Count(output, `msg="http request"`); got != 1 {
 		t.Fatalf("got %d request log records, want 1: a panicking request must still be logged", got)
 	}

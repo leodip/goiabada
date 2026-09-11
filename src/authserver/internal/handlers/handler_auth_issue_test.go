@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/leodip/goiabada/core/constants"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1153,7 +1153,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-			logs := captureLogs(t)
+			logs := testutil.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
@@ -1240,7 +1240,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-			logs := captureLogs(t)
+			logs := testutil.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
@@ -1389,7 +1389,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-		logs := captureLogs(t)
+		logs := testutil.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
@@ -1450,7 +1450,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-		logs := captureLogs(t)
+		logs := testutil.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
@@ -1536,75 +1536,20 @@ func stubIssuanceTransaction(database *mocks_data.Database) {
 	database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 }
 
-// capturedLogs holds the slog records emitted while one subtest runs. Whole records rather than
-// the flattened text buffer this replaced, because two of the properties decision 7's line is
-// owed cannot be seen in a buffer at all: that the record is a WARNING, and that the message and
-// the two user ids sit on the SAME record. Both gaps were demonstrated against the buffer
-// version: demoting slog.Warn to slog.Info, and splitting the message away from the ids into a
-// second unrelated record, each left every assertion green (#133).
-type capturedLogs struct {
-	mu      sync.Mutex
-	records []slog.Record
-}
-
-func (c *capturedLogs) add(record slog.Record) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.records = append(c.records, record)
-}
-
-func (c *capturedLogs) all() []slog.Record {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return append([]slog.Record(nil), c.records...)
-}
-
-// recordingHandler is the slog.Handler side of capturedLogs. WithAttrs is carried forward so a
-// logger built through slog.With records what it would print; nothing under test opens a group,
-// so WithGroup is the identity and grouped key qualification is not modelled.
-type recordingHandler struct {
-	logs  *capturedLogs
-	attrs []slog.Attr
-}
-
-func (h *recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
-
-func (h *recordingHandler) Handle(_ context.Context, record slog.Record) error {
-	// Clone before keeping it: a Record's attributes may share backing storage with the caller's.
-	kept := record.Clone()
-	kept.AddAttrs(h.attrs...)
-	h.logs.add(kept)
-	return nil
-}
-
-func (h *recordingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	carried := append(append([]slog.Attr(nil), h.attrs...), attrs...)
-	return &recordingHandler{logs: h.logs, attrs: carried}
-}
-
-func (h *recordingHandler) WithGroup(string) slog.Handler { return h }
-
-// captureLogs sends the default slog logger into a recorder for one subtest and restores it
-// afterwards. The refusal arms below answer a foreign session and a missing one identically
-// from the client's side, deliberately, so what was logged is the only place the two can be
-// told apart and the only place an assertion can reach them.
-func captureLogs(t *testing.T) *capturedLogs {
-	t.Helper()
-	logs := &capturedLogs{}
-	previous := slog.Default()
-	slog.SetDefault(slog.New(&recordingHandler{logs: logs}))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	return logs
-}
+// The records are read whole rather than as rendered text, because two of the properties decision
+// 7's line is owed cannot be seen in a buffer at all: that the record is a WARNING, and that the
+// message and the two user ids sit on the SAME record. Both gaps were demonstrated against the
+// buffer version this replaced: demoting slog.Warn to slog.Info, and splitting the message away
+// from the ids into a second unrelated record, each left every assertion green (#133).
 
 // warningSaying returns the one WARN record whose message carries the discriminator, and fails
 // when there is not exactly one. The level is asserted rather than assumed: an operator
 // filtering at warning level is the reader this line was written for, so a record quietly
 // demoted to Info would be invisible to them while every text assertion still passed.
-func warningSaying(t *testing.T, logs *capturedLogs, discriminator string) (slog.Record, bool) {
+func warningSaying(t *testing.T, logs *testutil.SlogCapture, discriminator string) (testutil.CapturedRecord, bool) {
 	t.Helper()
-	captured := logs.all()
-	var matched []slog.Record
+	captured := logs.Records()
+	var matched []testutil.CapturedRecord
 	for _, record := range captured {
 		if record.Level == slog.LevelWarn && strings.Contains(record.Message, discriminator) {
 			matched = append(matched, record)
@@ -1612,28 +1557,17 @@ func warningSaying(t *testing.T, logs *capturedLogs, discriminator string) (slog
 	}
 	if !assert.Len(t, matched, 1,
 		"want exactly one WARN record saying %q, out of %d captured", discriminator, len(captured)) {
-		return slog.Record{}, false
+		return testutil.CapturedRecord{}, false
 	}
 	return matched[0], true
-}
-
-// attrsOf flattens ONE record's attributes, which is the whole point of it taking a record: an
-// assertion has to name where it read a value, or two unrelated records satisfy it between them.
-func attrsOf(record slog.Record) map[string]any {
-	attrs := make(map[string]any)
-	record.Attrs(func(attr slog.Attr) bool {
-		attrs[attr.Key] = attr.Value.Resolve().Any()
-		return true
-	})
-	return attrs
 }
 
 // noRecordSays fails when any captured record carries the phrase, at any level. The two refusal
 // arms are one discrimination, so the wrong sentence appearing anywhere in a refusal is the
 // failure, not merely its appearance on the record examined above.
-func noRecordSays(t *testing.T, logs *capturedLogs, phrase string) {
+func noRecordSays(t *testing.T, logs *testutil.SlogCapture, phrase string) {
 	t.Helper()
-	for _, record := range logs.all() {
+	for _, record := range logs.Records() {
 		assert.NotContains(t, record.Message, phrase, "no record should say %q here", phrase)
 	}
 }
@@ -1642,13 +1576,13 @@ func noRecordSays(t *testing.T, logs *capturedLogs, phrase string) {
 // has to be able to tell "this browser's session belongs to someone else" from "this ceremony's
 // session is gone", and to see the two user ids that failed to match, because those ids are the
 // whole record of an account takeover attempt that got as far as issuance (#133).
-func assertWarnedForeignSession(t *testing.T, logs *capturedLogs, ceremonyUserId int64) {
+func assertWarnedForeignSession(t *testing.T, logs *testutil.SlogCapture, ceremonyUserId int64) {
 	t.Helper()
 	record, ok := warningSaying(t, logs, "belongs to a different user")
 	if !ok {
 		return
 	}
-	attrs := attrsOf(record)
+	attrs := record.Attrs
 	assert.Equal(t, foreignSessionUserId, attrs["sessionUserId"],
 		"the ambient session's owner, on the record that names the refusal")
 	assert.Equal(t, ceremonyUserId, attrs["ceremonyUserId"],
@@ -1660,13 +1594,13 @@ func assertWarnedForeignSession(t *testing.T, logs *capturedLogs, ceremonyUserId
 // assertWarnedSessionGone is the other side of the same discrimination: a row that did not
 // resolve has no owner to name, so #129's line stands verbatim and neither user id appears on
 // it. An operator handed one here would be reading an owner nothing established.
-func assertWarnedSessionGone(t *testing.T, logs *capturedLogs) {
+func assertWarnedSessionGone(t *testing.T, logs *testutil.SlogCapture) {
 	t.Helper()
 	record, ok := warningSaying(t, logs, "is gone")
 	if !ok {
 		return
 	}
-	attrs := attrsOf(record)
+	attrs := record.Attrs
 	assert.NotContains(t, attrs, "sessionUserId")
 	assert.NotContains(t, attrs, "ceremonyUserId")
 	noRecordSays(t, logs, "belongs to a different user")
@@ -4142,7 +4076,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 
 			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-			logs := captureLogs(t)
+			logs := testutil.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
@@ -4211,7 +4145,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			// that did not resolve.
 			record, ok := warningSaying(t, logs, "no longer within its idle timeout or maximum lifetime")
 			if ok {
-				assert.Equal(t, liveSessionIdentifier, attrsOf(record)["sessionIdentifier"])
+				assert.Equal(t, liveSessionIdentifier, record.Attrs["sessionIdentifier"])
 			}
 			noRecordSays(t, logs, "belongs to a different user")
 			noRecordSays(t, logs, "is gone")

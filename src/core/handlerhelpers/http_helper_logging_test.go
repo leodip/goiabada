@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -19,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,76 +28,22 @@ import (
 // these rows: a handler proves it called the writer, and the writer proves what the operator reads
 // (#279 decisions 6, 9 and 10).
 
-// capturedLogs collects the records the writers emit while a test holds the default logger.
-type capturedLogs struct {
-	mu      sync.Mutex
-	records []slog.Record
-}
-
-func (c *capturedLogs) add(record slog.Record) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.records = append(c.records, record)
-}
-
-func (c *capturedLogs) all() []slog.Record {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return append([]slog.Record(nil), c.records...)
-}
-
-// recordingHandler is the slog.Handler side of capturedLogs. Nothing under test builds a logger
-// through slog.With or opens a group, so WithAttrs and WithGroup are the identity.
-type recordingHandler struct{ logs *capturedLogs }
-
-func (h *recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
-
-func (h *recordingHandler) Handle(_ context.Context, record slog.Record) error {
-	// Clone before keeping it: a Record's attributes may share backing storage with the caller's.
-	h.logs.add(record.Clone())
-	return nil
-}
-
-func (h *recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
-
-func (h *recordingHandler) WithGroup(string) slog.Handler { return h }
-
-func captureLogs(t *testing.T) *capturedLogs {
-	t.Helper()
-	logs := &capturedLogs{}
-	previous := slog.Default()
-	slog.SetDefault(slog.New(&recordingHandler{logs: logs}))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	return logs
-}
-
 // theOneErrorRecord requires exactly one ERROR record and returns it. Exactly one is the assertion,
 // not at least one: decision 9's claim is that a 500 is logged once, so a writer that logged twice,
 // or that logged at a level an operator filters out, has to fail here.
-func theOneErrorRecord(t *testing.T, logs *capturedLogs) (slog.Record, bool) {
+func theOneErrorRecord(t *testing.T, logs *testutil.SlogCapture) (testutil.CapturedRecord, bool) {
 	t.Helper()
-	captured := logs.all()
-	var matched []slog.Record
+	captured := logs.Records()
+	var matched []testutil.CapturedRecord
 	for _, record := range captured {
 		if record.Level == slog.LevelError {
 			matched = append(matched, record)
 		}
 	}
 	if !assert.Len(t, matched, 1, "want exactly one ERROR record, out of %d captured", len(captured)) {
-		return slog.Record{}, false
+		return testutil.CapturedRecord{}, false
 	}
 	return matched[0], true
-}
-
-// attrsOf flattens ONE record's attributes. Taking a record rather than the whole capture is the
-// point: two unrelated records must not be able to satisfy one assertion between them.
-func attrsOf(record slog.Record) map[string]any {
-	attrs := make(map[string]any)
-	record.Attrs(func(attr slog.Attr) bool {
-		attrs[attr.Key] = attr.Value.Resolve().Any()
-		return true
-	})
-	return attrs
 }
 
 // frameCount counts the "\n\tfile:line" pairs %+v printed, which is how many stack frames the error
@@ -111,9 +57,9 @@ func frameCount(err error) int {
 // assertion about the contract: slog's default handler is what prints the stack, and it can only do
 // that from an error value, so a writer that logged err.Error() would satisfy every text check
 // while silently dropping every frame.
-func loggedErrorOf(t *testing.T, record slog.Record) (error, bool) {
+func loggedErrorOf(t *testing.T, record testutil.CapturedRecord) (error, bool) {
 	t.Helper()
-	logged, ok := attrsOf(record)["error"].(error)
+	logged, ok := record.Attrs["error"].(error)
 	if !assert.True(t, ok, "the error attribute must carry the error value itself, not its text") {
 		return nil, false
 	}
@@ -160,7 +106,7 @@ func notFoundPageHelper() *HttpHelper {
 // grepping for ERROR would still be reading other people's stale bookmarks. Empty rather than "no
 // ERROR record": a warn or an info line at this volume is the same defect (#279 decision 11).
 func TestNotFound_LogsNothing(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	httpHelper := notFoundPageHelper()
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -171,7 +117,7 @@ func TestNotFound_LogsNothing(t *testing.T) {
 	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
-	assert.Empty(t, logs.all(), "a stale or malformed URL is not an event an operator has to read")
+	assert.Empty(t, logs.Records(), "a stale or malformed URL is not an event an operator has to read")
 }
 
 // The silence is scoped to the 404. A render failure inside NotFound is a server fault reaching
@@ -179,7 +125,7 @@ func TestNotFound_LogsNothing(t *testing.T) {
 // the request id the page shows. errorPageHelper has no not_found.html, so ParseFS fails for its own
 // reason.
 func TestNotFound_RenderFailureStillLogsOnce(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -203,13 +149,13 @@ func TestNotFound_RenderFailureStillLogsOnce(t *testing.T) {
 	}
 	assert.Contains(t, logged.Error(), "unable to render template")
 
-	requestId, isString := attrsOf(record)["request_id"].(string)
+	requestId, isString := record.Attrs["request_id"].(string)
 	assert.True(t, isString, "request_id must be a string attribute")
 	assert.Contains(t, w.Body.String(), "Error: "+requestId)
 }
 
 func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
 	failure := errs.New("the database went away")
@@ -235,7 +181,7 @@ func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
 	// The request id on the log line and the one on the page the visitor is looking at have to be
 	// the same string, or the line cannot be found from a user's report, which is the only reason
 	// either of them is written down at all.
-	requestId, isString := attrsOf(record)["request_id"].(string)
+	requestId, isString := record.Attrs["request_id"].(string)
 	assert.True(t, isString, "request_id must be a string attribute")
 	assert.NotEmpty(t, requestId)
 	assert.Contains(t, w.Body.String(), "Error: "+requestId)
@@ -245,7 +191,7 @@ func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
 // that passes a bare error still gets frames, so nothing is lost by asking all 1,007 sites to pass
 // err bare.
 func TestInternalServerError_StacksAnUnstackedError(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
 	// Deliberately a stdlib error with no frames anywhere in its tree, which is what a dependency
@@ -274,7 +220,7 @@ func TestInternalServerError_StacksAnUnstackedError(t *testing.T) {
 // an error arriving already stacked must not collect the writer's frames on top of its own. That is
 // rule 3, and this writer is the one place in the tree that could break it for every error at once.
 func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
 	origin := errs.New("the origin")
@@ -298,7 +244,7 @@ func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
 }
 
 func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	httpHelper := NewHttpHelper(&mocks.TestFS{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -319,7 +265,7 @@ func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 	if _, isError := loggedErrorOf(t, record); !isError {
 		return
 	}
-	requestId, isString := attrsOf(record)["request_id"].(string)
+	requestId, isString := record.Attrs["request_id"].(string)
 	assert.True(t, isString, "request_id must be a string attribute")
 	assert.NotEmpty(t, requestId)
 
@@ -336,7 +282,7 @@ func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 // could not join to a log line, and the silence was invisible because TestJsonError pinned the
 // status and the code and never looked at the record (#279 decisions 9 and 12).
 func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	httpHelper := NewHttpHelper(&mocks.TestFS{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -357,7 +303,7 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 		return
 	}
 
-	requestId, isString := attrsOf(record)["request_id"].(string)
+	requestId, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString, "request_id must be a string attribute")
 	require.NotEmpty(t, requestId)
 
@@ -376,7 +322,7 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 // in the description before it ever reaches here. Logging it a second time here is the defect this
 // row exists to catch.
 func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	httpHelper := NewHttpHelper(&mocks.TestFS{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error",
@@ -391,7 +337,7 @@ func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
 	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Empty(t, logs.all(), "the caller that chose this status owns the record")
+	assert.Empty(t, logs.Records(), "the caller that chose this status owns the record")
 
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
@@ -404,7 +350,7 @@ func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
 // replaced, one wrap turned a validator's 400 into a 500 and sent the sentence to the log instead
 // of to the client.
 func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	httpHelper := NewHttpHelper(&mocks.TestFS{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
@@ -425,7 +371,7 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 	assert.Equal(t, "The redirect URI is not registered.", response["error_description"],
 		"the wrapper's own message must not reach the wire")
 
-	assert.Empty(t, logs.all(), "a client's mistake answered as a client's mistake is not a server fault")
+	assert.Empty(t, logs.Records(), "a client's mistake answered as a client's mistake is not a server fault")
 }
 
 // The WWW-Authenticate header travels with the detail through a wrapper too, and it is the half of

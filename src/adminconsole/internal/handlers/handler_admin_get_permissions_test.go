@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil"
 )
 
 // This handler carried the console's only caller-side error log: a slog.Error on every apiClient
@@ -46,10 +46,7 @@ func (c *permissionsByResourceClient) GetPermissionsByResource(accessToken strin
 func permissionRecords(t *testing.T, client apiclient.ApiClient, query string) (*httptest.ResponseRecorder, []string) {
 	t.Helper()
 
-	var buf strings.Builder
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	defer slog.SetDefault(previous)
+	capture := testutil.CaptureSlog(t)
 
 	httpHelper := handlerhelpers.NewHttpHelper(&mocks.TestFS{})
 
@@ -68,7 +65,7 @@ func permissionRecords(t *testing.T, client apiclient.ApiClient, query string) (
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/permissions?"+query, nil))
 
 	var errorLines []string
-	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+	for _, line := range strings.Split(strings.TrimSpace(capture.Text()), "\n") {
 		if strings.Contains(line, "level=ERROR") {
 			errorLines = append(errorLines, line)
 		}

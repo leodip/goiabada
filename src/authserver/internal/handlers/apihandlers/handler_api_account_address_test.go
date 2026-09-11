@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -43,18 +43,6 @@ func addressPutRequest(t *testing.T, subject string, body api.UpdateUserAddressR
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 
-// captureHandlerLogs redirects slog's default logger, the one both servers run, and returns
-// everything written while fn ran.
-func captureHandlerLogs(t *testing.T, fn func()) string {
-	t.Helper()
-	var buf strings.Builder
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	defer slog.SetDefault(previous)
-	fn()
-	return buf.String()
-}
-
 // The `api/unlogged-500` anchor: this exact line answered 500 and threw the error away.
 func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
@@ -66,9 +54,11 @@ func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *te
 	rr := httptest.NewRecorder()
 	handler := HandleAPIAccountAddressPut(database, validators.NewAddressValidator(database), auditLogger)
 
-	logged := captureHandlerLogs(t, func() {
-		handler.ServeHTTP(rr, addressPutRequest(t, "the-subject", api.UpdateUserAddressRequest{}))
-	})
+	capture := testutil.CaptureSlog(t)
+
+	handler.ServeHTTP(rr, addressPutRequest(t, "the-subject", api.UpdateUserAddressRequest{}))
+
+	logged := capture.Text()
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
@@ -100,12 +90,14 @@ func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler := HandleAPIAccountAddressPut(database, validators.NewAddressValidator(database), auditLogger)
 
-	logged := captureHandlerLogs(t, func() {
-		handler.ServeHTTP(rr, addressPutRequest(t, "the-subject", api.UpdateUserAddressRequest{
-			AddressLine1:    "1 Example Street",
-			AddressLocality: "Example City",
-		}))
-	})
+	capture := testutil.CaptureSlog(t)
+
+	handler.ServeHTTP(rr, addressPutRequest(t, "the-subject", api.UpdateUserAddressRequest{
+		AddressLine1:    "1 Example Street",
+		AddressLocality: "Example City",
+	}))
+
+	logged := capture.Text()
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))

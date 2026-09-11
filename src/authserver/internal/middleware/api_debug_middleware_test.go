@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/otp"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -155,16 +155,6 @@ func TestAPIDebugMiddleware_EnabledWithNoRequestBody(t *testing.T) {
 // verbatim.
 // -----------------------------------------------------------------------------
 
-// captureSlog redirects the default logger into a buffer for the test.
-func captureSlog(t *testing.T) *bytes.Buffer {
-	t.Helper()
-	buf := &bytes.Buffer{}
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	return buf
-}
-
 func TestDebugLog_DoesNotLogTheAuthorizationHeaderVerbatim(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -194,7 +184,7 @@ func TestDebugLog_DoesNotLogTheAuthorizationHeaderVerbatim(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logged := captureSlog(t)
+			logged := testutil.CaptureSlog(t)
 
 			req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 			req.Header.Set("Authorization", tc.authHeader)
@@ -202,9 +192,9 @@ func TestDebugLog_DoesNotLogTheAuthorizationHeaderVerbatim(t *testing.T) {
 			debugLog("POST", "/api/v1/admin/users", []byte(`{"a":1}`),
 				http.StatusOK, []byte(`{"b":2}`), 5*time.Millisecond, req)
 
-			assert.NotContains(t, logged.String(), tc.secret,
+			assert.NotContains(t, logged.Text(), tc.secret,
 				"the credential must never be written to the log")
-			assert.Contains(t, logged.String(), tc.wantInLog)
+			assert.Contains(t, logged.Text(), tc.wantInLog)
 		})
 	}
 }
@@ -212,25 +202,25 @@ func TestDebugLog_DoesNotLogTheAuthorizationHeaderVerbatim(t *testing.T) {
 // With no Authorization header the placeholder is "None", so an absent credential
 // is distinguishable from a redacted one.
 func TestDebugLog_ReportsAnAbsentAuthorizationHeader(t *testing.T) {
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
 	debugLog("GET", "/api/v1/admin/users", nil, http.StatusOK, nil, time.Millisecond, req)
 
-	assert.Contains(t, logged.String(), "Authorization: None")
+	assert.Contains(t, logged.Text(), "Authorization: None")
 }
 
 // The bodies are logged deliberately, which is the point of the debug mode, so
 // this pins that they do reach the log when present. It is also the regression
 // guard against redaction becoming over-eager: an ordinary field must survive.
 func TestDebugLog_LogsRequestAndResponseBodies(t *testing.T) {
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 	debugLog("POST", "/api/v1/admin/users", []byte(`{"givenName":"Jane"}`),
 		http.StatusCreated, []byte(`{"id":42}`), time.Millisecond, req)
 
-	output := logged.String()
+	output := logged.Text()
 	assert.Contains(t, output, "givenName")
 	assert.Contains(t, output, "Jane")
 	assert.Contains(t, output, "201")
@@ -287,11 +277,11 @@ func TestDebugLog_HandlesUnknownStatusCode(t *testing.T) {
 // logRequestBody runs debugLog over one request body and returns what was logged.
 func logRequestBody(t *testing.T, body string) string {
 	t.Helper()
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 	req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 	debugLog("POST", "/api/v1/admin/users", []byte(body),
 		http.StatusOK, nil, time.Millisecond, req)
-	return logged.String()
+	return logged.Text()
 }
 
 // nestedBody builds a body of `depth` nested objects with leaf at the bottom, so
@@ -688,7 +678,7 @@ func debugAPIRouter(t *testing.T, method, pattern string, handler http.HandlerFu
 // Both must be gone from the log, and the client must still receive exactly what the
 // handler wrote.
 func TestAPIDebugMiddleware_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	generator := otp.OTPSecretGenerator{}
 	keyURL, err := generator.GenerateOTPSecret("seam2@example.com", "Goiabada")
@@ -717,7 +707,7 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
 	assert.Equal(t, written.Bytes(), recorder.Body.Bytes(),
 		"buffering the response for the log must not change a byte of what the client receives")
 
-	output := logged.String()
+	output := logged.Text()
 	assert.NotContains(t, output, secretKey,
 		"the TOTP seed must not reach the log")
 	// Asserted on a prefix rather than the whole string: a bug that logged only the
@@ -738,7 +728,7 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
 // must still reach the handler, which is the half that makes the middleware safe to
 // mount in front of a real endpoint rather than merely quiet.
 func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	generator := otp.OTPSecretGenerator{}
 	keyURL, err := generator.GenerateOTPSecret("seam2@example.com", "Goiabada")
@@ -790,7 +780,7 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
 
-	output := logged.String()
+	output := logged.Text()
 	assert.NotContains(t, output, "SENTINEL-account-password",
 		"the account password must not reach the log")
 	assert.NotContains(t, output, otpCode,
@@ -827,7 +817,7 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestAPIDebugMiddleware_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	router := debugAPIRouter(t, http.MethodGet, "/users", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -840,7 +830,7 @@ func TestAPIDebugMiddleware_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
 	// page and size are two of the twelve names the redactor keeps, and they are
 	// what an operator reads off this surface, so the change must not have cost
 	// the debug log its pagination.
-	assert.Contains(t, logged.String(), "/api/v1/account/users?page=2&size=10")
+	assert.Contains(t, logged.Text(), "/api/v1/account/users?page=2&size=10")
 }
 
 // The reject. `query` is the admin API's free-text user search, so it carries
@@ -851,7 +841,7 @@ func TestAPIDebugMiddleware_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
 // never written, or a request that never reached the middleware, would satisfy
 // "the search string is absent" perfectly.
 func TestAPIDebugMiddleware_DoesNotLogAUserSearchStringFromTheQuery(t *testing.T) {
-	logged := captureSlog(t)
+	logged := testutil.CaptureSlog(t)
 
 	router := debugAPIRouter(t, http.MethodGet, "/users", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -863,7 +853,7 @@ func TestAPIDebugMiddleware_DoesNotLogAUserSearchStringFromTheQuery(t *testing.T
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
 
-	output := logged.String()
+	output := logged.Text()
 	assert.Contains(t, output, "page=2", "the line must have been written at all")
 	assert.Contains(t, output, "query="+redactedValue)
 	assert.NotContains(t, output, "alice@example.com",

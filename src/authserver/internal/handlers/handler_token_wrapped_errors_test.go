@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -164,7 +165,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 // owed here too: an operator filtering on request_id has to be able to join a client's report to it,
 // and the stack has to ride on the error attribute rather than be glued into the message.
 func TestJsonErrorConformed_LogsStructuredOnTheGenericBranch(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	req := httptest.NewRequest("POST", "/token", nil)
@@ -173,8 +174,8 @@ func TestJsonErrorConformed_LogsStructuredOnTheGenericBranch(t *testing.T) {
 
 	jsonErrorConformed(httpHelper, rr, req, errs.New("the key store is unreachable"))
 
-	var errorRecords []slog.Record
-	for _, record := range logs.all() {
+	var errorRecords []testutil.CapturedRecord
+	for _, record := range logs.Records() {
 		if record.Level == slog.LevelError {
 			errorRecords = append(errorRecords, record)
 		}
@@ -182,7 +183,7 @@ func TestJsonErrorConformed_LogsStructuredOnTheGenericBranch(t *testing.T) {
 	require.Len(t, errorRecords, 1, "the generic branch logs exactly once")
 	assert.Equal(t, "internal server error", errorRecords[0].Message)
 
-	attrs := attrsOf(errorRecords[0])
+	attrs := errorRecords[0].Attrs
 	logged, ok := attrs["error"].(error)
 	require.True(t, ok, "the error travels as an error value, not as text: got %T", attrs["error"])
 	assert.Contains(t, logged.Error(), "the key store is unreachable")

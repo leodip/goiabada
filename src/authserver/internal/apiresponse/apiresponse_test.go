@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,51 +41,28 @@ func decodeEnvelope(t *testing.T, rr *httptest.ResponseRecorder) (code, descript
 	return body.ErrorCode, body.ErrorDescription
 }
 
-// captureOne runs fn with slog's default logger redirected, which is the logger both servers run,
-// and returns the records it produced. Every case below asserts on the record and on the wire
-// together, because "answered once and logged once" is one property and not two.
-func captureOne(t *testing.T, fn func()) []map[string]any {
+// Every case below holds slog's default logger through testutil.CaptureSlog, which installs the
+// same handler both servers run, and asserts on the record and on the wire together: "answered
+// once and logged once" is one property and not two. Text() renders a record the way the servers'
+// text handler does, with an error value printed by %+v, so the stack rides inside the attribute
+// and the two stack cases can read it.
+//
+// loggedError reads the error attribute as an error value, which is the contract: the handlers
+// print a stack from an error value and nothing from its text.
+func loggedError(t *testing.T, record testutil.CapturedRecord) error {
 	t.Helper()
-	var buf strings.Builder
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, nil)))
-	defer slog.SetDefault(previous)
-
-	fn()
-
-	records := []map[string]any{}
-	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
-		if line == "" {
-			continue
-		}
-		var rec map[string]any
-		require.NoError(t, json.Unmarshal([]byte(line), &rec))
-		records = append(records, rec)
-	}
-	return records
-}
-
-// captureText redirects the default logger to slog's TEXT handler, which is what both servers
-// actually run: it formats an error value with %+v, so the stack rides inside the error attribute.
-// The JSON handler above prints the message alone, which is slog's convention and decision 3's
-// stated consequence, so the two stack cases below have to read this one.
-func captureText(t *testing.T, fn func()) string {
-	t.Helper()
-	var buf strings.Builder
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	defer slog.SetDefault(previous)
-
-	fn()
-	return buf.String()
+	logged, ok := record.Attrs["error"].(error)
+	require.True(t, ok, "the error attribute must carry the error value itself, not its text")
+	return logged
 }
 
 func TestWriteJSON_WritesStatusContentTypeAndBody(t *testing.T) {
 	rr := httptest.NewRecorder()
+	capture := testutil.CaptureSlog(t)
 
-	records := captureOne(t, func() {
-		WriteJSON(rr, requestWithId(t), http.StatusCreated, map[string]string{"hello": "world"})
-	})
+	WriteJSON(rr, requestWithId(t), http.StatusCreated, map[string]string{"hello": "world"})
+
+	records := capture.Records()
 
 	assert.Equal(t, http.StatusCreated, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
@@ -99,25 +76,27 @@ func TestWriteJSON_WritesStatusContentTypeAndBody(t *testing.T) {
 // caller gets a real 500 and no partial body.
 func TestWriteJSON_AnUnencodableValueIsARealFiveHundred(t *testing.T) {
 	rr := httptest.NewRecorder()
+	capture := testutil.CaptureSlog(t)
 
-	records := captureOne(t, func() {
-		WriteJSON(rr, requestWithId(t), http.StatusOK, map[string]any{"broken": math.Inf(1)})
-	})
+	WriteJSON(rr, requestWithId(t), http.StatusOK, map[string]any{"broken": math.Inf(1)})
+
+	records := capture.Records()
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	code, description := decodeEnvelope(t, rr)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", code)
 	assert.Contains(t, description, requestId)
 	require.Len(t, records, 1)
-	assert.Contains(t, records[0]["error"], "unable to encode the API response")
+	assert.ErrorContains(t, loggedError(t, records[0]), "unable to encode the API response")
 }
 
 func TestWriteError_WritesTheEnvelope(t *testing.T) {
 	rr := httptest.NewRecorder()
+	capture := testutil.CaptureSlog(t)
 
-	records := captureOne(t, func() {
-		WriteError(rr, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
-	})
+	WriteError(rr, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+
+	records := capture.Records()
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
@@ -131,12 +110,13 @@ func TestWriteError_WritesTheEnvelope(t *testing.T) {
 // exactly one structured record carrying the error, the request id and the caller's attributes.
 func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 	rr := httptest.NewRecorder()
+	capture := testutil.CaptureSlog(t)
 
-	records := captureOne(t, func() {
-		WriteInternalServerError(rr, requestWithId(t),
-			errs.Wrap(errors.New("connection refused"), "failed to load the client"),
-			"clientId", int64(7))
-	})
+	WriteInternalServerError(rr, requestWithId(t),
+		errs.Wrap(errors.New("connection refused"), "failed to load the client"),
+		"clientId", int64(7))
+
+	records := capture.Records()
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
@@ -146,19 +126,21 @@ func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 		"refer to the server logs. Request Id: "+requestId, description)
 
 	require.Len(t, records, 1, "exactly one record, which is the point of the primitive")
-	assert.Equal(t, "internal server error", records[0]["msg"])
-	assert.Equal(t, requestId, records[0]["request_id"])
-	assert.Equal(t, float64(7), records[0]["clientId"])
-	assert.Contains(t, records[0]["error"], "failed to load the client: connection refused")
+	assert.Equal(t, "internal server error", records[0].Message)
+	assert.Equal(t, requestId, records[0].Attrs["request_id"])
+	assert.Equal(t, int64(7), records[0].Attrs["clientId"])
+	assert.ErrorContains(t, loggedError(t, records[0]), "failed to load the client: connection refused")
 }
 
 // The sentence is HttpHelper.JsonError's own, so the API and the web surface read alike. If either
 // moves, this fails rather than the two drifting apart unnoticed.
 func TestWriteInternalServerError_RepeatsTheWebSurfaceSentence(t *testing.T) {
 	rr := httptest.NewRecorder()
-	captureOne(t, func() {
-		WriteInternalServerError(rr, requestWithId(t), errors.New("boom"))
-	})
+	// Held so the record does not reach the test's own output; nothing here asserts on it.
+	testutil.CaptureSlog(t)
+
+	WriteInternalServerError(rr, requestWithId(t), errors.New("boom"))
+
 	_, description := decodeEnvelope(t, rr)
 	assert.Equal(t, "An unexpected server error has occurred. For additional information, "+
 		"refer to the server logs. Request Id: "+requestId, description)
@@ -169,10 +151,11 @@ func TestWriteInternalServerError_RepeatsTheWebSurfaceSentence(t *testing.T) {
 // changes, and it is the one that would otherwise log with no frames at all (#279 decision 10).
 func TestWriteInternalServerError_ABareStdlibErrorStillLogsAStack(t *testing.T) {
 	rr := httptest.NewRecorder()
+	capture := testutil.CaptureSlog(t)
 
-	logged := captureText(t, func() {
-		WriteInternalServerError(rr, requestWithId(t), errors.New("a bare stdlib error"))
-	})
+	WriteInternalServerError(rr, requestWithId(t), errors.New("a bare stdlib error"))
+
+	logged := capture.Text()
 
 	assert.Contains(t, logged, "a bare stdlib error")
 	assert.Contains(t, logged, "apiresponse_test.go:", "the stack is the caller's, and it is present")
@@ -184,9 +167,11 @@ func TestWriteInternalServerError_DoesNotAddASecondStack(t *testing.T) {
 	rr := httptest.NewRecorder()
 	origin := errs.New("the origin")
 
-	logged := captureText(t, func() {
-		WriteInternalServerError(rr, requestWithId(t), errs.Wrap(origin, "on the way up"))
-	})
+	capture := testutil.CaptureSlog(t)
+
+	WriteInternalServerError(rr, requestWithId(t), errs.Wrap(origin, "on the way up"))
+
+	logged := capture.Text()
 
 	assert.Equal(t, 1, strings.Count(logged, "apiresponse_test.go:"),
 		"one frame set from this file means one stack, the origin's")
@@ -198,30 +183,33 @@ func TestLogInternalServerError_LogsAndWritesNothing(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	var returned string
-	records := captureOne(t, func() {
-		returned = LogInternalServerError(requestWithId(t), errs.New("DCR: could not register"),
-			"uri", "https://a.example.com")
-	})
+	capture := testutil.CaptureSlog(t)
+
+	returned = LogInternalServerError(requestWithId(t), errs.New("DCR: could not register"),
+		"uri", "https://a.example.com")
+
+	records := capture.Records()
 
 	assert.Equal(t, requestId, returned)
 	assert.Equal(t, 200, rr.Code, "nothing was written")
 	assert.Empty(t, rr.Body.String())
 	require.Len(t, records, 1)
-	assert.Equal(t, requestId, records[0]["request_id"])
-	assert.Equal(t, "https://a.example.com", records[0]["uri"])
+	assert.Equal(t, requestId, records[0].Attrs["request_id"])
+	assert.Equal(t, "https://a.example.com", records[0].Attrs["uri"])
 }
 
 // A request outside the request-id middleware still answers and still logs; chi's helper returns
 // the empty string there, so the attribute is present and empty rather than missing.
 func TestWriteInternalServerError_WithoutARequestId(t *testing.T) {
 	rr := httptest.NewRecorder()
+	capture := testutil.CaptureSlog(t)
 
-	records := captureOne(t, func() {
-		WriteInternalServerError(rr, httptest.NewRequest(http.MethodGet, "/api/v1/admin/anything", nil),
-			errs.New("boom"))
-	})
+	WriteInternalServerError(rr, httptest.NewRequest(http.MethodGet, "/api/v1/admin/anything", nil),
+		errs.New("boom"))
+
+	records := capture.Records()
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	require.Len(t, records, 1)
-	assert.Equal(t, "", records[0]["request_id"])
+	assert.Equal(t, "", records[0].Attrs["request_id"])
 }
