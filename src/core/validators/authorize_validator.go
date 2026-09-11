@@ -200,8 +200,8 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 		// The client identifier is a bounded stored value, so it is safe to log. The
 		// requested URI is unbounded attacker-controlled input and is deliberately left
 		// out: the operator reads the offending value off the client's page.
-		slog.Warn("AuthServer: rejected an authorization request whose redirect_uri is not an absolute URI, or is an http/https URI naming no host",
-			"clientIdentifier", client.ClientIdentifier)
+		slog.Warn("rejected an authorization request whose redirect_uri is not an absolute uri, or is an http or https uri naming no host",
+			"client_identifier", client.ClientIdentifier)
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotAbsolute, nil)
 	}
 

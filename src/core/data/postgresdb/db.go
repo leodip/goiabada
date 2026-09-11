@@ -43,11 +43,11 @@ type DatabaseConfig struct {
 
 func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDatabase, error) {
 
-	slog.Info("using database postgres")
-	slog.Info(fmt.Sprintf("db username: %v", dbConfig.Username))
-	slog.Info(fmt.Sprintf("db host: %v", dbConfig.Host))
-	slog.Info(fmt.Sprintf("db port: %v", dbConfig.Port))
-	slog.Info(fmt.Sprintf("db name: %v", dbConfig.Name))
+	// One record where five used to be, and no password: the URL is assembled below from the
+	// same four values, so a startup problem is read off this line rather than off four
+	// consecutive ones that a collector had no way to join (#320 decision 6).
+	slog.Info("using database", "type", "postgres", "username", dbConfig.Username,
+		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
 
 	dbURL := fmt.Sprintf("postgres://%v:%v@%v:%v/%v",
 		dbConfig.Username,
@@ -90,7 +90,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		// application database and holding no CREATEDB is enough to start, which is what the
 		// production checklist's "don't use root/admin accounts" asks for and what this
 		// engine refused to allow before (#293).
-		slog.Info("db create: disabled, the database must already exist (GOIABADA_DB_CREATE=false)")
+		slog.Info("database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
 
 		// sql.Open only parses the URL, so without this an absent database would come back as
 		// a usable handle and a nil error, and the failure would surface inside the migrator

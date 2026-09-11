@@ -561,11 +561,13 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error
 	// Remove leading and trailing single or double quotes from dbType
 	dbType := strings.Trim(dbConfig.Type, "\"'")
 
-	slog.Info("db type is " + dbType)
+	// One record for the whole choice. This used to write "db type is x" here and "creating x
+	// database" in the arm, and each engine's constructor then wrote "using database x" a line
+	// later: three records saying the same thing, none of them structured (#320).
+	slog.Info("opening the database", "type", dbType)
 
 	switch dbType {
 	case "mysql":
-		slog.Info("creating mysql database")
 		mysqlConfig := &mysqldb.DatabaseConfig{
 			Type:     dbConfig.Type,
 			Username: dbConfig.Username,
@@ -578,7 +580,6 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error
 		}
 		database, err = mysqldb.NewMySQLDatabase(mysqlConfig, logSQL)
 	case "sqlite":
-		slog.Info("creating sqlite database")
 		sqliteConfig := &sqlitedb.DatabaseConfig{
 			Type:     dbConfig.Type,
 			Username: dbConfig.Username,
@@ -590,7 +591,6 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error
 		}
 		database, err = sqlitedb.NewSQLiteDatabase(sqliteConfig, logSQL)
 	case "postgres":
-		slog.Info("creating postgres database")
 		postgresConfig := &postgresdb.DatabaseConfig{
 			Type:     dbConfig.Type,
 			Username: dbConfig.Username,
@@ -603,7 +603,6 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error
 		}
 		database, err = postgresdb.NewPostgresDatabase(postgresConfig, logSQL)
 	case "mssql":
-		slog.Info("creating mssql database")
 		mssqlConfig := &mssqldb.DatabaseConfig{
 			Type:     dbConfig.Type,
 			Username: dbConfig.Username,
@@ -710,7 +709,7 @@ func runStartupDataTasks(database Database, envKey []byte, previousKey []byte) e
 		return errs.Wrap(err, "failed to encrypt legacy plaintext OTP secrets")
 	}
 	if migrated > 0 {
-		slog.Info(fmt.Sprintf("encrypted %d legacy plaintext OTP secret(s) at rest", migrated))
+		slog.Info("encrypted legacy plaintext otp secrets at rest", "count", migrated)
 	}
 
 	// Lowercase any legacy mixed-case email addresses (issues #221 and #283). Fail-closed and
@@ -726,8 +725,8 @@ func runStartupDataTasks(database Database, envKey []byte, previousKey []byte) e
 		return errs.Wrap(err, "failed to lowercase legacy user email addresses")
 	}
 	if lowercased > 0 || disabled > 0 {
-		slog.Info(fmt.Sprintf("lowercased %d legacy user email address(es); disabled %d that differed from another only by case",
-			lowercased, disabled))
+		slog.Info("lowercased legacy user email addresses", "lowercased", lowercased,
+			"disabled", disabled)
 	}
 
 	return nil

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -15,8 +16,10 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	mock_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	mock_oauth "github.com/leodip/goiabada/core/oauth/mocks"
@@ -661,12 +664,25 @@ func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 		t.Error("Next handler should not be called")
 	})
 
+	logged := testutil.CaptureSlog(t)
+
 	handler := middleware.JwtSessionHandler()(nextHandler)
 	handler.ServeHTTP(rr, req)
 
 	// Verify redirected to root
 	assert.Equal(t, http.StatusFound, rr.Code)
 	assert.Equal(t, "/", rr.Header().Get("Location"))
+
+	// Warn, not Error. This was Error, and it is the one level #320's sweep moved in core: a
+	// token from another issuer is a condition this middleware exists to meet, and it meets it
+	// by clearing the session and redirecting. Pinned so nobody restores it on the reasoning
+	// that an invalid issuer sounds severe; decision 5 answers that an error log full of
+	// handled conditions is not an error log.
+	records := logged.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, slog.LevelWarn, records[0].Level)
+	assert.Equal(t, "jwt token has an invalid issuer, clearing the session and redirecting to root",
+		records[0].Message)
 
 	// Verify session was cleared
 	_, exists := session.Values[constants.SessionKeyJwt]

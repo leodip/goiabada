@@ -418,7 +418,7 @@ func (m *RateLimiterMiddleware) refuse(w http.ResponseWriter, r *http.Request, t
 	class rejectClass, details map[string]interface{}) {
 
 	w.Header().Set("Retry-After", strconv.Itoa(int(t.window.Seconds())))
-	m.reportTrip(t, key, details)
+	m.reportTrip(r.Context(), t, key, details)
 	m.reject(w, r, class)
 }
 
@@ -427,14 +427,18 @@ func (m *RateLimiterMiddleware) refuse(w http.ResponseWriter, r *http.Request, t
 //
 // Warn rather than Error because a limiter doing its job is an expected event, and an auth
 // server whose error log fills with them has no error log left.
-func (m *RateLimiterMiddleware) reportTrip(t *tier, key string,
+// The context is a parameter rather than something this reaches for because a trip is a request
+// event: the installed handler reads chi's request id off it, so the warning below joins the
+// request log line for the request that was refused. Without it the operator has a rate-limit
+// warning and no way to tell which request produced it (#320 decision 2).
+func (m *RateLimiterMiddleware) reportTrip(ctx context.Context, t *tier, key string,
 	details map[string]interface{}) {
 
 	attrs := []any{"limiter", t.name}
 	if t.keyField != "" {
 		attrs = append(attrs, t.keyField, key)
 	}
-	slog.Warn("Rate limiter - limit reached", attrs...)
+	slog.WarnContext(ctx, "rate limit reached", attrs...)
 
 	if m.auditLogger == nil {
 		return
@@ -501,7 +505,8 @@ func (m *RateLimiterMiddleware) reject(w http.ResponseWriter, r *http.Request, c
 		"_httpStatus": http.StatusTooManyRequests,
 	}
 	if err := m.renderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
-		slog.Error("Rate limiter - unable to render the rejection page", "error", err)
+		slog.ErrorContext(r.Context(), "unable to render the rate limiter rejection page",
+			"error", err)
 		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 	}
 }

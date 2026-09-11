@@ -23,7 +23,10 @@ func MiddlewareSettings(database data.Database) func(next http.Handler) http.Han
 				// riding inside the error attribute rather than formatted into the message
 				// (#279).
 				requestId := middleware.GetReqID(r.Context())
-				slog.Error("fatal failure in GetSettings() middleware", "error", err, "request_id", requestId)
+				// No request_id attribute: the installed handler takes it off the context this
+				// call passes it (#320 decision 2). requestId is still read for the body below,
+				// which is what gives whoever hit this something to quote to an operator.
+				slog.ErrorContext(r.Context(), "unable to load the settings", "error", err)
 				http.Error(w, fmt.Sprintf("fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", requestId), http.StatusInternalServerError)
 				return
 			}

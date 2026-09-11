@@ -31,7 +31,7 @@ func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 	info, err := os.Stat(catalogsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			slog.Info("i18n: override directory has no catalogs/ subdir, skipping",
+			slog.Info("override directory has no catalogs subdirectory, skipping it",
 				slog.String("dir", catalogsDir))
 			return nil, nil
 		}
@@ -59,7 +59,7 @@ func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 			return nil, err
 		}
 		out = append(out, catalogFile{tag: tag, messages: messages})
-		slog.Info("i18n: loaded override catalog (overrides win over embedded)",
+		slog.Info("loaded an override catalog, which wins over the embedded one",
 			slog.String("path", path))
 	}
 	return out, nil

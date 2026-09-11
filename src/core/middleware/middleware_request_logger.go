@@ -460,10 +460,11 @@ func MiddlewareRequestLogger(enabled bool) func(next http.Handler) http.Handler 
 			// Deferred, so a request whose handler panics still produces a line,
 			// which is what chi's logger did.
 			defer func() {
-				attributes := make([]any, 0, 14)
-				if requestId := middleware.GetReqID(r.Context()); requestId != "" {
-					attributes = append(attributes, "request_id", logging.FieldForLog(requestId))
-				}
+				// No request_id here any more. The handler both servers install reads it off
+				// the context and appends it, through the same FieldForLog bound this used to
+				// apply, so the record still carries it and this is now the same record every
+				// other site on the request path writes (#320 decision 2).
+				attributes := make([]any, 0, 12)
 				attributes = append(attributes,
 					"method", logging.FieldForLog(r.Method),
 					"target", target,
@@ -480,7 +481,7 @@ func MiddlewareRequestLogger(enabled bool) func(next http.Handler) http.Handler 
 					"bytes", wrapped.BytesWritten(),
 					"duration", time.Since(started),
 				)
-				slog.Info("http request", attributes...)
+				slog.InfoContext(r.Context(), "http request", attributes...)
 			}()
 
 			next.ServeHTTP(wrapped, r)

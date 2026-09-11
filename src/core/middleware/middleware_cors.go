@@ -32,7 +32,7 @@ func MiddlewareCors(database data.Database) func(next http.Handler) http.Handler
 				if err != nil {
 					// Fail closed: an unreadable list is not an empty one, and answering true
 					// here would let script on any origin read a token response.
-					slog.Error("unable to load the CORS configuration", "error", err)
+					slog.ErrorContext(r.Context(), "unable to load the cors configuration", "error", err)
 					return false
 				}
 				return exists

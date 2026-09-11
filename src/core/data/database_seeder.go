@@ -163,7 +163,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("client '%v' created", client1.ClientIdentifier))
+	slog.Info("client created", "client_identifier", client1.ClientIdentifier)
 	if len(ds.bootstrapEnvOutFile) > 0 {
 		// Prepare directory
 		dir := filepath.Dir(ds.bootstrapEnvOutFile)
@@ -199,7 +199,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("redirect URI '%v' created", redirectURI.URI))
+	slog.Info("redirect uri created", "uri", redirectURI.URI)
 
 	redirectURI = &models.RedirectURI{
 		URI:      ds.adminConsoleBaseURL,
@@ -209,19 +209,22 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("redirect URI '%v' created", redirectURI.URI))
+	slog.Info("redirect uri created", "uri", redirectURI.URI)
 
 	adminEmail := ds.adminEmail
 	if len(adminEmail) == 0 {
 		const defaultAdminEmail = "admin@example.com"
-		slog.Warn(fmt.Sprintf("Admin email is not set. Will default admin email to '%v'", defaultAdminEmail))
+		slog.Warn("admin email is not set, defaulting it", "email", defaultAdminEmail)
 		adminEmail = defaultAdminEmail
 	}
 
 	adminPassword := ds.adminPassword
 	if len(adminPassword) == 0 {
 		const defaultAdminPassword = "changeme"
-		slog.Warn(fmt.Sprintf("Admin password is not set. Will default admin password to '%v'", defaultAdminPassword))
+		// The default is a published constant rather than a secret, and an operator who did not
+		// set one has to be told what they got: the alternative is an admin account nobody can
+		// sign in to. A configured password is never written here.
+		slog.Warn("admin password is not set, defaulting it", "password", defaultAdminPassword)
 		adminPassword = defaultAdminPassword
 	}
 
@@ -243,7 +246,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("user '%v' created", user.Email))
+	slog.Info("user created", "email", user.Email)
 
 	resource1 := &models.Resource{
 		ResourceIdentifier: constants.AuthServerResourceIdentifier,
@@ -253,7 +256,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("resource '%v' created", resource1.ResourceIdentifier))
+	slog.Info("resource created", "resource_identifier", resource1.ResourceIdentifier)
 
 	permission1 := &models.Permission{
 		PermissionIdentifier: constants.UserinfoPermissionIdentifier,
@@ -264,7 +267,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("permission '%v' created", permission1.PermissionIdentifier))
+	slog.Info("permission created", "permission_identifier", permission1.PermissionIdentifier)
 
 	permission2 := &models.Permission{
 		PermissionIdentifier: constants.ManageAccountPermissionIdentifier,
@@ -275,7 +278,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("permission '%v' created", permission2.PermissionIdentifier))
+	slog.Info("permission created", "permission_identifier", permission2.PermissionIdentifier)
 
 	permission3 := &models.Permission{
 		PermissionIdentifier: constants.ManagePermissionIdentifier,
@@ -286,7 +289,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("permission '%v' created", permission3.PermissionIdentifier))
+	slog.Info("permission created", "permission_identifier", permission3.PermissionIdentifier)
 
 	// Granular admin API scopes
 	permissionAdminRead := &models.Permission{
@@ -298,7 +301,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("permission '%v' created", permissionAdminRead.PermissionIdentifier))
+	slog.Info("permission created", "permission_identifier", permissionAdminRead.PermissionIdentifier)
 
 	permissionManageUsers := &models.Permission{
 		PermissionIdentifier: constants.ManageUsersPermissionIdentifier,
@@ -309,7 +312,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("permission '%v' created", permissionManageUsers.PermissionIdentifier))
+	slog.Info("permission created", "permission_identifier", permissionManageUsers.PermissionIdentifier)
 
 	permissionManageClients := &models.Permission{
 		PermissionIdentifier: constants.ManageClientsPermissionIdentifier,
@@ -320,7 +323,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("permission '%v' created", permissionManageClients.PermissionIdentifier))
+	slog.Info("permission created", "permission_identifier", permissionManageClients.PermissionIdentifier)
 
 	permissionManageSettings := &models.Permission{
 		PermissionIdentifier: constants.ManageSettingsPermissionIdentifier,
@@ -331,7 +334,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("permission '%v' created", permissionManageSettings.PermissionIdentifier))
+	slog.Info("permission created", "permission_identifier", permissionManageSettings.PermissionIdentifier)
 
 	permissionBrowserSessions := &models.Permission{
 		PermissionIdentifier: constants.BrowserSessionsPermissionIdentifier,
@@ -342,7 +345,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("permission '%v' created", permissionBrowserSessions.PermissionIdentifier))
+	slog.Info("permission created", "permission_identifier", permissionBrowserSessions.PermissionIdentifier)
 
 	// Migration 000035 produces this same end state for an installation that already
 	// existed, and the two must not drift: the permission on the authserver resource,
@@ -354,8 +357,8 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("client '%v' granted permission '%v'", client1.ClientIdentifier,
-		permissionBrowserSessions.PermissionIdentifier))
+	slog.Info("client granted permission", "client_identifier", client1.ClientIdentifier,
+		"permission_identifier", permissionBrowserSessions.PermissionIdentifier)
 
 	err = ds.DB.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,
@@ -364,7 +367,8 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("user '%v' granted permission '%v'", user.Email, permission2.PermissionIdentifier))
+	slog.Info("user granted permission", "email", user.Email,
+		"permission_identifier", permission2.PermissionIdentifier)
 
 	err = ds.DB.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,
@@ -373,7 +377,8 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("user '%v' granted permission '%v'", user.Email, permission3.PermissionIdentifier))
+	slog.Info("user granted permission", "email", user.Email,
+		"permission_identifier", permission3.PermissionIdentifier)
 
 	// key pair (current)
 
@@ -419,7 +424,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("key pair '%v' (current) created", keyPair.KeyIdentifier))
+	slog.Info("key pair created", "key_identifier", keyPair.KeyIdentifier, "state", "current")
 
 	// key pair (next)
 	privateKey, err = rsautil.GeneratePrivateKey(4096)
@@ -464,12 +469,12 @@ func (ds *DatabaseSeeder) Seed() error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("key pair '%v' (next) created", keyPair.KeyIdentifier))
+	slog.Info("key pair created", "key_identifier", keyPair.KeyIdentifier, "state", "next")
 
 	appName := ds.appName
 	if len(appName) == 0 {
 		appName = "Goiabada"
-		slog.Warn(fmt.Sprintf("App name is not set. Will default app name to '%v'", appName))
+		slog.Warn("app name is not set, defaulting it", "app_name", appName)
 	}
 
 	settings := &models.Settings{

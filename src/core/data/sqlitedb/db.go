@@ -46,8 +46,10 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 		dsn = "file::memory:?cache=shared"
 	}
 
-	slog.Info("using database sqlite")
-	slog.Info(fmt.Sprintf("db dsn: %v", dbConfig.DSN))
+	// The effective dsn rather than dbConfig.DSN, which is empty on the default above: the pair
+	// of records this replaces said "db dsn: " with nothing after it for every in-memory start,
+	// which is the one case where a reader most needs to know which database was opened (#320).
+	slog.Info("using database", "type", "sqlite", "dsn", dsn)
 
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {

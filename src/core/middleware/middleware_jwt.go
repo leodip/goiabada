@@ -187,7 +187,13 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 
 					if hasInvalidIssuer {
 
-						slog.Error("Invalid issuer in JWT token. Will clear the session and redirect to root")
+						// Warn, not Error: a token from another issuer is a condition this
+						// middleware is here to meet, and it meets it by clearing the session
+						// and sending the browser to the root. Nobody has to act, and an error
+						// log that fills with handled conditions has no error log left
+						// (#320 decision 5).
+						slog.WarnContext(r.Context(),
+							"jwt token has an invalid issuer, clearing the session and redirecting to root")
 
 						// Clear the session
 						delete(sess.Values, constants.SessionKeyJwt)
@@ -224,7 +230,7 @@ func (m *MiddlewareJwt) refreshToken(
 	clientID := m.clientID
 	clientSecret := m.clientSecret
 	if strings.TrimSpace(clientID) == "" || strings.TrimSpace(clientSecret) == "" {
-		slog.Error("missing client credentials for refreshToken; skipping refresh")
+		slog.ErrorContext(r.Context(), "missing client credentials, so the token refresh is skipped")
 		return false, errs.Errorf("missing client credentials for refresh")
 	}
 
@@ -245,7 +251,11 @@ func (m *MiddlewareJwt) refreshToken(
 
 	// Send the request
 	if m.httpClient == nil {
-		slog.Error("http client is nil in refreshToken (middleware_jwt)")
+		// Returning rather than logging and carrying on: the next line dereferences
+		// m.httpClient, so this record was the last thing written before the process panicked.
+		// The caller already treats a refresh error as "clear the session and continue", which
+		// is the behaviour a nil client should have had all along (#320).
+		return false, errs.New("no http client is configured, so the token cannot be refreshed")
 	}
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
