@@ -112,9 +112,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState is not level2_otp"
-		})).Return()
+		expectAuthStateMismatch(t, httpHelper, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
@@ -468,9 +466,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState is not level2_otp"
-		})).Return()
+		expectAuthStateMismatch(t, httpHelper, rr, req)
 
 		handler.ServeHTTP(rr, req)
 

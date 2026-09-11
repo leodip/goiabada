@@ -93,6 +93,8 @@
 "auth_error.page_title" = "Error"
 "auth_error.ceremony_mismatch.title" = "This request is no longer active"
 "auth_error.ceremony_mismatch.message" = "This page belongs to a sign-in request that is no longer the one in progress. Another one was started in this browser, so this form can no longer be submitted. Go back to the application you were signing in to and start again."
+"auth_error.state_mismatch.title" = "This step is no longer available"
+"auth_error.state_mismatch.message" = "This page belongs to a step of the sign-in you have already moved past, so it can no longer be used. Going back in the browser reaches a page the server has finished with. Go back to the application you were signing in to and start again."
 "auth_error.rate_limited.title" = "Too many attempts"
 "auth_error.rate_limited.message" = "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
 "auth_error.unable_to_authorize.title" = "Unable to authorize"

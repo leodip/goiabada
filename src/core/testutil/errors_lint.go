@@ -27,14 +27,20 @@ import (
 //     errs.New, errs.Join and errs.Errorf are drop-in and capture at the caller.
 //   - errs.WithStack(errs.New(...)) or errs.WithStack(errs.Errorf(...)). Both inner constructors
 //     already capture, so the outer call is a no-op that reads like a decision.
+//   - Any errs constructor in a package-level var initializer, which is the exemption below read
+//     in the other direction. This one is not hypothetical: #279's own core sweep moved four
+//     sentinels from errors.New onto errs.New, and nothing here saw it, so five
+//     errs.WithStack(<sentinel>) return sites silently recorded nothing and two distinct
+//     compare-and-set failures in signing_key_rotator.go printed the same init stack.
 //
 // One exemption is a rule rather than a concession: a package-level var initializer keeps stdlib
 // errors.New. A sentinel is built once during init, so a stack captured there records the
 // initializing goroutine and then masquerades as the origin of every error that ever wraps the
 // sentinel. Sentinels are matched with errors.Is and never printed for their frames, so they lose
-// nothing by staying plain. The exemption stops at a function literal: a func assigned to a
-// package variable is a function body that runs when it is called, not at init, and its calls are
-// reported like any other.
+// nothing by staying plain, and the exemption is therefore a requirement rather than a permission:
+// an errs constructor in the same position is refused. The exemption stops at a function literal:
+// a func assigned to a package variable is a function body that runs when it is called, not at
+// init, and its calls are reported like any other.
 //
 // Resolution is by import path, not by the name written at the call site: core/data/mssqldb/db.go
 // imports stdlib errors as goerrors, and a check that matched the literal text "errors." would
@@ -86,6 +92,12 @@ type legacyErrorUse struct {
 }
 
 const errsImportPath = "github.com/leodip/goiabada/core/errs"
+
+// errsConstructors is every exported function in core/errs that can attach frames. All of them
+// are wrong in a package-level var for the one reason: the frames would be init's.
+var errsConstructors = map[string]bool{
+	"New": true, "Errorf": true, "Wrap": true, "Wrapf": true, "WithStack": true, "Join": true,
+}
 
 // findLegacyErrorUses parses every non-test Go file under root, or under the named subdirectories
 // of root, and reports each refused construction along with the number of files it parsed.
@@ -307,6 +319,10 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 			}
 			uses = append(uses, legacyErrorUse{file: rel, line: line,
 				what: "fmt.Errorf", fix: "use errs.Errorf"})
+		case pkg == errsImportPath && sentinels[call] && errsConstructors[fn]:
+			uses = append(uses, legacyErrorUse{file: rel, line: line,
+				what: "errs." + fn + " in a package-level var",
+				fix:  "a sentinel keeps stdlib errors.New; errs captures the init goroutine's stack"})
 		case pkg == errsImportPath && fn == "WithStack":
 			if len(call.Args) != 1 {
 				return true

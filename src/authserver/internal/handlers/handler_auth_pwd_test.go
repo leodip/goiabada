@@ -66,9 +66,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState is not level1_password"
-		})).Return()
+		expectAuthStateMismatch(t, httpHelper, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
@@ -284,9 +282,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState is not level1_password"
-		})).Return()
+		expectAuthStateMismatch(t, httpHelper, rr, req)
 
 		handler.ServeHTTP(rr, req)
 

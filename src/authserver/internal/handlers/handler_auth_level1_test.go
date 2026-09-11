@@ -63,9 +63,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState is not requires_level_1"
-		})).Return()
+		expectAuthStateMismatch(t, httpHelper, rr, req)
 
 		handler.ServeHTTP(rr, req)
 

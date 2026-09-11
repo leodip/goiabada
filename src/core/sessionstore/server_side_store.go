@@ -97,7 +97,14 @@ const (
 // is a fresh session, while any other error means the lookup could not be performed,
 // which is a refused request. Collapsing the second into the first would sign everyone
 // out during a database interruption and leave nothing to diagnose it by (#266).
-var ErrNotFound = errs.New("session not found")
+//
+// Stdlib errors.New and not errs.New, which is the rule for every package-level sentinel in
+// this tree: errs.New captures a stack where it is called, and a package-level var is called
+// during init, so the frames would be runtime.doInit rather than the site that raised it. Worse,
+// errs.WithStack is the identity on an error whose tree already carries a stack, so the
+// WithStack below would silently record nothing. Matched with errors.Is, so it loses no
+// diagnosis by having no frames of its own (#279 decision 5).
+var ErrNotFound = errors.New("session not found")
 
 // randReader is crypto/rand in production. It is a variable so a test can make the
 // CSPRNG fail, which is the one failure this store must not paper over.

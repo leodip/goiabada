@@ -41,8 +41,16 @@ func HandleUserInfoGetPost(
 		}
 
 		if user == nil {
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error",
-				"The user could not be found."))
+			// 401 invalid_token rather than 500. RFC 6750 section 3.1: a token that is
+			// "invalid for other reasons" SHOULD be answered with 401 invalid_token, and a
+			// token naming a subject that no longer has a row is exactly that. OIDC Core
+			// 5.3.3 sends this endpoint's error responses through RFC 6750. 500 was
+			// permitted but told the client to retry a request that can only fail again,
+			// where 401 tells it to obtain a new token, which is the whole point of the
+			// distinction (#279 decision 14).
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+				"invalid_token", "The user could not be found.", http.StatusUnauthorized,
+				`Bearer error="invalid_token"`))
 			return
 		}
 
@@ -51,7 +59,12 @@ func HandleUserInfoGetPost(
 				"userId": user.Id,
 			})
 
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The user account is disabled."))
+			// 401 invalid_token, for the reason the not-found branch above gives: the
+			// token is no longer valid for this account and the client's remedy is a new
+			// one, not a retry (#279 decision 14).
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+				"invalid_token", "The user account is disabled.", http.StatusUnauthorized,
+				`Bearer error="invalid_token"`))
 			return
 		}
 

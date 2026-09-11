@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,11 +16,13 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleUserInfoGetPost(t *testing.T) {
@@ -115,8 +119,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("GetUserBySubject", (*sql.Tx)(nil), "user123").Return(nil, nil)
 
 		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.(*customerrors.ErrorDetail).GetCode() == "server_error" &&
-				err.(*customerrors.ErrorDetail).GetDescription() == "The user could not be found."
+			return isUserInfoInvalidToken(err, "The user could not be found.")
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -153,8 +156,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		})).Return()
 
 		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.(*customerrors.ErrorDetail).GetCode() == "server_error" &&
-				err.(*customerrors.ErrorDetail).GetDescription() == "The user account is disabled."
+			return isUserInfoInvalidToken(err, "The user account is disabled.")
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -264,4 +266,82 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
+}
+
+// isUserInfoInvalidToken is what both refusal branches of /userinfo now carry: RFC 6750 section
+// 3.1's invalid_token, 401, and the challenge that tells the client which error it is.
+//
+// errors.As rather than the bare assertion these cases used, so a wrap on the way to JsonError
+// could not turn the whole expectation into a panic in a mock matcher (#279 decision 6).
+func isUserInfoInvalidToken(err error, description string) bool {
+	var detail *customerrors.ErrorDetail
+	if !errors.As(err, &detail) {
+		return false
+	}
+	return detail.GetCode() == "invalid_token" &&
+		detail.GetDescription() == description &&
+		detail.GetHttpStatusCode() == http.StatusUnauthorized &&
+		detail.GetWWWAuthenticate() == `Bearer error="invalid_token"`
+}
+
+// The two cases above assert on the value handed to a mocked writer, which cannot say what a
+// client receives. This drives the real HttpHelper, so the status line and the challenge header
+// are asserted where the client reads them.
+//
+// It is the seam decision 14 actually moved: before it, both branches answered 500 server_error
+// with no challenge at all, so a client had nothing to distinguish "your token is no good" from
+// "this server is broken" and no instruction to obtain a new one (#279 decision 14, seam 8).
+func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
+	tests := []struct {
+		name        string
+		user        *models.User
+		description string
+	}{
+		{
+			name:        "the subject has no row",
+			user:        nil,
+			description: "The user could not be found.",
+		},
+		{
+			name:        "the account is disabled",
+			user:        &models.User{Id: 1, Subject: "user123", Enabled: false},
+			description: "The user account is disabled.",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			// templateFS is nil because JsonError renders no template; a 500 through the
+			// page writer would panic here, which is the fail-loud direction.
+			handler := HandleUserInfoGetPost(handlerhelpers.NewHttpHelper(nil), database, auditLogger)
+
+			req, _ := http.NewRequest("GET", "/userinfo", nil)
+			jwtToken := oauth.JwtToken{
+				Claims: map[string]interface{}{
+					"sub":   "user123",
+					"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
+				},
+			}
+			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken))
+			rr := httptest.NewRecorder()
+
+			database.On("GetUserBySubject", (*sql.Tx)(nil), "user123").Return(test.user, nil)
+			if test.user != nil {
+				auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
+			}
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusUnauthorized, rr.Code)
+			assert.Equal(t, `Bearer error="invalid_token"`, rr.Header().Get("WWW-Authenticate"))
+
+			var body map[string]interface{}
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+			assert.Equal(t, "invalid_token", body["error"])
+			assert.Equal(t, test.description, body["error_description"])
+		})
+	}
 }

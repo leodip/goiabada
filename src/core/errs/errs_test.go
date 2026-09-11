@@ -47,6 +47,16 @@ func originWrapf() error     { return Wrapf(sql.ErrConnDone, "origin %d", 1) }
 func originWithStack() error { return WithStack(sql.ErrConnDone) }
 func originJoin() error      { return Join(errors.New("close failed"), errors.New("unlock failed")) }
 
+// bareSentinel and stackedSentinel stand in for a package-level var declared each way. Both are
+// package level, so stackedSentinel's frames really are init's, which is the point.
+var bareSentinel = errors.New("bare sentinel")
+var stackedSentinel = buildStackedSentinel()
+
+func buildStackedSentinel() error { return New("stacked sentinel") }
+
+func raiseBareSentinel() error    { return WithStack(bareSentinel) }
+func raiseStackedSentinel() error { return WithStack(stackedSentinel) }
+
 func branchA() error { return New("branch a") }
 func branchB() error { return New("branch b") }
 
@@ -232,6 +242,38 @@ func TestWithStack_KeepsSentinelIdentity(t *testing.T) {
 	assert.True(t, errors.Is(stacked, sentinel))
 	assert.Equal(t, "sentinel", stacked.Error())
 	assert.Same(t, stacked, WithStack(stacked), "already stacked, so WithStack is the identity")
+}
+
+// Why a package-level sentinel keeps stdlib errors.New, stated as behaviour rather than as the
+// lint's prose. A sentinel built with New already carries a stack, so WithStack at the site that
+// raises it is the identity and records nothing: the frames stay the ones captured wherever the
+// sentinel was constructed, which for a package-level var is init.
+//
+// This is not hypothetical. #279's core sweep moved four sentinels onto New, and
+// signing_key_rotator.go then raised the same one from two distinct compare-and-set failures with
+// an identical stack, so a log could not tell them apart. Both rows are here because it is the
+// contrast that carries the rule; the lint's package-level check is what keeps it (#279 decision 5).
+func TestWithStack_OnlyRecordsTheRaisingSiteForABareSentinel(t *testing.T) {
+	t.Run("a stdlib sentinel records where it was raised", func(t *testing.T) {
+		err := raiseBareSentinel()
+
+		owners := stackOwners(err)
+		require.Len(t, owners, 1)
+		assert.Equal(t, "raiseBareSentinel", frameNames(owners[0])[0])
+	})
+
+	t.Run("a sentinel built through New records where it was built", func(t *testing.T) {
+		err := raiseStackedSentinel()
+
+		owners := stackOwners(err)
+		require.Len(t, owners, 1)
+		// "init" and not "buildStackedSentinel": the constructor is inlined into the
+		// package's synthesized init, so the whole trace is the initializing goroutine and
+		// the raising site appears nowhere in it. That is the masquerade in one frame.
+		assert.Equal(t, "init", frameNames(owners[0])[0],
+			"WithStack is the identity here, so the raising site is nowhere in the trace")
+		assert.NotContains(t, frameNames(owners[0]), "raiseStackedSentinel")
+	})
 }
 
 // ---- the caller row: one per export ------------------------------------------------------------

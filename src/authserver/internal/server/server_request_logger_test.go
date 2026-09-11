@@ -83,6 +83,12 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 		*handlerRan = true
 		w.WriteHeader(http.StatusOK)
 	})
+	// The route the panic case drives. On the same branch as the one above, so the panic
+	// travels back up the whole real chain rather than a shortened one.
+	app.Get("/auth/panic", func(http.ResponseWriter, *http.Request) {
+		*handlerRan = true
+		panic("a handler panicked")
+	})
 	return s
 }
 
@@ -132,4 +138,35 @@ func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 	// The other half: a middleware that dropped the request would also log nothing.
 	assert.True(t, handlerRan, "the request must still reach the handler with the flag off")
 	assert.Equal(t, http.StatusOK, recorder.Code)
+}
+
+// #203. A panicking handler is answered 500 by Recoverer, and until this change the request
+// logger sat above that 500 rather than below it: chi's Recoverer wrote WriteHeader(500) to the
+// writer it was handed, which was the one ABOVE the logger's wrapper, so the wrapper never saw a
+// status and the record said status=0. An operator filtering for 500s therefore found every
+// request that failed except the ones that failed hardest.
+//
+// This drives the real chain through initMiddleware rather than a hand-built pair, so it fails if
+// anybody ever restores the old order.
+func TestInitMiddleware_APanickingRequestIsRecordedAs500(t *testing.T) {
+	handlerRan := false
+	server := newLoggerTestServer(t, true, &handlerRan)
+	logged := captureSlog(t)
+
+	recorder := httptest.NewRecorder()
+	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/panic", nil))
+
+	// The panic really happened and really was recovered, or the assertion below would be
+	// satisfied by a route that never panicked at all.
+	assert.True(t, handlerRan, "the panicking handler must have run")
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code,
+		"Recoverer must still answer the client 500")
+
+	output := logged.String()
+	assert.Equal(t, 1, strings.Count(output, `msg="http request"`),
+		"a panicking request must still produce exactly one record")
+	assert.Contains(t, output, "status=500",
+		"the record must say 500, which means the logger is mounted above Recoverer (#203)")
+	assert.NotContains(t, output, "status=0",
+		"status=0 is the old order: Recoverer's 500 never reached the logger's wrapped writer")
 }

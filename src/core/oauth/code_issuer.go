@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"database/sql"
+	"errors"
 	"regexp"
 	"strings"
 	"time"
@@ -18,7 +19,14 @@ import (
 // no longer has a row. It is a sentinel rather than a wrapped message because /auth/issue branches
 // on it: the condition is the client's registration disappearing mid-ceremony, which is answered
 // by restarting the browser at level 1 (or login_required for a silent request), not by a 500.
-var ErrIssuingClientGone = errs.New("the client this ceremony is issuing for no longer exists")
+//
+// Stdlib errors.New and not errs.New, which is the rule for every package-level sentinel in
+// this tree: errs.New captures a stack where it is called, and a package-level var is called
+// during init, so the frames would be runtime.doInit rather than the site that raised it. Worse,
+// errs.WithStack is the identity on an error whose tree already carries a stack, so the
+// WithStack below would silently record nothing. Matched with errors.Is, so it loses no
+// diagnosis by having no frames of its own (#279 decision 5).
+var ErrIssuingClientGone = errors.New("the client this ceremony is issuing for no longer exists")
 
 type CodeIssuer struct {
 	database data.Database

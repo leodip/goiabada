@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"encoding/pem"
+	"errors"
 
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
@@ -17,11 +18,19 @@ import (
 // ErrRotationInProgress means a compare-and-set transitioned no row, so another rotation
 // had already moved the key this one read. The caller lost the race and nothing was
 // committed.
-var ErrRotationInProgress = errs.New("another signing key rotation is in progress")
+//
+// Stdlib errors.New and not errs.New, which is the rule for every package-level sentinel in
+// this tree: errs.New captures a stack where it is called, and a package-level var is called
+// during init, so the frames would be runtime.doInit rather than the site that raised it. Worse,
+// errs.WithStack is the identity on an error whose tree already carries a stack, so the
+// WithStack below would silently record nothing. Matched with errors.Is, so it loses no
+// diagnosis by having no frames of its own (#279 decision 5).
+var ErrRotationInProgress = errors.New("another signing key rotation is in progress")
 
 // ErrKeySetIncomplete means the current or the next key is missing. The rotation refused
 // before writing anything, so the key set is exactly as it was found.
-var ErrKeySetIncomplete = errs.New("expected current and next signing keys to exist")
+// Stdlib errors.New, for the reason ErrRotationInProgress above states (#279 decision 5).
+var ErrKeySetIncomplete = errors.New("expected current and next signing keys to exist")
 
 // SigningKeyRotator performs the current -> previous -> deleted transition of the signing
 // keys, as one transaction whose every refusal happens before the commit.
