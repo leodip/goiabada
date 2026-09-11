@@ -52,6 +52,11 @@ func originJoin() error      { return Join(errors.New("close failed"), errors.Ne
 var errBareSentinel = errors.New("bare sentinel")
 var errStackedSentinel = buildStackedSentinel()
 
+// noinline pins the frame the stacked sentinel records. Left to the compiler, the
+// plain build inlines this into the package's synthesized init and the race build
+// does not, and a test that names either frame is asserting an inlining decision.
+//
+//go:noinline
 func buildStackedSentinel() error { return New("stacked sentinel") }
 
 func raiseBareSentinel() error    { return WithStack(errBareSentinel) }
@@ -267,10 +272,10 @@ func TestWithStack_OnlyRecordsTheRaisingSiteForABareSentinel(t *testing.T) {
 
 		owners := stackOwners(err)
 		require.Len(t, owners, 1)
-		// "init" and not "buildStackedSentinel": the constructor is inlined into the
-		// package's synthesized init, so the whole trace is the initializing goroutine and
-		// the raising site appears nowhere in it. That is the masquerade in one frame.
-		assert.Equal(t, "init", frameNames(owners[0])[0],
+		// The trace was captured when the package initialised, so it starts at the builder
+		// and runs down the initializing goroutine; the raising site appears nowhere in it.
+		// That is the masquerade in one frame.
+		assert.Equal(t, "buildStackedSentinel", frameNames(owners[0])[0],
 			"WithStack is the identity here, so the raising site is nowhere in the trace")
 		assert.NotContains(t, frameNames(owners[0]), "raiseStackedSentinel")
 	})
