@@ -1643,3 +1643,76 @@ func resolveSchemaRequired(t *testing.T, schemas map[string]yaml.Node, name stri
 	walk(&node)
 	return out
 }
+
+// TestOpenAPI_APIFiveHundredsAreTheJSONEnvelope holds every 500 under /api/v1 to the one shape
+// the API surface answers since #279 decision 7: the shared InternalServerError response, a JSON
+// envelope naming INTERNAL_SERVER_ERROR and the request id.
+//
+// Three operations documented the opposite after decision 7 landed. getUserConsents and
+// deleteUserConsent declared a text/html body, and deleteAccountProfilePicture declared two
+// bodies, JSON on one branch and the HTML error page on another, because their handlers really
+// did render error.html on those branches. The handlers were fixed on the pull request review's
+// finding, and this is what keeps the document from telling a generated client the old story
+// again: a status the spec declares as text/html on an endpoint that answers JSON is a client
+// that parses a page as an envelope.
+//
+// One operation writes its 500 in place on purpose. rotateKeys answers KEY_SET_INCOMPLETE as
+// well as INTERNAL_SERVER_ERROR, and a caller acts on the difference, so its entry names both
+// codes; it is held to the JSON content type rather than to the $ref. The public /client/logo
+// page is not under /api/v1 and is outside this rule: its handler renders the HTML page and its
+// entry says so.
+func TestOpenAPI_APIFiveHundredsAreTheJSONEnvelope(t *testing.T) {
+	var doc struct {
+		Paths map[string]map[string]struct {
+			OperationId string `yaml:"operationId"`
+			Responses   map[string]struct {
+				Ref     string               `yaml:"$ref"`
+				Content map[string]yaml.Node `yaml:"content"`
+			} `yaml:"responses"`
+		} `yaml:"paths"`
+	}
+	if err := yaml.Unmarshal(web.OpenAPISpec(), &doc); err != nil {
+		t.Fatalf("parsing the embedded openapi.yaml: %v", err)
+	}
+
+	const (
+		shared  = "#/components/responses/InternalServerError"
+		inPlace = "rotateSettingsKeys"
+	)
+
+	checked := 0
+	for path, item := range doc.Paths {
+		if !strings.HasPrefix(path, "/api/v1/") {
+			continue
+		}
+		for verb, op := range item {
+			if !specVerbs[verb] {
+				continue
+			}
+			response, declared := op.Responses["500"]
+			if !declared {
+				continue
+			}
+			checked++
+			if response.Ref == shared {
+				continue
+			}
+			if op.OperationId == inPlace {
+				if _, ok := response.Content["application/json"]; !ok || len(response.Content) != 1 {
+					t.Errorf("%s %s '500' (%s) is the one in-place API 500 and must declare "+
+						"application/json alone", strings.ToUpper(verb), path, op.OperationId)
+				}
+				continue
+			}
+			t.Errorf("%s %s '500' (%s) is not $ref: '%s'. Every 500 on the API surface is "+
+				"writeInternalServerError's JSON envelope since #279 decision 7, and "+
+				"TestAPIHandlers_DoNotRenderPages in apihandlers keeps the handlers to it; the "+
+				"document has to say the same", strings.ToUpper(verb), path, op.OperationId, shared)
+		}
+	}
+
+	if checked < 80 {
+		t.Errorf("checked only %d API 500 entries; the walk is no longer reaching the "+
+			"document's operations", checked)
+	}
+}

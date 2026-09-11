@@ -986,15 +986,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
-          description: |
-            The request failed inside the server. Unlike every other failure on
-            this endpoint, the body is the server's HTML error page rather than
-            the JSON error envelope, because this handler renders the shared
-            error template.
-          content:
-            text/html:
-              schema:
-                type: string
+          $ref: '#/components/responses/InternalServerError'
 
   /api/v1/admin/user-consents/{id}:
     delete:
@@ -1026,15 +1018,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
-          description: |
-            The request failed inside the server. Unlike every other failure on
-            this endpoint, the body is the server's HTML error page rather than
-            the JSON error envelope, because this handler renders the shared
-            error template.
-          content:
-            text/html:
-              schema:
-                type: string
+          $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
   # ADMIN API - GROUPS
@@ -3232,18 +3216,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
-          description: |
-            The request failed inside the server. This operation is the one account endpoint
-            with two 500 bodies: a failure deleting the picture is the JSON error envelope with
-            error_code INTERNAL_SERVER_ERROR, and a failure loading the user beforehand is the
-            server's HTML error page, because that branch renders the shared error template.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-            text/html:
-              schema:
-                type: string
+          $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
   # INTERNAL API - BROWSER SESSIONS

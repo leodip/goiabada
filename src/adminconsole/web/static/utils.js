@@ -149,10 +149,17 @@ function sendAjaxRequest(props) {
           response.text().then((text) => {
             try {
               const err = JSON.parse(text);
+              // The title says whose mistake it was. A 5xx is the server's, so it is
+              // "Server error"; a 400, 404 or 409 is a rejected value, a stale record or
+              // a conflict, and the sentence below already explains it, so the title is
+              // the plain "Error" (#279).
+              const title = response.status >= 500
+                ? t("js.error.server_error_title")
+                : t("js.error.error_title");
               // error_description can echo back what the user typed: handlers now
               // forward the API's 400 description verbatim so a validation failure is
               // readable, and showModalDialog assigns this to innerHTML (#122).
-              showModalDialog(props.modalId, t("js.error.server_error_title"), escapeHtml(err.error_description));
+              showModalDialog(props.modalId, title, escapeHtml(err.error_description));
               setLoading(false);
             } catch (err) {
               showModalDialog(

@@ -17,7 +17,6 @@ import (
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil/fake"
@@ -349,11 +348,10 @@ func TestHandleAPIAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 }
 
 func TestHandleAPIAccountProfilePictureDelete_NoToken(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePictureDelete(httpHelper, database, auditLogger)
+	handler := HandleAPIAccountProfilePictureDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/account/profile-picture", nil)
 	rr := httptest.NewRecorder()
@@ -364,11 +362,10 @@ func TestHandleAPIAccountProfilePictureDelete_NoToken(t *testing.T) {
 }
 
 func TestHandleAPIAccountProfilePictureDelete_UserNotFound(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePictureDelete(httpHelper, database, auditLogger)
+	handler := HandleAPIAccountProfilePictureDelete(database, auditLogger)
 
 	sub := fake.UUID()
 	req, _ := http.NewRequest("DELETE", "/api/v1/account/profile-picture", nil)
@@ -384,11 +381,10 @@ func TestHandleAPIAccountProfilePictureDelete_UserNotFound(t *testing.T) {
 }
 
 func TestHandleAPIAccountProfilePictureDelete_Success(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePictureDelete(httpHelper, database, auditLogger)
+	handler := HandleAPIAccountProfilePictureDelete(database, auditLogger)
 
 	sub := fake.UUID()
 	user := &models.User{Id: 1, Subject: sub, Enabled: true}
@@ -417,12 +413,31 @@ func TestHandleAPIAccountProfilePictureDelete_Success(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-func TestHandleAPIAccountProfilePictureDelete_DatabaseError(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+func TestHandleAPIAccountProfilePictureDelete_GetUserFails_JSON500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePictureDelete(httpHelper, database, auditLogger)
+	handler := HandleAPIAccountProfilePictureDelete(database, auditLogger)
+
+	sub := fake.UUID()
+	req, _ := http.NewRequest("DELETE", "/api/v1/account/profile-picture", nil)
+	req = setTokenContext(req, sub)
+	rr := httptest.NewRecorder()
+
+	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(nil, assert.AnError)
+
+	handler.ServeHTTP(rr, req)
+
+	// This branch was the one 500 in the file still rendering error.html.
+	assertJSONInternalServerError(t, rr)
+	database.AssertExpectations(t)
+}
+
+func TestHandleAPIAccountProfilePictureDelete_DatabaseError(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	handler := HandleAPIAccountProfilePictureDelete(database, auditLogger)
 
 	sub := fake.UUID()
 	user := &models.User{Id: 1, Subject: sub, Enabled: true}

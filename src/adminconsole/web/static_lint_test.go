@@ -253,3 +253,49 @@ func TestImageUploadJS_ReadsErrorDescription(t *testing.T) {
 		i = at + len("data.error")
 	}
 }
+
+// TestUtilsJS_ModalTitleFollowsTheStatus pins the title sendAjaxRequest gives the error modal.
+//
+// Every non-401 failure with a JSON body used to open under "Server error", whatever the status
+// was. After #279 the AJAX handlers forward the API's own 400, 404 and 409, so that title sat over
+// "Redirect URI must be an absolute URI" and "the record no longer exists", which are the
+// administrator's mistake and a stale page, not the server's. The title is now a ternary on
+// response.status: 5xx keeps "Server error", everything else is the plain "Error" the catch branch
+// already uses.
+//
+// Lexical, like its two neighbours, and for the same reason: no JavaScript runs in any tier of this
+// repository, so the only observable is the source. The claim is that the title argument in the
+// parsed-JSON branch is chosen by status, and that the old unconditional spelling is gone.
+func TestUtilsJS_ModalTitleFollowsTheStatus(t *testing.T) {
+	content := utilsJS(t)
+
+	const (
+		chooser  = "response.status >= 500"
+		server   = `t("js.error.server_error_title")`
+		generic  = `t("js.error.error_title")`
+		oldTitle = `showModalDialog(props.modalId, t("js.error.server_error_title")`
+	)
+
+	at := strings.Index(content, chooser)
+	if at < 0 {
+		t.Fatalf("static/utils.js: no `%s`; the modal title is no longer chosen by status (#279)", chooser)
+	}
+	// The two arms follow the condition, in this order, before the next showModalDialog call.
+	window := content[at:]
+	if end := strings.Index(window, "showModalDialog("); end >= 0 {
+		window = window[:end]
+	}
+	serverAt := strings.Index(window, server)
+	genericAt := strings.Index(window, generic)
+	if serverAt < 0 || genericAt < 0 || genericAt < serverAt {
+		t.Errorf("static/utils.js: the title ternary after `%s` must read %s for the 5xx arm and "+
+			"then %s for the rest; found server arm at %d and generic arm at %d",
+			chooser, server, generic, serverAt, genericAt)
+	}
+
+	if strings.Contains(content, oldTitle) {
+		line := 1 + strings.Count(content[:strings.Index(content, oldTitle)], "\n")
+		t.Errorf("static/utils.js:%d: showModalDialog is handed \"Server error\" unconditionally; "+
+			"a 400, 404 or 409 is not the server's mistake (#279)", line)
+	}
+}
