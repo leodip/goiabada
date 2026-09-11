@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,9 +54,9 @@ func recordBackoff(t *testing.T) *[]time.Duration {
 }
 
 // retryWarnings counts the reruns the helper announced.
-func retryWarnings(logs *capturedLogs) int {
+func retryWarnings(logs *testutil.SlogCapture) int {
 	n := 0
-	for _, m := range logs.messagesAt(slog.LevelWarn) {
+	for _, m := range messagesAt(logs, slog.LevelWarn) {
 		if strings.Contains(m, retryWarning) {
 			n++
 		}
@@ -75,7 +76,7 @@ func oneStatement(db *CommonDatabase, ran *int) func(tx *sql.Tx) error {
 }
 
 func TestRunInTransaction_ASuccessfulBodyCommitsOnce(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	requested := recordBackoff(t)
 	d := &scriptedDriver{}
 	db := retryingDB(t, d)
@@ -93,7 +94,7 @@ func TestRunInTransaction_ASuccessfulBodyCommitsOnce(t *testing.T) {
 }
 
 func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	requested := recordBackoff(t)
 	boom := errors.New("connection reset by peer")
 	d := &scriptedDriver{}
@@ -116,7 +117,7 @@ func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T)
 }
 
 func TestRunInTransaction_ADeadlockInTheBodyIsRerunAndTheRerunCommits(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	requested := recordBackoff(t)
 	// The first attempt's statement is the engine's deadlock abort; the second is answered
 	// cleanly by running past the end of the script.
@@ -136,7 +137,7 @@ func TestRunInTransaction_ADeadlockInTheBodyIsRerunAndTheRerunCommits(t *testing
 }
 
 func TestRunInTransaction_ThreeDeadlocksExhaustTheAttemptsAndTheLastOneSurfaces(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	requested := recordBackoff(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}, {err: errDeadlock}}}
 	db := retryingDB(t, d)
@@ -180,7 +181,7 @@ func TestRunInTransaction_AVictimTheEngineAlreadyRolledBackIsStillRerun(t *testi
 }
 
 func TestRunInTransaction_ADeadlockAtCommitIsRerunAndTheRerunCommits(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	requested := recordBackoff(t)
 	// The body succeeds both times; it is the COMMIT that the engine aborts on the first.
 	d := &scriptedDriver{commitErrs: []error{errDeadlock}}
@@ -217,7 +218,7 @@ func TestRunInTransaction_ThreeDeadlocksAtCommitExhaustTheAttempts(t *testing.T)
 // outcome the client cannot know: the server may have committed before the failure reached the
 // client, and replaying the body would apply it twice.
 func TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed(t *testing.T) {
-	logs := captureLogs(t)
+	logs := testutil.CaptureSlog(t)
 	requested := recordBackoff(t)
 	boom := errors.New("write: broken pipe")
 	d := &scriptedDriver{commitErrs: []error{boom}}

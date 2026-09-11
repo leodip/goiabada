@@ -18,6 +18,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -756,57 +757,18 @@ func TestBackfillLowercaseEmails_GivesUpRatherThanSpinning(t *testing.T) {
 	assert.Equal(t, emailGroupAttempts+1, d.queryCount, "the scan plus one re-read per attempt")
 }
 
-// capturedLogs is a slog.Handler that keeps what was written to it, so a test can assert on
-// output that otherwise only a person reading a terminal would ever see.
-//
-// It exists because one half of the audit emission has no other observable: the console target
-// is a slog.Info call and nothing else. Before this, no test in the repository read slog output
-// at all, which is why forcing the console branch to false left the whole four-engine data tier
-// green.
-type capturedLogs struct {
-	mu      sync.Mutex
-	records []slog.Record
-}
-
-func (c *capturedLogs) Enabled(context.Context, slog.Level) bool { return true }
-
-func (c *capturedLogs) Handle(_ context.Context, r slog.Record) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.records = append(c.records, r.Clone())
-	return nil
-}
-
-func (c *capturedLogs) WithAttrs([]slog.Attr) slog.Handler { return c }
-func (c *capturedLogs) WithGroup(string) slog.Handler      { return c }
-
+// The console half of the audit emission has no other observable: the target is a slog.Info call
+// and nothing else, which is why forcing that branch to false once left the whole four-engine data
+// tier green. testutil.CaptureSlog is what reads it.
 // messagesAt returns the messages logged at one level, in order.
-func (c *capturedLogs) messagesAt(level slog.Level) []string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+func messagesAt(logs *testutil.SlogCapture, level slog.Level) []string {
 	out := []string{}
-	for _, r := range c.records {
-		if r.Level == level {
-			out = append(out, r.Message)
+	for _, record := range logs.Records() {
+		if record.Level == level {
+			out = append(out, record.Message)
 		}
 	}
 	return out
-}
-
-// captureLogs redirects the default logger for one test and restores it afterwards.
-//
-// slog.SetDefault is process-wide, so this is only safe while no test in this package calls
-// t.Parallel(). None does, and a parallel test here would break far more than this helper: the
-// scripted driver counts statements globally per script.
-func captureLogs(t *testing.T) *capturedLogs {
-	t.Helper()
-
-	c := &capturedLogs{}
-	previous := slog.Default()
-	slog.SetDefault(slog.New(c))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	return c
 }
 
 // auditedGroup is the script for one collision the pass resolves in full: a survivor already
@@ -877,7 +839,7 @@ func TestBackfillLowercaseEmails_TheAuditSettingsDecideBothTargets(t *testing.T)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			logs := captureLogs(t)
+			logs := testutil.CaptureSlog(t)
 			d := auditedGroup(t, tc.console, tc.database)
 
 			_, disabled, err := scriptedDB(t, d).BackfillLowercaseEmails()
@@ -887,7 +849,7 @@ func TestBackfillLowercaseEmails_TheAuditSettingsDecideBothTargets(t *testing.T)
 				"the fixture only says anything about auditing if the loser was actually disabled")
 
 			console := 0
-			for _, message := range logs.messagesAt(slog.LevelInfo) {
+			for _, message := range messagesAt(logs, slog.LevelInfo) {
 				if strings.Contains(message, constants.AuditRevokedUserAuthState) {
 					console++
 				}
@@ -913,9 +875,9 @@ func TestBackfillLowercaseEmails_TheAuditSettingsDecideBothTargets(t *testing.T)
 			// stdlib wrapper does, so a call that reads the id back logs a persistence failure
 			// over a row that landed. That is what jammed the operator's only alarm for the
 			// audit trail on PostgreSQL and SQL Server (#283).
-			assert.Emptyf(t, logs.messagesAt(slog.LevelError),
+			assert.Emptyf(t, messagesAt(logs, slog.LevelError),
 				"nothing here failed, so nothing may be logged at ERROR; got %v",
-				logs.messagesAt(slog.LevelError))
+				messagesAt(logs, slog.LevelError))
 		})
 	}
 }

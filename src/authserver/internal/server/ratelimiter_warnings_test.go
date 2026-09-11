@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -72,36 +73,35 @@ func TestRateLimiterConfigWarnings(t *testing.T) {
 // The emission itself
 // -----------------------------------------------------------------------------
 
-// captureSlog, which redirects the default logger into a buffer, lives in
-// server_request_logger_test.go: one helper per package, not one per test file.
+// testutil.CaptureSlog holds the default logger for each case below and restores it afterwards.
 
 // TestEmitRateLimiterConfigWarnings owns the one claim the table above cannot make: that
 // something actually writes the strings to the log. Delete the loop and the table stays
 // green while an operator is told nothing, which is the whole point of the change.
 func TestEmitRateLimiterConfigWarnings(t *testing.T) {
 	t.Run("an enabled misconfiguration produces one warning, carrying the message", func(t *testing.T) {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 
 		emitRateLimiterConfigWarnings(true, false, nil)
 
-		assert.Equal(t, 1, strings.Count(buf.String(), "level=WARN"))
-		assert.Contains(t, buf.String(), warnRateLimiterNoProxyTrust)
+		assert.Equal(t, 1, strings.Count(buf.Text(), "level=WARN"))
+		assert.Contains(t, buf.Text(), warnRateLimiterNoProxyTrust)
 	})
 
 	t.Run("single-hop trust produces its own message, not the other one", func(t *testing.T) {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 
 		emitRateLimiterConfigWarnings(true, true, nil)
 
-		assert.Equal(t, 1, strings.Count(buf.String(), "level=WARN"))
-		assert.Contains(t, buf.String(), warnRateLimiterSingleHopTrust)
+		assert.Equal(t, 1, strings.Count(buf.Text(), "level=WARN"))
+		assert.Contains(t, buf.Text(), warnRateLimiterSingleHopTrust)
 	})
 
 	t.Run("a disabled limiter writes nothing at all", func(t *testing.T) {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 
 		emitRateLimiterConfigWarnings(false, false, nil)
 
-		assert.Empty(t, buf.String())
+		assert.Empty(t, buf.Text())
 	})
 }

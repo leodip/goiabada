@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -167,7 +166,7 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 	})
 
 	t.Run("logs both states at warn, with no stack", func(t *testing.T) {
-		logged := captureSlog(t)
+		logged := testutil.CaptureSlog(t)
 
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/pwd")
@@ -182,7 +181,7 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		rejectAuthStateMismatch(httpHelper, rr, req,
 			oauth.AuthStateRequiresConsent, oauth.AuthStateInitial)
 
-		output := logged.String()
+		output := logged.Text()
 		// Both states, because the pair is the whole diagnosis: neither alone says which step
 		// the browser asked for and which one the ceremony is on.
 		assert.Contains(t, output, "level=WARN")
@@ -199,14 +198,4 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 func renderableRequest(target string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
-}
-
-// captureSlog redirects the default logger into a buffer for the test.
-func captureSlog(t *testing.T) *bytes.Buffer {
-	t.Helper()
-	buf := &bytes.Buffer{}
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	return buf
 }

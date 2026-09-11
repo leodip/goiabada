@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -1738,11 +1738,8 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	nextCalled := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { nextCalled = true })
 
-	var buf strings.Builder
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	capture := testutil.CaptureSlog(t)
 	RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
-	slog.SetDefault(previous)
 
 	assert.False(t, nextCalled)
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -1753,7 +1750,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", body.ErrorCode)
 	assert.Contains(t, body.ErrorDescription, requestId)
 
-	logged := buf.String()
+	logged := capture.Text()
 	assert.Equal(t, 1, strings.Count(logged, "internal server error"))
 	assert.Contains(t, logged, "the database is down")
 	assert.Contains(t, logged, "request_id="+requestId)

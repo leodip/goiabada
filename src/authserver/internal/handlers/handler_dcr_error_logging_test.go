@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -53,11 +53,8 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
-	var buf strings.Builder
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	capture := testutil.CaptureSlog(t)
 	HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger).ServeHTTP(rr, req)
-	slog.SetDefault(previous)
 
 	// The envelope is DCR's own, not the API's: "error" and "error_description", as RFC 7591
 	// section 3.2.2 spells them, and no error_code.
@@ -68,7 +65,7 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 	assert.Equal(t, "Failed to register client", envelope["error_description"])
 	assert.NotContains(t, envelope, "error_code")
 
-	logged := buf.String()
+	logged := capture.Text()
 	assert.Equal(t, 1, strings.Count(logged, "internal server error"))
 	assert.Contains(t, logged, "the disk is full")
 	assert.Contains(t, logged, "request_id="+requestId)

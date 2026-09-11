@@ -1,9 +1,7 @@
 package middleware
 
 import (
-	"bytes"
 	"fmt"
-	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +13,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -408,16 +407,6 @@ func TestRequestTargetForLog_ParseQueryParameterLimit(t *testing.T) {
 // Seam 2: MiddlewareRequestLogger
 // -----------------------------------------------------------------------------
 
-// captureSlog redirects the default logger into a buffer for the test.
-func captureSlog(t *testing.T) *bytes.Buffer {
-	t.Helper()
-	buf := &bytes.Buffer{}
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	return buf
-}
-
 // okHandler answers 200 with no body and records that it ran.
 func okHandler(ran *bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -427,12 +416,12 @@ func okHandler(ran *bool) http.Handler {
 }
 
 // records counts the log records in the captured output.
-func records(buf *bytes.Buffer) int {
-	return strings.Count(buf.String(), `msg="http request"`)
+func records(capture *testutil.SlogCapture) int {
+	return strings.Count(capture.Text(), `msg="http request"`)
 }
 
 func TestMiddlewareRequestLogger_DisabledWritesNothingAndStillServes(t *testing.T) {
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 	ran := false
 
 	handler := MiddlewareRequestLogger(false)(okHandler(&ran))
@@ -460,7 +449,7 @@ func TestMiddlewareRequestLogger_SkipList(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := captureSlog(t)
+			buf := testutil.CaptureSlog(t)
 			ran := false
 
 			handler := MiddlewareRequestLogger(true)(okHandler(&ran))
@@ -475,7 +464,7 @@ func TestMiddlewareRequestLogger_SkipList(t *testing.T) {
 }
 
 func TestMiddlewareRequestLogger_LogsExactlyOneRecord(t *testing.T) {
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 	ran := false
 
 	handler := MiddlewareRequestLogger(true)(okHandler(&ran))
@@ -484,7 +473,7 @@ func TestMiddlewareRequestLogger_LogsExactlyOneRecord(t *testing.T) {
 	assert.Equal(t, 1, records(buf))
 	// Quoted by slog's text handler, which is a property of the handler rather than
 	// of the target: the value itself is printable ASCII by construction.
-	assert.Contains(t, buf.String(), `target="/auth/authorize?client_id=c"`)
+	assert.Contains(t, buf.Text(), `target="/auth/authorize?client_id=c"`)
 }
 
 // The goal sentence of the change: the reported defect, at both endpoints.
@@ -508,21 +497,21 @@ func TestMiddlewareRequestLogger_DoesNotLogTheIdTokenHint(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := captureSlog(t)
+			buf := testutil.CaptureSlog(t)
 			ran := false
 
 			handler := MiddlewareRequestLogger(true)(okHandler(&ran))
 			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, test.target, nil))
 
 			assert.Equal(t, 1, records(buf))
-			assert.NotContains(t, buf.String(), jwtLike, "the hint must not reach the log")
-			assert.Contains(t, buf.String(), "id_token_hint=[redacted]")
+			assert.NotContains(t, buf.Text(), jwtLike, "the hint must not reach the log")
+			assert.Contains(t, buf.Text(), "id_token_hint=[redacted]")
 		})
 	}
 }
 
 func TestMiddlewareRequestLogger_RecordsStatusAndBytes(t *testing.T) {
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 
 	handler := MiddlewareRequestLogger(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -530,8 +519,8 @@ func TestMiddlewareRequestLogger_RecordsStatusAndBytes(t *testing.T) {
 	}))
 	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 
-	assert.Contains(t, buf.String(), "status=403")
-	assert.Contains(t, buf.String(), "bytes=5")
+	assert.Contains(t, buf.Text(), "status=403")
+	assert.Contains(t, buf.Text(), "bytes=5")
 }
 
 // The two halves of #203 at this seam, which is where the ordering rule actually lives: the
@@ -544,21 +533,21 @@ func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) 
 	})
 
 	t.Run("Recoverer beneath the logger", func(t *testing.T) {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 
 		handler := MiddlewareRequestLogger(true)(chimiddleware.Recoverer(panicking))
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 
 		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-		assert.Contains(t, buf.String(), "status=500")
+		assert.Contains(t, buf.Text(), "status=500")
 	})
 
 	// The order this change replaced, kept as a case because it is the whole reason the change
 	// exists: Recoverer's WriteHeader goes to the writer above the logger's wrapper, so the
 	// wrapper is asked for a status nobody ever set through it.
 	t.Run("Recoverer above the logger", func(t *testing.T) {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 
 		handler := chimiddleware.Recoverer(MiddlewareRequestLogger(true)(panicking))
 		recorder := httptest.NewRecorder()
@@ -566,13 +555,13 @@ func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) 
 
 		assert.Equal(t, http.StatusInternalServerError, recorder.Code,
 			"the client is answered 500 either way; only the record differs")
-		assert.Contains(t, buf.String(), "status=0")
+		assert.Contains(t, buf.Text(), "status=0")
 	})
 }
 
 func TestMiddlewareRequestLogger_RequestId(t *testing.T) {
 	t.Run("present when chi's RequestID ran ahead of the logger", func(t *testing.T) {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 		ran := false
 
 		handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
@@ -580,18 +569,18 @@ func TestMiddlewareRequestLogger_RequestId(t *testing.T) {
 		request.Header.Set(chimiddleware.RequestIDHeader, "REQUEST-ID-SENTINEL")
 		handler.ServeHTTP(httptest.NewRecorder(), request)
 
-		assert.Contains(t, buf.String(), "request_id=REQUEST-ID-SENTINEL")
+		assert.Contains(t, buf.Text(), "request_id=REQUEST-ID-SENTINEL")
 	})
 
 	t.Run("the attribute is absent altogether when it did not", func(t *testing.T) {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 		ran := false
 
 		handler := MiddlewareRequestLogger(true)(okHandler(&ran))
 		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 
 		assert.Equal(t, 1, records(buf))
-		assert.NotContains(t, buf.String(), "request_id",
+		assert.NotContains(t, buf.Text(), "request_id",
 			"an empty request id is omitted rather than logged as empty")
 	})
 }
@@ -628,7 +617,7 @@ func TestMiddlewareRequestLogger_ClipsTheClientChosenFields(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := captureSlog(t)
+			buf := testutil.CaptureSlog(t)
 			ran := false
 
 			handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
@@ -637,8 +626,8 @@ func TestMiddlewareRequestLogger_ClipsTheClientChosenFields(t *testing.T) {
 			handler.ServeHTTP(httptest.NewRecorder(), request)
 
 			assert.Equal(t, 1, records(buf))
-			assert.Contains(t, buf.String(), test.wantMarker)
-			assert.Less(t, buf.Len(), 5*1024,
+			assert.Contains(t, buf.Text(), test.wantMarker)
+			assert.Less(t, len(buf.Text()), 5*1024,
 				"one oversized header must not become one oversized log line")
 		})
 	}
@@ -661,7 +650,7 @@ func TestMiddlewareRequestLogger_TheClipIsLossy(t *testing.T) {
 
 	logged := make([]string, 0, 2)
 	for _, requestId := range []string{first, second} {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 		ran := false
 
 		handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
@@ -669,7 +658,7 @@ func TestMiddlewareRequestLogger_TheClipIsLossy(t *testing.T) {
 		request.Header.Set(chimiddleware.RequestIDHeader, requestId)
 		handler.ServeHTTP(httptest.NewRecorder(), request)
 
-		line := buf.String()
+		line := buf.Text()
 		start := strings.Index(line, "request_id=")
 		assert.NotEqual(t, -1, start)
 		logged = append(logged, line[start:strings.Index(line[start:], " method=")+start])
@@ -706,7 +695,7 @@ func TestMiddlewareRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := captureSlog(t)
+			buf := testutil.CaptureSlog(t)
 			ran := false
 
 			handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
@@ -716,8 +705,8 @@ func TestMiddlewareRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 
 			// Both halves. Asserting only that the escape is present would pass with
 			// the raw rune sitting in the record beside it.
-			assert.Contains(t, buf.String(), test.wantIn)
-			assert.NotContains(t, buf.String(), test.rawIsBad, "the raw rune must be gone")
+			assert.Contains(t, buf.Text(), test.wantIn)
+			assert.NotContains(t, buf.Text(), test.rawIsBad, "the raw rune must be gone")
 		})
 	}
 }
@@ -729,7 +718,7 @@ func TestMiddlewareRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *t
 	// would record a path the client never sent. Every other assertion in this file
 	// passes either way, which is what makes this case worth its own test rather
 	// than a comment.
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 
 	var seenByHandler string
 	chain := MiddlewareRequestLogger(true)(
@@ -743,14 +732,14 @@ func TestMiddlewareRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *t
 
 	assert.Equal(t, "/auth/authorize", seenByHandler, "StripSlashes really does rewrite the path")
 	// Quoted because slog's text handler quotes any value holding an "="".
-	assert.Contains(t, buf.String(), `target="/auth/authorize/?client_id=c"`,
+	assert.Contains(t, buf.Text(), `target="/auth/authorize/?client_id=c"`,
 		"the log must carry the target that arrived, trailing slash and all")
 }
 
 func TestMiddlewareRequestLogger_LogsARequestThatPanics(t *testing.T) {
 	// This is what pins the deferred write, which is otherwise invisible: chi's
 	// logger produced a line for a panicking request and so must this one.
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 
 	handler := MiddlewareRequestLogger(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("handler exploded")
@@ -764,7 +753,7 @@ func TestMiddlewareRequestLogger_LogsARequestThatPanics(t *testing.T) {
 	// status=0 because Recoverer, which is registered outside this middleware, has
 	// not written anything yet when the deferred record runs. That is what chi
 	// logged too, and it is #203 rather than this change.
-	assert.Contains(t, buf.String(), "status=0")
+	assert.Contains(t, buf.Text(), "status=0")
 }
 
 // -----------------------------------------------------------------------------

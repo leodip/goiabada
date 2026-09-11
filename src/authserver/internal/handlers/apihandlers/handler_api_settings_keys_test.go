@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -153,9 +154,11 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	logged := captureHandlerLogs(t, func() {
-		HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())
-	})
+	capture := testutil.CaptureSlog(t)
+
+	HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())
+
+	logged := capture.Text()
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	body := decodeErrorBody(t, rr)

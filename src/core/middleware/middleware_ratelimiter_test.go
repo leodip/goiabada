@@ -25,6 +25,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/ratelimit"
+	"github.com/leodip/goiabada/core/testutil"
 )
 
 // testTemplateFS is the smallest tree RenderTemplate needs: a layout that includes the
@@ -1839,11 +1840,11 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 // deliberately not on that list. The address is carried by the audit event instead.
 func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 	t.Run("an account tier names the limiter and nothing else", func(t *testing.T) {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 		m := newTestMiddleware(nil, true)
 		tripBrowser(t, m)
 
-		out := buf.String()
+		out := buf.Text()
 		if strings.Contains(out, "victim@example.com") {
 			t.Errorf("the warning line carries the address:\n%s", out)
 		}
@@ -1857,11 +1858,11 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 	})
 
 	t.Run("an IP tier keeps its bucket, which names no user", func(t *testing.T) {
-		buf := captureSlog(t)
+		buf := testutil.CaptureSlog(t)
 		m := newTestMiddleware(nil, true)
 		tripOAuth(t, m)
 
-		out := buf.String()
+		out := buf.Text()
 		if !strings.Contains(out, "limiter=dcr") || !strings.Contains(out, "ip=203.0.113.8") {
 			t.Errorf("the warning line should carry the limiter and the client block:\n%s", out)
 		}
