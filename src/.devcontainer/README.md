@@ -60,9 +60,9 @@ wait_for() {  # wait_for <label> <deadline-seconds> <probe command...>
     sleep 2
   done
 }
-wait_for mysql    120 docker exec "$NAME-mysql-server-1"    mysql --connect-timeout=3 -h 127.0.0.1 -P 13306 -uroot -pmySqlPass123 -e 'select 1' &&
-wait_for postgres 120 docker exec "$NAME-postgres-server-1" pg_isready -t 3 -p 15432 -U postgres &&
-wait_for mssql    300 docker exec "$NAME-mssql-server-1"    /opt/mssql-tools18/bin/sqlcmd -l 3 -t 3 -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -C -Q 'select 1' ||
+wait_for mysql    120 docker exec "$NAME-mysql-server-1"   mysql --connect-timeout=3 -h mysql-server -P 13306 -uroot -pmySqlPass123 -e 'select 1' &&
+wait_for postgres 120 docker exec -e PGCONNECT_TIMEOUT=3 -e PGPASSWORD=myPostgresPass123 "$NAME-postgres-server-1"   psql -h postgres-server -p 15432 -U postgres -c 'select 1' &&
+wait_for mssql    300 docker exec "$NAME-mssql-server-1"   /opt/mssql-tools18/bin/sqlcmd -l 3 -t 3 -S mssql-server,11433 -U sa -P 'YourStr0ngPassw0rd!' -C -Q 'select 1' ||
 exit 1
 ```
 
@@ -70,12 +70,14 @@ The three are chained so the first database that misses its deadline ends the wa
 failure; without the chain a later success would hide an earlier timeout.
 
 SQL Server gets the longest deadline because it is the slowest to accept its first login on a
-fresh volume. Each probe is a real login over TCP on the port the tests use, and each exits
-non-zero on a refused login as well as on an unreachable server, so a wrong password hits the
-deadline rather than looping past it. The MySQL probe is `mysql -e 'select 1'` with an explicit
-`-h 127.0.0.1` rather than `mysqladmin ping`: with no host the client takes the Unix socket and
-ignores `-P`, which answers during first-run initialisation while networking is still off, and
-`mysqladmin ping` exits zero on access denied.
+fresh volume. Each probe is an authenticated query over TCP through the same service name, port
+and credentials the tests use, so it is answered by the same rule the tests will be, and each
+exits non-zero on a refused login as well as on an unreachable server, so a wrong password hits
+the deadline rather than looping past it. Two shortcuts that look equivalent are not:
+`mysqladmin ping` and `pg_isready` do not authenticate, and both take a Unix socket when no host
+is given, which answers before networking is up. And `127.0.0.1` is not the tests' path either:
+PostgreSQL's `pg_hba.conf` trusts loopback without a password, so only the service name reaches
+the `scram-sha-256` rule the tests are held to.
 
 ### Use
 
