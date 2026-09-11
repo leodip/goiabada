@@ -1,6 +1,8 @@
 package config
 
 import (
+	"flag"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -810,5 +812,157 @@ func TestSimpleAccessors(t *testing.T) {
 	}
 	if got := GetAppName(); got != "Goiabada Test" {
 		t.Errorf("GetAppName() = %q", got)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Seam 2: the two log settings, from the environment and from the command line
+// -----------------------------------------------------------------------------
+
+// logEnvVars is every variable the cases below read, cleared before each one so
+// a developer's own environment cannot decide what a default case observes.
+var logEnvVars = []string{
+	"GOIABADA_AUTHSERVER_LOG_LEVEL",
+	"GOIABADA_AUTHSERVER_LOG_FORMAT",
+	"GOIABADA_ADMINCONSOLE_LOG_LEVEL",
+	"GOIABADA_ADMINCONSOLE_LOG_FORMAT",
+}
+
+type logSettings struct {
+	authLevel   string
+	authFormat  string
+	adminLevel  string
+	adminFormat string
+}
+
+// unsetEnv removes key for the duration of the test and puts it back after.
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	previous, exists := os.LookupEnv(key)
+	if !exists {
+		return
+	}
+	t.Cleanup(func() { _ = os.Setenv(key, previous) })
+	_ = os.Unsetenv(key)
+}
+
+// loadLogSettings drives loadFrom with its own flag set, which is the whole
+// reason that seam exists: the flags are registered on the set handed in, so
+// each case gets a fresh registration instead of panicking on the second.
+func loadLogSettings(t *testing.T, env map[string]string, args []string) logSettings {
+	t.Helper()
+
+	for _, key := range logEnvVars {
+		unsetEnv(t, key)
+	}
+	for key, value := range env {
+		t.Setenv(key, value)
+	}
+
+	saved := cfg
+	t.Cleanup(func() { cfg = saved })
+
+	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	loadFrom(fs, args)
+
+	return logSettings{
+		authLevel:   cfg.AuthServer.LogLevel,
+		authFormat:  cfg.AuthServer.LogFormat,
+		adminLevel:  cfg.AdminConsole.LogLevel,
+		adminFormat: cfg.AdminConsole.LogFormat,
+	}
+}
+
+func TestLoadFrom_LogSettings(t *testing.T) {
+	// Every flag case sets its variable to a value the flag does not use, so a
+	// pass cannot come from the environment having supplied the same answer.
+	tests := []struct {
+		name string
+		env  map[string]string
+		args []string
+		want logSettings
+	}{
+		{
+			name: "nothing set at all",
+			want: logSettings{"info", "text", "info", "text"},
+		},
+		{
+			name: "the auth server's level, from the environment",
+			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_LEVEL": "debug"},
+			want: logSettings{"debug", "text", "info", "text"},
+		},
+		{
+			name: "the auth server's format, from the environment",
+			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_FORMAT": "json"},
+			want: logSettings{"info", "json", "info", "text"},
+		},
+		{
+			name: "the admin console's level, from the environment",
+			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_LEVEL": "error"},
+			want: logSettings{"info", "text", "error", "text"},
+		},
+		{
+			name: "the admin console's format, from the environment",
+			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_FORMAT": "json"},
+			want: logSettings{"info", "text", "info", "json"},
+		},
+		{
+			name: "the auth server's level, from the command line",
+			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_LEVEL": "debug"},
+			args: []string{"--authserver-log-level=warn"},
+			want: logSettings{"warn", "text", "info", "text"},
+		},
+		{
+			name: "the auth server's format, from the command line",
+			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_FORMAT": "text"},
+			args: []string{"--authserver-log-format=json"},
+			want: logSettings{"info", "json", "info", "text"},
+		},
+		{
+			name: "the admin console's level, from the command line",
+			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_LEVEL": "debug"},
+			args: []string{"--adminconsole-log-level=warn"},
+			want: logSettings{"info", "text", "warn", "text"},
+		},
+		{
+			name: "the admin console's format, from the command line",
+			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_FORMAT": "text"},
+			args: []string{"--adminconsole-log-format=json"},
+			want: logSettings{"info", "text", "info", "json"},
+		},
+		{
+			name: "both servers at once, each with its own values",
+			env: map[string]string{
+				"GOIABADA_AUTHSERVER_LOG_LEVEL":    "debug",
+				"GOIABADA_AUTHSERVER_LOG_FORMAT":   "json",
+				"GOIABADA_ADMINCONSOLE_LOG_LEVEL":  "error",
+				"GOIABADA_ADMINCONSOLE_LOG_FORMAT": "text",
+			},
+			want: logSettings{"debug", "json", "error", "text"},
+		},
+		{
+			name: "an unrecognised value is carried through unchanged",
+			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_LEVEL": "verbose"},
+			// Nothing here validates: logging.Install refuses at startup, so the
+			// value is checked once, where it is used, and the server names it in
+			// the failure rather than silently falling back to info.
+			want: logSettings{"verbose", "text", "info", "text"},
+		},
+		{
+			name: "a variable set to the empty string is not the default",
+			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_FORMAT": ""},
+			want: logSettings{"info", "", "info", "text"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := loadLogSettings(t, test.env, test.args)
+
+			if got != test.want {
+				t.Errorf("got %+v, want %+v", got, test.want)
+			}
+		})
 	}
 }

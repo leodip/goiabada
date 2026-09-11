@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/timezones"
@@ -27,12 +28,21 @@ import (
 
 func main() {
 
+	// The configuration and the log handler come before the first record. The
+	// level and the format are per-server settings, so anything written ahead of
+	// the install goes out in a shape the deployment did not choose, and a value
+	// the handler cannot read has to stop the server rather than be silently
+	// replaced by a default (#320).
+	config.Init()
+	if err := logging.Install(config.GetAuthServer().LogLevel, config.GetAuthServer().LogFormat); err != nil {
+		slog.Error("unable to install the log handler", "error", err)
+		os.Exit(1)
+	}
+
 	slog.Info("auth server started")
 	slog.Info("goiabada version: " + constants.Version)
 	slog.Info("build date: " + constants.BuildDate)
 	slog.Info("git commit: " + constants.GitCommit)
-
-	config.Init()
 	slog.Info("config loaded")
 
 	// The `migrate` subcommand is dispatched here: after the configuration is loaded, because it

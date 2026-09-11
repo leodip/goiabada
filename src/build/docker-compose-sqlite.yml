@@ -49,6 +49,8 @@ services:
       - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090
       - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=false
       - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
+      - GOIABADA_AUTHSERVER_LOG_LEVEL=info
+      - GOIABADA_AUTHSERVER_LOG_FORMAT=text
       - GOIABADA_AUTHSERVER_LOG_SQL=false
       - GOIABADA_AUTHSERVER_STATICDIR= #leave this empty to use embedded static files
       - GOIABADA_AUTHSERVER_TEMPLATEDIR= #leave this empty to use embedded templates
@@ -109,6 +111,8 @@ services:
       - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091
       - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=false
       - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
+      - GOIABADA_ADMINCONSOLE_LOG_LEVEL=info
+      - GOIABADA_ADMINCONSOLE_LOG_FORMAT=text
       - GOIABADA_ADMINCONSOLE_STATICDIR= #leave this empty to use embedded static files
       - GOIABADA_ADMINCONSOLE_TEMPLATEDIR= #leave this empty to use embedded templates
 

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/core/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -207,11 +208,11 @@ func TestRequestTargetForLog(t *testing.T) {
 
 	t.Run("every rendered target is printable ASCII", func(t *testing.T) {
 		// This is what lets the middleware log the target without passing it through
-		// safeLogValue: EscapedPath and QueryEscape between them leave nothing that
+		// logging.SafeLogValue: EscapedPath and QueryEscape between them leave nothing that
 		// needs escaping. If a future change renders a raw byte, this fails here
 		// rather than in a log file.
 		for _, output := range rendered {
-			assert.Equal(t, output, safeLogValue(output),
+			assert.Equal(t, output, logging.SafeLogValue(output),
 				"the rendered target must already be safe to log verbatim")
 		}
 	})
@@ -401,51 +402,6 @@ func TestRequestTargetForLog_ParseQueryParameterLimit(t *testing.T) {
 	got := RequestTargetForLog(u)
 
 	assert.Equal(t, fmt.Sprintf("/auth/authorize?[unparsable query, %d bytes]", len(query)), got)
-}
-
-// -----------------------------------------------------------------------------
-// safeLogValue
-//
-// The bytes here are the ones net/http actually lets through: a NUL, a vertical
-// tab, a unit separator and a DEL are all refused with 400 before any handler
-// runs, so they are not in the table. A tab, a quote, U+2028, U+2029, U+0085 and a
-// lone continuation byte all reach the handler.
-// -----------------------------------------------------------------------------
-
-func TestSafeLogValue(t *testing.T) {
-	tests := []struct {
-		name string
-		in   string
-		want string
-		note string
-	}{
-		{name: "tab", in: "a\tb", want: "a%09b"},
-		{name: "a literal double quote", in: `a"b`, want: `a"b`, note: "printable, so it stays; slog quotes it"},
-		{name: "an equals sign", in: "a=b", want: "a=b", note: "printable, so it stays"},
-		{name: "U+2028 line separator", in: "a\u2028b", want: "a%E2%80%A8b"},
-		{name: "U+2029 paragraph separator", in: "a\u2029b", want: "a%E2%80%A9b"},
-		{
-			name: "U+0085 next line",
-			in:   "a\u0085b",
-			want: "a%C2%85b",
-			note: "slog's JSON handler drops this one silently, which is why it is escaped here",
-		},
-		{
-			name: "a lone 0x80 continuation byte",
-			in:   "a\x80b",
-			want: "a%80b",
-			note: "invalid UTF-8; slog's JSON handler renders it as U+FFFD",
-		},
-		{name: "an already-safe IPv6 address", in: "2001:db8::1%eth0", want: "2001:db8::1%eth0", note: "unchanged, and no allocation"},
-		{name: "an already-safe method", in: "GET", want: "GET"},
-		{name: "the empty string", in: "", want: ""},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.want, safeLogValue(test.in))
-		})
-	}
 }
 
 // -----------------------------------------------------------------------------
@@ -839,11 +795,11 @@ func renderingCorpus() []string {
 		"  ",
 		"scope=openid&x=1",
 		jwtLike,
-		strings.Repeat("a", maxLoggedField-1),
-		strings.Repeat("a", maxLoggedField),
-		strings.Repeat("a", maxLoggedField+1),
-		strings.Repeat("\x80", maxLoggedField/3),
-		strings.Repeat("\x80", maxLoggedField),
+		strings.Repeat("a", logging.MaxLoggedField-1),
+		strings.Repeat("a", logging.MaxLoggedField),
+		strings.Repeat("a", logging.MaxLoggedField+1),
+		strings.Repeat("\x80", logging.MaxLoggedField/3),
+		strings.Repeat("\x80", logging.MaxLoggedField),
 		strings.Repeat("a", maxLoggedQueryComponent-1),
 		strings.Repeat("a", maxLoggedQueryComponent),
 		strings.Repeat("a", maxLoggedQueryComponent+1),
@@ -962,7 +918,7 @@ func assertRendersLikeEscapedPath(t *testing.T, u *url.URL, label string, limits
 
 		assert.Equal(t, len(want), total,
 			"%s at limit %d: Path=%q RawPath=%q", label, limit, u.Path, u.RawPath)
-		assert.Equal(t, truncate(want, limit), truncateCounted(head, limit, total),
+		assert.Equal(t, truncate(want, limit), logging.TruncateCounted(head, limit, total),
 			"%s at limit %d: Path=%q RawPath=%q", label, limit, u.Path, u.RawPath)
 	}
 }
@@ -1082,17 +1038,6 @@ func TestHexDigits_MatchTheStandardLibrary(t *testing.T) {
 	}
 }
 
-func TestSafeLogValueLen_MatchesSafeLogValue(t *testing.T) {
-	for b := 0; b < 256; b++ {
-		s := string([]byte{byte(b)})
-		assert.Equal(t, len(safeLogValue(s)), safeLogValueLen(s), "byte 0x%02X", b)
-	}
-
-	for _, s := range renderingCorpus() {
-		assert.Equal(t, len(safeLogValue(s)), safeLogValueLen(s), "input of %d bytes", len(s))
-	}
-}
-
 func TestQueryComponentForLog_MatchesEscapeThenClip(t *testing.T) {
 	for _, s := range renderingCorpus() {
 		// The right-hand side is verbatim what this file did before the rendering
@@ -1109,13 +1054,6 @@ func TestQueryComponentLen_MatchesQueryComponentForLog(t *testing.T) {
 	// would have rendered puts a wrong total in the target's truncation marker.
 	for _, s := range renderingCorpus() {
 		assert.Equal(t, len(queryComponentForLog(s)), queryComponentLen(s), "input of %d bytes", len(s))
-	}
-}
-
-func TestFieldForLog_MatchesEscapeThenClip(t *testing.T) {
-	for _, s := range renderingCorpus() {
-		assert.Equal(t, truncate(safeLogValue(s), maxLoggedField), fieldForLog(s),
-			"input of %d bytes", len(s))
 	}
 }
 
@@ -1168,23 +1106,6 @@ func allocatedBytesPerCall(t *testing.T, iterations int, f func()) uint64 {
 // renderSink defeats dead-store elimination, so the work under measurement
 // actually happens.
 var renderSink string
-
-func TestFieldForLog_CountsWhatItDiscardsRatherThanBuildingIt(t *testing.T) {
-	// The reachable shape: chi's RequestID middleware is mounted ahead of the
-	// logger in both servers and adopts an inbound X-Request-Id verbatim, and
-	// net/http admits bytes above 0x7e in a header value. Each costs three bytes to
-	// escape, so before the bound this allocated 10.3 MB and burned 31 ms of CPU to
-	// keep 128 bytes, for any unauthenticated request.
-	huge := strings.Repeat("\x80", 900000)
-
-	allocated := allocatedBytesPerCall(t, 20, func() { renderSink = fieldForLog(huge) })
-
-	assert.Less(t, allocated, uint64(8192),
-		"escaping must stop at the clip, but %d bytes were allocated", allocated)
-	// And the output is unchanged, marker and all.
-	assert.Equal(t, strings.Repeat("%80", maxLoggedField/3)+"%8[truncated, 128 of 2700000 bytes]",
-		fieldForLog(huge))
-}
 
 func TestRequestTargetForLog_CountsWhatItDiscardsRatherThanBuildingIt(t *testing.T) {
 	t.Run("one enormous allowlisted value", func(t *testing.T) {
