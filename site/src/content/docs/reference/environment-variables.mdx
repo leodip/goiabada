@@ -302,6 +302,16 @@ See [Customizations](/reference/customizations/) for details on how to customize
       <td>Log HTTP requests, one record per request on the application log (stderr), apart from health checks, static assets and the favicon. Query parameter values are redacted apart from a short assessed-safe list, and the query is re-encoded rather than copied. See <a href="/reference/security/">Security</a>.</td>
     </tr>
     <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LOG_LEVEL</code><br/><code>--authserver-log-level</code></td>
+      <td><code>info</code></td>
+      <td>Lowest level of log record written. One of <code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code>, spelled in lowercase; anything else refuses startup. <code>debug</code> adds per-request tracing.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LOG_FORMAT</code><br/><code>--authserver-log-format</code></td>
+      <td><code>text</code></td>
+      <td>Shape of each log record: <code>text</code> for one <code>key=value</code> line, or <code>json</code> for one JSON document. Anything else refuses startup.</td>
+    </tr>
+    <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LOG_SQL</code><br/><code>--authserver-log-sql</code></td>
       <td><code>false</code></td>
       <td>Log SQL statements</td>
@@ -544,6 +554,16 @@ See [Customizations](/reference/customizations/) for details on how to customize
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS</code><br/><code>--adminconsole-log-http-requests</code></td>
       <td><code>false</code></td>
       <td>Log HTTP requests, one record per request on the application log (stderr), apart from health checks, static assets and the favicon. Query parameter values are redacted apart from a short assessed-safe list, and the query is re-encoded rather than copied. See <a href="/reference/security/">Security</a>.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LOG_LEVEL</code><br/><code>--adminconsole-log-level</code></td>
+      <td><code>info</code></td>
+      <td>Lowest level of log record written. One of <code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code>, spelled in lowercase; anything else refuses startup. <code>debug</code> adds per-request tracing.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LOG_FORMAT</code><br/><code>--adminconsole-log-format</code></td>
+      <td><code>text</code></td>
+      <td>Shape of each log record: <code>text</code> for one <code>key=value</code> line, or <code>json</code> for one JSON document. Anything else refuses startup.</td>
     </tr>
   </tbody>
 </table>

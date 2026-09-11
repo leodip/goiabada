@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/leodip/goiabada/core/logging"
 )
 
 const (
@@ -45,18 +47,8 @@ const (
 	// still written whole (#159).
 	maxLoggedQueryComponent = 512
 
-	// maxLoggedField bounds each client-chosen scalar attribute: the method, the
-	// request id and the IP. All three can be enormous, measured rather than
-	// assumed: a 900000-byte method and a 900000-byte X-Request-Id both reach the
-	// handler, and MiddlewareRealIP writes a 900000-byte X-Forwarded-For entry
-	// straight into r.RemoteAddr.
-	//
-	// 128 is set from what legitimate values measure: chi's own generated request
-	// id is 27 bytes, a proxy's correlation UUID is 36, the longest method in
-	// ordinary use is 7, and the longest textual IPv6 address with a zone is under
-	// 64. With it the worst case for one line is about 4.6 KB; without it one
-	// header makes one log line of 900 KB (#159).
-	maxLoggedField = 128
+	// hexDigits is the hex alphabet escapePathForLog writes a %XX escape with.
+	hexDigits = "0123456789ABCDEF"
 )
 
 // loggableQueryParams is the set of query parameter names whose value is written
@@ -96,7 +88,7 @@ func RequestTargetForLog(u *url.URL) string {
 	// is safe only because of the handler currently installed is safe by accident.
 	pathHead, pathLen := escapedPathForLog(u, maxLoggedTarget)
 	if u.RawQuery == "" {
-		return truncateCounted(pathHead, maxLoggedTarget, pathLen)
+		return logging.TruncateCounted(pathHead, maxLoggedTarget, pathLen)
 	}
 
 	values, err := url.ParseQuery(u.RawQuery)
@@ -196,7 +188,7 @@ func (c *clipped) writeQueryComponent(s string) {
 }
 
 func (c *clipped) string() string {
-	return truncateCounted(c.b.String(), c.limit, c.n)
+	return logging.TruncateCounted(c.b.String(), c.limit, c.n)
 }
 
 // clip returns the first limit bytes of s, and s itself when it is shorter.
@@ -210,24 +202,7 @@ func clip(s string, limit int) string {
 // truncate returns s unchanged when it fits, and otherwise the retained prefix
 // followed by a marker giving the limit and the true byte count.
 func truncate(s string, limit int) string {
-	return truncateCounted(s, limit, len(s))
-}
-
-// truncateCounted is truncate for a caller that holds the retained prefix and
-// the true length separately, having deliberately never built the rest. s must
-// be at least limit bytes long whenever total exceeds limit.
-func truncateCounted(s string, limit, total int) string {
-	if total <= limit {
-		return s
-	}
-	return s[:limit] + truncationMarker(limit, total)
-}
-
-// truncationMarker is the only place the marker's text is written, so that
-// queryComponentLen can measure a component it has deliberately not rendered
-// and still agree with queryComponentForLog to the byte.
-func truncationMarker(limit, total int) string {
-	return fmt.Sprintf("[truncated, %d of %d bytes]", limit, total)
+	return logging.TruncateCounted(s, limit, len(s))
 }
 
 // queryComponentForLog renders one parameter name or one retained value: escaped
@@ -244,7 +219,7 @@ func queryComponentForLog(s string) string {
 	if len(head) > maxLoggedQueryComponent {
 		head = head[:maxLoggedQueryComponent]
 	}
-	return truncateCounted(url.QueryEscape(head), maxLoggedQueryComponent, queryEscapedLen(s))
+	return logging.TruncateCounted(url.QueryEscape(head), maxLoggedQueryComponent, queryEscapedLen(s))
 }
 
 // queryComponentLen returns the length queryComponentForLog(s) would have,
@@ -255,7 +230,7 @@ func queryComponentLen(s string) int {
 	if full <= maxLoggedQueryComponent {
 		return full
 	}
-	return maxLoggedQueryComponent + len(truncationMarker(maxLoggedQueryComponent, full))
+	return maxLoggedQueryComponent + len(logging.TruncationMarker(maxLoggedQueryComponent, full))
 }
 
 // queryEscapedLen returns the length url.QueryEscape(s) would have, without
@@ -446,88 +421,6 @@ func unhexDigit(c byte) byte {
 	return c - 'A' + 10
 }
 
-// safeLogValue keeps the printable ASCII bytes of s and percent-escapes every
-// other byte, so that no client-chosen value can put a control character, a line
-// separator or invalid UTF-8 into the record.
-//
-// The request target is already safe by construction, being built from
-// EscapedPath and QueryEscape. The scalar attributes are not: a header value may
-// carry a tab, U+2028, U+0085 or a lone continuation byte and still be accepted by
-// net/http. Remove this and what reaches the log depends on which slog handler
-// happens to be installed, which is exactly the accident RequestTargetForLog
-// avoids (#159).
-func safeLogValue(s string) string {
-	escapeNeeded := false
-	for i := 0; i < len(s); i++ {
-		if s[i] < 0x20 || s[i] > 0x7e {
-			escapeNeeded = true
-			break
-		}
-	}
-	if !escapeNeeded {
-		// The common case allocates nothing.
-		return s
-	}
-
-	var b strings.Builder
-	b.Grow(safeLogValueLen(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 0x20 && c <= 0x7e {
-			b.WriteByte(c)
-			continue
-		}
-		// Written by hand rather than through fmt: this runs once per escaped
-		// byte, and fmt.Fprintf here cost 31 ms on a 900000-byte header (#159).
-		b.WriteByte('%')
-		b.WriteByte(hexDigits[c>>4])
-		b.WriteByte(hexDigits[c&0x0f])
-	}
-	return b.String()
-}
-
-const hexDigits = "0123456789ABCDEF"
-
-// safeLogValueLen returns the length safeLogValue(s) would have, without
-// building it.
-func safeLogValueLen(s string) int {
-	n := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] >= 0x20 && s[i] <= 0x7e {
-			n++
-			continue
-		}
-		n += 3
-	}
-	return n
-}
-
-// fieldForLog escapes then clips a client-chosen scalar attribute, in that order,
-// so the bytes the limit counts are the bytes the log receives. Remove it and one
-// oversized header becomes one oversized log line (#159).
-//
-// Like queryComponentForLog it escapes only as far as the clip reaches.
-// safeLogValue also maps each byte independently, so escaping the first
-// maxLoggedField bytes yields at least that many output bytes and they are
-// exactly the ones kept. This matters more here than anywhere else in the file:
-// chi's RequestID middleware, mounted ahead of this one in both servers, adopts
-// an inbound X-Request-Id header verbatim, so before this bound an unauthenticated
-// request carrying 900000 non-printable bytes in that header cost 31 ms of CPU
-// and 10 MB of allocation to render 128 bytes of log (#159).
-func fieldForLog(s string) string {
-	if len(s) <= maxLoggedField && safeLogValueLen(s) == len(s) {
-		// The common case, and the only one that runs per ordinary request: an
-		// unremarkable request id, method or IP, with nothing to escape and
-		// nothing to clip. It allocates nothing.
-		return s
-	}
-	head := s
-	if len(head) > maxLoggedField {
-		head = head[:maxLoggedField]
-	}
-	return truncateCounted(safeLogValue(head), maxLoggedField, safeLogValueLen(s))
-}
-
 // MiddlewareRequestLogger writes one log record per request when enabled, with the
 // query string redacted by RequestTargetForLog.
 //
@@ -569,13 +462,13 @@ func MiddlewareRequestLogger(enabled bool) func(next http.Handler) http.Handler 
 			defer func() {
 				attributes := make([]any, 0, 14)
 				if requestId := middleware.GetReqID(r.Context()); requestId != "" {
-					attributes = append(attributes, "request_id", fieldForLog(requestId))
+					attributes = append(attributes, "request_id", logging.FieldForLog(requestId))
 				}
 				attributes = append(attributes,
-					"method", fieldForLog(r.Method),
+					"method", logging.FieldForLog(r.Method),
 					"target", target,
 					// Already resolved to a bare client IP by MiddlewareRealIP.
-					"ip", fieldForLog(r.RemoteAddr),
+					"ip", logging.FieldForLog(r.RemoteAddr),
 					// Written raw. A panicking request reports 500, because this
 					// middleware is mounted above Recoverer in both servers, so the
 					// status Recoverer writes goes through the wrapped writer here

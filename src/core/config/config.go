@@ -23,6 +23,8 @@ type AuthServerConfig struct {
 	TrustProxyHeaders        bool
 	TrustedProxies           []string
 	LogHttpRequests          bool
+	LogLevel                 string
+	LogFormat                string
 	CertFile                 string
 	KeyFile                  string
 	LogSQL                   bool
@@ -78,6 +80,8 @@ type AdminConsoleConfig struct {
 	TrustProxyHeaders        bool
 	TrustedProxies           []string
 	LogHttpRequests          bool
+	LogLevel                 string
+	LogFormat                string
 	CertFile                 string
 	KeyFile                  string
 	StaticDir                string
@@ -134,6 +138,16 @@ func Init() {
 }
 
 func load() {
+	loadFrom(flag.CommandLine, os.Args[1:])
+}
+
+// loadFrom is load with the flag set and the arguments supplied.
+//
+// The seam exists because these flags live on the process-global
+// flag.CommandLine, which panics on the second registration of any name: load()
+// can therefore run exactly once per process, and no test could call it twice to
+// observe what a flag or a variable lands on the config (#320).
+func loadFrom(fs *flag.FlagSet, args []string) {
 	authServerBaseURL := getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090")
 
 	cfg = Config{
@@ -147,6 +161,8 @@ func load() {
 			TrustProxyHeaders:                getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_AUTHSERVER_TRUSTED_PROXIES"),
 			LogHttpRequests:                  getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
+			LogLevel:                         getEnv("GOIABADA_AUTHSERVER_LOG_LEVEL", "info"),
+			LogFormat:                        getEnv("GOIABADA_AUTHSERVER_LOG_FORMAT", "text"),
 			CertFile:                         getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
 			KeyFile:                          getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
 			LogSQL:                           getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
@@ -170,6 +186,8 @@ func load() {
 			TrustProxyHeaders:                getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"),
 			LogHttpRequests:                  getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
+			LogLevel:                         getEnv("GOIABADA_ADMINCONSOLE_LOG_LEVEL", "info"),
+			LogFormat:                        getEnv("GOIABADA_ADMINCONSOLE_LOG_FORMAT", "text"),
 			CertFile:                         getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
 			KeyFile:                          getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
 			StaticDir:                        getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
@@ -198,57 +216,64 @@ func load() {
 	}
 
 	// Auth server
-	flag.StringVar(&cfg.AuthServer.BaseURL, "authserver-baseurl", cfg.AuthServer.BaseURL, "Goiabada auth server base URL")
-	flag.StringVar(&cfg.AuthServer.InternalBaseURL, "authserver-internalbaseurl", cfg.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
-	flag.StringVar(&cfg.AuthServer.ListenHostHttps, "authserver-listen-host-https", cfg.AuthServer.ListenHostHttps, "Auth server https host")
-	flag.IntVar(&cfg.AuthServer.ListenPortHttps, "authserver-listen-port-https", cfg.AuthServer.ListenPortHttps, "Auth server https port")
-	flag.StringVar(&cfg.AuthServer.ListenHostHttp, "authserver-listen-host-http", cfg.AuthServer.ListenHostHttp, "Auth server http host")
-	flag.IntVar(&cfg.AuthServer.ListenPortHttp, "authserver-listen-port-http", cfg.AuthServer.ListenPortHttp, "Auth server http port")
-	flag.BoolVar(&cfg.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", cfg.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
+	fs.StringVar(&cfg.AuthServer.BaseURL, "authserver-baseurl", cfg.AuthServer.BaseURL, "Goiabada auth server base URL")
+	fs.StringVar(&cfg.AuthServer.InternalBaseURL, "authserver-internalbaseurl", cfg.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
+	fs.StringVar(&cfg.AuthServer.ListenHostHttps, "authserver-listen-host-https", cfg.AuthServer.ListenHostHttps, "Auth server https host")
+	fs.IntVar(&cfg.AuthServer.ListenPortHttps, "authserver-listen-port-https", cfg.AuthServer.ListenPortHttps, "Auth server https port")
+	fs.StringVar(&cfg.AuthServer.ListenHostHttp, "authserver-listen-host-http", cfg.AuthServer.ListenHostHttp, "Auth server http host")
+	fs.IntVar(&cfg.AuthServer.ListenPortHttp, "authserver-listen-port-http", cfg.AuthServer.ListenPortHttp, "Auth server http port")
+	fs.BoolVar(&cfg.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", cfg.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
 	authServerTrustedProxies := strings.Join(cfg.AuthServer.TrustedProxies, ",")
-	flag.StringVar(&authServerTrustedProxies, "authserver-trusted-proxies", authServerTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (auth server)")
-	flag.BoolVar(&cfg.AuthServer.LogHttpRequests, "authserver-log-http-requests", cfg.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
-	flag.StringVar(&cfg.AuthServer.CertFile, "authserver-certfile", cfg.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
-	flag.StringVar(&cfg.AuthServer.KeyFile, "authserver-keyfile", cfg.AuthServer.KeyFile, "Key file for HTTPS (auth server)")
-	flag.BoolVar(&cfg.AuthServer.LogSQL, "authserver-log-sql", cfg.AuthServer.LogSQL, "Log SQL queries for auth server")
-	flag.StringVar(&cfg.AuthServer.StaticDir, "authserver-staticdir", cfg.AuthServer.StaticDir, "Static files directory for auth server")
-	flag.StringVar(&cfg.AuthServer.TemplateDir, "authserver-templatedir", cfg.AuthServer.TemplateDir, "Template files directory for auth server")
-	flag.BoolVar(&cfg.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", cfg.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
-	flag.StringVar(&cfg.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", cfg.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
-	flag.BoolVar(&cfg.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", cfg.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")
+	fs.StringVar(&authServerTrustedProxies, "authserver-trusted-proxies", authServerTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (auth server)")
+	fs.BoolVar(&cfg.AuthServer.LogHttpRequests, "authserver-log-http-requests", cfg.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
+	fs.StringVar(&cfg.AuthServer.LogLevel, "authserver-log-level", cfg.AuthServer.LogLevel, "Lowest level of log record the auth server writes. Options: debug, info, warn, error")
+	fs.StringVar(&cfg.AuthServer.LogFormat, "authserver-log-format", cfg.AuthServer.LogFormat, "Format the auth server writes log records in. Options: text, json")
+	fs.StringVar(&cfg.AuthServer.CertFile, "authserver-certfile", cfg.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
+	fs.StringVar(&cfg.AuthServer.KeyFile, "authserver-keyfile", cfg.AuthServer.KeyFile, "Key file for HTTPS (auth server)")
+	fs.BoolVar(&cfg.AuthServer.LogSQL, "authserver-log-sql", cfg.AuthServer.LogSQL, "Log SQL queries for auth server")
+	fs.StringVar(&cfg.AuthServer.StaticDir, "authserver-staticdir", cfg.AuthServer.StaticDir, "Static files directory for auth server")
+	fs.StringVar(&cfg.AuthServer.TemplateDir, "authserver-templatedir", cfg.AuthServer.TemplateDir, "Template files directory for auth server")
+	fs.BoolVar(&cfg.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", cfg.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
+	fs.StringVar(&cfg.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", cfg.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
+	fs.BoolVar(&cfg.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", cfg.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")
 
 	// Admin console
-	flag.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")
-	flag.StringVar(&cfg.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", cfg.AdminConsole.ListenHostHttps, "Admin console https host")
-	flag.IntVar(&cfg.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", cfg.AdminConsole.ListenPortHttps, "Admin console https port")
-	flag.StringVar(&cfg.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", cfg.AdminConsole.ListenHostHttp, "Admin console http host")
-	flag.IntVar(&cfg.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", cfg.AdminConsole.ListenPortHttp, "Admin console http port")
-	flag.BoolVar(&cfg.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", cfg.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
+	fs.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")
+	fs.StringVar(&cfg.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", cfg.AdminConsole.ListenHostHttps, "Admin console https host")
+	fs.IntVar(&cfg.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", cfg.AdminConsole.ListenPortHttps, "Admin console https port")
+	fs.StringVar(&cfg.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", cfg.AdminConsole.ListenHostHttp, "Admin console http host")
+	fs.IntVar(&cfg.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", cfg.AdminConsole.ListenPortHttp, "Admin console http port")
+	fs.BoolVar(&cfg.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", cfg.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
 	adminConsoleTrustedProxies := strings.Join(cfg.AdminConsole.TrustedProxies, ",")
-	flag.StringVar(&adminConsoleTrustedProxies, "adminconsole-trusted-proxies", adminConsoleTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (admin console)")
-	flag.BoolVar(&cfg.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", cfg.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
-	flag.StringVar(&cfg.AdminConsole.CertFile, "adminconsole-certfile", cfg.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
-	flag.StringVar(&cfg.AdminConsole.KeyFile, "adminconsole-keyfile", cfg.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
-	flag.StringVar(&cfg.AdminConsole.StaticDir, "adminconsole-staticdir", cfg.AdminConsole.StaticDir, "Static files directory for admin console")
-	flag.StringVar(&cfg.AdminConsole.TemplateDir, "adminconsole-templatedir", cfg.AdminConsole.TemplateDir, "Template files directory for admin console")
-	flag.StringVar(&cfg.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", cfg.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
+	fs.StringVar(&adminConsoleTrustedProxies, "adminconsole-trusted-proxies", adminConsoleTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (admin console)")
+	fs.BoolVar(&cfg.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", cfg.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
+	fs.StringVar(&cfg.AdminConsole.LogLevel, "adminconsole-log-level", cfg.AdminConsole.LogLevel, "Lowest level of log record the admin console writes. Options: debug, info, warn, error")
+	fs.StringVar(&cfg.AdminConsole.LogFormat, "adminconsole-log-format", cfg.AdminConsole.LogFormat, "Format the admin console writes log records in. Options: text, json")
+	fs.StringVar(&cfg.AdminConsole.CertFile, "adminconsole-certfile", cfg.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
+	fs.StringVar(&cfg.AdminConsole.KeyFile, "adminconsole-keyfile", cfg.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
+	fs.StringVar(&cfg.AdminConsole.StaticDir, "adminconsole-staticdir", cfg.AdminConsole.StaticDir, "Static files directory for admin console")
+	fs.StringVar(&cfg.AdminConsole.TemplateDir, "adminconsole-templatedir", cfg.AdminConsole.TemplateDir, "Template files directory for admin console")
+	fs.StringVar(&cfg.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", cfg.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 
 	// Database
-	flag.StringVar(&cfg.Database.Type, "db-type", cfg.Database.Type, "Database type. Options: mysql, sqlite")
-	flag.StringVar(&cfg.Database.Username, "db-username", cfg.Database.Username, "Database username")
-	flag.StringVar(&cfg.Database.Password, "db-password", cfg.Database.Password, "Database password")
-	flag.StringVar(&cfg.Database.Host, "db-host", cfg.Database.Host, "Database host")
-	flag.IntVar(&cfg.Database.Port, "db-port", cfg.Database.Port, "Database port")
-	flag.StringVar(&cfg.Database.Name, "db-name", cfg.Database.Name, "Database name")
-	flag.StringVar(&cfg.Database.DSN, "db-dsn", cfg.Database.DSN, "Database DSN (only for sqlite)")
-	flag.BoolVar(&cfg.Database.Create, "db-create", cfg.Database.Create, "Create the database if it does not exist (only for mysql, postgres, mssql)")
+	fs.StringVar(&cfg.Database.Type, "db-type", cfg.Database.Type, "Database type. Options: mysql, sqlite")
+	fs.StringVar(&cfg.Database.Username, "db-username", cfg.Database.Username, "Database username")
+	fs.StringVar(&cfg.Database.Password, "db-password", cfg.Database.Password, "Database password")
+	fs.StringVar(&cfg.Database.Host, "db-host", cfg.Database.Host, "Database host")
+	fs.IntVar(&cfg.Database.Port, "db-port", cfg.Database.Port, "Database port")
+	fs.StringVar(&cfg.Database.Name, "db-name", cfg.Database.Name, "Database name")
+	fs.StringVar(&cfg.Database.DSN, "db-dsn", cfg.Database.DSN, "Database DSN (only for sqlite)")
+	fs.BoolVar(&cfg.Database.Create, "db-create", cfg.Database.Create, "Create the database if it does not exist (only for mysql, postgres, mssql)")
 
 	// Initial setup
-	flag.StringVar(&cfg.AdminEmail, "admin-email", cfg.AdminEmail, "Default admin email")
-	flag.StringVar(&cfg.AdminPassword, "admin-password", cfg.AdminPassword, "Default admin password")
-	flag.StringVar(&cfg.AppName, "appname", cfg.AppName, "Default app name")
+	fs.StringVar(&cfg.AdminEmail, "admin-email", cfg.AdminEmail, "Default admin email")
+	fs.StringVar(&cfg.AdminPassword, "admin-password", cfg.AdminPassword, "Default admin password")
+	fs.StringVar(&cfg.AppName, "appname", cfg.AppName, "Default app name")
 
-	flag.Parse()
+	// The error is discarded rather than returned: flag.CommandLine is built with
+	// ExitOnError, so a server given a bad flag has already exited by here, and a
+	// test supplying its own set asserts on the config rather than on the parse.
+	_ = fs.Parse(args)
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.
