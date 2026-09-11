@@ -60,10 +60,14 @@ wait_for() {  # wait_for <label> <deadline-seconds> <probe command...>
     sleep 2
   done
 }
-wait_for mysql    120 docker exec "$NAME-mysql-server-1"    mysqladmin --connect-timeout=3 -P 13306 -uroot -pmySqlPass123 ping --silent
-wait_for postgres 120 docker exec "$NAME-postgres-server-1" pg_isready -t 3 -p 15432 -U postgres
-wait_for mssql    300 docker exec "$NAME-mssql-server-1"    /opt/mssql-tools18/bin/sqlcmd -l 3 -t 3 -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -C -Q 'select 1'
+wait_for mysql    120 docker exec "$NAME-mysql-server-1"    mysqladmin --connect-timeout=3 -P 13306 -uroot -pmySqlPass123 ping --silent &&
+wait_for postgres 120 docker exec "$NAME-postgres-server-1" pg_isready -t 3 -p 15432 -U postgres &&
+wait_for mssql    300 docker exec "$NAME-mssql-server-1"    /opt/mssql-tools18/bin/sqlcmd -l 3 -t 3 -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -C -Q 'select 1' ||
+exit 1
 ```
+
+The three are chained so the first database that misses its deadline ends the wait with a
+failure; without the chain a later success would hide an earlier timeout.
 
 SQL Server gets the longest deadline because it is the slowest to accept its first login on a
 fresh volume. `sqlcmd` exits non-zero on a refused login as well as on an unreachable server,
