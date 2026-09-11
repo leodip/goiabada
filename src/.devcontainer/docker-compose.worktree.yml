@@ -1,0 +1,25 @@
+# Override for automated stacks: same services, no host-published ports.
+#
+# Apply it on top of docker-compose.yml, with a project name, to bring up an
+# independent copy of the dev stack beside the one VS Code runs, one per git
+# worktree. The four `ports:` entries in docker-compose.yml are the only thing
+# that stops a second stack from starting: they exist for a person with a
+# browser or a database client, not for the tests, which reach the databases
+# by service name on the project's private network. Everything else (image,
+# service names, internal ports, `command`, volumes) is inherited unchanged,
+# so run-tests.sh works inside the second stack as it is.
+#
+# `!reset` needs Compose 2.24 or later. Never apply this file to the human
+# container: VS Code reads docker-compose.yml alone, and keeps its ports.
+#
+# See README.md in this directory for how to start, wait for, use and tear
+# down such a stack.
+services:
+  mysql-server:
+    ports: !reset []
+  postgres-server:
+    ports: !reset []
+  mssql-server:
+    ports: !reset []
+  mailpit:
+    ports: !reset []
