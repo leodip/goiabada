@@ -13,6 +13,7 @@ import (
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging"
 	// Aliased because this file's own package is named middleware.
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
@@ -268,26 +269,40 @@ func debugLog(method, url string, reqBody []byte, statusCode int, respBody []byt
 		}
 	}
 
-	// Log request
-	slog.Info(fmt.Sprintf("[DEBUG API] → %s %s", method, url))
-	slog.Info(fmt.Sprintf("[DEBUG API]   Headers: Authorization: %s", authHeader))
+	// One record for the whole exchange, in place of the six this used to write.
+	// Six records meant a reader joined them by adjacency, which is wrong the
+	// moment two requests are in flight, and it cost the log five copies of the
+	// [DEBUG API] prefix to say what one message says (#320 decision 9).
+	//
+	// Both bodies go through bodyForLog, which is the only path from a body to the
+	// log: there is no fallback that writes raw bytes, so a body that cannot be
+	// parsed produces a placeholder rather than appearing in the clear (#145).
+	// They are always present, empty when there was no body, so the record has one
+	// shape and a bodyless request is still distinguishable from a refused one.
+	//
+	// method goes through FieldForLog because it is client-chosen and this
+	// middleware is mounted ahead of authentication: a request line carrying a
+	// 900000-byte method reaches here, and the request logger already bounds the
+	// same value for the same reason (#159).
+	slog.InfoContext(r.Context(), "api exchange",
+		"method", logging.FieldForLog(method),
+		"target", url,
+		"authorization", authHeader,
+		"status", statusCode,
+		"duration", duration,
+		"request_body", bodyAttrForLog(reqBody),
+		"response_body", bodyAttrForLog(respBody))
+}
 
-	// Log request body (if applicable). Both bodies go through bodyForLog, which is
-	// the only path from a body to the log: there is no fallback that writes raw
-	// bytes, so a body that cannot be parsed produces a placeholder rather than
-	// appearing in the clear (#145).
-	if len(reqBody) > 0 {
-		slog.Info(fmt.Sprintf("[DEBUG API]   Request Body:\n%s", bodyForLog(reqBody)))
+// bodyAttrForLog is bodyForLog with the no-body case answered as an empty string.
+//
+// json.Decoder reports io.EOF for zero bytes, so bodyForLog on an absent body
+// returns "0 bytes, not logged (EOF)", which reads like a body that was there and
+// could not be shown. The attribute is always written, so this is what keeps a
+// bodyless request distinguishable from a refused body (#320).
+func bodyAttrForLog(body []byte) string {
+	if len(body) == 0 {
+		return ""
 	}
-
-	// Log response
-	status := http.StatusText(statusCode)
-	slog.Info(fmt.Sprintf("[DEBUG API] ← %d %s (%s)", statusCode, status, duration))
-
-	// Log response body
-	if len(respBody) > 0 {
-		slog.Info(fmt.Sprintf("[DEBUG API]   Response Body:\n%s", bodyForLog(respBody)))
-	}
-
-	slog.Info("[DEBUG API]") // Empty line for separation
+	return bodyForLog(body)
 }

@@ -13,7 +13,7 @@ Audit logging has two independent targets that can be enabled together or separa
 
 | Target | Default | Description |
 |--------|---------|-------------|
-| Console | Enabled | Events are emitted via structured logging (`slog.Info`) and picked up by your container or host log pipeline. |
+| Console | Enabled | One log record per event, carrying the event name and its details as fields, picked up by your container or host log pipeline. |
 | Database | Enabled | Events are persisted to the `audit_logs` table and can be browsed in the admin console. |
 
 Disabling both effectively turns off audit logging.

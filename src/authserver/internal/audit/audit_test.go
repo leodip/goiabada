@@ -1,24 +1,30 @@
 package audit
 
 import (
-	"bytes"
-	"encoding/json"
 	"log/slog"
 	"testing"
 
 	mocks "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
-func TestAuditLogger(t *testing.T) {
-	// Test cases
+// TestAuditLogger_ConsoleRecordCarriesTheEventAndTheDetails is the console half of AuditLogger,
+// at the seam auditlog.LogToConsole now owns.
+//
+// These three cases used to marshal an envelope into the message field and compare the message
+// against an expected JSON document. That is the shape #320 decision 7 replaced: a collector
+// consuming this log as JSON had to parse `msg` a second time to reach the field it was querying
+// on. So they now read the event name and the details off the record, which is where a consumer
+// reads them.
+func TestAuditLogger_ConsoleRecordCarriesTheEventAndTheDetails(t *testing.T) {
 	testCases := []struct {
-		name         string
-		event        string
-		details      map[string]interface{}
-		expectedJSON string
+		name    string
+		event   string
+		details map[string]interface{}
 	}{
 		{
 			name:  "Basic log event",
@@ -27,13 +33,11 @@ func TestAuditLogger(t *testing.T) {
 				"user_id": "123",
 				"ip":      "192.168.1.1",
 			},
-			expectedJSON: `{"audit_event":"user_login","details":{"ip":"192.168.1.1","user_id":"123"}}`,
 		},
 		{
-			name:         "Log event with empty details",
-			event:        "system_startup",
-			details:      map[string]interface{}{},
-			expectedJSON: `{"audit_event":"system_startup","details":{}}`,
+			name:    "Log event with empty details",
+			event:   "system_startup",
+			details: map[string]interface{}{},
 		},
 		{
 			name:  "Log event with nested details",
@@ -45,17 +49,12 @@ func TestAuditLogger(t *testing.T) {
 				},
 				"changes": []string{"email", "phone"},
 			},
-			expectedJSON: `{"audit_event":"data_update","details":{"changes":["email","phone"],"user":{"id":"456","name":"John Doe"}}}`,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
-			// Create a buffer to capture log output
-			var buf bytes.Buffer
-			logger := slog.New(slog.NewJSONHandler(&buf, nil))
-			slog.SetDefault(logger)
+			logs := testutil.CaptureSlog(t)
 
 			// Create mock DB that returns settings with console enabled, DB disabled
 			mockDB := mocks.NewDatabase(t)
@@ -65,41 +64,22 @@ func TestAuditLogger(t *testing.T) {
 			}
 			mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
 
-			// Create an AuditLogger instance
-			auditLogger := NewAuditLogger(mockDB)
+			NewAuditLogger(mockDB).Log(tc.event, tc.details)
 
-			// Call the Log method
-			auditLogger.Log(tc.event, tc.details)
-
-			// Get the logged output
-			output := buf.String()
-
-			// Parse the JSON log entry
-			var logEntry map[string]interface{}
-			err := json.Unmarshal([]byte(output), &logEntry)
-			if err != nil {
-				t.Fatalf("Failed to parse log output as JSON: %v", err)
-			}
-
-			// Extract the message field
-			msg, ok := logEntry["msg"].(string)
-			if !ok {
-				t.Fatalf("Log entry does not contain 'msg' field")
-			}
-
-			// Compare the logged JSON with the expected JSON
-			if !compareJSONStrings(t, tc.expectedJSON, msg) {
-				t.Errorf("Logged JSON does not match expected JSON.\nExpected: %v\nGot: %v", tc.expectedJSON, msg)
-			}
+			records := logs.Records()
+			require.Len(t, records, 1, "one audit event, one console record")
+			assert.Equal(t, slog.LevelInfo, records[0].Level)
+			assert.Equal(t, "audit event", records[0].Message,
+				"one message for every event, so the name a consumer filters on is an attribute")
+			assert.Equal(t, tc.event, records[0].Attrs["event"])
+			assert.Equal(t, tc.details, records[0].Attrs["details"],
+				"the details reach the record as the map, nesting and slices intact, rather than as a JSON string inside the message")
 		})
 	}
 }
 
 func TestAuditLoggerDisabled(t *testing.T) {
-	// Create a buffer to capture log output
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	slog.SetDefault(logger)
+	logs := testutil.CaptureSlog(t)
 
 	// Create mock DB that returns settings with both disabled
 	mockDB := mocks.NewDatabase(t)
@@ -116,7 +96,7 @@ func TestAuditLoggerDisabled(t *testing.T) {
 	auditLogger.Log("test_event", map[string]interface{}{"key": "value"})
 
 	// Get the logged output
-	output := buf.String()
+	output := logs.Text()
 
 	// Should be empty since both logging targets are disabled
 	if output != "" {
@@ -125,31 +105,6 @@ func TestAuditLoggerDisabled(t *testing.T) {
 
 	// Verify no DB write
 	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything)
-}
-
-// compareJSONStrings compares two JSON strings for equality
-func compareJSONStrings(t *testing.T, expected, actual string) bool {
-	var expectedMap, actualMap map[string]interface{}
-	err := json.Unmarshal([]byte(expected), &expectedMap)
-	if err != nil {
-		t.Fatalf("Failed to parse expected JSON: %v", err)
-	}
-	err = json.Unmarshal([]byte(actual), &actualMap)
-	if err != nil {
-		t.Fatalf("Failed to parse actual JSON: %v", err)
-	}
-
-	// Marshal both maps back to JSON strings
-	expectedJSON, err := json.Marshal(expectedMap)
-	if err != nil {
-		t.Fatalf("Failed to marshal expected JSON: %v", err)
-	}
-	actualJSON, err := json.Marshal(actualMap)
-	if err != nil {
-		t.Fatalf("Failed to marshal actual JSON: %v", err)
-	}
-
-	return string(expectedJSON) == string(actualJSON)
 }
 
 func TestAuditLogger_DBPersistence_Enabled(t *testing.T) {
@@ -220,10 +175,7 @@ func TestAuditLogger_SettingsError(t *testing.T) {
 
 	// CreateAuditLog should NOT be called due to settings error
 
-	// Capture logs to verify error is logged
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	slog.SetDefault(logger)
+	logs := testutil.CaptureSlog(t)
 
 	// Create audit logger
 	auditLogger := NewAuditLogger(mockDB)
@@ -234,7 +186,7 @@ func TestAuditLogger_SettingsError(t *testing.T) {
 	})
 
 	// Verify error was logged
-	output := buf.String()
+	output := logs.Text()
 	assert.Contains(t, output, "failed to read settings for audit logging")
 
 	// Verify CreateAuditLog was not called
@@ -256,10 +208,7 @@ func TestAuditLogger_DBPersistence_CreateError(t *testing.T) {
 	// Mock CreateAuditLog to return error
 	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything).Return(assert.AnError)
 
-	// Capture logs to verify error is logged
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	slog.SetDefault(logger)
+	logs := testutil.CaptureSlog(t)
 
 	// Create audit logger
 	auditLogger := NewAuditLogger(mockDB)
@@ -270,7 +219,7 @@ func TestAuditLogger_DBPersistence_CreateError(t *testing.T) {
 	})
 
 	// Verify error was logged
-	output := buf.String()
+	output := logs.Text()
 	assert.Contains(t, output, "failed to persist audit log to database")
 
 	// Verify CreateAuditLog was called (even though it failed)
@@ -291,10 +240,7 @@ func TestAuditLogger_DBPersistence_JSONMarshalError(t *testing.T) {
 
 	// CreateAuditLog should NOT be called due to marshal error
 
-	// Capture logs to verify error is logged
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	slog.SetDefault(logger)
+	logs := testutil.CaptureSlog(t)
 
 	// Create audit logger
 	auditLogger := NewAuditLogger(mockDB)
@@ -305,7 +251,7 @@ func TestAuditLogger_DBPersistence_JSONMarshalError(t *testing.T) {
 	})
 
 	// Verify error was logged
-	output := buf.String()
+	output := logs.Text()
 	assert.Contains(t, output, "failed to marshal audit event details for DB")
 
 	// Verify CreateAuditLog was not called
@@ -325,10 +271,7 @@ func TestAuditLogger_BothConsoleAndDB(t *testing.T) {
 	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
 	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything).Return(nil)
 
-	// Capture console logs
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	slog.SetDefault(logger)
+	logs := testutil.CaptureSlog(t)
 
 	// Create audit logger with BOTH console and DB enabled
 	auditLogger := NewAuditLogger(mockDB)
@@ -339,7 +282,7 @@ func TestAuditLogger_BothConsoleAndDB(t *testing.T) {
 	})
 
 	// Verify console output
-	output := buf.String()
+	output := logs.Text()
 	assert.Contains(t, output, "test_event")
 
 	// Verify DB was called
@@ -358,10 +301,7 @@ func TestAuditLogger_ConsoleEnabledDBDisabled(t *testing.T) {
 	}
 	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
 
-	// Capture console logs
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	slog.SetDefault(logger)
+	logs := testutil.CaptureSlog(t)
 
 	// Create audit logger
 	auditLogger := NewAuditLogger(mockDB)
@@ -372,7 +312,7 @@ func TestAuditLogger_ConsoleEnabledDBDisabled(t *testing.T) {
 	})
 
 	// Verify console output exists
-	output := buf.String()
+	output := logs.Text()
 	assert.Contains(t, output, "test_event")
 
 	// Verify DB was NOT called

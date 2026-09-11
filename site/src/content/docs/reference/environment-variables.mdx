@@ -314,12 +314,12 @@ See [Customizations](/reference/customizations/) for details on how to customize
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LOG_SQL</code><br/><code>--authserver-log-sql</code></td>
       <td><code>false</code></td>
-      <td>Log SQL statements</td>
+      <td>Log SQL statements, one record per statement carrying the statement text. The values bound to it are not written, so a query is identifiable but the data it ran with is not.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS</code><br/><code>--authserver-debug-api-requests</code></td>
       <td><code>false</code></td>
-      <td>Verbose API logging</td>
+      <td>Verbose API logging, one record per exchange carrying the method, target, status, duration and both bodies. Credential fields in the bodies and the <code>Authorization</code> header are redacted. See <a href="/reference/security/">Security</a>.</td>
     </tr>
   </tbody>
 </table>

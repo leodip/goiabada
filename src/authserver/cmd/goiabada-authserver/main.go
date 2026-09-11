@@ -141,10 +141,7 @@ func main() {
 				os.Exit(1)
 			}
 
-			slog.Info("================================================================================")
-			slog.Info("DATABASE SEEDED SUCCESSFULLY")
-			slog.Info("================================================================================")
-			slog.Info("Continuing with normal startup...")
+			slog.Info("database seeded, continuing with normal startup")
 			// Don't exit - continue to normal operation
 		} else if bootstrapFile != "" {
 			// Legacy flow: No OAuth secret, but bootstrap file configured
@@ -166,46 +163,12 @@ func main() {
 				os.Exit(1)
 			}
 
-			slog.Info("================================================================================")
-			slog.Info("BOOTSTRAP COMPLETE - AUTH SERVER EXITING")
-			slog.Info("================================================================================")
-			slog.Info("")
-			slog.Info("The bootstrap credentials have been written to: " + bootstrapFile)
-			slog.Info("")
-			slog.Info("NEXT STEPS:")
-			slog.Info("1. Copy the credentials from the bootstrap file")
-			slog.Info("2. Add them as environment variables in your docker-compose.yml or deployment config")
-			slog.Info("3. Restart the services")
-			slog.Info("")
-			slog.Info("For Docker Compose, add these to the admin console service:")
-			slog.Info("  environment:")
-			slog.Info("    - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<from bootstrap file>")
-			slog.Info("    - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<from bootstrap file>")
-			slog.Info("    - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<from bootstrap file>")
-			slog.Info("")
-			slog.Info("And add these to the auth server service:")
-			slog.Info("  environment:")
-			slog.Info("    - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<from bootstrap file>")
-			slog.Info("    - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<from bootstrap file>")
-			slog.Info("================================================================================")
+			logBootstrapComplete(bootstrapFile)
 
 			os.Exit(0)
 		} else {
 			// No OAuth secret and no bootstrap file - show helpful error
-			slog.Error("================================================================================")
-			slog.Error("INITIAL SETUP REQUIRED")
-			slog.Error("================================================================================")
-			slog.Error("")
-			slog.Error("The database is empty and needs to be seeded. Choose one of these options:")
-			slog.Error("")
-			slog.Error("OPTION 1 - Recommended: Use goiabada-setup (single-step)")
-			slog.Error("  Run: goiabada-setup")
-			slog.Error("  This generates a ready-to-use docker-compose.yml with all credentials")
-			slog.Error("")
-			slog.Error("OPTION 2 - Legacy: Two-step bootstrap")
-			slog.Error("  Set GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=/bootstrap/bootstrap.env")
-			slog.Error("  Run the auth server, copy credentials from the file, then restart")
-			slog.Error("================================================================================")
+			logInitialSetupRequired()
 			os.Exit(1)
 		}
 	} else {
@@ -214,27 +177,7 @@ func main() {
 
 	// Validate session keys for normal operation (after bootstrap check)
 	if err := config.ValidateAuthServerSessionKeys(); err != nil {
-		slog.Error("================================================================================")
-		slog.Error("BOOTSTRAP CREDENTIALS NOT CONFIGURED - AUTH SERVER CANNOT START")
-		slog.Error("================================================================================")
-		slog.Error("session key validation failed: " + err.Error())
-		slog.Error("")
-		slog.Error("ACTION REQUIRED:")
-		slog.Error("1. Open the bootstrap file: ./bootstrap/bootstrap.env")
-		slog.Error("2. Copy ALL credentials from the file")
-		slog.Error("")
-		slog.Error("   For AUTH SERVER (add to goiabada-authserver service):")
-		slog.Error("   - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY")
-		slog.Error("   - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY")
-		slog.Error("")
-		slog.Error("   For ADMIN CONSOLE (add to goiabada-adminconsole service):")
-		slog.Error("   - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET")
-		slog.Error("   - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY")
-		slog.Error("   - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY")
-		slog.Error("")
-		slog.Error("3. Add them to your docker-compose.yml (uncomment the credential lines)")
-		slog.Error("4. Restart both services")
-		slog.Error("================================================================================")
+		logBootstrapCredentialsNotConfigured(err, config.GetAuthServer().BootstrapEnvOutFile)
 		os.Exit(1)
 	}
 	slog.Info("session keys validated")
@@ -310,4 +253,57 @@ func main() {
 	s.Start(ctx)
 
 	slog.Info("auth server stopped")
+}
+
+// bootstrapCredentialVars are the five values a deployment has to carry over from
+// the bootstrap file, three for the admin console and two for the auth server.
+//
+// One list rather than one per record. Two of this file's records name these
+// variables, and before this they were two hand-typed lists in two banners: a
+// credential added to the bootstrap file and to one of them would leave an
+// operator following the other one short, with a startup failure naming a variable
+// they had never been told to set (#320).
+var bootstrapCredentialVars = []string{
+	"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET",
+	"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY",
+	"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY",
+	"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY",
+	"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY",
+}
+
+// logBootstrapComplete reports the end of the legacy two-step bootstrap.
+//
+// One record where a 22-line banner used to be. The prose it replaced walked
+// through the docker-compose.yml edit twice, once per service; what an operator
+// needs from it is the file and the names, and those are the two attributes (#320
+// decision 6).
+func logBootstrapComplete(bootstrapFile string) {
+	slog.Info("bootstrap complete, so the auth server is exiting: copy every credential from the bootstrap file into the two services' configuration, then restart them",
+		"bootstrap_file", bootstrapFile,
+		"required", bootstrapCredentialVars)
+}
+
+// logInitialSetupRequired reports an empty database with neither bootstrap mode
+// configured, which is the one startup failure an operator hits before they have
+// any credentials at all.
+func logInitialSetupRequired() {
+	slog.Error("initial setup is required, because the database is empty and neither bootstrap mode is configured",
+		"options", []string{
+			"run goiabada-setup, which writes a ready-to-use docker-compose.yml carrying every credential",
+			"or set GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE and restart, then copy the credentials out of the file it writes",
+		})
+}
+
+// logBootstrapCredentialsNotConfigured reports session keys that are missing or
+// malformed on a database that is already seeded.
+//
+// bootstrap_file is read from the configuration. The banner this replaced printed
+// "./bootstrap/bootstrap.env", which is the path the shipped compose files happen
+// to use rather than this deployment's, so an operator who mounted the file
+// somewhere else was sent to look at a path that did not exist (#320).
+func logBootstrapCredentialsNotConfigured(err error, bootstrapFile string) {
+	slog.Error("bootstrap credentials are not configured, so the auth server cannot start: copy every credential from the bootstrap file into the two services' configuration, then restart them",
+		"error", err,
+		"bootstrap_file", bootstrapFile,
+		"required", bootstrapCredentialVars)
 }

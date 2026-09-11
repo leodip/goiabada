@@ -1188,7 +1188,7 @@ PUT /api/v1/admin/settings/audit-logs
 ```
 
 **Field notes:**
-- `auditLogsInConsoleEnabled`: Log audit events to the console via structured logging (slog)
+- `auditLogsInConsoleEnabled`: Write each audit event to the application log as one record, with the event name and its details as fields
 - `auditLogsInDatabaseEnabled`: Persist audit events to the `audit_logs` database table
 - `auditLogRetentionDays`: Number of days to retain audit logs in the database. Use `0` for infinite retention. Maximum `3650` (10 years). A background worker periodically deletes logs older than this value.
 
