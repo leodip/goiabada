@@ -46,11 +46,28 @@ that, so wait for each database before running anything. The devcontainer image 
 database client; each database image ships its own, so ask each server through its own
 container:
 
+Every probe is bounded twice: a short client timeout, so one hung connection cannot stall the
+loop (the MySQL image's default `--connect-timeout` is 43,200 seconds), and a deadline on the
+whole wait, so a server that is running but broken, or a wrong password, fails the run instead
+of holding it forever:
+
 ```sh
-until docker exec "$NAME-mysql-server-1" mysqladmin -P 13306 -uroot -pmySqlPass123 ping --silent >/dev/null 2>&1; do sleep 2; done
-until docker exec "$NAME-postgres-server-1" pg_isready -p 15432 -U postgres >/dev/null 2>&1; do sleep 2; done
-until docker exec "$NAME-mssql-server-1" /opt/mssql-tools18/bin/sqlcmd -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -C -Q 'select 1' >/dev/null 2>&1; do sleep 2; done
+wait_for() {  # wait_for <label> <deadline-seconds> <probe command...>
+  local label=$1 deadline=$2; shift 2
+  local t0=$SECONDS
+  until "$@" >/dev/null 2>&1; do
+    if (( SECONDS - t0 >= deadline )); then echo "$label not ready after ${deadline}s" >&2; return 1; fi
+    sleep 2
+  done
+}
+wait_for mysql    120 docker exec "$NAME-mysql-server-1"    mysqladmin --connect-timeout=3 -P 13306 -uroot -pmySqlPass123 ping --silent
+wait_for postgres 120 docker exec "$NAME-postgres-server-1" pg_isready -t 3 -p 15432 -U postgres
+wait_for mssql    300 docker exec "$NAME-mssql-server-1"    /opt/mssql-tools18/bin/sqlcmd -l 3 -t 3 -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -C -Q 'select 1'
 ```
+
+SQL Server gets the longest deadline because it is the slowest to accept its first login on a
+fresh volume. `sqlcmd` exits non-zero on a refused login as well as on an unreachable server,
+so a wrong password hits the deadline rather than looping past it.
 
 ### Use
 
