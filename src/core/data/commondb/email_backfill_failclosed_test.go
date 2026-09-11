@@ -848,15 +848,31 @@ func TestBackfillLowercaseEmails_TheAuditSettingsDecideBothTargets(t *testing.T)
 			require.Equal(t, 1, disabled,
 				"the fixture only says anything about auditing if the loser was actually disabled")
 
+			// Read off the `event` attribute rather than the message. The console record is
+			// auditlog.LogToConsole's now, shared with the authserver's AuditLogger, and its
+			// message is the same "audit event" for every event: the name a consumer filters
+			// on is an attribute (#320 decision 7).
 			console := 0
-			for _, message := range messagesAt(logs, slog.LevelInfo) {
-				if strings.Contains(message, constants.AuditRevokedUserAuthState) {
+			for _, record := range logs.Records() {
+				if record.Level == slog.LevelInfo && record.Attrs["event"] == constants.AuditRevokedUserAuthState {
 					console++
 				}
 			}
 			if tc.console {
 				assert.Equal(t, 1, console,
 					"audit_logs_in_console_enabled is on, so the event must reach the console exactly once")
+				// And carrying its payload rather than only its name. `reason` is how the
+				// event's contract says a consumer tells this site apart from the four
+				// credential sites that raise the same event.
+				for _, record := range logs.Records() {
+					if record.Attrs["event"] != constants.AuditRevokedUserAuthState {
+						continue
+					}
+					details, ok := record.Attrs["details"].(map[string]interface{})
+					require.True(t, ok, "the console record must carry the details as a map")
+					assert.Equal(t, constants.RevocationReasonEmailCollisionBackfill, details["reason"])
+					assert.Equal(t, int64(1), details["userId"])
+				}
 			} else {
 				assert.Zero(t, console,
 					"audit_logs_in_console_enabled is off, so the operator has turned this event's console copy off and it must not appear")

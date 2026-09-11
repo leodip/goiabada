@@ -62,21 +62,7 @@ func main() {
 	// One block, keyed on the secret: the client id is no longer configuration, so the only
 	// half of the credential a deployment supplies is the secret (#285).
 	if adminConsoleConfig.OAuthClientSecret == "" {
-		slog.Error("================================================================================")
-		slog.Error("BOOTSTRAP CREDENTIALS NOT CONFIGURED")
-		slog.Error("================================================================================")
-		slog.Error("The admin console requires OAuth credentials to authenticate with the auth server.")
-		slog.Error("")
-		slog.Error("If this is your first deployment:")
-		slog.Error("1. Start the auth server first - it will generate bootstrap credentials and exit")
-		slog.Error("2. Copy credentials from the bootstrap file to your deployment configuration")
-		slog.Error("3. Restart both auth server and admin console with the credentials set")
-		slog.Error("")
-		slog.Error("Required environment variables:")
-		slog.Error("  - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET")
-		slog.Error("  - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY")
-		slog.Error("  - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY")
-		slog.Error("================================================================================")
+		logBootstrapCredentialsNotConfigured()
 		os.Exit(1)
 	}
 	slog.Info("OAuth credentials validated")
@@ -193,4 +179,19 @@ func main() {
 	s := server.NewServer(r, sessionStore, settingsCache)
 
 	s.Start()
+}
+
+// logBootstrapCredentialsNotConfigured reports a deployment with no OAuth client
+// secret, which is the credential the admin console authenticates to the auth
+// server with and the one half of it a deployment supplies (#285).
+//
+// One record where a 13-line banner used to be. The names are listed rather than
+// described, because the operator's next action is to set them (#320 decision 6).
+func logBootstrapCredentialsNotConfigured() {
+	slog.Error("bootstrap credentials are not configured, so the admin console cannot start: on a first deployment start the auth server first, which writes the bootstrap file and exits, then copy every credential into the two services' configuration and restart them",
+		"required", []string{
+			"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET",
+			"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY",
+			"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY",
+		})
 }

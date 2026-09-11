@@ -1,10 +1,13 @@
 package data
 
 import (
+	"log/slog"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBootstrapEnvContent_CarriesNoClientId pins the whole point of #285 on the one artifact that
@@ -47,4 +50,26 @@ func TestBootstrapEnvContent_CarriesEveryRemainingCredential(t *testing.T) {
 		}
 	}
 	assert.Equal(t, len(expected), assignments)
+}
+
+// TestLogBootstrapCredentialsGenerated_IsOneRecordNamingTheFile pins the console half of the same
+// artifact: the record is the only place an operator is told the bootstrap file exists, and it is
+// where the twelve-line banner went (#320 decision 6). Its own function for the same reason
+// bootstrapEnvContent is one, since the block it came from sits inside Seed and needs a live
+// database to reach.
+func TestLogBootstrapCredentialsGenerated_IsOneRecordNamingTheFile(t *testing.T) {
+	logs := testutil.CaptureSlog(t)
+
+	logBootstrapCredentialsGenerated("/bootstrap/bootstrap.env")
+
+	records := logs.Records()
+	require.Len(t, records, 1, "one record, where the banner wrote twelve")
+	assert.Equal(t, slog.LevelInfo, records[0].Level,
+		"the seeder succeeded; this is the result, not a failure")
+	assert.Equal(t, "/bootstrap/bootstrap.env", records[0].Attrs["bootstrap_file"],
+		"the operator's next action is to open this file, so its path is the one thing the record must carry")
+	assert.Equal(t, "0600", records[0].Attrs["file_mode"],
+		"and that the file is readable by its owner alone, which is why leaving it in place is survivable")
+	assert.Contains(t, records[0].Message, "copy",
+		"the message has to say what to do with the file, or the path alone is an announcement")
 }

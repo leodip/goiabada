@@ -2,9 +2,11 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,12 +14,15 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/otp"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The debug middleware only runs when GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS is
@@ -207,7 +212,80 @@ func TestDebugLog_ReportsAnAbsentAuthorizationHeader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
 	debugLog("GET", "/api/v1/admin/users", nil, http.StatusOK, nil, time.Millisecond, req)
 
-	assert.Contains(t, logged.Text(), "Authorization: None")
+	records := logged.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, "None", records[0].Attrs["authorization"],
+		"an absent credential must stay distinguishable from a redacted one")
+}
+
+// -----------------------------------------------------------------------------
+// The record's shape
+//
+// One record per exchange, in place of the six this used to write (#320 decision
+// 9). Six meant a reader joined them by adjacency, which is wrong the moment two
+// requests are in flight, and five of them carried a [DEBUG API] prefix instead
+// of a key.
+// -----------------------------------------------------------------------------
+
+func TestDebugLog_WritesOneRecordCarryingTheWholeExchange(t *testing.T) {
+	logged := testutil.CaptureSlog(t)
+
+	req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
+	req.Header.Set("Authorization", "Bearer a-token")
+	debugLog("POST", "/api/v1/admin/users?page=2", []byte(`{"a":1}`),
+		http.StatusCreated, []byte(`{"b":2}`), 7*time.Millisecond, req)
+
+	records := logged.Records()
+	require.Len(t, records, 1, "one exchange, one record")
+
+	assert.Equal(t, slog.LevelInfo, records[0].Level)
+	assert.Equal(t, "api exchange", records[0].Message)
+	assert.Equal(t, "POST", records[0].Attrs["method"])
+	assert.Equal(t, "/api/v1/admin/users?page=2", records[0].Attrs["target"])
+	assert.Equal(t, "Bearer "+redactedValue, records[0].Attrs["authorization"])
+	// int64 because that is what slog stores an int as, and what a JSON collector reads.
+	assert.Equal(t, int64(http.StatusCreated), records[0].Attrs["status"])
+	assert.Equal(t, 7*time.Millisecond, records[0].Attrs["duration"])
+	assert.Contains(t, records[0].Attrs["request_body"], `"a": 1`)
+	assert.Contains(t, records[0].Attrs["response_body"], `"b": 2`)
+}
+
+// The method is client-chosen and this middleware is mounted ahead of
+// authentication, so one unauthenticated request could otherwise write a
+// request-line-sized method into the log. It goes through the same bound the
+// request logger applies to the same value (#159).
+func TestDebugLog_BoundsAnOversizedMethod(t *testing.T) {
+	logged := testutil.CaptureSlog(t)
+
+	method := strings.Repeat("M", 900000)
+	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
+	debugLog(method, "/api/v1/admin/users", nil, http.StatusOK, nil, time.Millisecond, req)
+
+	records := logged.Records()
+	require.Len(t, records, 1)
+
+	written, ok := records[0].Attrs["method"].(string)
+	require.True(t, ok)
+	assert.Equal(t, strings.Repeat("M", logging.MaxLoggedField)+
+		logging.TruncationMarker(logging.MaxLoggedField, len(method)), written,
+		"the retained prefix and a marker giving the limit and the true byte count, and nothing more")
+}
+
+// The request id is on the record because the handler puts it there, not because
+// this call site names it, which is what decision 2 bought. debugLog is the only
+// API-surface writer reached through a *Context variant, so it is where that is
+// worth pinning at this seam.
+func TestDebugLog_CarriesTheRequestIdFromTheContext(t *testing.T) {
+	logged := testutil.CaptureSlog(t)
+
+	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
+	req = req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, "req-abc"))
+	debugLog("GET", "/api/v1/admin/users", nil, http.StatusOK, nil, time.Millisecond, req)
+
+	records := logged.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, "req-abc", records[0].Attrs["request_id"],
+		"the installed handler injects it from the context, so no call site writes it")
 }
 
 // The bodies are logged deliberately, which is the point of the debug mode, so
@@ -563,10 +641,17 @@ func TestDebugLog_RefusesBodiesItCannotSafelyLog(t *testing.T) {
 // cases: a body sitting exactly on a bound is logged, and an absent body produces no
 // body line at all rather than a placeholder.
 func TestDebugLog_LogsBodiesOnTheAcceptedSideOfEveryBound(t *testing.T) {
-	t.Run("empty body logs no body line", func(t *testing.T) {
-		output := logRequestBody(t, "")
+	t.Run("empty body writes an empty attribute rather than a refusal", func(t *testing.T) {
+		logged := testutil.CaptureSlog(t)
+		req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
+		debugLog("POST", "/api/v1/admin/users", nil, http.StatusOK, nil, time.Millisecond, req)
 
-		assert.NotContains(t, output, "Request Body:",
+		records := logged.Records()
+		require.Len(t, records, 1)
+		// json.Decoder answers io.EOF for zero bytes, so the unguarded path would write
+		// "0 bytes, not logged (EOF)" here and a bodyless request would read like a body
+		// that could not be shown.
+		assert.Equal(t, "", records[0].Attrs["request_body"],
 			"a bodyless request must stay distinguishable from a refused body")
 	})
 

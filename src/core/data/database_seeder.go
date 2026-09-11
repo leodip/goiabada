@@ -58,6 +58,19 @@ func (ds *DatabaseSeeder) WithOAuthClientSecret(secret string) *DatabaseSeeder {
 	return ds
 }
 
+// logBootstrapCredentialsGenerated reports the legacy two-step bootstrap file the seeder has just
+// written, which is the one place the generated credentials are ever readable.
+//
+// One record where a 12-line banner used to be, and a named function rather than a block inside
+// Seed so the record it writes can be asserted: the ruled box, the blank lines and the inventory
+// of what the file contains were unparseable in a JSON stream and said less than the message and
+// the two attributes do (#320 decision 6).
+func logBootstrapCredentialsGenerated(bootstrapEnvOutFile string) {
+	slog.Info("bootstrap credentials generated: open the file and copy the OAuth client secret and the session keys into the deployment configuration",
+		"bootstrap_file", bootstrapEnvOutFile,
+		"file_mode", "0600")
+}
+
 // bootstrapEnvContent renders the legacy two-step bootstrap file. It carries no client id: the
 // admin console always authenticates as constants.AdminConsoleClientIdentifier, which the seeder
 // writes and the migrations grant against, so there is nothing for an operator to copy across
@@ -175,18 +188,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		}
 		_ = f.Sync()
 		_ = f.Close()
-		slog.Info("================================================================================")
-		slog.Info("BOOTSTRAP CREDENTIALS GENERATED")
-		slog.Info("================================================================================")
-		slog.Info(fmt.Sprintf("File location: %s", ds.bootstrapEnvOutFile))
-		slog.Info("File permissions: 0600 (owner read/write only)")
-		slog.Info("")
-		slog.Info("The file contains:")
-		slog.Info("  - OAuth client secret for admin console")
-		slog.Info("  - Session authentication and encryption keys")
-		slog.Info("")
-		slog.Info("NEXT STEP: Open the file and copy credentials to your deployment configuration")
-		slog.Info("================================================================================")
+		logBootstrapCredentialsGenerated(ds.bootstrapEnvOutFile)
 	}
 
 	var redirectURI = &models.RedirectURI{

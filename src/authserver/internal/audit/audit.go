@@ -4,14 +4,10 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/leodip/goiabada/core/auditlog"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
 )
-
-type AuditEvent struct {
-	AuditEvent string                 `json:"audit_event"`
-	Details    map[string]interface{} `json:"details"`
-}
 
 type AuditLogger struct {
 	database data.Database
@@ -39,17 +35,7 @@ func (al *AuditLogger) Log(auditEvent string, details map[string]interface{}) {
 
 	// Console logging
 	if settings.AuditLogsInConsoleEnabled {
-		evt := AuditEvent{
-			AuditEvent: auditEvent,
-			Details:    details,
-		}
-
-		eventJSON, err := json.Marshal(evt)
-		if err != nil {
-			slog.Error("failed to marshal audit event", "error", err, "event", auditEvent)
-		} else {
-			slog.Info(string(eventJSON))
-		}
+		auditlog.LogToConsole(auditEvent, details)
 	}
 
 	// Database persistence

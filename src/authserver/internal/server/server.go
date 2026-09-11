@@ -117,16 +117,7 @@ func (s *Server) Start(ctx context.Context) {
 	slog.Info(fmt.Sprintf("http enabled: %v", httpEnabled))
 
 	if httpEnabled && !httpsEnabled {
-		slog.Warn("=== WARNING ===")
-		slog.Warn("You are running the auth server with HTTP (without TLS/HTTPS).")
-		slog.Warn("This is HIGHLY INSECURE unless you are:")
-		slog.Warn("  1. Only doing development/testing, OR")
-		slog.Warn("  2. Running behind a reverse proxy that handles HTTPS")
-		slog.Warn("")
-		slog.Warn("In production environments, you should either:")
-		slog.Warn("  - Enable HTTPS configuration, OR")
-		slog.Warn("  - Ensure your reverse proxy handles HTTPS properly")
-		slog.Warn("===============")
+		logHttpWithoutTlsWarning()
 	}
 
 	errChan := make(chan error, 2) // Buffer for both HTTP and HTTPS errors
@@ -356,4 +347,16 @@ func (s *Server) serveStaticFiles(path string, root http.FileSystem) {
 
 		fsHandler.ServeHTTP(w, r)
 	})
+}
+
+// logHttpWithoutTlsWarning reports a deployment listening on HTTP with no HTTPS
+// listener configured.
+//
+// One record where an 11-line banner used to be, which is what makes it greppable
+// by message and readable under both log formats: the banner's ruled box and blank
+// lines were unparseable noise in a JSON stream, and its nine lines of prose said
+// the two things the message and the remedy attribute say (#320 decision 6).
+func logHttpWithoutTlsWarning() {
+	slog.Warn("the auth server is listening on HTTP with no TLS, which is insecure outside development unless a reverse proxy in front of it terminates HTTPS",
+		"remedy", "configure the HTTPS listener, or make sure the reverse proxy handles HTTPS")
 }

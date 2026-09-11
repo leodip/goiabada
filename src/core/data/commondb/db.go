@@ -2,7 +2,6 @@ package commondb
 
 import (
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -231,20 +230,25 @@ func (d *CommonDatabase) inTransaction(tx *sql.Tx, fn func(tx *sql.Tx) error) er
 	return d.RunInTransaction(fn)
 }
 
-func (d *CommonDatabase) Log(sql string, args ...any) {
+// Log writes one record per statement when GOIABADA_AUTHSERVER_LOG_SQL is on.
+//
+// It takes no arguments beyond the statement, and that is the point rather than a
+// simplification. It used to write a second record listing every bound value, and
+// nothing at this layer can tell a password hash, a TOTP seed or an encrypted
+// client secret from a page size: every value the product writes to the database
+// passes through here. Every other logger in this tree already bounds or redacts
+// what it writes (#145, #159), and a flag an operator turns on to see which
+// queries run should not be the one path that publishes what they ran with.
+// Restore the arguments and the log carries credentials in the clear (#320).
+func (d *CommonDatabase) Log(sql string) {
 	if d.logSQL {
-		slog.Info(fmt.Sprintf("sql: %v", sql))
-		argsStr := ""
-		for i, arg := range args {
-			argsStr += fmt.Sprintf("[arg %v: %v] ", i, arg)
-		}
-		slog.Info(fmt.Sprintf("sql args: %v", argsStr))
+		slog.Info("sql", "statement", sql)
 	}
 }
 
 func (d *CommonDatabase) ExecSql(tx *sql.Tx, sql string, args ...any) (sql.Result, error) {
 
-	d.Log(sql, args...)
+	d.Log(sql)
 
 	if tx != nil {
 		result, err := tx.Exec(sql, args...)
@@ -272,7 +276,7 @@ func (d *CommonDatabase) ExecSql(tx *sql.Tx, sql string, args ...any) (sql.Resul
 // For the getters behind permission and session lookups, that is the wrong
 // direction to fail in.
 func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Rows, error) {
-	d.Log(sql, args...)
+	d.Log(sql)
 
 	if tx != nil {
 		result, err := tx.Query(sql, args...)

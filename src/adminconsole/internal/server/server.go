@@ -103,16 +103,7 @@ func (s *Server) Start() {
 	slog.Info(fmt.Sprintf("http enabled: %v", httpEnabled))
 
 	if httpEnabled && !httpsEnabled {
-		slog.Warn("=== WARNING ===")
-		slog.Warn("You are running the admin console with HTTP (without TLS/HTTPS).")
-		slog.Warn("This is HIGHLY INSECURE unless you are:")
-		slog.Warn("  1. Only doing development/testing, OR")
-		slog.Warn("  2. Running behind a reverse proxy that handles HTTPS")
-		slog.Warn("")
-		slog.Warn("In production environments, you should either:")
-		slog.Warn("  - Enable HTTPS configuration, OR")
-		slog.Warn("  - Ensure your reverse proxy handles HTTPS properly")
-		slog.Warn("===============")
+		logHttpWithoutTlsWarning()
 	}
 
 	errChan := make(chan error, 2) // Buffer for both HTTP and HTTPS errors
@@ -307,4 +298,13 @@ func (s *Server) serveStaticFiles(path string, root http.FileSystem) {
 
 		fsHandler.ServeHTTP(w, r)
 	})
+}
+
+// logHttpWithoutTlsWarning reports a deployment listening on HTTP with no HTTPS
+// listener configured. The auth server's copy is the same record about the other
+// server, and the two cannot be shared: each names the server it is about, and
+// neither module imports the other (#320 decision 6).
+func logHttpWithoutTlsWarning() {
+	slog.Warn("the admin console is listening on HTTP with no TLS, which is insecure outside development unless a reverse proxy in front of it terminates HTTPS",
+		"remedy", "configure the HTTPS listener, or make sure the reverse proxy handles HTTPS")
 }

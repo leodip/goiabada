@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/core/auditlog"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
@@ -518,10 +519,12 @@ type revocationSweep struct {
 // emitted by every site that invalidates a user's live authentication state, so that a forced
 // logout never happens without a trace. The four credential sites reach it through
 // handlers.LogRevokedUserAuthState. This one cannot, because that helper and AuditLogger both
-// live in the authserver module and core cannot import it, so the payload is written out here
-// and the shape is kept identical field for field. A consumer matching on
-// revoked_user_auth_state finds the same keys whichever site produced the row, and tells them
-// apart by `reason` as the event's contract says.
+// live in the authserver module and core cannot import it, so the payload is built here and the
+// shape is kept identical field for field. A consumer matching on revoked_user_auth_state finds
+// the same keys whichever site produced the row, and tells them apart by `reason` as the event's
+// contract says. The console record is no longer a hand copy: auditlog.LogToConsole is the one
+// writer both sites call, so the two cannot drift into two shapes on one log stream (#320). The
+// database row still is one, and the test below is what holds it.
 //
 // WHY THE RECORD MATTERS MORE HERE THAN AT THE OTHER FOUR. Those four are things a person did
 // and can account for. This one is the server disabling an account and destroying every
@@ -572,18 +575,7 @@ func (d *CommonDatabase) auditRevokedUserAuthState(userId int64, swept revocatio
 	}
 
 	if settings.AuditLogsInConsoleEnabled {
-		evt := struct {
-			AuditEvent string                 `json:"audit_event"`
-			Details    map[string]interface{} `json:"details"`
-		}{AuditEvent: constants.AuditRevokedUserAuthState, Details: details}
-
-		eventJSON, err := json.Marshal(evt)
-		if err != nil {
-			slog.Error("failed to marshal audit event",
-				"error", err, "event", constants.AuditRevokedUserAuthState)
-		} else {
-			slog.Info(string(eventJSON))
-		}
+		auditlog.LogToConsole(constants.AuditRevokedUserAuthState, details)
 	}
 
 	if settings.AuditLogsInDatabaseEnabled {
