@@ -7,7 +7,7 @@ require (
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/leodip/goiabada/core v0.0.0
 	github.com/lib/pq v1.12.3
-	github.com/microsoft/go-mssqldb v1.10.0
+	github.com/microsoft/go-mssqldb v1.11.0
 )
 
 replace github.com/leodip/goiabada/core => ../../core
