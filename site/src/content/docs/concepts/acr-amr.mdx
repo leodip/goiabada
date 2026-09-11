@@ -46,7 +46,7 @@ The AMR claim in the ID token contains all methods used during authentication. F
 - Password only: `"amr": ["pwd"]`
 - Password + OTP: `"amr": ["pwd", "otp"]`
 
-Goiabada never emits the `mfa` value. Check `amr` for the methods and `acr` for the level: `["pwd", "otp"]` already tells you two factors were used.
+Goiabada never emits the `mfa` value, because it would add nothing that is not already there: `amr` lists the methods and `acr` names the level. Read those two claims rather than looking for `mfa`.
 
 ## Configuring ACR levels
 
