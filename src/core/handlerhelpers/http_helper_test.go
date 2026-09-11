@@ -314,7 +314,11 @@ func TestJsonError(t *testing.T) {
 	assert.NoError(t, err2)
 
 	assert.Equal(t, "test_error", response["error"])
-	assert.Equal(t, "Test error description", response["error_description"])
+	// The detail names no status, so it defaults to 500 and the description picks up the request
+	// id the way every other 500 on this surface does. There is no request id middleware on this
+	// bare request, so the id is empty; http_helper_logging_test.go owns the row that pins the
+	// correlation itself.
+	assert.Contains(t, response["error_description"], "Test error description")
 }
 
 func TestEncodeJson(t *testing.T) {

@@ -110,8 +110,14 @@ func HandleAPISettingsKeysRotatePost(
 				http.StatusConflict)
 
 		case errors.Is(err, oauth.ErrKeySetIncomplete):
-			writeJSONError(w, "Expected current and next keys to exist", "KEY_SET_INCOMPLETE",
-				http.StatusInternalServerError)
+			// A 500 that keeps its own error_code, because the console routes on it and the
+			// OpenAPI text names it: the generic writer would flatten it to
+			// INTERNAL_SERVER_ERROR. It still owes what every other 500 here writes, one
+			// structured record with the stack and the same request id on the wire, which is
+			// what this writer adds and what the bare 4xx envelope it used could not (#279).
+			writeInternalServerErrorWithCode(w, r,
+				errs.Wrap(err, "unable to rotate the signing keys"),
+				"Expected current and next keys to exist", "KEY_SET_INCOMPLETE")
 
 		default:
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to rotate signing keys"))

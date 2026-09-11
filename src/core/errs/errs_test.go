@@ -203,6 +203,28 @@ func TestChain_CarriesExactlyOneStackAndItIsTheOrigin(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(out, ".dataLayer\n"), "one stack, printed once")
 }
 
+// Implementing fmt.Formatter takes fmt's own verb handling away from the value, and every error in
+// this tree is now this type, so a directive this package does not interpret has to keep meaning
+// what it means everywhere else. It did not: Format answered every verb with the bare message, so
+// %q printed unquoted text, %x printed the message instead of its hex, and a width was ignored.
+// The contract asserted here is "the message string, formatted by fmt", which is what a caller who
+// writes %q on an error is asking for (#279).
+func TestFormat_EveryDirectiveButPlusVFormatsTheMessageString(t *testing.T) {
+	err := WithStack(service())
+	message := err.Error()
+
+	for _, directive := range []string{"%v", "%s", "%q", "%x", "%X", "%#v", "%+q", "%20.8s", "%-40s|", "%d"} {
+		assert.Equal(t, fmt.Sprintf(directive, message), fmt.Sprintf(directive, err),
+			"%s on an error must read as %s on its message", directive, directive)
+	}
+
+	// And %+v is still the one directive this type interprets, so the loop above cannot be
+	// satisfied by a Format that simply forwarded everything.
+	plus := fmt.Sprintf("%+v", err)
+	assert.NotEqual(t, message, plus, "%%+v must add the frames")
+	assert.Contains(t, plus, "\n\t", "%%+v must print frames, not just the message")
+}
+
 func TestChain_ErrorsIsTraversesEveryWrapper(t *testing.T) {
 	assert.True(t, errors.Is(WithStack(service()), sql.ErrConnDone),
 		"Wrap, then Wrap, then WithStack, and the sentinel is still reachable")

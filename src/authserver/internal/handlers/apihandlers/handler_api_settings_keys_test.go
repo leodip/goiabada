@@ -1,11 +1,14 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -51,8 +54,13 @@ func stubRotateRead(database *mocks_data.Database, keys []models.KeyPair) *runIn
 	return stub
 }
 
+// rotateKeysRequestId is chi's request id for these rows: the attribute the request logger writes,
+// and therefore the one a 500's log record and its body have to agree on.
+const rotateKeysRequestId = "req-rotate-keys"
+
 func rotateRequest() *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/api/v1/admin/settings/keys/rotate", nil)
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/admin/settings/keys/rotate", nil)
+	return r.WithContext(context.WithValue(r.Context(), middleware.RequestIDKey, rotateKeysRequestId))
 }
 
 // TestHandleAPISettingsKeysRotatePost_Success is the wiring test: the whole transition runs and the
@@ -145,12 +153,26 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())
+	logged := captureHandlerLogs(t, func() {
+		HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())
+	})
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	body := decodeErrorBody(t, rr)
-	assert.Equal(t, "KEY_SET_INCOMPLETE", body.ErrorCode)
-	assert.Equal(t, "Expected current and next keys to exist", body.ErrorDescription)
+	assert.Equal(t, "KEY_SET_INCOMPLETE", body.ErrorCode,
+		"the code a caller routes on survives; only the generic 500s were flattened")
+	assert.Contains(t, body.ErrorDescription, "Expected current and next keys to exist")
+
+	// The half this branch skipped entirely while it wrote a bare 4xx envelope: a 500 is logged
+	// once, with its stack, and names on the wire the request id an operator finds that record by.
+	assert.Equal(t, 1, strings.Count(logged, "level=ERROR"), "one record, not none and not two")
+	assert.Contains(t, logged, "msg=\"internal server error\"")
+	assert.Contains(t, logged, "request_id="+rotateKeysRequestId)
+	assert.Contains(t, logged, "handler_api_settings_keys.go",
+		"slog's text handler prints an error value with %+v, so the stack rides in the record")
+	assert.Contains(t, body.ErrorDescription, rotateKeysRequestId,
+		"the id on the wire and the id in the log have to be the same string")
+
 	assert.Error(t, stub.bodyErr, "the refusal reached the helper, which rolls back")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)

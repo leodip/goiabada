@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -40,8 +39,13 @@ func HandleAdminGetPermissionsGet(
 		// Get permissions via API client
 		permissions, err := apiClient.GetPermissionsByResource(accessToken, resourceId)
 		if err != nil {
-			slog.Error("Admin Console: Error getting permissions from API", "error", err, "resourceId", resourceId)
-			HandleAPIErrorJson(httpHelper, w, r, err)
+			// The resource id goes into the message rather than into a record of its own. This
+			// was the console's one caller-side error log, and it ran before the classifier: an
+			// upstream 500 was written twice, and a 400, 404 or 409 that the classifier forwards
+			// silently on purpose was still announced at ERROR. errors.As sees the
+			// *apiclient.APIError through this wrap, so the forwarding is unaffected (#279).
+			HandleAPIErrorJson(httpHelper, w, r,
+				errs.Wrapf(err, "unable to get the permissions of resource %d", resourceId))
 			return
 		}
 

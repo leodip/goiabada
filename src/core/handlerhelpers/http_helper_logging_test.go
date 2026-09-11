@@ -330,6 +330,75 @@ func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 	assert.Contains(t, response["error_description"], requestId)
 }
 
+// The branch between the two: an *ErrorDetail carrying no status at all. It is answered 500, and a
+// 500 is a server fault whichever branch produced it, so it owes the same single record and the
+// same request id on the wire. It did neither, which made this the one 500 in the tree an operator
+// could not join to a log line, and the silence was invisible because TestJsonError pinned the
+// status and the code and never looked at the record (#279 decisions 9 and 12).
+func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testing.T) {
+	logs := captureLogs(t)
+	httpHelper := NewHttpHelper(&mocks.TestFS{})
+
+	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
+		httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The operation failed."))
+	})
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+	record, ok := theOneErrorRecord(t, logs)
+	if !ok {
+		return
+	}
+	assert.Equal(t, "internal server error", record.Message)
+	if _, isError := loggedErrorOf(t, record); !isError {
+		return
+	}
+
+	requestId, isString := attrsOf(record)["request_id"].(string)
+	require.True(t, isString, "request_id must be a string attribute")
+	require.NotEmpty(t, requestId)
+
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Equal(t, "server_error", response["error"], "the detail's own code still reaches the wire")
+	assert.Contains(t, response["error_description"], "The operation failed.",
+		"and so does its own sentence")
+	assert.Contains(t, response["error_description"], requestId,
+		"the id on the wire and the id on the log line have to be the same string")
+}
+
+// The silence is scoped to a status somebody chose. A 4xx detail is a client's mistake and stays
+// silent, which is the row below; an explicit 500 stays silent too, because its one production
+// builder is handler_token.go's jsonErrorConformed, which writes the record and puts the request id
+// in the description before it ever reaches here. Logging it a second time here is the defect this
+// row exists to catch.
+func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
+	logs := captureLogs(t)
+	httpHelper := NewHttpHelper(&mocks.TestFS{})
+
+	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error",
+		"An unexpected server error has occurred. Request Id: already-in-the-sentence",
+		http.StatusInternalServerError)
+
+	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
+		httpHelper.JsonError(w, r, detail)
+	})
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Empty(t, logs.all(), "the caller that chose this status owns the record")
+
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Equal(t, "An unexpected server error has occurred. Request Id: already-in-the-sentence",
+		response["error_description"], "and owns the sentence, so nothing is appended to it")
+}
+
 // Decision 6's regression guard at this writer. An *ErrorDetail that something wrapped on the way
 // up still decides the status, the code and the description; under the bare type assertion this
 // replaced, one wrap turned a validator's 400 into a 500 and sent the sentence to the log instead

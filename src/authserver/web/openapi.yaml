@@ -2607,8 +2607,9 @@ paths:
             error_code is KEY_SET_INCOMPLETE when the deployment has no current
             or no next key, which is an operator problem rather than a
             transient one and a retry will not clear it, or INTERNAL_SERVER_ERROR
-            for a storage or key generation failure. Nothing was rotated either
-            way: the whole transition is one transaction.
+            for a storage or key generation failure. Either way the description
+            ends with the request id of the log line, and nothing was rotated:
+            the whole transition is one transaction.
           content:
             application/json:
               schema:
