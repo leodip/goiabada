@@ -12,7 +12,6 @@ import (
 )
 
 func HandleAPIUserConsentsGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +30,7 @@ func HandleAPIUserConsentsGet(
 		// Check if user exists
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
@@ -42,14 +41,14 @@ func HandleAPIUserConsentsGet(
 		// Get user consents
 		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		// Load client details for consents
 		err = database.UserConsentsLoadClients(nil, userConsents)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
@@ -62,7 +61,6 @@ func HandleAPIUserConsentsGet(
 }
 
 func HandleAPIUserConsentDelete(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -82,7 +80,7 @@ func HandleAPIUserConsentDelete(
 		// Get the consent to check if it exists and get user info for audit
 		consent, err := database.GetUserConsentById(nil, consentId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			writeInternalServerError(w, r, err)
 			return
 		}
 		if consent == nil {
@@ -93,7 +91,7 @@ func HandleAPIUserConsentDelete(
 		// Delete the consent
 		err = database.DeleteUserConsent(nil, consentId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			writeInternalServerError(w, r, err)
 			return
 		}
 

@@ -220,8 +220,8 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-sessions/{id}", apihandlers.HandleAPIUserSessionDelete(s.database, authHelper, auditLogger))
 
 		// User consent routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleAPIUserConsentsGet(httpHelper, s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-consents/{id}", apihandlers.HandleAPIUserConsentDelete(httpHelper, s.database, auditLogger))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleAPIUserConsentsGet(s.database))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-consents/{id}", apihandlers.HandleAPIUserConsentDelete(s.database, auditLogger))
 
 		// Group management routes
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups", apihandlers.HandleAPIGroupsGet(s.database))
@@ -365,7 +365,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		// Profile picture (self-service)
 		r.Get("/profile-picture", apihandlers.HandleAPIAccountProfilePictureGet(s.database))
 		r.Post("/profile-picture", apihandlers.HandleAPIAccountProfilePicturePost(s.database, auditLogger))
-		r.Delete("/profile-picture", apihandlers.HandleAPIAccountProfilePictureDelete(httpHelper, s.database, auditLogger))
+		r.Delete("/profile-picture", apihandlers.HandleAPIAccountProfilePictureDelete(s.database, auditLogger))
 	})
 
 	// Browser session store, for the admin console (#266).

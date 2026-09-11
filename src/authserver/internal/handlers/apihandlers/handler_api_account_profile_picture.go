@@ -127,7 +127,6 @@ func HandleAPIAccountProfilePicturePost(
 
 // HandleAPIAccountProfilePictureDelete - DELETE /api/v1/account/profile-picture
 func HandleAPIAccountProfilePictureDelete(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -148,7 +147,7 @@ func HandleAPIAccountProfilePictureDelete(
 		// Get user from database
 		user, err := database.GetUserBySubject(nil, sub)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, errs.Wrap(err, "failed to get user"))
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to get user"))
 			return
 		}
 
