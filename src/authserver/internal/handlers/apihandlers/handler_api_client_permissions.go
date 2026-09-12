@@ -194,7 +194,7 @@ func HandleAPIClientPermissionsPut(
 		}
 
 		// Audit consolidated update
-		auditLogger.Log(constants.AuditUpdatedClientPermissions, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedClientPermissions, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})

@@ -872,6 +872,11 @@ func TestBackfillLowercaseEmails_TheAuditSettingsDecideBothTargets(t *testing.T)
 					require.True(t, ok, "the console record must carry the details as a map")
 					assert.Equal(t, constants.RevocationReasonEmailCollisionBackfill, details["reason"])
 					assert.Equal(t, int64(1), details["userId"])
+					// And no request_id, which is the truth about this site rather than a gap:
+					// the pass runs at startup inside a Database method, so there is no request
+					// to correlate to and LogToConsole is given a Background context (#328).
+					assert.NotContains(t, record.Attrs, "request_id",
+						"a startup pass has no request, so the attribute is absent rather than empty")
 				}
 			} else {
 				assert.Zero(t, console,

@@ -591,10 +591,14 @@ func RevokeClientGrantsTx(db data.Database, clientId int64,
 // then differ between sites, and there is a single place to assert its shape field by field.
 //
 // Call this only after RevokeClientGrantsTx returned without error.
-func LogRevokedClientGrants(auditLogger AuditLogger, clientId int64, reason string,
+//
+// ctx is the request's, taken as a parameter rather than reached for because this helper has
+// neither an *http.Request nor a context of its own and the event it raises has to be correlated
+// to the request that caused the revocation (#328). All of its callers are handlers.
+func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, clientId int64, reason string,
 	loggedInUser string, result ClientGrantRevocationResult) {
 
-	auditLogger.Log(constants.AuditRevokedClientGrants, map[string]interface{}{
+	auditLogger.Log(ctx, constants.AuditRevokedClientGrants, map[string]interface{}{
 		"clientId":     clientId,
 		"reason":       reason,
 		"loggedInUser": loggedInUser,
@@ -612,10 +616,12 @@ func LogRevokedClientGrants(auditLogger AuditLogger, clientId int64, reason stri
 // its shape field by field.
 //
 // Call this only after RevokeUserAuthStateTx returned without error.
-func LogRevokedUserAuthState(auditLogger AuditLogger, userId int64, reason string,
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
 	loggedInUser string, result RevocationResult) {
 
-	auditLogger.Log(constants.AuditRevokedUserAuthState, map[string]interface{}{
+	auditLogger.Log(ctx, constants.AuditRevokedUserAuthState, map[string]interface{}{
 		"userId":       userId,
 		"reason":       reason,
 		"loggedInUser": loggedInUser,
@@ -642,10 +648,12 @@ func LogRevokedUserAuthState(auditLogger AuditLogger, userId int64, reason strin
 //
 // Call this only after TerminateUserSessionTx returned without error, and beside rather than
 // instead of AuditDeletedUserSession, whose payload decision 9 leaves untouched.
-func LogTerminatedUserSession(auditLogger AuditLogger, userSession *models.UserSession,
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, userSession *models.UserSession,
 	loggedInUser string, result TerminationResult) {
 
-	auditLogger.Log(constants.AuditTerminatedUserSession, map[string]interface{}{
+	auditLogger.Log(ctx, constants.AuditTerminatedUserSession, map[string]interface{}{
 		"userId":            userSession.UserId,
 		"userSessionId":     userSession.Id,
 		"sessionIdentifier": userSession.SessionIdentifier,

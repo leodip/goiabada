@@ -113,11 +113,11 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	database.On("PromoteUserSessionGeneration", apiRevokeTx, int64(100), int64(8)).Return(nil).Once()
 	database.On("DeleteUserSession", apiRevokeTx, int64(200)).Return(nil).Once()
 
-	auditLogger.On("Log", constants.AuditChangedPassword, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditChangedPassword, mock.Anything).Return().Once()
 	var payload map[string]interface{}
-	auditLogger.On("Log", constants.AuditRevokedUserAuthState, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditRevokedUserAuthState, mock.Anything).
 		Run(func(args mock.Arguments) {
-			payload = args.Get(1).(map[string]interface{})
+			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -174,11 +174,11 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 	database.On("SetUserPasswordHash", apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	stubSweep(database, 42, 8)
 
-	auditLogger.On("Log", constants.AuditChangedPassword, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditChangedPassword, mock.Anything).Return().Once()
 	var payload map[string]interface{}
-	auditLogger.On("Log", constants.AuditRevokedUserAuthState, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditRevokedUserAuthState, mock.Anything).
 		Run(func(args mock.Arguments) {
-			payload = args.Get(1).(map[string]interface{})
+			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -233,5 +233,5 @@ func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	database.AssertExpectations(t)
 	assert.EqualError(t, stub.bodyErr, "increment failed", "the body hands its error to the helper, which rolls back")
 	// NEITHER event. changed_password would otherwise claim a password change that rolled back.
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

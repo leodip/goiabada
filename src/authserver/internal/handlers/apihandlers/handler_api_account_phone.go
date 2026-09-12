@@ -100,7 +100,7 @@ func HandleAPIAccountPhonePut(
 		}
 
 		// Audit (self-service)
-		auditLogger.Log(constants.AuditUpdatedOwnPhone, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedOwnPhone, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})

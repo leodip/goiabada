@@ -77,7 +77,7 @@ func HandleAPISettingsUIThemePut(
 		}
 
 		// Audit log old/new
-		auditLogger.Log(constants.AuditUpdatedUIThemeSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedUIThemeSettings, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 			"oldUITheme":   oldTheme,
 			"newUITheme":   currentSettings.UITheme,

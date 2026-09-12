@@ -192,7 +192,7 @@ func auditFailedResetPasswordCode(auditLogger AuditLogger, r *http.Request, user
 		details["userId"] = userId
 	}
 
-	auditLogger.Log(constants.AuditFailedResetPasswordCode, details)
+	auditLogger.Log(r.Context(), constants.AuditFailedResetPasswordCode, details)
 }
 
 // rejectResetPassword audits the cause and renders the one indistinguishable response. The
@@ -495,7 +495,7 @@ func HandleResetPasswordPost(
 
 		// After commit, per decision 5. This is also the first audit event this handler emits
 		// on SUCCESS: until now it logged only failures (auditFailedResetPasswordCode).
-		LogRevokedUserAuthState(auditLogger, user.Id, RevocationReasonPasswordReset, "", result)
+		LogRevokedUserAuthState(r.Context(), auditLogger, user.Id, RevocationReasonPasswordReset, "", result)
 
 		// Hygiene, and not the thing that makes the marker single-use: the claim above is.
 		// A failure here is logged rather than answered with a 500, because the password has

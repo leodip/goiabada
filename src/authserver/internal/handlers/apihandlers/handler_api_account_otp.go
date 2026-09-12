@@ -376,7 +376,7 @@ func HandleAPIAccountOTPPut(
 				// emits nothing when a code is simply wrong, and enabling OTP is not an
 				// authentication ceremony. Decision 5 puts the replay event alongside the
 				// existing failure event, and here there is none.
-				auditLogger.Log(constants.AuditOTPCodeReplayDetected, map[string]interface{}{
+				auditLogger.Log(r.Context(), constants.AuditOTPCodeReplayDetected, map[string]interface{}{
 					"userId": user.Id,
 					"step":   step,
 				})
@@ -400,7 +400,7 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			auditLogger.Log(constants.AuditEnabledOTP, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditEnabledOTP, map[string]interface{}{
 				"userId": user.Id,
 			})
 		} else {
@@ -415,7 +415,7 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			auditLogger.Log(constants.AuditDisabledOTP, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditDisabledOTP, map[string]interface{}{
 				"userId": user.Id,
 			})
 		}

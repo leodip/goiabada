@@ -1,9 +1,12 @@
 package audit
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/core/constants"
 	mocks "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil"
@@ -64,7 +67,7 @@ func TestAuditLogger_ConsoleRecordCarriesTheEventAndTheDetails(t *testing.T) {
 			}
 			mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
 
-			NewAuditLogger(mockDB).Log(tc.event, tc.details)
+			NewAuditLogger(mockDB).Log(context.Background(), tc.event, tc.details)
 
 			records := logs.Records()
 			require.Len(t, records, 1, "one audit event, one console record")
@@ -93,7 +96,7 @@ func TestAuditLoggerDisabled(t *testing.T) {
 	auditLogger := NewAuditLogger(mockDB)
 
 	// Call the Log method
-	auditLogger.Log("test_event", map[string]interface{}{"key": "value"})
+	auditLogger.Log(context.Background(), "test_event", map[string]interface{}{"key": "value"})
 
 	// Get the logged output
 	output := logs.Text()
@@ -130,7 +133,7 @@ func TestAuditLogger_DBPersistence_Enabled(t *testing.T) {
 	auditLogger := NewAuditLogger(mockDB)
 
 	// Log an event
-	auditLogger.Log("test_event", map[string]interface{}{
+	auditLogger.Log(context.Background(), "test_event", map[string]interface{}{
 		"user_id": "123",
 		"action":  "login",
 	})
@@ -158,7 +161,7 @@ func TestAuditLogger_DBPersistence_Disabled(t *testing.T) {
 	auditLogger := NewAuditLogger(mockDB)
 
 	// Log an event
-	auditLogger.Log("test_event", map[string]interface{}{
+	auditLogger.Log(context.Background(), "test_event", map[string]interface{}{
 		"key": "value",
 	})
 
@@ -181,7 +184,7 @@ func TestAuditLogger_SettingsError(t *testing.T) {
 	auditLogger := NewAuditLogger(mockDB)
 
 	// Log an event
-	auditLogger.Log("test_event", map[string]interface{}{
+	auditLogger.Log(context.Background(), "test_event", map[string]interface{}{
 		"key": "value",
 	})
 
@@ -214,7 +217,7 @@ func TestAuditLogger_DBPersistence_CreateError(t *testing.T) {
 	auditLogger := NewAuditLogger(mockDB)
 
 	// Log an event (should not panic despite DB error)
-	auditLogger.Log("test_event", map[string]interface{}{
+	auditLogger.Log(context.Background(), "test_event", map[string]interface{}{
 		"key": "value",
 	})
 
@@ -246,7 +249,7 @@ func TestAuditLogger_DBPersistence_JSONMarshalError(t *testing.T) {
 	auditLogger := NewAuditLogger(mockDB)
 
 	// Log an event with un-marshalable details (channel cannot be marshaled to JSON)
-	auditLogger.Log("test_event", map[string]interface{}{
+	auditLogger.Log(context.Background(), "test_event", map[string]interface{}{
 		"channel": make(chan int),
 	})
 
@@ -277,7 +280,7 @@ func TestAuditLogger_BothConsoleAndDB(t *testing.T) {
 	auditLogger := NewAuditLogger(mockDB)
 
 	// Log an event
-	auditLogger.Log("test_event", map[string]interface{}{
+	auditLogger.Log(context.Background(), "test_event", map[string]interface{}{
 		"key": "value",
 	})
 
@@ -307,7 +310,7 @@ func TestAuditLogger_ConsoleEnabledDBDisabled(t *testing.T) {
 	auditLogger := NewAuditLogger(mockDB)
 
 	// Log an event
-	auditLogger.Log("test_event", map[string]interface{}{
+	auditLogger.Log(context.Background(), "test_event", map[string]interface{}{
 		"key": "value",
 	})
 
@@ -325,8 +328,192 @@ func TestAuditLogger_NilDatabase(t *testing.T) {
 
 	// Log an event (should not panic, just return early)
 	assert.NotPanics(t, func() {
-		auditLogger.Log("test_event", map[string]interface{}{
+		auditLogger.Log(context.Background(), "test_event", map[string]interface{}{
 			"key": "value",
 		})
 	})
+}
+
+// requestContext is a context carrying chi's request id under the key chimiddleware.GetReqID
+// reads, which is what a request's context holds once the RequestID middleware at the root of
+// both servers has run.
+func requestContext(id string) context.Context {
+	return context.WithValue(context.Background(), chimiddleware.RequestIDKey, id)
+}
+
+// TestAuditLogger_EveryRecordCarriesTheRequestId is the whole of #328 at this seam: all four
+// records this function can write carry the request id when the context has one, and none carries
+// it when the context has none. Four records rather than one because the three failures are the
+// records an operator reads while working out why an event is missing, and a failure nobody can
+// tie to a request is the same gap the event itself had.
+//
+// Nothing below names request_id at a call site. CaptureSlog installs logging.WrapRequestID, the
+// same wrapper both servers install, so what these cases exercise is the injection in production
+// and not a second copy of it.
+func TestAuditLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
+	const requestId = "goiabada/req-0000042"
+
+	records := []struct {
+		name string
+		// setup arranges the one record this row is about, and nothing else: each row disables the
+		// target it is not testing so exactly one record is written.
+		setup   func(mockDB *mocks.Database)
+		details map[string]interface{}
+		level   slog.Level
+		message string
+	}{
+		{
+			name: "the console record",
+			setup: func(mockDB *mocks.Database) {
+				mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+					AuditLogsInConsoleEnabled: true,
+				}, nil)
+			},
+			details: map[string]interface{}{"email": "jane@example.com"},
+			level:   slog.LevelInfo,
+			message: "audit event",
+		},
+		{
+			name: "the settings row could not be read",
+			setup: func(mockDB *mocks.Database) {
+				mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(nil, assert.AnError)
+			},
+			details: map[string]interface{}{"email": "jane@example.com"},
+			level:   slog.LevelError,
+			message: "unable to read the settings row for audit logging",
+		},
+		{
+			name: "the details could not be marshalled",
+			setup: func(mockDB *mocks.Database) {
+				mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+					AuditLogsInDatabaseEnabled: true,
+				}, nil)
+			},
+			// A channel is the value json.Marshal refuses, so this row reaches the marshal failure
+			// rather than the persist one; CreateAuditLog is left unexpected, so the mock fails the
+			// test if the row is written anyway.
+			details: map[string]interface{}{"channel": make(chan int)},
+			level:   slog.LevelError,
+			message: "unable to marshal the audit event details for the database",
+		},
+		{
+			name: "the row could not be persisted",
+			setup: func(mockDB *mocks.Database) {
+				mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+					AuditLogsInDatabaseEnabled: true,
+				}, nil)
+				mockDB.On("CreateAuditLog", mock.Anything, mock.Anything).Return(assert.AnError)
+			},
+			details: map[string]interface{}{"email": "jane@example.com"},
+			level:   slog.LevelError,
+			message: "unable to persist the audit log to the database",
+		},
+	}
+
+	for _, rec := range records {
+		t.Run(rec.name+", under the request's context", func(t *testing.T) {
+			logs := testutil.CaptureSlog(t)
+			mockDB := mocks.NewDatabase(t)
+			rec.setup(mockDB)
+
+			NewAuditLogger(mockDB).Log(requestContext(requestId), "auth_failed_pwd", rec.details)
+
+			written := logs.Records()
+			require.Len(t, written, 1, "exactly the record this case is about")
+			require.Equal(t, rec.message, written[0].Message)
+			assert.Equal(t, rec.level, written[0].Level)
+			assert.Equal(t, requestId, written[0].Attrs["request_id"],
+				"the record an operator filters by request_id is the one this request raised")
+		})
+
+		t.Run(rec.name+", under a context carrying no request", func(t *testing.T) {
+			logs := testutil.CaptureSlog(t)
+			mockDB := mocks.NewDatabase(t)
+			rec.setup(mockDB)
+
+			NewAuditLogger(mockDB).Log(context.Background(), "auth_failed_pwd", rec.details)
+
+			written := logs.Records()
+			require.Len(t, written, 1)
+			require.Equal(t, rec.message, written[0].Message)
+			assert.NotContains(t, written[0].Attrs, "request_id",
+				"no request means the attribute is absent rather than empty")
+		})
+	}
+}
+
+// TestAuditLogger_TakesTheSettingsFromTheRequestContext is decision 5, the cheap half of #212
+// folded in: on every route the settings middleware runs on, the row Log needs is already on the
+// request context, so the per-event fetch is skipped.
+//
+// The mock is given NO GetSettingsById expectation, which is what makes this case fail for its
+// stated reason: mocks.NewDatabase(t) fails the test on an unexpected call, so a Log that read the
+// row anyway is reported as the unexpected read rather than passing quietly.
+func TestAuditLogger_TakesTheSettingsFromTheRequestContext(t *testing.T) {
+	logs := testutil.CaptureSlog(t)
+
+	mockDB := mocks.NewDatabase(t)
+	mockDB.On("CreateAuditLog", mock.Anything, mock.MatchedBy(func(log *models.AuditLog) bool {
+		return log.AuditEvent == "auth_success_pwd"
+	})).Return(nil).Once()
+
+	ctx := context.WithValue(requestContext("goiabada/req-0000007"), constants.ContextKeySettings,
+		&models.Settings{AuditLogsInConsoleEnabled: true, AuditLogsInDatabaseEnabled: true})
+
+	NewAuditLogger(mockDB).Log(ctx, "auth_success_pwd", map[string]interface{}{"userId": int64(1)})
+
+	written := logs.Records()
+	require.Len(t, written, 1, "both targets were enabled by the settings on the context")
+	assert.Equal(t, "audit event", written[0].Message)
+	assert.Equal(t, "goiabada/req-0000007", written[0].Attrs["request_id"])
+	mockDB.AssertExpectations(t)
+	mockDB.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything)
+}
+
+// The fallback, which is what keeps the five root registrations and the rate limiter's three tiers
+// working: those routes never pass through the settings middleware, so nothing is on the context
+// and the row is read exactly as before.
+//
+// Two shapes of absent are covered, and the typed nil is the one worth its own case: the type
+// assertion succeeds on a (*models.Settings)(nil), so a guard reading only the assertion's second
+// result would go on to dereference it and panic in the audit path of every event.
+func TestAuditLogger_ReadsTheSettingsRowWhenTheContextHasNone(t *testing.T) {
+	contexts := []struct {
+		name string
+		ctx  context.Context
+	}{
+		{name: "nothing on the context", ctx: requestContext("goiabada/req-0000008")},
+		{
+			name: "a typed nil on the context",
+			ctx: context.WithValue(requestContext("goiabada/req-0000008"),
+				constants.ContextKeySettings, (*models.Settings)(nil)),
+		},
+		{
+			name: "a value of another type on the context",
+			ctx: context.WithValue(requestContext("goiabada/req-0000008"),
+				constants.ContextKeySettings, "not a settings row"),
+		},
+	}
+
+	for _, tc := range contexts {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := testutil.CaptureSlog(t)
+
+			mockDB := mocks.NewDatabase(t)
+			mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+				AuditLogsInConsoleEnabled: true,
+			}, nil).Once()
+
+			assert.NotPanics(t, func() {
+				NewAuditLogger(mockDB).Log(tc.ctx, "auth_success_pwd",
+					map[string]interface{}{"userId": int64(1)})
+			})
+
+			written := logs.Records()
+			require.Len(t, written, 1)
+			assert.Equal(t, "audit event", written[0].Message)
+			assert.Equal(t, "goiabada/req-0000008", written[0].Attrs["request_id"])
+			mockDB.AssertExpectations(t)
+		})
+	}
 }

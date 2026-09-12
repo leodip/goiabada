@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
@@ -81,7 +82,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// SSO reuse: no UpdateUserSession call (AuthTime is NOT refreshed)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -198,6 +199,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionIdentifier := "session-of-user-1"
 		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		// The request id chi's middleware would have put there, read back by the
+		// AuditTerminatedUserSession expectation below (#328 seam 3).
+		ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, "goiabada/req-completed-1")
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
@@ -238,27 +242,33 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			{Id: 11, RefreshTokenJti: "rt-of-user-1"},
 		}, func(step string) { sequence = append(sequence, step) })
 
-		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(0).(string)) }
+		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(1).(string)) }
 
 		var replacedPayload map[string]interface{}
-		auditLogger.On("Log", constants.AuditCrossUserSessionReplaced, mock.Anything).
+		auditLogger.On("Log", mock.Anything, constants.AuditCrossUserSessionReplaced, mock.Anything).
 			Run(func(args mock.Arguments) {
 				recordEvent(args)
-				replacedPayload = args.Get(1).(map[string]interface{})
+				replacedPayload = args.Get(2).(map[string]interface{})
 			}).Return().Once()
 		var deletedPayload map[string]interface{}
-		auditLogger.On("Log", constants.AuditDeletedUserSession, mock.Anything).
+		auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSession, mock.Anything).
 			Run(func(args mock.Arguments) {
 				recordEvent(args)
-				deletedPayload = args.Get(1).(map[string]interface{})
+				deletedPayload = args.Get(2).(map[string]interface{})
 			}).Return().Once()
 		var terminatedPayload map[string]interface{}
-		auditLogger.On("Log", constants.AuditTerminatedUserSession, mock.Anything).
+		// LogTerminatedUserSession is one of the three revocation helpers that took neither an
+		// *http.Request nor a context before #328, so this is the call shape the compiler could
+		// not have forced on its own: the helper has to be handed the request's context by each
+		// of its eight callers, and the id below is how this case says it was.
+		auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
+			return chimiddleware.GetReqID(ctx) == "goiabada/req-completed-1"
+		}), constants.AuditTerminatedUserSession, mock.Anything).
 			Run(func(args mock.Arguments) {
 				recordEvent(args)
-				terminatedPayload = args.Get(1).(map[string]interface{})
+				terminatedPayload = args.Get(2).(map[string]interface{})
 			}).Return().Once()
-		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).
+		auditLogger.On("Log", mock.Anything, constants.AuditStartedNewUserSesson, mock.Anything).
 			Run(recordEvent).Return().Once()
 
 		newAuthTime := time.Now().UTC()
@@ -406,10 +416,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// action happened.
 		stubCrossUserTermination(database, foreignSession, 0, nil, nil)
 
-		auditLogger.On("Log", constants.AuditCrossUserSessionReplaced, mock.Anything).Return().Once()
-		auditLogger.On("Log", constants.AuditDeletedUserSession, mock.Anything).Return().Once()
-		auditLogger.On("Log", constants.AuditTerminatedUserSession, mock.Anything).Return().Once()
-		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return().Once()
+		auditLogger.On("Log", mock.Anything, constants.AuditCrossUserSessionReplaced, mock.Anything).Return().Once()
+		auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSession, mock.Anything).Return().Once()
+		auditLogger.On("Log", mock.Anything, constants.AuditTerminatedUserSession, mock.Anything).Return().Once()
+		auditLogger.On("Log", mock.Anything, constants.AuditStartedNewUserSesson, mock.Anything).Return().Once()
 
 		newAuthTime := time.Now().UTC()
 		newSession := &models.UserSession{
@@ -508,7 +518,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// No termination expectations at all. The mock is strict, so any of the six calls
 		// TerminateUserSessionTx makes fails this case, and no cross_user_session_replaced or
 		// terminated_user_session event is permitted either.
-		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return().Once()
+		auditLogger.On("Log", mock.Anything, constants.AuditStartedNewUserSesson, mock.Anything).Return().Once()
 
 		newAuthTime := time.Now().UTC()
 		newSession := &models.UserSession{
@@ -644,7 +654,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// Not one audit event. cross_user_session_replaced or terminated_user_session written
 		// here would attest to a revocation that rolled back.
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -722,13 +732,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			{Id: 11, RefreshTokenJti: "rt-of-user-1"},
 		}, func(step string) { sequence = append(sequence, step) })
 
-		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(0).(string)) }
+		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(1).(string)) }
 
 		// Once each: the termination committed, so all three are owed exactly one time even
 		// though the ceremony is about to fail.
-		auditLogger.On("Log", constants.AuditCrossUserSessionReplaced, mock.Anything).Run(recordEvent).Return().Once()
-		auditLogger.On("Log", constants.AuditDeletedUserSession, mock.Anything).Run(recordEvent).Return().Once()
-		auditLogger.On("Log", constants.AuditTerminatedUserSession, mock.Anything).Run(recordEvent).Return().Once()
+		auditLogger.On("Log", mock.Anything, constants.AuditCrossUserSessionReplaced, mock.Anything).Run(recordEvent).Return().Once()
+		auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSession, mock.Anything).Run(recordEvent).Return().Once()
+		auditLogger.On("Log", mock.Anything, constants.AuditTerminatedUserSession, mock.Anything).Run(recordEvent).Return().Once()
 
 		startError := errors.New("the replacement session could not be created")
 		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
@@ -752,7 +762,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			constants.AuditDeletedUserSession,
 			constants.AuditTerminatedUserSession,
 		}, sequence)
-		auditLogger.AssertNotCalled(t, "Log", constants.AuditStartedNewUserSesson, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditStartedNewUserSesson, mock.Anything)
 
 		// The ceremony stops at the failure: no ACR is saved and no user is loaded, so nothing
 		// downstream can act as though a session were bound.
@@ -829,7 +839,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			return s.Id == userSession.Id && !s.AuthTime.IsZero() && s.AuthTime.After(oldAuthTime)
 		})).Return(nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -924,7 +934,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// No UpdateUserSession expectation: a zero timestamp is not authentication, so
 		// AuthTime must not be refreshed. Reaching it fails the case on the strict mock.
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -1019,7 +1029,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil)).Return(newUserSession, nil)
 
-		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -1124,7 +1134,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// current counter, which this handler never reads.
 		database.On("PromoteUserSessionOtpConfigGeneration", mock.Anything, int64(9), int64(4)).Return(nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{Id: 1, Enabled: true}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
@@ -1216,7 +1226,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"pwd", enums.AcrLevel1.String()).Return(userSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{Id: 1, Enabled: true}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
@@ -1307,7 +1317,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"pwd otp", enums.AcrLevel2Optional.String()).Return(userSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{Id: 1, Enabled: true}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
@@ -1395,7 +1405,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd otp",
 			enums.AcrLevel2Optional.String(), int64(7), &captured).Return(newUserSession, nil)
 
-		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
 		user := &models.User{Id: 1, Enabled: true}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
@@ -1575,7 +1585,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// SSO reuse: no UpdateUserSession call (AuthTime is NOT refreshed)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -1583,7 +1593,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
-		auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.Anything).Return()
 
 		// The clear has to reach the browser, so it must happen before the response is
 		// committed. rr.Header() is the live map the handler and this stub share, so it shows
@@ -1671,7 +1681,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -1679,7 +1689,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
-		auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.Anything).Return()
 
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
@@ -1765,7 +1775,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -1773,7 +1783,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
-		auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.Anything).Return()
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
@@ -1855,7 +1865,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -1863,7 +1873,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
-		auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.Anything).Return()
 
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// refusal that cannot be committed. This is the site's second and pre-existing 500,
@@ -1943,7 +1953,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// SSO reuse: no UpdateUserSession call (AuthTime is NOT refreshed)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -2037,7 +2047,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -2124,7 +2134,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -2209,7 +2219,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -2302,7 +2312,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil)).Return(newUserSession, nil)
 
-		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,
@@ -2390,7 +2400,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil)).Return(newUserSession, nil)
 
-		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
 		user := &models.User{
 			Id:      1,

@@ -71,7 +71,7 @@ func HandleAPIAccountEmailPut(
 		}
 
 		// Audit
-		auditLogger.Log(constants.AuditUpdatedOwnEmail, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedOwnEmail, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})

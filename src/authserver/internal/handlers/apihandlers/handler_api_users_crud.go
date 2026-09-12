@@ -151,11 +151,11 @@ func HandleAPIUserPasswordPut(
 		}
 
 		// Both events, after commit. The pre-existing one is unchanged (decision 7).
-		auditLogger.Log(constants.AuditUpdatedUserAuthentication, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedUserAuthentication, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})
-		handlers.LogRevokedUserAuthState(auditLogger, user.Id,
+		handlers.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
 			handlers.RevocationReasonAdminPasswordSet, loggedInUser, result)
 
 		// Get the updated user to return
@@ -236,7 +236,7 @@ func HandleAPIUserOTPPut(
 		}
 
 		// Log audit event
-		auditLogger.Log(constants.AuditDisabledOTP, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditDisabledOTP, map[string]interface{}{
 			"userId": user.Id,
 		})
 
@@ -399,7 +399,7 @@ func HandleAPIUserCreatePost(
 		}
 
 		// Log audit event
-		auditLogger.Log(constants.AuditCreatedUser, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditCreatedUser, map[string]interface{}{
 			"email":        createdUser.Email,
 			"loggedInUser": loggedInUser,
 		})
@@ -593,14 +593,14 @@ func HandleAPIUserEnabledPut(
 
 		// Unchanged in both directions, per decision 7: the endpoint's existing event still
 		// fires for every successful request, including the ones that revoke nothing.
-		auditLogger.Log(constants.AuditUpdatedUserDetails, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedUserDetails, map[string]interface{}{
 			"userId":       userId,
 			"loggedInUser": loggedInUser,
 		})
 
 		// Only on a real disable transition, and only after its commit.
 		if transitioned {
-			handlers.LogRevokedUserAuthState(auditLogger, userId,
+			handlers.LogRevokedUserAuthState(r.Context(), auditLogger, userId,
 				handlers.RevocationReasonAccountDisabled, loggedInUser, result)
 		}
 
@@ -669,7 +669,7 @@ func HandleAPIUserDelete(
 		}
 
 		// Log audit event
-		auditLogger.Log(constants.AuditDeletedUser, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditDeletedUser, map[string]interface{}{
 			"userId":       userId,
 			"loggedInUser": loggedInUser,
 		})

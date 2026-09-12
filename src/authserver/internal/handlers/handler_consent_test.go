@@ -875,7 +875,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
-		auditLogger.On("Log", constants.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateReadyToIssueCode && ac.ConsentedScope == "openid profile"
@@ -943,7 +943,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
-		auditLogger.On("Log", constants.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateReadyToIssueCode && ac.ConsentedScope == "openid profile"
@@ -1013,7 +1013,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return true
 		})).Return(nil)
 
-		auditLogger.On("Log", constants.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
 
 		var saved *oauth.AuthContext
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
@@ -1879,7 +1879,7 @@ func TestHandleConsentPost(t *testing.T) {
 						return true
 					})).Return(nil)
 
-					auditLogger.On("Log", constants.AuditSavedConsent, mock.Anything).Return()
+					auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
 
 					var saved *oauth.AuthContext
 					authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
@@ -1952,7 +1952,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return consent.Scope == "email"
 		})).Return(nil)
 
-		auditLogger.On("Log", constants.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.ConsentedScope == "email"

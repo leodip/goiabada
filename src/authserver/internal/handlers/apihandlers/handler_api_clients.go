@@ -259,7 +259,7 @@ func HandleAPIClientDelete(
 			return
 		}
 
-		auditLogger.Log(constants.AuditDeletedClient, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditDeletedClient, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
 			"loggedInUser":     authHelper.GetLoggedInSubject(r),
@@ -364,7 +364,7 @@ func HandleAPIClientCreatePost(
 		}
 
 		// Audit log
-		auditLogger.Log(constants.AuditCreatedClient, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditCreatedClient, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
 			"loggedInUser":     authHelper.GetLoggedInSubject(r),
@@ -580,7 +580,7 @@ func HandleAPIClientUpdatePut(
 		}
 
 		// Audit log
-		auditLogger.Log(constants.AuditUpdatedClientSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedClientSettings, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -692,7 +692,7 @@ func HandleAPIClientAuthenticationPut(
 			// Only a write that really performed the transition gets the event. A save of an
 			// already-public client revoked nothing and must not claim to.
 			if becamePublic {
-				handlers.LogRevokedClientGrants(auditLogger, client.Id,
+				handlers.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
 					handlers.RevocationReasonClientBecamePublic, authHelper.GetLoggedInSubject(r), result)
 			}
 		} else if err := database.UpdateClient(nil, client); err != nil {
@@ -711,7 +711,7 @@ func HandleAPIClientAuthenticationPut(
 		}
 
 		// Audit
-		auditLogger.Log(constants.AuditUpdatedClientAuthentication, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedClientAuthentication, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -803,7 +803,7 @@ func HandleAPIClientOAuth2FlowsPut(
 		}
 
 		// Audit
-		auditLogger.Log(constants.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -954,7 +954,7 @@ func HandleAPIClientRedirectURIsPut(
 		}
 
 		// Audit
-		auditLogger.Log(constants.AuditUpdatedRedirectURIs, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedRedirectURIs, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -1148,7 +1148,7 @@ func HandleAPIClientWebOriginsPut(
 		}
 
 		// Audit
-		auditLogger.Log(constants.AuditUpdatedWebOrigins, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedWebOrigins, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -1263,7 +1263,7 @@ func HandleAPIClientTokensPut(
 		}
 
 		// Audit
-		auditLogger.Log(constants.AuditUpdatedClientTokens, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedClientTokens, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})

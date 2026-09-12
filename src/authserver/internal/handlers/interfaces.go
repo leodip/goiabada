@@ -113,8 +113,14 @@ type EmailSender interface {
 	SendEmail(ctx context.Context, input *communication.SendEmailInput) error
 }
 
+// AuditLogger records one security event. The context is first because every audit event raised
+// while serving a request is correlated to that request: the installed slog handler reads chi's
+// request id off it, so the console record joins the request's own log line, and the persisted row
+// carries the same id. A call that passed context.Background() here would produce exactly the
+// uncorrelated record this exists to prevent, which is why testutil.AssertAuditLogContext refuses
+// one in a request-path package (#328).
 type AuditLogger interface {
-	Log(auditEvent string, details map[string]interface{})
+	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
 
 // CredentialFailureRecorder marks the credential check this request performed as failed, so

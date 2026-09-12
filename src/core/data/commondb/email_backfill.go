@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"log/slog"
@@ -575,7 +576,10 @@ func (d *CommonDatabase) auditRevokedUserAuthState(userId int64, swept revocatio
 	}
 
 	if settings.AuditLogsInConsoleEnabled {
-		auditlog.LogToConsole(constants.AuditRevokedUserAuthState, details)
+		// context.Background() because this runs at startup inside a Database method and no
+		// request exists, so there is no request id to carry: the record is written without one,
+		// which is what it is (#328).
+		auditlog.LogToConsole(context.Background(), constants.AuditRevokedUserAuthState, details)
 	}
 
 	if settings.AuditLogsInDatabaseEnabled {

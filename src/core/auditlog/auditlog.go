@@ -2,7 +2,10 @@
 // audit event writes to the application log, whichever site raised it (#320).
 package auditlog
 
-import "log/slog"
+import (
+	"context"
+	"log/slog"
+)
 
 // LogToConsole writes one audit event to the application log.
 //
@@ -22,15 +25,21 @@ import "log/slog"
 // bools and slices of them), and the database half of AuditLogger still marshals
 // and still reports the failure, so an unrenderable value is caught there.
 //
-// It takes no context because AuditLogger.Log has none, and giving it one would
-// change a signature 32 mock-using files depend on for a request id an audit
-// event does not need: the event carries the identifying details it is about.
+// It takes a context so the installed handler can append request_id, which ties
+// an event to the request that raised it: an operator holding a request id from a
+// user's report finds this record beside the request's own log line, where before
+// the two could not be joined at all (#328). The identifying details the event
+// carries are about the subject, not about the request.
 //
 // Two sites call this, and that is the second reason it exists. The authserver's
 // AuditLogger and the email-collision backfill in core/data/commondb both write
 // this record, and they cannot share code any higher up because core cannot
 // import the authserver module. Before this they were two hand-copied envelope
 // structs, so a change to one silently produced two shapes on one log stream.
-func LogToConsole(event string, details map[string]any) {
-	slog.Info("audit event", "event", event, "details", details)
+// The backfill passes context.Background(), because it runs at startup inside a
+// Database method with no request in existence, and a Background context adds
+// nothing to the record: its record carries no request_id, which is the truth
+// about it rather than a gap.
+func LogToConsole(ctx context.Context, event string, details map[string]any) {
+	slog.InfoContext(ctx, "audit event", "event", event, "details", details)
 }

@@ -181,7 +181,7 @@ func TestHandleIssueGet(t *testing.T) {
 		stubIssuanceTransaction(database)
 
 		// Mock audit logging
-		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(123) && details["clientId"] == int64(1) && details["codeId"] == int64(1)
 		})).Return()
 
@@ -766,7 +766,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 			Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
 
-		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditCreatedAuthCode, mock.Anything).Return()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -849,7 +849,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		// Nothing was written and nothing was attested to: the body left the helper on the
 		// refusal sentinel, which is how it asks for a rollback rather than a commit.
 		assert.ErrorIs(t, stub.bodyErr, errIssuanceRefused)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		authHelper.AssertNotCalled(t, "ClearAuthContext")
 
 		httpHelper.AssertExpectations(t)
@@ -920,7 +920,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		// the helper.
 		httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 		assert.ErrorIs(t, stub.bodyErr, errIssuanceRefused)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1088,7 +1088,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				assert.NotContains(t, rr.Header().Get("Location"), "code=")
 				authHelper.AssertNotCalled(t, "SaveAuthContext")
 				authHelper.AssertNotCalled(t, "ClearAuthContext")
-				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 				if stub != nil {
 					assert.ErrorIs(t, stub.bodyErr, boom, "the body hands its error to the helper unchanged, which rolls back")
 				}
@@ -1339,7 +1339,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			Scope:       "openid",
 		}, nil)
 
-		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1738,7 +1738,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}), true, false).Return(tokenResponse, nil)
 
 		// Mock audit logging
-		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(123) && details["clientId"] == int64(1) && details["issueAccessToken"] == true && details["issueIdToken"] == false
 		})).Return()
 
@@ -1824,7 +1824,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Nonce == "test-nonce"
 		}), false, true).Return(tokenResponse, nil)
 
-		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["issueAccessToken"] == false && details["issueIdToken"] == true
 		})).Return()
 
@@ -1911,7 +1911,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123)
 		}), true, true).Return(tokenResponse, nil)
 
-		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["issueAccessToken"] == true && details["issueIdToken"] == true
 		})).Return()
 
@@ -1983,7 +1983,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			return input.Scope == "openid profile" // Should use consented scope
 		}), true, false).Return(tokenResponse, nil)
 
-		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -2032,7 +2032,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "unknown-client").Return(nil, nil)
 
-		auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["clientId"] == "unknown-client" && details["userId"] == int64(123)
 		})).Return()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
@@ -2516,7 +2516,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		}
 		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, true, false).Return(tokenResponse, nil)
 
-		auditLogger.On("Log", constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 
 		clearError := errs.New("failed to clear auth context")
 		authHelper.On("ClearAuthContext", rr, req).Return(clearError)
@@ -3344,7 +3344,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		stubIssuanceTransaction(database)
 
 		// Mock audit logging
-		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(1) && details["clientId"] == int64(1) && details["codeId"] == int64(1)
 		})).Return()
 
@@ -3710,7 +3710,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		stubIssuanceTransaction(database)
 
 		// Mock audit logging
-		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(1) && details["clientId"] == int64(1) && details["codeId"] == int64(1)
 		})).Return()
 
@@ -3939,9 +3939,9 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything).
 					Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
 				stubIssuanceTransaction(database)
-				auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
+				auditLogger.On("Log", mock.Anything, constants.AuditCreatedAuthCode, mock.Anything).Return()
 			} else {
-				auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
+				auditLogger.On("Log", mock.Anything, constants.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["clientId"] == "test-client" && details["userId"] == int64(123)
 				})).Return()
 				httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
@@ -4019,7 +4019,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 	database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).Return(nil)
 
-	auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, constants.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
 	authHelper.On("ClearAuthContext", rr, req).Return(nil)
 	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 		mock.Anything).Return(nil)
@@ -4110,7 +4110,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 				}),
 				(*int)(nil)).Return(false)
 
-			auditLogger.On("Log", constants.AuditIssuanceRefusedSessionInvalid, mock.MatchedBy(func(details map[string]interface{}) bool {
+			auditLogger.On("Log", mock.Anything, constants.AuditIssuanceRefusedSessionInvalid, mock.MatchedBy(func(details map[string]interface{}) bool {
 				return details["userId"] == int64(123) &&
 					details["clientId"] == "test-client" &&
 					details["sessionIdentifier"] == liveSessionIdentifier
@@ -4274,9 +4274,9 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
 					RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
 				stubIssuanceTransaction(database)
-				auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.Anything).Return()
+				auditLogger.On("Log", mock.Anything, constants.AuditCreatedAuthCode, mock.Anything).Return()
 			} else {
-				auditLogger.On("Log", constants.AuditIssuanceRefusedScopeDenied, mock.MatchedBy(func(details map[string]interface{}) bool {
+				auditLogger.On("Log", mock.Anything, constants.AuditIssuanceRefusedScopeDenied, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userId"] == int64(123) && details["clientId"] == "test-client"
 				})).Return()
 			}
@@ -4476,7 +4476,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 					[]models.RedirectURI{{URI: "https://other.example/cb"}}
 			}).Return(nil)
 
-		auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
 
 		// The clear fails, and this is the one refusal in the handler that carries on regardless.
 		// Answering this client is precisely what the gate exists to prevent, so an error redirect
@@ -4546,7 +4546,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 					[]models.RedirectURI{{URI: "https://other.example/cb"}}
 			}).Return(nil)
 
-		auditLogger.On("Log", constants.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		// The clear worked and it is the page that cannot be produced. There is nowhere left to
@@ -4623,7 +4623,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "backend:read", user).
 			Return("", nil)
 
-		auditLogger.On("Log", constants.AuditIssuanceRefusedScopeDenied, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditIssuanceRefusedScopeDenied, mock.Anything).Return()
 
 		return authContext
 	}

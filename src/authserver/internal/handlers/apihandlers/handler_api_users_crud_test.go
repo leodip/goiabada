@@ -121,12 +121,12 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 			}
 
 			// The pre-existing event, on every row.
-			auditLogger.On("Log", constants.AuditUpdatedUserDetails, mock.Anything).Return().Once()
+			auditLogger.On("Log", mock.Anything, constants.AuditUpdatedUserDetails, mock.Anything).Return().Once()
 			var revocationPayload map[string]interface{}
 			if tc.wantSweep {
-				auditLogger.On("Log", constants.AuditRevokedUserAuthState, mock.Anything).
+				auditLogger.On("Log", mock.Anything, constants.AuditRevokedUserAuthState, mock.Anything).
 					Run(func(args mock.Arguments) {
-						revocationPayload = args.Get(1).(map[string]interface{})
+						revocationPayload = args.Get(2).(map[string]interface{})
 					}).Return().Once()
 			}
 
@@ -163,7 +163,7 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 				// state change, the second is the claim about it.
 				database.AssertNotCalled(t, "IncrementUserAuthStateGeneration",
 					mock.Anything, mock.Anything)
-				auditLogger.AssertNotCalled(t, "Log", constants.AuditRevokedUserAuthState,
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditRevokedUserAuthState,
 					mock.Anything)
 			}
 
@@ -196,7 +196,7 @@ func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	assert.ErrorIs(t, stub.bodyErr, assert.AnError, "the body hands its error to the helper, which rolls back")
 	// Not even the pre-existing event: the disable did not happen, so recording it as a user
 	// detail update would be false.
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleAPIUserPasswordPut_RevokesEverything covers the fourth site, the one the issue never
@@ -220,11 +220,11 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 		}).Return(nil).Once()
 	stubSweep(database, userId, 4)
 
-	auditLogger.On("Log", constants.AuditUpdatedUserAuthentication, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedUserAuthentication, mock.Anything).Return().Once()
 	var payload map[string]interface{}
-	auditLogger.On("Log", constants.AuditRevokedUserAuthState, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditRevokedUserAuthState, mock.Anything).
 		Run(func(args mock.Arguments) {
-			payload = args.Get(1).(map[string]interface{})
+			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 
 	database.On("GetUserById", (*sql.Tx)(nil), userId).
@@ -289,7 +289,7 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, userId).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 
-	auditLogger.On("Log", constants.AuditDisabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditDisabledOTP, mock.Anything).Return().Once()
 	database.On("GetUserById", (*sql.Tx)(nil), userId).
 		Return(&models.User{Id: userId, Enabled: true}, nil).Once()
 
@@ -352,7 +352,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	database.On("GetUserByEmail", mock.Anything, "newuser@example.com").Return(nil, nil)
 	userCreator.On("CreateUser", mock.Anything).Return(createdUser, nil)
 	database.On("UpdateUser", mock.Anything, createdUser).Return(nil)
-	auditLogger.On("Log", constants.AuditCreatedUser, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, constants.AuditCreatedUser, mock.Anything).Return()
 	var emailedLink string
 	httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 		"/emails/email_newuser_set_password.html", mock.Anything).

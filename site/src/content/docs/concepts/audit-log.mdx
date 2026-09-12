@@ -13,10 +13,12 @@ Audit logging has two independent targets that can be enabled together or separa
 
 | Target | Default | Description |
 |--------|---------|-------------|
-| Console | Enabled | One log record per event, carrying the event name and its details as fields, picked up by your container or host log pipeline. |
+| Console | Enabled | One log record per event, carrying the event name, its details as fields, and, for an event raised while serving a request, that request's id, picked up by your container or host log pipeline. |
 | Database | Enabled | Events are persisted to the `audit_logs` table and can be browsed in the admin console. |
 
 Disabling both effectively turns off audit logging.
+
+That request id is whatever the client or proxy sent in `X-Request-Id`, or one Goiabada generated when none was sent, so it ties an event to a log line and is not proof of who sent the request.
 
 <Aside type="caution">
 Database persistence is only useful if you can guarantee the database stays available. For deployments where the database is the resource being audited, also enable console logging so events still reach an external log collector.

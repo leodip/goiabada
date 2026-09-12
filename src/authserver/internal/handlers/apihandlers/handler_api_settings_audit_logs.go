@@ -65,7 +65,7 @@ func HandleAPISettingsAuditLogsPut(
 
 		// Audit log before saving, so the logger reads the old settings
 		// and always records the change (even when disabling logging)
-		auditLogger.Log(constants.AuditUpdatedAuditLogsSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedAuditLogsSettings, map[string]interface{}{
 			"loggedInUser":               authHelper.GetLoggedInSubject(r),
 			"auditLogsInConsoleEnabled":  req.AuditLogsInConsoleEnabled,
 			"auditLogsInDatabaseEnabled": req.AuditLogsInDatabaseEnabled,

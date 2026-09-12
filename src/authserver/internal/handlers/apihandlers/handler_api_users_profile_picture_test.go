@@ -266,7 +266,7 @@ func TestHandleAPIUserProfilePicturePost_CreateNew(t *testing.T) {
 		return pp.UserId == int64(123) && pp.ContentType == "image/png"
 	})).Return(nil)
 
-	auditLogger.On("Log", constants.AuditUpdatedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == user.Id && details["loggedInUser"] == adminSub
 	})).Return()
 
@@ -313,7 +313,7 @@ func TestHandleAPIUserProfilePicturePost_UpdateExisting(t *testing.T) {
 		return pp.Id == existingPicture.Id && pp.ContentType == "image/png"
 	})).Return(nil)
 
-	auditLogger.On("Log", constants.AuditUpdatedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == user.Id && details["loggedInUser"] == adminSub
 	})).Return()
 
@@ -411,7 +411,7 @@ func TestHandleAPIUserProfilePictureDelete_Success(t *testing.T) {
 	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
 	database.On("DeleteUserProfilePicture", (*sql.Tx)(nil), int64(123)).Return(nil)
 
-	auditLogger.On("Log", constants.AuditDeletedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == user.Id && details["loggedInUser"] == adminSub
 	})).Return()
 

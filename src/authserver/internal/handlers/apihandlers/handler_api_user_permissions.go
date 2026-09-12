@@ -148,7 +148,7 @@ func HandleAPIUserPermissionsPut(
 					return
 				}
 
-				auditLogger.Log(constants.AuditAddedUserPermission, map[string]interface{}{
+				auditLogger.Log(r.Context(), constants.AuditAddedUserPermission, map[string]interface{}{
 					"userId":       user.Id,
 					"permissionId": permission.Id,
 					"loggedInUser": authHelper.GetLoggedInSubject(r),
@@ -185,7 +185,7 @@ func HandleAPIUserPermissionsPut(
 				return
 			}
 
-			auditLogger.Log(constants.AuditDeletedUserPermission, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditDeletedUserPermission, map[string]interface{}{
 				"userId":       user.Id,
 				"permissionId": permissionId,
 				"loggedInUser": authHelper.GetLoggedInSubject(r),

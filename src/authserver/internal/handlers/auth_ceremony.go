@@ -78,7 +78,7 @@ func rejectCeremonyMismatch(httpHelper HttpHelper, auditLogger AuditLogger, w ht
 	if authContext.UserId != 0 {
 		details["userId"] = authContext.UserId
 	}
-	auditLogger.Log(constants.AuditAuthCeremonyMismatch, details)
+	auditLogger.Log(r.Context(), constants.AuditAuthCeremonyMismatch, details)
 
 	bind := map[string]interface{}{
 		"title":       i18n.T(r.Context(), "auth_error.ceremony_mismatch.title"),

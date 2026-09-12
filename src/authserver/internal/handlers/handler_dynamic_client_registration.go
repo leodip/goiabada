@@ -147,7 +147,7 @@ func HandleDynamicClientRegistrationPost(
 		}
 
 		// 12. Audit log
-		auditLogger.Log(constants.AuditDynamicClientRegistration, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditDynamicClientRegistration, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
 			"grantTypes":       req.GrantTypes,

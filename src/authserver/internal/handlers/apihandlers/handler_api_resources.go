@@ -101,7 +101,7 @@ func HandleAPIResourceCreatePost(
 		}
 
 		// Audit log
-		auditLogger.Log(constants.AuditCreatedResource, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditCreatedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
 			"loggedInUser":       authHelper.GetLoggedInSubject(r),
@@ -238,7 +238,7 @@ func HandleAPIResourceUpdatePut(
 		}
 
 		// Audit
-		auditLogger.Log(constants.AuditUpdatedResource, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
 			"loggedInUser":       authHelper.GetLoggedInSubject(r),
@@ -291,7 +291,7 @@ func HandleAPIResourceDelete(
 			return
 		}
 
-		auditLogger.Log(constants.AuditDeletedResource, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditDeletedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
 			"loggedInUser":       authHelper.GetLoggedInSubject(r),

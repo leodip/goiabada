@@ -36,9 +36,11 @@ type ErrorRenderer interface {
 }
 
 // AuditLogger records a security event. Same reasoning as ErrorRenderer: the concrete
-// logger lives in the authserver module.
+// logger lives in the authserver module. The context is first and carries the request's id, so
+// the trip this audits joins the warning beside it and the request's own log line; the shape is
+// kept identical to handlers.AuditLogger, which the same concrete logger satisfies (#328).
 type AuditLogger interface {
-	Log(auditEvent string, details map[string]interface{})
+	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
 
 // rejectClass is the shape a rejected caller can parse. A browser gets the error page it
@@ -453,7 +455,7 @@ func (m *RateLimiterMiddleware) reportTrip(ctx context.Context, t *tier, key str
 		details = map[string]interface{}{}
 	}
 	details["limiter"] = t.name
-	m.auditLogger.Log(constants.AuditRateLimitExceeded, details)
+	m.auditLogger.Log(ctx, constants.AuditRateLimitExceeded, details)
 }
 
 // reject writes the 429 in the shape the route's caller parses.

@@ -281,7 +281,7 @@ func HandleAPIResourcePermissionsPut(
 		}
 
 		// Audit consolidated update
-		auditLogger.Log(constants.AuditUpdatedResourcePermissions, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedResourcePermissions, map[string]interface{}{
 			"resourceId":   resource.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})

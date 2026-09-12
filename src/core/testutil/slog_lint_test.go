@@ -352,6 +352,27 @@ func parseCIDRs2() { slog.Warn("not the admitted function") }
 
 func (m *limiter) parseCIDRs() { slog.Warn("a method by the admitted name, in another file") }
 `)
+	// The audit path's two packages, listed by #328 now that AuditLogger.Log takes a context. Both
+	// are planted because the rule reads a directory list and an entry can be added to it for one
+	// package while the sibling it was added with is left off.
+	tree.write("authserver/internal/audit/audit.go", `package audit
+
+import (
+	"context"
+	"log/slog"
+)
+
+func report(ctx context.Context, err error) {
+	slog.Error("unable to persist the audit log to the database", "error", err)
+	slog.ErrorContext(ctx, "unable to read the settings row for audit logging", "error", err)
+}
+`)
+	tree.write("core/auditlog/auditlog.go", `package auditlog
+
+import "log/slog"
+
+func LogToConsole(event string) { slog.Info("audit event", "event", event) }
+`)
 	tree.write("core/handlerhelpers/template_funcs.go", `package handlerhelpers
 
 import "log/slog"
@@ -388,7 +409,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 
 	violations, files, err := findSlogViolations(tree.root, tree.golangci, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 23, files, "every non-exempt fixture is walked")
+	assert.Equal(t, 25, files, "every non-exempt fixture is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {
@@ -423,6 +444,8 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"authserver/internal/handlers/caught.go:13 a run spread into WriteInternalServerError outside slogSpreadSites",
 		"authserver/internal/handlers/caught.go:17 a run spread into rejectIdTokenHint outside slogSpreadSites",
 		// rule 5
+		"authserver/internal/audit/audit.go:9 a plain slog.Error in a request-path package",
+		"core/auditlog/auditlog.go:5 a plain slog.Info in a request-path package",
 		"authserver/internal/handlers/plain.go:9 a plain slog.Info in a request-path package",
 		"authserver/internal/handlers/plain.go:13 a plain slog.Warn in a request-path package",
 		"authserver/internal/handlers/plain.go:14 a plain slog.Debug in a request-path package",

@@ -537,7 +537,7 @@ func handleExistingSessionOnLogout(
 				return err
 			}
 
-			auditLogger.Log(constants.AuditDeletedUserSessionClient, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditDeletedUserSessionClient, map[string]interface{}{
 				"userId":        userSession.UserId,
 				"userSessionId": userSession.Id,
 				"clientId":      sessionClient.Client.Id,
@@ -550,7 +550,7 @@ func handleExistingSessionOnLogout(
 					return err
 				}
 
-				auditLogger.Log(constants.AuditLogout, map[string]interface{}{
+				auditLogger.Log(r.Context(), constants.AuditLogout, map[string]interface{}{
 					"userId":            userSession.UserId,
 					"sessionIdentifier": sessionIdentifier,
 					"loggedInUser":      authHelper.GetLoggedInSubject(r),
@@ -692,7 +692,7 @@ func doLogout(
 		// Unconditional, as before, so a logout with no usable session still records the attempt.
 		// There being no session to end is not a failure: it may have been reaped or ended from
 		// another device, and the End-User asking to leave has got what they asked for either way.
-		auditLogger.Log(constants.AuditLogout, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditLogout, map[string]interface{}{
 			"userId":            userId,
 			"sessionIdentifier": sessionIdentifier,
 			"loggedInUser":      authHelper.GetLoggedInSubject(r),
@@ -790,7 +790,7 @@ func deleteWholeUserSession(
 		return 0, err
 	}
 
-	auditLogger.Log(constants.AuditDeletedUserSession, map[string]interface{}{
+	auditLogger.Log(r.Context(), constants.AuditDeletedUserSession, map[string]interface{}{
 		"userSessionId": userSession.Id,
 		"loggedInUser":  authHelper.GetLoggedInSubject(r),
 	})

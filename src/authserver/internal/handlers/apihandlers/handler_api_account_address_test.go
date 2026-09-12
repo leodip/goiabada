@@ -85,7 +85,7 @@ func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	user := &models.User{Id: 42, Subject: "the-subject"}
 	database.On("GetUserBySubject", (*sql.Tx)(nil), "the-subject").Return(user, nil).Once()
 	database.On("UpdateUser", (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
-	auditLogger.On("Log", constants.AuditUpdatedOwnAddress, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedOwnAddress, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIAccountAddressPut(database, validators.NewAddressValidator(database), auditLogger)
