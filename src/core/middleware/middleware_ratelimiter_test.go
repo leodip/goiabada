@@ -1927,16 +1927,18 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 // overwritten by the conformant one declared after it and the count would still be right.
 func TestCollectTierKeyFields_ReachesEveryContainerKind(t *testing.T) {
 	type holder struct {
-		direct    tier
-		behind    *tier
-		inSlice   []tier
-		inArray   [1]*tier
-		inMap     map[string]*tier
-		inMapKey  map[*tier]bool
-		shortView []tier
-		longView  []tier
-		anonymous any
-		itself    *holder
+		direct       tier
+		behind       *tier
+		inSlice      []tier
+		inArray      [1]*tier
+		inMap        map[string]*tier
+		inMapKey     map[*tier]bool
+		shortView    []tier
+		longView     []tier
+		anonymous    any
+		aliasField   *tier
+		aliasElement *tier
+		itself       *holder
 	}
 
 	// One backing array under two views, the second reaching one element further. They share an
@@ -1961,6 +1963,13 @@ func TestCollectTierKeyFields_ReachesEveryContainerKind(t *testing.T) {
 		anonymous: &tier{name: "direct", keyField: "keyId"},
 	}
 	subject.itself = subject
+	// The same two tiers a second time, by pointer. Neither is a new tier, so neither adds an
+	// entry: one object reached two ways is one instance, and a walk that marked only the route
+	// would report four tiers where the holder has two and fail the count beside it the day
+	// anyone held a pointer to a tier the constructor already owns. Declared after the values
+	// they alias, so the entry is recorded at the path that owns the tier.
+	subject.aliasField = &subject.direct
+	subject.aliasElement = &subject.inSlice[0]
 
 	var found []foundTier
 	collectTierKeyFields(reflect.ValueOf(subject), "holder", &found, map[visitedValue]bool{})
@@ -2009,9 +2018,17 @@ type foundTier struct {
 // the address here is an element's for those and the holder is the element type: two views of one
 // backing array are the same value at every index they share and different values past that, and
 // a mark on the header would call the whole of the longer one visited.
+//
+// instance separates the mark on a tier itself from the marks on the containers reached along the
+// way, and the two have to be separate because they collide: a *tier and the tier it points at
+// share an address, so one namespace would let the pointer's own mark answer for the tier and the
+// tier would be recorded by nothing. With it, a tier reached twice -- as a field and through a
+// pointer to that field, or as a slice element and through a pointer to that element -- is
+// recorded once, which is what the count beside it claims to be counting.
 type visitedValue struct {
-	address uintptr
-	holder  reflect.Type
+	address  uintptr
+	holder   reflect.Type
+	instance bool
 }
 
 // collectTierKeyFields walks a value for the tier structs inside it and records each one's name
@@ -2049,6 +2066,17 @@ func collectTierKeyFields(v reflect.Value, where string, into *[]foundTier, seen
 		}
 	case reflect.Struct:
 		if v.Type() == reflect.TypeOf(tier{}) {
+			// One entry per tier, not per path to one. An addressable tier has an identity every
+			// route to it agrees on, so a field and a pointer to that field are the same object
+			// and the second arrival adds nothing. A tier that is not addressable is a copy --
+			// out of a map value or an interface -- and is its own object however alike it looks.
+			if v.CanAddr() {
+				mark := visitedValue{address: v.UnsafeAddr(), holder: v.Type(), instance: true}
+				if seen[mark] {
+					return
+				}
+				seen[mark] = true
+			}
 			*into = append(*into, foundTier{where: where,
 				name:     v.FieldByName("name").String(),
 				keyField: v.FieldByName("keyField").String()})
