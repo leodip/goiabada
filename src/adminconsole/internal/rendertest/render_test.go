@@ -488,3 +488,97 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 		})
 	}
 }
+
+// The Device label reaches a second sink the tooltip above does not, and this is the case that
+// says it arrives there as text.
+//
+// A label is derived from Sec-CH-UA and Sec-CH-UA-Platform, whose values UA-CH requires a
+// server to accept arbitrarily (core/useragent pins that premise), so any user can put markup
+// in their own session's label by completing a login with hand-written headers. On these two
+// pages the End Session button hands that label to endSessionClick, which builds a message
+// showModalDialog assigns to innerHTML. html/template escapes the label for the JavaScript
+// string literal in the onclick attribute and stops there, so the concatenation is where the
+// escaping has to happen, and only rendered HTML can see whether it does (#281).
+//
+// The third session page passes the user's email rather than the device label to its modal, so
+// it is asserted here as the negative: no device concatenation to escape.
+func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
+	const markup = `<script>alert(1)</script>`
+
+	// The unescaped concatenation, in any spacing. This is the shape that shipped and the shape
+	// a later edit would reintroduce; matching on it rather than on the fixed text is what makes
+	// the guard survive reformatting.
+	unescaped := regexp.MustCompile(`\+\s*device\s*\+`)
+
+	for _, tc := range []struct {
+		name       string
+		page       string
+		bind       map[string]interface{}
+		modalTakes bool
+	}{
+		{
+			name: "account",
+			page: "/account_user_sessions.html",
+			bind: map[string]interface{}{
+				"sessions": []accounthandlers.SessionInfo{{
+					UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop",
+					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
+				}},
+			},
+			modalTakes: true,
+		},
+		{
+			name: "admin user",
+			page: "/admin_users_sessions.html",
+			bind: map[string]interface{}{
+				"user": &models.User{Id: 7, Email: "someone@example.com"},
+				"sessions": []adminuserhandlers.SessionInfo{{
+					UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop",
+					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
+				}},
+				"page":  "1",
+				"query": "",
+			},
+			modalTakes: true,
+		},
+		{
+			name: "admin client",
+			page: "/admin_clients_usersessions.html",
+			bind: map[string]interface{}{
+				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+				"sessions": []adminclienthandlers.SessionInfo{{
+					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
+					DeviceName: markup, DeviceType: "Desktop",
+					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
+				}},
+			},
+			modalTakes: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := render(t, tc.page, tc.bind)
+
+			// Neither the cell nor the onclick attribute carries the label as markup: the cell
+			// is HTML text and the attribute is a JavaScript string literal, and html/template
+			// escapes each for its own context.
+			assert.NotContains(t, out, markup,
+				"the device label must never reach the page as markup")
+			assert.Contains(t, out, "&lt;script&gt;alert(1)&lt;/script&gt;",
+				"the label belongs in the Device cell, as text")
+
+			if !tc.modalTakes {
+				assert.NotContains(t, out, "escapeHtml(device)")
+				assert.NotRegexp(t, unescaped, out,
+					"this page's modal takes the email, so no device label reaches it")
+				return
+			}
+
+			// And the script that reads it back out of the attribute escapes it before the
+			// innerHTML sink. Dropping the call leaves every other assertion here passing.
+			assert.Contains(t, out, "escapeHtml(device)",
+				"the device label must be escaped before showModalDialog assigns it to innerHTML")
+			assert.NotRegexp(t, unescaped, out,
+				"the device label must not be concatenated into the modal message unescaped")
+		})
+	}
+}

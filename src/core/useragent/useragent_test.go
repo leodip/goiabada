@@ -288,6 +288,121 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			},
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
+		{
+			// Gate: RFC 8941 3.1.2 param-key = key = ( lcalpha / "*" ) *( lcalpha / DIGIT /
+			// "_" / "-" / "." / "*" ). Uppercase is not in it, so "V" is not the v parameter
+			// spelled differently -- it is a header that is not a structured field. A reader
+			// on the wider HTTP token grammar takes the key, fails to match "v", and labels
+			// the session "Google Chrome" with no version at all.
+			name: "a parameter key outside RFC 8941's key grammar",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";V="120"`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: the same key production, read for where it *starts*. The two rows around
+			// this one prove the gate is there; this one proves it is the grammar's and not a
+			// looser set, and it is the only row that can. A key reader widened to HTTP tokens
+			// refuses "V" anyway, because "V" is not a continuation character either, so the
+			// cursor never moves and the comma gate below refuses the member; and it refuses
+			// "=" anyway, because "=" is in neither set. A digit is the case where the two
+			// disagree and the parse still runs on: it starts no key in RFC 8941 but continues
+			// one, so a widened reader takes "1x" as a key, reads its value, finishes the list
+			// cleanly and labels the session Chrome 120. The same holds for "-", "." and "_",
+			// which fail the same predicate and pass the same continuation.
+			name: "a parameter key starting with a digit",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";1x=2`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: a parameter has a key, and RFC 8941 3.1.2's key production has no empty
+			// form. This is the row that reaches that gate rather than the comma gate after
+			// it: the uppercase row above is refused either way, because a key reader that
+			// takes nothing leaves the cursor on a byte that is not a comma, whereas here the
+			// bare item consumes the rest of the field and the list ends cleanly. So without
+			// the gate this one parses, and a header with a nameless parameter is honoured.
+			name: "a parameter with no key at all",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";=1`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: param-value = bare-item (RFC 8941 3.1.2), and "@" starts none of the six
+			// forms. Without the gate the version reads "@junk" and "Google Chrome @junk"
+			// goes into device_name.
+			name: "a parameter value that is not a bare item",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v=@junk`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Same gate at its emptiest: "=" promises a bare item and there is none. A reader
+			// that scanned to the next delimiter instead accepts this as the version "".
+			name: "a parameter with an equals sign and no value",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v=`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// A malformed parameter refuses the whole header even when it is not the one this
+			// package reads: the field either is a structured field or it is not, and half of
+			// one is what RFC 8942 2.2 says to ignore.
+			name: "a malformed parameter on a key nothing reads",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";bad=@oops`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: sf-integer is at most 15 digits (RFC 8941 3.3.1), so sixteen is not a
+			// bare item.
+			name: "an integer parameter longer than sf-integer allows",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v=1234567890123456`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: sf-decimal takes one to three digits after the point (RFC 8941 3.3.2).
+			name: "a decimal parameter with four fractional digits",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v=1.2345`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: RFC 8941 3.1.2 separates a parameter from its ";" with *SP, not OWS.
+			name: "a tab between the semicolon and the parameter",
+			headers: map[string]string{
+				"Sec-CH-UA":  "\"Google Chrome\";\tv=\"120\"",
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: an unterminated byte sequence must not swallow the rest of the field
+			// (RFC 8941 3.3.5).
+			name: "a byte sequence that never closes",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v=:AAAA`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -337,6 +452,79 @@ func TestLabels_PlatformHintsThatDoNotParseAreAbsent(t *testing.T) {
 			assert.Equal(t, "", os)
 		})
 	}
+}
+
+// A header may arrive as more than one field line, and a structured field's value is those
+// lines joined with ", " before anything parses them (RFC 9110 5.3, RFC 8941 4.2).
+//
+// http.Header.Get answers the first line alone, which is wrong in both directions at once: a
+// Sec-CH-UA legitimately split after its GREASE brand reads as a one-brand list and the session
+// is labelled from the arbitrary value UA-CH 8.2 requires be there, while two Sec-CH-UA-Platform
+// lines read as the first rather than as the invalid Item they combine into. These rows use
+// Header.Add, which is what a repeated field line is on the server side.
+func TestLabels_RepeatedFieldLinesAreJoinedBeforeParsing(t *testing.T) {
+	t.Run("a brand list split across two field lines", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Add("Sec-CH-UA", `"Not A;Brand";v="99"`)
+		req.Header.Add("Sec-CH-UA", `"Chromium";v="120", "Google Chrome";v="120"`)
+		req.Header.Set("Sec-CH-UA-Platform", `"Windows"`)
+
+		// Reading the first line alone leaves GREASE as the only brand, and pickBrand's last
+		// resort hands back the first brand as sent rather than labelling from nothing.
+		name, deviceType, os := Labels(req)
+		assert.Equal(t, "Chrome 120", name)
+		assert.Equal(t, "Desktop", deviceType)
+		assert.Equal(t, "Windows", os)
+	})
+
+	// An Item-valued hint has no list to join into, so two lines combine into something that
+	// is not an Item at all. RFC 8942 2.2 makes that a hint to ignore, which is exactly what
+	// each field's own gate does once the lines are joined: the mobile flag is compared
+	// against "?1" and the platform goes through the sf-string reader whole.
+	t.Run("a repeated mobile hint is not a boolean", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Sec-CH-UA", `"Google Chrome";v="120"`)
+		req.Header.Add("Sec-CH-UA-Mobile", "?1")
+		req.Header.Add("Sec-CH-UA-Mobile", "?0")
+
+		_, deviceType, _ := Labels(req)
+		assert.Equal(t, "Desktop", deviceType)
+	})
+
+	t.Run("a repeated platform hint is not one sf-string", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Sec-CH-UA", `"Google Chrome";v="120"`)
+		req.Header.Add("Sec-CH-UA-Platform", `"Windows"`)
+		req.Header.Add("Sec-CH-UA-Platform", `"Linux"`)
+
+		_, _, os := Labels(req)
+		assert.Equal(t, "", os)
+	})
+}
+
+// A brand and a platform are arbitrary text, by specification: UA-CH 3 says a server "MUST
+// accept arbitrary values for each" of these properties, and an RFC 8941 sf-string admits every
+// printable ASCII character, angle brackets and quotes among them. So markup in a label is not
+// a header to reject -- rejecting it would be the source-side filtering UA-CH forbids -- it is
+// a value every consumer has to render as text.
+//
+// This row is the premise of that obligation, and it is pinned here so the two places that
+// discharge it cannot drift from it: the Device cell and its tooltip, escaped by html/template,
+// and the End Session modal message, escaped by escapeHtml at the concatenation because
+// showModalDialog assigns that message to innerHTML. Both are proved in the admin console's
+// rendertest package, over the real templates (#281).
+func TestLabels_HintsCarryArbitraryTextIncludingMarkup(t *testing.T) {
+	const markup = `<script>alert(1)</script>`
+
+	name, deviceType, os := Labels(newRequest(map[string]string{
+		"Sec-CH-UA":          `"` + markup + `";v="1"`,
+		"Sec-CH-UA-Platform": `"` + markup + `"`,
+		"User-Agent":         chromeWindows,
+	}))
+
+	assert.Equal(t, markup+" 1", name)
+	assert.Equal(t, "Desktop", deviceType)
+	assert.Equal(t, markup, os)
 }
 
 // The User-Agent path: the only path for Firefox, Safari, a plain-HTTP deployment and every

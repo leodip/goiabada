@@ -42,7 +42,7 @@ func Labels(r *http.Request) (name, deviceType, os string) {
 }
 
 func derive(r *http.Request) (name, deviceType, os string) {
-	brands, ok := parseBrands(r.Header.Get("Sec-CH-UA"))
+	brands, ok := parseBrands(fieldValue(r.Header, "Sec-CH-UA"))
 	if !ok {
 		return fromUserAgent(r.UserAgent())
 	}
@@ -53,10 +53,23 @@ func derive(r *http.Request) (name, deviceType, os string) {
 	// device is not a phone. The hints carry no tablet signal of any kind, so Tablet can
 	// only ever come from the User-Agent path (decision 3).
 	deviceType = "Desktop"
-	if r.Header.Get("Sec-CH-UA-Mobile") == "?1" {
+	if fieldValue(r.Header, "Sec-CH-UA-Mobile") == "?1" {
 		deviceType = "Mobile"
 	}
-	return strings.TrimSpace(b.name + " " + b.major), deviceType, platform(r.Header.Get("Sec-CH-UA-Platform"))
+	return strings.TrimSpace(b.name + " " + b.major), deviceType, platform(fieldValue(r.Header, "Sec-CH-UA-Platform"))
+}
+
+// fieldValue is the whole of a header field, which is not always its first line.
+//
+// A sender may split a list-valued field across several field lines (RFC 9110 5.3), and RFC
+// 8941 4.2 says a structured field's value is those lines joined with ", " before it is
+// parsed. http.Header.Get answers the first line alone, so it would read a split Sec-CH-UA as
+// a shorter list than was sent -- picking a GREASE brand as the browser name when the real
+// brands were on the second line -- and would read two Sec-CH-UA-Platform lines as the first
+// one instead of as the invalid Item they combine into. Joining first makes a repeated Item
+// hint fail its own gate and be ignored, which is what RFC 8942 2.2 asks for (#281).
+func fieldValue(h http.Header, name string) string {
+	return strings.Join(h.Values(name), ", ")
 }
 
 // --- Sec-CH-UA: an sf-list of sf-strings, each with an optional v parameter (UA-CH 3.1).
@@ -143,35 +156,123 @@ func parseString(s string, i int) (string, int, bool) {
 	return "", 0, false
 }
 
-// parseParam reads one ";"-led parameter, i pointing just past the semicolon. A parameter
-// with no "=" is boolean true (RFC 8941 3.1.2) and is read as valueless here, because the
-// only key this package looks at is v.
+// parseParam reads one ";"-led parameter, i pointing just past the semicolon, per RFC 8941
+// 3.1.2: parameters = *( ";" *SP parameter ), parameter = param-key [ "=" param-value ],
+// param-value = bare-item. A parameter with no "=" is boolean true and is read as valueless
+// here, because the only key this package looks at is v.
+//
+// Both halves are the structured-field grammar and not the wider HTTP one, which is what makes
+// parseBrands's promise -- a header that does not parse is treated as absent -- true rather
+// than nearly true. A key is lowercase (RFC 8941's key production), so "V" is not "v" written
+// differently, it is not a key at all; and a value is a bare item, so v=@junk is a malformed
+// header rather than the version "@junk". Reading either loosely accepts a Sec-CH-UA that no
+// structured-field parser would, and then labels the session from it, when RFC 8942 2.2 says a
+// hint a server cannot understand is one to ignore in favour of the User-Agent (#281).
 func parseParam(h string, i int) (key, value string, next int, ok bool) {
-	i = skipOWS(h, i)
+	i = skipSP(h, i)
 	start := i
-	for i < len(h) && isTokenChar(h[i]) {
-		i++
-	}
-	if i == start {
+	if i == len(h) || !isKeyStart(h[i]) {
 		return "", "", 0, false
+	}
+	for i < len(h) && isKeyChar(h[i]) {
+		i++
 	}
 	key = h[start:i]
 	if i == len(h) || h[i] != '=' {
 		return key, "", i, true
 	}
-	i++
-	if i < len(h) && h[i] == '"' {
-		v, next, ok := parseString(h, i)
-		if !ok {
-			return "", "", 0, false
-		}
-		return key, v, next, true
+	value, next, ok = parseBareItem(h, i+1)
+	if !ok {
+		return "", "", 0, false
 	}
-	start = i
-	for i < len(h) && h[i] != ';' && h[i] != ',' && h[i] != ' ' {
+	return key, value, next, true
+}
+
+// parseBareItem reads one RFC 8941 3.3 bare item and answers its text as sent, together with
+// the index just past it.
+//
+// Only the v parameter is ever looked at and in practice it is always an sf-string, so the
+// other five forms are here to be recognised rather than to be used: a header carrying a
+// well-formed integer or token parameter is a valid structured field, and RFC 8942 2.2 asks
+// that such a hint be honoured rather than refused for spelling a value in a form this
+// package happens not to read.
+func parseBareItem(s string, i int) (string, int, bool) {
+	if i >= len(s) {
+		return "", 0, false
+	}
+	switch c := s[i]; {
+	case c == '"':
+		return parseString(s, i)
+	case c == '?':
+		// sf-boolean = "?" ( "0" / "1" ).
+		if i+1 < len(s) && (s[i+1] == '0' || s[i+1] == '1') {
+			return s[i : i+2], i + 2, true
+		}
+		return "", 0, false
+	case c == ':':
+		return parseByteSequence(s, i)
+	case c == '-' || isDigit(c):
+		return parseNumber(s, i)
+	// sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" ).
+	case c == '*' || isAlpha(c):
+		start := i
+		for i++; i < len(s) && (isTokenChar(s[i]) || s[i] == ':' || s[i] == '/'); i++ {
+		}
+		return s[start:i], i, true
+	}
+	return "", 0, false
+}
+
+// parseNumber reads an RFC 8941 3.3.1 sf-integer or 3.3.2 sf-decimal. The digit counts are the
+// grammar's own -- at most 15 integer digits, or at most 12 before the point and one to three
+// after it -- and they are the whole difference between a bare item and a run of digits.
+func parseNumber(s string, i int) (string, int, bool) {
+	start := i
+	if s[i] == '-' {
 		i++
 	}
-	return key, h[start:i], i, true
+	digits := i
+	for i < len(s) && isDigit(s[i]) {
+		i++
+	}
+	whole := i - digits
+	if whole == 0 {
+		return "", 0, false
+	}
+	if i == len(s) || s[i] != '.' {
+		if whole > 15 {
+			return "", 0, false
+		}
+		return s[start:i], i, true
+	}
+	if whole > 12 {
+		return "", 0, false
+	}
+	i++
+	frac := i
+	for i < len(s) && isDigit(s[i]) {
+		i++
+	}
+	if n := i - frac; n < 1 || n > 3 {
+		return "", 0, false
+	}
+	return s[start:i], i, true
+}
+
+// parseByteSequence reads an RFC 8941 3.3.5 sf-binary, base64 between two colons. The value is
+// returned with its colons, since nothing reads it: what matters is that a well-formed one
+// parses, and that an unterminated one does not swallow the rest of the field.
+func parseByteSequence(s string, i int) (string, int, bool) {
+	start := i
+	for i++; i < len(s) && s[i] != ':'; i++ {
+		if !isBase64Char(s[i]) {
+			return "", 0, false
+		}
+	}
+	if i == len(s) {
+		return "", 0, false
+	}
+	return s[start : i+1], i + 1, true
 }
 
 func skipOWS(s string, i int) int {
@@ -181,9 +282,32 @@ func skipOWS(s string, i int) int {
 	return i
 }
 
+// RFC 8941 3.1.2 separates a parameter from the ";" before it with *SP, not OWS: a tab there
+// is not whitespace to skip, it is a header that does not parse.
+func skipSP(s string, i int) int {
+	for i < len(s) && s[i] == ' ' {
+		i++
+	}
+	return i
+}
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+
+func isAlpha(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
+
 func isTokenChar(c byte) bool {
-	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' ||
-		strings.IndexByte("!#$%&'*+-.^_`|~", c) >= 0
+	return isDigit(c) || isAlpha(c) || strings.IndexByte("!#$%&'*+-.^_`|~", c) >= 0
+}
+
+// RFC 8941 3.1.2: key = ( lcalpha / "*" ) *( lcalpha / DIGIT / "_" / "-" / "." / "*" ).
+func isKeyStart(c byte) bool { return c >= 'a' && c <= 'z' || c == '*' }
+
+func isKeyChar(c byte) bool {
+	return c >= 'a' && c <= 'z' || isDigit(c) || strings.IndexByte("_-.*", c) >= 0
+}
+
+func isBase64Char(c byte) bool {
+	return isDigit(c) || isAlpha(c) || c == '+' || c == '/' || c == '='
 }
 
 // platform reads Sec-CH-UA-Platform through the same sf-string reader, so an unquoted value,
