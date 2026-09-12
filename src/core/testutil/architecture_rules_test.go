@@ -195,7 +195,7 @@ func TestArchitecture_KernelPurity(t *testing.T) {
 			"core/i18n/i18n.go":     pkg("i18n", "example.test/core/models"),
 			"core/models/models.go": pkg("models"),
 		}, architectureTables{owners: ownerRows("core/i18n kernel -", "core/models authserver #359")})
-		assertFindings(t, findings, "kernel purity: core/i18n imports core/models at example.test/core/i18n, and ARCHITECTURE.md lists no exception")
+		assertFindings(t, findings, "kernel purity: core/i18n imports core/models, and ARCHITECTURE.md lists no exception")
 	})
 
 	t.Run("a kernel package may not import a package already marked for deletion", func(t *testing.T) {
@@ -263,7 +263,7 @@ func TestArchitecture_ProcessIsolation(t *testing.T) {
 			"core/user/user.go":            pkg("user"),
 			"adminconsole/internal/a/a.go": pkg("a", "example.test/core/user"),
 		}, tables)
-		assertFindings(t, findings, "process isolation: adminconsole imports core/user at example.test/adminconsole/internal/a")
+		assertFindings(t, findings, "process isolation: adminconsole/internal/a imports core/user")
 	})
 
 	t.Run("the auth server may not import an adminconsole-owned package", func(t *testing.T) {
@@ -271,7 +271,7 @@ func TestArchitecture_ProcessIsolation(t *testing.T) {
 			"core/uithemes/uithemes.go":  pkg("uithemes"),
 			"authserver/internal/a/a.go": pkg("a", "example.test/core/uithemes"),
 		}, tables)
-		assertFindings(t, findings, "process isolation: authserver imports core/uithemes")
+		assertFindings(t, findings, "process isolation: authserver/internal/a imports core/uithemes")
 	})
 
 	// The wizard ships as a standalone binary, so a package it pulls in is a package a user
@@ -543,16 +543,45 @@ func TestArchitecture_Exceptions(t *testing.T) {
 		assertFindings(t, findings, "lists the exception core/i18n -> core/models twice")
 	})
 
-	t.Run("a module-wide exception covers every package in that module", func(t *testing.T) {
-		findings := check(t, map[string]string{
+	// Guidance point 4 of #332 asks for exact package edges, and this is what that buys: granting
+	// one package a dependency must not grant it to the package next door, or a second consumer
+	// could appear with nothing going red and the row count would stop measuring the work left.
+	t.Run("an exception names the importing package, not its module", func(t *testing.T) {
+		tree := map[string]string{
 			"core/user/user.go":            pkg("user"),
 			"adminconsole/internal/a/a.go": pkg("a", "example.test/core/user"),
 			"adminconsole/internal/b/b.go": pkg("b", "example.test/core/user"),
+		}
+		owners := ownerRows("core/user authserver #346")
+
+		findings := check(t, tree, architectureTables{
+			owners:     owners,
+			exceptions: exceptionRows("adminconsole/internal/a core/user #346"),
+		})
+		assertFindings(t, findings, "process isolation: adminconsole/internal/b imports core/user")
+
+		findings = check(t, tree, architectureTables{
+			owners: owners,
+			exceptions: exceptionRows(
+				"adminconsole/internal/a core/user #346",
+				"adminconsole/internal/b core/user #346"),
+		})
+		assert.Empty(t, findings)
+	})
+
+	// A module name in the from column is no longer a grant at all: it matches no edge, so it reads
+	// as a stale row and says so.
+	t.Run("a module name in the from column grants nothing", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			"core/user/user.go":            pkg("user"),
+			"adminconsole/internal/a/a.go": pkg("a", "example.test/core/user"),
 		}, architectureTables{
 			owners:     ownerRows("core/user authserver #346"),
 			exceptions: exceptionRows("adminconsole core/user #346"),
 		})
-		assert.Empty(t, findings)
+		assertFindings(t, findings,
+			"process isolation: adminconsole/internal/a imports core/user",
+			"lists adminconsole -> core/user as a temporary exception, but that edge no longer exists")
 	})
 }
 
