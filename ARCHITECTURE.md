@@ -82,7 +82,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | package | owner | moves in |
 |---|---|---|
 | `core/api` | kernel | — |
-| `core/audit` | delete | #333 |
 | `core/auditlog` | authserver | #359 |
 | `core/cmd` | authserver | #358 |
 | `core/communication` | authserver | #347 |
@@ -123,8 +122,10 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 
 Notes on rows that are not self-evident:
 
-- `core/audit` holds no package of its own. It is a directory containing `mocks` and nothing else,
-  and nothing in the repository imports it — not one production file, not one test. #333 deletes it.
+- There is no `core/audit` row because there is no `core/audit` in the repository. #333 lists it for
+  deletion, and it does exist as a directory of generated mocks in a working tree that has run the
+  mock generator, but git has never tracked a file under it. A row for it fails the completeness
+  rule, which is how this was found.
 - `core/mocks` and `core/testutil` are kernel because they are test support compiled into no binary.
   They are still held to the kernel rule: `core/testutil/fake` imports `core/uuidutil` today, and
   that is an exception below rather than a waiver, because #360 moves `uuidutil` and the edge has to
@@ -221,7 +222,6 @@ then.
 | `github.com/jackc/pgx/v5` | PostgreSQL driver | yes | #359 |
 | `github.com/microsoft/go-mssqldb` | SQL Server driver | yes | #359 |
 | `github.com/huandu/go-sqlbuilder` | SQL construction | yes | #359 |
-| `github.com/mileusna/useragent` | session user-agent parsing | yes | #346 |
 | `github.com/pquerna/otp` | TOTP generation | no | — |
 
 Every driver arrives the same way, through one edge:
@@ -237,6 +237,12 @@ nothing on its own, which is why the table asserts reachability rather than coun
 
 `github.com/pquerna/otp` is listed at `no` deliberately. It is not reachable now, `core/otp` moves
 to the auth server in #348, and the row states that it must not arrive in the meantime.
+
+The table is a declared list, not a discovery mechanism: it asserts these modules and says nothing
+about a dependency nobody has written a row for. Closing that would mean an allowlist of every
+module the admin console legitimately compiles, churned on every dependency change, which is a wider
+rule than #332 asks for. #360 is where the categories in its point 5 — database drivers, sqlbuilder,
+OTP and image libraries, provider-only crypto — are checked off, and each is listed here.
 
 ## The guard
 
