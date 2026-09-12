@@ -329,6 +329,57 @@ func CaptureSlog(h slog.Handler) *slog.Logger {
 
 	// ---- rule 6: the wrappers that carry a caller's attributes ---------------------------------
 
+	// The two listed forwarders this tree declares correctly, which is what the third boundary
+	// accepts: one declaration inside the scope the table gives, taking its attributes from the
+	// argument the table names. reject, further down, is the third. LogInternalServerError is
+	// deliberately absent, and the refusal that produces is a row of its own.
+	write("authserver/internal/apiresponse/apiresponse.go", `package apiresponse
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
+	record := []any{"error", err}
+	record = append(record, attrs...)
+	slog.ErrorContext(r.Context(), "internal server error", record...)
+}
+`)
+	write("authserver/internal/handlers/apihandlers/forwarder_declared.go", `package apihandlers
+
+import (
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+)
+
+func writeInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
+	apiresponse.WriteInternalServerError(w, r, err, attrs...)
+}
+`)
+
+	// And the shadow. A second function of a listed name inside the scope it is listed under
+	// inherits the registration: rule 6's declaration half reads it as the forwarder and lets it
+	// through, and rule 3 reads its callers' keys from the listed one's offset, which is past the
+	// end of this one's arguments. The clientId below is written to a record and read by nothing,
+	// and every rule the lint has is green on it. The count is the finding.
+	write("authserver/internal/handlers/apihandlers/forwarder_shadow.go", `package apihandlers
+
+import (
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+)
+
+func shadowed(r *http.Request, err error) {
+	writeInternalServerError := func(attrs ...any) {
+		apiresponse.LogInternalServerError(r, err, attrs...)
+	}
+	writeInternalServerError("clientId", 1)
+}
+`)
+
 	// The keys a forwarder's caller writes, read at the call site because that is the only place
 	// they exist. All three forms: the unexported wrapper called bare inside its own package, and
 	// the two exported ones called through the import. This is the shape that kept 179 camelCase
@@ -599,6 +650,94 @@ func varDeclaredEmpty() {
 }
 `)
 
+	// The five shapes a rule reading assignments to a name is green on, and a rule reading every
+	// use of it is not. Each puts a camelCase key in a record, and the first four leave every
+	// assignment in the function conformant while they do it.
+	//
+	// A write through an index and a write through a helper are the run changing under a name
+	// whose assignments all still read correctly. A parameter is a run built in a caller this
+	// reading cannot see, so there is nothing to read at all and the old rule took a later
+	// assignment as its construction. Two declarations in sibling blocks are two runs the old
+	// rule merged into one, and the key from the branch not taken was read as if it belonged to
+	// the other. The fifth is the same confusion inside a listed forwarder: a local shadowing the
+	// variadic parameter was read as the parameter, so rule 6's declaration half sent the reading
+	// to the forwarder's callers, and the shadow's own keys were never anyone's to read.
+	write("core/caught/run_index_write.go", `package caught
+
+import "log/slog"
+
+func indexWrittenRun() {
+	attrs := make([]any, 2)
+	attrs[0] = "clientId"
+	attrs[1] = 1
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	write("core/caught/run_helper_write.go", `package caught
+
+import "log/slog"
+
+func rename(attrs []any) { attrs[0] = "clientId" }
+
+func helperWrittenRun() {
+	attrs := []any{"client_id", 1}
+	rename(attrs)
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	write("core/caught/run_parameter.go", `package caught
+
+import "log/slog"
+
+func parameterRun(attrs []any) {
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	// The same parameter with an inner block declaring the name, which is the one shape a count
+	// of declarations gets wrong on its own: one declaration, every assignment readable, and the
+	// run that reaches the second record is still the caller's. A plain []any parameter is not a
+	// variadic one, so rule 6's declaration half never looked at this function either.
+	write("core/caught/run_parameter_shadowed.go", `package caught
+
+import "log/slog"
+
+func parameterShadowed(flag bool, attrs []any) {
+	if flag {
+		attrs := []any{"client_id", 1}
+		slog.Info("a thing happened", attrs...)
+	}
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	write("core/caught/run_two_declarations.go", `package caught
+
+import "log/slog"
+
+func twoRuns(flag bool) {
+	if flag {
+		attrs := []any{"client_id", 1}
+		slog.Info("a thing happened", attrs...)
+	} else {
+		attrs := []any{"clientId", 2}
+		slog.Info("a thing happened", attrs...)
+	}
+}
+`)
+	// Two findings, and both are true of it: an unlisted forwarder, because the spread names the
+	// variadic parameter, and the shadow. They cannot be separated, since the two variables are
+	// one identifier and the declaration half matches on the same text.
+	write("core/caught/run_shadows_variadic.go", `package caught
+
+import "log/slog"
+
+func shadowsVariadic(attrs ...any) {
+	if len(attrs) == 0 {
+		attrs := []any{"clientId", 1}
+		slog.Info("a thing happened", attrs...)
+	}
+}
+`)
+
 	// ---- the evasions, and the parser boundary ------------------------------------------------
 
 	// One pair of brackets, and the callee is no longer a bare selector. The third evasion.
@@ -683,14 +822,17 @@ func broken( {
 
 	violations, files, err := findSlogViolations(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 46, files,
+	assert.Equal(t, 55, files,
 		"every parseable, production-reachable fixture outside a mocks directory and a _test.go file is parsed")
 	assert.Equal(t, []string{
 		`authserver/internal/handlers/apihandlers/forwarded_keys.go:10 attribute key "clientId"`,
 		`authserver/internal/handlers/apihandlers/forwarded_keys.go:14 attribute key "userId"`,
+		`authserver/internal/handlers/apihandlers/forwarded_keys.go:18 LogInternalServerError is called here and declared nowhere this walk reached`,
 		`authserver/internal/handlers/apihandlers/forwarded_keys.go:18 attribute key "permissionId"`,
 		`authserver/internal/handlers/apihandlers/forwarded_slice.go:6 attribute key "clientId"`,
 		`authserver/internal/handlers/apihandlers/forwarded_slice.go:8 attribute key "originHeader"`,
+		`authserver/internal/handlers/apihandlers/forwarder_declared.go:9 writeInternalServerError is declared 2 times inside the scope it is listed under`,
+		`authserver/internal/handlers/apihandlers/forwarder_shadow.go:10 writeInternalServerError is declared 2 times inside the scope it is listed under`,
 		`authserver/internal/handlers/apihandlers/forwarder_value.go:10 apiresponse.WriteInternalServerError as a value`,
 		`authserver/internal/handlers/apihandlers/forwarder_value.go:14 writeInternalServerError as a value`,
 		`authserver/internal/handlers/handler_account_logout.go:14 attribute key "badReason"`,
@@ -757,10 +899,48 @@ func broken( {
 		`core/caught/run_closure_write.go:9 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_expression.go:6 attribute run spread into a record is not a named slice`,
 		`core/caught/run_foreign_spread.go:8 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_helper_write.go:10 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_index_write.go:9 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_parameter.go:6 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_parameter_shadowed.go:8 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_parameter_shadowed.go:10 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_shadows_variadic.go:5 shadowsVariadic forwards a variadic ...any into a record`,
+		`core/caught/run_shadows_variadic.go:8 attribute run "attrs" shadows this function's variadic parameter`,
+		`core/caught/run_two_declarations.go:8 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_two_declarations.go:11 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_var_decl.go:6 attribute key "clientId"`,
 		`core/testutil/another_install.go:5 slog.New`,
 		`core/testutil/another_install.go:5 slog.SetDefault`,
 	}, describeSlog(violations))
+
+	// The third boundary's other half, in a tree of its own because one entry cannot be declared
+	// correctly and shifted at the same time. A registered signature that grows a fixed parameter
+	// leaves the table's index stale: the run now starts at 4, every call is still read from 3,
+	// so the new argument is read as a key and the caller's first key as its value. Nothing about
+	// that call site looks wrong, and the keys below it are read one position out from then on.
+	drift := t.TempDir()
+	driftFile := filepath.Join(drift, filepath.FromSlash("authserver/internal/apiresponse/apiresponse.go"))
+	require.NoError(t, os.MkdirAll(filepath.Dir(driftFile), 0o755))
+	require.NoError(t, os.WriteFile(driftFile, []byte(`package apiresponse
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error, code string, attrs ...any) {
+	record := []any{"error", err, "code", code}
+	record = append(record, attrs...)
+	slog.ErrorContext(r.Context(), "internal server error", record...)
+}
+`), 0o644))
+	drifted, driftFiles, err := findSlogViolations(drift, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 1, driftFiles)
+	assert.Equal(t, []string{
+		"authserver/internal/apiresponse/apiresponse.go:8 WriteInternalServerError takes its " +
+			"attributes from argument 4, and the table says 3",
+	}, describeSlog(drifted))
 
 	// The per-module scoping the sweep stages leaned on: the same rule, one subtree at a time.
 	// Ten of core/passed's fourteen fixtures are parsed: the mocks file, the test file and the
