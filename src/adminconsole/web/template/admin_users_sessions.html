@@ -11,7 +11,15 @@
 
     function endSessionClick(elem, evt, userSessionId, device, isCurrent) {
 
-        let msg = "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_body_prefix" }}" + device + "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_body_suffix" }}";
+        // escapeHtml, because showModalDialog assigns its message to innerHTML and the device
+        // label is attacker-chosen text: it is derived from Sec-CH-UA and Sec-CH-UA-Platform,
+        // which UA-CH requires a server to accept with arbitrary values, so any user can store
+        // markup in their own session's label by logging in with hand-written headers. The
+        // onclick attribute it arrives in is escaped for the JavaScript string context and no
+        // further, so dropping this call runs that markup in the origin of whoever opens the
+        // list -- an administrator's, on the page where they review someone else's sessions
+        // (#281).
+        let msg = "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_body_prefix" }}" + escapeHtml(device) + "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_body_suffix" }}";
         msg += "{{ T $.ctx "adminconsole.admin_users.sessions.modal_revocation_note" }}";
         if (isCurrent) {
             msg += "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_current_warning" }}";
