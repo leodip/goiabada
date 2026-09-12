@@ -95,7 +95,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	captured := m.expectSuccessfulPersist(123, nil)
 
 	before := time.Now().UTC()
-	result, err := m.manager.StartNewUserSession(recorder, req, 123, 7, "pwd otp", enums.AcrLevel2Mandatory.String(), 0, nil)
+	result, err := m.manager.StartNewUserSession(recorder, req, 123, 7, "pwd otp", enums.AcrLevel2Mandatory.String(), 0, nil, nil)
 	after := time.Now().UTC()
 
 	assert.NoError(t, err)
@@ -115,7 +115,10 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	// one. Compare against the nil spelling itself.
 	assert.NotEqual(t, "00000000-0000-0000-0000-000000000000", parsed)
 
-	// Started, LastAccessed and AuthTime are all stamped with the same UTC now.
+	// Started, LastAccessed and AuthTime are all stamped with the same UTC now. AuthTime is
+	// only "now" here because this call captured no credential instant, which is the nil
+	// fallback; when one is captured it wins, and
+	// TestStartNewUserSession_AuthTimeIsTheCapturedCredentialInstant pins that.
 	for name, value := range map[string]time.Time{
 		"Started":      result.Started,
 		"LastAccessed": result.LastAccessed,
@@ -155,7 +158,7 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 	m.store.On("Get", mock.Anything, testSessionName).Return(m.session, nil).Once()
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
 
-	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
+	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, nil)
 
 	assert.NoError(t, err)
 	assert.Len(t, result.Clients, 1)
@@ -177,7 +180,7 @@ func TestStartNewUserSession_WritesIdentifierIntoTheCookieSession(t *testing.T) 
 
 	m.expectSuccessfulPersist(123, nil)
 
-	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
+	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, result.SessionIdentifier, m.session.Values[constants.SessionKeySessionIdentifier])
@@ -211,7 +214,7 @@ func TestStartNewUserSession_IpAddressExtraction(t *testing.T) {
 			m.expectSuccessfulPersist(123, nil)
 
 			result, err := m.manager.StartNewUserSession(
-				httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
+				httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, nil)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantIp, result.IpAddress)
@@ -243,7 +246,7 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 	m.db.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
+		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, nil)
 
 	assert.NoError(t, err)
 }
@@ -297,7 +300,7 @@ func TestStartNewUserSession_KeepsSessionsFromOtherDevicesOrIps(t *testing.T) {
 
 			_, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-				123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
+				123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, nil)
 
 			assert.NoError(t, err)
 		})
@@ -336,7 +339,7 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
+		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, nil)
 
 	assert.NoError(t, err)
 }
@@ -440,7 +443,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 
 			result, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-				123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
+				123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, nil)
 
 			assert.Error(t, err)
 			assert.Nil(t, result, "no session may be returned alongside an error")
@@ -461,7 +464,7 @@ func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", enums.AcrLevel1.String(), 0, nil)
+		123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, nil)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to get the session")
@@ -501,7 +504,7 @@ func TestStartNewUserSession_StampsAuthStateGeneration(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", enums.AcrLevel1.String(), 7, nil)
+		123, 7, "pwd", enums.AcrLevel1.String(), 7, nil, nil)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -524,7 +527,7 @@ func TestStartNewUserSession_StampsOtpConfigGeneration(t *testing.T) {
 	observed := int64(9)
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", enums.AcrLevel1.String(), 7, &observed)
+		123, 7, "pwd", enums.AcrLevel1.String(), 7, &observed, nil)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -546,10 +549,109 @@ func TestStartNewUserSession_NilOtpConfigGenerationLandsAtZero(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", enums.AcrLevel1.String(), 7, nil)
+		123, 7, "pwd", enums.AcrLevel1.String(), 7, nil, nil)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
 		assert.EqualValues(t, 0, (*captured).OtpConfigGeneration)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// AuthTime: the credential's instant, not this function's clock (#252 decision 8)
+// -----------------------------------------------------------------------------
+
+// AuthTime is the auth_time claim, and OIDC Core 3.1.2.1 makes it max_age's reference point:
+// "the allowable elapsed time in seconds since the last time the End-User was actively
+// authenticated by the OP". The credential is accepted at /auth/pwd or /auth/otp and the
+// session is created two hops later at /auth/completed, with the browser driving the gap, so
+// the two instants are the same only when nobody pauses.
+//
+// 90 minutes is well past any max_age a relying party would send and far outside the window a
+// clock read inside the call could land in, so the assertion cannot pass by coincidence.
+// Started and LastAccessed must stay on now: they measure the session's own life, and pulling
+// them back would shorten it against the idle timeout and the max lifetime.
+func TestStartNewUserSession_AuthTimeIsTheCapturedCredentialInstant(t *testing.T) {
+	m := newStartSessionMocks(t)
+	captured := m.expectSuccessfulPersist(123, nil)
+
+	credentialAcceptedAt := time.Now().UTC().Add(-90 * time.Minute)
+
+	before := time.Now().UTC()
+	result, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		123, 7, "pwd", enums.AcrLevel1.String(), 7, nil, &credentialAcceptedAt)
+	after := time.Now().UTC()
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
+		assert.True(t, (*captured).AuthTime.Equal(credentialAcceptedAt),
+			"the persisted AuthTime must be the captured credential instant, got %v want %v",
+			(*captured).AuthTime, credentialAcceptedAt)
+	}
+	assert.True(t, result.AuthTime.Equal(credentialAcceptedAt),
+		"the returned session must carry it too: /auth/completed reads AuthTime back off this "+
+			"row and puts it on the AuthContext, which is what the code and then the token sign")
+
+	assert.False(t, result.Started.Before(before), "Started must stay on now")
+	assert.False(t, result.Started.After(after), "Started must stay on now")
+	assert.Equal(t, result.Started, result.LastAccessed)
+	assert.True(t, result.AuthTime.Before(result.Started),
+		"a paused ceremony produces an AuthTime older than the session it creates")
+}
+
+// A non-UTC capture is normalised rather than stored as it arrives. Nothing in the ceremony
+// produces one today (both credential handlers capture time.Now().UTC()), but the column is
+// read back and compared against UTC values by every session view, and a location riding along
+// on the model is the kind of thing that survives until a formatter prints the wrong hour.
+func TestStartNewUserSession_AuthTimeIsNormalisedToUTC(t *testing.T) {
+	m := newStartSessionMocks(t)
+	captured := m.expectSuccessfulPersist(123, nil)
+
+	zone := time.FixedZone("UTC+7", 7*60*60)
+	credentialAcceptedAt := time.Now().In(zone).Add(-30 * time.Minute)
+
+	_, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		123, 7, "pwd", enums.AcrLevel1.String(), 7, nil, &credentialAcceptedAt)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
+		assert.Equal(t, time.UTC, (*captured).AuthTime.Location(),
+			"AuthTime must be stored in UTC, like Started and LastAccessed")
+		assert.True(t, (*captured).AuthTime.Equal(credentialAcceptedAt),
+			"normalising the location must not move the instant")
+	}
+}
+
+// Nil and zero both mean "this call captured no credential instant", and the only information
+// left to write is now. The one production caller cannot reach either: /auth/completed refuses
+// to mint a session without Level1AuthCompleted, and the password handler that sets it sets
+// AuthenticatedAt beside it. The fallback exists so the field is never left at Go's zero time,
+// which would read as 1 January year 1 in the auth_time claim and in every session view.
+func TestStartNewUserSession_NoCapturedInstantFallsBackToNow(t *testing.T) {
+	var zeroTime time.Time
+	for name, capture := range map[string]*time.Time{
+		"nil":  nil,
+		"zero": &zeroTime,
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := newStartSessionMocks(t)
+			captured := m.expectSuccessfulPersist(123, nil)
+
+			before := time.Now().UTC()
+			_, err := m.manager.StartNewUserSession(
+				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+				123, 7, "pwd", enums.AcrLevel1.String(), 7, nil, capture)
+			after := time.Now().UTC()
+
+			assert.NoError(t, err)
+			if assert.NotNil(t, *captured, "CreateUserSession was never called") {
+				authTime := (*captured).AuthTime
+				assert.False(t, authTime.IsZero(), "the zero time must never reach the column")
+				assert.False(t, authTime.Before(before), "AuthTime must fall back to now")
+				assert.False(t, authTime.After(after), "AuthTime must fall back to now")
+			}
+		})
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -89,8 +88,10 @@ func HandleAuthCompletedGet(
 		// authContext.AuthenticatedAt is set when the user actually enters credentials in
 		// this ceremony, by the password handler and by the OTP handler. It is nil for SSO
 		// session reuse (existing session flows through level1completed without hitting
-		// either). Used only to decide whether to refresh the session's AuthTime below:
-		// it is NOT proof of level 1, since OTP alone sets it (#129 decision 15).
+		// either). It decides whether the session's AuthTime is refreshed below and, on both
+		// arms, is the value written: it is the instant the credential was accepted, which is
+		// what auth_time means (#252 decision 8). It is NOT proof of level 1, since OTP alone
+		// sets it (#129 decision 15).
 		userReallyAuthenticated := authContext.AuthenticatedAt != nil && !authContext.AuthenticatedAt.IsZero()
 
 		// The session this ceremony actually bound to, which is what the ACR below is taken
@@ -139,8 +140,17 @@ func HandleAuthCompletedGet(
 				// BumpUserSession preserves the old AuthTime (correct for SSO reuse
 				// in handler_authorize.go), but here the user actually entered
 				// credentials again, so refresh AuthTime to reflect that.
-				utcNow := time.Now().UTC()
-				bumpedSession.AuthTime = utcNow
+				//
+				// The value is the one the credential handler captured, never the clock read
+				// here. auth_time is what max_age is measured against, "the last time the
+				// End-User was actively authenticated by the OP" in OIDC Core 3.1.2.1, and
+				// the browser owns the hop between the credential and this handler: reading
+				// the clock here lets a tab paused after the password was accepted and
+				// resumed hours later mint a token saying the user authenticated just now,
+				// so a relying party that asked for a fresh sign-in is told it got one
+				// (#252 decision 8). userReallyAuthenticated is exactly the guard that makes
+				// the dereference safe: non-nil and non-zero.
+				bumpedSession.AuthTime = authContext.AuthenticatedAt.UTC()
 				err = database.UpdateUserSession(nil, bumpedSession)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -282,9 +292,16 @@ func HandleAuthCompletedGet(
 			}
 
 			// start new session
+			// AuthenticatedAt is the credential's instant, and it is what the new row's
+			// AuthTime is stamped with rather than the clock inside StartNewUserSession, for
+			// the reason the reuse arm above gives (#252 decision 8). It is always set here:
+			// the gate above refuses to mint a session without Level1AuthCompleted, and the
+			// password handler is the only writer of that field, setting AuthenticatedAt
+			// beside it.
 			newSession, err := userSessionManager.StartNewUserSession(
 				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String(),
-				authContext.AuthStateGeneration, authContext.OtpConfigGeneration)
+				authContext.AuthStateGeneration, authContext.OtpConfigGeneration,
+				authContext.AuthenticatedAt)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

@@ -61,11 +61,30 @@ func (u *UserSessionManager) HasValidUserSession(ctx context.Context, userSessio
 // observed nothing, which writes 0, and for a brand new session that means it owes a
 // level 2 re-prompt whenever the user's counter is already above 0. That is the
 // fail-closed direction and the only one a nil can safely take (#242).
+//
+// authenticatedAt is the instant this ceremony's last credential was accepted, captured by
+// the password handler and overwritten by the OTP handler. It becomes the session's AuthTime
+// and so the auth_time claim, which OIDC Core 3.1.2.1 makes max_age's reference point: "the
+// last time the End-User was actively authenticated by the OP". Reading the clock here
+// instead would name the moment this function ran, and the browser owns the hop between the
+// two -- a tab left sitting after the password was accepted and resumed hours later would
+// mint a session claiming the user had just authenticated, so a relying party asking for a
+// fresh sign-in with max_age would be told it got one (#252 decision 8). Started and
+// LastAccessed stay on now: they measure the session's own life, not the credential's.
+// Nil or zero falls back to now, which is all the information there is to write; the one
+// caller cannot produce it, because /auth/completed refuses to mint a session without
+// Level1AuthCompleted and only the password handler sets that, alongside authenticatedAt.
 func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	userId int64, clientId int64, authMethods string, acrLevel string,
-	authStateGeneration int64, otpConfigGeneration *int64) (*models.UserSession, error) {
+	authStateGeneration int64, otpConfigGeneration *int64,
+	authenticatedAt *time.Time) (*models.UserSession, error) {
 
 	utcNow := time.Now().UTC()
+
+	authTime := utcNow
+	if authenticatedAt != nil && !authenticatedAt.IsZero() {
+		authTime = authenticatedAt.UTC()
+	}
 
 	observedOtpConfigGeneration := int64(0)
 	if otpConfigGeneration != nil {
@@ -84,7 +103,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		IpAddress:         ipWithoutPort,
 		AuthMethods:       authMethods,
 		AcrLevel:          acrLevel,
-		AuthTime:          utcNow,
+		AuthTime:          authTime,
 		UserId:            userId,
 		DeviceName:        useragent.GetDeviceName(r),
 		DeviceType:        useragent.GetDeviceType(r),

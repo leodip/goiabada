@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/models"
@@ -76,7 +77,8 @@ type UserSessionManager interface {
 	HasValidUserSession(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool
 	StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		userId int64, clientId int64, authMethods string, acrLevel string,
-		authStateGeneration int64, otpConfigGeneration *int64) (*models.UserSession, error)
+		authStateGeneration int64, otpConfigGeneration *int64,
+		authenticatedAt *time.Time) (*models.UserSession, error)
 
 	// BumpUserSession updates an existing session's last accessed time and client list.
 	// It also handles ACR/AMR step-up: if the user completed a higher level of authentication
