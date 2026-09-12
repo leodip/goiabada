@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -1867,6 +1869,68 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 			t.Errorf("the warning line should carry the limiter and the client block:\n%s", out)
 		}
 	})
+}
+
+// TestRateLimiter_EveryTierLogsUnderAConventionalKey holds the one attribute key in this tree
+// that no lint reads. reportTrip appends t.keyField, so the key at that slog call is a field
+// value rather than a string literal, and testutil.AssertSlogConvention reads literals: it walks
+// past this site by construction and records the fact as a ceiling. The key is held here instead,
+// which is the same answer decision 5 gives for a level -- what the text cannot decide, a test
+// pins at the site.
+//
+// Over every tier the production constructor builds, found by walking the struct rather than by
+// listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
+// test can reach today are two of thirteen tiers, and the next tier is what this exists for (#320
+// decision 3).
+func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
+	// Decision 3's vocabulary. Spelled out rather than imported: the lint's copy is unexported,
+	// and this is deliberately the same rule applied to the one value the lint cannot see.
+	conventional := regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+	keyFields := map[string]string{}
+	collectTierKeyFields(reflect.ValueOf(newTestMiddleware(nil, true)), keyFields)
+
+	// The count is asserted because a walk that silently stopped matching would pass over an
+	// empty map exactly as it passes over a conformant one.
+	if len(keyFields) != 13 {
+		t.Fatalf("walked %d tiers, expected the 13 the constructor builds: %v", len(keyFields), keyFields)
+	}
+	for name, keyField := range keyFields {
+		if keyField == "" {
+			// An account tier's bucket names a person, so it is logged nowhere and carries no
+			// key at all. That emptiness is its own invariant and newFailureTier holds it.
+			continue
+		}
+		if !conventional.MatchString(keyField) {
+			t.Errorf("tier %q logs its bucket under %q, which is not a snake_case attribute key; "+
+				"the record would carry a name nothing else in the tree spells that way", name, keyField)
+		}
+		if keyField == "request_id" || keyField == "request-id" || keyField == "err" {
+			t.Errorf("tier %q logs its bucket under the reserved key %q", name, keyField)
+		}
+	}
+}
+
+// collectTierKeyFields walks a value for the tier structs inside it and records each one's name
+// against the attribute key it logs its bucket under. Reading an unexported field through reflect
+// is allowed; only Interface and Set are not, and this needs neither. The walk stops at a tier
+// rather than descending into its limiter, which is both what bounds it and what keeps it off the
+// pointers ratelimit keeps back to itself.
+func collectTierKeyFields(v reflect.Value, into map[string]string) {
+	switch v.Kind() {
+	case reflect.Pointer:
+		if !v.IsNil() {
+			collectTierKeyFields(v.Elem(), into)
+		}
+	case reflect.Struct:
+		if v.Type() == reflect.TypeOf(tier{}) {
+			into[v.FieldByName("name").String()] = v.FieldByName("keyField").String()
+			return
+		}
+		for i := 0; i < v.NumField(); i++ {
+			collectTierKeyFields(v.Field(i), into)
+		}
+	}
 }
 
 // TestLimitDCR_PerIP is LimitDCR's first test, which is half of #195's remainder. RFC
