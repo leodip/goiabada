@@ -217,11 +217,11 @@ then.
 
 | module | why it must not be there | reachable today | cleared by |
 |---|---|---|---|
-| `modernc.org/sqlite` | SQLite driver | yes | #359 |
-| `github.com/go-sql-driver/mysql` | MySQL driver | yes | #359 |
-| `github.com/jackc/pgx/v5` | PostgreSQL driver | yes | #359 |
-| `github.com/microsoft/go-mssqldb` | SQL Server driver | yes | #359 |
-| `github.com/huandu/go-sqlbuilder` | SQL construction | yes | #359 |
+| `modernc.org/sqlite` | SQLite driver | yes | #353 |
+| `github.com/go-sql-driver/mysql` | MySQL driver | yes | #353 |
+| `github.com/jackc/pgx/v5` | PostgreSQL driver | yes | #353 |
+| `github.com/microsoft/go-mssqldb` | SQL Server driver | yes | #353 |
+| `github.com/huandu/go-sqlbuilder` | SQL construction | yes | #353 |
 | `github.com/pquerna/otp` | TOTP generation | no | — |
 
 Every driver arrives the same way, through one edge:
@@ -234,6 +234,14 @@ adminconsole/cmd/goiabada-adminconsole -> core/oauth -> core/data -> core/data/<
 every driver. Five of the core packages the admin console imports reach `core/data`: `core/oauth`,
 `core/user`, `core/middleware`, `core/validators` and `core/sessionstore`. Closing one path changes
 nothing on its own, which is why the table asserts reachability rather than counting edges.
+
+All five rows say #353 rather than #359, which is worth explaining because the ordering does not
+suggest it. `core/data/database.go` is the only production file in `core` that imports an engine
+package — every other importer is an auth-server test — so it is the single cut point, and #353
+point 7 already requires that `core/data` stop importing the four engines. The drivers therefore
+leave the admin console's binary at 22/29, six issues before the persistence packages themselves
+move. #353 reads like a staging step, so the effect is easy to miss; the guard will not miss it,
+because these rows go stale the moment it lands.
 
 `github.com/pquerna/otp` is listed at `no` deliberately. It is not reachable now, `core/otp` moves
 to the auth server in #348, and the row states that it must not arrive in the meantime.
