@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
@@ -17,8 +16,6 @@ import (
 func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestId := middleware.GetReqID(r.Context())
-
 			// Fetch settings from cache (auto-refreshes if expired)
 			publicSettings, err := settingsCache.Get()
 			if err != nil {
@@ -34,7 +31,11 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 				// traded the one thing a 500 is logged for -- where in the cache's paths it
 				// failed -- against a line length, and left the console the only surface in the
 				// tree whose 500 record had no frames (#279 decisions 9 and 17).
-				slog.Error("unable to fetch settings from the auth server", "error", err, "request_id", requestId)
+				//
+				// ErrorContext with no request_id attribute: the installed handler reads
+				// chi's request id off the context and appends it, so the correlation is
+				// the same and no call site can spell the key differently (#320 decision 2).
+				slog.ErrorContext(r.Context(), "unable to fetch settings from the auth server", "error", err)
 				http.Error(w, i18n.T(r.Context(), "adminconsole.error.settings_unavailable"), http.StatusInternalServerError)
 				return
 			}
@@ -59,9 +60,8 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 				// Decision 9's shape needs an error value to carry a stack, and this arm refuses
 				// a successful response rather than handling a failure, so it raises its own.
 				// Without it this is the one 500 in the tree logged with nothing to locate it by.
-				slog.Error("unable to read the auth server's issuer",
-					"error", errs.New("the auth server did not report an issuer; it may be running an older version"),
-					"request_id", requestId)
+				slog.ErrorContext(r.Context(), "unable to read the auth server's issuer",
+					"error", errs.New("the auth server did not report an issuer; it may be running an older version"))
 				http.Error(w, i18n.T(r.Context(), "adminconsole.error.issuer_missing"), http.StatusInternalServerError)
 				return
 			}

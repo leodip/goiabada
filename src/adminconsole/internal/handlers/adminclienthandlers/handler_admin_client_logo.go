@@ -61,7 +61,7 @@ func HandleAdminClientLogoGet(
 		var logoUrl string
 		logoInfo, err := apiClient.GetClientLogo(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			slog.Warn("Failed to fetch client logo info", "error", err, "clientId", id)
+			slog.WarnContext(r.Context(), "unable to fetch the client logo info", "error", err, "client_id", id)
 		} else if logoInfo != nil && logoInfo.HasLogo {
 			logoUrl = fmt.Sprintf("%s?t=%d", logoInfo.LogoUrl, time.Now().UnixNano())
 		}
