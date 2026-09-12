@@ -341,7 +341,8 @@ import (
 )
 
 func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
-	record := []any{"error", err}
+	record := make([]any, 0, len(attrs)+2)
+	record = append(record, "error", err)
 	record = append(record, attrs...)
 	slog.ErrorContext(r.Context(), "internal server error", record...)
 }
@@ -723,6 +724,112 @@ func twoRuns(flag bool) {
 	}
 }
 `)
+	// Two more the same reading is green on once a name is read without regard to where it was
+	// declared or where it was reached. The first is a use before the declaration: the spread on
+	// line 8 is the package-level run, not the local one below it, and a census by spelling sees
+	// one declaration with every assignment conformant. The second is a run reached through a
+	// composite literal's key, which the scan skipped whole on the grounds that a key names a
+	// struct field: a pointer to a slice is comparable, so a map literal can hold the run there
+	// and hand it to something that writes it.
+	write("core/caught/run_before_declaration.go", `package caught
+
+import "log/slog"
+
+var attrs = []any{"clientId", 1}
+
+func beforeDeclaration() {
+	slog.Info("a thing happened", attrs...)
+	attrs := []any{"client_id", 2}
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	// The same confusion one position later. Once a run has absorbed the caller's, its length
+	// from there on is whatever the caller passed, so nothing can say whether the literal below
+	// is a key or the value of the key before it. Two findings and both hold: the function is an
+	// unlisted forwarder as well, which is inseparable, since a tail can only arrive by spreading
+	// a variadic parameter.
+	write("core/caught/run_tail_append.go", `package caught
+
+import "log/slog"
+
+func tailAppend(attrs ...any) {
+	record := []any{"error", "x"}
+	record = append(record, attrs...)
+	record = append(record, "clientId", 1)
+	slog.Info("a thing happened", record...)
+}
+`)
+
+	// The third of the same kind, and the one a position test alone does not separate: the
+	// declaration is above the spread and there is only one of it, and it still is not the run
+	// that reaches the record, because the block it was declared in has closed.
+	write("core/caught/run_sibling_scope.go", `package caught
+
+import "log/slog"
+
+var attrs = []any{"clientId", 1}
+
+func siblingScope(flag bool) {
+	if flag {
+		attrs := []any{"client_id", 2}
+		slog.Info("a thing happened", attrs...)
+	}
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	write("core/caught/run_composite_key.go", `package caught
+
+import "log/slog"
+
+func renameThrough(attrs *[]any) { (*attrs)[0] = "clientId" }
+
+func compositeKeyRun() {
+	attrs := []any{"client_id", 1}
+	held := map[*[]any]bool{&attrs: true}
+	for run := range held {
+		renameThrough(run)
+	}
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	// The near miss of the row above, and the reason the key is not simply scanned: a struct
+	// literal's field label is an identifier that can match a run's name and is not that run.
+	write("core/passed/run_field_label.go", `package passed
+
+import "log/slog"
+
+type payload struct{ attrs int }
+
+func fieldLabel() {
+	attrs := []any{"client_id", 1}
+	_ = payload{attrs: 2}
+	slog.Info("a thing happened", attrs...)
+}
+`)
+
+	// A method carrying a listed name. The table resolves a bare identifier inside a scope or a
+	// package path through an import, and a method is reached through neither: the census
+	// excludes it, so its call sites are read by nothing, while the declaration half asked only
+	// whether something of that name is listed and let it through. Every rule green, and the
+	// caller's clientId reaches a record.
+	write("authserver/internal/handlers/apihandlers/forwarder_method.go", `package apihandlers
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+type localWriter struct{}
+
+func (localWriter) writeInternalServerError(r *http.Request, attrs ...any) {
+	slog.ErrorContext(r.Context(), "internal server error", attrs...)
+}
+
+func useMethod(r *http.Request) {
+	localWriter{}.writeInternalServerError(r, "clientId", 1)
+}
+`)
+
 	// Two findings, and both are true of it: an unlisted forwarder, because the spread names the
 	// variadic parameter, and the shadow. They cannot be separated, since the two variables are
 	// one identifier and the declaration half matches on the same text.
@@ -822,7 +929,7 @@ func broken( {
 
 	violations, files, err := findSlogViolations(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 55, files,
+	assert.Equal(t, 61, files,
 		"every parseable, production-reachable fixture outside a mocks directory and a _test.go file is parsed")
 	assert.Equal(t, []string{
 		`authserver/internal/handlers/apihandlers/forwarded_keys.go:10 attribute key "clientId"`,
@@ -832,6 +939,7 @@ func broken( {
 		`authserver/internal/handlers/apihandlers/forwarded_slice.go:6 attribute key "clientId"`,
 		`authserver/internal/handlers/apihandlers/forwarded_slice.go:8 attribute key "originHeader"`,
 		`authserver/internal/handlers/apihandlers/forwarder_declared.go:9 writeInternalServerError is declared 2 times inside the scope it is listed under`,
+		`authserver/internal/handlers/apihandlers/forwarder_method.go:10 method writeInternalServerError forwards a variadic ...any into a record`,
 		`authserver/internal/handlers/apihandlers/forwarder_shadow.go:10 writeInternalServerError is declared 2 times inside the scope it is listed under`,
 		`authserver/internal/handlers/apihandlers/forwarder_value.go:10 apiresponse.WriteInternalServerError as a value`,
 		`authserver/internal/handlers/apihandlers/forwarder_value.go:14 writeInternalServerError as a value`,
@@ -895,8 +1003,10 @@ func broken( {
 		`core/caught/paren_callee.go:5 message "Capitalised" does not start with a lowercase letter`,
 		`core/caught/run_alias.go:8 attribute run "other" is built in a form this rule cannot read`,
 		`core/caught/run_append_base.go:6 attribute key "clientId"`,
+		`core/caught/run_before_declaration.go:8 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_builder.go:9 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_closure_write.go:9 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_composite_key.go:13 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_expression.go:6 attribute run spread into a record is not a named slice`,
 		`core/caught/run_foreign_spread.go:8 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_helper_write.go:10 attribute run "attrs" is built in a form this rule cannot read`,
@@ -906,6 +1016,9 @@ func broken( {
 		`core/caught/run_parameter_shadowed.go:10 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_shadows_variadic.go:5 shadowsVariadic forwards a variadic ...any into a record`,
 		`core/caught/run_shadows_variadic.go:8 attribute run "attrs" shadows this function's variadic parameter`,
+		`core/caught/run_sibling_scope.go:12 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_tail_append.go:5 tailAppend forwards a variadic ...any into a record`,
+		`core/caught/run_tail_append.go:9 attribute run "record" is built in a form this rule cannot read`,
 		`core/caught/run_two_declarations.go:8 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_two_declarations.go:11 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_var_decl.go:6 attribute key "clientId"`,
@@ -942,12 +1055,53 @@ func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error,
 			"attributes from argument 4, and the table says 3",
 	}, describeSlog(drifted))
 
+	// The third boundary's last half, and it is the one a correctly registered forwarder hides
+	// best: the table is right, the census counts one declaration at the stated index, every call
+	// site is read, and the run those sites built is rewritten on the way to the record. Rule 6
+	// reads a forwarder's keys at its callers, so a key the forwarder itself puts into the run is
+	// written where nothing reads and refutes the offset besides, since it moves every later key
+	// by two. Both halves of it: a write through an index before the run is passed to a second
+	// listed forwarder, and an append before it goes into a local record that is itself readable,
+	// which is the shape apiresponse actually has. A tree of its own, because a forwarder cannot
+	// be declared correctly here and correctly in the tree above at the same time.
+	tamper := t.TempDir()
+	tamperFile := filepath.Join(tamper, filepath.FromSlash("authserver/internal/apiresponse/apiresponse.go"))
+	require.NoError(t, os.MkdirAll(filepath.Dir(tamperFile), 0o755))
+	require.NoError(t, os.WriteFile(tamperFile, []byte(`package apiresponse
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
+	attrs[0] = "clientId"
+	LogInternalServerError(r, err, attrs...)
+}
+
+func LogInternalServerError(r *http.Request, err error, attrs ...any) string {
+	attrs = append(attrs, "userId", 1)
+	record := make([]any, 0, len(attrs)+2)
+	record = append(record, "error", err)
+	record = append(record, attrs...)
+	slog.ErrorContext(r.Context(), "internal server error", record...)
+	return ""
+}
+`), 0o644))
+	tampered, tamperFiles, err := findSlogViolations(tamper, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 1, tamperFiles)
+	assert.Equal(t, []string{
+		`authserver/internal/apiresponse/apiresponse.go:9 the variadic run "attrs" is changed before it reaches a record`,
+		`authserver/internal/apiresponse/apiresponse.go:14 the variadic run "attrs" is changed before it reaches a record`,
+	}, describeSlog(tampered))
+
 	// The per-module scoping the sweep stages leaned on: the same rule, one subtree at a time.
-	// Ten of core/passed's fourteen fixtures are parsed: the mocks file, the test file and the
+	// Eleven of core/passed's fifteen fixtures are parsed: the mocks file, the test file and the
 	// !production file are exempt, and the unparseable one is not counted.
 	scoped, scopedFiles, err := findSlogViolations(root, []string{"core/passed"})
 	require.NoError(t, err)
-	assert.Equal(t, 10, scopedFiles)
+	assert.Equal(t, 11, scopedFiles)
 	assert.Empty(t, describeSlog(scoped), "the caught subtree is outside the named directory")
 }
 
