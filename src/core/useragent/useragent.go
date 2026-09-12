@@ -102,7 +102,7 @@ func parseBrands(h string) ([]brand, bool) {
 		i = next
 		major := ""
 		for i < len(h) && h[i] == ';' {
-			key, value, next, ok := parseParam(h, i+1)
+			key, value, isString, next, ok := parseParam(h, i+1)
 			if !ok {
 				return nil, false
 			}
@@ -110,8 +110,20 @@ func parseBrands(h string) ([]brand, bool) {
 			// UA-CH 3.1: the v parameter carries the version, of which only the text
 			// before the first "." is displayed (decision 3). A brand sending the full
 			// version and one sending the major alone therefore read the same.
+			//
+			// Only a String is a version. UA-CH 4.1.4 builds the parameter by setting
+			// param_value to version, which step 3 makes "a string", and the
+			// NavigatorUABrandVersion it mirrors declares version a DOMString. A v of
+			// any other bare-item type is a parameter this package cannot use rather
+			// than a version spelled unusually, so the brand keeps its name and loses
+			// its version. The assignment is unconditional because parameters are a
+			// dictionary (RFC 9651 3.1.2): a repeated v is the later value, including
+			// when the later value is the unusable one (#281).
 			if key == "v" {
-				major, _, _ = strings.Cut(value, ".")
+				major = ""
+				if isString {
+					major, _, _ = strings.Cut(value, ".")
+				}
 			}
 		}
 		out = append(out, brand{name, major})
@@ -172,28 +184,32 @@ func parseString(s string, i int) (string, int, bool) {
 // header rather than the version "@junk". Reading either loosely accepts a Sec-CH-UA that no
 // structured-field parser would, and then labels the session from it, when RFC 8942 2.2 says a
 // hint a server cannot understand is one to ignore in favour of the User-Agent (#281).
-func parseParam(h string, i int) (key, value string, next int, ok bool) {
+//
+// isString is the bare item's type, carried out because the one parameter this package reads
+// is defined as a String and every other type is a valid parameter whose value is unusable.
+// A valueless parameter is boolean true (RFC 9651 3.1.2), so it is not a string either.
+func parseParam(h string, i int) (key, value string, isString bool, next int, ok bool) {
 	i = skipSP(h, i)
 	start := i
 	if i == len(h) || !isKeyStart(h[i]) {
-		return "", "", 0, false
+		return "", "", false, 0, false
 	}
 	for i < len(h) && isKeyChar(h[i]) {
 		i++
 	}
 	key = h[start:i]
 	if i == len(h) || h[i] != '=' {
-		return key, "", i, true
+		return key, "", false, i, true
 	}
-	value, next, ok = parseBareItem(h, i+1)
+	value, isString, next, ok = parseBareItem(h, i+1)
 	if !ok {
-		return "", "", 0, false
+		return "", "", false, 0, false
 	}
-	return key, value, next, true
+	return key, value, isString, next, true
 }
 
-// parseBareItem reads one RFC 9651 3.3 bare item and answers its text as sent, together with
-// the index just past it.
+// parseBareItem reads one RFC 9651 3.3 bare item, answering the index just past it, whether it
+// was a String, and its value when it was one.
 //
 // RFC 9651 rather than RFC 8941, which it obsoletes: UA-CH 3.1, 3.7 and 3.9 now define all
 // three hints against 9651, and 4.2.3.1 there dispatches on eight leading characters rather
@@ -202,59 +218,66 @@ func parseParam(h string, i int) (key, value string, next int, ok bool) {
 // valid current field would have been answered with a label derived from a header Chromium
 // freezes -- the exact outcome decision 2 of #281 exists to avoid.
 //
-// Only the v parameter is ever looked at and UA-CH 3.1 says its value is a String, so the
-// other seven forms are here to be recognised rather than to be used: a header carrying a
-// well-formed integer or token parameter is a valid structured field, and RFC 8942 2.2 asks
-// that such a hint be honoured rather than refused for spelling a value in a form this
-// package happens not to read.
+// The other seven forms are recognised rather than read, and answer no value at all. The one
+// parameter this package looks at is v, which UA-CH 4.1.4 defines as a string, so no other
+// type can be a version; and a header carrying a well-formed integer or token parameter on any
+// key is still a valid structured field, which RFC 8942 2.2 asks be honoured rather than
+// refused for spelling a value in a form this package does not read. Answering nothing for
+// them is what keeps those two facts from colliding: before this, every form answered its
+// source span and "v=@1659578233" was displayed as the version "@1659578233".
 //
-// Every form but the string answers the source text as sent rather than a decoded value, and
-// for the Display String that is load-bearing rather than merely consistent: 4.2.10 rejects
-// anything outside VCHAR and SP in the *encoded* text but places no limit on what the
-// pct-encoded octets decode to, so %"%00" is a valid field whose value is a NUL byte.
-// Answering the span keeps every byte that can reach a label inside VCHAR and SP, which is
-// what it was before this form was recognised at all -- and PostgreSQL refuses a text value
-// carrying U+0000 outright, so a decoded value could have failed the session insert.
-func parseBareItem(s string, i int) (string, int, bool) {
+// It also settles the Display String, which is the form where answering a value is genuinely
+// unsafe: 4.2.10 rejects anything outside VCHAR and SP in the *encoded* text but places no
+// limit on what the pct-encoded octets decode to, so %"%00" is a valid field whose value is a
+// NUL byte, and PostgreSQL refuses a text value carrying U+0000 outright. A form that answers
+// no value cannot put one in a label or in a column.
+func parseBareItem(s string, i int) (value string, isString bool, next int, ok bool) {
 	if i >= len(s) {
-		return "", 0, false
+		return "", false, 0, false
 	}
 	switch c := s[i]; {
 	case c == '"':
-		return parseString(s, i)
+		v, next, ok := parseString(s, i)
+		if !ok {
+			return "", false, 0, false
+		}
+		return v, true, next, true
 	case c == '?':
 		// sf-boolean = "?" ( "0" / "1" ).
 		if i+1 < len(s) && (s[i+1] == '0' || s[i+1] == '1') {
-			return s[i : i+2], i + 2, true
+			return "", false, i + 2, true
 		}
-		return "", 0, false
+		return "", false, 0, false
 	case c == ':':
-		return parseByteSequence(s, i)
+		next, ok := parseByteSequence(s, i)
+		return "", false, next, ok
 	case c == '@':
-		return parseDate(s, i)
+		next, ok := parseDate(s, i)
+		return "", false, next, ok
 	case c == '%':
-		return parseDisplayString(s, i)
+		next, ok := parseDisplayString(s, i)
+		return "", false, next, ok
 	case c == '-' || isDigit(c):
-		return parseNumber(s, i)
+		_, next, ok := parseNumber(s, i)
+		return "", false, next, ok
 	// sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" ).
 	case c == '*' || isAlpha(c):
-		start := i
 		for i++; i < len(s) && (isTokenChar(s[i]) || s[i] == ':' || s[i] == '/'); i++ {
 		}
-		return s[start:i], i, true
+		return "", false, i, true
 	}
-	return "", 0, false
+	return "", false, 0, false
 }
 
 // parseDate reads an RFC 9651 3.3.7 sf-date, "@" followed by an sf-integer. 4.2.9 step 4
 // fails parsing when what follows is a Decimal, so the point that parseNumber would have
 // accepted is what separates @1659578233 from @1659578233.5 here.
-func parseDate(s string, i int) (string, int, bool) {
+func parseDate(s string, i int) (int, bool) {
 	n, next, ok := parseNumber(s, i+1)
 	if !ok || strings.Contains(n, ".") {
-		return "", 0, false
+		return 0, false
 	}
-	return s[i:next], next, true
+	return next, true
 }
 
 // parseDisplayString reads an RFC 9651 3.3.8 sf-displaystring, per the 4.2.10 algorithm:
@@ -265,34 +288,33 @@ func parseDate(s string, i int) (string, int, bool) {
 // The backslash is not an escape here, which is the one place this differs from parseString
 // and the reason the two are not shared: 4.2.10's loop appends it like any other character,
 // so %"a\"" closes at the quote after the backslash where "a\"" would not.
-func parseDisplayString(s string, i int) (string, int, bool) {
+func parseDisplayString(s string, i int) (int, bool) {
 	if i+1 >= len(s) || s[i+1] != '"' {
-		return "", 0, false
+		return 0, false
 	}
-	start := i
 	var decoded strings.Builder
 	for i += 2; i < len(s); {
 		switch c := s[i]; {
 		// 4.2.10: "If char is in the range %x00-1f or %x7f-ff [...] fail parsing."
 		case c < 0x20 || c >= 0x7f:
-			return "", 0, false
+			return 0, false
 		case c == '%':
 			if i+2 >= len(s) || !isLCHexDig(s[i+1]) || !isLCHexDig(s[i+2]) {
-				return "", 0, false
+				return 0, false
 			}
 			decoded.WriteByte(hexVal(s[i+1])<<4 | hexVal(s[i+2]))
 			i += 3
 		case c == '"':
 			if !utf8.ValidString(decoded.String()) {
-				return "", 0, false
+				return 0, false
 			}
-			return s[start : i+1], i + 1, true
+			return i + 1, true
 		default:
 			decoded.WriteByte(c)
 			i++
 		}
 	}
-	return "", 0, false
+	return 0, false
 }
 
 // parseNumber reads an RFC 9651 3.3.1 sf-integer or 3.3.2 sf-decimal. The digit counts are the
@@ -339,9 +361,9 @@ func parseNumber(s string, i int) (string, int, bool) {
 	return s[start:i], i, true
 }
 
-// parseByteSequence reads an RFC 9651 3.3.5 sf-binary, base64 between two colons. The value is
-// returned with its colons, since nothing reads it: what matters is that a well-formed one
-// parses, and that an unterminated one does not swallow the rest of the field.
+// parseByteSequence reads an RFC 9651 3.3.5 sf-binary, base64 between two colons, and answers
+// no value: what matters is that a well-formed one parses, and that an unterminated one does
+// not swallow the rest of the field.
 //
 // The alphabet check of 4.2.7 step 6 is not the whole gate, and reading it as though it were
 // is the easy mistake: step 7 then requires the content to be base64-decoded and says "if
@@ -354,20 +376,20 @@ func parseNumber(s string, i int) (string, int, bool) {
 // Padding is synthesized rather than demanded, which is what step 7 asks for: the trailing
 // "=" are dropped and the rest decoded unpadded, so :QQ: and :QQ==: are the same byte and an
 // "=" anywhere but the end is still refused.
-func parseByteSequence(s string, i int) (string, int, bool) {
+func parseByteSequence(s string, i int) (int, bool) {
 	start := i
 	for i++; i < len(s) && s[i] != ':'; i++ {
 		if !isBase64Char(s[i]) {
-			return "", 0, false
+			return 0, false
 		}
 	}
 	if i == len(s) {
-		return "", 0, false
+		return 0, false
 	}
 	if _, err := base64.RawStdEncoding.DecodeString(strings.TrimRight(s[start+1:i], "=")); err != nil {
-		return "", 0, false
+		return 0, false
 	}
-	return s[start : i+1], i + 1, true
+	return i + 1, true
 }
 
 // OWS is what RFC 9651 4.2.1 discards around the commas of a list, and the only place in this
