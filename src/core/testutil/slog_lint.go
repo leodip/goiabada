@@ -5,121 +5,71 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// AssertSlogConvention holds production code to one logging convention, so that every record this
-// tree writes is greppable by its message, queryable by its attributes and correlatable to the
-// request that produced it. Five rules, each decidable from the text alone:
+// AssertSlogConvention holds production code to the part of the logging convention that sloglint
+// cannot express. sloglint, enabled in .golangci.yml at the repository root and run over
+// golangci-lint's type information by run-tests.sh's lint tier and CI's Lint job, holds the rest:
+// a literal message with a lowercase first rune, snake_case attribute keys, err and request_id
+// refused, and a *Context variant inside any function that has a context.Context or an
+// *http.Request parameter at any enclosing depth. Being type-checked it resolves an aliased
+// import, a shadowed builtin or a type alias for free, which is what a parse of one file spent
+// 2,300 lines refusing approximations of before the review of #320 replaced them with this file.
 //
-//  1. The message is a string literal. 125 sites used to build it with fmt.Sprintf, a +
-//     concatenation, err.Error() or a variable, which makes a record ungreppable and puts the
-//     value the reader wants inside the one field no collector can index.
-//  2. The literal message starts with a lowercase letter, carries no "component: " prefix, and
-//     does not open with "failed to" or "error ". 47 messages were capitalised, nine component
-//     prefixes were in use (logout:, TokenParser:, i18n:, WARNING: and five more), and the tree
-//     spelled the same event three ways. The one verb is "unable to".
-//  3. Every attribute key matches ^[a-z][a-z0-9_]*$ and is none of err, request_id or request-id.
-//     45 calls carried a camelCase key and one carried a dash, so the same value arrived under
-//     clientId, clientIdentifier and client_identifier in three records of one request. err is
-//     spelled error, and request_id is never written by a call site because the handler injects
-//     it (decision 2); a site that wrote its own would produce the key twice in one record, so
-//     core/logging, which is that handler, is the one package allowed to write it.
-//  4. A slog call inside a function that takes a context.Context or an *http.Request, at any
-//     enclosing depth, is a *Context variant. Only those pass a context to the handler, so a
-//     plain slog.Info on a request path is a record with no request_id, and it is invisible
-//     rather than wrong: it looks exactly like a correct record until someone tries to correlate
-//     it. slog.Log and slog.LogAttrs take a context by construction and satisfy the rule.
-//  5. slog.SetDefault, slog.New, slog.Default and slog.With are refused outside the files that
-//     own the handler. slog.SetDefault is process-global, so a second install silently replaces
-//     the one both servers configured, and a *slog.Logger obtained anywhere else carries
-//     attributes this rule cannot see.
-//  6. A function that takes the caller's key/value run as a variadic parameter and hands it to a
-//     record is declared in slogAttrForwarders, and rule 3 then reads the keys at its call sites
-//     and in any slice spread into it. Four exist. The API's 500 writer is why the rule does:
-//     328 calls reach one record through it, and until this rule they were the one place in the
-//     tree a key was never read, so 179 of them still spelled clientId, groupId and userId after
-//     the sweep while all three tier callers passed. An unregistered forwarder is refused rather
-//     than ignored, because the shape it creates is a hole in rule 3 that looks like nothing.
+// Four rules remain, each decidable from the text alone:
 //
-// Resolution is by import path rather than by the text at the call site, as errors_lint.go does
-// and for the same reason: an aliased log/slog, context or net/http would walk straight past a
-// textual check. A dot import of log/slog is refused outright, because it leaves no selector for
-// any of the six rules to resolve.
+//  1. The message is a string literal at the call, and it carries no "component: " prefix and does
+//     not open with "failed to" or "error ". sloglint's static-msg accepts a constant as well as a
+//     literal and its msg-style reads literals only, so a constant is the one shape that would
+//     pass every guard while carrying an opener this rule refuses; refusing anything that is not a
+//     literal closes that without resolving constants. Nine component prefixes were in use before
+//     the sweep and the tree spelled the same event three ways; the one verb is "unable to"
+//     (decision 4). sloglint has no message-text option, so this is what it leaves of that decision.
+//  2. slog.SetDefault, slog.New, slog.Default and slog.With are refused outside the files that own
+//     the handler (decision 12), whether called or named as a value. slog.SetDefault is
+//     process-global, so a second install silently replaces the one both servers configured, and a
+//     *slog.Logger obtained anywhere else carries attributes no lint can see. sloglint's no-global
+//     would also refuse the package-level calls the whole tree uses by design, so it cannot stand
+//     in for this rule.
+//  3. A `...` spread into a record, or into a registered forwarder, is refused unless the enclosing
+//     top-level function is listed in slogSpreadSites. sloglint reads a key only where it is a
+//     literal at the call it inspects; a run spread from a slice is invisible to it, and 179
+//     camelCase keys survived the first sweep behind exactly that shape. The table names each
+//     function that may spread and why: a forwarder, whose callers' keys sloglint reads because
+//     .golangci.yml registers it under custom-funcs, or a builder whose every key is a literal in
+//     its own body or is pinned by a test beside it. A closure inside a listed function is inside
+//     the function a reader registered, and is admitted with it.
+//  4. The forwarders in slogSpreadSites and the custom-funcs in .golangci.yml are one set, so a
+//     forwarder cannot be admitted to spread here without sloglint reading its callers there. The
+//     comparison is by name: msg-pos and args-pos are not read back against the signatures, so a
+//     forwarder that grows a parameter with its args-pos left stale would have sloglint read its
+//     callers' keys one position out while this rule stays green. Accepted rather than closed:
+//     there are four entries, each offset was checked by planting a camelCase key at a call site
+//     and seeing it reported, and reading signatures back is the machinery this file was cut to
+//     stop carrying (#320, review of #321).
 //
-// Rule 6 spans three boundaries, and each is closed by refusing what cannot be read rather than by
-// matching the shapes that exist. How the callee resolves: a dot import of a forwarder's package
-// and a forwarder named anywhere but at a call are both refused, because either one puts a record
-// one indirection past every selector this rule resolves. How the run is built: a run spread into
-// a record must be the enclosing function's own variadic parameter, which rule 6's declaration
-// half already covers, or a local introduced once in that body out of []any{...}, make([]any, ...)
-// and appends onto itself, declared above the spread and in a block still open at it, and used
-// nowhere but there and the spread. A builder's return value, an alias of another slice, an append
-// onto a slice that is not the run, a spread of anything but the enclosing variadic parameter, a
-// write through an index, a helper or a composite literal's key, an element appended after the run
-// absorbed a spread of unknown length, a name this body never declared or declared somewhere the
-// spread cannot see, and any use from inside a closure are each reported as a run this rule cannot
-// read. The enclosing variadic parameter is admitted on one condition, that this body passes it on
-// as it arrived: its keys are answered for at the call sites that built it, so a write here is
-// both a key nothing reads and a shift of every key those sites did write past the index the table
-// states. And what the table itself names: a listed forwarder whose keys were read must have been
-// declared exactly once in what was walked, at the argument index the table gives, and by a
-// package function or a named closure rather than a method, which no entry could be describing
-// since a receiver is neither a bare name in a scope nor an import path. So a same-name shadow
-// cannot inherit the registration and a signature that grew a parameter cannot leave every key its
-// callers write being read one position out. All three are refusals rather than approximations on
-// purpose: an enumeration of permitted forms is green on the forms nobody thought of, which is how
-// 179 camelCase keys survived the sweep behind a wrapper in the first place.
-//
-// ceiling: three shapes are outside a parse and are therefore not held. An attribute key computed
-// at runtime is skipped rather than reported, and a non-literal expression at a key position also
-// costs the walk its alignment for the rest of that call's arguments, so a string literal after
-// one may be read as a key. One production site writes a computed key: the rate limiter appends
-// tier.keyField, whose value is a literal at each newTier call, and the key those literals spell
-// is held by TestRateLimiter_EveryTierLogsUnderAConventionalKey in core/middleware rather than
-// here, exactly as decision 5 pins a level the text cannot decide. An elided composite literal
-// inside a []slog.Attr, {Key: "x"}, has no type to resolve and is skipped. And the methods on a
-// *slog.Logger are not linted, which rule 5 is what makes safe: outside the handler's own files
-// there is no way to get one. Revisit when a second site needs a computed key, since one test per
-// site does not scale, or when rule 5 grows a sixth exemption; closing any of them means running
-// this over go/packages-loaded type information rather than one parsed file (#320).
-//
-// ceiling: a variable is identified by its name, the position of its one declaration and the
-// extent of the scope holding it, which is what a parse of a single file can answer; a resolved
-// object is what a type checker would answer. The three differ nowhere this rule accepts a run,
-// because every shape where they could differ is refused rather than read: a second declaration
-// of the name, a use above the declaration or past the end of its scope, a self-named base in the
-// declaration that introduces the name, a file that declares one of the four builtins this
-// reading spells, and every occurrence the rule has not modelled, including any inside a closure.
-// The cost of that is paid in false refusals rather than in missed keys, and the price of one is
-// a renamed variable. Revisit if a refusal ever lands on a shape that is genuinely the clearest
-// way to write a run, which would mean the rule is now costing more than the wrapper hole did.
-//
-// One file is also the limit on the two identities read rather than refused. A type alias of
-// slog.Attr, context.Context or http.Request is resolved where this file declares it, and an
-// alias declared in another file of the same package is not visible to a parse of this one, so it
-// is neither resolved nor refused; the same holds for a package-level append, make, len or cap
-// declared in a sibling file. Neither exists in this tree, and closing either means the same
-// go/packages load the ceiling above names (#320).
+// A dot import of log/slog is refused outright, since it leaves no selector for rule 2 to
+// resolve. Test files and mocks are exempt, as they are for AssertNoLegacyErrors: a test reads
+// records through CaptureSlog rather than writing them.
 //
 // Passing dirs restricts the walk to those subdirectories of the source root, forward slashes and
-// relative to it. Scope and shape follow AssertNoLegacyErrors, which carries the reasoning for
-// walking the source root rather than the calling module.
+// relative to it. Rule 4 is checked whatever dirs are passed.
 func AssertSlogConvention(t *testing.T, dirs ...string) {
 	t.Helper()
 
 	root := SourceRoot(t)
+	golangci := filepath.Join(filepath.Dir(root), golangciConfigName)
 
-	violations, files, err := findSlogViolations(root, dirs)
+	violations, files, err := findSlogViolations(root, golangci, dirs)
 	if err != nil {
 		t.Fatalf("walking %s: %v", root, err)
 	}
@@ -137,17 +87,18 @@ func AssertSlogConvention(t *testing.T, dirs ...string) {
 		lines = append(lines, v.file+":"+strconv.Itoa(v.line)+": "+v.what+" -- "+v.fix)
 	}
 	t.Errorf("%d slog convention violation(s) in %d non-test file(s):\n\t%s\n\n"+
-		"Every record has a literal, lowercase, unprefixed message, snake_case attribute keys, "+
-		"and a *Context variant wherever a context or a request is in scope so the handler can "+
-		"inject request_id. core/logging owns the handler; testutil.CaptureSlog is how a test "+
-		"reads records; a wrapper that forwards a caller's attributes is listed in "+
-		"slogAttrForwarders so its call sites are read too (#320).",
+		"A message is a string literal at the call and opens with neither a component prefix nor "+
+		"\"failed to\" or \"error \"; "+
+		"core/logging owns the handler and testutil.CaptureSlog is how a test reads records; a "+
+		"run is spread into a record only inside a function listed in slogSpreadSites, and a "+
+		"forwarder listed there is registered under custom-funcs in .golangci.yml, where sloglint "+
+		"holds every other rule (#320).",
 		len(violations), files, strings.Join(lines, "\n\t"))
 }
 
-// slogViolation is one refused call, located.
+// slogViolation is one refused site, located.
 type slogViolation struct {
-	// file is relative to the source root, forward slashes.
+	// file is relative to the source root, forward slashes; rule 4 reports on golangciConfigName.
 	file string
 	line int
 	what string
@@ -155,14 +106,14 @@ type slogViolation struct {
 }
 
 const (
-	slogImportPath    = "log/slog"
-	contextImportPath = "context"
-	httpImportPath    = "net/http"
+	slogImportPath = "log/slog"
+	// golangciConfigName is the file at the repository root, one directory above the source root,
+	// that carries sloglint's settings and the custom-funcs rule 4 compares against.
+	golangciConfigName = ".golangci.yml"
 )
 
 // slogEmissions maps each package-level emission function in log/slog to the index its message
-// occupies. The index is per function rather than one number because the forms differ:
-// slog.Info(msg, ...) puts it first, slog.InfoContext(ctx, msg, ...) second, and both
+// occupies. slog.Info(msg, ...) puts it first, slog.InfoContext(ctx, msg, ...) second, and both
 // slog.Log(ctx, level, msg, ...) and slog.LogAttrs(ctx, level, msg, ...) third.
 var slogEmissions = map[string]int{
 	"Debug": 0, "Info": 0, "Warn": 0, "Error": 0,
@@ -170,22 +121,14 @@ var slogEmissions = map[string]int{
 	"Log": 2, "LogAttrs": 2,
 }
 
-// slogAttrConstructors is every log/slog function whose first argument is an attribute key. Group
-// is one of them and is also a container, so its remaining arguments are key/value pairs read the
-// same way an emission's are.
-var slogAttrConstructors = map[string]bool{
-	"String": true, "Int": true, "Int64": true, "Uint64": true, "Float64": true,
-	"Bool": true, "Duration": true, "Time": true, "Any": true, "Group": true,
-}
-
-// slogHandlerInstalls is rule 5's list: the four ways to replace the default logger or obtain one
+// slogHandlerInstalls is rule 2's list: the four ways to replace the default logger or obtain one
 // of your own. Handler constructors are absent on purpose, since building a slog.Handler installs
 // nothing and core/logging's own code builds several.
 var slogHandlerInstalls = map[string]bool{
 	"SetDefault": true, "New": true, "Default": true, "With": true,
 }
 
-// slogHandlerOwners is rule 5's allowlist, by path rather than by package. Four are whole
+// slogHandlerOwners is rule 2's allowlist, by path rather than by package. Four are whole
 // directories: the package that owns the handler, the two mains that install it, and schemadump,
 // which is a one-file tool with the only other SetDefault in the tree. The fifth is a single
 // file, because decision 11 makes testutil.CaptureSlog a non-test file that installs the handler
@@ -199,79 +142,64 @@ var slogHandlerOwners = []string{
 	"core/testutil/slog_capture.go",
 }
 
-// slogAttrForwarder is one function that takes the caller's key/value run as a variadic ...any and
-// puts it in a record, so the keys rule 3 has to read are at its call sites rather than at any
-// slog call. firstAttr is the argument index that run begins at.
+// slogSpreadSite is one function admitted to spread a run into a record or into a forwarder.
 //
-// pkgPath resolves a call written pkg.Name, through the file's imports like every other rule here.
-// scope resolves a bare Name, which is how an unexported forwarder and a closure are called and
-// the only way they can be: it is the file or directory, relative to the source root, inside which
-// that identifier is this function. Both are set where a forwarder is called under both forms.
-type slogAttrForwarder struct {
-	pkgPath   string
+// scope is the file or directory, relative to the source root, that declares it; name is the
+// function or method name. forwarder is empty for a builder, and for a forwarder it is the name
+// .golangci.yml registers under custom-funcs: the import path, a dot, the function name. A
+// forwarder's callers are also resolved through it, by import path where the call is qualified
+// and by scope where it is bare, so a spread at one of its call sites is rule 3's concern too.
+type slogSpreadSite struct {
 	scope     string
 	name      string
-	firstAttr int
+	forwarder string
 }
 
-// apiresponseImportPath is the package holding the API's one 500, which is the reason rule 6
-// exists: the two functions below reach one slog.ErrorContext, and 328 sites pass their
-// attributes through them.
-const apiresponseImportPath = "github.com/leodip/goiabada/authserver/internal/apiresponse"
+const (
+	apiresponseImportPath = "github.com/leodip/goiabada/authserver/internal/apiresponse"
+	apihandlersImportPath = "github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
+	handlersImportPath    = "github.com/leodip/goiabada/authserver/internal/handlers"
+)
 
-// slogAttrForwarders is rule 6's table, and it is exhaustive by construction: every other
-// production function taking a variadic ...any hands it to fmt or to a SQL driver, and rule 6
-// refuses any new one that reaches a record without being listed here.
+// slogSpreadSites is rule 3's table. Every production function that spreads a run into a record
+// is here with its reason, and rule 3 refuses any other.
 //
-// The fourth entry is a closure, which is why scope can be a file: classifyIdTokenHint's reject
-// helper builds the twenty id_token_hint refusals, and its keys are as much a part of the
-// vocabulary as any other. A closure is reachable only from its own file, so the file is its
-// scope exactly as the package directory is an unexported function's.
-var slogAttrForwarders = []slogAttrForwarder{
-	{pkgPath: apiresponseImportPath, scope: "authserver/internal/apiresponse",
-		name: "WriteInternalServerError", firstAttr: 3},
-	{pkgPath: apiresponseImportPath, scope: "authserver/internal/apiresponse",
-		name: "LogInternalServerError", firstAttr: 2},
-	{scope: "authserver/internal/handlers/apihandlers",
-		name: "writeInternalServerError", firstAttr: 3},
-	{scope: "authserver/internal/handlers/handler_account_logout.go",
-		name: "reject", firstAttr: 1},
+// The four forwarders take the caller's key/value run as a variadic ...any and put it in one
+// record: the API's 500 writer, which 328 sites reach, its logging half, the apihandlers wrapper
+// over it, and the one answer for a refused id_token_hint. Their callers' keys are read by
+// sloglint at the call sites, which is what registering them under custom-funcs buys and what
+// rule 4 holds.
+//
+// The two builders spread a run they assemble themselves. reportTrip's keys are "limiter" and a
+// tier's keyField, whose value is a literal at each newTier call and is held by
+// TestRateLimiter_EveryTierLogsUnderAConventionalKey in core/middleware. MiddlewareRequestLogger
+// appends the request line's attributes under literal keys in its own body, conditionally, which
+// is why it is a run and not one call.
+var slogSpreadSites = []slogSpreadSite{
+	{scope: "authserver/internal/apiresponse", name: "WriteInternalServerError",
+		forwarder: apiresponseImportPath + ".WriteInternalServerError"},
+	{scope: "authserver/internal/apiresponse", name: "LogInternalServerError",
+		forwarder: apiresponseImportPath + ".LogInternalServerError"},
+	{scope: "authserver/internal/handlers/apihandlers", name: "writeInternalServerError",
+		forwarder: apihandlersImportPath + ".writeInternalServerError"},
+	{scope: "authserver/internal/handlers", name: "rejectIdTokenHint",
+		forwarder: handlersImportPath + ".rejectIdTokenHint"},
+	{scope: "core/middleware", name: "reportTrip"},
+	{scope: "core/middleware", name: "MiddlewareRequestLogger"},
 }
 
 var (
-	// slogKeyPattern is decision 3's vocabulary: a lowercase letter, then lowercase letters,
-	// digits and underscores.
-	slogKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	// slogComponentPrefix is one token, then a colon and a space. Anchored and token-shaped so a
 	// colon later in the message is not read as a prefix.
 	slogComponentPrefix = regexp.MustCompile(`^[^\s:]+: `)
+	// slogRefusedOpeners are the two ways the tree used to spell what "unable to" says.
+	slogRefusedOpeners = []string{"failed to", "error "}
 )
 
-// slogReservedKeys is the spelling refused in every file whatever it owns: an error value is
-// named error everywhere, which is also the name the JSON handler rewrites to keep the stack.
-var slogReservedKeys = map[string]string{
-	"err": `spell it "error", the one name for an error value and what the JSON handler rewrites to keep the stack`,
-}
-
-// slogInjectedKeys are the two spellings of the one attribute a call site never writes, because
-// the installed handler appends it from the context (decision 2). The ten sites that used to pass
-// their own request id were removed during the sweep, and a site writing one again would put the
-// key in the record twice.
-var slogInjectedKeys = map[string]string{
-	"request_id": "the installed handler injects request_id from the context; writing it puts the key in the record twice",
-	"request-id": "the installed handler injects request_id from the context, spelled with an underscore",
-}
-
-// slogRequestIDOwner is the one package exempt from slogInjectedKeys, and it is exempt because it
-// is the injector: WrapRequestID.Handle is the single site in the tree that writes request_id at
-// all, and a rule refusing the key everywhere would refuse the mechanism that makes the rule
-// worth having. Narrower than slogHandlerOwners on purpose -- schemadump and the two mains own a
-// handler install and still have no business writing the key.
-const slogRequestIDOwner = "core/logging"
-
 // findSlogViolations parses every non-test Go file under root, or under the named subdirectories
-// of root, and reports each refused call along with the number of files it parsed.
-func findSlogViolations(root string, dirs []string) ([]slogViolation, int, error) {
+// of root, reports each refused site along with the number of files it parsed, and then compares
+// the forwarder table against the custom-funcs in the golangci-lint configuration at golangci.
+func findSlogViolations(root, golangci string, dirs []string) ([]slogViolation, int, error) {
 	roots := []string{root}
 	if len(dirs) > 0 {
 		roots = roots[:0]
@@ -282,7 +210,6 @@ func findSlogViolations(root string, dirs []string) ([]slogViolation, int, error
 
 	var violations []slogViolation
 	files := 0
-	census := newSlogForwarderCensus()
 	for _, start := range roots {
 		err := filepath.WalkDir(start, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
@@ -312,16 +239,19 @@ func findSlogViolations(root string, dirs []string) ([]slogViolation, int, error
 				return nil
 			}
 			files++
-			fileViolations, fileCensus := slogViolationsInFile(file, fset, rel)
-			violations = append(violations, fileViolations...)
-			census.absorb(fileCensus)
+			violations = append(violations, slogViolationsInFile(file, fset, rel)...)
 			return nil
 		})
 		if err != nil {
 			return nil, files, err
 		}
 	}
-	violations = append(violations, slogForwarderTableViolations(census)...)
+
+	tableViolations, err := slogForwarderTableViolations(golangci)
+	if err != nil {
+		return nil, files, err
+	}
+	violations = append(violations, tableViolations...)
 
 	sort.Slice(violations, func(i, j int) bool {
 		if violations[i].file != violations[j].file {
@@ -332,24 +262,14 @@ func findSlogViolations(root string, dirs []string) ([]slogViolation, int, error
 		}
 		return violations[i].what < violations[j].what
 	})
-
-	// A closure's body is walked both on its own and as part of the function enclosing it, so a
-	// key inside one is reported twice. Reporting one finding once is what lets the rule table
-	// assert an exact set.
-	deduped := violations[:0]
-	for i, v := range violations {
-		if i > 0 && v == violations[i-1] {
-			continue
-		}
-		deduped = append(deduped, v)
-	}
-	return deduped, files, nil
+	return violations, files, nil
 }
 
 // slogExemptByPath covers a test file, which is not production code and reads records through
 // testutil.CaptureSlog rather than writing them, and a mocks directory, which is generated or
-// hand-written scaffolding that emits nothing. Both exemptions match AssertNoLegacyErrors, so one
-// answer about what production code means holds for both lints.
+// hand-written scaffolding that emits nothing. Both exemptions match AssertNoLegacyErrors and
+// the exclusions in .golangci.yml, so one answer about what production code means holds for
+// every guard.
 func slogExemptByPath(rel string) bool {
 	if strings.HasSuffix(rel, "_test.go") {
 		return true
@@ -362,423 +282,82 @@ func slogExemptByPath(rel string) bool {
 	return false
 }
 
-// slogHandlerOwner reports whether rule 5 admits this file: an exact match on a listed file, or
-// anything under a listed directory.
+// slogWithinScope reports whether rel is the scope itself or sits under it: an exact match on a
+// file, or anything under a directory.
+func slogWithinScope(rel, scope string) bool {
+	return rel == scope || strings.HasPrefix(rel, scope+"/")
+}
+
+// slogHandlerOwner reports whether rule 2 admits this file.
 func slogHandlerOwner(rel string) bool {
 	for _, owner := range slogHandlerOwners {
-		if rel == owner || strings.HasPrefix(rel, owner+"/") {
+		if slogWithinScope(rel, owner) {
 			return true
 		}
 	}
 	return false
 }
 
-// slogOwnsRequestID reports whether this file is part of the package that injects request_id.
-func slogOwnsRequestID(rel string) bool {
-	return rel == slogRequestIDOwner || strings.HasPrefix(rel, slogRequestIDOwner+"/")
-}
-
-// slogWithinScope reports whether rel is the scope itself or sits under it, which is the same
-// file-or-directory test slogHandlerOwner applies to rule 5's allowlist.
-func slogWithinScope(rel, scope string) bool {
-	return scope != "" && (rel == scope || strings.HasPrefix(rel, scope+"/"))
-}
-
-// slogForwarderCall resolves a call to one of the forwarders in the table: pkg.Name through the
-// file's imports, or a bare Name inside the scope where that identifier is this function.
-func slogForwarderCall(call *ast.CallExpr, importPaths map[string]string, rel string) (slogAttrForwarder, bool) {
-	switch fun := unparen(call.Fun).(type) {
-	case *ast.SelectorExpr:
-		pkg, name, ok := qualifiedSelector(fun, importPaths)
-		if !ok {
-			return slogAttrForwarder{}, false
-		}
-		for _, fwd := range slogAttrForwarders {
-			if fwd.pkgPath == pkg && fwd.name == name {
-				return fwd, true
-			}
-		}
-	case *ast.Ident:
-		for _, fwd := range slogAttrForwarders {
-			if fwd.name == fun.Name && slogWithinScope(rel, fwd.scope) {
-				return fwd, true
-			}
-		}
-	}
-	return slogAttrForwarder{}, false
-}
-
-// slogForwarderDeclared reports whether a function of this name declared in this file is one the
-// table already covers, which is what rule 6 asks before refusing it.
-func slogForwarderDeclared(name, rel string) bool {
-	_, listed := slogForwarderEntry(name, rel)
-	return listed
-}
-
-// slogForwarderEntry resolves a bare name declared or called in this file against the table, the
-// same name-and-scope test slogForwarderCall applies to an identifier callee.
-func slogForwarderEntry(name, rel string) (slogAttrForwarder, bool) {
-	for _, fwd := range slogAttrForwarders {
-		if fwd.name == name && slogWithinScope(rel, fwd.scope) {
-			return fwd, true
-		}
-	}
-	return slogAttrForwarder{}, false
-}
-
-// slogForwarderNamed resolves pkg.Name against the table without the scope test, which is what a
-// selector reached outside a call needs: the import path is the whole of the resolution there.
-func slogForwarderNamed(pkgPath, name string) bool {
-	for _, fwd := range slogAttrForwarders {
-		if fwd.pkgPath == pkgPath && fwd.name == name {
+// slogSpreadAdmitted reports whether a top-level function named name in the file rel is listed in
+// slogSpreadSites.
+func slogSpreadAdmitted(rel, name string) bool {
+	for _, site := range slogSpreadSites {
+		if site.name == name && slogWithinScope(rel, site.scope) {
 			return true
 		}
 	}
 	return false
 }
 
-// slogForwarderPackage reports whether the path holds one, which is what makes a dot import of it
-// a hole rather than a style choice.
-func slogForwarderPackage(path string) bool {
-	for _, fwd := range slogAttrForwarders {
-		if fwd.pkgPath != "" && fwd.pkgPath == path {
-			return true
-		}
+// slogForwarderPackage splits a forwarder's registered name into its import path and function
+// name at the last dot.
+func (s slogSpreadSite) forwarderPackage() (string, string) {
+	i := strings.LastIndex(s.forwarder, ".")
+	if i < 0 {
+		return "", s.forwarder
 	}
-	return false
+	return s.forwarder[:i], s.forwarder[i+1:]
 }
 
-// slogForwarderSite is one place a forwarder was declared or called, located for the report.
-type slogForwarderSite struct {
-	file string
-	line int
-	// firstAttr is where the declaration's variadic ...any actually begins, or -1 where it has
-	// none. Unused for a call site.
-	firstAttr int
-}
-
-// slogForwarderCensus is rule 6's third boundary, and it is the one the other two stand on. The
-// table resolves a forwarder by name and scope, and rule 3 then reads the keys at its call sites
-// from firstAttr onwards. Both of those are claims about a declaration nothing had checked: a
-// second function of the same name in the same scope inherits the registration, and a registered
-// signature that grows a parameter shifts every key its callers write past the offset the table
-// still states. Either way the keys are read from the wrong place or not at all, and the lint
-// stays green because it is reading exactly what it was told to.
-//
-// So the walk counts them. A forwarder whose keys were read somewhere must have been declared
-// exactly once in what was walked, at the index the table gives. Anything else is refused: two
-// declarations because the rule cannot say which one a bare call reaches, a shifted index because
-// the offset is stale, none at all because the offset was never verified against anything.
-type slogForwarderCensus struct {
-	declared map[slogAttrForwarder][]slogForwarderSite
-	called   map[slogAttrForwarder][]slogForwarderSite
-}
-
-func newSlogForwarderCensus() slogForwarderCensus {
-	return slogForwarderCensus{
-		declared: map[slogAttrForwarder][]slogForwarderSite{},
-		called:   map[slogAttrForwarder][]slogForwarderSite{},
-	}
-}
-
-// absorb folds one file's census into this one, which is how the whole walk accumulates.
-func (c slogForwarderCensus) absorb(other slogForwarderCensus) {
-	for fwd, sites := range other.declared {
-		c.declared[fwd] = append(c.declared[fwd], sites...)
-	}
-	for fwd, sites := range other.called {
-		c.called[fwd] = append(c.called[fwd], sites...)
-	}
-}
-
-// slogForwarderCensusInFile records every declaration and every call of a listed forwarder in one
-// file. A method is not counted as a declaration: it is reached through a receiver, which is a
-// selector resolved by import path, so it can never inherit a bare name's registration.
-func slogForwarderCensusInFile(file *ast.File, importPaths map[string]string, fset *token.FileSet, rel string) slogForwarderCensus {
-	census := newSlogForwarderCensus()
-	litNames := map[*ast.FuncLit]string{}
-
-	declare := func(name string, ft *ast.FuncType, pos token.Pos) {
-		fwd, listed := slogForwarderEntry(name, rel)
-		if !listed {
-			return
-		}
-		_, at := slogVariadicAny(ft)
-		census.declared[fwd] = append(census.declared[fwd],
-			slogForwarderSite{file: rel, line: fset.Position(pos).Line, firstAttr: at})
-	}
-
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.AssignStmt:
-			for i, rhs := range node.Rhs {
-				if lit, isLit := rhs.(*ast.FuncLit); isLit && i < len(node.Lhs) {
-					if id, isIdent := node.Lhs[i].(*ast.Ident); isIdent {
-						litNames[lit] = id.Name
-					}
-				}
+// slogIsForwarderCall reports whether call reaches one of the registered forwarders, either
+// qualified through an import of its package or bare from inside its scope.
+func slogIsForwarderCall(call *ast.CallExpr, importPaths map[string]string, rel string) (slogSpreadSite, bool) {
+	fun := unparen(call.Fun)
+	if path, name, ok := qualifiedCall(call, importPaths); ok {
+		for _, site := range slogSpreadSites {
+			if site.forwarder == "" {
+				continue
 			}
-		case *ast.ValueSpec:
-			for i, value := range node.Values {
-				if lit, isLit := value.(*ast.FuncLit); isLit && i < len(node.Names) {
-					litNames[lit] = node.Names[i].Name
-				}
-			}
-		case *ast.FuncDecl:
-			if node.Recv == nil {
-				declare(node.Name.Name, node.Type, node.Pos())
-			}
-		case *ast.FuncLit:
-			if name, bound := litNames[node]; bound {
-				declare(name, node.Type, node.Pos())
-			}
-		case *ast.CallExpr:
-			if fwd, isForwarder := slogForwarderCall(node, importPaths, rel); isForwarder {
-				census.called[fwd] = append(census.called[fwd],
-					slogForwarderSite{file: rel, line: fset.Position(node.Pos()).Line, firstAttr: -1})
+			pkg, fn := site.forwarderPackage()
+			if pkg == path && fn == name {
+				return site, true
 			}
 		}
-		return true
-	})
-	return census
+		return slogSpreadSite{}, false
+	}
+	ident, ok := fun.(*ast.Ident)
+	if !ok {
+		return slogSpreadSite{}, false
+	}
+	for _, site := range slogSpreadSites {
+		if site.forwarder != "" && site.name == ident.Name && slogWithinScope(rel, site.scope) {
+			return site, true
+		}
+	}
+	return slogSpreadSite{}, false
 }
 
-// slogForwarderTableViolations holds the table to what the walk actually found, per the reasoning
-// on slogForwarderCensus.
-func slogForwarderTableViolations(census slogForwarderCensus) []slogViolation {
+// slogViolationsInFile applies rules 1 to 3 and the dot-import refusal to one parsed file.
+func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slogViolation {
 	var violations []slogViolation
-	for _, fwd := range slogAttrForwarders {
-		declared := census.declared[fwd]
-		called := census.called[fwd]
-		switch {
-		case len(declared) > 1:
-			for _, site := range declared {
-				violations = append(violations, slogViolation{file: site.file, line: site.line,
-					what: fwd.name + " is declared " + strconv.Itoa(len(declared)) +
-						" times inside the scope it is listed under",
-					fix: "rename all but the listed one; a bare call resolves by name and scope, " +
-						"so a second declaration inherits the registration and its caller's keys " +
-						"are read at the other one's offset"})
-			}
-		case len(declared) == 1 && declared[0].firstAttr != fwd.firstAttr:
-			violations = append(violations, slogViolation{file: declared[0].file, line: declared[0].line,
-				what: fwd.name + " takes its attributes from argument " +
-					strconv.Itoa(declared[0].firstAttr) + ", and the table says " +
-					strconv.Itoa(fwd.firstAttr),
-				fix: "update firstAttr in testutil.slogAttrForwarders to match this signature; " +
-					"every key its callers write is read from the index the table states"})
-		case len(declared) == 0 && len(called) > 0:
-			violations = append(violations, slogViolation{file: called[0].file, line: called[0].line,
-				what: fwd.name + " is called here and declared nowhere this walk reached",
-				fix: "walk the package that declares it, or drop the entry from " +
-					"testutil.slogAttrForwarders; its keys are being read at an offset nothing " +
-					"in this walk verified"})
-		}
-	}
-	return violations
-}
-
-// slogNameOnlyIdents collects every identifier occurrence that introduces or labels a name rather
-// than referring to the value bound to one: a callee, the field half of a selector, a declared
-// function, a parameter or struct field, a key in a composite literal, an assignment's left side,
-// a label, an import name. Subtracting them leaves the references, which is what lets the walk
-// tell a forwarder being called from a forwarder being handed round -- the same distinction
-// calleeSelectors draws for a package-qualified one, at the bare name a closure is called by.
-func slogNameOnlyIdents(file *ast.File) map[*ast.Ident]bool {
-	nameOnly := map[*ast.Ident]bool{}
-	mark := func(expr ast.Expr) {
-		if id, isIdent := unparen(expr).(*ast.Ident); isIdent {
-			nameOnly[id] = true
-		}
-	}
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.CallExpr:
-			mark(node.Fun)
-		case *ast.SelectorExpr:
-			nameOnly[node.Sel] = true
-		case *ast.FuncDecl:
-			nameOnly[node.Name] = true
-			if node.Recv != nil {
-				for _, field := range node.Recv.List {
-					for _, name := range field.Names {
-						nameOnly[name] = true
-					}
-				}
-			}
-		case *ast.Field:
-			for _, name := range node.Names {
-				nameOnly[name] = true
-			}
-		case *ast.ValueSpec:
-			for _, name := range node.Names {
-				nameOnly[name] = true
-			}
-		case *ast.TypeSpec:
-			nameOnly[node.Name] = true
-		case *ast.AssignStmt:
-			for _, lhs := range node.Lhs {
-				mark(lhs)
-			}
-		case *ast.KeyValueExpr:
-			mark(node.Key)
-		case *ast.LabeledStmt:
-			nameOnly[node.Label] = true
-		case *ast.BranchStmt:
-			if node.Label != nil {
-				nameOnly[node.Label] = true
-			}
-		case *ast.ImportSpec:
-			if node.Name != nil {
-				nameOnly[node.Name] = true
-			}
-		}
-		return true
-	})
-	return nameOnly
-}
-
-// slogQualified is a type named by the package that declares it, which is the identity rules 3
-// and 4 ask about: slog.Attr carries a key, context.Context and http.Request carry a request.
-type slogQualified struct {
-	pkg  string
-	name string
-}
-
-// slogTypeAliases maps each name this file declares as a type over pkg.Name to that type, so a
-// second spelling of one resolves like the selector does. An alias is the same type outright; a
-// defined type is a distinct one over the same shape, and it is collected too because both ways
-// of reaching the rules here go through it: a value of a defined type over slog.Attr is one
-// conversion from a record, and a parameter of a defined type over context.Context holds a real
-// context, so treating either as unrelated loses exactly what the rule is looking for. Reading
-// one that turns out never to reach slog costs a false refusal and a rename, which is the
-// direction this file errs in everywhere else.
-//
-// A chain is followed, because `type A = B` over `type B = slog.Attr` is one alias written twice,
-// and one leading star is stripped, because an alias of *http.Request is a parameter spelled
-// without one. Resolution is through the file's imports like everything else here, so an aliased
-// import resolves as well. A type declared in another file of the same package is outside a
-// single parse and is the ceiling above.
-func slogTypeAliases(file *ast.File, importPaths map[string]string) map[string]slogQualified {
-	local := map[string]ast.Expr{}
-	for _, decl := range file.Decls {
-		gen, isGen := decl.(*ast.GenDecl)
-		if !isGen || gen.Tok != token.TYPE {
-			continue
-		}
-		for _, spec := range gen.Specs {
-			if ts, isType := spec.(*ast.TypeSpec); isType {
-				local[ts.Name.Name] = ts.Type
-			}
-		}
+	report := func(pos token.Pos, what, fix string) {
+		violations = append(violations, slogViolation{
+			file: rel, line: fset.Position(pos).Line, what: what, fix: fix,
+		})
 	}
 
-	named := map[string]slogQualified{}
-	for name, expr := range local {
-		// Bounded by the number of declarations, so a type declared in terms of itself, which
-		// does not compile but does parse, cannot spin here.
-		for step := 0; step <= len(local); step++ {
-			if star, isPointer := unparen(expr).(*ast.StarExpr); isPointer {
-				expr = star.X
-			}
-			if pkg, target, ok := selectorPath(expr, importPaths); ok {
-				named[name] = slogQualified{pkg: pkg, name: target}
-				break
-			}
-			id, isIdent := unparen(expr).(*ast.Ident)
-			if !isIdent {
-				break
-			}
-			next, isLocal := local[id.Name]
-			if !isLocal {
-				break
-			}
-			expr = next
-		}
-	}
-	return named
-}
-
-// slogNamedType resolves a type expression to the package and name that declare it: a pkg.Name
-// selector directly, and a bare identifier through the file's own type declarations.
-func slogNamedType(expr ast.Expr, importPaths map[string]string, aliases map[string]slogQualified) (string, string, bool) {
-	if id, isIdent := unparen(expr).(*ast.Ident); isIdent {
-		if alias, aliased := aliases[id.Name]; aliased {
-			return alias.pkg, alias.name, true
-		}
-		return "", "", false
-	}
-	return selectorPath(expr, importPaths)
-}
-
-// slogShadowedBuiltins is the names among append, make, len and cap that this file declares as
-// something of its own, which is how a parse can tell that a call spelled append is not the
-// builtin rule 6 reads a run out of. Declarations only: a function, a type, a var or const, a
-// short declaration, a range clause and a signature's parameters and results. A struct field or
-// an interface method of that name shadows nothing and is not collected, since a field is only
-// ever reached through a selector.
-//
-// Whole-file, because a declaration anywhere in the file is in scope for the whole of it or for
-// some part this reading does not track, and either way the name has stopped meaning one thing.
-// A declaration in another file of the same package is not visible to a single parse and is the
-// ceiling above rather than a case here.
-func slogShadowedBuiltins(file *ast.File) map[string]bool {
-	builtin := map[string]bool{"append": true, "make": true, "len": true, "cap": true}
-	shadowed := map[string]bool{}
-	mark := func(id *ast.Ident) {
-		if id != nil && builtin[id.Name] {
-			shadowed[id.Name] = true
-		}
-	}
-	markFields := func(fields *ast.FieldList) {
-		if fields == nil {
-			return
-		}
-		for _, field := range fields.List {
-			for _, name := range field.Names {
-				mark(name)
-			}
-		}
-	}
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.FuncDecl:
-			mark(node.Name)
-			markFields(node.Recv)
-		case *ast.FuncType:
-			markFields(node.Params)
-			markFields(node.Results)
-		case *ast.ValueSpec:
-			for _, name := range node.Names {
-				mark(name)
-			}
-		case *ast.TypeSpec:
-			mark(node.Name)
-		case *ast.AssignStmt:
-			if node.Tok == token.DEFINE {
-				for _, id := range identsOf(node.Lhs) {
-					mark(id)
-				}
-			}
-		case *ast.RangeStmt:
-			if node.Tok == token.DEFINE {
-				for _, id := range identsOf([]ast.Expr{node.Key, node.Value}) {
-					mark(id)
-				}
-			}
-		}
-		return true
-	})
-	return shadowed
-}
-
-// slogViolationsInFile reports every refused call in one parsed file, and the forwarders it
-// declares and calls, which only the whole walk can hold to the table.
-func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) ([]slogViolation, slogForwarderCensus) {
-	var violations []slogViolation
-
-	// importPaths maps the name this file writes at a call site to the path it imports, so an
-	// aliased log/slog, context or net/http resolves like any other.
+	// importPaths maps the name a file actually writes at a call site to the path it imports, so
+	// an aliased log/slog resolves like any other, exactly as errors_lint.go reads its imports.
 	importPaths := map[string]string{}
 	for _, spec := range file.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)
@@ -790,31 +369,9 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) ([]sl
 			name = spec.Name.Name
 		}
 		if name == "." {
-			// A dot import binds Info, SetDefault and String unqualified, so no selector is left
-			// for any of the six rules to resolve and the whole file walks past them. Refusing
-			// the import is the answer rather than resolving unqualified calls, which would also
-			// have to model every local declaration that shadows one.
-			//
-			// A forwarder's package is refused on the same argument and it is the same hole:
-			// WriteInternalServerError bound unqualified is a call rule 6 cannot resolve, so the
-			// keys at that call site are read by nothing. The scope half of the table cannot
-			// stand in for it, because a dot import reaches the name from any directory.
-			switch {
-			case path == slogImportPath:
-				violations = append(violations, slogViolation{
-					file: rel,
-					line: fset.Position(spec.Pos()).Line,
-					what: `dot import of "log/slog"`,
-					fix:  "import it under its own name; a dot import hides every slog call from this rule",
-				})
-			case slogForwarderPackage(path):
-				violations = append(violations, slogViolation{
-					file: rel,
-					line: fset.Position(spec.Pos()).Line,
-					what: `dot import of ` + strconv.Quote(path),
-					fix: "import it under its own name; a dot import leaves a forwarder call with " +
-						"no selector, so the attribute keys at that call site are read by nothing",
-				})
+			if path == slogImportPath {
+				report(spec.Pos(), `dot import of "log/slog"`,
+					"import it under its own name; a dot import leaves no selector for the handler-ownership rule to resolve")
 			}
 			continue
 		}
@@ -824,1145 +381,166 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) ([]sl
 		importPaths[name] = path
 	}
 
-	aliases := slogTypeAliases(file, importPaths)
-	callees := calleeSelectors(file)
-	nameOnly := slogNameOnlyIdents(file)
-	lineOf := func(n ast.Node) int { return fset.Position(n.Pos()).Line }
-
-	// requestScope runs parallel to the walk: each entry says whether the node sits inside a
-	// function, at any depth, that takes a context.Context or an *http.Request. A closure nested
-	// in a handler inherits its enclosing function's answer, which is the whole point of rule 4
-	// being about enclosing depth rather than the immediate signature.
-	var requestScope []bool
+	// Rule 2 reads every selector rather than every call, so slog.New handed round as a value is
+	// the same finding as slog.New(...): the logger it builds is obtained one indirection later.
 	ast.Inspect(file, func(n ast.Node) bool {
-		if n == nil {
-			requestScope = requestScope[:len(requestScope)-1]
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok {
 			return true
 		}
-		inScope := len(requestScope) > 0 && requestScope[len(requestScope)-1]
-		switch fn := n.(type) {
-		case *ast.FuncDecl:
-			inScope = inScope || funcTakesRequestScope(fn.Type, importPaths, aliases)
-		case *ast.FuncLit:
-			inScope = inScope || funcTakesRequestScope(fn.Type, importPaths, aliases)
-		}
-		requestScope = append(requestScope, inScope)
-		// Every arm below returns true. Returning false would skip ast.Inspect's closing nil
-		// callback for this node and leave the stack one entry short for the rest of the file.
-
-		if composite, isComposite := n.(*ast.CompositeLit); isComposite {
-			violations = append(violations, slogAttrLiteralViolations(composite, importPaths, aliases, fset, rel)...)
+		path, name, ok := qualifiedSelector(sel, importPaths)
+		if !ok || path != slogImportPath || !slogHandlerInstalls[name] {
 			return true
 		}
-
-		if sel, isSelector := n.(*ast.SelectorExpr); isSelector {
-			if callees[sel] {
-				return true
-			}
-			pkg, fn, resolved := qualifiedSelector(sel, importPaths)
-			if !resolved {
-				return true
-			}
-			if pkg != slogImportPath {
-				// A forwarder as a value is the emission-as-a-value hole one wrapper further
-				// out: the call that eventually runs it writes its keys against an identifier
-				// rule 6 cannot resolve to the table, so the run reaches a record unread.
-				if slogForwarderNamed(pkg, fn) {
-					violations = append(violations, slogViolation{file: rel, line: lineOf(sel),
-						what: defaultImportName(pkg) + "." + fn + " as a value",
-						fix: "call it where the attributes are written; as a value its call " +
-							"sites carry keys this rule cannot find"})
-				}
-				return true
-			}
-			// An emission or an install handed round as a value reaches the same record one
-			// indirection later, and the call that eventually runs it has no package selector
-			// left to resolve, so every rule above walks past it. errors_lint.go refuses a
-			// constructor value for the same reason and by the same argument.
-			switch {
-			case slogIsEmission(fn):
-				violations = append(violations, slogViolation{file: rel, line: lineOf(sel),
-					what: "slog." + fn + " as a value",
-					fix:  "call it where the record is written; as a value its message and keys cannot be read"})
-			case slogHandlerInstalls[fn] && !slogHandlerOwner(rel):
-				violations = append(violations, slogViolation{file: rel, line: lineOf(sel),
-					what: "slog." + fn + " as a value",
-					fix:  "core/logging owns the handler; a test reads records through testutil.CaptureSlog"})
-			case slogAttrConstructors[fn]:
-				// The same argument one rule further down. An attribute constructor bound to a
-				// name is called through that name, so its first argument is a key at a call
-				// this rule resolves to nothing, and rule 3 walks past it.
-				violations = append(violations, slogViolation{file: rel, line: lineOf(sel),
-					what: "slog." + fn + " as a value",
-					fix: "call it where the key is written; as a value its key is at a call this " +
-						"rule cannot resolve, so the record carries a key nothing reads"})
-			}
+		if slogHandlerOwner(rel) {
 			return true
 		}
-
-		// The same value, taken under the bare name an unexported forwarder and a closure are
-		// called by. nameOnly holds every occurrence that names something rather than referring
-		// to it -- the declaration itself, a parameter, a field, a callee -- so what reaches
-		// here is a reference, and a reference to a forwarder that is not a call is a value.
-		if id, isIdent := n.(*ast.Ident); isIdent {
-			if !nameOnly[id] && slogForwarderDeclared(id.Name, rel) {
-				violations = append(violations, slogViolation{file: rel, line: lineOf(id),
-					what: id.Name + " as a value",
-					fix: "call it where the attributes are written; as a value its call " +
-						"sites carry keys this rule cannot find"})
-			}
-			return true
-		}
-
-		call, isCall := n.(*ast.CallExpr)
-		if !isCall {
-			return true
-		}
-
-		// A forwarder's call site is where its record's keys are written, so rule 3 reads them
-		// here. The run is read with the same parity as an emission's, because that is what the
-		// forwarder eventually hands to one.
-		if fwd, isForwarder := slogForwarderCall(call, importPaths, rel); isForwarder {
-			if len(call.Args) > fwd.firstAttr {
-				violations = append(violations, slogBareKeyViolations(call.Args[fwd.firstAttr:], fset, rel)...)
-			}
-			return true
-		}
-
-		pkg, fn, resolved := qualifiedCall(call, importPaths)
-		if !resolved || pkg != slogImportPath {
-			return true
-		}
-
-		if slogHandlerInstalls[fn] && !slogHandlerOwner(rel) {
-			violations = append(violations, slogViolation{file: rel, line: lineOf(call),
-				what: "slog." + fn,
-				fix:  "core/logging owns the handler; a test reads records through testutil.CaptureSlog"})
-			return true
-		}
-
-		if slogAttrConstructors[fn] && len(call.Args) > 0 {
-			if v, bad := slogKeyViolation(call.Args[0], "slog."+fn, fset, rel); bad {
-				violations = append(violations, v)
-			}
-			if fn == "Group" {
-				violations = append(violations, slogBareKeyViolations(call.Args[1:], fset, rel)...)
-			}
-			return true
-		}
-
-		msgIndex, isEmission := slogEmissions[fn]
-		if !isEmission {
-			return true
-		}
-
-		if inScope && !slogCarriesContext(fn) {
-			violations = append(violations, slogViolation{file: rel, line: lineOf(call),
-				what: "slog." + fn + " inside a function taking a context.Context or an *http.Request",
-				fix:  "use slog." + fn + "Context(ctx, ...); only a *Context variant reaches the handler's request_id injection"})
-		}
-		if len(call.Args) <= msgIndex {
-			return true
-		}
-		if v, bad := slogMessageViolation(call.Args[msgIndex], fset, rel); bad {
-			violations = append(violations, v)
-		}
-		violations = append(violations, slogBareKeyViolations(call.Args[msgIndex+1:], fset, rel)...)
+		report(sel.Pos(), "slog."+name+" outside the files that own the handler",
+			"core/logging installs the one handler and testutil.CaptureSlog is how a test reads records; log through the package-level slog functions")
 		return true
 	})
 
-	violations = append(violations, slogAttrKeyWriteViolations(file, importPaths, aliases, fset, rel)...)
-	violations = append(violations, slogForwarderDeclarationViolations(file, importPaths, fset, rel)...)
-	violations = append(violations, slogSpreadRunViolations(file, importPaths, fset, rel)...)
-
-	return violations, slogForwarderCensusInFile(file, importPaths, fset, rel)
-}
-
-// slogIsRecordCall reports whether this call puts its argument run in a record: a slog emission,
-// or one of the forwarders that hands its own run to one.
-func slogIsRecordCall(call *ast.CallExpr, importPaths map[string]string, rel string) bool {
-	if _, isForwarder := slogForwarderCall(call, importPaths, rel); isForwarder {
-		return true
-	}
-	pkg, fn, resolved := qualifiedCall(call, importPaths)
-	return resolved && pkg == slogImportPath && slogIsEmission(fn)
-}
-
-// slogVariadicAnyParam returns the name of the signature's variadic ...any or ...interface{}
-// parameter, which is the shape that carries a caller's key/value run.
-func slogVariadicAnyParam(ft *ast.FuncType) string {
-	name, _ := slogVariadicAny(ft)
-	return name
-}
-
-// slogVariadicAny returns the name of the signature's variadic ...any parameter and the argument
-// index it begins at, or "" and -1. The index is what a forwarder's firstAttr claims, and reading
-// it off the declaration rather than trusting the table is what keeps a signature that grew a
-// parameter from shifting every key its callers write out from under rule 3.
-//
-// Counted in argument positions rather than in fields, because func(w, r, err, attrs ...any) is
-// three fields and four arguments.
-func slogVariadicAny(ft *ast.FuncType) (string, int) {
-	if ft.Params == nil {
-		return "", -1
-	}
-	at := 0
-	for _, param := range ft.Params.List {
-		positions := len(param.Names)
-		if positions == 0 {
-			positions = 1
+	// Rules 1 and 3 read calls, with the enclosing top-level function known for rule 3.
+	for _, decl := range file.Decls {
+		enclosing := ""
+		if fn, ok := decl.(*ast.FuncDecl); ok {
+			enclosing = fn.Name.Name
 		}
-		if ellipsis, isVariadic := param.Type.(*ast.Ellipsis); isVariadic && len(param.Names) > 0 {
-			isAny := false
-			switch elt := unparen(ellipsis.Elt).(type) {
-			case *ast.Ident:
-				isAny = elt.Name == "any"
-			case *ast.InterfaceType:
-				isAny = elt.Methods == nil || len(elt.Methods.List) == 0
-			}
-			if isAny {
-				return param.Names[0].Name, at
-			}
-		}
-		at += positions
-	}
-	return "", -1
-}
-
-// slogSignatureNames is every name the signature binds, parameters and named results. A body's
-// declaration of one of them shadows it rather than introducing it, which is the difference
-// between a run this reading built and a run it was handed.
-func slogSignatureNames(ft *ast.FuncType) map[string]bool {
-	names := map[string]bool{}
-	for _, list := range []*ast.FieldList{ft.Params, ft.Results} {
-		if list == nil {
-			continue
-		}
-		for _, field := range list.List {
-			for _, name := range field.Names {
-				names[name.Name] = true
-			}
-		}
-	}
-	return names
-}
-
-// slogForwardsVariadic reports whether body hands param to a record, either by spreading it
-// straight into one or by appending it onto a slice that is spread into one. Those are the two
-// shapes the four real forwarders use, and a function doing neither is not forwarding attributes
-// whatever else it does with the parameter.
-func slogForwardsVariadic(body *ast.BlockStmt, param string, importPaths map[string]string, rel string) bool {
-	spreadsParam, appendsParam, spreadsAnything := false, false, false
-	ast.Inspect(body, func(n ast.Node) bool {
-		call, isCall := n.(*ast.CallExpr)
-		if !isCall || len(call.Args) == 0 {
-			return true
-		}
-		last, isIdent := unparen(call.Args[len(call.Args)-1]).(*ast.Ident)
-		if fn, isBuiltin := unparen(call.Fun).(*ast.Ident); isBuiltin && fn.Name == "append" {
-			for _, arg := range call.Args[1:] {
-				if id, ok := unparen(arg).(*ast.Ident); ok && id.Name == param && call.Ellipsis != token.NoPos {
-					appendsParam = true
-				}
-			}
-			return true
-		}
-		if call.Ellipsis == token.NoPos || !isIdent || !slogIsRecordCall(call, importPaths, rel) {
-			return true
-		}
-		spreadsAnything = true
-		if last.Name == param {
-			spreadsParam = true
-		}
-		return true
-	})
-	return spreadsParam || (appendsParam && spreadsAnything)
-}
-
-// slogForwarderDeclarationViolations is rule 6: a function that forwards a caller's attribute run
-// into a record and is not in slogAttrForwarders. Its call sites write keys no rule reads, which
-// is how 179 camelCase keys survived a sweep that visited every slog call in the tree.
-//
-// A closure is named by the variable it is bound to, because that is the name its callers write.
-// One bound to nothing is refused outright: it can be called, and nothing could ever name it in
-// the table.
-func slogForwarderDeclarationViolations(file *ast.File, importPaths map[string]string, fset *token.FileSet, rel string) []slogViolation {
-	var violations []slogViolation
-	litNames := map[*ast.FuncLit]string{}
-
-	report := func(name string, pos token.Pos) {
-		if slogForwarderDeclared(name, rel) {
-			return
-		}
-		shown := name
-		if shown == "" {
-			shown = "an unnamed function literal"
-		}
-		violations = append(violations, slogViolation{file: rel, line: fset.Position(pos).Line,
-			what: shown + " forwards a variadic ...any into a record",
-			fix: "list it in testutil.slogAttrForwarders with the index its attributes start at, " +
-				"so the keys its callers pass are read; an unlisted one is a hole in the key rule"})
-	}
-
-	// A method is reported whatever the table says, because the table cannot be talking about it:
-	// an entry resolves a bare identifier inside a scope or a package path through an import, and
-	// a method is reached through neither. The census excludes methods for that reason, so a
-	// method carrying a listed name used to inherit the registration here while its own call
-	// sites were read by nothing at all -- the one arrangement where every rule is green and a
-	// caller's keys reach a record unread.
-	reportMethod := func(name string, pos token.Pos) {
-		violations = append(violations, slogViolation{file: rel, line: fset.Position(pos).Line,
-			what: "method " + name + " forwards a variadic ...any into a record",
-			fix: "move the forwarding into a package function or a named closure and list that in " +
-				"testutil.slogAttrForwarders; the table resolves a name and a scope, and a call " +
-				"through a receiver is neither, so this method's callers' keys are read nowhere"})
-	}
-
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch decl := n.(type) {
-		case *ast.AssignStmt:
-			for i, rhs := range decl.Rhs {
-				if lit, isLit := rhs.(*ast.FuncLit); isLit && i < len(decl.Lhs) {
-					if id, isIdent := decl.Lhs[i].(*ast.Ident); isIdent {
-						litNames[lit] = id.Name
-					}
-				}
-			}
-		case *ast.ValueSpec:
-			for i, value := range decl.Values {
-				if lit, isLit := value.(*ast.FuncLit); isLit && i < len(decl.Names) {
-					litNames[lit] = decl.Names[i].Name
-				}
-			}
-		case *ast.FuncDecl:
-			if decl.Body == nil {
+		ast.Inspect(decl, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
 				return true
 			}
-			if param := slogVariadicAnyParam(decl.Type); param != "" &&
-				slogForwardsVariadic(decl.Body, param, importPaths, rel) {
-				if decl.Recv != nil {
-					reportMethod(decl.Name.Name, decl.Pos())
+			spread := call.Ellipsis.IsValid()
+			admitted := enclosing != "" && slogSpreadAdmitted(rel, enclosing)
+
+			if path, name, ok := qualifiedCall(call, importPaths); ok && path == slogImportPath {
+				msgIndex, isEmission := slogEmissions[name]
+				if !isEmission {
 					return true
 				}
-				report(decl.Name.Name, decl.Pos())
+				if msgIndex < len(call.Args) {
+					msgArg := unparen(call.Args[msgIndex])
+					if lit, isLit := msgArg.(*ast.BasicLit); isLit && lit.Kind == token.STRING {
+						if msg, err := strconv.Unquote(lit.Value); err == nil {
+							if what, fix, bad := slogMessageOpener(msg); bad {
+								report(lit.Pos(), what, fix)
+							}
+						}
+					} else {
+						report(msgArg.Pos(), "message is not a string literal",
+							"write the message as a literal at the call, and put the value in an attribute; a constant or an expression is the one shape that carries an opener past every guard")
+					}
+				}
+				if spread && !admitted {
+					report(call.Pos(), "a run spread into a record outside slogSpreadSites",
+						"write the keys as literals at the call so sloglint reads them, or list the function in slogSpreadSites with the reason its keys are read elsewhere")
+				}
+				return true
 			}
-		case *ast.FuncLit:
-			if param := slogVariadicAnyParam(decl.Type); param != "" &&
-				slogForwardsVariadic(decl.Body, param, importPaths, rel) {
-				report(litNames[decl], decl.Pos())
+
+			if site, isForwarder := slogIsForwarderCall(call, importPaths, rel); isForwarder && spread && !admitted {
+				report(call.Pos(), "a run spread into "+site.name+" outside slogSpreadSites",
+					"write the keys as literals at the call so sloglint reads them through custom-funcs, or list the function in slogSpreadSites")
 			}
-		}
-		return true
-	})
+			return true
+		})
+	}
+
 	return violations
 }
 
-// slogSpreadRunViolations is rule 6's second boundary: the run a record call spreads, which is the
-// one attribute shape that is neither an argument at a call site nor a slog.Attr. attrs :=
-// []any{"client_id", client.Id}, appended to and then spread, writes its keys in a composite
-// literal no other rule looks at.
-//
-// It reads what it can follow and refuses what it cannot, rather than matching the constructions
-// that happen to exist. A run is readable when it is the enclosing function's own variadic
-// parameter, which rule 6's declaration half already covers, or a local built only out of an []any
-// composite literal, a make of one, and appends onto itself. A builder's return, an alias of
-// another slice, an append onto something that is not the run, a spread of anything but the
-// enclosing variadic parameter, and a write from inside a closure are each reported, because each
-// of them carries a key to a record past every rule that reads one.
-//
-// Readability is decided by every *use* of the name rather than by every assignment to it, and
-// that is the difference between a rule and an enumeration. Collecting assignments answers "what
-// was written into this run", which is silent about a run written through attrs[0], handed to a
-// helper that writes it, arriving as a parameter this body never declared, or named by a second
-// variable in an inner block. Each of those reaches a record with keys nothing read. So the run
-// must be introduced exactly once in this body, by := or var, and every occurrence of that name
-// in the body must be one of four: the introduction, the left side of an assignment whose right
-// side this rule reads, the base of an append back onto itself, or the spread at the record. An
-// occurrence anywhere else, including any occurrence inside a closure, is a use this rule has not
-// modelled and the run is refused.
-//
-// Two names in one body, declared in sibling blocks, are therefore refused as well, since the rule
-// reads a run by its name and cannot tell them apart. Renaming one is the fix, and it costs a word
-// against a boundary that would otherwise be decided by which declaration the walk saw last.
-//
-// Each function body is read on its own, without descending into the closures inside it, so the
-// variadic parameter in hand is always the one belonging to the body being read. That is also what
-// makes a run built in one body and spread in another unreadable, which it is: neither reading has
-// both halves in view. A body that introduces a name shadowing its own variadic parameter and
-// spreads that is refused for the same reason: which of the two reaches the record is a scoping
-// question this rule does not resolve, and reading it as the parameter would hand the shadow's
-// keys to rule 6's declaration half, which looks at the callers of a run that never leaves.
-func slogSpreadRunViolations(file *ast.File, importPaths map[string]string, fset *token.FileSet, rel string) []slogViolation {
-	var violations []slogViolation
-
-	// Every form this rule reads a run out of is spelled with a predeclared builtin, and a
-	// predeclared name is only the builtin until something declares it. append and make are how
-	// a run is built, len and cap are the two reads of one that carry no key, and a file that
-	// declares any of the four leaves this reading calling a function of its own by the builtin's
-	// meaning. Refused for the whole file rather than read, per the ceiling above.
-	shadowed := slogShadowedBuiltins(file)
-
-	inBody := func(ft *ast.FuncType, body *ast.BlockStmt) {
-		if body == nil {
-			return
+// slogMessageOpener is rule 1: the three openers a literal message may not carry.
+func slogMessageOpener(msg string) (what, fix string, bad bool) {
+	if slogComponentPrefix.MatchString(msg) {
+		return "message carries a component prefix",
+			"drop the prefix; the component is an attribute where it matters, and the message is the event",
+			true
+	}
+	for _, opener := range slogRefusedOpeners {
+		if strings.HasPrefix(msg, opener) {
+			return `message opens with "` + opener + `"`,
+				`say what could not be done, opening with "unable to" where a verb is needed`,
+				true
 		}
-		variadic := slogVariadicAnyParam(ft)
-		signature := slogSignatureNames(ft)
-		walk := func(visit func(ast.Node) bool) {
-			ast.Inspect(body, func(n ast.Node) bool {
-				if n == nil {
-					return false
-				}
-				if _, isClosure := n.(*ast.FuncLit); isClosure {
-					return false
-				}
-				return visit(n)
+	}
+	return "", "", false
+}
+
+// slogForwarderTableViolations is rule 4. It reads the custom-funcs names out of the golangci-lint
+// configuration at path and holds them equal to the forwarders in slogSpreadSites.
+//
+// The read is textual: the `- name:` entries under the `custom-funcs:` key, taken while the
+// indentation stays deeper than that key's. That is enough for the one file this tree has, and a
+// YAML parser would be a dependency the test tiers do not otherwise carry.
+func slogForwarderTableViolations(path string) ([]slogViolation, error) {
+	rel := filepath.Base(path)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []slogViolation{{
+				file: rel, line: 0,
+				what: "no golangci-lint configuration beside the source root",
+				fix:  "every forwarder in slogSpreadSites is registered under sloglint's custom-funcs there",
+			}}, nil
+		}
+		return nil, errs.Wrapf(err, "reading %s", path)
+	}
+
+	registered := map[string]int{}
+	customFuncsLine := 0
+	indent := -1
+	for i, line := range strings.Split(string(content), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if indent < 0 {
+			if strings.HasPrefix(trimmed, "custom-funcs:") {
+				indent = len(line) - len(strings.TrimLeft(line, " "))
+				customFuncsLine = i + 1
+			}
+			continue
+		}
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if len(line)-len(strings.TrimLeft(line, " ")) <= indent {
+			break
+		}
+		if rest, ok := strings.CutPrefix(trimmed, "- name:"); ok {
+			registered[strings.TrimSpace(rest)] = i + 1
+		}
+	}
+
+	var violations []slogViolation
+	if customFuncsLine == 0 {
+		return []slogViolation{{
+			file: rel, line: 0,
+			what: "no custom-funcs under sloglint",
+			fix:  "register every forwarder in slogSpreadSites so sloglint reads the keys at its call sites",
+		}}, nil
+	}
+
+	listed := map[string]bool{}
+	for _, site := range slogSpreadSites {
+		if site.forwarder == "" {
+			continue
+		}
+		listed[site.forwarder] = true
+		if _, ok := registered[site.forwarder]; !ok {
+			violations = append(violations, slogViolation{
+				file: rel, line: customFuncsLine,
+				what: site.forwarder + " is a forwarder in slogSpreadSites but not a custom-func",
+				fix:  "register it with msg-pos -1 and the args-pos its run begins at, or its callers' keys are read by nothing",
 			})
 		}
-
-		// Every run this body spreads into a record, named where it is a plain identifier.
-		// used holds the occurrences this rule has accounted for; everything else is a use it
-		// has not modelled, which is what the scan at the bottom turns into a refusal.
-		type spreadSite struct {
-			name string
-			pos  token.Pos
-		}
-		var sites []spreadSite
-		runs := map[string]*slogRun{}
-		used := map[*ast.Ident]bool{}
-		track := func(name string) *slogRun {
-			run, tracked := runs[name]
-			if !tracked {
-				run = &slogRun{readable: true}
-				runs[name] = run
-			}
-			return run
-		}
-
-		// boundAt is where this body's own variadic parameter is carried into a record: spread at
-		// one, appended into a run that is, or handed to a second listed forwarder. Until that
-		// happens the parameter is somebody else's ...any, fmt's or a SQL driver's, and nothing
-		// below applies to it. It is tracked from the start either way, so that every occurrence
-		// of it goes through the same scan the local runs do.
-		boundAt := token.NoPos
-		if variadic != "" {
-			track(variadic)
-		}
-
-		walk(func(n ast.Node) bool {
-			call, isCall := n.(*ast.CallExpr)
-			if !isCall || len(call.Args) == 0 {
-				return true
-			}
-			// len and cap read a run's shape and cannot change it, which is how a forwarder
-			// sizes the record it is about to build.
-			if fn, isBuiltin := unparen(call.Fun).(*ast.Ident); isBuiltin && (fn.Name == "len" || fn.Name == "cap") {
-				if id, isIdent := unparen(call.Args[0]).(*ast.Ident); isIdent {
-					if _, tracked := runs[id.Name]; tracked {
-						used[id] = true
-					}
-				}
-				return true
-			}
-			if call.Ellipsis == token.NoPos {
-				return true
-			}
-			// A listed forwarder counts as a record here, which slogIsRecordCall already says:
-			// a spread into one reaches a record a call later, and that is how
-			// WriteInternalServerError handing its run to LogInternalServerError is seen.
-			if !slogIsRecordCall(call, importPaths, rel) {
-				return true
-			}
-			site := spreadSite{pos: call.Pos()}
-			if id, isIdent := unparen(call.Args[len(call.Args)-1]).(*ast.Ident); isIdent {
-				site.name = id.Name
-				track(id.Name)
-				used[id] = true
-				if id.Name == variadic {
-					boundAt = earliest(boundAt, id.Pos())
-				}
-			}
-			sites = append(sites, site)
-			return true
-		})
-		if len(sites) == 0 && variadic == "" {
-			return
-		}
-
-		// read takes one assignment into a tracked run: the right side has to be a form this
-		// rule follows, and the append base it permits is marked used where it is read.
-		read := func(run *slogRun, name string, declares bool, from ast.Expr) {
-			self := name
-			if declares {
-				// The name on the left is a new variable here, so an append based on that
-				// spelling reads a different one: see slogReadAppendBase.
-				self = ""
-			}
-			refuse := func(at token.Pos) {
-				run.readable = false
-				run.badAt = earliest(run.badAt, at)
-			}
-			got, readable := slogReadRun(from, self, variadic, used)
-			if !readable {
-				refuse(from.Pos())
-				return
-			}
-			if got.extends {
-				if run.tail && len(got.elems) > 0 {
-					// An element appended after the run absorbed a spread of unknown length,
-					// which leaves it at no position this rule can call a key or a value.
-					refuse(from.Pos())
-					return
-				}
-				if len(run.segments) == 0 {
-					run.segments = append(run.segments, nil)
-				}
-				last := len(run.segments) - 1
-				run.segments[last] = append(run.segments[last], got.elems...)
-			} else {
-				// A whole new sequence: what the run held before is gone at runtime, and its
-				// keys are still read because the branch that wrote them can still be the one
-				// that runs. Reading it as a continuation is what let a replacement inherit an
-				// odd predecessor's parity and land its own first key on a value position.
-				run.segments = append(run.segments, got.elems)
-				run.tail = false
-			}
-			if got.spreadAt == token.NoPos {
-				return
-			}
-			// The caller's run arrives at the offset rule 6's table states for it, and its keys
-			// were read at the call sites that built it starting from that offset. So whatever
-			// this body puts in front of it has to be a whole number of key/value pairs: one
-			// element of its own shifts every one of those keys onto the value beside it, and
-			// the record carries a key nothing read.
-			if len(run.segments[len(run.segments)-1])%2 != 0 {
-				refuse(got.spreadAt)
-				return
-			}
-			run.tail = true
-			boundAt = earliest(boundAt, got.spreadAt)
-		}
-		// A declaration or assignment with more names than values is one call filling several,
-		// which carries no key this rule can pair off.
-		introduce := func(names []*ast.Ident, declares bool, readable bool) {
-			for _, id := range names {
-				run, tracked := runs[id.Name]
-				if !tracked {
-					continue
-				}
-				used[id] = true
-				if declares {
-					run.decls++
-					run.declAt = earliest(run.declAt, id.Pos())
-				} else {
-					run.writes++
-					run.writeAt = earliest(run.writeAt, id.Pos())
-				}
-				if !readable {
-					run.readable = false
-					run.badAt = earliest(run.badAt, id.Pos())
-				}
-			}
-		}
-
-		walk(func(n ast.Node) bool {
-			switch stmt := n.(type) {
-			case *ast.AssignStmt:
-				declares := stmt.Tok == token.DEFINE
-				if len(stmt.Lhs) != len(stmt.Rhs) {
-					introduce(identsOf(stmt.Lhs), declares, false)
-					return true
-				}
-				for i, lhs := range stmt.Lhs {
-					id, isIdent := unparen(lhs).(*ast.Ident)
-					if !isIdent {
-						continue
-					}
-					run, tracked := runs[id.Name]
-					if !tracked {
-						continue
-					}
-					introduce([]*ast.Ident{id}, declares, true)
-					read(run, id.Name, declares, stmt.Rhs[i])
-				}
-			case *ast.ValueSpec:
-				switch {
-				case len(stmt.Values) == 0:
-					// var attrs []any: declared empty, and an empty run carries no key.
-					introduce(stmt.Names, true, true)
-				case len(stmt.Values) != len(stmt.Names):
-					introduce(stmt.Names, true, false)
-				default:
-					for i, id := range stmt.Names {
-						run, tracked := runs[id.Name]
-						if !tracked {
-							continue
-						}
-						introduce([]*ast.Ident{id}, true, true)
-						read(run, id.Name, true, stmt.Values[i])
-					}
-				}
-			}
-			return true
-		})
-
-		// Every remaining occurrence of a tracked name, closures included. Three positions are
-		// skipped because an identifier there cannot be this variable at all: the field half of
-		// a selector, a bare identifier in a composite literal's key, which is a struct field's
-		// label or an array index, and a parameter or field name, whose type cannot mention a
-		// run. A key that is any other expression is scanned like the value beside it: a slice is
-		// not comparable and cannot be a map key, but a pointer to one is, and &attrs written
-		// there hands the run to whatever holds the map. What is left is a read or a write of the
-		// run, and any shape above has left it marked: an index, an argument to a helper that
-		// writes it, a second variable taking it, a spread into something that is not a record,
-		// an assignment or a declaration inside a closure.
-		var scan func(ast.Node) bool
-		scan = func(n ast.Node) bool {
-			switch node := n.(type) {
-			case *ast.SelectorExpr:
-				ast.Inspect(node.X, scan)
-				return false
-			case *ast.KeyValueExpr:
-				if _, label := unparen(node.Key).(*ast.Ident); !label {
-					ast.Inspect(node.Key, scan)
-				}
-				ast.Inspect(node.Value, scan)
-				return false
-			case *ast.Field:
-				return false
-			case *ast.Ident:
-				if run, tracked := runs[node.Name]; tracked && !used[node] {
-					run.readable = false
-					run.badAt = earliest(run.badAt, node.Pos())
-				}
-				return false
-			}
-			return true
-		}
-		ast.Inspect(body, scan)
-
-		if len(shadowed) > 0 {
-			for _, run := range runs {
-				run.readable = false
-				run.badAt = earliest(run.badAt, body.Pos())
-			}
-		}
-
-		for _, site := range sites {
-			line := fset.Position(site.pos).Line
-			if site.name == "" {
-				violations = append(violations, slogViolation{file: rel, line: line,
-					what: "attribute run spread into a record is not a named slice",
-					fix: "build it as []any{...} in this function and spread that; an expression " +
-						"this rule cannot follow carries keys nothing reads"})
-				continue
-			}
-			run := runs[site.name]
-			if signature[site.name] && site.name != variadic {
-				// A name the signature already binds, so this body's declaration of it is a
-				// second variable and which one the spread reaches is a scoping question. The
-				// parameter itself is a run built in a caller this reading cannot see, and a
-				// plain []any parameter is not a variadic one, so rule 6's declaration half
-				// never looked at it either.
-				run.readable = false
-			}
-			if site.name == variadic {
-				// The enclosing function's own run, unless this body declared a second
-				// variable of that name: rule 6's declaration half reads the callers of the
-				// parameter, and a shadow's keys never reach them.
-				if run.decls > 0 {
-					violations = append(violations, slogViolation{file: rel, line: line,
-						what: "attribute run " + strconv.Quote(site.name) +
-							" shadows this function's variadic parameter",
-						fix: "give the local run a different name; which of the two reaches the " +
-							"record is a scoping question this rule does not answer, and rule 6 " +
-							"reads the parameter's callers rather than the shadow's keys"})
-				}
-				continue
-			}
-			if run.decls != 1 || !run.readable ||
-				site.pos < run.declAt || site.pos > slogScopeEnd(body, run.declAt) {
-				// The last two are the spread reaching a different variable of the same name,
-				// above the declaration or outside the block it was declared in: the
-				// package-level one, or an enclosing scope's. Its keys were built where this
-				// reading never looked, and a census by spelling sees one declaration in the
-				// body with every assignment into it conformant.
-				violations = append(violations, slogViolation{file: rel, line: line,
-					what: "attribute run " + strconv.Quote(site.name) + " is built in a form this rule cannot read",
-					fix: "declare it once in this function, above this line, out of []any{...}, " +
-						"make([]any, ...) and appends onto itself, and use it nowhere but those " +
-						"and this spread; a run reached any other way carries keys nothing reads"})
-			}
-		}
-
-		// The enclosing function's own variadic parameter, once it reaches a record. Rule 6's
-		// declaration half answers for this run by reading the keys at the call sites that built
-		// it, so the one thing this body owes is to pass it on as it arrived. A key written here
-		// is written where nothing reads, and it shifts every key those call sites did write past
-		// the index the table states for them, which is the same staleness the census refuses
-		// when a signature grows a parameter. A body that declares a second variable of the name
-		// is left to the shadow report above, which says the same thing about the same line.
-		if variadic != "" && boundAt != token.NoPos {
-			if run := runs[variadic]; run.decls == 0 && (run.writes > 0 || !run.readable) {
-				at := earliest(run.badAt, run.writeAt, boundAt)
-				violations = append(violations, slogViolation{file: rel, line: fset.Position(at).Line,
-					what: "the variadic run " + strconv.Quote(variadic) + " is changed before it reaches a record",
-					fix: "forward a caller's attribute run unchanged and build anything of this " +
-						"function's own into a separate []any; rule 6 reads this run's keys at the " +
-						"call sites that built it, and a write here is a key nothing reads at an " +
-						"offset that no longer holds"})
-			}
-		}
-		for name, run := range runs {
-			if name != variadic && run.decls == 1 && run.readable {
-				// One segment at a time. Each is a key/value sequence of its own, and reading
-				// them end to end would pair a replacement's first key with the last value of
-				// whatever the run held before it.
-				for _, segment := range run.segments {
-					violations = append(violations, slogBareKeyViolations(segment, fset, rel)...)
-				}
-			}
+	}
+	for name, line := range registered {
+		if !listed[name] {
+			violations = append(violations, slogViolation{
+				file: rel, line: line,
+				what: name + " is a custom-func but not a forwarder in slogSpreadSites",
+				fix:  "list it there so the spread in its body is admitted for the reason the registration states",
+			})
 		}
 	}
-
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch fn := n.(type) {
-		case *ast.FuncDecl:
-			inBody(fn.Type, fn.Body)
-		case *ast.FuncLit:
-			inBody(fn.Type, fn.Body)
-		}
-		return true
-	})
-	return violations
-}
-
-// slogRun is one spread attribute run as this rule was able to follow it: every key/value
-// expression assigned into it, how many times the body introduced the name, and whether every
-// assignment into it and every use of it was a form it could read. decls is a count rather than a
-// flag because one is the only answer that leaves the name unambiguous: none means the run is a
-// parameter or a capture built where this reading cannot see it, and two means two variables the
-// rule would merge into one.
-//
-// segments, rather than one list, because an assignment that replaces the run starts a key/value
-// sequence of its own. Both are read, since either branch can be the one that runs, but neither
-// pairs off against the other: a one-element predecessor concatenated onto a replacement made the
-// replacement's first key a value and let it reach a record unread.
-//
-// declAt is where the one declaration is, and it is read because a count alone says nothing about
-// which variable a given use reaches: an occurrence above the declaration is a different variable
-// of that name, the package-level one or an enclosing scope's, whose keys this reading never saw.
-// writes counts the assignments that are not declarations and tail records that the run has
-// absorbed a spread of unknown length, after which no later element has a position this rule can
-// call a key or a value. badAt and writeAt locate the first of each for the report.
-type slogRun struct {
-	segments [][]ast.Expr
-	decls    int
-	declAt   token.Pos
-	writes   int
-	writeAt  token.Pos
-	badAt    token.Pos
-	tail     bool
-	readable bool
-}
-
-// earliest is the first position among those given that is set, which is the line a run's refusal
-// points at: the write or the unreadable use, whichever the body reached first.
-func earliest(positions ...token.Pos) token.Pos {
-	at := token.NoPos
-	for _, pos := range positions {
-		if pos != token.NoPos && (at == token.NoPos || pos < at) {
-			at = pos
-		}
-	}
-	return at
-}
-
-// slogScopeEnd is where a name declared at pos stops being visible: the end of the innermost
-// construct that opens a scope around it. A run is read by its name, so this and the
-// declaration's own position are together what says whether a given spread is the run that was
-// read or another variable spelled the same way in a sibling block, whose keys this reading never
-// saw. Without it, one declaration anywhere in the body answers for every use of the name.
-//
-// A block, a case clause and a comm clause are the scopes a parse shows as a node holding the
-// declaration. The five statement headers are the ones it does not: a name declared in the
-// initializer of an if, a for or a switch, or in a range clause, is scoped to that whole statement
-// and not to the block after it, which no node containing the declaration says. Reading only the
-// blocks gave the initializer's declaration the rest of the enclosing body, so a spread below the
-// statement was answered for by a run built inside its header while it actually reached the
-// package-level variable of that name, whose keys this reading never saw.
-func slogScopeEnd(body *ast.BlockStmt, pos token.Pos) token.Pos {
-	end := body.End()
-	ast.Inspect(body, func(n ast.Node) bool {
-		if n == nil || pos < n.Pos() || pos >= n.End() {
-			return false
-		}
-		switch n.(type) {
-		case *ast.BlockStmt, *ast.CaseClause, *ast.CommClause,
-			*ast.IfStmt, *ast.ForStmt, *ast.RangeStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt:
-			end = n.End()
-		}
-		return true
-	})
-	return end
-}
-
-// slogReadResult is one assignment into a run as this rule read it: the key/value expressions it
-// puts there, whether the run grew out of itself rather than being replaced wholesale, and where
-// the enclosing variadic parameter was absorbed if it was.
-//
-// extends is the distinction the parity and the segmenting both rest on. An append onto the run
-// continues a key/value sequence already under way, so its elements sit at the offsets the ones
-// before them left; every other form is a new sequence starting at its own first element, and
-// concatenating the two ran the second one's keys through the first one's parity.
-type slogReadResult struct {
-	elems    []ast.Expr
-	extends  bool
-	spreadAt token.Pos
-}
-
-// slogReadRun reads one assignment into a spread run. target is the run being built, so an append
-// onto it is the run growing; variadic is the enclosing function's ...any parameter, the one
-// spread this rule permits inside an append because rule 6 reads its callers' keys instead. used
-// collects the occurrences this read accounts for, which is how an append back onto the run is
-// told from every other mention of its name.
-func slogReadRun(from ast.Expr, target, variadic string, used map[*ast.Ident]bool) (slogReadResult, bool) {
-	switch built := unparen(from).(type) {
-	case *ast.CompositeLit:
-		if slogIsAnySlice(built.Type) {
-			return slogReadResult{elems: built.Elts}, true
-		}
-		return slogReadResult{}, false
-	case *ast.CallExpr:
-		fn, isBuiltin := unparen(built.Fun).(*ast.Ident)
-		if !isBuiltin {
-			return slogReadResult{}, false
-		}
-		switch fn.Name {
-		case "make":
-			// make([]any, 0, n): the run starts empty and the appends below carry it.
-			return slogReadResult{}, len(built.Args) > 0 && slogIsAnySlice(built.Args[0])
-		case "append":
-			if len(built.Args) == 0 {
-				return slogReadResult{}, false
-			}
-			read, readable := slogReadAppendBase(built.Args[0], target, variadic, used)
-			if !readable {
-				return slogReadResult{}, false
-			}
-			added := built.Args[1:]
-			if built.Ellipsis != token.NoPos {
-				if len(added) == 0 {
-					return slogReadResult{}, false
-				}
-				spread, isIdent := unparen(added[len(added)-1]).(*ast.Ident)
-				if variadic == "" || !isIdent || spread.Name != variadic {
-					return slogReadResult{}, false
-				}
-				used[spread] = true
-				read.spreadAt = spread.Pos()
-				added = added[:len(added)-1]
-			}
-			read.elems = append(read.elems, added...)
-			return read, true
-		}
-		return slogReadResult{}, false
-	}
-	return slogReadResult{}, false
-}
-
-// slogReadAppendBase reads what an append starts from. The run itself is the ordinary case and
-// carries nothing new, since its own assignments are read where they are written. Any other
-// identifier is a second slice this rule has not followed, which is the alias the refusal exists
-// for; nil is the empty slice spelled as a value, and it starts a sequence rather than continuing
-// one.
-//
-// target is empty when the statement being read declares the name, because then the name on the
-// left is a new variable and the one inside the append is whatever it meant before the statement:
-// an enclosing scope's variable or the package-level one, built where this reading never looked.
-// Spelling alone cannot tell those apart, so the self-shaped base is refused there rather than
-// read as the run continuing.
-func slogReadAppendBase(from ast.Expr, target, variadic string, used map[*ast.Ident]bool) (slogReadResult, bool) {
-	if id, isIdent := unparen(from).(*ast.Ident); isIdent {
-		if id.Name == "nil" {
-			return slogReadResult{}, true
-		}
-		if target == "" || id.Name != target {
-			return slogReadResult{}, false
-		}
-		used[id] = true
-		return slogReadResult{extends: true}, true
-	}
-	return slogReadRun(from, target, variadic, used)
-}
-
-// identsOf is the plain identifiers among expressions, which is what an assignment's left side is
-// when it is naming variables rather than indexing or dereferencing something.
-func identsOf(exprs []ast.Expr) []*ast.Ident {
-	var idents []*ast.Ident
-	for _, expr := range exprs {
-		if id, isIdent := unparen(expr).(*ast.Ident); isIdent {
-			idents = append(idents, id)
-		}
-	}
-	return idents
-}
-
-// slogIsAnySlice reports whether the type is []any or []interface{}, the element type an
-// attribute run is built in.
-func slogIsAnySlice(expr ast.Expr) bool {
-	slice, isSlice := unparen(expr).(*ast.ArrayType)
-	if !isSlice || slice.Len != nil {
-		return false
-	}
-	switch elt := unparen(slice.Elt).(type) {
-	case *ast.Ident:
-		return elt.Name == "any"
-	case *ast.InterfaceType:
-		return elt.Methods == nil || len(elt.Methods.List) == 0
-	}
-	return false
-}
-
-// slogIsEmission reports whether fn is one of the ten package-level emission functions.
-func slogIsEmission(fn string) bool {
-	_, ok := slogEmissions[fn]
-	return ok
-}
-
-// slogCarriesContext reports whether fn passes a context to the handler. The four *Context
-// variants do, and so do Log and LogAttrs, whose first parameter is a context by construction.
-func slogCarriesContext(fn string) bool {
-	return strings.HasSuffix(fn, "Context") || fn == "Log" || fn == "LogAttrs"
-}
-
-// funcTakesRequestScope reports whether the signature has a context.Context or an *http.Request
-// parameter, resolved through the file's imports so an aliased context or net/http is seen, and
-// through its type aliases so a second spelling of either is seen as well. An alias is the same
-// type, so a function taking one is on a request path exactly as much as one taking the type it
-// names, and a plain slog call inside it loses the same request_id.
-func funcTakesRequestScope(ft *ast.FuncType, importPaths map[string]string, aliases map[string]slogQualified) bool {
-	if ft.Params == nil {
-		return false
-	}
-	for _, param := range ft.Params.List {
-		typ := unparen(param.Type)
-		if star, isPointer := typ.(*ast.StarExpr); isPointer {
-			typ = unparen(star.X)
-		}
-		pkg, name, ok := slogNamedType(typ, importPaths, aliases)
-		if !ok {
-			continue
-		}
-		if pkg == contextImportPath && name == "Context" {
-			return true
-		}
-		// Whether a star was written is not read. *http.Request is the only spelling in this
-		// tree and a request is too large to pass by value, but one that did would carry the
-		// same request, and a rule that let the star decide would answer no to it.
-		if pkg == httpImportPath && name == "Request" {
-			return true
-		}
-	}
-	return false
-}
-
-// selectorPath resolves pkg.Name written as a type or an expression to the imported path and the
-// name.
-func selectorPath(expr ast.Expr, importPaths map[string]string) (string, string, bool) {
-	sel, ok := unparen(expr).(*ast.SelectorExpr)
-	if !ok {
-		return "", "", false
-	}
-	return qualifiedSelector(sel, importPaths)
-}
-
-// slogAttrLiteralViolations reads the key out of a slog.Attr{Key: "x", ...} composite literal,
-// which is how an attribute is built where a constructor will not do. The literal is looked for
-// anywhere in the file rather than only under an emission, because a helper returning []slog.Attr
-// writes its keys nowhere else.
-func slogAttrLiteralViolations(lit *ast.CompositeLit, importPaths map[string]string,
-	aliases map[string]slogQualified, fset *token.FileSet, rel string) []slogViolation {
-	pkg, name, ok := slogNamedType(lit.Type, importPaths, aliases)
-	if !ok || pkg != slogImportPath || name != "Attr" {
-		return nil
-	}
-	var violations []slogViolation
-	for _, elt := range lit.Elts {
-		kv, isKeyed := elt.(*ast.KeyValueExpr)
-		if !isKeyed {
-			continue
-		}
-		if field, isIdent := kv.Key.(*ast.Ident); !isIdent || field.Name != "Key" {
-			continue
-		}
-		if v, bad := slogKeyViolation(kv.Value, "slog.Attr", fset, rel); bad {
-			violations = append(violations, v)
-		}
-	}
-	return violations
-}
-
-// slogAttrKeyWriteViolations reads the key out of a write to an attribute's Key field. An
-// attribute built with a conformant key and renamed afterwards reaches a record under the name it
-// was renamed to, and every other reading here looks at where it was built. Only a value this
-// file built as a slog.Attr is followed, because Key is an ordinary field name that four
-// production sites write on a model attribute, and a rule that refused the spelling would refuse
-// those instead of reading this.
-//
-// The value has to be declared in the body out of an attribute constructor or an Attr literal,
-// which is the same identification by declaration that rule 6 makes for a run, and it carries the
-// same limit: a name declared twice, or written through anything but its own declaration, is not
-// followed here and the write is left to the ceiling above.
-func slogAttrKeyWriteViolations(file *ast.File, importPaths map[string]string,
-	aliases map[string]slogQualified, fset *token.FileSet, rel string) []slogViolation {
-	isAttr := func(from ast.Expr) bool {
-		switch built := unparen(from).(type) {
-		case *ast.CompositeLit:
-			pkg, name, ok := slogNamedType(built.Type, importPaths, aliases)
-			return ok && pkg == slogImportPath && name == "Attr"
-		case *ast.CallExpr:
-			pkg, fn, ok := qualifiedCall(built, importPaths)
-			return ok && pkg == slogImportPath && slogAttrConstructors[fn]
-		}
-		return false
-	}
-
-	attrs := map[string]bool{}
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch stmt := n.(type) {
-		case *ast.AssignStmt:
-			if stmt.Tok != token.DEFINE || len(stmt.Lhs) != len(stmt.Rhs) {
-				return true
-			}
-			for i, lhs := range stmt.Lhs {
-				if id, isIdent := unparen(lhs).(*ast.Ident); isIdent && isAttr(stmt.Rhs[i]) {
-					attrs[id.Name] = true
-				}
-			}
-		case *ast.ValueSpec:
-			if len(stmt.Values) != len(stmt.Names) {
-				return true
-			}
-			for i, id := range stmt.Names {
-				if isAttr(stmt.Values[i]) {
-					attrs[id.Name] = true
-				}
-			}
-		}
-		return true
-	})
-	if len(attrs) == 0 {
-		return nil
-	}
-
-	var violations []slogViolation
-	ast.Inspect(file, func(n ast.Node) bool {
-		assign, isAssign := n.(*ast.AssignStmt)
-		if !isAssign || len(assign.Lhs) != len(assign.Rhs) {
-			return true
-		}
-		for i, lhs := range assign.Lhs {
-			sel, isSelector := unparen(lhs).(*ast.SelectorExpr)
-			if !isSelector || sel.Sel.Name != "Key" {
-				continue
-			}
-			id, isIdent := unparen(sel.X).(*ast.Ident)
-			if !isIdent || !attrs[id.Name] {
-				continue
-			}
-			if v, bad := slogKeyViolation(assign.Rhs[i], "slog.Attr", fset, rel); bad {
-				violations = append(violations, v)
-			}
-		}
-		return true
-	})
-	return violations
-}
-
-// slogBareKeyViolations reads the keys out of a run of key/value arguments the way slog's own
-// argsToAttrSlice does: a string is a key and consumes the argument after it, anything else is an
-// already-built Attr and consumes one. Index parity would be wrong for the mixed form, where one
-// slog.String sits among bare pairs.
-func slogBareKeyViolations(args []ast.Expr, fset *token.FileSet, rel string) []slogViolation {
-	var violations []slogViolation
-	for i := 0; i < len(args); i++ {
-		lit, isLiteral := unparen(args[i]).(*ast.BasicLit)
-		if !isLiteral || lit.Kind != token.STRING {
-			// Either an Attr, which consumes one argument, or a key computed at runtime, which
-			// is the ceiling above: the walk keeps going and may read the next literal as a key.
-			continue
-		}
-		if v, bad := slogKeyViolation(lit, "attribute", fset, rel); bad {
-			violations = append(violations, v)
-		}
-		i++ // step over the value this key binds
-	}
-	return violations
-}
-
-// slogKeyViolation checks one attribute key. A key that is not a string literal is the computed
-// key the ceiling above describes, and is skipped rather than reported.
-func slogKeyViolation(expr ast.Expr, where string, fset *token.FileSet, rel string) (slogViolation, bool) {
-	lit, isLiteral := unparen(expr).(*ast.BasicLit)
-	if !isLiteral || lit.Kind != token.STRING {
-		return slogViolation{}, false
-	}
-	key, err := strconv.Unquote(lit.Value)
-	if err != nil {
-		return slogViolation{}, false
-	}
-	at := slogViolation{file: rel, line: fset.Position(lit.Pos()).Line,
-		what: where + " key " + strconv.Quote(key)}
-	if reason, reserved := slogReservedKeys[key]; reserved {
-		at.fix = reason
-		return at, true
-	}
-	if reason, injected := slogInjectedKeys[key]; injected && !slogOwnsRequestID(rel) {
-		at.fix = reason
-		return at, true
-	}
-	if !slogKeyPattern.MatchString(key) {
-		at.fix = "attribute keys are snake_case, ^[a-z][a-z0-9_]*$; decision 3 fixes the name for each concept"
-		return at, true
-	}
-	return slogViolation{}, false
-}
-
-// slogMessageViolation checks the message argument against rules 1 and 2, reporting the first
-// rule it breaks. The order is what makes each report name the thing to fix first: a message that
-// is not a literal has no text to judge, and a capitalised prefix is reported as the capital.
-func slogMessageViolation(expr ast.Expr, fset *token.FileSet, rel string) (slogViolation, bool) {
-	at := slogViolation{file: rel, line: fset.Position(expr.Pos()).Line}
-
-	lit, isLiteral := unparen(expr).(*ast.BasicLit)
-	if !isLiteral || lit.Kind != token.STRING {
-		at.what = "message is not a string literal"
-		at.fix = "make the message a fixed literal and move every value into an attribute"
-		return at, true
-	}
-	msg, err := strconv.Unquote(lit.Value)
-	if err != nil {
-		return slogViolation{}, false
-	}
-
-	first, size := utf8.DecodeRuneInString(msg)
-	if size == 0 || !unicode.IsLower(first) {
-		at.what = "message " + strconv.Quote(msg) + " does not start with a lowercase letter"
-		at.fix = "messages are lowercase sentences; an empty, digit-led or punctuation-led message is not one"
-		return at, true
-	}
-	if slogComponentPrefix.MatchString(msg) {
-		at.what = "message " + strconv.Quote(msg) + " starts with a component prefix"
-		at.fix = "drop the prefix; where the component matters it is an attribute"
-		return at, true
-	}
-	for _, banned := range []string{"failed to", "error "} {
-		if strings.HasPrefix(msg, banned) {
-			at.what = "message " + strconv.Quote(msg) + " starts with " + strconv.Quote(banned)
-			at.fix = `the one verb is "unable to", so the same event is spelled one way everywhere`
-			return at, true
-		}
-	}
-	return slogViolation{}, false
+	return violations, nil
 }

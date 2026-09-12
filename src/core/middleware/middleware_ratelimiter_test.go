@@ -1873,10 +1873,10 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 
 // TestRateLimiter_EveryTierLogsUnderAConventionalKey holds the one attribute key in this tree
 // that no lint reads. reportTrip appends t.keyField, so the key at that slog call is a field
-// value rather than a string literal, and testutil.AssertSlogConvention reads literals: it walks
-// past this site by construction and records the fact as a ceiling. The key is held here instead,
-// which is the same answer decision 5 gives for a level -- what the text cannot decide, a test
-// pins at the site.
+// value rather than a string literal, and sloglint's key-naming-case reads literals: it cannot
+// resolve a runtime value, and reportTrip is listed in testutil's slogSpreadSites for exactly this
+// reason. The key is held here instead, which is the same answer decision 5 gives for a level --
+// what the text cannot decide, a test pins at the site.
 //
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip

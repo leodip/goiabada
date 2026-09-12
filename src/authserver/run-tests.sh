@@ -12,8 +12,10 @@
 #                             adminconsole  - adminconsole module tests
 #                             data          - data-layer tests (per DB)
 #                             integration   - end-to-end integration tests (per DB)
+#                             lint          - golangci-lint over the four modules, the
+#                                             command CI's Lint job runs per module
 #                             modules       - shorthand for internal+core+adminconsole
-#                             all           - everything (default)
+#                             all           - everything (default), lint included
 #   -d, --db     <db>       Database to use for `data` and `integration` tests.
 #                           One of: mysql | postgres | mssql | sqlite | all (default: all)
 #   -r, --run    <pattern>  go test -run regex passed to data/integration runs
@@ -51,6 +53,9 @@
 #   # The three module tiers under the race detector, as CI's Unit / race job runs them
 #   ./run-tests.sh --type modules --race
 #
+#   # golangci-lint alone, which is where sloglint holds the logging convention (#320)
+#   ./run-tests.sh --type lint
+#
 # Notes:
 #   * --run only affects `data` and `integration` runs (where go test is invoked
 #     against ./tests/<type>/...). It is ignored for module-level test runs.
@@ -61,6 +66,11 @@
 #     here, and the data tier would need it per database; neither is wired up.
 #     Under --race each module leg runs with CGO_ENABLED=1 for itself, so the
 #     dev container's pinned CGO_ENABLED=0 stays in force for everything else.
+#   * `lint` needs golangci-lint on PATH at the version src/authserver/versions.yaml
+#     pins, which the dev container installs. Without it the tier fails rather
+#     than skipping: a tier that reports green having run nothing is the failure
+#     this script's comments keep returning to. Refused with --race, which it
+#     does not cover.
 #   * Rate limiter is disabled via GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false.
 #   * Per-phase output is also written to $LOG_DIR (printed at startup). On
 #     failure the log path plus a FAIL/panic summary is printed at the bottom
@@ -112,7 +122,7 @@ done
 
 # Validate --type
 case "$TYPE" in
-    internal|core|adminconsole|data|integration|modules|all) ;;
+    internal|core|adminconsole|data|integration|lint|modules|all) ;;
     *)
         echo "Invalid --type '$TYPE'. Run './run-tests.sh --help'."
         exit 2 ;;
@@ -131,7 +141,7 @@ esac
 # rather than a no-op to let through silently.
 if [ "$RACE" = true ]; then
     case "$TYPE" in
-        data|integration)
+        data|integration|lint)
             echo "--race covers the module tiers only; it does nothing for --type '$TYPE'."
             exit 2 ;;
     esac
@@ -154,6 +164,7 @@ should_run_core()         { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ 
 should_run_adminconsole() { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ "$TYPE" = "adminconsole" ]; }
 should_run_data()         { [ "$TYPE" = "all" ] || [ "$TYPE" = "data" ]; }
 should_run_integration()  { [ "$TYPE" = "all" ] || [ "$TYPE" = "integration" ]; }
+should_run_lint()         { [ "$TYPE" = "all" ] || [ "$TYPE" = "lint" ]; }
 
 # ---- GitHub Actions output helpers ------------------------------------------
 # Everything CI-specific goes through these. $GITHUB_ACTIONS is set only by the
@@ -479,6 +490,37 @@ configure_database() {
 # report `ok ... (cached)` and exit 0 even when mailpit is gone -- so the tier
 # reports green having executed nothing. Verified: the same invocation exits 0
 # with 29 cached packages when isolated, and 1 once caching is defeated.
+
+# ---- lint -------------------------------------------------------------------
+# The exact command CI's Lint job runs per module, so local and CI cannot
+# disagree on what lint-clean means. It exists here because sloglint, enabled
+# in .golangci.yml, is now where most of the logging convention is held (#320
+# decision 12, amended): before this tier that convention was a Go test every
+# module leg ran, and moving it into golangci-lint would otherwise have made it
+# CI-only, unlike every other guard in the tree. First among the tiers because
+# it is the cheapest and the one a sweep breaks.
+if should_run_lint; then
+    log="$LOG_DIR/00-lint.log"
+    echo "Running golangci-lint over the four modules... (log: $log)"
+    start=$SECONDS
+    gha_group "Lint"
+    if ! command -v golangci-lint >/dev/null 2>&1; then
+        echo "golangci-lint is not on PATH; run this inside the dev container, which installs the version versions.yaml pins" | tee "$log"
+        gha_summary_row "Lint" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+        fail_with "Lint" "$log"
+    fi
+    if ! (
+        for m in core authserver adminconsole cmd/goiabada-setup; do
+            echo "== $m"
+            (cd "../$m" && golangci-lint run --max-same-issues=0 --max-issues-per-linter=0 ./...) || exit 1
+        done
+    ) 2>&1 | tee "$log"; then
+        gha_summary_row "Lint" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+        fail_with "Lint" "$log"
+    fi
+    gha_endgroup
+    gha_summary_row "Lint" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
+fi
 
 if should_run_internal; then
     log="$LOG_DIR/01-internal.log"
