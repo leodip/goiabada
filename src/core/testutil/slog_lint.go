@@ -25,7 +25,7 @@ import (
 // import, a shadowed builtin or a type alias for free, which is what a parse of one file spent
 // 2,300 lines refusing approximations of before the review of #320 replaced them with this file.
 //
-// Four rules remain, each decidable from the text alone:
+// Five rules remain, each decidable from the text alone:
 //
 //  1. The message is a string literal at the call, and it carries no "component: " prefix and does
 //     not open with "failed to" or "error ". sloglint's static-msg accepts a constant as well as a
@@ -56,6 +56,15 @@ import (
 //     there are four entries, each offset was checked by planting a camelCase key at a call site
 //     and seeing it reported, and reading signatures back is the machinery this file was cut to
 //     stop carrying (#320, review of #321).
+//  5. A plain slog.Debug, Info, Warn or Error is refused inside the directories slogRequestPathDirs
+//     lists, unless the enclosing top-level function is named in slogPlainSites. sloglint's
+//     context: scope demands the *Context variant only where a context.Context or *http.Request
+//     parameter exists, so a helper written without either is admitted by it, and 26 records were
+//     found in exactly that shape after the sweep (decision 2, amended). This rule is what stops
+//     the shape coming back: in a package a request runs through, a record with no context to
+//     carry request_id is refused whatever the helper's signature. The directories are enumerated
+//     rather than inferred, and the two admitted functions are named with the reason no context
+//     can reach them.
 //
 // A dot import of log/slog is refused outright, since it leaves no selector for rule 2 to
 // resolve. Test files and mocks are exempt, as they are for AssertNoLegacyErrors: a test reads
@@ -92,7 +101,8 @@ func AssertSlogConvention(t *testing.T, dirs ...string) {
 		"core/logging owns the handler and testutil.CaptureSlog is how a test reads records; a "+
 		"run is spread into a record only inside a function listed in slogSpreadSites, and a "+
 		"forwarder listed there is registered under custom-funcs in .golangci.yml, where sloglint "+
-		"holds every other rule (#320).",
+		"holds every other rule; a record written in a request-path package carries a context, "+
+		"outside the functions slogPlainSites names (#320).",
 		len(violations), files, strings.Join(lines, "\n\t"))
 }
 
@@ -186,6 +196,54 @@ var slogSpreadSites = []slogSpreadSite{
 		forwarder: handlersImportPath + ".rejectIdTokenHint"},
 	{scope: "core/middleware", name: "reportTrip"},
 	{scope: "core/middleware", name: "MiddlewareRequestLogger"},
+}
+
+// slogRequestPathDirs is rule 5's list: the directories, relative to the source root, that a
+// request runs through, so that every record written there is one an operator will filter by
+// request_id after a user reports a refusal. Both servers' handlers and middleware, the
+// authserver's API response writers and the admin console's client of the auth server's API, and
+// the core packages the handlers call into on a request: the shared middleware, the validators,
+// token and code issuance, the token parsers, the handler helpers and the session store.
+//
+// Left out on purpose, each a ceiling recorded in the PR of #320 rather than a site this rule
+// admits: authserver/internal/audit and core/auditlog, whose AuditLogger.Log has no context and
+// whose 126 call sites are a change of their own (#328); core/data, whose
+// transaction and statement records run under RunInTransaction with no context to reach them
+// short of changing every Database method; and core/stringutil, whose one record is written from
+// a template function like addUrlParam below. A startup, worker or main package is not a request
+// path and is not listed.
+var slogRequestPathDirs = []string{
+	"authserver/internal/handlers",
+	"authserver/internal/middleware",
+	"authserver/internal/apiresponse",
+	"adminconsole/internal/handlers",
+	"adminconsole/internal/middleware",
+	"adminconsole/internal/apiclient",
+	"core/middleware",
+	"core/validators",
+	"core/oauth",
+	"core/oauthdb",
+	"core/handlerhelpers",
+	"core/sessionstore",
+}
+
+// slogPlainSite is one top-level function inside slogRequestPathDirs admitted to write a plain
+// record. scope is the file that declares it, relative to the source root, so an admission cannot
+// leak to a namesake elsewhere in the package; name is the function name.
+type slogPlainSite struct {
+	scope string
+	name  string
+}
+
+// slogPlainSites is rule 5's table. Two functions, each with the reason no context reaches it:
+// parseCIDRs runs once, when the real-IP middleware is constructed at startup, and its record is
+// about the configuration rather than a request; addUrlParam is a template function, and
+// html/template calls it with no context, so a record it writes has nothing to carry request_id
+// on. A third function of the second kind, stringutil.ConvertToString, sits outside the listed
+// directories and is named in the comment on them.
+var slogPlainSites = []slogPlainSite{
+	{scope: "core/middleware/middleware_realip.go", name: "parseCIDRs"},
+	{scope: "core/handlerhelpers/template_funcs.go", name: "addUrlParam"},
 }
 
 var (
@@ -298,6 +356,28 @@ func slogHandlerOwner(rel string) bool {
 	return false
 }
 
+// slogRequestPath reports whether rel sits under one of the directories rule 5 lists.
+func slogRequestPath(rel string) bool {
+	for _, dir := range slogRequestPathDirs {
+		if slogWithinScope(rel, dir) {
+			return true
+		}
+	}
+	return false
+}
+
+// slogPlainAdmitted reports whether a top-level function named name in the file rel is listed in
+// slogPlainSites. A call outside any top-level function, in a package-level composite literal for
+// instance, has no name to admit and is refused.
+func slogPlainAdmitted(rel, name string) bool {
+	for _, site := range slogPlainSites {
+		if site.name == name && rel == site.scope {
+			return true
+		}
+	}
+	return false
+}
+
 // slogSpreadAdmitted reports whether a top-level function named name in the file rel is listed in
 // slogSpreadSites.
 func slogSpreadAdmitted(rel, name string) bool {
@@ -347,7 +427,7 @@ func slogIsForwarderCall(call *ast.CallExpr, importPaths map[string]string, rel 
 	return slogSpreadSite{}, false
 }
 
-// slogViolationsInFile applies rules 1 to 3 and the dot-import refusal to one parsed file.
+// slogViolationsInFile applies rules 1, 2, 3 and 5 and the dot-import refusal to one parsed file.
 func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slogViolation {
 	var violations []slogViolation
 	report := func(pos token.Pos, what, fix string) {
@@ -400,7 +480,7 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slo
 		return true
 	})
 
-	// Rules 1 and 3 read calls, with the enclosing top-level function known for rule 3.
+	// Rules 1, 3 and 5 read calls, with the enclosing top-level function known for rules 3 and 5.
 	for _, decl := range file.Decls {
 		enclosing := ""
 		if fn, ok := decl.(*ast.FuncDecl); ok {
@@ -435,6 +515,10 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slo
 				if spread && !admitted {
 					report(call.Pos(), "a run spread into a record outside slogSpreadSites",
 						"write the keys as literals at the call so sloglint reads them, or list the function in slogSpreadSites with the reason its keys are read elsewhere")
+				}
+				if msgIndex == 0 && slogRequestPath(rel) && !slogPlainAdmitted(rel, enclosing) {
+					report(call.Pos(), "a plain slog."+name+" in a request-path package",
+						"take a context.Context and call slog."+name+"Context so the handler injects request_id, or list the function in slogPlainSites with the reason no request reaches it")
 				}
 				return true
 			}
