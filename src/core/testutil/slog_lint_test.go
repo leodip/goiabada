@@ -845,6 +845,174 @@ func shadowsVariadic(attrs ...any) {
 }
 `)
 
+	// Five more the same reading is green on when spelling is taken for identity, each carrying a
+	// camelCase key into a record with every rule above it green.
+	//
+	// The first two are a declaration in a statement header. An if or a switch initializer is
+	// scoped to its own statement, and no node containing the declaration says so, so reading the
+	// blocks alone handed the initializer's run the rest of the enclosing body: the spread below
+	// the statement reaches the package-level variable, whose keys this reading never saw. A for
+	// and a range clause are the same mechanism.
+	write("core/caught/run_if_init_scope.go", `package caught
+
+import "log/slog"
+
+var attrs = []any{"clientId", 1}
+
+func ifInitScope(flag bool) {
+	if attrs := []any{"client_id", 2}; flag {
+		slog.Info("a thing happened", attrs...)
+	}
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	write("core/caught/run_switch_init_scope.go", `package caught
+
+import "log/slog"
+
+var attrs = []any{"clientId", 1}
+
+func switchInitScope(n int) {
+	switch attrs := []any{"client_id", 2}; n {
+	case 1:
+		slog.Info("a thing happened", attrs...)
+	}
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	// The third is the same variable read twice in one statement. In a short declaration the name
+	// on the left is new, so the append inside reads whatever that spelling meant before the
+	// statement, which here is the package-level run: a reading that matched the base against the
+	// target by name took it for the run continuing and started from empty.
+	write("core/caught/run_declared_from_self.go", `package caught
+
+import "log/slog"
+
+var attrs = []any{"clientId", 1}
+
+func declaredFromSelf() {
+	attrs := append(attrs, "client_id", 2)
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	// The fourth is the builtin itself. Every form this rule reads a run out of is spelled with a
+	// predeclared name, and a file declaring one of the four has taken that spelling for something
+	// of its own: the append below returns whatever it likes and the reading credits it with the
+	// arguments written at the call.
+	write("core/caught/run_shadowed_builtin.go", `package caught
+
+import "log/slog"
+
+func append(base []any, extra ...any) []any { return []any{"clientId", 1} }
+
+func shadowedBuiltin() {
+	attrs := append(nil, "client_id", 2)
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	// The fifth is a run replaced rather than grown. The replacement is a key/value sequence of
+	// its own, and reading it as a continuation of what the run held before ran it through that
+	// predecessor's parity: one element in front of it was enough to make its first key a value.
+	// Both segments are read, because either branch can be the one that runs.
+	write("core/caught/run_replaced.go", `package caught
+
+import "log/slog"
+
+func replacedRun(flag bool) {
+	attrs := []any{"error"}
+	if flag {
+		attrs = []any{"clientId", 1}
+	}
+	slog.Info("a thing happened", attrs...)
+}
+`)
+
+	// ---- rule 3: the three literal keys a selector check does not see -------------------------
+
+	// A key is a key wherever it is spelled. An alias of slog.Attr is the same type, and a
+	// constructor bound to a name is called through that name, so its first argument is a key at
+	// a call with no package selector left to resolve -- the same hole rule 5 refuses for an
+	// install and rule 6 for a forwarder. A key written onto an attribute after it is built is
+	// the name the record actually carries, and every other reading here looks where it was made.
+	write("core/caught/attr_alias.go", `package caught
+
+import "log/slog"
+
+type Attribute = slog.Attr
+
+func aliasedAttr() Attribute { return Attribute{Key: "clientId"} }
+`)
+	write("core/caught/attr_constructor_value.go", `package caught
+
+import "log/slog"
+
+func constructorValue() slog.Attr {
+	stringAttr := slog.String
+	return stringAttr("clientId", "x")
+}
+`)
+	write("core/caught/attr_key_write.go", `package caught
+
+import "log/slog"
+
+func renamedAttr() slog.Attr {
+	attr := slog.String("client_id", "x")
+	attr.Key = "clientId"
+	return attr
+}
+`)
+	// The near miss of the row above, and the reason a write to Key is followed rather than
+	// refused by its spelling: Key is an ordinary field name, and four production sites write it
+	// on a model attribute that reaches no record at all.
+	write("core/passed/attr_key_other.go", `package passed
+
+type attribute struct {
+	Key   string
+	Value string
+}
+
+func renameModelAttribute(a *attribute) { a.Key = "someKey" }
+`)
+
+	// ---- rule 4: the request-bearing types under a second name --------------------------------
+
+	// An alias is the same type and a defined type over one holds the same request, so a function
+	// taking either is on a request path exactly as much as one taking the type it names, and the
+	// record it writes loses the same request_id. A star is not read: an alias can carry it, and
+	// a request passed by value carries a request too.
+	write("core/caught/context_alias_type.go", `package caught
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+)
+
+type RequestContext = context.Context
+
+type Request = http.Request
+
+func aliasedContextType(ctx RequestContext) { slog.Info("a record") }
+
+func aliasedRequestType(r *Request) { slog.Warn("a record") }
+`)
+	write("core/caught/context_defined_type.go", `package caught
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+)
+
+type ownContext context.Context
+
+type ownRequest = *http.Request
+
+func definedContextType(ctx ownContext) { slog.Info("a record") }
+
+func aliasedRequestPointer(r ownRequest) { slog.Warn("a record") }
+`)
+
 	// ---- the evasions, and the parser boundary ------------------------------------------------
 
 	// One pair of brackets, and the callee is no longer a bare selector. The third evasion.
@@ -929,7 +1097,7 @@ func broken( {
 
 	violations, files, err := findSlogViolations(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 61, files,
+	assert.Equal(t, 72, files,
 		"every parseable, production-reachable fixture outside a mocks directory and a _test.go file is parsed")
 	assert.Equal(t, []string{
 		`authserver/internal/handlers/apihandlers/forwarded_keys.go:10 attribute key "clientId"`,
@@ -944,9 +1112,16 @@ func broken( {
 		`authserver/internal/handlers/apihandlers/forwarder_value.go:10 apiresponse.WriteInternalServerError as a value`,
 		`authserver/internal/handlers/apihandlers/forwarder_value.go:14 writeInternalServerError as a value`,
 		`authserver/internal/handlers/handler_account_logout.go:14 attribute key "badReason"`,
+		`core/caught/attr_alias.go:7 slog.Attr key "clientId"`,
+		`core/caught/attr_constructor_value.go:6 slog.String as a value`,
+		`core/caught/attr_key_write.go:7 slog.Attr key "clientId"`,
 		`core/caught/build_linux.go:7 message "Capitalised" does not start with a lowercase letter`,
+		`core/caught/context_alias_type.go:13 slog.Info inside a function taking a context.Context or an *http.Request`,
+		`core/caught/context_alias_type.go:15 slog.Warn inside a function taking a context.Context or an *http.Request`,
 		`core/caught/context_aliased.go:9 slog.Info inside a function taking a context.Context or an *http.Request`,
 		`core/caught/context_aliased.go:11 slog.Warn inside a function taking a context.Context or an *http.Request`,
+		`core/caught/context_defined_type.go:13 slog.Info inside a function taking a context.Context or an *http.Request`,
+		`core/caught/context_defined_type.go:15 slog.Warn inside a function taking a context.Context or an *http.Request`,
 		`core/caught/context_variants.go:9 slog.Info inside a function taking a context.Context or an *http.Request`,
 		`core/caught/context_variants.go:11 slog.Warn inside a function taking a context.Context or an *http.Request`,
 		`core/caught/context_variants.go:15 slog.Error inside a function taking a context.Context or an *http.Request`,
@@ -1007,16 +1182,21 @@ func broken( {
 		`core/caught/run_builder.go:9 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_closure_write.go:9 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_composite_key.go:13 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_declared_from_self.go:9 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_expression.go:6 attribute run spread into a record is not a named slice`,
 		`core/caught/run_foreign_spread.go:8 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_helper_write.go:10 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_if_init_scope.go:11 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_index_write.go:9 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_parameter.go:6 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_parameter_shadowed.go:8 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_parameter_shadowed.go:10 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_replaced.go:8 attribute key "clientId"`,
+		`core/caught/run_shadowed_builtin.go:9 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_shadows_variadic.go:5 shadowsVariadic forwards a variadic ...any into a record`,
 		`core/caught/run_shadows_variadic.go:8 attribute run "attrs" shadows this function's variadic parameter`,
 		`core/caught/run_sibling_scope.go:12 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_switch_init_scope.go:12 attribute run "attrs" is built in a form this rule cannot read`,
 		`core/caught/run_tail_append.go:5 tailAppend forwards a variadic ...any into a record`,
 		`core/caught/run_tail_append.go:9 attribute run "record" is built in a form this rule cannot read`,
 		`core/caught/run_two_declarations.go:8 attribute run "attrs" is built in a form this rule cannot read`,
@@ -1096,12 +1276,93 @@ func LogInternalServerError(r *http.Request, err error, attrs ...any) string {
 		`authserver/internal/apiresponse/apiresponse.go:14 the variadic run "attrs" is changed before it reaches a record`,
 	}, describeSlog(tampered))
 
+	// The boundary inside the run rather than at either end of it. Rule 6 reads a forwarder's keys
+	// at its call sites, starting at the index the table states, and pairing them off there is only
+	// right if what the forwarder puts in front of the caller's run is a whole number of key/value
+	// pairs. One element is enough to break it: every key those sites wrote lands on a value
+	// position and is read as the value of the key before it, so the caller below writes clientId
+	// into a record with every rule green and nothing reporting anything. Refused where the
+	// misalignment is created rather than at the call sites, which are innocent. A tree of its
+	// own, for the same reason the two above have one.
+	prefixed := t.TempDir()
+	writeTo := func(root, rel, src string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(src), 0o644))
+	}
+	writeTo(prefixed, "authserver/internal/apiresponse/apiresponse.go", `package apiresponse
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
+	record := append([]any{"error"}, attrs...)
+	slog.ErrorContext(r.Context(), "internal server error", record...)
+}
+`)
+	writeTo(prefixed, "authserver/internal/handlers/apihandlers/prefixed_caller.go", `package apihandlers
+
+import (
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+)
+
+func prefixedCaller(w http.ResponseWriter, r *http.Request, err error) {
+	apiresponse.WriteInternalServerError(w, r, err, "x", "clientId", 1)
+}
+`)
+	misaligned, prefixedFiles, err := findSlogViolations(prefixed, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 2, prefixedFiles)
+	assert.Equal(t, []string{
+		`authserver/internal/apiresponse/apiresponse.go:10 attribute run "record" is built in a form this rule cannot read`,
+	}, describeSlog(misaligned))
+
+	// The near miss, and the shape apiresponse actually has: an even prefix leaves the caller's
+	// keys at the offsets the table states, so the run is read and the call sites keep answering
+	// for their own keys.
+	aligned := t.TempDir()
+	writeTo(aligned, "authserver/internal/apiresponse/apiresponse.go", `package apiresponse
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
+	record := append([]any{"error", err}, attrs...)
+	slog.ErrorContext(r.Context(), "internal server error", record...)
+}
+`)
+	writeTo(aligned, "authserver/internal/handlers/apihandlers/aligned_caller.go", `package apihandlers
+
+import (
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+)
+
+func alignedCaller(w http.ResponseWriter, r *http.Request, err error) {
+	apiresponse.WriteInternalServerError(w, r, err, "client_id", 1, "clientId", 2)
+}
+`)
+	stillRead, alignedFiles, err := findSlogViolations(aligned, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 2, alignedFiles)
+	assert.Equal(t, []string{
+		`authserver/internal/handlers/apihandlers/aligned_caller.go:10 attribute key "clientId"`,
+	}, describeSlog(stillRead))
+
 	// The per-module scoping the sweep stages leaned on: the same rule, one subtree at a time.
-	// Eleven of core/passed's fifteen fixtures are parsed: the mocks file, the test file and the
+	// Twelve of core/passed's sixteen fixtures are parsed: the mocks file, the test file and the
 	// !production file are exempt, and the unparseable one is not counted.
 	scoped, scopedFiles, err := findSlogViolations(root, []string{"core/passed"})
 	require.NoError(t, err)
-	assert.Equal(t, 11, scopedFiles)
+	assert.Equal(t, 12, scopedFiles)
 	assert.Empty(t, describeSlog(scoped), "the caught subtree is outside the named directory")
 }
 
