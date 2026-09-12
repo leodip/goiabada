@@ -71,20 +71,23 @@ func (u *UserSessionManager) HasValidUserSession(ctx context.Context, userSessio
 // mint a session claiming the user had just authenticated, so a relying party asking for a
 // fresh sign-in with max_age would be told it got one (#252 decision 8). Started and
 // LastAccessed stay on now: they measure the session's own life, not the credential's.
-// Nil or zero falls back to now, which is all the information there is to write; the one
-// caller cannot produce it, because /auth/completed refuses to mint a session without
-// Level1AuthCompleted and only the password handler sets that, alongside authenticatedAt.
+// Nil or zero is refused, before anything is written: a session with no credential instant
+// has nothing true to put in auth_time, and falling back to now would recreate the false
+// freshness this parameter exists to remove, one broken caller away. The one caller cannot
+// produce it, because /auth/completed refuses to mint a session without Level1AuthCompleted
+// and only the password handler sets that, alongside authenticatedAt; the refusal is what
+// makes that invariant fail closed rather than an argument in a comment.
 func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	userId int64, clientId int64, authMethods string, acrLevel string,
 	authStateGeneration int64, otpConfigGeneration *int64,
 	authenticatedAt *time.Time) (*models.UserSession, error) {
 
-	utcNow := time.Now().UTC()
-
-	authTime := utcNow
-	if authenticatedAt != nil && !authenticatedAt.IsZero() {
-		authTime = authenticatedAt.UTC()
+	if authenticatedAt == nil || authenticatedAt.IsZero() {
+		return nil, errs.New("StartNewUserSession: no credential instant captured; refusing to mint a session whose auth_time would be invented")
 	}
+	authTime := authenticatedAt.UTC()
+
+	utcNow := time.Now().UTC()
 
 	observedOtpConfigGeneration := int64(0)
 	if otpConfigGeneration != nil {
