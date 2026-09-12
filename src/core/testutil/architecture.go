@@ -432,6 +432,22 @@ func (g *importGraph) moduleDir(importPath string) string {
 	return best
 }
 
+// relPath returns the import path as a directory relative to the source root, which is how the
+// exception table names both ends of an edge. An exception is granted to the package that holds the
+// import, never to its module or to its parent: guidance point 4 of #332 asks for exact package
+// edges, and a module-wide grant would let a second package acquire the same dependency in silence.
+func (g *importGraph) relPath(importPath string) string {
+	dir := g.moduleDir(importPath)
+	if dir == "" {
+		return importPath
+	}
+	module := g.modules[dir]
+	if importPath == module {
+		return dir
+	}
+	return dir + "/" + strings.TrimPrefix(importPath, module+"/")
+}
+
 // topCorePackage returns the top-level core package an import path belongs to, as "core/<name>", or
 // "" when the path is not under core. Ownership is recorded per top-level package because that is
 // the granularity the epic moves things at.
@@ -494,12 +510,12 @@ func checkArchitecture(tables architectureTables, graph *importGraph) []string {
 		owners[row.pkg] = row.owner
 	}
 
-	violations := map[edge][]string{}
-	for e, sites := range kernelPurityViolations(owners, graph) {
-		violations[e] = append(violations[e], sites...)
+	violations := map[edge]bool{}
+	for e := range kernelPurityViolations(owners, graph) {
+		violations[e] = true
 	}
-	for e, sites := range processIsolationViolations(owners, graph) {
-		violations[e] = append(violations[e], sites...)
+	for e := range processIsolationViolations(owners, graph) {
+		violations[e] = true
 	}
 
 	findings = append(findings, checkModuleDirection(graph)...)
@@ -542,21 +558,21 @@ func checkModuleDirection(graph *importGraph) []string {
 // kernelPurityViolations reports every edge from a kernel package into a package owned by one of
 // the processes or already marked for deletion. A split package is not a target: until its issue
 // draws the line, there is nothing at package granularity to check.
-func kernelPurityViolations(owners map[string]string, graph *importGraph) map[edge][]string {
-	violations := map[edge][]string{}
-	for pkg, imports := range graph.prod {
-		from := graph.topCorePackage(pkg)
+func kernelPurityViolations(owners map[string]string, g *importGraph) map[edge]bool {
+	violations := map[edge]bool{}
+	for pkg, imports := range g.prod {
+		from := g.topCorePackage(pkg)
 		if from == "" || owners[from] != ownerKernel {
 			continue
 		}
 		for _, imported := range imports {
-			to := graph.topCorePackage(imported)
+			to := g.topCorePackage(imported)
 			if to == "" || to == from {
 				continue
 			}
 			switch owners[to] {
 			case ownerAuthserver, ownerAdminconsole, ownerDelete:
-				violations[edge{from: from, to: to}] = append(violations[edge{from: from, to: to}], pkg)
+				violations[edge{from: g.relPath(pkg), to: g.relPath(imported)}] = true
 			}
 		}
 	}
@@ -566,28 +582,28 @@ func kernelPurityViolations(owners map[string]string, graph *importGraph) map[ed
 // processIsolationViolations reports every edge from one module into a core package owned by the
 // other, and every edge from the setup wizard into a core package owned by either. The wizard ships
 // as a standalone binary, so a package it pulls in is a package a user downloads.
-func processIsolationViolations(owners map[string]string, graph *importGraph) map[edge][]string {
+func processIsolationViolations(owners map[string]string, g *importGraph) map[edge]bool {
 	forbidden := map[string][]string{
 		"adminconsole":       {ownerAuthserver},
 		"authserver":         {ownerAdminconsole},
 		"cmd/goiabada-setup": {ownerAuthserver, ownerAdminconsole},
 	}
 
-	violations := map[edge][]string{}
-	for pkg, imports := range graph.prod {
-		from := graph.moduleDir(pkg)
+	violations := map[edge]bool{}
+	for pkg, imports := range g.prod {
+		from := g.moduleDir(pkg)
 		refused, ok := forbidden[from]
 		if !ok {
 			continue
 		}
 		for _, imported := range imports {
-			to := graph.topCorePackage(imported)
+			to := g.topCorePackage(imported)
 			if to == "" {
 				continue
 			}
 			for _, owner := range refused {
 				if owners[to] == owner {
-					violations[edge{from: from, to: to}] = append(violations[edge{from: from, to: to}], pkg)
+					violations[edge{from: g.relPath(pkg), to: g.relPath(imported)}] = true
 				}
 			}
 		}
@@ -717,7 +733,7 @@ func isStdlib(importPath string) bool {
 // reconcileExceptions is the burn-down. Every violation must be listed, and every listed exception
 // must still be a violation: an exception that stopped matching anything is the signal that the
 // issue which removed the edge forgot to remove its row.
-func reconcileExceptions(tables architectureTables, violations map[edge][]string) []string {
+func reconcileExceptions(tables architectureTables, violations map[edge]bool) []string {
 	listed := map[edge]exceptionRow{}
 	var findings []string
 
@@ -742,18 +758,17 @@ func reconcileExceptions(tables architectureTables, violations map[edge][]string
 		}
 	}
 
-	for e, sites := range violations {
+	for e := range violations {
 		if _, ok := listed[e]; ok {
 			continue
 		}
-		sort.Strings(sites)
 		rule := "kernel purity"
 		if !strings.HasPrefix(e.from, "core/") {
 			rule = "process isolation"
 		}
 		findings = append(findings, fmt.Sprintf(
-			"%s: %s imports %s at %s, and %s lists no exception for that edge; move the code or add a row naming the issue that will",
-			rule, e.from, e.to, strings.Join(sites, ", "), architectureDoc))
+			"%s: %s imports %s, and %s lists no exception for that edge; move the code or add a row naming the issue that will",
+			rule, e.from, e.to, architectureDoc))
 	}
 
 	return findings

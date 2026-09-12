@@ -126,9 +126,9 @@ Notes on rows that are not self-evident:
 - `core/audit` holds no package of its own. It is a directory containing `mocks` and nothing else,
   and nothing in the repository imports it — not one production file, not one test. #333 deletes it.
 - `core/mocks` and `core/testutil` are kernel because they are test support compiled into no binary.
-  They are still held to the kernel rule: `core/testutil` imports `core/uuidutil` today, and that is
-  an exception below rather than a waiver, because #360 moves `uuidutil` and the edge has to be
-  noticed then.
+  They are still held to the kernel rule: `core/testutil/fake` imports `core/uuidutil` today, and
+  that is an exception below rather than a waiver, because #360 moves `uuidutil` and the edge has to
+  be noticed then.
 - `core/api` stays, but only as declarations. The model-aware `ToResponse` mapping leaves in #349
   and the model-typed fields leave in #350; what remains is the wire contract the admin console
   decodes.
@@ -168,6 +168,12 @@ removes it. An exception is not a waiver: when the edge goes, the row must go wi
 fails until it does. That is how the epic burns down — #335 already instructs its implementer to
 "remove the exact architecture exceptions introduced by #332 for these edges".
 
+Both ends name a package, never a module and never a parent. `adminconsole/internal/handlers` is
+granted its dependency on `core/models`; `adminconsole` is not, and neither is
+`adminconsole/internal/handlers/adminuserhandlers`, which is why it has a row of its own. A
+module-wide grant would let a second package acquire the same dependency in silence, and the count
+of rows is the only measure of how much is left to do.
+
 ### Temporary exceptions
 
 | from | to | issue |
@@ -177,13 +183,20 @@ fails until it does. That is how the epic burns down — #335 already instructs 
 | `core/handlerhelpers` | `core/hashutil` | #360 |
 | `core/handlerhelpers` | `core/models` | #337 |
 | `core/i18n` | `core/models` | #337 |
-| `core/testutil` | `core/uuidutil` | #360 |
-| `adminconsole` | `core/communication` | #347 |
-| `adminconsole` | `core/models` | #350 |
-| `adminconsole` | `core/user` | #346 |
+| `core/testutil/fake` | `core/uuidutil` | #360 |
+| `adminconsole/internal/apiclient` | `core/models` | #350 |
+| `adminconsole/internal/handlers` | `core/communication` | #347 |
+| `adminconsole/internal/handlers` | `core/models` | #350 |
+| `adminconsole/internal/handlers` | `core/user` | #346 |
+| `adminconsole/internal/handlers/accounthandlers` | `core/models` | #350 |
+| `adminconsole/internal/handlers/adminclienthandlers` | `core/models` | #350 |
+| `adminconsole/internal/handlers/admingrouphandlers` | `core/models` | #350 |
+| `adminconsole/internal/handlers/adminresourcehandlers` | `core/models` | #350 |
+| `adminconsole/internal/handlers/adminuserhandlers` | `core/models` | #350 |
+| `adminconsole/internal/middleware` | `core/models` | #350 |
 
-A `from` of `adminconsole` or `authserver` means any production package in that module. A `from`
-naming a `core` package means that package.
+Sixteen rows, and #350 owns nine of them: the admin console's dependency on persistence models is
+the single largest piece of the boundary still to close.
 
 ## Foreign modules the admin console must not compile
 
