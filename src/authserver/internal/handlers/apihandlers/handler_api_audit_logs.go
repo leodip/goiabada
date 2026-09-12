@@ -46,10 +46,15 @@ func HandleAPIAuditLogsGet(
 		// Get audit logs
 		auditLogs, total, err := database.GetAuditLogsPaginated(nil, page, size, auditEvent, requestId)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get audit logs"), "page", page, "size", size, "audit_event", auditEvent,
-				// Not request_id: that name is the handler's own, injected from the context.
-				// This is what the caller asked to filter by, and it is client-chosen, so it
-				// is bounded and escaped the way every other such value on a record is (#328).
+			// Both filter values are client-chosen, so both go on the record through
+			// FieldForLog: without it a multi-kilobyte auditEvent lands whole, carrying
+			// whatever control characters or line separators it was sent with, which is the
+			// log injection this tree closed for every other client-chosen scalar (#159).
+			// filter_request_id and not request_id because that name is the handler's own,
+			// injected from the context; this is what the caller asked to filter by (#328).
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get audit logs"),
+				"page", page, "size", size,
+				"audit_event", logging.FieldForLog(auditEvent),
 				"filter_request_id", logging.FieldForLog(requestId))
 			return
 		}

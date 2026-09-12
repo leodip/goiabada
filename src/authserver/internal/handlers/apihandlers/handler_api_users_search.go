@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging"
 )
 
 func HandleAPIUsersSearchGet(
@@ -45,7 +46,11 @@ func HandleAPIUsersSearchGet(
 		// Search users
 		users, total, err := database.SearchUsersPaginated(nil, query, page, size)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to search users"), "query", query, "page", page)
+			// Through FieldForLog because query is client-chosen and unbounded on the wire:
+			// raw, a multi-kilobyte search term lands whole on the record with whatever control
+			// characters or line separators it carries, which is the log injection this tree
+			// closed for every other client-chosen scalar (#159).
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to search users"), "query", logging.FieldForLog(query), "page", page)
 			return
 		}
 
@@ -66,7 +71,7 @@ func HandleAPIUsersSearchGet(
 			// Verify group exists
 			group, err := database.GetGroupById(nil, annotateGroupId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get group by ID"), "group_id", annotateGroupId, "query", query, "page", page)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get group by ID"), "group_id", annotateGroupId, "query", logging.FieldForLog(query), "page", page)
 				return
 			}
 			if group == nil {
@@ -77,7 +82,7 @@ func HandleAPIUsersSearchGet(
 			// Load groups for all users to check membership
 			err = database.UsersLoadGroups(nil, users)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user groups"), "user_count", len(users), "query", query, "page", page)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user groups"), "user_count", len(users), "query", logging.FieldForLog(query), "page", page)
 				return
 			}
 
