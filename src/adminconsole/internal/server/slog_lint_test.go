@@ -17,3 +17,11 @@ import (
 func TestSlogConvention(t *testing.T) {
 	testutil.AssertSlogConvention(t)
 }
+
+// TestAuditLogContext fails the tier when a .Log call in a request-path package passes a context
+// carrying nothing. The compiler forces AuditLogger.Log's callers to pass a context; this is what
+// forces it to be the request's, so the audit record an operator filters by request_id is the one
+// the request actually raised (#328 decision 3).
+func TestAuditLogContext(t *testing.T) {
+	testutil.AssertAuditLogContext(t)
+}

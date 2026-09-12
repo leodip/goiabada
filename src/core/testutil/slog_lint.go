@@ -201,24 +201,30 @@ var slogSpreadSites = []slogSpreadSite{
 // slogRequestPathDirs is rule 5's list: the directories, relative to the source root, that a
 // request runs through, so that every record written there is one an operator will filter by
 // request_id after a user reports a refusal. Both servers' handlers and middleware, the
-// authserver's API response writers and the admin console's client of the auth server's API, and
-// the core packages the handlers call into on a request: the shared middleware, the validators,
-// token and code issuance, the token parsers, the handler helpers and the session store.
+// authserver's API response writers and the admin console's client of the auth server's API, the
+// audit path's two packages, and the core packages the handlers call into on a request: the shared
+// middleware, the validators, token and code issuance, the token parsers, the handler helpers and
+// the session store.
 //
 // Left out on purpose, each a ceiling recorded in the PR of #320 rather than a site this rule
-// admits: authserver/internal/audit and core/auditlog, whose AuditLogger.Log has no context and
-// whose 126 call sites are a change of their own (#328); core/data, whose
-// transaction and statement records run under RunInTransaction with no context to reach them
-// short of changing every Database method; and core/stringutil, whose one record is written from
-// a template function like addUrlParam below. A startup, worker or main package is not a request
-// path and is not listed.
+// admits: core/data, whose transaction and statement records run under RunInTransaction with no
+// context to reach them short of changing every Database method; and core/stringutil, whose one
+// record is written from a template function like addUrlParam below. A startup, worker or main
+// package is not a request path and is not listed.
+//
+// authserver/internal/audit and core/auditlog were the third such ceiling and are now listed:
+// AuditLogger.Log takes a context and its 126 call sites pass the request's, so a plain record
+// there is refused from #328 onward. The compiler forces the parameter; what it cannot force is
+// that the context is the request's, which is AssertAuditLogContext's rule over this same list.
 var slogRequestPathDirs = []string{
+	"authserver/internal/audit",
 	"authserver/internal/handlers",
 	"authserver/internal/middleware",
 	"authserver/internal/apiresponse",
 	"adminconsole/internal/handlers",
 	"adminconsole/internal/middleware",
 	"adminconsole/internal/apiclient",
+	"core/auditlog",
 	"core/middleware",
 	"core/validators",
 	"core/oauth",

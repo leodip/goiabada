@@ -85,7 +85,7 @@ func HandleAPISettingsSessionsPut(
 		}
 
 		// Audit log
-		auditLogger.Log(constants.AuditUpdatedSessionsSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedSessionsSettings, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 

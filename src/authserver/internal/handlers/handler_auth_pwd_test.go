@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -580,11 +581,20 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			SMTPEnabled: true,
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		// The request id chi's middleware would have put there, so the expectation below can
+		// assert which context the handler audited under (#328 seam 3).
+		ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, "goiabada/req-pwd-1")
 		req = req.WithContext(ctx)
 
 		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 
-		auditLogger.On("Log", constants.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+		// A handler closure is one of the four call shapes #328 has to reach, and this is that
+		// shape pinned: the context has to be the request's, not one the handler reached for.
+		// The other 122 handler sites are held by the compiler, which requires a context, and by
+		// testutil.AssertAuditLogContext, which refuses a Background one here.
+		auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
+			return chimiddleware.GetReqID(ctx) == "goiabada/req-pwd-1"
+		}), constants.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "test@example.com"
 		})).Return()
 
@@ -647,7 +657,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		database.On("GetUserByEmail", mock.Anything, "bob@example.com").Return(nil, nil)
 
-		auditLogger.On("Log", constants.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "bob@example.com"
 		})).Return()
 
@@ -759,7 +769,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(user, nil)
 
-		auditLogger.On("Log", constants.AuditAuthSuccessPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditAuthSuccessPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(1)
 		})).Return()
 
@@ -861,7 +871,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		database.On("GetUserByEmail", mock.Anything, "disabled@example.com").Return(disabledUser, nil)
 
-		auditLogger.On("Log", constants.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(2)
 		})).Return()
 
@@ -928,7 +938,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
 		database.On("GetUserByEmail", mock.Anything, email).Return(account, nil)
-		auditLogger.On("Log", mock.Anything, mock.Anything).Return().Maybe()
+		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 			"/auth_pwd.html", mock.Anything).Return(nil).Maybe()
 

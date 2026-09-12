@@ -242,11 +242,11 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
 	var revokedPayload map[string]interface{}
-	auditLogger.On("Log", constants.AuditRevokedClientGrants, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditRevokedClientGrants, mock.Anything).
 		Run(func(args mock.Arguments) {
-			revokedPayload = args.Get(1).(map[string]interface{})
+			revokedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
-	auditLogger.On("Log", constants.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientAuthenticationPut(authHelper, database, auditLogger)
@@ -292,8 +292,8 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 	assert.EqualError(t, stub.bodyErr, "no client with that id")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient",
 		"RevokeCodesByClientId", "GetRefreshTokensByClientId")
-	auditLogger.AssertNotCalled(t, "Log", constants.AuditRevokedClientGrants, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", constants.AuditUpdatedClientAuthentication, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditRevokedClientGrants, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditUpdatedClientAuthentication, mock.Anything)
 }
 
 // TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing is the other
@@ -313,7 +313,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
 
-	auditLogger.On("Log", constants.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
 
 	rr := httptest.NewRecorder()
@@ -324,7 +324,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	// The strict mock carries most of this: neither revocation call is registered, so reaching
 	// one fails. Naming them makes the failure say which property broke.
 	assertNotAttemptedOnClientDatabase(t, database, "RevokeCodesByClientId", "GetRefreshTokensByClientId")
-	auditLogger.AssertNotCalled(t, "Log", constants.AuditRevokedClientGrants, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditRevokedClientGrants, mock.Anything)
 }
 
 // assertNotAttemptedOnClientDatabase fails naming the method, where the strict mock alone would
@@ -396,7 +396,7 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 	stubClientResponseLoads(database)
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
-	auditLogger.On("Log", constants.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(authHelper, database, auditLogger)
@@ -452,7 +452,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	assert.Equal(t, "https://a.example.com", failure.origin)
 	// Nothing was audited either: an audit entry for a save that did not happen is a false
 	// record of an administrator's action.
-	auditLogger.AssertNotCalled(t, "Log", constants.AuditUpdatedWebOrigins, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditUpdatedWebOrigins, mock.Anything)
 }
 
 // The load failing inside the transaction is answered under its own message, as it was before
@@ -482,7 +482,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 	assert.Contains(t, stub.bodyErr.Error(), "Database error loading client web origins before update")
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
-	auditLogger.AssertNotCalled(t, "Log", constants.AuditUpdatedWebOrigins, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditUpdatedWebOrigins, mock.Anything)
 }
 
 // A body aborted as a deadlock victim on its first attempt and rerun by the helper answers ONCE:
@@ -525,7 +525,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	stubClientResponseLoads(database)
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
-	auditLogger.On("Log", constants.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(authHelper, database, auditLogger)
@@ -559,7 +559,7 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
 	database.AssertExpectations(t)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A canonical origin longer than the column is refused rather than stored. web_origins.origin is

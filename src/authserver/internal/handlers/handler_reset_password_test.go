@@ -67,7 +67,7 @@ func expectRenderedCodeInvalid(httpHelper *mocks_handlerhelpers.HttpHelper, want
 // lookup actually resolved a user. Pass wantUserId 0 to require the key is ABSENT rather
 // than zero, since a payload naming user 0 asserts a row that does not exist.
 func expectAuditFailedCode(auditLogger *mocks_audit.AuditLogger, wantReason string, wantUserId int64) {
-	auditLogger.On("Log", constants.AuditFailedResetPasswordCode,
+	auditLogger.On("Log", mock.Anything, constants.AuditFailedResetPasswordCode,
 		mock.MatchedBy(func(details map[string]interface{}) bool {
 			if details["reason"] != wantReason || details["ip"] != testClientIP {
 				return false
@@ -827,7 +827,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 				build(tc.password, tc.passwordConfirmation, continuationId))
 
 			httpHelper.AssertExpectations(t)
-			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -994,7 +994,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 		}).Return(true, nil).Once()
 	stubRevocationSweepTx(database, 1, 4)
 
-	auditLogger.On("Log", constants.AuditRevokedUserAuthState, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditRevokedUserAuthState, mock.Anything).Return().Once()
 
 	httpHelper.On("RenderTemplate",
 		mock.Anything,
@@ -1111,7 +1111,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 	// sessions intact.
 	assert.EqualError(t, stub.bodyErr, "update failed", "the body hands its error to the helper, which rolls back")
 	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleResetPasswordPost_TransactionFailureHandling: the credential write succeeds and
@@ -1229,7 +1229,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			// No audit event at all, on any of the three. This is the assertion that matters:
 			// AuditLogger.Log takes no transaction, so an event emitted here would be a
 			// permanent record of a revocation the caller was told had failed (decision 5).
-			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			// And the success template is never rendered, so the caller is not told the
 			// operation succeeded. This says nothing about the durable outcome: on the
 			// commit-failure variant the write may in fact have applied (finding 36).
@@ -1569,7 +1569,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 			withRawMarker(t, store, cleanGetRequest(), "not json"))
 
 		httpHelper.AssertExpectations(t)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	// A session store that cannot be written is a fault too: proceeding would answer 303 to a
@@ -1625,9 +1625,9 @@ func TestAuditFailedResetPasswordCode(t *testing.T) {
 		t.Helper()
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		var captured map[string]interface{}
-		auditLogger.On("Log", constants.AuditFailedResetPasswordCode, mock.Anything).
+		auditLogger.On("Log", mock.Anything, constants.AuditFailedResetPasswordCode, mock.Anything).
 			Run(func(args mock.Arguments) {
-				captured = args.Get(1).(map[string]interface{})
+				captured = args.Get(2).(map[string]interface{})
 			}).Return().Once()
 
 		auditFailedResetPasswordCode(auditLogger, r, userId, reason)

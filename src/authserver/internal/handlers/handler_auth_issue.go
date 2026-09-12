@@ -106,7 +106,7 @@ func HandleIssueGet(
 			slog.WarnContext(r.Context(), "the redirect URI this ceremony would be answered at is no longer registered on the client, so nothing is issued and nothing is emitted",
 				"client_identifier", authContext.ClientId)
 
-			auditLogger.Log(constants.AuditIssuanceRefusedRedirectURI, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditIssuanceRefusedRedirectURI, map[string]interface{}{
 				"userId":   authContext.UserId,
 				"clientId": authContext.ClientId,
 			})
@@ -359,7 +359,7 @@ func HandleIssueGet(
 				"user_id", authContext.UserId,
 				"client_identifier", authContext.ClientId)
 
-			auditLogger.Log(constants.AuditIssuanceRefusedScopeDenied, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditIssuanceRefusedScopeDenied, map[string]interface{}{
 				"userId":   authContext.UserId,
 				"clientId": authContext.ClientId,
 			})
@@ -509,7 +509,7 @@ func HandleIssueGet(
 			return
 		}
 
-		auditLogger.Log(constants.AuditCreatedAuthCode, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditCreatedAuthCode, map[string]interface{}{
 			"userId":   createCodeInput.UserId,
 			"clientId": code.ClientId,
 			"codeId":   code.Id,
@@ -592,7 +592,7 @@ func refuseIssuanceUnusableSession(
 	// administrator can cause by configuring a timeout, and stretching it over two older
 	// conditions would make it useless for answering the question it exists for.
 	if shape == sessionExpired {
-		auditLogger.Log(constants.AuditIssuanceRefusedSessionInvalid, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditIssuanceRefusedSessionInvalid, map[string]interface{}{
 			"userId":            authContext.UserId,
 			"clientId":          authContext.ClientId,
 			"sessionIdentifier": sessionIdentifier,
@@ -744,7 +744,7 @@ func handleImplicitFlow(
 	}
 
 	// Audit log
-	auditLogger.Log(constants.AuditTokenIssuedImplicitResponse, map[string]interface{}{
+	auditLogger.Log(r.Context(), constants.AuditTokenIssuedImplicitResponse, map[string]interface{}{
 		"userId":           user.Id,
 		"clientId":         client.Id,
 		"scope":            scope,

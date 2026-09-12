@@ -646,7 +646,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
-		auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.Anything).Return()
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).Return(nil)
 
@@ -811,7 +811,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
-		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditAuthFailedOtp, mock.Anything).Return()
 
 		// The error re-render is a path no happy-path case sees, and it has to carry the ceremony
 		// id: without it a single mistyped code would end the ceremony, because the retry would
@@ -862,7 +862,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
 
-		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditAuthFailedOtp, mock.Anything).Return()
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
 			"/auth_otp_enrollment.html", mock.MatchedBy(func(bind map[string]interface{}) bool {
@@ -923,7 +923,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
-		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditAuthFailedOtp, mock.Anything).Return()
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
@@ -993,7 +993,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, true).
 			Return(true, nil)
 
-		auditLogger.On("Log", constants.AuditAuthSuccessOtp, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditAuthSuccessOtp, mock.Anything).Return()
 
 		// An accepted authenticator code replaces the browser session's identifier at once,
 		// rather than leaving it to /auth/completed one redirect later. Ordering is asserted
@@ -1103,8 +1103,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("ClearPendingOTPEnrollment", otpEnrolTx, int64(1)).Return(nil).
 			Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 
-		auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return()
-		auditLogger.On("Log", constants.AuditAuthSuccessOtp, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditEnabledOTP, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditAuthSuccessOtp, mock.Anything).Return()
 
 		// Rotation joins the ordering this case already tracks, which is what makes the
 		// sequence readable in one assertion: the enrolment commits, THEN the identifier is
@@ -1294,7 +1294,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything)
 		// Nothing is audited as an enrollment that did not happen, and the ceremony does not
 		// advance: no auth method is added and no context is saved.
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
@@ -1357,7 +1357,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, true).
 			Return(false, nil)
 
-		auditLogger.On("Log", constants.AuditOTPCodeReplayDetected,
+		auditLogger.On("Log", mock.Anything, constants.AuditOTPCodeReplayDetected,
 			mock.MatchedBy(func(payload map[string]interface{}) bool {
 				step, ok := payload["step"].(int64)
 				if !ok {
@@ -1374,7 +1374,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			})).Return()
 		// Emitted alongside, not instead: the replay is additional signal on top of the
 		// ordinary failure the caller sees (#111 decision 5).
-		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditAuthFailedOtp, mock.Anything).Return()
 
 		// A replay must be indistinguishable from a wrong code, so it renders the same
 		// message the wrong-code branch renders, computed here the way the handler does.
@@ -1498,7 +1498,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
-		auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.Anything).Return()
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).Return(nil)
 
@@ -1566,7 +1566,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		// the enrollment half establishes one (#111 decision 10).
 		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, enrolled).
 			Return(consumed, nil).Maybe()
-		auditLogger.On("Log", mock.Anything, mock.Anything).Return().Maybe()
+		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 			template, mock.Anything).Return(nil).Maybe()
 

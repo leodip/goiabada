@@ -20,6 +20,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/handlerhelpers"
@@ -48,9 +49,14 @@ var testTemplateFS = fstest.MapFS{
 }
 
 // auditEvent is one call the middleware made to its audit logger.
+//
+// requestId is what chi's id read off the context the call carried, recorded beside the event so
+// the trip cases can assert that reportTrip audits under the request's own id rather than under
+// some context it reached for (#328 seam 3). Empty when the context carried none.
 type auditEvent struct {
-	name    string
-	details map[string]interface{}
+	name      string
+	details   map[string]interface{}
+	requestId string
 }
 
 // stubAuditLogger records what the limiter audited. Hand-written rather than generated,
@@ -62,10 +68,12 @@ type stubAuditLogger struct {
 	events []auditEvent
 }
 
-func (s *stubAuditLogger) Log(name string, details map[string]interface{}) {
+func (s *stubAuditLogger) Log(ctx context.Context, name string, details map[string]interface{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.events = append(s.events, auditEvent{name: name, details: details})
+	s.events = append(s.events, auditEvent{
+		name: name, details: details, requestId: chimiddleware.GetReqID(ctx),
+	})
 }
 
 func (s *stubAuditLogger) count(name string) int {
@@ -97,11 +105,21 @@ func newAuditedTestMiddleware(authHelper AuthHelper, enabled bool) (*RateLimiter
 // per-route limiter, and the browser rejection renders a template, which reads settings off
 // the context. A request built without them panics on the first 429, so this is the shape
 // the reject path has to work in rather than test scaffolding.
+//
+// The request id is there for the same reason: chi's RequestID middleware is mounted at the root
+// of both servers, ahead of every limiter tier, so a request reaching a limiter carries one and
+// the trip it audits is correlated to it (#328).
 func limiterRequest(method, target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, target, body)
-	return req.WithContext(context.WithValue(req.Context(),
-		constants.ContextKeySettings, &models.Settings{AppName: "Goiabada"}))
+	ctx := context.WithValue(req.Context(),
+		constants.ContextKeySettings, &models.Settings{AppName: "Goiabada"})
+	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, limiterRequestId)
+	return req.WithContext(ctx)
 }
+
+// limiterRequestId is the id every limiterRequest carries, so a case asserting on it names one
+// constant rather than a literal the helper could drift away from.
+const limiterRequestId = "goiabada/req-limiter-1"
 
 // rateLimitHeaderNames are the four headers decision 13 blanks. They told any caller the
 // exact budget, how much was left and whether the limiter was on at all, without tripping
@@ -1804,6 +1822,14 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 		// administrator reading the event needs to know which network spent the budget.
 		if e.details["ip"] != "203.0.113.7" {
 			t.Errorf("details[ip] = %v, want 203.0.113.7", e.details["ip"])
+		}
+		// reportTrip is the one production Log call site outside the handlers, and the fourth of
+		// #328's four call shapes: it already took a context for its own Warn record, so the
+		// property under test is that the audit call is given that same context rather than one
+		// reached for. The stub read chi's id off whatever it was handed, so an empty value here
+		// means the trip was audited under a context carrying no request (#328 seam 3).
+		if e.requestId != limiterRequestId {
+			t.Errorf("request id on the audited context = %q, want %q", e.requestId, limiterRequestId)
 		}
 	})
 

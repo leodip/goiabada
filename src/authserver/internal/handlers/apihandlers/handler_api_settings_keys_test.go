@@ -90,9 +90,9 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return(subject)
 	var payload map[string]interface{}
-	auditLogger.On("Log", constants.AuditRotatedKeys, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditRotatedKeys, mock.Anything).
 		Run(func(args mock.Arguments) {
-			payload = args.Get(1).(map[string]interface{})
+			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()

@@ -118,7 +118,7 @@ func HandleAPISettingsTokensPut(
 			"includeOpenIDConnectClaimsInAccessToken": currentSettings.IncludeOpenIDConnectClaimsInAccessToken,
 			"includeOpenIDConnectClaimsInIdToken":     currentSettings.IncludeOpenIDConnectClaimsInIdToken,
 		}
-		auditLogger.Log(constants.AuditUpdatedTokensSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedTokensSettings, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 			"old":          oldVals,
 			"new":          newVals,

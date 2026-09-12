@@ -180,7 +180,7 @@ func HandleAPIGroupAttributeCreatePost(
 		}
 
 		// Audit log
-		auditLogger.Log(constants.AuditAddedGroupAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditAddedGroupAttribute, map[string]interface{}{
 			"groupAttributeId": groupAttribute.Id,
 			"groupId":          group.Id,
 			"groupIdentifier":  group.GroupIdentifier,
@@ -285,7 +285,7 @@ func HandleAPIGroupAttributeUpdatePut(
 		}
 
 		// Audit log
-		auditLogger.Log(constants.AuditUpdatedGroupAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedGroupAttribute, map[string]interface{}{
 			"groupAttributeId": attribute.Id,
 			"groupId":          attribute.GroupId,
 			"groupIdentifier":  group.GroupIdentifier,
@@ -352,7 +352,7 @@ func HandleAPIGroupAttributeDelete(
 		}
 
 		// Audit log
-		auditLogger.Log(constants.AuditDeleteGroupAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditDeleteGroupAttribute, map[string]interface{}{
 			"groupAttributeId": id,
 			"groupId":          attribute.GroupId,
 			"groupIdentifier":  group.GroupIdentifier,

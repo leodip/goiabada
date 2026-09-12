@@ -111,7 +111,7 @@ func HandleAPIAccountProfilePicturePost(
 		}
 
 		// Log audit event
-		auditLogger.Log(constants.AuditUpdatedOwnProfilePicture, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedOwnProfilePicture, map[string]interface{}{
 			"userId": user.Id,
 		})
 
@@ -164,7 +164,7 @@ func HandleAPIAccountProfilePictureDelete(
 		}
 
 		// Log audit event
-		auditLogger.Log(constants.AuditDeletedOwnProfilePicture, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditDeletedOwnProfilePicture, map[string]interface{}{
 			"userId": user.Id,
 		})
 

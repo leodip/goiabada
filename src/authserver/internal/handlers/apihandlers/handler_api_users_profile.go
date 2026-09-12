@@ -133,7 +133,7 @@ func HandleAPIUserProfilePut(
 		}
 
 		// Log audit event
-		auditLogger.Log(constants.AuditUpdatedUserProfile, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedUserProfile, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})
@@ -228,7 +228,7 @@ func HandleAPIUserAddressPut(
 		}
 
 		// Log audit event
-		auditLogger.Log(constants.AuditUpdatedUserAddress, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedUserAddress, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})

@@ -76,7 +76,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 
 	database.On("GetUserBySubject", (*sql.Tx)(nil), verificationSubject).Return(user, nil).Maybe()
 	database.On("UpdateUser", (*sql.Tx)(nil), user).Return(nil).Maybe()
-	auditLogger.On("Log", mock.Anything, mock.Anything).Return().Maybe()
+	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	rateLimiter := core_middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, true)
 	handler := HandleAPIAccountEmailVerificationPost(database, auditLogger, rateLimiter)

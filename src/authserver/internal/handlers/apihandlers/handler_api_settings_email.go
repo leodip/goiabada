@@ -84,7 +84,7 @@ func HandleAPISettingsEmailPut(
 				return
 			}
 
-			auditLogger.Log(constants.AuditUpdatedSMTPSettings, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditUpdatedSMTPSettings, map[string]interface{}{
 				"loggedInUser": authHelper.GetLoggedInSubject(r),
 			})
 
@@ -200,7 +200,7 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 
-		auditLogger.Log(constants.AuditUpdatedSMTPSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditUpdatedSMTPSettings, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
@@ -262,7 +262,7 @@ func HandleAPISettingsEmailSendTestPost(
 			return
 		}
 
-		auditLogger.Log(constants.AuditSentTestEmail, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditSentTestEmail, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 			"to":           req.To,
 		})

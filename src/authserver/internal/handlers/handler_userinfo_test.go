@@ -151,7 +151,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		user := &models.User{Id: 1, Subject: sub, Enabled: false}
 		database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
 
-		auditLogger.On("Log", constants.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == user.Id
 		})).Return()
 
@@ -330,7 +330,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 
 			database.On("GetUserBySubject", (*sql.Tx)(nil), "user123").Return(test.user, nil)
 			if test.user != nil {
-				auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
+				auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.Anything).Return()
 			}
 
 			handler.ServeHTTP(rr, req)

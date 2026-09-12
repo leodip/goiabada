@@ -181,11 +181,11 @@ func HandleAPIUserSessionDelete(
 		// that rolled back would be a false record. deleted_user_session keeps its existing
 		// payload untouched and terminated_user_session carries the security detail (decision 9).
 		loggedInUser := authHelper.GetLoggedInSubject(r)
-		auditLogger.Log(constants.AuditDeletedUserSession, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditDeletedUserSession, map[string]interface{}{
 			"userSessionId": sessionId,
 			"loggedInUser":  loggedInUser,
 		})
-		handlers.LogTerminatedUserSession(auditLogger, userSession, loggedInUser, result)
+		handlers.LogTerminatedUserSession(r.Context(), auditLogger, userSession, loggedInUser, result)
 
 		// Return success response
 		response := api.SuccessResponse{

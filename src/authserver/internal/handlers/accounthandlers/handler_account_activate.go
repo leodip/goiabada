@@ -218,7 +218,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 		return
 	}
 
-	auditLogger.Log(constants.AuditCreatedUser, map[string]interface{}{
+	auditLogger.Log(r.Context(), constants.AuditCreatedUser, map[string]interface{}{
 		"email": createdUser.Email,
 	})
 
@@ -232,7 +232,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 		return
 	}
 
-	auditLogger.Log(constants.AuditActivatedAccount, map[string]interface{}{
+	auditLogger.Log(r.Context(), constants.AuditActivatedAccount, map[string]interface{}{
 		"email": createdUser.Email,
 	})
 

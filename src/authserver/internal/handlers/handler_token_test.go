@@ -207,7 +207,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mockCode).
 			Return(mockTokenResponse, nil)
 
-		auditLogger.On("Log", "token_issued_authorization_code_response", mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, "token_issued_authorization_code_response", mock.MatchedBy(func(details map[string]interface{}) bool {
 			codeId, ok := details["codeId"].(int64)
 			return ok && codeId == mockCode.Id
 		})).Return()
@@ -258,7 +258,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), mockClient, "test_scope").
 			Return(mockTokenResponse, nil)
 
-		auditLogger.On("Log", "token_issued_client_credentials_response", mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, "token_issued_client_credentials_response", mock.MatchedBy(func(details map[string]interface{}) bool {
 			clientId, ok := details["clientId"].(int64)
 			return ok && clientId == mockClient.Id
 		})).Return()
@@ -311,7 +311,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		database.AssertExpectations(t)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Refresh_token MarkRefreshTokenAsRevoked gives error", func(t *testing.T) {
@@ -463,11 +463,11 @@ func TestHandleTokenPost(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, mockSessionIdentifier, mockClientId, "", "").
 			Return(mockUserSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == mockUserId && details["clientId"] == mockClientId
 		})).Return()
 
-		auditLogger.On("Log", constants.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["codeId"] == mockCodeId && details["refreshTokenJti"] == mockRefreshTokenJti
 		})).Return()
 
@@ -538,7 +538,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*oauth.GenerateTokenForRefreshInput")).
 			Return(mockTokenResponse, nil)
 
-		auditLogger.On("Log", constants.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["codeId"] == mockCodeId && details["refreshTokenJti"] == mockRefreshTokenJti
 		})).Return()
 
@@ -918,7 +918,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 
 	// Audit log must NOT fire when revocation fails: it is reserved for the
 	// post-commit success path where revokedJtis are real.
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	// invalid_grant response must NOT be sent: the client gets 500 instead.
 	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -965,7 +965,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	tokenValidator.AssertExpectations(t)
 	database.AssertExpectations(t)
 
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -1022,7 +1022,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
 	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses pins the branch a refresh
@@ -1093,7 +1093,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything)
 	userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleTokenPost_Refresh_Replay_AuditsContainment asserts the replay-containment
@@ -1177,9 +1177,9 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 			database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), familyJti).Return(int64(2), nil)
 
 			var logged []map[string]interface{}
-			auditLogger.On("Log", constants.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
+			auditLogger.On("Log", mock.Anything, constants.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
 				Run(func(args mock.Arguments) {
-					logged = append(logged, args.Get(1).(map[string]interface{}))
+					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return()
 
 			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -1261,7 +1261,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 
 	// No event, and no invalid_grant either: the request did not get a clean refusal,
 	// it got a server error.
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -1543,7 +1543,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 			tokenValidator.On("ValidateTokenRequest", req.Context(),
 				mock.AnythingOfType("*validators.ValidateTokenRequestInput")).Return(nil, denial)
 
-			auditLogger.On("Log", constants.AuditTokenScopeDenied, mock.MatchedBy(
+			auditLogger.On("Log", mock.Anything, constants.AuditTokenScopeDenied, mock.MatchedBy(
 				func(details map[string]interface{}) bool {
 					return details["clientIdentifier"] == "test_client" &&
 						details["grantType"] == tc.grantType &&
@@ -1591,7 +1591,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		httpHelper.AssertExpectations(t)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		tokenValidator.AssertNotCalled(t, "ValidateTokenRequest", mock.Anything, mock.Anything)
 		if assert.NotNil(t, rejection) {
 			assert.Equal(t, "invalid_scope", rejection.GetCode())
@@ -1616,7 +1616,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), mockClient, "billing-api:read").
 			Return(tokenResponse, nil)
 
-		auditLogger.On("Log", constants.AuditTokenIssuedClientCredentialsResponse, mock.MatchedBy(
+		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedClientCredentialsResponse, mock.MatchedBy(
 			func(details map[string]interface{}) bool {
 				clientId, ok := details["clientId"].(int64)
 				return ok && clientId == mockClient.Id && details["scope"] == "billing-api:read"
@@ -1682,7 +1682,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 		Run(func(args mock.Arguments) { captured = args.Get(1).(*oauth.ROPCGrantInput) }).
 		Return(&oauth.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 
-	auditLogger.On("Log", constants.AuditTokenIssuedROPCResponse, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedROPCResponse, mock.Anything).Return()
 	httpHelper.On("EncodeJson", rr, mock.Anything, mock.Anything).Return()
 
 	handler.ServeHTTP(rr, req)
@@ -1733,7 +1733,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	httpHelper.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
 	httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly is seam 2 for the
@@ -1777,7 +1777,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 				Return(&oauth.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 			httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 		}
-		auditLogger.On("Log", mock.Anything, mock.Anything).Return().Maybe()
+		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 		rateLimiter := newTestRateLimiter(nil)
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer,
@@ -1833,7 +1833,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		handler, auditLogger := newHandler(t, invalidGrant)
 		assert.Equal(t, http.StatusOK, post(handler))
 		// Declared since the grant was written and never fired until now (#126).
-		auditLogger.AssertCalled(t, "Log", constants.AuditROPCAuthFailed, map[string]interface{}{
+		auditLogger.AssertCalled(t, "Log", mock.Anything, constants.AuditROPCAuthFailed, map[string]interface{}{
 			"email":            username,
 			"clientIdentifier": "app",
 		})
@@ -1851,7 +1851,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = "203.0.113.7:5000"
 		handler.ServeHTTP(httptest.NewRecorder(), req)
-		auditLogger.AssertCalled(t, "Log", constants.AuditROPCAuthFailed, map[string]interface{}{
+		auditLogger.AssertCalled(t, "Log", mock.Anything, constants.AuditROPCAuthFailed, map[string]interface{}{
 			"email":            username,
 			"clientIdentifier": "app",
 		})
@@ -1885,7 +1885,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		t.Run(tc.name+" emits no ropc_auth_failed", func(t *testing.T) {
 			handler, auditLogger := newHandler(t, tc.err)
 			assert.Equal(t, http.StatusOK, post(handler))
-			auditLogger.AssertNotCalled(t, "Log", constants.AuditROPCAuthFailed, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditROPCAuthFailed, mock.Anything)
 		})
 	}
 
@@ -1896,7 +1896,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		for i := 0; i < 25; i++ { // under ropc_ip's 30, which counts every request
 			assert.Equal(t, http.StatusOK, post(handler), "grant %d should succeed", i+1)
 		}
-		auditLogger.AssertNotCalled(t, "Log", constants.AuditROPCAuthFailed, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditROPCAuthFailed, mock.Anything)
 	})
 }
 
@@ -2157,7 +2157,7 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 				database.AssertNotCalled(t, "MarkRefreshTokenAsRevoked", mock.Anything, mock.Anything)
 				// The gate is not containment: nothing is cascaded and nothing is audited.
 				database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything)
-				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			}
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything)
@@ -2241,9 +2241,9 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 			database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), "jti-family").Return(int64(2), nil).Once()
 
 			var logged []map[string]interface{}
-			auditLogger.On("Log", constants.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
+			auditLogger.On("Log", mock.Anything, constants.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
 				Run(func(args mock.Arguments) {
-					logged = append(logged, args.Get(1).(map[string]interface{}))
+					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return().Once()
 
 			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -2306,7 +2306,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(),
 			mock.AnythingOfType("*validators.ValidateTokenRequestInput")).Return(nil, refusal)
 
-		auditLogger.On("Log", constants.AuditRedemptionRefusedRedirectURI, mock.MatchedBy(
+		auditLogger.On("Log", mock.Anything, constants.AuditRedemptionRefusedRedirectURI, mock.MatchedBy(
 			func(details map[string]interface{}) bool {
 				// clientIdentifier, the request's string, matching the neighbouring events.
 				// Unlike AuditTokenScopeDenied's it has been PROVED rather than asserted: this

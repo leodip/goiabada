@@ -826,7 +826,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		auditLogger.On("Log", constants.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(123)
 		})).Return()
 
@@ -3075,7 +3075,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", enums.AcrLevel1.String()).Return(userSession, nil)
 
-		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
 		})).Return()
 

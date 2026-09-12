@@ -124,7 +124,7 @@ func TestHandleAPIUserConsentDelete_Success(t *testing.T) {
 
 	database.On("GetUserConsentById", (*sql.Tx)(nil), int64(5)).Return(&models.UserConsent{Id: 5, UserId: 7}, nil)
 	database.On("DeleteUserConsent", (*sql.Tx)(nil), int64(5)).Return(nil)
-	auditLogger.On("Log", constants.AuditDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == int64(7) && details["consentId"] == int64(5)
 	})).Return()
 
@@ -169,5 +169,5 @@ func TestHandleAPIUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	assertJSONInternalServerError(t, rr)
 	database.AssertExpectations(t)
 	// Nothing was deleted, so nothing is audited.
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

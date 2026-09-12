@@ -95,7 +95,7 @@ func HandleAPIUserConsentDelete(
 			return
 		}
 
-		auditLogger.Log(constants.AuditDeletedUserConsent, map[string]interface{}{
+		auditLogger.Log(r.Context(), constants.AuditDeletedUserConsent, map[string]interface{}{
 			"userId":       consent.UserId,
 			"consentId":    consentId,
 			"loggedInUser": r.Context().Value("subject"),

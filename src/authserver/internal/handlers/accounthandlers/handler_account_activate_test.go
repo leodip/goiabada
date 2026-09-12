@@ -460,10 +460,10 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 		}).Return(createdUser, nil).Once()
 
 		database.On("DeletePreRegistration", (*sql.Tx)(nil), int64(7)).Return(nil).Once()
-		auditLogger.On("Log", constants.AuditCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == activateTestEmail
 		})).Return().Once()
-		auditLogger.On("Log", constants.AuditActivatedAccount, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, constants.AuditActivatedAccount, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == activateTestEmail
 		})).Return().Once()
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",

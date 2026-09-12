@@ -164,7 +164,7 @@ func HandleAPIGroupPermissionsPut(
 					return
 				}
 
-				auditLogger.Log(constants.AuditAddedGroupPermission, map[string]interface{}{
+				auditLogger.Log(r.Context(), constants.AuditAddedGroupPermission, map[string]interface{}{
 					"groupId":      group.Id,
 					"permissionId": permission.Id,
 					"loggedInUser": authHelper.GetLoggedInSubject(r),
@@ -201,7 +201,7 @@ func HandleAPIGroupPermissionsPut(
 				return
 			}
 
-			auditLogger.Log(constants.AuditDeletedGroupPermission, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditDeletedGroupPermission, map[string]interface{}{
 				"groupId":      group.Id,
 				"permissionId": permissionId,
 				"loggedInUser": authHelper.GetLoggedInSubject(r),

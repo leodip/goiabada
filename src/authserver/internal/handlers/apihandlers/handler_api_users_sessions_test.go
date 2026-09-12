@@ -81,14 +81,14 @@ func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return(subject)
 	var deletedPayload map[string]interface{}
-	auditLogger.On("Log", constants.AuditDeletedUserSession, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSession, mock.Anything).
 		Run(func(args mock.Arguments) {
-			deletedPayload = args.Get(1).(map[string]interface{})
+			deletedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 	var terminatedPayload map[string]interface{}
-	auditLogger.On("Log", constants.AuditTerminatedUserSession, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditTerminatedUserSession, mock.Anything).
 		Run(func(args mock.Arguments) {
-			terminatedPayload = args.Get(1).(map[string]interface{})
+			terminatedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -148,7 +148,7 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	// NEITHER event. deleted_user_session would otherwise claim a deletion that rolled back, and
 	// the two emitters are adjacent in the handler, so it is easy to leave the first one outside the
 	// error check.
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleAPIUserSessionDelete_NotFoundDoesNotTerminate pins that the pre-existing 404 still
@@ -169,5 +169,5 @@ func TestHandleAPIUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 	database.AssertExpectations(t)
 	// No transaction is opened for a session that does not exist.
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

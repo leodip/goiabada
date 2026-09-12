@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
@@ -17,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // testCeremonyId is the id the bound handlers' cases share: the auth context holds it and the
@@ -33,7 +35,7 @@ func expectCeremonyMismatch(t *testing.T, httpHelper *mocks_handlerhelpers.HttpH
 	auditLogger *mocks_audit.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
 
-	auditLogger.On("Log", constants.AuditAuthCeremonyMismatch, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditAuthCeremonyMismatch, mock.Anything).Return().Once()
 	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["_httpStatus"] == http.StatusBadRequest &&
@@ -198,4 +200,40 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 func renderableRequest(target string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
+}
+
+// TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext is the third of #328's four call
+// shapes: a helper that holds an *http.Request and no context of its own, so its audit call has to
+// reach for r.Context(). Driven directly rather than through a handler, because the property is
+// the helper's and the four bound handlers reach it identically.
+//
+// The matcher is what makes this fail for its stated reason: an id that is not the request's, the
+// empty one a Background context yields included, matches nothing and the strict mock reports the
+// unexpected call rather than the case passing.
+func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
+	const requestId = "goiabada/req-ceremony-1"
+
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	req, err := http.NewRequest("POST", "/auth/pwd", nil)
+	require.NoError(t, err)
+	req = req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, requestId))
+	rr := httptest.NewRecorder()
+
+	auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
+		return chimiddleware.GetReqID(ctx) == requestId
+	}), constants.AuditAuthCeremonyMismatch, mock.MatchedBy(func(details map[string]interface{}) bool {
+		return details["clientId"] == "test-client"
+	})).Return().Once()
+	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+		mock.Anything).Return(nil).Once()
+
+	rejectCeremonyMismatch(httpHelper, auditLogger, rr, req, &oauth.AuthContext{
+		ClientId:  "test-client",
+		AuthState: oauth.AuthStateLevel1Password,
+	})
+
+	auditLogger.AssertExpectations(t)
+	httpHelper.AssertExpectations(t)
 }

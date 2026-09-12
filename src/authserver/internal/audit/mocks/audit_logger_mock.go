@@ -7,6 +7,8 @@
 package mocks_audit
 
 import (
+	"context"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -38,8 +40,8 @@ func (_m *AuditLogger) EXPECT() *AuditLogger_Expecter {
 }
 
 // Log provides a mock function for the type AuditLogger
-func (_mock *AuditLogger) Log(auditEvent string, details map[string]interface{}) {
-	_mock.Called(auditEvent, details)
+func (_mock *AuditLogger) Log(ctx context.Context, auditEvent string, details map[string]interface{}) {
+	_mock.Called(ctx, auditEvent, details)
 	return
 }
 
@@ -49,25 +51,31 @@ type AuditLogger_Log_Call struct {
 }
 
 // Log is a helper method to define mock.On call
+//   - ctx context.Context
 //   - auditEvent string
 //   - details map[string]interface{}
-func (_e *AuditLogger_Expecter) Log(auditEvent any, details any) *AuditLogger_Log_Call {
-	return &AuditLogger_Log_Call{Call: _e.mock.On("Log", auditEvent, details)}
+func (_e *AuditLogger_Expecter) Log(ctx any, auditEvent any, details any) *AuditLogger_Log_Call {
+	return &AuditLogger_Log_Call{Call: _e.mock.On("Log", ctx, auditEvent, details)}
 }
 
-func (_c *AuditLogger_Log_Call) Run(run func(auditEvent string, details map[string]interface{})) *AuditLogger_Log_Call {
+func (_c *AuditLogger_Log_Call) Run(run func(ctx context.Context, auditEvent string, details map[string]interface{})) *AuditLogger_Log_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 map[string]interface{}
+		var arg1 string
 		if args[1] != nil {
-			arg1 = args[1].(map[string]interface{})
+			arg1 = args[1].(string)
+		}
+		var arg2 map[string]interface{}
+		if args[2] != nil {
+			arg2 = args[2].(map[string]interface{})
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -78,7 +86,7 @@ func (_c *AuditLogger_Log_Call) Return() *AuditLogger_Log_Call {
 	return _c
 }
 
-func (_c *AuditLogger_Log_Call) RunAndReturn(run func(auditEvent string, details map[string]interface{})) *AuditLogger_Log_Call {
+func (_c *AuditLogger_Log_Call) RunAndReturn(run func(ctx context.Context, auditEvent string, details map[string]interface{})) *AuditLogger_Log_Call {
 	_c.Run(run)
 	return _c
 }

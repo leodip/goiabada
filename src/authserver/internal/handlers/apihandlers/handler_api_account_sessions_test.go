@@ -54,14 +54,14 @@ func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return(subject)
 	var deletedPayload map[string]interface{}
-	auditLogger.On("Log", constants.AuditDeletedUserSession, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSession, mock.Anything).
 		Run(func(args mock.Arguments) {
-			deletedPayload = args.Get(1).(map[string]interface{})
+			deletedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 	var terminatedPayload map[string]interface{}
-	auditLogger.On("Log", constants.AuditTerminatedUserSession, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditTerminatedUserSession, mock.Anything).
 		Run(func(args mock.Arguments) {
-			terminatedPayload = args.Get(1).(map[string]interface{})
+			terminatedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -113,7 +113,7 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
 	database.AssertNotCalled(t, "RevokeCodesBySessionIdentifier", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleAPIAccountSessionDelete_TerminationFailureIsA500 repeats the suppression contract at the
@@ -141,5 +141,5 @@ func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
 	assert.EqualError(t, stub.bodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

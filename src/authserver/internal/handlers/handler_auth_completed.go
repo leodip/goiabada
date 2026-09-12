@@ -192,7 +192,7 @@ func HandleAuthCompletedGet(
 				bumpedSession.OtpConfigGeneration = *authContext.OtpConfigGeneration
 			}
 
-			auditLogger.Log(constants.AuditBumpedUserSession, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditBumpedUserSession, map[string]interface{}{
 				"userId":   authContext.UserId,
 				"clientId": client.Id,
 			})
@@ -271,7 +271,7 @@ func HandleAuthCompletedGet(
 				// cookie still names the user being terminated, so passing it would record the
 				// party losing the session as the actor who ended it. The actor is this event's
 				// userId, which is where an auditor reads it.
-				auditLogger.Log(constants.AuditCrossUserSessionReplaced, map[string]interface{}{
+				auditLogger.Log(r.Context(), constants.AuditCrossUserSessionReplaced, map[string]interface{}{
 					"userId":                    authContext.UserId,
 					"previousUserId":            userSession.UserId,
 					"previousSessionIdentifier": userSession.SessionIdentifier,
@@ -284,11 +284,11 @@ func HandleAuthCompletedGet(
 				// Emitting one without the other would make a browser handover the only
 				// termination that never reaches a consumer watching the lifecycle stream, and it
 				// would falsify the promise that ending a session always writes both.
-				auditLogger.Log(constants.AuditDeletedUserSession, map[string]interface{}{
+				auditLogger.Log(r.Context(), constants.AuditDeletedUserSession, map[string]interface{}{
 					"userSessionId": userSession.Id,
 					"loggedInUser":  "",
 				})
-				LogTerminatedUserSession(auditLogger, userSession, "", terminationResult)
+				LogTerminatedUserSession(r.Context(), auditLogger, userSession, "", terminationResult)
 			}
 
 			// start new session
@@ -318,7 +318,7 @@ func HandleAuthCompletedGet(
 				authContext.AuthenticatedAt = &newSession.AuthTime
 			}
 
-			auditLogger.Log(constants.AuditStartedNewUserSesson, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditStartedNewUserSesson, map[string]interface{}{
 				"userId":   authContext.UserId,
 				"clientId": client.Id,
 			})
@@ -351,7 +351,7 @@ func HandleAuthCompletedGet(
 		}
 
 		if !user.Enabled {
-			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 			// The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie

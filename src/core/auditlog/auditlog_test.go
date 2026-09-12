@@ -1,9 +1,11 @@
 package auditlog
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +19,7 @@ func TestLogToConsole_WritesOneInfoRecordCarryingTheEventAndTheDetails(t *testin
 	logs := testutil.CaptureSlog(t)
 
 	details := map[string]any{"userId": int64(42), "reason": "email_collision_backfill"}
-	LogToConsole("revoked_user_auth_state", details)
+	LogToConsole(context.Background(), "revoked_user_auth_state", details)
 
 	records := logs.Records()
 	require.Len(t, records, 1, "one audit event must produce exactly one record")
@@ -38,7 +40,7 @@ func TestLogToConsole_WritesOneInfoRecordCarryingTheEventAndTheDetails(t *testin
 func TestLogToConsole_KeepsAnEmptyDetailsMapAsAnEmptyMap(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
 
-	LogToConsole("system_startup", map[string]any{})
+	LogToConsole(context.Background(), "system_startup", map[string]any{})
 
 	records := logs.Records()
 	require.Len(t, records, 1)
@@ -55,7 +57,7 @@ func TestLogToConsole_KeepsNestedValuesAsValues(t *testing.T) {
 		"terminatedSessionIdentifiers": []string{"sid-1", "sid-2"},
 		"user":                         map[string]any{"id": "456", "name": "Jane"},
 	}
-	LogToConsole("data_update", details)
+	LogToConsole(context.Background(), "data_update", details)
 
 	records := logs.Records()
 	require.Len(t, records, 1)
@@ -64,4 +66,36 @@ func TestLogToConsole_KeepsNestedValuesAsValues(t *testing.T) {
 	require.True(t, ok, "details must arrive as a map, not as a rendering of one")
 	assert.Equal(t, []string{"sid-1", "sid-2"}, written["terminatedSessionIdentifiers"])
 	assert.Equal(t, map[string]any{"id": "456", "name": "Jane"}, written["user"])
+}
+
+// The request id is the whole of #328 at this seam, and it arrives without this function naming
+// it: core/logging's handler reads chi's id off the context, and CaptureSlog installs that same
+// wrapper, so what these two cases exercise is the injection the servers run rather than a second
+// copy of it.
+func TestLogToConsole_CarriesTheRequestIdOfTheContextItIsGiven(t *testing.T) {
+	logs := testutil.CaptureSlog(t)
+
+	ctx := context.WithValue(context.Background(), chimiddleware.RequestIDKey, "host/req-0000001")
+	LogToConsole(ctx, "auth_failed_pwd", map[string]any{"email": "jane@example.com"})
+
+	records := logs.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, "host/req-0000001", records[0].Attrs["request_id"],
+		"an operator holding the request id from a user's report finds this event by it")
+}
+
+// The backfill's shape, and the reason decision 2 gave LogToConsole one entry point rather than
+// two: a context with no request on it writes the same record without a request id, so the absence
+// is the truth about a startup event rather than a gap in the record.
+func TestLogToConsole_WritesNoRequestIdUnderAContextThatCarriesNone(t *testing.T) {
+	logs := testutil.CaptureSlog(t)
+
+	LogToConsole(context.Background(), "revoked_user_auth_state", map[string]any{"userId": int64(7)})
+
+	records := logs.Records()
+	require.Len(t, records, 1)
+	assert.NotContains(t, records[0].Attrs, "request_id",
+		"a startup event has no request, so the attribute is absent rather than empty")
+	assert.Equal(t, "revoked_user_auth_state", records[0].Attrs["event"],
+		"and the record is otherwise unchanged")
 }

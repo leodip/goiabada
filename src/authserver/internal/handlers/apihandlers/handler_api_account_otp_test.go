@@ -148,9 +148,9 @@ func TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 	// this test. That asymmetry is deliberate and decision 5 permits it, since there is no existing
 	// failure event at this endpoint for the replay event to be emitted "alongside".
 	var payload map[string]interface{}
-	auditLogger.On("Log", constants.AuditOTPCodeReplayDetected, mock.Anything).
+	auditLogger.On("Log", mock.Anything, constants.AuditOTPCodeReplayDetected, mock.Anything).
 		Run(func(args mock.Arguments) {
-			payload = args.Get(1).(map[string]interface{})
+			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -198,7 +198,7 @@ func TestHandleAPIAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
 	// must not read as a replay either: the event names an attack and a fault is not one.
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything)
 	assert.False(t, user.OTPEnabled)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleAPIAccountOTPPut_Enable_WrongCodeDoesNotClaim is the control that makes the two cases above
@@ -222,7 +222,7 @@ func TestHandleAPIAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 	assert.Equal(t, "INVALID_OTP_CODE", errorCodeOf(t, rr))
 	database.AssertNotCalled(t, "TryConsumeUserOTPStep",
 		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically is the enable half of #242
@@ -260,7 +260,7 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 		Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 
 	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditEnabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
@@ -312,7 +312,7 @@ func TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 	// The body handed its error to the helper, which is when the helper rolls back, and an
 	// enable that did not happen is not audited as one.
 	assert.EqualError(t, stub.bodyErr, "the database is unwell")
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // otpDisableTx is an opaque non-nil transaction, the counterpart of this package's apiRevokeTx. The
@@ -373,7 +373,7 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 
 	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", constants.AuditDisabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditDisabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
@@ -415,7 +415,7 @@ func TestHandleAPIAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 	// The body handed its error to the helper, which is when the helper rolls back, and a
 	// disable that did not happen is not audited as one.
 	assert.EqualError(t, stub.bodyErr, "the database is unwell")
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // wrongButWellFormedCode is six digits that pass the handler's shape checks and do not match the secret,
@@ -835,7 +835,7 @@ func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	// live seed still installed behind it.
 	database.On("ClearPendingOTPEnrollment", tx, user.Id).Return(nil).Once()
 	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, constants.AuditEnabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
