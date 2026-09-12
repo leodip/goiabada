@@ -62,3 +62,4 @@ In the database, each row of the `audit_logs` table stores:
 - `created_at`: timestamp the event was recorded
 - `audit_event`: event identifier
 - `details`: JSON payload as text
+- `request_id`: id of the request that raised the event, empty if there was none

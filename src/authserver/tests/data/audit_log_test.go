@@ -1,10 +1,12 @@
 package datatests
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,6 +66,43 @@ func TestCreateAuditLog(t *testing.T) {
 		err := database.CreateAuditLog(nil, auditLog)
 		require.NoError(t, err)
 		assert.Greater(t, auditLog.Id, int64(0))
+	})
+
+	// #328: the request id written is the request id read back, on every engine, and a row
+	// written off a request reads '' rather than NULL. The values are the shapes the column
+	// actually receives: chi's own, a proxy's uuid adopted from the header, and the clipped
+	// rendering of an oversized one, which is the longest string that can reach the column.
+	t.Run("Success - the request id round-trips", func(t *testing.T) {
+		requestIds := []struct {
+			name string
+			id   string
+		}{
+			{name: "chi's own shape", id: "goiabada/req-0000042"},
+			{name: "a proxy's correlation uuid", id: "6d8f4a2e-0c3b-4a1e-9f77-2b5d1c8e4a90"},
+			{name: "no request", id: ""},
+			{
+				name: "the log's clipped rendering of an oversized id, 157 bytes",
+				id:   strings.Repeat("x", 128) + "[truncated, 128 of 300 bytes]",
+			},
+		}
+
+		for _, tc := range requestIds {
+			t.Run(tc.name, func(t *testing.T) {
+				event := "request_id_roundtrip_" + fake.LetterN(12)
+				require.NoError(t, database.CreateAuditLog(nil, &models.AuditLog{
+					AuditEvent: event,
+					Details:    `{"test": "data"}`,
+					RequestId:  tc.id,
+				}))
+
+				logs, total, err := database.GetAuditLogsPaginated(nil, 1, 10, event)
+				require.NoError(t, err)
+				require.Equal(t, 1, total)
+				require.Len(t, logs, 1)
+				assert.Equalf(t, tc.id, logs[0].RequestId,
+					"the id the viewer shows must be the id the writer stored, byte for byte, on %s", dbType())
+			})
+		}
 	})
 }
 

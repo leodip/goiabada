@@ -485,6 +485,12 @@ func TestBackfillLowercaseEmails_DisablingALoserIsAudited(t *testing.T) {
 			constants.AuditRevokedUserAuthState, total)
 		require.Len(t, logs, 1)
 
+		// The pass runs at startup, inside a Database method, with no request anywhere: the row
+		// carries the empty string rather than an invented id, which is what the viewer shows as
+		// "not written on a request" (#328).
+		assert.Emptyf(t, logs[0].RequestId,
+			"a startup revocation has no request to name; got %q on %s", logs[0].RequestId, dbType())
+
 		var details revokedUserAuthStateDetails
 		require.NoError(t, json.Unmarshal([]byte(logs[0].Details), &details),
 			"the details column must hold the payload as JSON: %q", logs[0].Details)
