@@ -471,7 +471,7 @@ func HandleResetPasswordPost(
 		// Reset revokes everything, with no exceptSid: whoever is resetting a forgotten
 		// password is not necessarily the person holding the live sessions, which is the
 		// stolen-laptop case this issue exists for.
-		result, err := RevokeUserAuthStateTx(database, user.Id, "", func(tx *sql.Tx) error {
+		result, err := RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
 			claimed, err := database.TryConsumeForgotPasswordCode(tx, user.Id, marker.CodeHash, passwordHash)
 			if err != nil {
 				return err

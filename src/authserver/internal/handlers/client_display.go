@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/leodip/goiabada/core/data"
@@ -18,7 +19,7 @@ type ClientDisplayInfo struct {
 }
 
 // getClientDisplayInfo computes what client information should be displayed based on the client's display settings
-func getClientDisplayInfo(database data.Database, client *models.Client) *ClientDisplayInfo {
+func getClientDisplayInfo(ctx context.Context, database data.Database, client *models.Client) *ClientDisplayInfo {
 	info := &ClientDisplayInfo{}
 
 	if client.ShowDisplayName && client.DisplayName != "" {
@@ -32,7 +33,7 @@ func getClientDisplayInfo(database data.Database, client *models.Client) *Client
 		if err != nil {
 			// The error as a value, not through %v: %v prints err.Error() and drops the
 			// stack core/errs captured at the origin (#320, #279).
-			slog.Warn("unable to check whether the client has a logo, defaulting to false",
+			slog.WarnContext(ctx, "unable to check whether the client has a logo, defaulting to false",
 				"client_identifier", client.ClientIdentifier, "error", err)
 		} else if hasLogo {
 			info.HasLogo = true

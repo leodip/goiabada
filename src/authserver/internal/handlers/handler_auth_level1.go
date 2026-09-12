@@ -102,7 +102,7 @@ func HandleAuthLevel1CompletedGet(
 		if authContext.DeferredErrorCode != "" {
 			answerClientWithError(w, r, database, httpHelper, authHelper, templateFS,
 				redirectErrorFromAuthContext(authContext,
-					clientProvenance(database, authContext.ClientId),
+					clientProvenance(r.Context(), database, authContext.ClientId),
 					authContext.DeferredErrorCode, authContext.DeferredErrorDescription))
 			return
 		}

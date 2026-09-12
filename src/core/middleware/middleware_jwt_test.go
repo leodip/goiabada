@@ -49,7 +49,7 @@ func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", "validtoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", mock.Anything, true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -78,7 +78,7 @@ func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
 
 	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
 
-	mockTokenParser.On("DecodeAndValidateTokenString", "invalidtoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", mock.Anything, true).
 		Return(nil, assert.AnError)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -153,7 +153,7 @@ func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", "validposttoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validposttoken", mock.Anything, true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=validposttoken"))
@@ -182,7 +182,7 @@ func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
 
 	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
 
-	mockTokenParser.On("DecodeAndValidateTokenString", "invalidposttoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidposttoken", mock.Anything, true).
 		Return(nil, assert.AnError)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=invalidposttoken"))
@@ -215,7 +215,7 @@ func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *te
 		},
 	}
 	// Only the header token should be validated, not the body token
-	mockTokenParser.On("DecodeAndValidateTokenString", "headertoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "headertoken", mock.Anything, true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=bodytoken"))
@@ -348,7 +348,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testi
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", "charsettoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "charsettoken", mock.Anything, true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=charsettoken"))
@@ -381,7 +381,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", "tokenwithotherparams", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "tokenwithotherparams", mock.Anything, true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("param1=value1&access_token=tokenwithotherparams&param2=value2"))
@@ -414,7 +414,7 @@ func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) 
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", "fallbacktoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "fallbacktoken", mock.Anything, true).
 		Return(expectedToken, nil)
 
 	// Empty Bearer token in header should fall back to POST body
@@ -488,13 +488,13 @@ func TestJwtSessionHandler_ValidSession(t *testing.T) {
 			"iss": "https://example.com",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", "validtoken", mock.Anything, true).Return(expectedToken, nil)
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", mock.Anything, true).Return(expectedToken, nil)
 
 	expectedJwtInfo := &oauth.JwtInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 		AccessToken:   expectedToken,
 	}
-	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.AnythingOfType("*oauth.TokenResponse")).Return(expectedJwtInfo, nil)
+	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.AnythingOfType("*oauth.TokenResponse")).Return(expectedJwtInfo, nil)
 
 	settings := &models.Settings{Issuer: "https://example.com"}
 	ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
@@ -594,7 +594,7 @@ func TestJwtSessionHandler_InvalidTokenInSession(t *testing.T) {
 	}
 
 	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
-	mockTokenParser.On("DecodeAndValidateTokenString", "invalidtoken", mock.Anything, true).Return(nil, assert.AnError)
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", mock.Anything, true).Return(nil, assert.AnError)
 
 	// Mock session save after failed refresh attempt
 	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -646,9 +646,9 @@ func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 			"iss": "https://invalid-issuer.com",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", "validtoken", mock.Anything, true).Return(expectedToken, nil)
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", mock.Anything, true).Return(expectedToken, nil)
 
-	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.AnythingOfType("*oauth.TokenResponse")).Return(&oauth.JwtInfo{
+	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.AnythingOfType("*oauth.TokenResponse")).Return(&oauth.JwtInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 		AccessToken:   expectedToken,
 	}, nil)
@@ -721,9 +721,9 @@ func TestJwtSessionHandler_ValidRefreshToken(t *testing.T) {
 	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Mock token parser
-	mockTokenParser.On("DecodeAndValidateTokenString", "invalidtoken", mock.Anything, true).Return(nil, errors.New("invalid token")).Once()
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", mock.Anything, true).Return(nil, errors.New("invalid token")).Once()
 
-	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.MatchedBy(func(tr *oauth.TokenResponse) bool {
+	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.MatchedBy(func(tr *oauth.TokenResponse) bool {
 		// Validate the TokenResponse
 		return tr != nil &&
 			tr.AccessToken == "newvalidtoken" &&

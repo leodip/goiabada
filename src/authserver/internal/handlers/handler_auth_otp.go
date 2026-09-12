@@ -66,7 +66,7 @@ func HandleAuthOtpGet(
 			return
 		}
 
-		displayInfo := getClientDisplayInfo(database, client)
+		displayInfo := getClientDisplayInfo(r.Context(), database, client)
 
 		if user.OTPEnabled {
 
@@ -251,7 +251,7 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		displayInfo := getClientDisplayInfo(database, client)
+		displayInfo := getClientDisplayInfo(r.Context(), database, client)
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{

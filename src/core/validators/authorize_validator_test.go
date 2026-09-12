@@ -1,6 +1,7 @@
 package validators
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -103,7 +104,7 @@ func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	assert.Error(t, err)
 	locErr := err.(*i18n.LocalizedError)
@@ -118,7 +119,7 @@ func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "non-existent").Return(nil, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "non-existent", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	assert.Error(t, err)
 	locErr := err.(*i18n.LocalizedError)
@@ -133,7 +134,7 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "disabled-client").Return(&models.Client{Enabled: false}, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "disabled-client", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	assert.Error(t, err)
 	locErr := err.(*i18n.LocalizedError)
@@ -148,7 +149,7 @@ func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *test
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "no-auth-code-client").Return(&models.Client{Enabled: true, AuthorizationCodeEnabled: false}, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "no-auth-code-client", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	assert.Error(t, err)
 	locErr := err.(*i18n.LocalizedError)
@@ -163,7 +164,7 @@ func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(&models.Client{Enabled: true, AuthorizationCodeEnabled: true}, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: ""}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	assert.Error(t, err)
 	locErr := err.(*i18n.LocalizedError)
@@ -231,7 +232,7 @@ func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
 				RedirectURI:  tc.requested,
 				ResponseType: tc.responseType,
 			}
-			err := validator.ValidateClientAndRedirectURI(&input)
+			err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 			assert.NoError(t, err)
 		})
@@ -395,7 +396,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 				RedirectURI:  tc.requested,
 				ResponseType: tc.responseType,
 			}
-			err := validator.ValidateClientAndRedirectURI(&input)
+			err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 			// require, not assert: on a regression err is nil, and the type assertion
 			// below would panic and take the remaining rows down with it.
@@ -652,7 +653,7 @@ func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, longClientId).Return(nil, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: longClientId, RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	assert.Error(t, err)
 	locErr := err.(*i18n.LocalizedError)
@@ -676,7 +677,7 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 
 	longRedirectURI := "http://example.com/" + strings.Repeat("a", 2000)
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: longRedirectURI}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	assert.Error(t, err)
 	locErr := err.(*i18n.LocalizedError)
@@ -1255,7 +1256,7 @@ func TestValidateClientAndRedirectURI_ImplicitFlow_DoesNotRequireAuthCodeEnabled
 		RedirectURI:  "https://example.com/callback",
 		ResponseType: "token", // Implicit flow
 	}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	assert.NoError(t, err)
 	mockDB.AssertExpectations(t)
@@ -1280,7 +1281,7 @@ func TestValidateClientAndRedirectURI_AuthCodeFlow_RequiresAuthCodeEnabled(t *te
 		RedirectURI:  "https://example.com/callback",
 		ResponseType: "code", // Authorization code flow
 	}
-	err := validator.ValidateClientAndRedirectURI(&input)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	assert.Error(t, err)
 	locErr := err.(*i18n.LocalizedError)

@@ -76,7 +76,7 @@ func HandleAuthPwdGet(
 			return
 		}
 
-		displayInfo := getClientDisplayInfo(database, client)
+		displayInfo := getClientDisplayInfo(r.Context(), database, client)
 
 		bind := map[string]interface{}{
 			"error": nil,
@@ -175,7 +175,7 @@ func HandleAuthPwdPost(
 			return
 		}
 
-		displayInfo := getClientDisplayInfo(database, client)
+		displayInfo := getClientDisplayInfo(r.Context(), database, client)
 
 		// renderError closes over r so a subsequent r = i18n.RefineLocalizerWithUser
 		// is picked up by the closure on its next invocation.

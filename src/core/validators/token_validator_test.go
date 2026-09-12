@@ -2235,7 +2235,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		now := time.Now().UTC()
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockTokenParser.On("DecodeAndValidateTokenString", "some_refresh_token", (*rsa.PublicKey)(nil), true).
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "some_refresh_token", (*rsa.PublicKey)(nil), true).
 			Return(&oauth.JwtToken{Claims: jwt.MapClaims{
 				"jti": "some_jti", "typ": "Refresh", "sub": "user_subject",
 			}}, nil).Once()
@@ -2397,7 +2397,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockTokenParser.On("DecodeAndValidateTokenString", "invalid_refresh_token", (*rsa.PublicKey)(nil), true).
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_refresh_token", (*rsa.PublicKey)(nil), true).
 			Return(nil, errors.New("token is expired")).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
@@ -2438,7 +2438,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		// Mock a JwtToken without a JTI claim
 		mockJwtToken := &oauth.JwtToken{}
-		mockTokenParser.On("DecodeAndValidateTokenString", "refresh_token_without_jti", (*rsa.PublicKey)(nil), true).
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "refresh_token_without_jti", (*rsa.PublicKey)(nil), true).
 			Return(mockJwtToken, nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
@@ -2478,7 +2478,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 				"jti": "non_existent_jti",
 			},
 		}
-		mockTokenParser.On("DecodeAndValidateTokenString", "non_existent_refresh_token", (*rsa.PublicKey)(nil), true).
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "non_existent_refresh_token", (*rsa.PublicKey)(nil), true).
 			Return(mockJwtToken, nil).Once()
 		mockDB.On("GetRefreshTokenByJti", (*sql.Tx)(nil), "non_existent_jti").Return(nil, nil).Once()
 
@@ -2548,7 +2548,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "mismatched_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "mismatched_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "mismatched_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -2610,7 +2610,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "disabled_user_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "disabled_user_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "disabled_user_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -2679,7 +2679,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "nil_session_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "nil_session_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "nil_session_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -2756,7 +2756,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "invalid_session_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_session_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "invalid_session_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -2824,7 +2824,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "expired_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "expired_offline_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -2890,7 +2890,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "invalid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "invalid_offline_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -2951,7 +2951,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "invalid_typ_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_typ_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "invalid_typ_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -3026,7 +3026,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "invalid_scope_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_scope_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "invalid_scope_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -3104,7 +3104,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "valid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -3180,7 +3180,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "valid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -3259,7 +3259,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "valid_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "valid_refresh_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -3340,7 +3340,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "revoked_consent_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_consent_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "revoked_consent_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -3430,7 +3430,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "partial_consent_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "partial_consent_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "partial_consent_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -3512,7 +3512,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "revoked_permission_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_permission_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "revoked_permission_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
@@ -4066,7 +4066,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-	mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 		Return(&oauth.JwtToken{Claims: jwt.MapClaims{
 			"jti": "the-jti", "typ": "Refresh", "sub": "user_subject",
 		}}, nil)
@@ -5284,7 +5284,7 @@ func TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope(t *testing
 			}
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc_client").Return(client, nil)
-			mockTokenParser.On("DecodeAndValidateTokenString", "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
+			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
 				Return(refreshTokenJwt, nil)
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
 			mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
@@ -5559,7 +5559,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				}
 
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-				mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+				mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 					Return(&oauth.JwtToken{Claims: jwt.MapClaims{
 						"jti": "the-jti", "typ": "Refresh", "sub": "user_subject",
 					}}, nil)
@@ -5634,7 +5634,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				}
 
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc_client").Return(client, nil)
-				mockTokenParser.On("DecodeAndValidateTokenString", "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
+				mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
 					Return(&oauth.JwtToken{Claims: jwt.MapClaims{
 						"jti": "ropc_jti", "typ": "Offline", "sub": "ropc_user_subject",
 						"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
@@ -5715,7 +5715,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
 
 	// withExpirationCheck = true is what makes the parser reject an expired token.
-	mockTokenParser.On("DecodeAndValidateTokenString", "expired_refresh_token", (*rsa.PublicKey)(nil), true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired_refresh_token", (*rsa.PublicKey)(nil), true).
 		Return(nil, errors.New("token has invalid claims: token is expired")).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
@@ -6079,7 +6079,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			client, refreshToken, _ := build(true, 1)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-			mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 				Return(offlineClaims(), nil)
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
 			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
@@ -6108,7 +6108,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			client, refreshToken, user := build(false, 1)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-			mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 				Return(offlineClaims(), nil)
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
 			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
@@ -6145,7 +6145,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			client, refreshToken, _ := build(true, 2)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-			mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 				Return(offlineClaims(), nil)
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
 			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
@@ -6193,7 +6193,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc_client").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
 			Return(&oauth.JwtToken{Claims: jwt.MapClaims{
 				"jti": "ropc_jti", "typ": "Offline", "sub": "ropc_user_subject",
 				"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
@@ -6290,7 +6290,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "ownership_refresh_token", (*rsa.PublicKey)(nil), true).
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ownership_refresh_token", (*rsa.PublicKey)(nil), true).
 			Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "ownership_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
@@ -6563,7 +6563,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		}}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", "the-refresh-token", (*rsa.PublicKey)(nil), true).
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 			Return(offlineClaims, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)

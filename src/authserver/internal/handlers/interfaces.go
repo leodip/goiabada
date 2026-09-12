@@ -62,7 +62,7 @@ type TokenIssuer interface {
 
 type AuthorizeValidator interface {
 	ValidateScopes(scope string) error
-	ValidateClientAndRedirectURI(input *validators.ValidateClientAndRedirectURIInput) error
+	ValidateClientAndRedirectURI(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput) error
 	ValidateRequest(input *validators.ValidateRequestInput) error
 	ValidatePrompt(prompt string) (string, error)
 	ValidateUnsupportedRequestParameters(input *validators.ValidateUnsupportedRequestParametersInput) error
@@ -96,8 +96,8 @@ type UserCreator interface {
 }
 
 type TokenParser interface {
-	DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
-	DecodeAndValidateTokenResponse(tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
 }
 
 type EmailValidator interface {

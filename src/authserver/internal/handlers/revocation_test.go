@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -131,7 +132,7 @@ func TestRevokeUserAuthState_PreservingASession(t *testing.T) {
 		Return(nil).Once()
 	db.On("DeleteUserSession", revokeTx, int64(200)).Return(nil).Once()
 
-	result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, revokeKeepSid)
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, revokeKeepSid)
 	require.NoError(t, err)
 
 	// Both tokens of the preserved session are promoted, the offline one included. This is
@@ -182,7 +183,7 @@ func TestRevokeUserAuthState_RevokingEverything(t *testing.T) {
 	db.On("DeleteUserSession", revokeTx, int64(100)).Return(nil).Once()
 	db.On("DeleteUserSession", revokeTx, int64(200)).Return(nil).Once()
 
-	result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, "")
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "")
 	require.NoError(t, err)
 
 	// FOUR entries, not five. Every live token transitions, and the already-revoked one is
@@ -227,7 +228,7 @@ func promotedIds(t *testing.T, db *mocks_data.Database) []int64 {
 func TestRevokeUserAuthState_RequiresATransaction(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	result, err := RevokeUserAuthState(db, nil, revokeUserId, "")
+	result, err := RevokeUserAuthState(context.Background(), db, nil, revokeUserId, "")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "requires a transaction")
@@ -249,7 +250,7 @@ func TestRevokeUserAuthState_UnknownUser(t *testing.T) {
 	db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
 		Return(int64(0), notFound).Once()
 
-	result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, "")
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "")
 
 	require.ErrorIs(t, err, notFound)
 	assert.Empty(t, result.RevokedRefreshTokenJtis)
@@ -278,7 +279,7 @@ func TestRevokeUserAuthState_OldGenerationIsDerivedFromTheIncrement(t *testing.T
 	db.On("GetUserSessionsByUserId", revokeTx, revokeUserId).
 		Return([]models.UserSession{}, nil).Once()
 
-	result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, "")
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "")
 
 	require.NoError(t, err)
 	assert.Equal(t, int64(9), result.NewGeneration)
@@ -333,7 +334,7 @@ func TestRevokeUserAuthState_ChildCommittedBetweenTheDiscoveryQueries(t *testing
 	db.On("PromoteUserSessionGeneration", revokeTx, int64(100), revokeNewGeneration).
 		Return(nil).Once()
 
-	result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, revokeKeepSid)
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, revokeKeepSid)
 	require.NoError(t, err)
 
 	// The child is promoted, not revoked. Promoting an id the sweep never saw is deliberate:
@@ -389,7 +390,7 @@ func TestRevokeUserAuthState_PreservedSessionAlreadyReaped(t *testing.T) {
 	db.On("GetUserSessionsByUserId", revokeTx, revokeUserId).
 		Return([]models.UserSession{}, nil).Once()
 
-	result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, revokeKeepSid)
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, revokeKeepSid)
 	require.NoError(t, err)
 
 	assert.False(t, offline.Revoked, "the token is still preserved even with no session row")
@@ -1149,7 +1150,7 @@ func TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep(t *testing.T
 		db.On("PromoteRefreshTokenGenerations", revokeTx, []int64{}, revokeNewGeneration).
 			Return(nil).Once()
 
-		result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, revokeKeepSid)
+		result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, revokeKeepSid)
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{revokeOtherSid}, result.TerminatedSessionIdentifiers)
@@ -1185,7 +1186,7 @@ func TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep(t *testing.T
 		db.On("PromoteRefreshTokenGenerations", revokeTx, []int64{}, revokeNewGeneration).
 			Return(nil).Once()
 
-		result, err := RevokeUserAuthState(db, revokeTx, revokeUserId, "")
+		result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "")
 
 		require.NoError(t, err)
 

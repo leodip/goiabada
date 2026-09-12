@@ -1,6 +1,7 @@
 package oauthdb
 
 import (
+	"context"
 	"crypto/rsa"
 	"errors"
 	"log/slog"
@@ -22,7 +23,7 @@ func NewTokenParser(database data.Database) *TokenParser {
 	}
 }
 
-func (tp *TokenParser) DecodeAndValidateTokenResponse(tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
+func (tp *TokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
 
 	pubKey, err := tp.getPublicKey()
 	if err != nil {
@@ -34,21 +35,21 @@ func (tp *TokenParser) DecodeAndValidateTokenResponse(tokenResponse *oauth.Token
 	}
 
 	if len(tokenResponse.AccessToken) > 0 {
-		result.AccessToken, err = tp.DecodeAndValidateTokenString(tokenResponse.AccessToken, pubKey, true)
+		result.AccessToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.AccessToken, pubKey, true)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if len(tokenResponse.IdToken) > 0 {
-		result.IdToken, err = tp.DecodeAndValidateTokenString(tokenResponse.IdToken, pubKey, true)
+		result.IdToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.IdToken, pubKey, true)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if len(tokenResponse.RefreshToken) > 0 {
-		result.RefreshToken, err = tp.DecodeAndValidateTokenString(tokenResponse.RefreshToken, pubKey, false)
+		result.RefreshToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.RefreshToken, pubKey, false)
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +72,7 @@ func (tp *TokenParser) getPublicKey() (*rsa.PublicKey, error) {
 	return pubKey, nil
 }
 
-func (tp *TokenParser) DecodeAndValidateTokenString(token string,
+func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token string,
 	pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error) {
 
 	result := &oauth.JwtToken{
@@ -106,7 +107,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 		}
 
 		if err := tryParse(pubKey); err != nil {
-			slog.Debug("unable to parse the token with the current key", "error", err)
+			slog.DebugContext(ctx, "unable to parse the token with the current key", "error", err)
 
 			// Check if this is a claims validation error (not a signature error)
 			// If the token has valid signature but invalid claims (e.g., expired),
@@ -122,7 +123,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 				errors.Is(err, jwt.ErrTokenInvalidId)
 
 			if isClaimsError {
-				slog.Debug("the error is claims-related, so no fallback key is tried")
+				slog.DebugContext(ctx, "the error is claims-related, so no fallback key is tried")
 				return nil, err
 			}
 
@@ -134,7 +135,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 			if derr != nil {
 				return nil, err
 			}
-			slog.Debug("trying the fallback keys", "count", len(allKeys))
+			slog.DebugContext(ctx, "trying the fallback keys", "count", len(allKeys))
 
 			var lastErr = err
 			for i, kp := range allKeys {
@@ -145,24 +146,24 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 					continue
 				}
 				if parsedPk.Equal(pubKey) {
-					slog.Debug("skipping a fallback key that is the current one",
+					slog.DebugContext(ctx, "skipping a fallback key that is the current one",
 						"index", i, "key_id", kp.Id)
 					continue
 				}
-				slog.Debug("trying a fallback key", "index", i, "key_id", kp.Id,
+				slog.DebugContext(ctx, "trying a fallback key", "index", i, "key_id", kp.Id,
 					"state", kp.State, "key_identifier", kp.KeyIdentifier)
 				if perr2 := tryParse(parsedPk); perr2 == nil {
 					// success with a fallback key
-					slog.Debug("parsed the token with a fallback key", "index", i, "key_id", kp.Id)
+					slog.DebugContext(ctx, "parsed the token with a fallback key", "index", i, "key_id", kp.Id)
 					result.Claims = claims
 					return result, nil
 				} else {
-					slog.Debug("unable to parse the token with a fallback key",
+					slog.DebugContext(ctx, "unable to parse the token with a fallback key",
 						"index", i, "key_id", kp.Id, "error", perr2)
 					lastErr = perr2
 				}
 			}
-			slog.Debug("every key is exhausted, returning the last error", "error", lastErr)
+			slog.DebugContext(ctx, "every key is exhausted, returning the last error", "error", lastErr)
 			return nil, lastErr
 		}
 		result.Claims = claims

@@ -1,6 +1,7 @@
 package validators
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -129,7 +130,7 @@ func (val *AuthorizeValidator) ValidateScopes(scope string) error {
 //
 // The declared return type stays error rather than *i18n.LocalizedError: a database failure is
 // returned unwrapped from here, and the handler tells the two apart by type assertion.
-func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClientAndRedirectURIInput) error {
+func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context, input *ValidateClientAndRedirectURIInput) error {
 	if len(input.ClientId) == 0 {
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientIdMissing, nil)
 	}
@@ -200,7 +201,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 		// The client identifier is a bounded stored value, so it is safe to log. The
 		// requested URI is unbounded attacker-controlled input and is deliberately left
 		// out: the operator reads the offending value off the client's page.
-		slog.Warn("rejected an authorization request whose redirect_uri is not an absolute uri, or is an http or https uri naming no host",
+		slog.WarnContext(ctx, "rejected an authorization request whose redirect_uri is not an absolute uri, or is an http or https uri naming no host",
 			"client_identifier", client.ClientIdentifier)
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotAbsolute, nil)
 	}

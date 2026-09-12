@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -114,7 +115,7 @@ func renderLoggedOut(w http.ResponseWriter, r *http.Request, httpHelper HttpHelp
 // isEncryptedIDTokenHint reports whether the hint is a compact JWE (5
 // dot-separated segments) rather than a compact JWS (3 segments). An encrypted
 // hint must be decrypted with the client's key before validation; a plain
-// signed hint is validated as-is. See OpenID Connect Core 1.0 §2 (an encrypted
+// signed hint is validated as-is. See OpenID Connect Core 1.0 Â§2 (an encrypted
 // ID Token is a Nested JWT).
 func isEncryptedIDTokenHint(hint string) bool {
 	return strings.Count(hint, ".") == 4
@@ -129,10 +130,10 @@ func isEncryptedIDTokenHint(hint string) bool {
 // The returned error is for the server log and never for the End-User. Every failure here means the
 // hint cannot be confirmed, and the spec's answer to a hint the OP cannot confirm is to ask the
 // End-User rather than to show them a diagnostic about a request their relying party built (#109).
-func decryptIDTokenHint(idTokenHint, clientID string, database data.Database) (string, error) {
+func decryptIDTokenHint(ctx context.Context, idTokenHint, clientID string, database data.Database) (string, error) {
 	client, err := database.GetClientByClientIdentifier(nil, clientID)
 	if err != nil {
-		slog.Error("unable to look up the client an id_token_hint names, so the hint cannot be decrypted",
+		slog.ErrorContext(ctx, "unable to look up the client an id_token_hint names, so the hint cannot be decrypted",
 			"client_identifier", clientID, "error", err)
 		return "", errs.Wrap(err, "unable to look up the client named by client_id")
 	}
@@ -140,14 +141,14 @@ func decryptIDTokenHint(idTokenHint, clientID string, database data.Database) (s
 		// Warn, not Error: a client_id naming no client is a request refused and handled,
 		// and the caller treats the logout as hintless. Nothing here is the server failing
 		// to do what it was asked (#320 decision 5).
-		slog.Warn("client_id names no client, so an id_token_hint cannot be decrypted",
+		slog.WarnContext(ctx, "client_id names no client, so an id_token_hint cannot be decrypted",
 			"client_identifier", clientID)
 		return "", errs.New("client_id names no client")
 	}
 
 	clientSecret, err := encryption.DecryptData(client.ClientSecretEncrypted)
 	if err != nil {
-		slog.Error("unable to decrypt the client secret, so an id_token_hint cannot be decrypted",
+		slog.ErrorContext(ctx, "unable to decrypt the client secret, so an id_token_hint cannot be decrypted",
 			"error", err)
 		return "", errs.Wrap(err, "unable to decrypt the client secret")
 	}
@@ -156,7 +157,7 @@ func decryptIDTokenHint(idTokenHint, clientID string, database data.Database) (s
 	if err != nil {
 		// Warn for the same reason as the no-client branch: the hint is a value the relying
 		// party chose, and one this server cannot open is refused rather than failed on.
-		slog.Warn("unable to decrypt the id_token_hint", "error", err)
+		slog.WarnContext(ctx, "unable to decrypt the id_token_hint", "error", err)
 		return "", errs.Wrap(err, "unable to decrypt the id_token_hint")
 	}
 
@@ -287,7 +288,7 @@ func classifyIdTokenHint(
 		if len(clientId) == 0 {
 			return reject("JWE key selection", "reason", "an encrypted id_token_hint needs client_id to select the key")
 		}
-		decrypted, err := decryptIDTokenHint(hint, clientId, database)
+		decrypted, err := decryptIDTokenHint(r.Context(), hint, clientId, database)
 		if err != nil {
 			// decryptIDTokenHint has already logged which half failed.
 			return reject("JWE decryption")
@@ -295,7 +296,7 @@ func classifyIdTokenHint(
 		hint = decrypted
 	}
 
-	idToken, err := tokenParser.DecodeAndValidateTokenString(hint, nil, false)
+	idToken, err := tokenParser.DecodeAndValidateTokenString(r.Context(), hint, nil, false)
 	if err != nil || idToken == nil {
 		return reject("parse and signature", "error", err)
 	}
@@ -645,7 +646,7 @@ func doLogout(
 		// redirect (#109 decision 15).
 		client := hint.client
 		if hint.state == hintAbsent {
-			client = clientForPostLogoutRedirect(httpHelper.GetFromUrlQueryOrFormPost(r, "client_id"), database)
+			client = clientForPostLogoutRedirect(r.Context(), httpHelper.GetFromUrlQueryOrFormPost(r, "client_id"), database)
 		}
 		location = postLogoutRedirectLocation(r, httpHelper, database, client, postLogoutRedirectURI)
 	}
@@ -804,24 +805,24 @@ func deleteWholeUserSession(
 // the teardown, so turning it into a 500 would put the End-User back on a terminal page while still
 // signed in, which is the defect #109 exists to remove. Losing a redirect is the safe direction; the
 // reason is logged.
-func clientForPostLogoutRedirect(clientId string, database data.Database) *models.Client {
+func clientForPostLogoutRedirect(ctx context.Context, clientId string, database data.Database) *models.Client {
 	if len(clientId) == 0 {
 		// RP-Initiated Logout 1.0 section 3: "if it is not supplied with post_logout_redirect_uri,
 		// the OP MUST NOT perform post-logout redirection unless the OP has other means of
 		// confirming the legitimacy of the post-logout redirection target". With neither a hint nor
 		// a client_id there are no such means.
-		slog.Warn("post_logout_redirect_uri supplied with no id_token_hint and no client_id, not redirecting")
+		slog.WarnContext(ctx, "post_logout_redirect_uri supplied with no id_token_hint and no client_id, not redirecting")
 		return nil
 	}
 
 	client, err := database.GetClientByClientIdentifier(nil, clientId)
 	if err != nil {
-		slog.Error("unable to look up the client named by client_id, not redirecting",
+		slog.ErrorContext(ctx, "unable to look up the client named by client_id, not redirecting",
 			"client_identifier", clientId, "error", err)
 		return nil
 	}
 	if client == nil {
-		slog.Warn("client_id names no client, not redirecting", "client_identifier", clientId)
+		slog.WarnContext(ctx, "client_id names no client, not redirecting", "client_identifier", clientId)
 		return nil
 	}
 

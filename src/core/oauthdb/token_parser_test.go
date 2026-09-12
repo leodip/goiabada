@@ -1,6 +1,7 @@
 package oauthdb
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -68,7 +69,7 @@ func TestDecodeAndValidateTokenResponse_ValidTokens(t *testing.T) {
 		RefreshToken: createTestToken(privateKey, refreshTokenClaims, expirationTime),
 	}
 
-	result, err := tp.DecodeAndValidateTokenResponse(tokenResponse)
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), tokenResponse)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result.AccessToken)
@@ -119,7 +120,7 @@ func TestDecodeAndValidateTokenResponse_ExpiredAccessToken(t *testing.T) {
 		AccessToken: createTestToken(privateKey, map[string]interface{}{"type": "Bearer"}, time.Now().Add(-time.Hour)),
 	}
 
-	result, err := tp.DecodeAndValidateTokenResponse(tokenResponse)
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), tokenResponse)
 
 	assert.Error(t, err)
 	assert.Equal(t, "token has invalid claims: token is expired", err.Error())
@@ -140,7 +141,7 @@ func TestDecodeAndValidateTokenResponse_EmptyTokens(t *testing.T) {
 
 	tokenResponse := &oauth.TokenResponse{}
 
-	result, err := tp.DecodeAndValidateTokenResponse(tokenResponse)
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), tokenResponse)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -194,7 +195,7 @@ func TestDecodeAndValidateTokenString(t *testing.T) {
 			token := jwt.NewWithClaims(jwt.SigningMethodRS256, tt.tokenClaims)
 			tokenString, _ := token.SignedString(privateKey)
 
-			result, err := tp.DecodeAndValidateTokenString(tokenString, publicKey, true)
+			result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, publicKey, true)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)
@@ -228,7 +229,7 @@ func TestDecodeAndValidateTokenString_InvalidSignature(t *testing.T) {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	tokenString, _ := token.SignedString(wrongPrivateKey)
 
-	result, err := tp.DecodeAndValidateTokenString(tokenString, publicKey, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, publicKey, true)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "token signature is invalid")
@@ -251,7 +252,7 @@ func TestDecodeAndValidateTokenString_RejectsNonRS256Token(t *testing.T) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, _ := token.SignedString([]byte("secret"))
 
-	result, err := tp.DecodeAndValidateTokenString(tokenString, publicKey, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, publicKey, true)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signing method HS256 is invalid")
@@ -265,7 +266,7 @@ func TestDecodeAndValidateTokenString_EmptyToken(t *testing.T) {
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := &privateKey.PublicKey
 
-	result, err := tp.DecodeAndValidateTokenString("", publicKey, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), "", publicKey, true)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)

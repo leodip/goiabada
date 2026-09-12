@@ -103,7 +103,7 @@ func HandleAPIAccountPasswordPut(
 		// Narrow write, not a full-row UpdateUser: the user model was loaded before the
 		// password was validated, so writing every column back would undo a concurrent admin
 		// disable (decision 14).
-		result, err := handlers.RevokeUserAuthStateTx(database, user.Id, exceptSid,
+		result, err := handlers.RevokeUserAuthStateTx(r.Context(), database, user.Id, exceptSid,
 			func(tx *sql.Tx) error {
 				return database.SetUserPasswordHash(tx, user.Id, passwordHash)
 			})

@@ -2376,7 +2376,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 			Return(&models.UserSession{Id: 9, SessionIdentifier: sid}, nil).Once()
 		db.On("DeleteUserSession", tx, int64(9)).Return(nil).Once()
 
-		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
+		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: sid})
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, jtis)
@@ -2407,7 +2407,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", tx, sid).Return(nil, nil).Once()
 
-		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
+		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: sid})
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, jtis,
@@ -2423,7 +2423,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		stub := expectRunInTransaction(db, tx)
 		db.On("AcquireUserSessionRow", tx, sid).Return(false, boom).Once()
 
-		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
+		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: sid})
 
 		require.ErrorIs(t, err, boom,
 			"a statement that did not run has not established anything, so the caller gets a 500")
@@ -2442,7 +2442,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 			Return([]*models.RefreshToken{token}, nil).Once()
 		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
 
-		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42})
+		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42})
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, jtis)
@@ -2460,7 +2460,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		db.On("GetRefreshTokensBySessionIdentifier", tx, sid).
 			Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", Revoked: true}}, nil).Once()
 
-		jtis, err := revokeOnAuthCodeReuse(db, &models.Code{Id: 42, SessionIdentifier: sid})
+		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: sid})
 
 		require.NoError(t, err)
 		assert.Empty(t, jtis)

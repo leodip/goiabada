@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
@@ -27,7 +28,7 @@ func TestJWKSTokenParserRejectsNonRS256Token(t *testing.T) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, _ := token.SignedString([]byte("secret"))
 
-	result, err := tp.DecodeAndValidateTokenString(tokenString, nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, nil, true)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signing method HS256 is invalid")
@@ -163,7 +164,7 @@ func TestJWKSTokenParser_AcceptsTokenSignedByPublishedKey(t *testing.T) {
 
 	tokenString := signRS256(t, key, "key-1", validClaims())
 
-	result, err := tp.DecodeAndValidateTokenString(tokenString, nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, nil, true)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -180,7 +181,7 @@ func TestJWKSTokenParser_CachesJwksAcrossCalls(t *testing.T) {
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
 	for i := 0; i < 3; i++ {
-		_, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-1", validClaims()), nil, true)
+		_, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-1", validClaims()), nil, true)
 		assert.NoError(t, err)
 	}
 
@@ -194,7 +195,7 @@ func TestJWKSTokenParser_TokenWithoutKidUsesTheOnlyPublishedKey(t *testing.T) {
 	server, _ := newJwksServer(t, jwkFromPublicKey("key-1", &key.PublicKey))
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "", validClaims()), nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "", validClaims()), nil, true)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "1234567890", result.Claims["sub"])
@@ -209,7 +210,7 @@ func TestJWKSTokenParser_SelectsCorrectKeyWhenSeveralArePublished(t *testing.T) 
 	)
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-2", validClaims()), nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-2", validClaims()), nil, true)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "1234567890", result.Claims["sub"])
@@ -218,7 +219,7 @@ func TestJWKSTokenParser_SelectsCorrectKeyWhenSeveralArePublished(t *testing.T) 
 func TestJWKSTokenParser_EmptyTokenIsNotAnError(t *testing.T) {
 	tp := NewJWKSTokenParser("https://auth.example.com", nil)
 
-	result, err := tp.DecodeAndValidateTokenString("", nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), "", nil, true)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -240,7 +241,7 @@ func TestJWKSTokenParser_RejectsTokenSignedByUnpublishedKey(t *testing.T) {
 	// Signed by the attacker but claiming to be key-1.
 	forged := signRS256(t, attacker, "key-1", validClaims())
 
-	result, err := tp.DecodeAndValidateTokenString(forged, nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), forged, nil, true)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -255,7 +256,7 @@ func TestJWKSTokenParser_RejectsForgedTokenEvenWithoutExpirationCheck(t *testing
 
 	forged := signRS256(t, attacker, "key-1", validClaims())
 
-	result, err := tp.DecodeAndValidateTokenString(forged, nil, false)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), forged, nil, false)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -267,7 +268,7 @@ func TestJWKSTokenParser_RejectsUnknownKid(t *testing.T) {
 	server, hits := newJwksServer(t, jwkFromPublicKey("key-1", &key.PublicKey))
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-does-not-exist", validClaims()), nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-does-not-exist", validClaims()), nil, true)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -285,7 +286,7 @@ func TestJWKSTokenParser_RejectsTokenWithoutKidWhenSeveralKeysArePublished(t *te
 	)
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "", validClaims()), nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "", validClaims()), nil, true)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -297,7 +298,7 @@ func TestJWKSTokenParser_RejectsMalformedToken(t *testing.T) {
 
 	for _, tokenString := range []string{"not-a-jwt", "a.b", "a.b.c", "...."} {
 		t.Run(tokenString, func(t *testing.T) {
-			result, err := tp.DecodeAndValidateTokenString(tokenString, nil, true)
+			result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, nil, true)
 
 			assert.Error(t, err)
 			assert.Nil(t, result)
@@ -320,7 +321,7 @@ func TestJWKSTokenParser_RejectsExpiredTokenWhenCheckingExpiration(t *testing.T)
 	claims := validClaims()
 	claims["exp"] = time.Now().Add(-time.Hour).Unix()
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-1", claims), nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-1", claims), nil, true)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -335,7 +336,7 @@ func TestJWKSTokenParser_AcceptsExpiredTokenWhenNotCheckingExpiration(t *testing
 	claims := validClaims()
 	claims["exp"] = time.Now().Add(-time.Hour).Unix()
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-1", claims), nil, false)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-1", claims), nil, false)
 
 	assert.NoError(t, err, "refresh tokens are validated against the database, not their exp claim")
 	assert.Equal(t, "1234567890", result.Claims["sub"])
@@ -348,7 +349,7 @@ func TestJWKSTokenParser_RequiresExpClaimWhenCheckingExpiration(t *testing.T) {
 
 	claims := jwt.MapClaims{"sub": "1234567890"} // no exp
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-1", claims), nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-1", claims), nil, true)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -361,7 +362,7 @@ func TestJWKSTokenParser_AllowsMissingExpWhenNotCheckingExpiration(t *testing.T)
 
 	claims := jwt.MapClaims{"sub": "1234567890"} // no exp
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-1", claims), nil, false)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-1", claims), nil, false)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "1234567890", result.Claims["sub"])
@@ -382,7 +383,7 @@ func TestJWKSTokenParser_JwksEndpointReturnsNonOK(t *testing.T) {
 	t.Cleanup(server.Close)
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-1", validClaims()), nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-1", validClaims()), nil, true)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -397,7 +398,7 @@ func TestJWKSTokenParser_JwksEndpointReturnsInvalidJson(t *testing.T) {
 	t.Cleanup(server.Close)
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-1", validClaims()), nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-1", validClaims()), nil, true)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -412,7 +413,7 @@ func TestJWKSTokenParser_JwksEndpointUnreachable(t *testing.T) {
 
 	tp := NewJWKSTokenParser(serverURL, &http.Client{Timeout: 2 * time.Second})
 
-	result, err := tp.DecodeAndValidateTokenString(tokenString, nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, nil, true)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -423,7 +424,7 @@ func TestJWKSTokenParser_JwksEndpointReturnsEmptyKeySet(t *testing.T) {
 	server, _ := newJwksServer(t) // no keys
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
-	result, err := tp.DecodeAndValidateTokenString(signRS256(t, key, "key-1", validClaims()), nil, true)
+	result, err := tp.DecodeAndValidateTokenString(context.Background(), signRS256(t, key, "key-1", validClaims()), nil, true)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -437,7 +438,7 @@ func TestJWKSTokenParser_RefreshJwksStoresKeys(t *testing.T) {
 
 	assert.Empty(t, tp.cachedJwks.Keys)
 
-	err := tp.refreshJwks()
+	err := tp.refreshJwks(context.Background())
 
 	assert.NoError(t, err)
 	assert.Len(t, tp.cachedJwks.Keys, 1)
@@ -448,7 +449,7 @@ func TestJWKSTokenParser_RefreshJwksStoresKeys(t *testing.T) {
 func TestJWKSTokenParser_RefreshJwksInvalidURL(t *testing.T) {
 	tp := NewJWKSTokenParser("http://\x7f-invalid", nil)
 
-	err := tp.refreshJwks()
+	err := tp.refreshJwks(context.Background())
 
 	assert.Error(t, err)
 }
@@ -481,7 +482,7 @@ func TestDecodeAndValidateTokenResponse_AllThreeTokens(t *testing.T) {
 		Scope:        "openid profile",
 	}
 
-	result, err := tp.DecodeAndValidateTokenResponse(tokenResponse)
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), tokenResponse)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -497,7 +498,7 @@ func TestDecodeAndValidateTokenResponse_OnlyAccessToken(t *testing.T) {
 	server, _ := newJwksServer(t, jwkFromPublicKey("key-1", &key.PublicKey))
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
-	result, err := tp.DecodeAndValidateTokenResponse(&TokenResponse{
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), &TokenResponse{
 		AccessToken: signRS256(t, key, "key-1", validClaims()),
 	})
 
@@ -510,7 +511,7 @@ func TestDecodeAndValidateTokenResponse_OnlyAccessToken(t *testing.T) {
 func TestDecodeAndValidateTokenResponse_EmptyResponse(t *testing.T) {
 	tp := NewJWKSTokenParser("https://auth.example.com", nil)
 
-	result, err := tp.DecodeAndValidateTokenResponse(&TokenResponse{})
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), &TokenResponse{})
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -555,7 +556,7 @@ func TestDecodeAndValidateTokenResponse_RejectsForgedTokenInAnySlot(t *testing.T
 			server, _ := newJwksServer(t, jwkFromPublicKey("key-1", &key.PublicKey))
 			tp := NewJWKSTokenParser(server.URL, server.Client())
 
-			result, err := tp.DecodeAndValidateTokenResponse(tc.response(t))
+			result, err := tp.DecodeAndValidateTokenResponse(context.Background(), tc.response(t))
 
 			assert.Error(t, err)
 			assert.Nil(t, result, "a forged token anywhere must fail the whole response")
@@ -571,7 +572,7 @@ func TestDecodeAndValidateTokenResponse_RejectsExpiredAccessToken(t *testing.T) 
 	claims := validClaims()
 	claims["exp"] = time.Now().Add(-time.Hour).Unix()
 
-	result, err := tp.DecodeAndValidateTokenResponse(&TokenResponse{
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), &TokenResponse{
 		AccessToken: signRS256(t, key, "key-1", claims),
 	})
 

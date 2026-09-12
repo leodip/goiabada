@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"html/template"
 	"io/fs"
@@ -32,7 +33,7 @@ import (
 // - SHOULD accept expired tokens (withExpirationCheck=false)
 // Returns the sub claim from the hint, or empty string if no hint provided.
 // Returns error if hint is malformed or not issued by this server.
-func validateIdTokenHint(idTokenHint string, tokenParser TokenParser, settings *models.Settings) (string, error) {
+func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser TokenParser, settings *models.Settings) (string, error) {
 	if idTokenHint == "" {
 		return "", nil
 	}
@@ -43,7 +44,7 @@ func validateIdTokenHint(idTokenHint string, tokenParser TokenParser, settings *
 	}
 
 	// Parse JWT: verify signature, skip expiration (spec: SHOULD accept expired)
-	jwtToken, err := tokenParser.DecodeAndValidateTokenString(idTokenHint, nil, false)
+	jwtToken, err := tokenParser.DecodeAndValidateTokenString(ctx, idTokenHint, nil, false)
 	if err != nil {
 		return "", customerrors.NewErrorDetailWithHttpStatusCode(
 			"invalid_request",
@@ -155,7 +156,7 @@ func HandleAuthorizeGet(
 			}
 		}
 
-		err = authorizeValidator.ValidateClientAndRedirectURI(&validators.ValidateClientAndRedirectURIInput{
+		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &validators.ValidateClientAndRedirectURIInput{
 			RequestId:    requestId,
 			ClientId:     authContext.ClientId,
 			RedirectURI:  authContext.RedirectURI,
@@ -321,7 +322,7 @@ func HandleAuthorizeGet(
 			}
 			emissionLookedUp = true
 
-			emissionAllowed = redirectWillBeEmitted(database, client, authContext.RedirectURI,
+			emissionAllowed = redirectWillBeEmitted(r.Context(), database, client, authContext.RedirectURI,
 				authContext.ResponseType, "authorize")
 			return emissionAllowed
 		}
@@ -472,7 +473,7 @@ func HandleAuthorizeGet(
 
 		// Validate id_token_hint if present (OIDC Core 1.0 Section 3.1.2.1/3.1.2.2)
 		idTokenHint := r.FormValue("id_token_hint")
-		hintSub, err := validateIdTokenHint(idTokenHint, tokenParser, settings)
+		hintSub, err := validateIdTokenHint(r.Context(), idTokenHint, tokenParser, settings)
 		if err != nil {
 			// id_token_hint validation errors are redirected to client
 			var valError *customerrors.ErrorDetail
@@ -929,10 +930,10 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, database data
 // error response to the client, so a lookup that fails must not turn a refusal that works today
 // into a 500; and unresolved provenance is the untrusted case, which errs towards withholding a
 // redirect rather than towards performing one (#108).
-func clientProvenance(database data.Database, clientIdentifier string) *models.Client {
+func clientProvenance(ctx context.Context, database data.Database, clientIdentifier string) *models.Client {
 	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
 	if err != nil {
-		slog.Error("unable to load the client while answering it with an error, treating its provenance as unresolved",
+		slog.ErrorContext(ctx, "unable to load the client while answering it with an error, treating its provenance as unresolved",
 			"client_identifier", clientIdentifier, "error", err)
 		return nil
 	}
@@ -1025,14 +1026,14 @@ func clientProvenance(database data.Database, clientIdentifier string) *models.C
 // This predicate is asked twice within one authorization request, and the second answer may not be
 // more permissive than the first: see redirectErrorInput.redirectAlreadyWithheld, which carries the
 // first refusal into the emitter.
-func redirectWillBeEmitted(database data.Database, client *models.Client, redirectURI string,
+func redirectWillBeEmitted(ctx context.Context, database data.Database, client *models.Client, redirectURI string,
 	responseType string, site string) bool {
 
 	if client == nil || client.CreatedViaDCR {
 		return false
 	}
 
-	if err := checkRedirectURIEmittable(site, redirectURI); err != nil {
+	if err := checkRedirectURIEmittable(ctx, site, redirectURI); err != nil {
 		return false
 	}
 
@@ -1041,7 +1042,7 @@ func redirectWillBeEmitted(database data.Database, client *models.Client, redire
 		// The client identifier is a bounded stored value and is safe to log; the URI is not,
 		// matching checkRedirectURIEmittable, which records where a refusal happened and
 		// deliberately never records the value (#159).
-		slog.Error("unable to load the client's redirect URIs while answering it with an error, withholding the redirect",
+		slog.ErrorContext(ctx, "unable to load the client's redirect URIs while answering it with an error, withholding the redirect",
 			"client_identifier", client.ClientIdentifier, "site", site, "error", err)
 		return false
 	}
@@ -1059,7 +1060,7 @@ func redirectWillBeEmitted(database data.Database, client *models.Client, redire
 	allowLoopbackPortFlexibility := len(responseTypes) == 1 && responseTypes[0] == "code"
 
 	if !urlutil.RedirectURIIsRegistered(registered, redirectURI, allowLoopbackPortFlexibility) {
-		slog.Warn("the redirect URI this client would be answered at is no longer registered on it, so the redirect is withheld",
+		slog.WarnContext(ctx, "the redirect URI this client would be answered at is no longer registered on it, so the redirect is withheld",
 			"client_identifier", client.ClientIdentifier, "site", site)
 		return false
 	}
@@ -1086,7 +1087,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database dat
 	// interstitial names the destination and the authorization stops, rather than this server
 	// forwarding a browser to a host of somebody else's choosing on a request it just refused.
 	if input.redirectAlreadyWithheld ||
-		!redirectWillBeEmitted(database, input.client, input.redirectURI, input.responseType,
+		!redirectWillBeEmitted(r.Context(), database, input.client, input.redirectURI, input.responseType,
 			"redirToClientWithError") {
 		return renderRedirectBlocked(httpHelper, w, r, input)
 	}

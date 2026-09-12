@@ -439,7 +439,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("another_client", true)
-		tokenParser.On("DecodeAndValidateTokenString", hintedToken, (*rsa.PublicKey)(nil), false).
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
 			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
 
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(hintedRegisteredURI)
@@ -502,7 +502,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		jwe, err := encryption.EncryptIDTokenHintJWE(innerToken, clientSecret)
 		require.NoError(t, err)
 
-		result, err := decryptIDTokenHint(jwe, "test_client", database)
+		result, err := decryptIDTokenHint(context.Background(), jwe, "test_client", database)
 
 		assert.Nil(t, err)
 		assert.Equal(t, innerToken, result)
@@ -514,7 +514,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "invalid_client").Return(nil, nil)
 
-		_, err := decryptIDTokenHint("a.b.c.d.e", "invalid_client", database)
+		_, err := decryptIDTokenHint(context.Background(), "a.b.c.d.e", "invalid_client", database)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "client_id names no client")
@@ -539,7 +539,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		logs := testutil.CaptureSlog(t)
 
-		_, err := decryptIDTokenHint("not.a.valid.jwe.token", "test_client", database)
+		_, err := decryptIDTokenHint(context.Background(), "not.a.valid.jwe.token", "test_client", database)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
@@ -565,7 +565,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		jwe, err := encryption.EncryptIDTokenHintJWE("test_token", "a-different-secret")
 		require.NoError(t, err)
 
-		_, err = decryptIDTokenHint(jwe, "test_client", database)
+		_, err = decryptIDTokenHint(context.Background(), jwe, "test_client", database)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
@@ -824,7 +824,7 @@ func stubConfirmedHint(
 
 	httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
 	httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("", false)
-	tokenParser.On("DecodeAndValidateTokenString", hintedToken, (*rsa.PublicKey)(nil), false).
+	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
 		Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: claims}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, hintedClientId).Return(client, nil)
 	database.On("GetUserBySubject", mock.Anything, hintedSubject).
@@ -1588,7 +1588,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		// different client from the aud the hint is signed over.
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("another_client", true)
-		tokenParser.On("DecodeAndValidateTokenString", hintedToken, (*rsa.PublicKey)(nil), false).
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
 			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
 
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(hintedRegisteredURI)
@@ -1648,7 +1648,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 
 				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
 				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("another_client", true)
-				tokenParser.On("DecodeAndValidateTokenString", hintedToken, (*rsa.PublicKey)(nil), false).
+				tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
 					Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
 
 				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
@@ -2505,7 +2505,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			if tc.innerToken != nil {
 				parsed = *tc.innerToken
 			}
-			parserCall := tokenParser.On("DecodeAndValidateTokenString", parsed, (*rsa.PublicKey)(nil), false)
+			parserCall := tokenParser.On("DecodeAndValidateTokenString", mock.Anything, parsed, (*rsa.PublicKey)(nil), false)
 			if tc.parserErr != nil {
 				parserCall.Return(nil, tc.parserErr).Maybe()
 			} else {
