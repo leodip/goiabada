@@ -119,7 +119,7 @@ func HandleConsentGet(
 		// - offline_access is requested (always re-confirm refresh token grant), OR
 		// - prompt=consent was explicitly requested (force consent UI)
 		if !scopesFullyConsented || authContext.HasScope(oidc.OfflineAccessScope) || authContext.HasPromptValue("consent") {
-			displayInfo := getClientDisplayInfo(database, client)
+			displayInfo := getClientDisplayInfo(r.Context(), database, client)
 
 			// The consent screen names the client through its own rule rather than through
 			// displayInfo.ClientName, which falls back to the raw identifier and would show a
@@ -246,7 +246,7 @@ func HandleConsentPost(
 				// carries the client it is answering, so provenance is resolved here rather than
 				// in the approval branch below where the load used to be the only one. The two
 				// branches are mutually exclusive, so no request loads the client twice (#108).
-				refusedClient := clientProvenance(database, authContext.ClientId)
+				refusedClient := clientProvenance(r.Context(), database, authContext.ClientId)
 
 				// The clear goes FIRST. ClearAuthContext persists the deletion through a
 				// Set-Cookie on w, and redirToClientWithError commits the response in every
@@ -419,7 +419,7 @@ func HandleConsentPost(
 			// Provenance is resolved here for the same reason as in the no-scopes-consented
 			// refusal above: this branch answers the client with an error redirect, and the
 			// redirect now carries the client it is answering (#108).
-			refusedClient := clientProvenance(database, authContext.ClientId)
+			refusedClient := clientProvenance(r.Context(), database, authContext.ClientId)
 
 			// The clear goes FIRST, for the same reason as the no-scopes-consented refusal
 			// above: a Set-Cookie written after redirToClientWithError has committed never

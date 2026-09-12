@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"context"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
@@ -36,26 +37,26 @@ func NewJWKSTokenParser(baseURL string, httpClient *http.Client) *JWKSTokenParse
 	}
 }
 
-func (tp *JWKSTokenParser) DecodeAndValidateTokenResponse(tokenResponse *TokenResponse) (*JwtInfo, error) {
+func (tp *JWKSTokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *TokenResponse) (*JwtInfo, error) {
 	result := &JwtInfo{TokenResponse: *tokenResponse}
 
 	var err error
 	if len(tokenResponse.AccessToken) > 0 {
-		result.AccessToken, err = tp.DecodeAndValidateTokenString(tokenResponse.AccessToken, nil, true)
+		result.AccessToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.AccessToken, nil, true)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if len(tokenResponse.IdToken) > 0 {
-		result.IdToken, err = tp.DecodeAndValidateTokenString(tokenResponse.IdToken, nil, true)
+		result.IdToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.IdToken, nil, true)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if len(tokenResponse.RefreshToken) > 0 {
-		result.RefreshToken, err = tp.DecodeAndValidateTokenString(tokenResponse.RefreshToken, nil, false)
+		result.RefreshToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.RefreshToken, nil, false)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +65,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateTokenResponse(tokenResponse *TokenRe
 	return result, nil
 }
 
-func (tp *JWKSTokenParser) DecodeAndValidateTokenString(token string, _ *rsa.PublicKey, withExpirationCheck bool) (*JwtToken, error) {
+func (tp *JWKSTokenParser) DecodeAndValidateTokenString(ctx context.Context, token string, _ *rsa.PublicKey, withExpirationCheck bool) (*JwtToken, error) {
 	result := &JwtToken{TokenBase64: token}
 	if len(token) == 0 {
 		return result, nil
@@ -86,7 +87,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateTokenString(token string, _ *rsa.Pub
 			return pub, nil
 		}
 		// Refresh JWKS and try again
-		if err := tp.refreshJwks(); err != nil {
+		if err := tp.refreshJwks(ctx); err != nil {
 			return nil, err
 		}
 		if pub := tp.getPublicKeyFromCache(kid); pub != nil {
@@ -124,8 +125,8 @@ func (tp *JWKSTokenParser) getPublicKeyFromCache(kid string) *rsa.PublicKey {
 	return nil
 }
 
-func (tp *JWKSTokenParser) refreshJwks() error {
-	req, err := http.NewRequest(http.MethodGet, tp.jwksURL, nil)
+func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tp.jwksURL, nil)
 	if err != nil {
 		return err
 	}
@@ -135,7 +136,7 @@ func (tp *JWKSTokenParser) refreshJwks() error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		slog.Error("unable to fetch the jwks document", "status", resp.StatusCode)
+		slog.ErrorContext(ctx, "unable to fetch the jwks document", "status", resp.StatusCode)
 		return errs.New("failed to fetch JWKS")
 	}
 	var jwks Jwks

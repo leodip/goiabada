@@ -777,7 +777,7 @@ func issueImplicitTokens(
 	// directly rather than something still to be exchanged. Nothing can reach here with such a value
 	// once the authorization endpoint has refused it, and the check stays so that the property is
 	// enforced by a test rather than claimed by a comment (#122).
-	if err := checkRedirectURIEmittable("issueImplicitTokens", redirectURI); err != nil {
+	if err := checkRedirectURIEmittable(r.Context(), "issueImplicitTokens", redirectURI); err != nil {
 		return err
 	}
 
@@ -834,7 +834,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 	//
 	// The caller answers a non-nil error with a 500, which leaves the code unredeemed rather than
 	// delivered to the wrong host; it expires in 60 seconds.
-	if err := checkRedirectURIEmittable("issueAuthCode", code.RedirectURI); err != nil {
+	if err := checkRedirectURIEmittable(r.Context(), "issueAuthCode", code.RedirectURI); err != nil {
 		return err
 	}
 

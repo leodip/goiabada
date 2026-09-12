@@ -135,7 +135,7 @@ func HandleAPIUserPasswordPut(
 		//
 		// Narrow write, not a full-row UpdateUser: the model was loaded before validation, so
 		// writing every column back would undo a concurrent disable (decision 14).
-		result, err := handlers.RevokeUserAuthStateTx(database, user.Id, "", func(tx *sql.Tx) error {
+		result, err := handlers.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
 			return database.SetUserPasswordHash(tx, user.Id, passwordHash)
 		})
 		if err != nil {
@@ -561,7 +561,7 @@ func HandleAPIUserEnabledPut(
 					return errUserAlreadyDisabled
 				}
 
-				result, err = handlers.RevokeUserAuthState(database, tx, userId, "")
+				result, err = handlers.RevokeUserAuthState(r.Context(), database, tx, userId, "")
 				return err
 			})
 			if errors.Is(err, errUserAlreadyDisabled) {

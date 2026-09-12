@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"sort"
@@ -75,7 +76,7 @@ type RevocationResult struct {
 // (decision 4). The caller owns the transaction, which is REQUIRED here rather than
 // optional, because IncrementUserAuthStateGeneration cannot read back its own increment
 // safely without one.
-func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid string) (RevocationResult, error) {
+func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, userId int64, exceptSid string) (RevocationResult, error) {
 	result := RevocationResult{
 		TerminatedSessionIdentifiers: []string{},
 		RevokedRefreshTokenJtis:      []string{},
@@ -224,7 +225,7 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 	// leave the audit record unable to explain why those JTIs are missing from the revoked
 	// list. The field names the exempted grant origin, not a surviving session row.
 	if exceptSid != "" && !preservedSessionFound {
-		slog.Warn("revocation exempted a grant origin whose session row no longer exists",
+		slog.WarnContext(ctx, "revocation exempted a grant origin whose session row no longer exists",
 			"user_id", userId, "except_session_identifier", exceptSid)
 	}
 
@@ -279,7 +280,7 @@ const (
 // side and a gap on the forensic side. Closing that gap needs a transactional outbox or a
 // distinct "commit outcome unknown" event, not a rollback, and neither is in scope for #106
 // (decision 5, finding 36).
-func RevokeUserAuthStateTx(db data.Database, userId int64, exceptSid string,
+func RevokeUserAuthStateTx(ctx context.Context, db data.Database, userId int64, exceptSid string,
 	write func(tx *sql.Tx) error) (RevocationResult, error) {
 
 	// The write and the sweep in one transaction opened through RunInTransaction, so a deadlock
@@ -293,7 +294,7 @@ func RevokeUserAuthStateTx(db data.Database, userId int64, exceptSid string,
 		}
 
 		var err error
-		result, err = RevokeUserAuthState(db, tx, userId, exceptSid)
+		result, err = RevokeUserAuthState(ctx, db, tx, userId, exceptSid)
 		return err
 	})
 	if err != nil {

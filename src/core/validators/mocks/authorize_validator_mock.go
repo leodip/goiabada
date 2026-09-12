@@ -7,6 +7,8 @@
 package mocks_validator
 
 import (
+	"context"
+
 	"github.com/leodip/goiabada/core/validators"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -39,16 +41,16 @@ func (_m *AuthorizeValidator) EXPECT() *AuthorizeValidator_Expecter {
 }
 
 // ValidateClientAndRedirectURI provides a mock function for the type AuthorizeValidator
-func (_mock *AuthorizeValidator) ValidateClientAndRedirectURI(input *validators.ValidateClientAndRedirectURIInput) error {
-	ret := _mock.Called(input)
+func (_mock *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput) error {
+	ret := _mock.Called(ctx, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ValidateClientAndRedirectURI")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*validators.ValidateClientAndRedirectURIInput) error); ok {
-		r0 = returnFunc(input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *validators.ValidateClientAndRedirectURIInput) error); ok {
+		r0 = returnFunc(ctx, input)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -61,19 +63,25 @@ type AuthorizeValidator_ValidateClientAndRedirectURI_Call struct {
 }
 
 // ValidateClientAndRedirectURI is a helper method to define mock.On call
+//   - ctx context.Context
 //   - input *validators.ValidateClientAndRedirectURIInput
-func (_e *AuthorizeValidator_Expecter) ValidateClientAndRedirectURI(input any) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
-	return &AuthorizeValidator_ValidateClientAndRedirectURI_Call{Call: _e.mock.On("ValidateClientAndRedirectURI", input)}
+func (_e *AuthorizeValidator_Expecter) ValidateClientAndRedirectURI(ctx any, input any) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
+	return &AuthorizeValidator_ValidateClientAndRedirectURI_Call{Call: _e.mock.On("ValidateClientAndRedirectURI", ctx, input)}
 }
 
-func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) Run(run func(input *validators.ValidateClientAndRedirectURIInput)) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
+func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) Run(run func(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput)) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *validators.ValidateClientAndRedirectURIInput
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*validators.ValidateClientAndRedirectURIInput)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *validators.ValidateClientAndRedirectURIInput
+		if args[1] != nil {
+			arg1 = args[1].(*validators.ValidateClientAndRedirectURIInput)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -84,7 +92,7 @@ func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) Return(err error
 	return _c
 }
 
-func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) RunAndReturn(run func(input *validators.ValidateClientAndRedirectURIInput) error) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
+func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) RunAndReturn(run func(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput) error) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
 	_c.Call.Return(run)
 	return _c
 }

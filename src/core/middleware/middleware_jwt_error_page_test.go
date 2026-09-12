@@ -103,7 +103,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
 				parser := new(mock_oauth.TokenParser)
-				parser.On("DecodeAndValidateTokenString", "expired", mock.Anything, true).
+				parser.On("DecodeAndValidateTokenString", mock.Anything, "expired", mock.Anything, true).
 					Return(nil, assert.AnError)
 
 				m := NewMiddlewareJwt(store, sessionName, parser,
@@ -131,8 +131,8 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
 				parser := new(mock_oauth.TokenParser)
-				parser.On("DecodeAndValidateTokenString", "valid", mock.Anything, true).Return(token, nil)
-				parser.On("DecodeAndValidateTokenResponse", mock.AnythingOfType("*oauth.TokenResponse")).
+				parser.On("DecodeAndValidateTokenString", mock.Anything, "valid", mock.Anything, true).Return(token, nil)
+				parser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.AnythingOfType("*oauth.TokenResponse")).
 					Return(&oauth.JwtInfo{
 						TokenResponse: oauth.TokenResponse{AccessToken: "valid"},
 						AccessToken:   token,

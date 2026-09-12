@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"errors"
@@ -163,7 +164,7 @@ func HandleTokenPost(
 			// an unauthenticated attacker.
 			var reused *customerrors.AuthCodeReusedError
 			if errors.As(err, &reused) {
-				if revokeErr := revokeAndAuditAuthCodeReuse(database, auditLogger, reused.Code); revokeErr != nil {
+				if revokeErr := revokeAndAuditAuthCodeReuse(r.Context(), database, auditLogger, reused.Code); revokeErr != nil {
 					httpHelper.InternalServerError(w, r, revokeErr)
 					return
 				}
@@ -612,8 +613,8 @@ func HandleTokenPost(
 // path and the concurrent double-spend guard in the authorization_code grant
 // (#77). On a nil return the caller is responsible for writing the client-facing
 // invalid_grant response; on a non-nil error the caller must surface a 500.
-func revokeAndAuditAuthCodeReuse(database data.Database, auditLogger AuditLogger, code *models.Code) error {
-	revokedJtis, err := revokeOnAuthCodeReuse(database, code)
+func revokeAndAuditAuthCodeReuse(ctx context.Context, database data.Database, auditLogger AuditLogger, code *models.Code) error {
+	revokedJtis, err := revokeOnAuthCodeReuse(ctx, database, code)
 	if err != nil {
 		return err
 	}
@@ -638,7 +639,7 @@ func revokeAndAuditAuthCodeReuse(database data.Database, auditLogger AuditLogger
 // Its first statement takes the session row, ahead of every grant that hangs off
 // it, so that this response and a termination of the same session serialize on
 // that row (#139). See the comment on that statement for what it prevents.
-func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string, error) {
+func revokeOnAuthCodeReuse(ctx context.Context, database data.Database, code *models.Code) ([]string, error) {
 	if code == nil {
 		return nil, nil
 	}
@@ -678,7 +679,7 @@ func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string,
 			// identifier today, but if a future change ever produces a
 			// session-less auth code, fall back to revoking only the refresh
 			// tokens directly linked to this code so reuse still has teeth.
-			slog.Warn("auth code reuse on a code without a session identifier, falling back to code-id-scoped revocation",
+			slog.WarnContext(ctx, "auth code reuse on a code without a session identifier, falling back to code-id-scoped revocation",
 				"code_id", code.Id)
 			refreshTokens, err = database.GetRefreshTokensByCodeId(tx, code.Id)
 		}

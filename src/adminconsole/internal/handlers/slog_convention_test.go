@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rsa"
 	"log/slog"
 	"net/http"
@@ -38,13 +39,13 @@ func (failingExchanger) ExchangeCodeForTokens(code, redirectURI, clientId, clien
 // either method is a test that stopped measuring what it says it measures.
 type unusedTokenParser struct{ t *testing.T }
 
-func (p unusedTokenParser) DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey,
+func (p unusedTokenParser) DecodeAndValidateTokenString(_ context.Context, token string, pubKey *rsa.PublicKey,
 	withExpirationCheck bool) (*oauth.JwtToken, error) {
 	p.t.Fatal("the token parser must not be reached: the exchange fails before it")
 	return nil, nil
 }
 
-func (p unusedTokenParser) DecodeAndValidateTokenResponse(tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
+func (p unusedTokenParser) DecodeAndValidateTokenResponse(_ context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
 	p.t.Fatal("the token parser must not be reached: the exchange fails before it")
 	return nil, nil
 }

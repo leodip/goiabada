@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"sync"
 	"testing"
@@ -172,7 +173,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 
 	sweepDone := make(chan error, 1)
 	go func() {
-		_, err := handlers.RevokeUserAuthStateTx(pDB, user.Id, "", func(tx *sql.Tx) error {
+		_, err := handlers.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
 			return pDB.SetUserPasswordHash(tx, user.Id, newHash)
 		})
 		sweepDone <- err
@@ -293,7 +294,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 	}
 	sweepDone := make(chan sweepResult, 1)
 	go func() {
-		result, err := handlers.RevokeUserAuthStateTx(pDB, user.Id, "", func(tx *sql.Tx) error {
+		result, err := handlers.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
 			return pDB.SetUserPasswordHash(tx, user.Id, newHash)
 		})
 		sweepDone <- sweepResult{result: result, err: err}

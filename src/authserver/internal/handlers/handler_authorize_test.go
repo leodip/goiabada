@@ -103,7 +103,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
@@ -192,7 +192,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
@@ -262,7 +262,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// as literals, so a catalog reword moves the page and the test together while a
 		// handler that stopped localizing still fails.
 		validationError := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(validationError)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(validationError)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["title"] == i18n.T(req.Context(), "auth_error.unable_to_authorize.title") &&
@@ -305,7 +305,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 
 		// _httpStatus is what RenderTemplate turns into the response code, so it is asserted here
 		// rather than on the recorder: the helper is a mock and writes nothing. The integration
@@ -370,7 +370,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -429,7 +429,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			})).Return(nil).Once()
 
 			validationError := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
-			authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(validationError).Once()
+			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(validationError).Once()
 			httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).Return(nil).Once()
 
 			handler.ServeHTTP(rr, req)
@@ -484,7 +484,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
@@ -550,7 +550,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
@@ -608,7 +608,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -679,7 +679,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -744,7 +744,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -798,7 +798,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
@@ -906,7 +906,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
@@ -996,7 +996,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -1074,7 +1074,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -1141,7 +1141,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && hasUILocales(ac)
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: enums.AcrLevel1}
@@ -1214,7 +1214,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && hasUILocales(ac)
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: enums.AcrLevel1}
@@ -2018,7 +2018,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := redirectWillBeEmitted(tc.database(t), tc.client, tc.redirectURI, tc.responseType,
+			got := redirectWillBeEmitted(context.Background(), tc.database(t), tc.client, tc.redirectURI, tc.responseType,
 				"TestRedirectWillBeEmitted")
 
 			assert.Equal(t, tc.want, got, tc.why)
@@ -2260,7 +2260,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.MatchedBy(func(input *validators.ValidateClientAndRedirectURIInput) bool {
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.MatchedBy(func(input *validators.ValidateClientAndRedirectURIInput) bool {
 			return input.ResponseType == "token"
 		})).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -2331,7 +2331,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 				ac.ResponseType == "id_token token"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.MatchedBy(func(input *validators.ValidateClientAndRedirectURIInput) bool {
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.MatchedBy(func(input *validators.ValidateClientAndRedirectURIInput) bool {
 			return input.ResponseType == "id_token token"
 		})).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -2402,7 +2402,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -2463,7 +2463,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && ac.ResponseType == "token"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client explicitly enables implicit flow
@@ -2536,7 +2536,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -2550,7 +2550,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		tokenParser.On("DecodeAndValidateTokenString", "bad-jwt-token", mock.Anything, false).Return(nil, errors.New("signature verification failed"))
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "bad-jwt-token", mock.Anything, false).Return(nil, errors.New("signature verification failed"))
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
@@ -2599,7 +2599,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -2620,7 +2620,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": "user-123",
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-wrong-issuer", mock.Anything, false).Return(wrongIssuerToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-wrong-issuer", mock.Anything, false).Return(wrongIssuerToken, nil)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
@@ -2669,7 +2669,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -2689,7 +2689,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"iss": "https://test-issuer.com",
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-no-sub", mock.Anything, false).Return(noSubToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-no-sub", mock.Anything, false).Return(noSubToken, nil)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
@@ -2739,7 +2739,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -2760,7 +2760,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": userSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "expired-jwt-token", mock.Anything, false).Return(expiredToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired-jwt-token", mock.Anything, false).Return(expiredToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject
@@ -2831,7 +2831,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -2852,7 +2852,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": userSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject
@@ -2925,7 +2925,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -2946,7 +2946,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.IdTokenHintSub == hintSubject
@@ -3016,7 +3016,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -3037,7 +3037,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": userSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
@@ -3132,7 +3132,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -3153,7 +3153,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.IdTokenHintSub == hintSubject && ac.Prompt == "none"
@@ -3232,7 +3232,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -3253,7 +3253,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
@@ -3334,7 +3334,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -3355,7 +3355,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
@@ -3428,7 +3428,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
@@ -3449,7 +3449,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
@@ -3514,7 +3514,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 
 		// The client load moved above the error-redirect closure, so it now runs before this
 		// validator's error is dispatched (#108).
@@ -3564,7 +3564,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 
 		// The client load moved above the error-redirect closure, so it now runs before this
 		// validator's error is dispatched (#108).
@@ -3613,7 +3613,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 
 		// The client load moved above the error-redirect closure, so it now runs before this
 		// validator's error is dispatched (#108).
@@ -3801,7 +3801,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 
 			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
 
-			authorizeValidator.On("ValidateClientAndRedirectURI",
+			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 				&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: tc.createdVia}, nil)
@@ -3919,7 +3919,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
-			authorizeValidator.On("ValidateClientAndRedirectURI",
+			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
@@ -4011,7 +4011,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 		parked = args.Get(2).(*oauth.AuthContext).DeferredErrorDescription
 	}).Return(nil).Once()
 
-	authorizeValidator.On("ValidateClientAndRedirectURI",
+	authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 		mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 		&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
@@ -4116,7 +4116,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-			authorizeValidator.On("ValidateClientAndRedirectURI",
+			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 				&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: false}, nil)

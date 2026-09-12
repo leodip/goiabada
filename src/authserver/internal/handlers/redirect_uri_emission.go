@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/leodip/goiabada/core/errs"
@@ -36,12 +37,12 @@ import (
 // closed. An operator reading this line knows the emitter is being fed something it must not emit;
 // the offending value is on the client's page in the admin console, which is a bounded lookup rather
 // than an unbounded write.
-func checkRedirectURIEmittable(site string, redirectURI string) error {
+func checkRedirectURIEmittable(ctx context.Context, site string, redirectURI string) error {
 	if urlutil.IsAbsoluteRedirectURI(redirectURI) {
 		return nil
 	}
 
-	slog.Error("refusing to emit an authorization response to a redirect URI that is not an absolute URI, so a gate upstream of this emitter was bypassed",
+	slog.ErrorContext(ctx, "refusing to emit an authorization response to a redirect URI that is not an absolute URI, so a gate upstream of this emitter was bypassed",
 		"site", site)
 
 	return errs.New("refusing to emit an authorization response to a redirect URI that is not an absolute URI, at " + site)
