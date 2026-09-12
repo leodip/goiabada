@@ -40,6 +40,23 @@ var jsBootstrapKeys = []string{
 	"js.image_upload.error_prefix",
 }
 
+// addUrlParam is the template function that appends one query parameter to a URL. It is the one
+// closure of templateFuncMap lifted to a name, because html/template calls a function with no
+// context and its record therefore carries no request_id: testutil's slogPlainSites lists it by
+// this name as the reason a plain slog call stands in a request-path package (#320).
+func addUrlParam(u string, k string, v interface{}) string {
+	parsedUrl, err := url.Parse(u)
+	if err != nil {
+		slog.Warn("unable to parse url", "url", u)
+		return u
+	}
+	query := parsedUrl.Query()
+
+	query.Add(k, stringutil.ConvertToString(v))
+	parsedUrl.RawQuery = query.Encode()
+	return parsedUrl.String()
+}
+
 var templateFuncMap = template.FuncMap{
 	// T translates key against the localizer carried on ctx. ctx is the
 	// request context, injected into bind maps by RenderTemplateToBuffer
@@ -164,18 +181,7 @@ var templateFuncMap = template.FuncMap{
 	"concat": func(parts ...string) string {
 		return strings.Join(parts, "")
 	},
-	"addUrlParam": func(u string, k string, v interface{}) string {
-		parsedUrl, err := url.Parse(u)
-		if err != nil {
-			slog.Warn("unable to parse url", "url", u)
-			return u
-		}
-		query := parsedUrl.Query()
-
-		query.Add(k, stringutil.ConvertToString(v))
-		parsedUrl.RawQuery = query.Encode()
-		return parsedUrl.String()
-	},
+	"addUrlParam": addUrlParam,
 	"marshal": func(v interface{}) template.JS {
 		a, _ := json.Marshal(v)
 		return template.JS(a)

@@ -314,6 +314,57 @@ func literal(ctx context.Context, id int64) {
 
 	// ---- exemptions -----------------------------------------------------------------------------
 
+	// Rule 5: a helper with neither a context nor a request, a closure in a package-level func
+	// map, and a *Context call beside them; then the two admitted functions in their own files,
+	// a namesake of one of them in another file of the same package, and a plain call in a
+	// package no request runs through.
+	tree.write("authserver/internal/handlers/plain.go", `package handlers
+
+import (
+	"context"
+	"log/slog"
+)
+
+var funcs = map[string]func(string) string{
+	"shout": func(s string) string { slog.Info("shouting", "value", s); return s },
+}
+
+func helper(id string) {
+	slog.Warn("client not found", "client_identifier", id)
+	slog.Debug("looked up", "client_identifier", id)
+}
+
+func withContext(ctx context.Context, id string) {
+	slog.WarnContext(ctx, "client not found", "client_identifier", id)
+}
+`)
+	tree.write("core/middleware/middleware_realip.go", `package middleware
+
+import "log/slog"
+
+func parseCIDRs(entries []string) { slog.Warn("ignoring invalid trusted proxy entry", "entry", entries[0]) }
+`)
+	tree.write("core/middleware/namesake.go", `package middleware
+
+import "log/slog"
+
+func parseCIDRs2() { slog.Warn("not the admitted function") }
+
+func (m *limiter) parseCIDRs() { slog.Warn("a method by the admitted name, in another file") }
+`)
+	tree.write("core/handlerhelpers/template_funcs.go", `package handlerhelpers
+
+import "log/slog"
+
+func addUrlParam(u string) string { slog.Warn("unable to parse url", "url", u); return u }
+`)
+	tree.write("core/config/startup.go", `package config
+
+import "log/slog"
+
+func load() { slog.Info("configuration loaded") }
+`)
+
 	tree.write("core/caught/exempt_test.go", `package caught
 
 import "log/slog"
@@ -337,7 +388,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 
 	violations, files, err := findSlogViolations(tree.root, tree.golangci, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 18, files, "every non-exempt fixture is walked")
+	assert.Equal(t, 23, files, "every non-exempt fixture is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {
@@ -371,6 +422,12 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"authserver/internal/handlers/apihandlers/caught.go:8 a run spread into writeInternalServerError outside slogSpreadSites",
 		"authserver/internal/handlers/caught.go:13 a run spread into WriteInternalServerError outside slogSpreadSites",
 		"authserver/internal/handlers/caught.go:17 a run spread into rejectIdTokenHint outside slogSpreadSites",
+		// rule 5
+		"authserver/internal/handlers/plain.go:9 a plain slog.Info in a request-path package",
+		"authserver/internal/handlers/plain.go:13 a plain slog.Warn in a request-path package",
+		"authserver/internal/handlers/plain.go:14 a plain slog.Debug in a request-path package",
+		"core/middleware/namesake.go:5 a plain slog.Warn in a request-path package",
+		"core/middleware/namesake.go:7 a plain slog.Warn in a request-path package",
 	}
 	sort.Strings(want)
 	sort.Strings(got)
@@ -475,18 +532,52 @@ func TestSlogConvention_EverySpreadSiteExists(t *testing.T) {
 	root := SourceRoot(t)
 	for _, site := range slogSpreadSites {
 		t.Run(site.scope+"/"+site.name, func(t *testing.T) {
-			matches, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(site.scope), "*.go"))
-			require.NoError(t, err)
-			declared := 0
-			for _, path := range matches {
-				if strings.HasSuffix(path, "_test.go") {
-					continue
-				}
-				src, err := os.ReadFile(path)
-				require.NoError(t, err)
-				declared += strings.Count(string(src), ") "+site.name+"(") + strings.Count(string(src), "func "+site.name+"(")
-			}
-			assert.Equal(t, 1, declared, "declared exactly once in its scope")
+			assertDeclaredOnce(t, root, site.scope, site.name)
 		})
 	}
+}
+
+// TestSlogConvention_EveryPlainSiteExists is the same guard for rule 5's table: an admission for
+// a function that was renamed or removed would otherwise stay in the table forever, and each
+// admitted function is declared in the one file its scope names.
+func TestSlogConvention_EveryPlainSiteExists(t *testing.T) {
+	root := SourceRoot(t)
+	for _, site := range slogPlainSites {
+		t.Run(site.scope+"/"+site.name, func(t *testing.T) {
+			assertDeclaredOnce(t, root, site.scope, site.name)
+		})
+	}
+}
+
+// TestSlogConvention_EveryRequestPathDirExists holds rule 5's directory list to the tree, so a
+// package that moves takes its entry with it rather than leaving the rule reading nothing there.
+func TestSlogConvention_EveryRequestPathDirExists(t *testing.T) {
+	root := SourceRoot(t)
+	for _, dir := range slogRequestPathDirs {
+		matches, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(dir), "*.go"))
+		require.NoError(t, err)
+		assert.NotEmpty(t, matches, "%s holds Go files", dir)
+	}
+}
+
+// assertDeclaredOnce holds a table entry to the tree: the function name is declared exactly once
+// in its scope, which is one file or every non-test file of one directory.
+func assertDeclaredOnce(t *testing.T, root, scope, name string) {
+	t.Helper()
+	pattern := filepath.Join(root, filepath.FromSlash(scope))
+	if !strings.HasSuffix(scope, ".go") {
+		pattern = filepath.Join(pattern, "*.go")
+	}
+	matches, err := filepath.Glob(pattern)
+	require.NoError(t, err)
+	declared := 0
+	for _, path := range matches {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(path)
+		require.NoError(t, err)
+		declared += strings.Count(string(src), ") "+name+"(") + strings.Count(string(src), "func "+name+"(")
+	}
+	assert.Equal(t, 1, declared, "declared exactly once in its scope")
 }
