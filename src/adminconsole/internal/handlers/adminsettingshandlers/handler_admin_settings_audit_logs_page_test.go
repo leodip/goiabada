@@ -38,7 +38,7 @@ type auditPagingApiClient struct {
 }
 
 func (c *auditPagingApiClient) GetAuditLogsPaginated(accessToken string, page, pageSize int,
-	auditEvent string) (*api.GetAuditLogsResponse, error) {
+	auditEvent string, requestId string) (*api.GetAuditLogsResponse, error) {
 
 	c.asked = append(c.asked, page)
 	c.events = append(c.events, auditEvent)

@@ -1195,10 +1195,13 @@ PUT /api/v1/admin/settings/audit-logs
 #### Audit logs (viewer)
 
 ```
-GET /api/v1/admin/audit-logs?page=1&pageSize=20&auditEvent=user_login
+GET /api/v1/admin/audit-logs?page=1&size=20&auditEvent=user_login&requestId=host/Ppg6bHPK5f-000012
 ```
 
 Returns paginated audit log entries from the database. All query parameters are optional.
+
+**Field notes:**
+- `requestId`: Return only entries carrying this request id, matched exactly
 
 ```json
 {
@@ -1207,7 +1210,8 @@ Returns paginated audit log entries from the database. All query parameters are 
       "id": 1,
       "createdAt": "2025-01-15T10:30:00Z",
       "auditEvent": "user_login",
-      "details": "{\"userId\":\"123\",\"ip\":\"192.168.1.1\"}"
+      "details": "{\"userId\":\"123\",\"ip\":\"192.168.1.1\"}",
+      "requestId": "host/Ppg6bHPK5f-000012"
     }
   ],
   "total": 150,

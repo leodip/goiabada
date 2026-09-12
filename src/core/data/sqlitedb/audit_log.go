@@ -30,6 +30,7 @@ func (d *SQLiteDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDel
 	return int(rowsAffected), nil
 }
 
-func (d *SQLiteDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error) {
-	return d.CommonDB.GetAuditLogsPaginated(tx, page, pageSize, auditEvent)
+func (d *SQLiteDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string,
+	requestId string) ([]models.AuditLog, int, error) {
+	return d.CommonDB.GetAuditLogsPaginated(tx, page, pageSize, auditEvent, requestId)
 }

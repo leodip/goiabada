@@ -170,7 +170,7 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 		t.Run("GetAuditLogsPaginated_size"+itoa(pageSize), func(t *testing.T) {
 			assertEmptyPagePastTheEnd(t, "GetAuditLogsPaginated", pageSize,
 				func(page, pageSize int) (int, int, error) {
-					logs, total, err := database.GetAuditLogsPaginated(nil, page, pageSize, auditEvent)
+					logs, total, err := database.GetAuditLogsPaginated(nil, page, pageSize, auditEvent, "")
 					return len(logs), total, err
 				})
 		})

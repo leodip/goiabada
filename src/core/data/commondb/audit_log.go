@@ -103,7 +103,8 @@ func (d *CommonDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDel
 	return int(rowsAffected), nil
 }
 
-func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error) {
+func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string,
+	requestId string) ([]models.AuditLog, int, error) {
 
 	if page < 1 {
 		page = 1
@@ -123,6 +124,9 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 	selectBuilder := auditLogStruct.SelectFrom("audit_logs")
 	if auditEvent != "" {
 		selectBuilder.Where(selectBuilder.Equal("audit_event", auditEvent))
+	}
+	if requestId != "" {
+		selectBuilder.Where(selectBuilder.Equal("request_id", requestId))
 	}
 	// Deterministic sort: created_at DESC, id DESC (id tiebreaker prevents pagination drift)
 	selectBuilder.OrderBy("created_at DESC", "id DESC")
@@ -144,6 +148,14 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 		if err != nil {
 			return nil, 0, errs.Wrap(err, "unable to scan audit log")
 		}
+		// The request id is client-chosen and is looked up with `=`, so the engine and not
+		// this package would otherwise decide which ids are the same id. A row the engine
+		// folded in carries an id the caller did not ask for, and listing it would put one
+		// request's audit entries under another request's id (#328, and see
+		// engineFoldedTheMatch).
+		if requestId != "" && engineFoldedTheMatch(auditLog.RequestId, requestId) {
+			continue
+		}
 		auditLogs = append(auditLogs, auditLog)
 	}
 
@@ -152,6 +164,19 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 	countBuilder.Select("COUNT(*)").From("audit_logs")
 	if auditEvent != "" {
 		countBuilder.Where(countBuilder.Equal("audit_event", auditEvent))
+	}
+	if requestId != "" {
+		// ceiling: the count cannot apply the guard above, which needs the rows, so on MySQL
+		// a stored id that differs from the filter only by a fold `=` accepts at equal length
+		// (a decomposed accent against its precomposed spelling) would be counted and not
+		// listed, showing as a page total one higher than the rows shown. SQLite and
+		// PostgreSQL have no such fold, and SQL Server's are closed in the statement by
+		// mssqldb's own body. Nothing reaches it today: the only writer stores the id as
+		// logging.FieldForLog renders it, which percent-escapes every byte outside printable
+		// ASCII, so no combining mark survives into the column. Revisit when a second writer
+		// can store a non-ASCII id, or when the total is read for anything but the pager; a
+		// MySQL-only binary predicate beside this equality is the next shape (#328).
+		countBuilder.Where(countBuilder.Equal("request_id", requestId))
 	}
 
 	countSql, countArgs := countBuilder.Build()

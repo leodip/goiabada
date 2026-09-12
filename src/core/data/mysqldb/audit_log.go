@@ -28,6 +28,7 @@ func (d *MySQLDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDele
 	return int(rowsAffected), nil
 }
 
-func (d *MySQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error) {
-	return d.CommonDB.GetAuditLogsPaginated(tx, page, pageSize, auditEvent)
+func (d *MySQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string,
+	requestId string) ([]models.AuditLog, int, error) {
+	return d.CommonDB.GetAuditLogsPaginated(tx, page, pageSize, auditEvent, requestId)
 }

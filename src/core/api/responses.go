@@ -1103,6 +1103,9 @@ type AuditLogResponse struct {
 	CreatedAt  string `json:"createdAt"`
 	AuditEvent string `json:"auditEvent"`
 	Details    string `json:"details"`
+	// RequestId is the request's id as the application log carries it, empty when the entry
+	// was not written on a request (#328).
+	RequestId string `json:"requestId"`
 }
 
 type GetAuditLogsResponse struct {
