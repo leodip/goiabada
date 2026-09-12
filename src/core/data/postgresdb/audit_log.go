@@ -66,6 +66,7 @@ func (d *PostgresDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxD
 	return int(rowsAffected), nil
 }
 
-func (d *PostgresDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error) {
-	return d.CommonDB.GetAuditLogsPaginated(tx, page, pageSize, auditEvent)
+func (d *PostgresDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string,
+	requestId string) ([]models.AuditLog, int, error) {
+	return d.CommonDB.GetAuditLogsPaginated(tx, page, pageSize, auditEvent, requestId)
 }

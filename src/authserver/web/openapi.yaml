@@ -2666,13 +2666,18 @@ paths:
       summary: Query audit logs
       description: |
         Get a page of audit log entries, most recent first, optionally narrowed to
-        a single audit event. Entries are only present when audit logging to the
-        database is enabled.
+        a single audit event, a single request id, or both. Entries are only present
+        when audit logging to the database is enabled.
       operationId: getAuditLogs
       parameters:
         - name: auditEvent
           in: query
           description: Return only entries for this audit event
+          schema:
+            type: string
+        - name: requestId
+          in: query
+          description: Return only entries carrying this request id, matched exactly
           schema:
             type: string
         - $ref: '#/components/parameters/PageParam'
@@ -5582,11 +5587,18 @@ components:
         details:
           type: string
           description: The event payload, as a JSON string
+        requestId:
+          type: string
+          description: |
+            The request's id as the application log carries it, so the same value
+            appears in the log's request_id attribute. Empty when the entry was not
+            written on a request.
       required:
         - id
         - createdAt
         - auditEvent
         - details
+        - requestId
 
     GetAuditLogsResponse:
       type: object

@@ -1,10 +1,13 @@
 package integrationtests
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -269,4 +272,139 @@ func TestAPIAuditLogs_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 	bodyBytes3, _ := io.ReadAll(resp3.Body)
 	assert.Contains(t, string(bodyBytes3), "Insufficient scope.")
+}
+
+// #328: the request id, end to end. An audited request writes a row carrying the id, and the
+// endpoint finds that row by it.
+//
+// The audited request used here is the audit log settings PUT, which audits itself, so the
+// whole chain is exercised through the API alone: the header arrives, chi adopts it,
+// AuditLogger.Log takes it off the request context, the row stores the log's rendering of it,
+// and the filter matches that same string. Reading audit_logs directly would prove the write
+// and nothing about the endpoint.
+//
+// It also pins that the header is adopted from any client, verbatim (decision 9): that is chi's
+// behaviour today, and a change to it should be a deliberate one rather than a silent one.
+func auditedPutWithRequestId(t *testing.T, accessToken string, requestId string) {
+	t.Helper()
+
+	body, err := json.Marshal(api.UpdateSettingsAuditLogsRequest{
+		AuditLogsInConsoleEnabled:  true,
+		AuditLogsInDatabaseEnabled: true,
+		AuditLogRetentionDays:      33,
+	})
+	assert.NoError(t, err)
+
+	req, err := http.NewRequest("PUT", config.GetAuthServer().BaseURL+settingsAuditLogsURL,
+		bytes.NewReader(body))
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+	if requestId != "" {
+		req.Header.Set("X-Request-Id", requestId)
+	}
+
+	resp, err := createHttpClient(t).Do(req)
+	assert.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// enableAuditLogsInDatabase turns database audit logging on, since nothing is queryable
+// without it, and restores the three settings when the test ends.
+func enableAuditLogsInDatabase(t *testing.T) {
+	t.Helper()
+	restoreAuditLogSettings(t)
+
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+	settings.AuditLogsInDatabaseEnabled = true
+	assert.NoError(t, database.UpdateSettings(nil, settings))
+}
+
+func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
+	enableAuditLogsInDatabase(t)
+	accessToken, _ := createAdminClientWithToken(t)
+
+	t.Run("the id the client sent is the id the filter finds", func(t *testing.T) {
+		requestId := "itest-" + fake.LetterN(16)
+		auditedPutWithRequestId(t, accessToken, requestId)
+
+		body, resp := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestId))
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, 1, body.Total)
+		if assert.Len(t, body.AuditLogs, 1) {
+			assert.Equal(t, requestId, body.AuditLogs[0].RequestId)
+			assert.Equal(t, constants.AuditUpdatedAuditLogsSettings, body.AuditLogs[0].AuditEvent)
+		}
+
+		t.Run("and narrows further with the audit event", func(t *testing.T) {
+			withEvent, resp := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestId)+
+				"&auditEvent="+constants.AuditUpdatedAuditLogsSettings)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, 1, withEvent.Total)
+			assert.Len(t, withEvent.AuditLogs, 1)
+
+			otherEvent, resp2 := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestId)+
+				"&auditEvent=user_login")
+			defer func() { _ = resp2.Body.Close() }()
+
+			assert.Equal(t, 0, otherEvent.Total, "the two filters must both apply, not either")
+			assert.Empty(t, otherEvent.AuditLogs)
+		})
+	})
+
+	// The header is bounded nowhere but the server's 1 MiB header cap, so what the row can
+	// carry is the log's clipped rendering and nothing longer. The filter finds the row by that
+	// same string, which is what makes the value on the admin page the value an operator greps
+	// the log for.
+	t.Run("an oversized id is stored and found as the log renders it", func(t *testing.T) {
+		oversized := strings.Repeat("x", 300)
+		clipped := strings.Repeat("x", 128) + "[truncated, 128 of 300 bytes]"
+		auditedPutWithRequestId(t, accessToken, oversized)
+
+		body, resp := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(clipped))
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, 1, body.Total)
+		if assert.Len(t, body.AuditLogs, 1) {
+			assert.Equal(t, clipped, body.AuditLogs[0].RequestId)
+		}
+
+		raw, resp2 := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(oversized))
+		defer func() { _ = resp2.Body.Close() }()
+		assert.Equal(t, 0, raw.Total, "the raw header is not what the row holds")
+	})
+
+	// No header means chi generates one, so an entry raised by a request always carries an id;
+	// only entries written off a request, and rows older than the column, carry none.
+	t.Run("with no header the entry still carries the id chi generated", func(t *testing.T) {
+		before, resp := getAuditLogs(t, accessToken,
+			"auditEvent="+constants.AuditUpdatedAuditLogsSettings+"&size=1")
+		defer func() { _ = resp.Body.Close() }()
+		var lastIdBefore int64
+		if len(before.AuditLogs) > 0 {
+			lastIdBefore = before.AuditLogs[0].Id
+		}
+
+		auditedPutWithRequestId(t, accessToken, "")
+
+		after, resp2 := getAuditLogs(t, accessToken,
+			"auditEvent="+constants.AuditUpdatedAuditLogsSettings+"&size=1")
+		defer func() { _ = resp2.Body.Close() }()
+
+		if assert.Len(t, after.AuditLogs, 1) {
+			entry := after.AuditLogs[0]
+			assert.NotEqual(t, lastIdBefore, entry.Id, "the PUT must have written a new entry")
+			// chi's own shape, hostname/prefix-counter, not chi's exact alphabet.
+			assert.Regexp(t, `^.+/.+-\d+$`, entry.RequestId)
+
+			found, resp3 := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(entry.RequestId))
+			defer func() { _ = resp3.Body.Close() }()
+			assert.Equal(t, 1, found.Total, "the generated id must be searchable like any other")
+		}
+	})
 }

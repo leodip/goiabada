@@ -4398,8 +4398,8 @@ func (_c *Database_GetAllWebOrigins_Call) RunAndReturn(run func(tx *sql.Tx) ([]m
 }
 
 // GetAuditLogsPaginated provides a mock function for the type Database
-func (_mock *Database) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error) {
-	ret := _mock.Called(tx, page, pageSize, auditEvent)
+func (_mock *Database) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]models.AuditLog, int, error) {
+	ret := _mock.Called(tx, page, pageSize, auditEvent, requestId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAuditLogsPaginated")
@@ -4408,23 +4408,23 @@ func (_mock *Database) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int,
 	var r0 []models.AuditLog
 	var r1 int
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int, int, string) ([]models.AuditLog, int, error)); ok {
-		return returnFunc(tx, page, pageSize, auditEvent)
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int, int, string, string) ([]models.AuditLog, int, error)); ok {
+		return returnFunc(tx, page, pageSize, auditEvent, requestId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int, int, string) []models.AuditLog); ok {
-		r0 = returnFunc(tx, page, pageSize, auditEvent)
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int, int, string, string) []models.AuditLog); ok {
+		r0 = returnFunc(tx, page, pageSize, auditEvent, requestId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.AuditLog)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int, int, string) int); ok {
-		r1 = returnFunc(tx, page, pageSize, auditEvent)
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int, int, string, string) int); ok {
+		r1 = returnFunc(tx, page, pageSize, auditEvent, requestId)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
-	if returnFunc, ok := ret.Get(2).(func(*sql.Tx, int, int, string) error); ok {
-		r2 = returnFunc(tx, page, pageSize, auditEvent)
+	if returnFunc, ok := ret.Get(2).(func(*sql.Tx, int, int, string, string) error); ok {
+		r2 = returnFunc(tx, page, pageSize, auditEvent, requestId)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -4441,11 +4441,12 @@ type Database_GetAuditLogsPaginated_Call struct {
 //   - page int
 //   - pageSize int
 //   - auditEvent string
-func (_e *Database_Expecter) GetAuditLogsPaginated(tx any, page any, pageSize any, auditEvent any) *Database_GetAuditLogsPaginated_Call {
-	return &Database_GetAuditLogsPaginated_Call{Call: _e.mock.On("GetAuditLogsPaginated", tx, page, pageSize, auditEvent)}
+//   - requestId string
+func (_e *Database_Expecter) GetAuditLogsPaginated(tx any, page any, pageSize any, auditEvent any, requestId any) *Database_GetAuditLogsPaginated_Call {
+	return &Database_GetAuditLogsPaginated_Call{Call: _e.mock.On("GetAuditLogsPaginated", tx, page, pageSize, auditEvent, requestId)}
 }
 
-func (_c *Database_GetAuditLogsPaginated_Call) Run(run func(tx *sql.Tx, page int, pageSize int, auditEvent string)) *Database_GetAuditLogsPaginated_Call {
+func (_c *Database_GetAuditLogsPaginated_Call) Run(run func(tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string)) *Database_GetAuditLogsPaginated_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *sql.Tx
 		if args[0] != nil {
@@ -4463,11 +4464,16 @@ func (_c *Database_GetAuditLogsPaginated_Call) Run(run func(tx *sql.Tx, page int
 		if args[3] != nil {
 			arg3 = args[3].(string)
 		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -4478,7 +4484,7 @@ func (_c *Database_GetAuditLogsPaginated_Call) Return(auditLogs []models.AuditLo
 	return _c
 }
 
-func (_c *Database_GetAuditLogsPaginated_Call) RunAndReturn(run func(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error)) *Database_GetAuditLogsPaginated_Call {
+func (_c *Database_GetAuditLogsPaginated_Call) RunAndReturn(run func(tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]models.AuditLog, int, error)) *Database_GetAuditLogsPaginated_Call {
 	_c.Call.Return(run)
 	return _c
 }

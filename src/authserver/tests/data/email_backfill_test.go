@@ -478,7 +478,7 @@ func TestBackfillLowercaseEmails_DisablingALoserIsAudited(t *testing.T) {
 		require.NoError(t, err, "BackfillLowercaseEmails")
 		require.Equalf(t, 1, disabled, "exactly the loser must be disabled on %s", dbType())
 
-		logs, total, err := h.DB.GetAuditLogsPaginated(nil, 1, 50, constants.AuditRevokedUserAuthState)
+		logs, total, err := h.DB.GetAuditLogsPaginated(nil, 1, 50, constants.AuditRevokedUserAuthState, "")
 		require.NoError(t, err, "read audit_logs back")
 		require.Equalf(t, 1, total,
 			"disabling one account must leave exactly one %s row; got %d",
@@ -524,7 +524,7 @@ func TestBackfillLowercaseEmails_DisablingALoserIsAudited(t *testing.T) {
 		require.NoError(t, err, "second BackfillLowercaseEmails")
 		require.Equal(t, 0, disabledAgain, "the second run must disable nobody")
 
-		_, totalAfter, err := h.DB.GetAuditLogsPaginated(nil, 1, 50, constants.AuditRevokedUserAuthState)
+		_, totalAfter, err := h.DB.GetAuditLogsPaginated(nil, 1, 50, constants.AuditRevokedUserAuthState, "")
 		require.NoError(t, err, "re-read audit_logs")
 		assert.Equalf(t, 1, totalAfter,
 			"a run that disabled nobody must audit nothing; the count went %d to %d", 1, totalAfter)
@@ -537,7 +537,7 @@ func TestBackfillLowercaseEmails_DisablingALoserIsAudited(t *testing.T) {
 		require.NoError(t, err, "BackfillLowercaseEmails")
 		require.Equal(t, 1, disabled, "the disable happens whatever the audit settings say")
 
-		_, total, err := h.DB.GetAuditLogsPaginated(nil, 1, 50, constants.AuditRevokedUserAuthState)
+		_, total, err := h.DB.GetAuditLogsPaginated(nil, 1, 50, constants.AuditRevokedUserAuthState, "")
 		require.NoError(t, err, "read audit_logs back")
 		assert.Equalf(t, 0, total,
 			"with audit_logs_in_database_enabled off this event must not be written; it is the one event an operator could not turn off otherwise, and %d rows say it is", total)

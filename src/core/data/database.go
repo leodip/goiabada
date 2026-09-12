@@ -325,7 +325,7 @@ type Database interface {
 
 	CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error
 	DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
-	GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error)
+	GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]models.AuditLog, int, error)
 
 	CreateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error
 	UpdateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error

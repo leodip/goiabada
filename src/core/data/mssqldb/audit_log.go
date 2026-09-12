@@ -73,7 +73,28 @@ func (d *MsSQLDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDele
 	return int(rowsAffected), nil
 }
 
-func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error) {
+// requestIdIsByteExact is the predicate that holds SQL Server to the bytes of the request id,
+// written once because the page query and the count query must carry the same one.
+//
+// `=` is not exact on this engine: it pads, so request_id = 'corr' is true of a row holding
+// 'corr ' under every collation SQL Server has, Latin1_General_100_BIN2_UTF8 included, and no
+// collation turns that off (see commondb.engineFoldedTheMatch). commondb answers that by
+// dropping the folded rows after the scan, which cannot work here: this body pages with
+// OFFSET/FETCH, so a row dropped after the fetch leaves a short page, and the count query has
+// no rows to drop at all. Measured against the live engine, a guard applied after the fetch
+// gave an empty page under a total of 1 (#328).
+//
+// So the fold is closed in the statement instead, and in both statements. The equality stays
+// beside it so the index on request_id can still seek; the CAST is the filter. VARBINARY(512)
+// is the column's whole width: request_id is NVARCHAR(256), which stores UTF-16 even under the
+// UTF-8 collation, so 256 characters are 512 bytes and nothing that fits the column is clipped
+// by the cast.
+func requestIdIsByteExact(b interface{ Var(arg interface{}) string }, requestId string) string {
+	return "CAST(request_id AS VARBINARY(512)) = CAST(" + b.Var(requestId) + " AS VARBINARY(512))"
+}
+
+func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string,
+	requestId string) ([]models.AuditLog, int, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -92,6 +113,10 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int
 	selectBuilder := auditLogStruct.SelectFrom("audit_logs")
 	if auditEvent != "" {
 		selectBuilder.Where(selectBuilder.Equal("audit_event", auditEvent))
+	}
+	if requestId != "" {
+		selectBuilder.Where(selectBuilder.Equal("request_id", requestId),
+			requestIdIsByteExact(selectBuilder, requestId))
 	}
 	// MSSQL pagination: ORDER BY ... OFFSET n ROWS FETCH NEXT m ROWS ONLY
 	selectBuilder.OrderBy("created_at DESC", "id DESC")
@@ -122,6 +147,10 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int
 	countBuilder.Select("COUNT(*)").From("audit_logs")
 	if auditEvent != "" {
 		countBuilder.Where(countBuilder.Equal("audit_event", auditEvent))
+	}
+	if requestId != "" {
+		countBuilder.Where(countBuilder.Equal("request_id", requestId),
+			requestIdIsByteExact(countBuilder, requestId))
 	}
 
 	countSql, countArgs := countBuilder.Build()

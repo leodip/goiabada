@@ -168,7 +168,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		const pageSize = 20
 
 		// Fetch audit logs
-		auditLogsResp, err := apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent)
+		auditLogsResp, err := apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, "")
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -179,7 +179,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		// that highlights a full one (#305).
 		if clamped := pagination.ClampPage(auditLogsResp.Total, pageSize, pageInt); clamped != pageInt {
 			pageInt = clamped
-			auditLogsResp, err = apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent)
+			auditLogsResp, err = apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, "")
 			if err != nil {
 				handlers.HandleAPIError(httpHelper, w, r, err)
 				return

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -80,10 +81,17 @@ func (c *AuthServerClient) UpdateSettingsAuditLogs(accessToken string, request *
 	return &response, nil
 }
 
-func (c *AuthServerClient) GetAuditLogsPaginated(accessToken string, page, pageSize int, auditEvent string) (*api.GetAuditLogsResponse, error) {
+func (c *AuthServerClient) GetAuditLogsPaginated(accessToken string, page, pageSize int, auditEvent string,
+	requestId string) (*api.GetAuditLogsResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/audit-logs?page=%d&size=%d", c.baseURL, page, pageSize)
 	if auditEvent != "" {
 		fullURL += fmt.Sprintf("&auditEvent=%s", auditEvent)
+	}
+	if requestId != "" {
+		// Escaped, unlike auditEvent above: the request id is whatever the client put in
+		// X-Request-Id, so it can carry an & or a # and would otherwise be read as another
+		// parameter or truncate the query (#328).
+		fullURL += fmt.Sprintf("&requestId=%s", url.QueryEscape(requestId))
 	}
 
 	req, err := http.NewRequest("GET", fullURL, nil)
