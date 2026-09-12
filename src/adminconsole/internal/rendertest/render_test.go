@@ -582,3 +582,84 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 		})
 	}
 }
+
+// The End Session button's arguments against endSessionClick's parameters, on all three session
+// pages.
+//
+// Folded in with #281: the admin-client page declared six parameters -- it kept a `device` the
+// body never reads, unlike the two pages whose modal names the device -- and its button passed
+// five, so `IsCurrent` landed in `device` and `isCurrent` was always undefined. The "you are
+// ending your own session" warning could therefore never appear on that page, although its
+// handler sets the flag. JavaScript pads a short call with undefined rather than failing, so
+// nothing anywhere reported it: not the renderer, not the browser, not a handler test that
+// only sees the bind.
+//
+// Counting rather than pinning the argument lists is what makes this a guard for the next edit
+// as well as this one: a parameter added to one page's function and not to its button, in
+// either direction, is the same defect and fails here too. The fixture values carry no comma,
+// which is what lets the count be commas plus one.
+func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.T) {
+	declRe := regexp.MustCompile(`function endSessionClick\(([^)]*)\)`)
+	callRe := regexp.MustCompile(`onclick="endSessionClick\(([^)]*)\)`)
+
+	for _, tc := range []struct {
+		name string
+		page string
+		bind map[string]interface{}
+	}{
+		{
+			name: "account",
+			page: "/account_user_sessions.html",
+			bind: map[string]interface{}{
+				"sessions": []accounthandlers.SessionInfo{{
+					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
+					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
+				}},
+			},
+		},
+		{
+			name: "admin user",
+			page: "/admin_users_sessions.html",
+			bind: map[string]interface{}{
+				"user": &models.User{Id: 7, Email: "someone@example.com"},
+				"sessions": []adminuserhandlers.SessionInfo{{
+					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
+					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
+				}},
+				"page":  "1",
+				"query": "",
+			},
+		},
+		{
+			name: "admin client",
+			page: "/admin_clients_usersessions.html",
+			bind: map[string]interface{}{
+				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+				"sessions": []adminclienthandlers.SessionInfo{{
+					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
+					DeviceName: "Chrome 120", DeviceType: "Desktop",
+					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
+				}},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := render(t, tc.page, tc.bind)
+
+			decl := declRe.FindStringSubmatch(out)
+			require.NotNilf(t, decl, "%s: no endSessionClick declaration", tc.page)
+			call := callRe.FindStringSubmatch(out)
+			require.NotNilf(t, call, "%s: no End Session button", tc.page)
+
+			assert.Equal(t, strings.Count(decl[1], ",")+1, strings.Count(call[1], ",")+1,
+				"%s: endSessionClick(%s) is called with (%s)", tc.page, decl[1], call[1])
+
+			// The flag is the argument the mismatch swallowed, and it is the last one on every
+			// page, so pinning it is what says the count above lines up where it matters.
+			assert.True(t, strings.HasSuffix(strings.TrimSpace(decl[1]), "isCurrent"),
+				"%s: isCurrent is expected last, got (%s)", tc.page, decl[1])
+			assert.True(t, strings.HasSuffix(strings.TrimSpace(call[1]), "true"),
+				"%s: the current session must pass true last, got (%s)", tc.page, call[1])
+		})
+	}
+}

@@ -3,6 +3,7 @@ package useragent
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -135,7 +136,7 @@ func TestLabels_ClientHints(t *testing.T) {
 			wantName: "Not/A)Brand 24", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// The positive control for the escape gate: \" is one of the two escapes RFC 8941
+			// The positive control for the escape gate: \" is one of the two escapes RFC 9651
 			// 3.3.3 allows, so this list parses and the quote survives into the name. v carries
 			// a full version and only the major is displayed (decision 3), and the platform
 			// "Unknown" is one UA-CH 3.9 lists and means absent.
@@ -176,6 +177,65 @@ func TestLabels_ClientHints(t *testing.T) {
 			},
 			wantName: "Chrome 120", wantType: "Desktop", wantOS: "Windows",
 		},
+		// The four rows below carry a valid parameter on a key nothing reads, paired with a
+		// Firefox User-Agent so the answer says which path ran. Each is a bare-item form that
+		// a reader of the obsolete RFC 8941 set refuses, and refusing means falling through to
+		// a User-Agent Chromium freezes -- reporting Firefox on Linux for a Chrome on Windows,
+		// which is the whole failure decision 2 of #281 exists to avoid.
+		{
+			// RFC 9651 4.2.3.1 step 6: "@" starts a Date (3.3.7), which 8941 did not have.
+			name: "a date parameter, an RFC 9651 form RFC 8941 lacked",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v="120";seen=@1659578233`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome 120", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			// RFC 9651 4.2.3.1 step 7: "%" starts a Display String (3.3.8). Its body carries
+			// lowercase pct-encoding, and "\" stands for itself rather than escaping, which is
+			// where 4.2.10 parts company with the sf-string reader beside it.
+			name: "a display string parameter, an RFC 9651 form RFC 8941 lacked",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v="120";note=%"caf%c3%a9 a\b"`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome 120", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			// The positive control for the base64 decode gate: a byte sequence that does
+			// decode still parses, so the gate refuses malformed content rather than the form.
+			name: "a byte sequence parameter that decodes",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v="120";other=:QQ==:`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome 120", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			// And the same byte with its padding omitted, which RFC 9651 4.2.7 step 7 says to
+			// synthesize rather than refuse. A decoder demanding padding rejects this.
+			name: "a byte sequence parameter with its padding omitted",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v="120";other=:QQ:`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome 120", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			// An empty byte sequence is the empty string base64-decoded, which succeeds.
+			name: "an empty byte sequence parameter",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v="120";other=::`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome 120", wantType: "Desktop", wantOS: "Windows",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -213,7 +273,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// Gate: RFC 8941 3.3.3, "other characters after '\' MUST cause parsing to fail".
+			// Gate: RFC 9651 3.3.3, "other characters after '\' MUST cause parsing to fail".
 			// Without it the brand reads Chro\me and is stored as a browser name.
 			name: "an escape of anything but a quote or a backslash",
 			headers: map[string]string{
@@ -224,7 +284,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 		},
 		{
 			// Gate: a member is its string, then its parameters, then a comma or the end of
-			// the field (RFC 8941 3.1). Pinning it takes a contrived header, and the shape is
+			// the field (RFC 9651 3.1). Pinning it takes a contrived header, and the shape is
 			// the point: a reader without the gate steps over one character and carries on,
 			// so it resynchronises onto the next quote and reads a list the sender never
 			// sent. Ordinary malformations do not show that -- junk that is not a member
@@ -240,7 +300,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 		},
 		{
 			// Rejected by parseString rather than by the comma gate: after the comma there is
-			// no member, and RFC 8941 3.1 has no empty one.
+			// no member, and RFC 9651 3.1 has no empty one.
 			name: "a trailing comma",
 			headers: map[string]string{
 				"Sec-CH-UA":  `"Google Chrome";v="120",`,
@@ -259,7 +319,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// Gate: RFC 8941 3.3.3 unescaped = %x20-21 / %x23-5B / %x5D-7E, so a control
+			// Gate: RFC 9651 3.3.3 unescaped = %x20-21 / %x23-5B / %x5D-7E, so a control
 			// character is not a character an sf-string may carry unescaped.
 			name: "a control character inside a brand",
 			headers: map[string]string{
@@ -279,7 +339,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// Gate: an empty Sec-CH-UA is an empty list, which UA-CH never sends and RFC 8941
+			// Gate: an empty Sec-CH-UA is an empty list, which UA-CH never sends and RFC 9651
 			// 3.1 does not admit as a member.
 			name: "an empty Sec-CH-UA",
 			headers: map[string]string{
@@ -289,12 +349,12 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// Gate: RFC 8941 3.1.2 param-key = key = ( lcalpha / "*" ) *( lcalpha / DIGIT /
+			// Gate: RFC 9651 3.1.2 param-key = key = ( lcalpha / "*" ) *( lcalpha / DIGIT /
 			// "_" / "-" / "." / "*" ). Uppercase is not in it, so "V" is not the v parameter
 			// spelled differently -- it is a header that is not a structured field. A reader
 			// on the wider HTTP token grammar takes the key, fails to match "v", and labels
 			// the session "Google Chrome" with no version at all.
-			name: "a parameter key outside RFC 8941's key grammar",
+			name: "a parameter key outside RFC 9651's key grammar",
 			headers: map[string]string{
 				"Sec-CH-UA":  `"Google Chrome";V="120"`,
 				"User-Agent": firefoxLinux,
@@ -308,7 +368,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			// refuses "V" anyway, because "V" is not a continuation character either, so the
 			// cursor never moves and the comma gate below refuses the member; and it refuses
 			// "=" anyway, because "=" is in neither set. A digit is the case where the two
-			// disagree and the parse still runs on: it starts no key in RFC 8941 but continues
+			// disagree and the parse still runs on: it starts no key in RFC 9651 but continues
 			// one, so a widened reader takes "1x" as a key, reads its value, finishes the list
 			// cleanly and labels the session Chrome 120. The same holds for "-", "." and "_",
 			// which fail the same predicate and pass the same continuation.
@@ -320,7 +380,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// Gate: a parameter has a key, and RFC 8941 3.1.2's key production has no empty
+			// Gate: a parameter has a key, and RFC 9651 3.1.2's key production has no empty
 			// form. This is the row that reaches that gate rather than the comma gate after
 			// it: the uppercase row above is refused either way, because a key reader that
 			// takes nothing leaves the cursor on a byte that is not a comma, whereas here the
@@ -334,9 +394,9 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// Gate: param-value = bare-item (RFC 8941 3.1.2), and "@" starts none of the six
-			// forms. Without the gate the version reads "@junk" and "Google Chrome @junk"
-			// goes into device_name.
+			// Gate: param-value = bare-item (RFC 9651 3.1.2). "@" starts a Date, and 4.2.9
+			// reads what follows as an sf-integer, which "junk" is not. Without the gate the
+			// version reads "@junk" and "Google Chrome @junk" goes into device_name.
 			name: "a parameter value that is not a bare item",
 			headers: map[string]string{
 				"Sec-CH-UA":  `"Google Chrome";v=@junk`,
@@ -366,7 +426,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// Gate: sf-integer is at most 15 digits (RFC 8941 3.3.1), so sixteen is not a
+			// Gate: sf-integer is at most 15 digits (RFC 9651 3.3.1), so sixteen is not a
 			// bare item.
 			name: "an integer parameter longer than sf-integer allows",
 			headers: map[string]string{
@@ -376,7 +436,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// Gate: sf-decimal takes one to three digits after the point (RFC 8941 3.3.2).
+			// Gate: sf-decimal takes one to three digits after the point (RFC 9651 3.3.2).
 			name: "a decimal parameter with four fractional digits",
 			headers: map[string]string{
 				"Sec-CH-UA":  `"Google Chrome";v=1.2345`,
@@ -385,7 +445,7 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
 		},
 		{
-			// Gate: RFC 8941 3.1.2 separates a parameter from its ";" with *SP, not OWS.
+			// Gate: RFC 9651 3.1.2 separates a parameter from its ";" with *SP, not OWS.
 			name: "a tab between the semicolon and the parameter",
 			headers: map[string]string{
 				"Sec-CH-UA":  "\"Google Chrome\";\tv=\"120\"",
@@ -395,10 +455,104 @@ func TestLabels_ClientHintsThatDoNotParseFallToTheUserAgent(t *testing.T) {
 		},
 		{
 			// Gate: an unterminated byte sequence must not swallow the rest of the field
-			// (RFC 8941 3.3.5).
+			// (RFC 9651 3.3.5).
 			name: "a byte sequence that never closes",
 			headers: map[string]string{
 				"Sec-CH-UA":  `"Google Chrome";v=:AAAA`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: RFC 9651 4.2.7 step 6 checks the alphabet and step 7 then decodes,
+			// "if base64 decoding fails, parsing fails". One base64 character is six bits,
+			// which is no whole byte, so it passes the alphabet check and fails the decode.
+			// With only the alphabet check the whole malformed hint is used.
+			name: "a byte sequence whose content cannot be base64-decoded",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";other=:A:`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Same gate, the other way a run of alphabet characters fails to decode: padding
+			// is only ever trailing, so "=" before content is not a synthesizable omission.
+			name: "a byte sequence with padding where content belongs",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";other=:=A==:`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: RFC 9651 4.2 step 2 discards leading SP before the list parser runs, and
+			// OWS only between members (4.2.1). Not reachable over HTTP/1, where Go strips
+			// field-line edge whitespace before the handler sees the request, so this pins the
+			// grammar at the one seam that can still be handed a tab: another caller in this
+			// process building a request by hand.
+			name: "a tab before the first list member",
+			headers: map[string]string{
+				"Sec-CH-UA":  "\t" + `"Google Chrome";v="120"`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: sf-date is "@" sf-integer (RFC 9651 3.3.7), and 4.2.9 step 4 fails parsing
+			// when what follows is a Decimal. The point is the whole of the difference.
+			name: "a date parameter that is a decimal",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";seen=@1659578233.5`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: RFC 9651 3.3.8 pct-encoded takes lc-hexdig, DIGIT / %x61-66. Upper case is
+			// not the same octet spelled differently, it is a field that does not parse.
+			name: "a display string with upper-case percent-encoding",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";note=%"caf%C3%A9"`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: RFC 9651 4.2.10's closing step decodes byte_array as UTF-8 and fails
+			// parsing if that fails. %ff alone is no UTF-8 sequence.
+			name: "a display string whose octets are not valid UTF-8",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";note=%"%ff"`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: 4.2.10 rejects anything outside VCHAR and SP in the encoded text, so a
+			// display string carrying a raw control character is not one.
+			name: "a display string carrying a raw control character",
+			headers: map[string]string{
+				"Sec-CH-UA":  "\"Google Chrome\";v=\"120\";note=%\"a\x01b\"",
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: a display string is "%" DQUOTE, never "%" alone. Without the quote check
+			// the "%" branch is entered and the rest of the field is read as its body.
+			name: "a percent that opens no display string",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";note=%junk`,
+				"User-Agent": firefoxLinux,
+			},
+			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
+		},
+		{
+			// Gate: unterminated, the display string's version of the row above it.
+			name: "a display string that never closes",
+			headers: map[string]string{
+				"Sec-CH-UA":  `"Google Chrome";v="120";note=%"hello`,
 				"User-Agent": firefoxLinux,
 			},
 			wantName: "Firefox 121", wantType: "Desktop", wantOS: "Linux",
@@ -427,7 +581,7 @@ func TestLabels_PlatformHintsThatDoNotParseAreAbsent(t *testing.T) {
 		// Gate: an sf-string is quoted. Without the gate this reads as the platform Windows,
 		// which is the shape the derivation had before the gates were added.
 		{"unquoted", "Windows"},
-		// Gate: RFC 8941 3.3.3 again, the escape rule, on the platform rather than a brand.
+		// Gate: RFC 9651 3.3.3 again, the escape rule, on the platform rather than a brand.
 		{"an invalid escape", `"Win\dows"`},
 		// Gate: nothing may trail the closing quote.
 		{"junk after the closing quote", `"Windows" x`},
@@ -435,6 +589,13 @@ func TestLabels_PlatformHintsThatDoNotParseAreAbsent(t *testing.T) {
 		{"never closed", `"Windows`},
 		// Gate: a control character, unescaped.
 		{"a control character", "\"Win\x01dows\""},
+		// Gate: RFC 9651 4.2 steps 2 and 6 bracket a field with *SP, not OWS, and an Item has
+		// no parser of its own that discards OWS the way a list does around its commas. Both
+		// edges, because they are separate sites in the code and a fix to one is not a fix to
+		// the other. Neither is reachable over HTTP/1 -- Go strips field-line edge whitespace
+		// before the handler runs -- so these pin the grammar rather than a wire case.
+		{"a leading tab", "\t" + `"Windows"`},
+		{"a trailing tab", `"Windows"` + "\t"},
 	}
 
 	for _, tc := range testCases {
@@ -455,7 +616,7 @@ func TestLabels_PlatformHintsThatDoNotParseAreAbsent(t *testing.T) {
 }
 
 // A header may arrive as more than one field line, and a structured field's value is those
-// lines joined with ", " before anything parses them (RFC 9110 5.3, RFC 8941 4.2).
+// lines joined with ", " before anything parses them (RFC 9110 5.3, RFC 9651 4.2).
 //
 // http.Header.Get answers the first line alone, which is wrong in both directions at once: a
 // Sec-CH-UA legitimately split after its GREASE brand reads as a one-brand list and the session
@@ -503,7 +664,7 @@ func TestLabels_RepeatedFieldLinesAreJoinedBeforeParsing(t *testing.T) {
 }
 
 // A brand and a platform are arbitrary text, by specification: UA-CH 3 says a server "MUST
-// accept arbitrary values for each" of these properties, and an RFC 8941 sf-string admits every
+// accept arbitrary values for each" of these properties, and an RFC 9651 sf-string admits every
 // printable ASCII character, angle brackets and quotes among them. So markup in a label is not
 // a header to reject -- rejecting it would be the source-side filtering UA-CH forbids -- it is
 // a value every consumer has to render as text.
@@ -857,4 +1018,72 @@ func TestRaw(t *testing.T) {
 		assert.Len(t, got, 512)
 		assert.Equal(t, strings.Repeat("a", 512), got)
 	})
+}
+
+// Every prefix of a header carrying every bare-item form, and every prefix of a platform hint.
+//
+// The reader walks a byte at a time and several of its steps look ahead, so the failure it is
+// prone to is indexing past a field that stopped early -- and a field stops wherever the sender
+// chose, since both hints are request headers. That is not hypothetical: `v=@` was a panic
+// inside Labels, reachable by anyone able to send a header, because parseDate stepped over the
+// "@" and handed parseNumber an index one past the end.
+//
+// Truncation is the whole family rather than that one row: every form's parser is entered here
+// and then cut off at each byte in turn, so a look-ahead added to any of them is covered by
+// this test on the day it is written. The assertion is only that Labels answers rather than
+// panics, and that it answers the same thing twice; which label a truncated header produces is
+// the tables above, and pinning it here would make this fail for the wrong reason.
+func TestLabels_NoPrefixOfAHintCanPanic(t *testing.T) {
+	// One member of each bare-item form RFC 9651 4.2.3.1 dispatches on: string, integer,
+	// decimal, negative, token, byte sequence, boolean, date, display string.
+	const brands = `"Google Chrome";v="120";a=1;b=1.5;c=-2;d=tok;e=:QQ==:;f=?1;g=@1659578233;` +
+		`h=%"caf%c3%a9", "Chromium";v="120"`
+
+	for i := 0; i <= len(brands); i++ {
+		prefix := brands[:i]
+		t.Run("brands cut at "+strconv.Itoa(i), func(t *testing.T) {
+			name, deviceType, os := Labels(newRequest(map[string]string{
+				"Sec-CH-UA":  prefix,
+				"User-Agent": firefoxLinux,
+			}))
+			// Whatever it answered, it answers it again: a reader that consumed a different
+			// number of bytes on the second pass has state the first pass left behind.
+			name2, deviceType2, os2 := Labels(newRequest(map[string]string{
+				"Sec-CH-UA":  prefix,
+				"User-Agent": firefoxLinux,
+			}))
+			assert.Equal(t, name, name2)
+			assert.Equal(t, deviceType, deviceType2)
+			assert.Equal(t, os, os2)
+		})
+	}
+
+	const plat = `"Windows"`
+	for i := 0; i <= len(plat); i++ {
+		prefix := plat[:i]
+		t.Run("platform cut at "+strconv.Itoa(i), func(t *testing.T) {
+			assert.NotPanics(t, func() {
+				Labels(newRequest(map[string]string{
+					"Sec-CH-UA":          `"Google Chrome";v="120"`,
+					"Sec-CH-UA-Platform": prefix,
+					"User-Agent":         firefoxLinux,
+				}))
+			})
+		})
+	}
+}
+
+// The one truncation that was a crash, named on its own so a failure says what broke rather
+// than pointing at an index in the sweep above. "@" starts a Date (RFC 9651 4.2.3.1 step 6)
+// and 4.2.9 discards it before parsing an sf-integer, so a field ending at the "@" leaves the
+// integer parser one byte past the end.
+func TestLabels_ADateParameterCutOffAtTheAtSignIsRefused(t *testing.T) {
+	name, deviceType, os := Labels(newRequest(map[string]string{
+		"Sec-CH-UA":  `"Google Chrome";v=@`,
+		"User-Agent": firefoxLinux,
+	}))
+
+	assert.Equal(t, "Firefox 121", name)
+	assert.Equal(t, "Desktop", deviceType)
+	assert.Equal(t, "Linux", os)
 }
