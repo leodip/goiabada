@@ -7,7 +7,7 @@ import (
 )
 
 // TestSlogConvention fails the authserver unit tier when any production file under src/ writes a
-// record outside the logging convention. testutil.AssertSlogConvention carries the five rules and
+// record outside the logging convention. testutil.AssertSlogConvention carries the six rules and
 // the reasoning for each.
 //
 // The scope is the whole source root, which is what makes it the measurement of #320's third goal

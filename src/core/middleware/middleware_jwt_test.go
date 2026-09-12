@@ -858,6 +858,40 @@ func TestRefreshToken_NoRefreshToken(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// The one path that used to panic. Every other refreshToken case either supplies a client or
+// returns before one is reached, so this is the case that holds the guard: with credentials
+// configured and a refresh token present, a nil HTTPClient used to log and then dereference on
+// the next line, taking the process down on a request the caller was equipped to handle. It now
+// fails closed, which is what the caller already does with a refresh error -- clear the session
+// and carry on (#320).
+//
+// A restored log-then-continue branch fails this test by panicking rather than by an assertion,
+// which needs no panic harness: a panic in a test is a failed test.
+func TestRefreshToken_NilHTTPClientFailsClosed(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+	mockSessionStore := new(mock_sessionstore.Store)
+
+	// nil as the interface itself, not a typed nil behind it: a (*mockHTTPClient)(nil) would
+	// pass the == nil guard and reach Do, which is a different thing to test.
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
+
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+
+	tokenResponse := &oauth.TokenResponse{
+		AccessToken:  "oldaccesstoken",
+		RefreshToken: "oldrefreshtoken",
+	}
+
+	refreshed, err := middleware.refreshToken(rr, req, tokenResponse)
+
+	assert.False(t, refreshed)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no http client is configured")
+}
+
 func TestRefreshToken_InvalidResponse(t *testing.T) {
 	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)

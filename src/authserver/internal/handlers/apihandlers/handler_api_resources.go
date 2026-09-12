@@ -82,7 +82,7 @@ func HandleAPIResourceCreatePost(
 		// Check uniqueness
 		existing, err := database.GetResourceByResourceIdentifier(nil, createReq.ResourceIdentifier)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking resource by identifier"), "resourceIdentifier", createReq.ResourceIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking resource by identifier"), "resource_identifier", createReq.ResourceIdentifier)
 			return
 		}
 		if existing != nil {
@@ -96,7 +96,7 @@ func HandleAPIResourceCreatePost(
 			Description:        strings.TrimSpace(createReq.Description),
 		}
 		if err := database.CreateResource(nil, resource); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating resource"), "resourceIdentifier", resource.ResourceIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating resource"), "resource_identifier", resource.ResourceIdentifier)
 			return
 		}
 
@@ -134,7 +134,7 @@ func HandleAPIResourceGet(
 
 		resource, err := database.GetResourceById(nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID"), "resourceId", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID"), "resource_id", id)
 			return
 		}
 		if resource == nil {
@@ -171,7 +171,7 @@ func HandleAPIResourceUpdatePut(
 
 		resource, err := database.GetResourceById(nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for update"), "resourceId", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for update"), "resource_id", id)
 			return
 		}
 		if resource == nil {
@@ -212,7 +212,7 @@ func HandleAPIResourceUpdatePut(
 		// Uniqueness check (excluding this resource)
 		existing, err := database.GetResourceByResourceIdentifier(nil, updateReq.ResourceIdentifier)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking resource by identifier for update"), "resourceIdentifier", updateReq.ResourceIdentifier, "resourceId", resource.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking resource by identifier for update"), "resource_identifier", updateReq.ResourceIdentifier, "resource_id", resource.Id)
 			return
 		}
 		if existing != nil && existing.Id != resource.Id {
@@ -233,7 +233,7 @@ func HandleAPIResourceUpdatePut(
 		resource.Description = strings.TrimSpace(updateReq.Description)
 
 		if err := database.UpdateResource(nil, resource); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating resource"), "resourceId", resource.Id, "resourceIdentifier", resource.ResourceIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating resource"), "resource_id", resource.Id, "resource_identifier", resource.ResourceIdentifier)
 			return
 		}
 
@@ -273,7 +273,7 @@ func HandleAPIResourceDelete(
 
 		resource, err := database.GetResourceById(nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for deletion"), "resourceId", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for deletion"), "resource_id", id)
 			return
 		}
 		if resource == nil {
@@ -287,7 +287,7 @@ func HandleAPIResourceDelete(
 		}
 
 		if err := database.DeleteResource(nil, resource.Id); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting resource"), "resourceId", resource.Id, "resourceIdentifier", resource.ResourceIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting resource"), "resource_id", resource.Id, "resource_identifier", resource.ResourceIdentifier)
 			return
 		}
 

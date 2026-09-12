@@ -66,7 +66,7 @@ func HandleAPIUsersSearchGet(
 			// Verify group exists
 			group, err := database.GetGroupById(nil, annotateGroupId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get group by ID"), "groupId", annotateGroupId, "query", query, "page", page)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get group by ID"), "group_id", annotateGroupId, "query", query, "page", page)
 				return
 			}
 			if group == nil {
@@ -77,7 +77,7 @@ func HandleAPIUsersSearchGet(
 			// Load groups for all users to check membership
 			err = database.UsersLoadGroups(nil, users)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user groups"), "userCount", len(users), "query", query, "page", page)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user groups"), "user_count", len(users), "query", query, "page", page)
 				return
 			}
 
@@ -120,7 +120,7 @@ func HandleAPIUsersSearchGet(
 			// Verify permission exists and enforce userinfo special case
 			perm, err := database.GetPermissionById(nil, permId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get permission by ID"), "permissionId", permId)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get permission by ID"), "permission_id", permId)
 				return
 			}
 			if perm == nil {
@@ -129,7 +129,7 @@ func HandleAPIUsersSearchGet(
 			}
 			resource, err := database.GetResourceById(nil, perm.ResourceId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get resource for permission annotation"), "permissionId", permId)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get resource for permission annotation"), "permission_id", permId)
 				return
 			}
 			if resource != nil && resource.ResourceIdentifier == constants.AuthServerResourceIdentifier && perm.PermissionIdentifier == constants.UserinfoPermissionIdentifier {
@@ -139,7 +139,7 @@ func HandleAPIUsersSearchGet(
 
 			// Load permissions for all users to check if they have permId
 			if err := database.UsersLoadPermissions(nil, users); err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user permissions"), "userCount", len(users))
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user permissions"), "user_count", len(users))
 				return
 			}
 

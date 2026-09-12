@@ -43,11 +43,18 @@ import (
 //     own the handler. slog.SetDefault is process-global, so a second install silently replaces
 //     the one both servers configured, and a *slog.Logger obtained anywhere else carries
 //     attributes this rule cannot see.
+//  6. A function that takes the caller's key/value run as a variadic parameter and hands it to a
+//     record is declared in slogAttrForwarders, and rule 3 then reads the keys at its call sites
+//     and in any slice spread into it. Four exist. The API's 500 writer is why the rule does:
+//     328 calls reach one record through it, and until this rule they were the one place in the
+//     tree a key was never read, so 179 of them still spelled clientId, groupId and userId after
+//     the sweep while all three tier callers passed. An unregistered forwarder is refused rather
+//     than ignored, because the shape it creates is a hole in rule 3 that looks like nothing.
 //
 // Resolution is by import path rather than by the text at the call site, as errors_lint.go does
 // and for the same reason: an aliased log/slog, context or net/http would walk straight past a
 // textual check. A dot import of log/slog is refused outright, because it leaves no selector for
-// any of the five rules to resolve.
+// any of the six rules to resolve.
 //
 // ceiling: three shapes are outside a parse and are therefore not held. An attribute key computed
 // at runtime is skipped rather than reported, and a non-literal expression at a key position also
@@ -88,7 +95,8 @@ func AssertSlogConvention(t *testing.T, dirs ...string) {
 		"Every record has a literal, lowercase, unprefixed message, snake_case attribute keys, "+
 		"and a *Context variant wherever a context or a request is in scope so the handler can "+
 		"inject request_id. core/logging owns the handler; testutil.CaptureSlog is how a test "+
-		"reads records (#320).",
+		"reads records; a wrapper that forwards a caller's attributes is listed in "+
+		"slogAttrForwarders so its call sites are read too (#320).",
 		len(violations), files, strings.Join(lines, "\n\t"))
 }
 
@@ -144,6 +152,45 @@ var slogHandlerOwners = []string{
 	"authserver/cmd/goiabada-authserver",
 	"adminconsole/cmd/goiabada-adminconsole",
 	"core/testutil/slog_capture.go",
+}
+
+// slogAttrForwarder is one function that takes the caller's key/value run as a variadic ...any and
+// puts it in a record, so the keys rule 3 has to read are at its call sites rather than at any
+// slog call. firstAttr is the argument index that run begins at.
+//
+// pkgPath resolves a call written pkg.Name, through the file's imports like every other rule here.
+// scope resolves a bare Name, which is how an unexported forwarder and a closure are called and
+// the only way they can be: it is the file or directory, relative to the source root, inside which
+// that identifier is this function. Both are set where a forwarder is called under both forms.
+type slogAttrForwarder struct {
+	pkgPath   string
+	scope     string
+	name      string
+	firstAttr int
+}
+
+// apiresponseImportPath is the package holding the API's one 500, which is the reason rule 6
+// exists: the two functions below reach one slog.ErrorContext, and 328 sites pass their
+// attributes through them.
+const apiresponseImportPath = "github.com/leodip/goiabada/authserver/internal/apiresponse"
+
+// slogAttrForwarders is rule 6's table, and it is exhaustive by construction: every other
+// production function taking a variadic ...any hands it to fmt or to a SQL driver, and rule 6
+// refuses any new one that reaches a record without being listed here.
+//
+// The fourth entry is a closure, which is why scope can be a file: classifyIdTokenHint's reject
+// helper builds the twenty id_token_hint refusals, and its keys are as much a part of the
+// vocabulary as any other. A closure is reachable only from its own file, so the file is its
+// scope exactly as the package directory is an unexported function's.
+var slogAttrForwarders = []slogAttrForwarder{
+	{pkgPath: apiresponseImportPath, scope: "authserver/internal/apiresponse",
+		name: "WriteInternalServerError", firstAttr: 3},
+	{pkgPath: apiresponseImportPath, scope: "authserver/internal/apiresponse",
+		name: "LogInternalServerError", firstAttr: 2},
+	{scope: "authserver/internal/handlers/apihandlers",
+		name: "writeInternalServerError", firstAttr: 3},
+	{scope: "authserver/internal/handlers/handler_account_logout.go",
+		name: "reject", firstAttr: 1},
 }
 
 var (
@@ -236,7 +283,18 @@ func findSlogViolations(root string, dirs []string) ([]slogViolation, int, error
 		}
 		return violations[i].what < violations[j].what
 	})
-	return violations, files, nil
+
+	// A closure's body is walked both on its own and as part of the function enclosing it, so a
+	// key inside one is reported twice. Reporting one finding once is what lets the rule table
+	// assert an exact set.
+	deduped := violations[:0]
+	for i, v := range violations {
+		if i > 0 && v == violations[i-1] {
+			continue
+		}
+		deduped = append(deduped, v)
+	}
+	return deduped, files, nil
 }
 
 // slogExemptByPath covers a test file, which is not production code and reads records through
@@ -271,6 +329,47 @@ func slogOwnsRequestID(rel string) bool {
 	return rel == slogRequestIDOwner || strings.HasPrefix(rel, slogRequestIDOwner+"/")
 }
 
+// slogWithinScope reports whether rel is the scope itself or sits under it, which is the same
+// file-or-directory test slogHandlerOwner applies to rule 5's allowlist.
+func slogWithinScope(rel, scope string) bool {
+	return scope != "" && (rel == scope || strings.HasPrefix(rel, scope+"/"))
+}
+
+// slogForwarderCall resolves a call to one of the forwarders in the table: pkg.Name through the
+// file's imports, or a bare Name inside the scope where that identifier is this function.
+func slogForwarderCall(call *ast.CallExpr, importPaths map[string]string, rel string) (slogAttrForwarder, bool) {
+	switch fun := unparen(call.Fun).(type) {
+	case *ast.SelectorExpr:
+		pkg, name, ok := qualifiedSelector(fun, importPaths)
+		if !ok {
+			return slogAttrForwarder{}, false
+		}
+		for _, fwd := range slogAttrForwarders {
+			if fwd.pkgPath == pkg && fwd.name == name {
+				return fwd, true
+			}
+		}
+	case *ast.Ident:
+		for _, fwd := range slogAttrForwarders {
+			if fwd.name == fun.Name && slogWithinScope(rel, fwd.scope) {
+				return fwd, true
+			}
+		}
+	}
+	return slogAttrForwarder{}, false
+}
+
+// slogForwarderDeclared reports whether a function of this name declared in this file is one the
+// table already covers, which is what rule 6 asks before refusing it.
+func slogForwarderDeclared(name, rel string) bool {
+	for _, fwd := range slogAttrForwarders {
+		if fwd.name == name && slogWithinScope(rel, fwd.scope) {
+			return true
+		}
+	}
+	return false
+}
+
 // slogViolationsInFile reports every refused call in one parsed file.
 func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slogViolation {
 	var violations []slogViolation
@@ -289,7 +388,7 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slo
 		}
 		if name == "." {
 			// A dot import binds Info, SetDefault and String unqualified, so no selector is left
-			// for any of the five rules to resolve and the whole file walks past them. Refusing
+			// for any of the six rules to resolve and the whole file walks past them. Refusing
 			// the import is the answer rather than resolving unqualified calls, which would also
 			// have to model every local declaration that shadows one.
 			if path == slogImportPath {
@@ -366,6 +465,17 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slo
 		if !isCall {
 			return true
 		}
+
+		// A forwarder's call site is where its record's keys are written, so rule 3 reads them
+		// here. The run is read with the same parity as an emission's, because that is what the
+		// forwarder eventually hands to one.
+		if fwd, isForwarder := slogForwarderCall(call, importPaths, rel); isForwarder {
+			if len(call.Args) > fwd.firstAttr {
+				violations = append(violations, slogBareKeyViolations(call.Args[fwd.firstAttr:], fset, rel)...)
+			}
+			return true
+		}
+
 		pkg, fn, resolved := qualifiedCall(call, importPaths)
 		if !resolved || pkg != slogImportPath {
 			return true
@@ -408,7 +518,222 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slo
 		return true
 	})
 
+	violations = append(violations, slogForwarderDeclarationViolations(file, importPaths, fset, rel)...)
+	violations = append(violations, slogSpreadSliceViolations(file, importPaths, fset, rel)...)
+
 	return violations
+}
+
+// slogIsRecordCall reports whether this call puts its argument run in a record: a slog emission,
+// or one of the forwarders that hands its own run to one.
+func slogIsRecordCall(call *ast.CallExpr, importPaths map[string]string, rel string) bool {
+	if _, isForwarder := slogForwarderCall(call, importPaths, rel); isForwarder {
+		return true
+	}
+	pkg, fn, resolved := qualifiedCall(call, importPaths)
+	return resolved && pkg == slogImportPath && slogIsEmission(fn)
+}
+
+// slogVariadicAnyParam returns the name of the signature's variadic ...any or ...interface{}
+// parameter, which is the shape that carries a caller's key/value run.
+func slogVariadicAnyParam(ft *ast.FuncType) string {
+	if ft.Params == nil {
+		return ""
+	}
+	for _, param := range ft.Params.List {
+		ellipsis, isVariadic := param.Type.(*ast.Ellipsis)
+		if !isVariadic || len(param.Names) == 0 {
+			continue
+		}
+		switch elt := unparen(ellipsis.Elt).(type) {
+		case *ast.Ident:
+			if elt.Name == "any" {
+				return param.Names[0].Name
+			}
+		case *ast.InterfaceType:
+			if elt.Methods == nil || len(elt.Methods.List) == 0 {
+				return param.Names[0].Name
+			}
+		}
+	}
+	return ""
+}
+
+// slogForwardsVariadic reports whether body hands param to a record, either by spreading it
+// straight into one or by appending it onto a slice that is spread into one. Those are the two
+// shapes the four real forwarders use, and a function doing neither is not forwarding attributes
+// whatever else it does with the parameter.
+func slogForwardsVariadic(body *ast.BlockStmt, param string, importPaths map[string]string, rel string) bool {
+	spreadsParam, appendsParam, spreadsAnything := false, false, false
+	ast.Inspect(body, func(n ast.Node) bool {
+		call, isCall := n.(*ast.CallExpr)
+		if !isCall || len(call.Args) == 0 {
+			return true
+		}
+		last, isIdent := unparen(call.Args[len(call.Args)-1]).(*ast.Ident)
+		if fn, isBuiltin := unparen(call.Fun).(*ast.Ident); isBuiltin && fn.Name == "append" {
+			for _, arg := range call.Args[1:] {
+				if id, ok := unparen(arg).(*ast.Ident); ok && id.Name == param && call.Ellipsis != token.NoPos {
+					appendsParam = true
+				}
+			}
+			return true
+		}
+		if call.Ellipsis == token.NoPos || !isIdent || !slogIsRecordCall(call, importPaths, rel) {
+			return true
+		}
+		spreadsAnything = true
+		if last.Name == param {
+			spreadsParam = true
+		}
+		return true
+	})
+	return spreadsParam || (appendsParam && spreadsAnything)
+}
+
+// slogForwarderDeclarationViolations is rule 6: a function that forwards a caller's attribute run
+// into a record and is not in slogAttrForwarders. Its call sites write keys no rule reads, which
+// is how 179 camelCase keys survived a sweep that visited every slog call in the tree.
+//
+// A closure is named by the variable it is bound to, because that is the name its callers write.
+// One bound to nothing is refused outright: it can be called, and nothing could ever name it in
+// the table.
+func slogForwarderDeclarationViolations(file *ast.File, importPaths map[string]string, fset *token.FileSet, rel string) []slogViolation {
+	var violations []slogViolation
+	litNames := map[*ast.FuncLit]string{}
+
+	report := func(name string, pos token.Pos) {
+		if slogForwarderDeclared(name, rel) {
+			return
+		}
+		shown := name
+		if shown == "" {
+			shown = "an unnamed function literal"
+		}
+		violations = append(violations, slogViolation{file: rel, line: fset.Position(pos).Line,
+			what: shown + " forwards a variadic ...any into a record",
+			fix: "list it in testutil.slogAttrForwarders with the index its attributes start at, " +
+				"so the keys its callers pass are read; an unlisted one is a hole in the key rule"})
+	}
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch decl := n.(type) {
+		case *ast.AssignStmt:
+			for i, rhs := range decl.Rhs {
+				if lit, isLit := rhs.(*ast.FuncLit); isLit && i < len(decl.Lhs) {
+					if id, isIdent := decl.Lhs[i].(*ast.Ident); isIdent {
+						litNames[lit] = id.Name
+					}
+				}
+			}
+		case *ast.ValueSpec:
+			for i, value := range decl.Values {
+				if lit, isLit := value.(*ast.FuncLit); isLit && i < len(decl.Names) {
+					litNames[lit] = decl.Names[i].Name
+				}
+			}
+		case *ast.FuncDecl:
+			if decl.Body == nil {
+				return true
+			}
+			if param := slogVariadicAnyParam(decl.Type); param != "" &&
+				slogForwardsVariadic(decl.Body, param, importPaths, rel) {
+				report(decl.Name.Name, decl.Pos())
+			}
+		case *ast.FuncLit:
+			if param := slogVariadicAnyParam(decl.Type); param != "" &&
+				slogForwardsVariadic(decl.Body, param, importPaths, rel) {
+				report(litNames[decl], decl.Pos())
+			}
+		}
+		return true
+	})
+	return violations
+}
+
+// slogSpreadSliceViolations reads the keys out of a slice a function builds and spreads into a
+// record, which is the one attribute shape that is neither an argument at a call site nor a
+// slog.Attr: attrs := []any{"client_id", client.Id}, appended to and then spread. Without this
+// the key is written in a composite literal no rule looks at.
+//
+// The names are collected per function body and the slices are then read in that same body, so a
+// slice of SQL arguments called args elsewhere in the file is not read as attributes.
+func slogSpreadSliceViolations(file *ast.File, importPaths map[string]string, fset *token.FileSet, rel string) []slogViolation {
+	var violations []slogViolation
+
+	inBody := func(body *ast.BlockStmt) {
+		spread := map[string]bool{}
+		ast.Inspect(body, func(n ast.Node) bool {
+			call, isCall := n.(*ast.CallExpr)
+			if !isCall || call.Ellipsis == token.NoPos || len(call.Args) == 0 {
+				return true
+			}
+			id, isIdent := unparen(call.Args[len(call.Args)-1]).(*ast.Ident)
+			if isIdent && slogIsRecordCall(call, importPaths, rel) {
+				spread[id.Name] = true
+			}
+			return true
+		})
+		if len(spread) == 0 {
+			return
+		}
+		ast.Inspect(body, func(n ast.Node) bool {
+			assign, isAssign := n.(*ast.AssignStmt)
+			if !isAssign {
+				return true
+			}
+			for i, rhs := range assign.Rhs {
+				if i >= len(assign.Lhs) {
+					break
+				}
+				target, isIdent := assign.Lhs[i].(*ast.Ident)
+				if !isIdent || !spread[target.Name] {
+					continue
+				}
+				switch built := unparen(rhs).(type) {
+				case *ast.CompositeLit:
+					if slogIsAnySlice(built.Type) {
+						violations = append(violations, slogBareKeyViolations(built.Elts, fset, rel)...)
+					}
+				case *ast.CallExpr:
+					fn, isBuiltin := unparen(built.Fun).(*ast.Ident)
+					if isBuiltin && fn.Name == "append" && len(built.Args) > 1 {
+						violations = append(violations, slogBareKeyViolations(built.Args[1:], fset, rel)...)
+					}
+				}
+			}
+			return true
+		})
+	}
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch fn := n.(type) {
+		case *ast.FuncDecl:
+			if fn.Body != nil {
+				inBody(fn.Body)
+			}
+		case *ast.FuncLit:
+			inBody(fn.Body)
+		}
+		return true
+	})
+	return violations
+}
+
+// slogIsAnySlice reports whether the type is []any or []interface{}, the element type an
+// attribute run is built in.
+func slogIsAnySlice(expr ast.Expr) bool {
+	slice, isSlice := unparen(expr).(*ast.ArrayType)
+	if !isSlice || slice.Len != nil {
+		return false
+	}
+	switch elt := unparen(slice.Elt).(type) {
+	case *ast.Ident:
+		return elt.Name == "any"
+	case *ast.InterfaceType:
+		return elt.Methods == nil || len(elt.Methods.List) == 0
+	}
+	return false
 }
 
 // slogIsEmission reports whether fn is one of the ten package-level emission functions.

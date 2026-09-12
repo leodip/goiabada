@@ -32,7 +32,7 @@ func HandleAPIGroupPermissionsGet(
 
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for permissions"), "groupId", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for permissions"), "group_id", id)
 			return
 		}
 		if group == nil {
@@ -42,7 +42,7 @@ func HandleAPIGroupPermissionsGet(
 
 		err = database.GroupLoadPermissions(nil, group)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading group permissions"), "groupId", group.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading group permissions"), "group_id", group.Id)
 			return
 		}
 
@@ -50,7 +50,7 @@ func HandleAPIGroupPermissionsGet(
 		for i := range group.Permissions {
 			resource, err := database.GetResourceById(nil, group.Permissions[i].ResourceId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for permission"), "resourceId", group.Permissions[i].ResourceId, "groupId", group.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for permission"), "resource_id", group.Permissions[i].ResourceId, "group_id", group.Id)
 				return
 			}
 			if resource != nil {
@@ -93,7 +93,7 @@ func HandleAPIGroupPermissionsPut(
 
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for permissions update"), "groupId", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for permissions update"), "group_id", id)
 			return
 		}
 		if group == nil {
@@ -121,7 +121,7 @@ func HandleAPIGroupPermissionsPut(
 		// Load current group permissions
 		err = database.GroupLoadPermissions(nil, group)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading current group permissions for update"), "groupId", group.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading current group permissions for update"), "group_id", group.Id)
 			return
 		}
 
@@ -129,7 +129,7 @@ func HandleAPIGroupPermissionsPut(
 		for _, permissionId := range request.PermissionIds {
 			permission, err := database.GetPermissionById(nil, permissionId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permission by ID for validation"), "permissionId", permissionId, "groupId", group.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permission by ID for validation"), "permission_id", permissionId, "group_id", group.Id)
 				return
 			}
 			if permission == nil {
@@ -151,7 +151,7 @@ func HandleAPIGroupPermissionsPut(
 			if !found {
 				permission, err := database.GetPermissionById(nil, permissionId)
 				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error retrieving permission for group assignment"), "permissionId", permissionId, "groupId", group.Id)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error retrieving permission for group assignment"), "permission_id", permissionId, "group_id", group.Id)
 					return
 				}
 
@@ -160,7 +160,7 @@ func HandleAPIGroupPermissionsPut(
 					PermissionId: permission.Id,
 				})
 				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating group permission"), "groupId", group.Id, "permissionId", permission.Id)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating group permission"), "group_id", group.Id, "permission_id", permission.Id)
 					return
 				}
 
@@ -191,13 +191,13 @@ func HandleAPIGroupPermissionsPut(
 		for _, permissionId := range toDelete {
 			groupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permissionId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group permission for deletion"), "groupId", group.Id, "permissionId", permissionId)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group permission for deletion"), "group_id", group.Id, "permission_id", permissionId)
 				return
 			}
 
 			err = database.DeleteGroupPermission(nil, groupPermission.Id)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting group permission"), "groupPermissionId", groupPermission.Id, "groupId", group.Id, "permissionId", permissionId)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting group permission"), "group_permission_id", groupPermission.Id, "group_id", group.Id, "permission_id", permissionId)
 				return
 			}
 

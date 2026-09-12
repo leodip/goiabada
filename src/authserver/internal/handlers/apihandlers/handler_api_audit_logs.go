@@ -42,7 +42,7 @@ func HandleAPIAuditLogsGet(
 		// Get audit logs
 		auditLogs, total, err := database.GetAuditLogsPaginated(nil, page, size, auditEvent)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get audit logs"), "page", page, "size", size, "auditEvent", auditEvent)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get audit logs"), "page", page, "size", size, "audit_event", auditEvent)
 			return
 		}
 

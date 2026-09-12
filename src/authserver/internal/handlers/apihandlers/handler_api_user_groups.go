@@ -35,7 +35,7 @@ func HandleAPIUserGroupsGet(
 
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for groups"), "userId", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for groups"), "user_id", id)
 			return
 		}
 		if user == nil {
@@ -45,7 +45,7 @@ func HandleAPIUserGroupsGet(
 
 		err = database.UserLoadGroups(nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading user groups"), "userId", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading user groups"), "user_id", user.Id)
 			return
 		}
 
@@ -98,7 +98,7 @@ func HandleAPIUserGroupsPut(
 
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for groups"), "userId", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for groups"), "user_id", id)
 			return
 		}
 		if user == nil {
@@ -110,7 +110,7 @@ func HandleAPIUserGroupsPut(
 		if len(request.GroupIds) > 0 {
 			groups, err := database.GetGroupsByIds(nil, request.GroupIds)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting groups by IDs for validation"), "groupIds", request.GroupIds, "userId", user.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting groups by IDs for validation"), "group_ids", request.GroupIds, "user_id", user.Id)
 				return
 			}
 			if len(groups) != len(request.GroupIds) {
@@ -123,7 +123,7 @@ func HandleAPIUserGroupsPut(
 		// Load current user groups
 		err = database.UserLoadGroups(nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading current user groups for update"), "userId", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading current user groups for update"), "user_id", user.Id)
 			return
 		}
 
@@ -149,7 +149,7 @@ func HandleAPIUserGroupsPut(
 					GroupId: groupId,
 				})
 				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating user group membership"), "userId", user.Id, "groupId", groupId)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating user group membership"), "user_id", user.Id, "group_id", groupId)
 					return
 				}
 
@@ -166,13 +166,13 @@ func HandleAPIUserGroupsPut(
 			if !requestedGroupIds[grp.Id] {
 				userGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, grp.Id)
 				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user group relationship for removal"), "userId", user.Id, "groupId", grp.Id)
+					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user group relationship for removal"), "user_id", user.Id, "group_id", grp.Id)
 					return
 				}
 				if userGroup != nil {
 					err = database.DeleteUserGroup(nil, userGroup.Id)
 					if err != nil {
-						writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting user group membership"), "userGroupId", userGroup.Id, "userId", user.Id, "groupId", grp.Id)
+						writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting user group membership"), "user_group_id", userGroup.Id, "user_id", user.Id, "group_id", grp.Id)
 						return
 					}
 
@@ -188,7 +188,7 @@ func HandleAPIUserGroupsPut(
 		// Reload user groups to get updated state
 		err = database.UserLoadGroups(nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error reloading user groups after update"), "userId", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error reloading user groups after update"), "user_id", user.Id)
 			return
 		}
 

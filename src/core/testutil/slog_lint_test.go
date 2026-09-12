@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSlogConvention_TheRuleTable writes one fixture per row of the five rules and asserts the
+// TestSlogConvention_TheRuleTable writes one fixture per row of the six rules and asserts the
 // exact set of findings, with lines. Every "caught" fixture is a shape the tree carried before
 // the sweep; every "passed" fixture is one that must survive it untouched, and several of those
 // are the near miss of a caught row rather than an obviously innocent line.
@@ -327,6 +327,131 @@ func CaptureSlog(h slog.Handler) *slog.Logger {
 }
 `)
 
+	// ---- rule 6: the wrappers that carry a caller's attributes ---------------------------------
+
+	// The keys a forwarder's caller writes, read at the call site because that is the only place
+	// they exist. All three forms: the unexported wrapper called bare inside its own package, and
+	// the two exported ones called through the import. This is the shape that kept 179 camelCase
+	// keys through a sweep that visited every slog call in the tree, with all three tier callers
+	// green, because the final emission sees only record... and has no key to read.
+	write("authserver/internal/handlers/apihandlers/forwarded_keys.go", `package apihandlers
+
+import (
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+)
+
+func bare(w http.ResponseWriter, r *http.Request, err error) {
+	writeInternalServerError(w, r, err, "clientId", 1, "group_id", 2)
+}
+
+func qualified(w http.ResponseWriter, r *http.Request, err error) {
+	apiresponse.WriteInternalServerError(w, r, err, "userId", 3)
+}
+
+func logOnly(r *http.Request, err error) {
+	apiresponse.LogInternalServerError(r, err, "permissionId", 4)
+}
+`)
+
+	// A slice built and then spread is the one attribute shape that is neither an argument at a
+	// call site nor a slog.Attr, and the tree has exactly one: the web-origins failure. Both
+	// halves are read, the composite literal and the append onto it.
+	write("authserver/internal/handlers/apihandlers/forwarded_slice.go", `package apihandlers
+
+import "net/http"
+
+func slice(w http.ResponseWriter, r *http.Request, err error) {
+	attrs := []any{"clientId", 1}
+	if r != nil {
+		attrs = append(attrs, "originHeader", "x")
+	}
+	writeInternalServerError(w, r, err, attrs...)
+}
+`)
+
+	// A closure is a forwarder too, and its scope is the file, because that is as far as its
+	// name reaches. reject is listed, so rule 6 is silent here and rule 3 reads its call site.
+	write("authserver/internal/handlers/handler_account_logout.go", `package handlers
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+func classify(r *http.Request) {
+	reject := func(gate string, args ...any) {
+		record := []any{"gate", gate}
+		record = append(record, args...)
+		slog.WarnContext(r.Context(), "id_token_hint rejected", record...)
+	}
+	reject("aud", "badReason", "x")
+}
+`)
+
+	// An unlisted forwarder is the finding itself. Nothing about it looks wrong at the emission,
+	// and its callers' keys are unread until someone adds it to the table, so the refusal is
+	// what keeps rule 3 closed rather than true of the four wrappers that happened to exist.
+	write("core/caught/forwarder_unlisted.go", `package caught
+
+import "log/slog"
+
+func logWithAttrs(attrs ...any) {
+	slog.Info("a thing happened", attrs...)
+}
+`)
+
+	// One bound to no name at all, which could never be listed: refused where it is written.
+	write("core/caught/forwarder_anonymous.go", `package caught
+
+import "log/slog"
+
+func run(emit func(...any)) { emit("k", 1) }
+
+func caller() {
+	run(func(attrs ...any) { slog.Info("inline", attrs...) })
+}
+`)
+
+	// The near misses, and they are what stops rule 6 being "any variadic any". A run handed to
+	// fmt or to a SQL driver reaches no record, and every other variadic ...any in this tree is
+	// one of those two.
+	write("core/passed/variadic_fmt.go", `package passed
+
+import "fmt"
+
+func outf(format string, a ...any) { fmt.Printf(format, a...) }
+`)
+	write("core/passed/variadic_sql.go", `package passed
+
+import "database/sql"
+
+func exec(db *sql.DB, query string, args ...any) error {
+	_, err := db.Exec(query, args...)
+	return err
+}
+`)
+
+	// The scope half: the same identifier outside the directory where it names the forwarder is
+	// a different function, and reading its arguments as attributes would be a textual match
+	// wearing this rule's error message.
+	write("core/passed/same_name_elsewhere.go", `package passed
+
+func writeInternalServerError(status int, fields ...string) {}
+
+func useIt() { writeInternalServerError(500, "clientId", "x") }
+`)
+
+	// And a []any that is spread into nothing is not an attribute run, whatever it is called.
+	write("core/passed/slice_not_attrs.go", `package passed
+
+func queryArgs() []any {
+	attrs := []any{"clientId", 1}
+	return attrs
+}
+`)
+
 	// ---- the evasions, and the parser boundary ------------------------------------------------
 
 	// One pair of brackets, and the callee is no longer a bare selector. The third evasion.
@@ -411,9 +536,15 @@ func broken( {
 
 	violations, files, err := findSlogViolations(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 26, files,
+	assert.Equal(t, 35, files,
 		"every parseable, production-reachable fixture outside a mocks directory and a _test.go file is parsed")
 	assert.Equal(t, []string{
+		`authserver/internal/handlers/apihandlers/forwarded_keys.go:10 attribute key "clientId"`,
+		`authserver/internal/handlers/apihandlers/forwarded_keys.go:14 attribute key "userId"`,
+		`authserver/internal/handlers/apihandlers/forwarded_keys.go:18 attribute key "permissionId"`,
+		`authserver/internal/handlers/apihandlers/forwarded_slice.go:6 attribute key "clientId"`,
+		`authserver/internal/handlers/apihandlers/forwarded_slice.go:8 attribute key "originHeader"`,
+		`authserver/internal/handlers/handler_account_logout.go:14 attribute key "badReason"`,
 		`core/caught/build_linux.go:7 message "Capitalised" does not start with a lowercase letter`,
 		`core/caught/context_aliased.go:9 slog.Info inside a function taking a context.Context or an *http.Request`,
 		`core/caught/context_aliased.go:11 slog.Warn inside a function taking a context.Context or an *http.Request`,
@@ -425,6 +556,8 @@ func broken( {
 		`core/caught/dot_import_slog.go:3 dot import of "log/slog"`,
 		`core/caught/emission_value.go:8 slog.Info as a value`,
 		`core/caught/emission_value.go:10 slog.LogAttrs as a value`,
+		`core/caught/forwarder_anonymous.go:8 an unnamed function literal forwards a variadic ...any into a record`,
+		`core/caught/forwarder_unlisted.go:5 logWithAttrs forwards a variadic ...any into a record`,
 		`core/caught/handler_install.go:6 slog.New`,
 		`core/caught/handler_install.go:6 slog.SetDefault`,
 		`core/caught/handler_install.go:9 slog.Default`,
@@ -473,11 +606,11 @@ func broken( {
 	}, describeSlog(violations))
 
 	// The per-module scoping the sweep stages leaned on: the same rule, one subtree at a time.
-	// Four of core/passed's eight fixtures are parsed: the mocks file, the test file and the
+	// Eight of core/passed's twelve fixtures are parsed: the mocks file, the test file and the
 	// !production file are exempt, and the unparseable one is not counted.
 	scoped, scopedFiles, err := findSlogViolations(root, []string{"core/passed"})
 	require.NoError(t, err)
-	assert.Equal(t, 4, scopedFiles)
+	assert.Equal(t, 8, scopedFiles)
 	assert.Empty(t, describeSlog(scoped), "the caught subtree is outside the named directory")
 }
 

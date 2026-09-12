@@ -7,7 +7,7 @@ import (
 )
 
 // TestSlogConvention fails the admin console unit tier when any production file under src/ writes
-// a record outside the logging convention. testutil.AssertSlogConvention carries the five rules
+// a record outside the logging convention. testutil.AssertSlogConvention carries the six rules
 // and the reasoning for each.
 //
 // The scope is the whole source root rather than this module, for the reason the errs caller
