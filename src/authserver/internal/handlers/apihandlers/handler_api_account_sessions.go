@@ -83,6 +83,7 @@ func HandleAPIAccountSessionsGet(
 				DeviceName:        us.DeviceName,
 				DeviceType:        us.DeviceType,
 				DeviceOS:          us.DeviceOS,
+				UserAgent:         us.UserAgent,
 				UserId:            us.UserId,
 				IsValid:           isValid,
 				IsCurrent:         currentSid != "" && us.SessionIdentifier == currentSid,

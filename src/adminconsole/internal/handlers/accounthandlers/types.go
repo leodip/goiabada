@@ -27,5 +27,8 @@ type SessionInfo struct {
 	DeviceName                string
 	DeviceType                string
 	DeviceOS                  string
-	Clients                   []string
+	// UserAgent is the raw header, shown as the Device cell's tooltip so two sessions
+	// whose labels read alike can still be told apart (#281).
+	UserAgent string
+	Clients   []string
 }

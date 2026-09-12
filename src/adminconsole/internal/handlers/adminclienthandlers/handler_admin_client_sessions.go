@@ -83,6 +83,7 @@ func HandleAdminClientUserSessionsGet(
 				DeviceName:                es.DeviceName,
 				DeviceType:                es.DeviceType,
 				DeviceOS:                  es.DeviceOS,
+				UserAgent:                 es.UserAgent,
 				Clients:                   es.ClientIdentifiers,
 			}
 			if user != nil {

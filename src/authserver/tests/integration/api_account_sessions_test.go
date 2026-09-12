@@ -74,6 +74,19 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 		}
 	}
 	assert.True(t, foundCurrent, "expected at least one session with isCurrent=true")
+
+	// The raw header, byte for byte, on the two fixture sessions. This endpoint also returns
+	// the live login session, whose header is whatever the test client sent, so the claim is
+	// made against the rows this test wrote rather than over the whole list (#281 decision 6).
+	byIdentifier := map[string]string{}
+	for _, s := range out.Sessions {
+		byIdentifier[s.SessionIdentifier] = s.UserAgent
+	}
+	for _, fixture := range []*models.UserSession{s1, s2} {
+		agent, present := byIdentifier[fixture.SessionIdentifier]
+		require.True(t, present, "fixture session %s missing from the response", fixture.SessionIdentifier)
+		assert.Equal(t, testSessionUserAgent, agent)
+	}
 }
 
 // Ensure invalid/expired sessions are filtered out

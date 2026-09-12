@@ -77,7 +77,7 @@
         <tbody>
             {{ range .sessions }}
                 <tr>
-                    <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
+                    <td title="{{.UserAgent}}">{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
                         {{ if .IsCurrent }}
                             <br /><span class="text-accent">{{ T $.ctx "adminconsole.admin_users.sessions.current_label" }}</span>
                         {{end}}

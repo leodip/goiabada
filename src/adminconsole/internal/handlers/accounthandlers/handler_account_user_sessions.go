@@ -45,6 +45,7 @@ func HandleAccountSessionsGet(
 				DeviceName:                es.DeviceName,
 				DeviceType:                es.DeviceType,
 				DeviceOS:                  es.DeviceOS,
+				UserAgent:                 es.UserAgent,
 				Clients:                   es.ClientIdentifiers,
 				IsCurrent:                 es.IsCurrent,
 			}

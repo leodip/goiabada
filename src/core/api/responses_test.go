@@ -398,6 +398,7 @@ func TestToUserSessionResponse_MapsFields(t *testing.T) {
 		DeviceName:        "Pixel",
 		DeviceType:        "mobile",
 		DeviceOS:          "Android",
+		UserAgent:         "Mozilla/5.0 (Linux; Android 10; K) Chrome/120.0.0.0 Mobile Safari/537.36",
 		UserId:            42,
 	}
 
@@ -414,6 +415,7 @@ func TestToUserSessionResponse_MapsFields(t *testing.T) {
 	assert.Equal(t, "Pixel", resp.DeviceName)
 	assert.Equal(t, "mobile", resp.DeviceType)
 	assert.Equal(t, "Android", resp.DeviceOS)
+	assert.Equal(t, "Mozilla/5.0 (Linux; Android 10; K) Chrome/120.0.0.0 Mobile Safari/537.36", resp.UserAgent)
 	assert.Equal(t, int64(42), resp.UserId)
 }
 
@@ -451,6 +453,61 @@ func TestUserSessionResponses_OmitLevel2AuthConfigHasChanged(t *testing.T) {
 
 			_, present := decoded["level2AuthConfigHasChanged"]
 			assert.False(t, present, "level2AuthConfigHasChanged must not be published on %s", tc.name)
+		})
+	}
+}
+
+// The raw header is published as "userAgent" by both session schemas, and this is the only
+// tier that can see the wire key. The integration tests decode into these same structs, so a
+// tag renamed, dropped or given an omitempty would leave every one of them green while the
+// console and every other client read nothing (#281, plan review finding 6).
+//
+// Both structs are listed because they carry the field independently: EnhancedUserSessionResponse
+// is not built from UserSessionResponse in Go, only in the OpenAPI document's allOf.
+func TestUserSessionResponses_PublishUserAgent(t *testing.T) {
+	const header = `Mozilla/5.0 "quoted" <angled>`
+
+	for _, tc := range []struct {
+		name  string
+		value interface{}
+	}{
+		{"UserSessionResponse", UserSessionResponse{Id: 1, UserAgent: header}},
+		{"EnhancedUserSessionResponse", EnhancedUserSessionResponse{Id: 1, UserAgent: header}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := json.Marshal(tc.value)
+			assert.NoError(t, err)
+
+			var decoded map[string]interface{}
+			assert.NoError(t, json.Unmarshal(raw, &decoded))
+
+			assert.Equal(t, header, decoded["userAgent"],
+				"%s must publish the raw header under the userAgent key", tc.name)
+		})
+	}
+}
+
+// A legacy row carries an empty header, and the key still has to be there: the OpenAPI schema
+// lists userAgent as required, which is a claim about presence. An omitempty on the field would
+// drop the key for exactly the rows an administrator is most likely to be puzzled by.
+func TestUserSessionResponses_PublishUserAgentWhenEmpty(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value interface{}
+	}{
+		{"UserSessionResponse", UserSessionResponse{Id: 1}},
+		{"EnhancedUserSessionResponse", EnhancedUserSessionResponse{Id: 1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := json.Marshal(tc.value)
+			assert.NoError(t, err)
+
+			var decoded map[string]interface{}
+			assert.NoError(t, json.Unmarshal(raw, &decoded))
+
+			value, present := decoded["userAgent"]
+			assert.True(t, present, "%s must publish userAgent even when empty", tc.name)
+			assert.Equal(t, "", value)
 		})
 	}
 }

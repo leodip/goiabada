@@ -174,6 +174,7 @@ func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier 
 		DeviceName:        response.Session.DeviceName,
 		DeviceType:        response.Session.DeviceType,
 		DeviceOS:          response.Session.DeviceOS,
+		UserAgent:         response.Session.UserAgent,
 		UserId:            response.Session.UserId,
 	}
 
