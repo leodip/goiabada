@@ -62,12 +62,19 @@ import (
 // one indirection past every selector this rule resolves. How the run is built: a run spread into
 // a record must be the enclosing function's own variadic parameter, which rule 6's declaration
 // half already covers, or a local introduced once in that body out of []any{...}, make([]any, ...)
-// and appends onto itself, and used nowhere but there and the spread. A builder's return value, an
-// alias of another slice, an append onto a slice that is not the run, a spread of anything but the
-// enclosing variadic parameter, a write through an index or a helper, a name this body never
-// declared, and any use from inside a closure are each reported as a run this rule cannot read.
-// And what the table itself names: a listed forwarder whose keys were read must have been declared
-// exactly once in what was walked, at the argument index the table gives, so a same-name shadow
+// and appends onto itself, declared above the spread and in a block still open at it, and used
+// nowhere but there and the spread. A builder's return value, an alias of another slice, an append
+// onto a slice that is not the run, a spread of anything but the enclosing variadic parameter, a
+// write through an index, a helper or a composite literal's key, an element appended after the run
+// absorbed a spread of unknown length, a name this body never declared or declared somewhere the
+// spread cannot see, and any use from inside a closure are each reported as a run this rule cannot
+// read. The enclosing variadic parameter is admitted on one condition, that this body passes it on
+// as it arrived: its keys are answered for at the call sites that built it, so a write here is
+// both a key nothing reads and a shift of every key those sites did write past the index the table
+// states. And what the table itself names: a listed forwarder whose keys were read must have been
+// declared exactly once in what was walked, at the argument index the table gives, and by a
+// package function or a named closure rather than a method, which no entry could be describing
+// since a receiver is neither a bare name in a scope nor an import path. So a same-name shadow
 // cannot inherit the registration and a signature that grew a parameter cannot leave every key its
 // callers write being read one position out. All three are refusals rather than approximations on
 // purpose: an enumeration of permitted forms is green on the forms nobody thought of, which is how
@@ -85,6 +92,16 @@ import (
 // there is no way to get one. Revisit when a second site needs a computed key, since one test per
 // site does not scale, or when rule 5 grows a sixth exemption; closing any of them means running
 // this over go/packages-loaded type information rather than one parsed file (#320).
+//
+// ceiling: a variable is identified by its name, the position of its one declaration and the
+// extent of the block holding it, which is what a parse of a single file can answer; a resolved
+// object is what a type checker would answer. The three differ nowhere this rule accepts a run,
+// because every shape where they could differ is refused rather than read: a second declaration
+// of the name, a use above the declaration or past the end of its block, and every occurrence the
+// rule has not modelled, including any inside a closure. The cost of that is paid in false
+// refusals rather than in missed keys, and the price of one is a renamed variable. Revisit if a
+// refusal ever lands on a shape that is genuinely the clearest way to write a run, which would
+// mean the rule is now costing more than the wrapper hole did (#320).
 //
 // Passing dirs restricts the walk to those subdirectories of the source root, forward slashes and
 // relative to it. Scope and shape follow AssertNoLegacyErrors, which carries the reasoning for
@@ -935,6 +952,20 @@ func slogForwarderDeclarationViolations(file *ast.File, importPaths map[string]s
 				"so the keys its callers pass are read; an unlisted one is a hole in the key rule"})
 	}
 
+	// A method is reported whatever the table says, because the table cannot be talking about it:
+	// an entry resolves a bare identifier inside a scope or a package path through an import, and
+	// a method is reached through neither. The census excludes methods for that reason, so a
+	// method carrying a listed name used to inherit the registration here while its own call
+	// sites were read by nothing at all -- the one arrangement where every rule is green and a
+	// caller's keys reach a record unread.
+	reportMethod := func(name string, pos token.Pos) {
+		violations = append(violations, slogViolation{file: rel, line: fset.Position(pos).Line,
+			what: "method " + name + " forwards a variadic ...any into a record",
+			fix: "move the forwarding into a package function or a named closure and list that in " +
+				"testutil.slogAttrForwarders; the table resolves a name and a scope, and a call " +
+				"through a receiver is neither, so this method's callers' keys are read nowhere"})
+	}
+
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch decl := n.(type) {
 		case *ast.AssignStmt:
@@ -957,6 +988,10 @@ func slogForwarderDeclarationViolations(file *ast.File, importPaths map[string]s
 			}
 			if param := slogVariadicAnyParam(decl.Type); param != "" &&
 				slogForwardsVariadic(decl.Body, param, importPaths, rel) {
+				if decl.Recv != nil {
+					reportMethod(decl.Name.Name, decl.Pos())
+					return true
+				}
 				report(decl.Name.Name, decl.Pos())
 			}
 		case *ast.FuncLit:
@@ -1045,11 +1080,37 @@ func slogSpreadRunViolations(file *ast.File, importPaths map[string]string, fset
 			return run
 		}
 
+		// boundAt is where this body's own variadic parameter is carried into a record: spread at
+		// one, appended into a run that is, or handed to a second listed forwarder. Until that
+		// happens the parameter is somebody else's ...any, fmt's or a SQL driver's, and nothing
+		// below applies to it. It is tracked from the start either way, so that every occurrence
+		// of it goes through the same scan the local runs do.
+		boundAt := token.NoPos
+		if variadic != "" {
+			track(variadic)
+		}
+
 		walk(func(n ast.Node) bool {
 			call, isCall := n.(*ast.CallExpr)
-			if !isCall || call.Ellipsis == token.NoPos || len(call.Args) == 0 {
+			if !isCall || len(call.Args) == 0 {
 				return true
 			}
+			// len and cap read a run's shape and cannot change it, which is how a forwarder
+			// sizes the record it is about to build.
+			if fn, isBuiltin := unparen(call.Fun).(*ast.Ident); isBuiltin && (fn.Name == "len" || fn.Name == "cap") {
+				if id, isIdent := unparen(call.Args[0]).(*ast.Ident); isIdent {
+					if _, tracked := runs[id.Name]; tracked {
+						used[id] = true
+					}
+				}
+				return true
+			}
+			if call.Ellipsis == token.NoPos {
+				return true
+			}
+			// A listed forwarder counts as a record here, which slogIsRecordCall already says:
+			// a spread into one reaches a record a call later, and that is how
+			// WriteInternalServerError handing its run to LogInternalServerError is seen.
 			if !slogIsRecordCall(call, importPaths, rel) {
 				return true
 			}
@@ -1058,21 +1119,33 @@ func slogSpreadRunViolations(file *ast.File, importPaths map[string]string, fset
 				site.name = id.Name
 				track(id.Name)
 				used[id] = true
+				if id.Name == variadic {
+					boundAt = earliest(boundAt, id.Pos())
+				}
 			}
 			sites = append(sites, site)
 			return true
 		})
-		if len(sites) == 0 {
+		if len(sites) == 0 && variadic == "" {
 			return
 		}
 
 		// read takes one assignment into a tracked run: the right side has to be a form this
 		// rule follows, and the append base it permits is marked used where it is read.
 		read := func(run *slogRun, name string, from ast.Expr) {
-			elems, readable := slogReadRun(from, name, variadic, used)
-			if !readable {
+			spreadAt := token.NoPos
+			elems, readable := slogReadRun(from, name, variadic, used, &spreadAt)
+			if !readable || (run.tail && len(elems) > 0) {
+				// Either a form this rule does not follow, or an element appended after the run
+				// absorbed a spread of unknown length, which leaves it at no position this rule
+				// can call a key or a value.
 				run.readable = false
+				run.badAt = earliest(run.badAt, from.Pos())
 				return
+			}
+			if spreadAt != token.NoPos {
+				run.tail = true
+				boundAt = earliest(boundAt, spreadAt)
 			}
 			run.elems = append(run.elems, elems...)
 		}
@@ -1087,9 +1160,14 @@ func slogSpreadRunViolations(file *ast.File, importPaths map[string]string, fset
 				used[id] = true
 				if declares {
 					run.decls++
+					run.declAt = earliest(run.declAt, id.Pos())
+				} else {
+					run.writes++
+					run.writeAt = earliest(run.writeAt, id.Pos())
 				}
 				if !readable {
 					run.readable = false
+					run.badAt = earliest(run.badAt, id.Pos())
 				}
 			}
 		}
@@ -1137,12 +1215,14 @@ func slogSpreadRunViolations(file *ast.File, importPaths map[string]string, fset
 
 		// Every remaining occurrence of a tracked name, closures included. Three positions are
 		// skipped because an identifier there cannot be this variable at all: the field half of
-		// a selector, a composite literal's key, which names a struct field and could not be a
-		// slice in a map since slices are not comparable, and a parameter or field name, whose
-		// type cannot mention a run. What is left is a read or a write of the run, and any
-		// shape above has left it marked: an index, an argument to a helper that writes it, a
-		// second variable taking it, a spread into something that is not a record, an assignment
-		// or a declaration inside a closure.
+		// a selector, a bare identifier in a composite literal's key, which is a struct field's
+		// label or an array index, and a parameter or field name, whose type cannot mention a
+		// run. A key that is any other expression is scanned like the value beside it: a slice is
+		// not comparable and cannot be a map key, but a pointer to one is, and &attrs written
+		// there hands the run to whatever holds the map. What is left is a read or a write of the
+		// run, and any shape above has left it marked: an index, an argument to a helper that
+		// writes it, a second variable taking it, a spread into something that is not a record,
+		// an assignment or a declaration inside a closure.
 		var scan func(ast.Node) bool
 		scan = func(n ast.Node) bool {
 			switch node := n.(type) {
@@ -1150,6 +1230,9 @@ func slogSpreadRunViolations(file *ast.File, importPaths map[string]string, fset
 				ast.Inspect(node.X, scan)
 				return false
 			case *ast.KeyValueExpr:
+				if _, label := unparen(node.Key).(*ast.Ident); !label {
+					ast.Inspect(node.Key, scan)
+				}
 				ast.Inspect(node.Value, scan)
 				return false
 			case *ast.Field:
@@ -1157,6 +1240,7 @@ func slogSpreadRunViolations(file *ast.File, importPaths map[string]string, fset
 			case *ast.Ident:
 				if run, tracked := runs[node.Name]; tracked && !used[node] {
 					run.readable = false
+					run.badAt = earliest(run.badAt, node.Pos())
 				}
 				return false
 			}
@@ -1196,12 +1280,37 @@ func slogSpreadRunViolations(file *ast.File, importPaths map[string]string, fset
 				}
 				continue
 			}
-			if run.decls != 1 || !run.readable {
+			if run.decls != 1 || !run.readable ||
+				site.pos < run.declAt || site.pos > slogScopeEnd(body, run.declAt) {
+				// The last two are the spread reaching a different variable of the same name,
+				// above the declaration or outside the block it was declared in: the
+				// package-level one, or an enclosing scope's. Its keys were built where this
+				// reading never looked, and a census by spelling sees one declaration in the
+				// body with every assignment into it conformant.
 				violations = append(violations, slogViolation{file: rel, line: line,
 					what: "attribute run " + strconv.Quote(site.name) + " is built in a form this rule cannot read",
-					fix: "declare it once in this function out of []any{...}, make([]any, ...) and " +
-						"appends onto itself, and use it nowhere but those and this spread; a run " +
-						"reached any other way carries keys nothing reads"})
+					fix: "declare it once in this function, above this line, out of []any{...}, " +
+						"make([]any, ...) and appends onto itself, and use it nowhere but those " +
+						"and this spread; a run reached any other way carries keys nothing reads"})
+			}
+		}
+
+		// The enclosing function's own variadic parameter, once it reaches a record. Rule 6's
+		// declaration half answers for this run by reading the keys at the call sites that built
+		// it, so the one thing this body owes is to pass it on as it arrived. A key written here
+		// is written where nothing reads, and it shifts every key those call sites did write past
+		// the index the table states for them, which is the same staleness the census refuses
+		// when a signature grows a parameter. A body that declares a second variable of the name
+		// is left to the shadow report above, which says the same thing about the same line.
+		if variadic != "" && boundAt != token.NoPos {
+			if run := runs[variadic]; run.decls == 0 && (run.writes > 0 || !run.readable) {
+				at := earliest(run.badAt, run.writeAt, boundAt)
+				violations = append(violations, slogViolation{file: rel, line: fset.Position(at).Line,
+					what: "the variadic run " + strconv.Quote(variadic) + " is changed before it reaches a record",
+					fix: "forward a caller's attribute run unchanged and build anything of this " +
+						"function's own into a separate []any; rule 6 reads this run's keys at the " +
+						"call sites that built it, and a write here is a key nothing reads at an " +
+						"offset that no longer holds"})
 			}
 		}
 		for name, run := range runs {
@@ -1229,10 +1338,54 @@ func slogSpreadRunViolations(file *ast.File, importPaths map[string]string, fset
 // flag because one is the only answer that leaves the name unambiguous: none means the run is a
 // parameter or a capture built where this reading cannot see it, and two means two variables the
 // rule would merge into one.
+//
+// declAt is where the one declaration is, and it is read because a count alone says nothing about
+// which variable a given use reaches: an occurrence above the declaration is a different variable
+// of that name, the package-level one or an enclosing scope's, whose keys this reading never saw.
+// writes counts the assignments that are not declarations and tail records that the run has
+// absorbed a spread of unknown length, after which no later element has a position this rule can
+// call a key or a value. badAt and writeAt locate the first of each for the report.
 type slogRun struct {
 	elems    []ast.Expr
 	decls    int
+	declAt   token.Pos
+	writes   int
+	writeAt  token.Pos
+	badAt    token.Pos
+	tail     bool
 	readable bool
+}
+
+// earliest is the first position among those given that is set, which is the line a run's refusal
+// points at: the write or the unreadable use, whichever the body reached first.
+func earliest(positions ...token.Pos) token.Pos {
+	at := token.NoPos
+	for _, pos := range positions {
+		if pos != token.NoPos && (at == token.NoPos || pos < at) {
+			at = pos
+		}
+	}
+	return at
+}
+
+// slogScopeEnd is where a name declared at pos stops being visible: the end of the innermost
+// block, case clause or comm clause holding it. A run is read by its name, so this and the
+// declaration's own position are together what says whether a given spread is the run that was
+// read or another variable spelled the same way in a sibling block, whose keys this reading never
+// saw. Without it, one declaration anywhere in the body answers for every use of the name.
+func slogScopeEnd(body *ast.BlockStmt, pos token.Pos) token.Pos {
+	end := body.End()
+	ast.Inspect(body, func(n ast.Node) bool {
+		if n == nil || pos < n.Pos() || pos >= n.End() {
+			return false
+		}
+		switch n.(type) {
+		case *ast.BlockStmt, *ast.CaseClause, *ast.CommClause:
+			end = n.End()
+		}
+		return true
+	})
+	return end
 }
 
 // slogReadRun reads one assignment into a spread run. target is the run being built, so an append
@@ -1240,7 +1393,7 @@ type slogRun struct {
 // spread this rule permits inside an append because rule 6 reads its callers' keys instead. used
 // collects the occurrences this read accounts for, which is how an append back onto the run is
 // told from every other mention of its name.
-func slogReadRun(from ast.Expr, target, variadic string, used map[*ast.Ident]bool) ([]ast.Expr, bool) {
+func slogReadRun(from ast.Expr, target, variadic string, used map[*ast.Ident]bool, spreadAt *token.Pos) ([]ast.Expr, bool) {
 	switch built := unparen(from).(type) {
 	case *ast.CompositeLit:
 		if slogIsAnySlice(built.Type) {
@@ -1260,7 +1413,7 @@ func slogReadRun(from ast.Expr, target, variadic string, used map[*ast.Ident]boo
 			if len(built.Args) == 0 {
 				return nil, false
 			}
-			base, readable := slogReadAppendBase(built.Args[0], target, variadic, used)
+			base, readable := slogReadAppendBase(built.Args[0], target, variadic, used, spreadAt)
 			if !readable {
 				return nil, false
 			}
@@ -1274,6 +1427,7 @@ func slogReadRun(from ast.Expr, target, variadic string, used map[*ast.Ident]boo
 					return nil, false
 				}
 				used[spread] = true
+				*spreadAt = spread.Pos()
 				added = added[:len(added)-1]
 			}
 			return append(base, added...), true
@@ -1287,7 +1441,7 @@ func slogReadRun(from ast.Expr, target, variadic string, used map[*ast.Ident]boo
 // carries nothing new, since its own assignments are read where they are written. Any other
 // identifier is a second slice this rule has not followed, which is the alias the refusal exists
 // for; nil is the empty slice spelled as a value.
-func slogReadAppendBase(from ast.Expr, target, variadic string, used map[*ast.Ident]bool) ([]ast.Expr, bool) {
+func slogReadAppendBase(from ast.Expr, target, variadic string, used map[*ast.Ident]bool, spreadAt *token.Pos) ([]ast.Expr, bool) {
 	if id, isIdent := unparen(from).(*ast.Ident); isIdent {
 		if id.Name != target && id.Name != "nil" {
 			return nil, false
@@ -1295,7 +1449,7 @@ func slogReadAppendBase(from ast.Expr, target, variadic string, used map[*ast.Id
 		used[id] = true
 		return nil, true
 	}
-	return slogReadRun(from, target, variadic, used)
+	return slogReadRun(from, target, variadic, used, spreadAt)
 }
 
 // identsOf is the plain identifiers among expressions, which is what an assignment's left side is

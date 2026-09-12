@@ -1932,8 +1932,19 @@ func TestCollectTierKeyFields_ReachesEveryContainerKind(t *testing.T) {
 		inSlice   []tier
 		inArray   [1]*tier
 		inMap     map[string]*tier
+		inMapKey  map[*tier]bool
+		shortView []tier
+		longView  []tier
 		anonymous any
 		itself    *holder
+	}
+
+	// One backing array under two views, the second reaching one element further. They share an
+	// address and a type, so an identity taken from the header alone calls the longer one visited
+	// and the tier only it holds is walked by nothing.
+	backing := []tier{
+		{name: "overlap_head", keyField: "session_identifier"},
+		{name: "overlap_tail", keyField: "refreshTokenId"},
 	}
 
 	// itself points back at the value being walked, which is the shape ratelimit's own types
@@ -1944,6 +1955,9 @@ func TestCollectTierKeyFields_ReachesEveryContainerKind(t *testing.T) {
 		inSlice:   []tier{{name: "in_slice", keyField: "clientId"}},
 		inArray:   [1]*tier{{name: "in_array", keyField: "session_id"}},
 		inMap:     map[string]*tier{"only": {name: "in_map", keyField: "code_id"}},
+		inMapKey:  map[*tier]bool{{name: "in_map_key", keyField: "keyIdentifier"}: true},
+		shortView: backing[:1],
+		longView:  backing[:2],
 		anonymous: &tier{name: "direct", keyField: "keyId"},
 	}
 	subject.itself = subject
@@ -1956,22 +1970,26 @@ func TestCollectTierKeyFields_ReachesEveryContainerKind(t *testing.T) {
 		keys[one.where] = one.name + "/" + one.keyField
 	}
 	want := map[string]string{
-		"holder.direct":     "direct/client_id",
-		"holder.behind":     "behind/user_id",
-		"holder.inSlice[0]": "in_slice/clientId",
-		"holder.inArray[0]": "in_array/session_id",
-		"holder.inMap[0]":   "in_map/code_id",
-		"holder.anonymous":  "direct/keyId",
+		"holder.direct":          "direct/client_id",
+		"holder.behind":          "behind/user_id",
+		"holder.inSlice[0]":      "in_slice/clientId",
+		"holder.inArray[0]":      "in_array/session_id",
+		"holder.inMap[0]":        "in_map/code_id",
+		"holder.inMapKey[key 0]": "in_map_key/keyIdentifier",
+		"holder.shortView[0]":    "overlap_head/session_identifier",
+		"holder.longView[1]":     "overlap_tail/refreshTokenId",
+		"holder.anonymous":       "direct/keyId",
 	}
 	if !reflect.DeepEqual(want, keys) {
 		t.Errorf("the walk reached %v, expected %v; a kind it does not traverse holds a tier "+
 			"whose key nothing here reads", keys, want)
 	}
-	// Six entries for six tiers, two of which are named "direct": the count is of instances, and
-	// a census keyed by name would have five, with the conformant key standing in for the
-	// camelCase one beside it.
-	if len(found) != 6 {
-		t.Errorf("the walk recorded %d tiers, expected 6: %v", len(found), found)
+	// Nine entries for nine tiers, two of which are named "direct": the count is of instances,
+	// and a census keyed by name would have eight, with the conformant key standing in for the
+	// camelCase one beside it. The element the two views share is walked once, at the shorter
+	// view where it was reached first, which is what stops a bounded walk double-counting.
+	if len(found) != 9 {
+		t.Errorf("the walk recorded %d tiers, expected 9: %v", len(found), found)
 	}
 }
 
@@ -1987,7 +2005,10 @@ type foundTier struct {
 
 // visitedValue bounds the walk. A value that points back at itself, which ratelimit's do, is
 // otherwise a walk with no end; the type rides along with the address because a pointer and a map
-// header can hold the same one.
+// header can hold the same one. A slice marks each element it reaches rather than its header, so
+// the address here is an element's for those and the holder is the element type: two views of one
+// backing array are the same value at every index they share and different values past that, and
+// a mark on the header would call the whole of the longer one visited.
 type visitedValue struct {
 	address uintptr
 	holder  reflect.Type
@@ -2041,18 +2062,30 @@ func collectTierKeyFields(v reflect.Value, where string, into *[]foundTier, seen
 			collectTierKeyFields(v.Index(i), where+"["+strconv.Itoa(i)+"]", into, seen)
 		}
 	case reflect.Slice:
-		if !once() {
+		if v.IsNil() {
 			return
 		}
+		// A slice is bounded per element rather than per header. Two views of one backing array
+		// share a first element and a type, so a mark on the header would read the longer view
+		// as already walked and never reach the tail that only it holds.
+		stride := v.Type().Elem().Size()
 		for i := 0; i < v.Len(); i++ {
+			mark := visitedValue{address: v.Pointer() + uintptr(i)*stride, holder: v.Type().Elem()}
+			if seen[mark] {
+				continue
+			}
+			seen[mark] = true
 			collectTierKeyFields(v.Index(i), where+"["+strconv.Itoa(i)+"]", into, seen)
 		}
 	case reflect.Map:
 		if !once() {
 			return
 		}
+		// Both halves of an entry. A map keyed by a tier or by a pointer to one holds it as
+		// reachably as a value does, and reportTrip reads whichever the lookup returns.
 		at := 0
 		for iter := v.MapRange(); iter.Next(); at++ {
+			collectTierKeyFields(iter.Key(), where+"[key "+strconv.Itoa(at)+"]", into, seen)
 			collectTierKeyFields(iter.Value(), where+"["+strconv.Itoa(at)+"]", into, seen)
 		}
 	}
