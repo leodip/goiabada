@@ -297,7 +297,9 @@ func HandleAuthCompletedGet(
 			// the reason the reuse arm above gives (#252 decision 8). It is always set here:
 			// the gate above refuses to mint a session without Level1AuthCompleted, and the
 			// password handler is the only writer of that field, setting AuthenticatedAt
-			// beside it.
+			// beside it. StartNewUserSession refuses a nil or zero instant rather than
+			// inventing one, so if that invariant ever breaks this arm answers 500 instead of
+			// minting a session that claims a sign-in happened just now.
 			newSession, err := userSessionManager.StartNewUserSession(
 				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String(),
 				authContext.AuthStateGeneration, authContext.OtpConfigGeneration,

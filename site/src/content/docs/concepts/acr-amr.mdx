@@ -149,7 +149,7 @@ If the session's ACR is **lower** than the requested ACR, the user must perform 
 
 After step-up, the session's ACR is upgraded to the higher level. This upgrade persists for the session lifetime. The user won't need to step up again for the same or lower ACR levels.
 
-The `auth_time` claim moves too: it becomes the time the OTP was entered, not the time of the first sign-in. Only `prompt=none` and plain session reuse keep the earlier time, and no claim carries the first factor's time after a step-up.
+The `auth_time` claim moves too: it becomes the time the OTP was verified, not the time of the first sign-in. Only `prompt=none` and plain session reuse keep the earlier time, and no claim carries the first factor's time after a step-up.
 
 <Aside type="note">
 ACR levels can only be **upgraded** during a session, never downgraded. Once a user authenticates at `level2_mandatory`, their session stays at that level until it expires.
