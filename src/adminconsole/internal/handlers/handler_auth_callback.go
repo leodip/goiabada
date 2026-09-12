@@ -76,7 +76,12 @@ func HandleAuthCallbackPost(
 			baseUrl = config.GetAuthServer().InternalBaseURL
 		}
 
-		slog.Info("Exchanging code for tokens. baseUrl: " + baseUrl)
+		// Debug: one record on every administrator sign-in, tracing a request through the
+		// code exchange. Decision 5 reserves Info for lifecycle and configuration, and this
+		// is neither: an operator reading the log to see what the console is doing does not
+		// need a line per sign-in, and the one reader who does is debugging the exchange
+		// against a base URL they suspect (#320).
+		slog.DebugContext(r.Context(), "exchanging the code for tokens", "base_url", baseUrl)
 
 		// The admin console is always the client the seeder provisions, so the identifier
 		// is the constant and only the secret is per deployment (#285).

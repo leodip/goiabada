@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
@@ -63,8 +64,15 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 	})
 
 	recorder := httptest.NewRecorder()
-	i18n.MiddlewareLocale(nil)(
-		MiddlewareSettingsCache(cache.NewSettingsCache(authServerBaseURL))(next),
+	// chi's RequestID in front, exactly as Server.initMiddleware mounts it, because the two
+	// refusals below no longer name request_id themselves: the installed handler reads chi's id
+	// off the context and appends it. Without this middleware the id does not exist, so the two
+	// cases asserting the attribute are what would fail if the wrapper were removed (#320
+	// decision 2).
+	chimiddleware.RequestID(
+		i18n.MiddlewareLocale(nil)(
+			MiddlewareSettingsCache(cache.NewSettingsCache(authServerBaseURL))(next),
+		),
 	).ServeHTTP(recorder, req)
 
 	return recorder, seen
@@ -244,8 +252,9 @@ func theOneLoggedError(t *testing.T, fn func()) error {
 	require.Len(t, errorRecords, 1, "a 500 is logged exactly once, out of %d records", len(records))
 
 	logged, _ := errorRecords[0].Attrs["error"].(error)
-	assert.Contains(t, errorRecords[0].Attrs, "request_id",
-		"the record must carry request_id, which is what joins it to the request log")
+	assert.NotEmpty(t, errorRecords[0].Attrs["request_id"],
+		"the record must carry request_id, which is what joins it to the request log; nothing in "+
+			"this file names it, so it can only have come from chi's id on the context (#320 decision 2)")
 	require.NotNil(t, logged, "the error attribute must carry the error value itself, not its text")
 	return logged
 }

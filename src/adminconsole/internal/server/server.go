@@ -43,18 +43,18 @@ func NewServer(router *chi.Mux, sessionStore sessionstore.Store, settingsCache *
 
 	if envVar := config.GetAdminConsole().StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
-		slog.Info("using embedded static files directory")
+		slog.Info("using the embedded static files")
 	} else {
 		s.staticFS = os.DirFS(envVar)
-		slog.Info(fmt.Sprintf("using static files directory %v", envVar))
+		slog.Info("using static files from a directory", "directory", envVar)
 	}
 
 	if envVar := config.GetAdminConsole().TemplateDir; len(envVar) == 0 {
 		s.templateFS = web.TemplateFS()
-		slog.Info("using embedded template files directory")
+		slog.Info("using the embedded template files")
 	} else {
 		s.templateFS = os.DirFS(envVar)
-		slog.Info(fmt.Sprintf("using template files directory %v", envVar))
+		slog.Info("using template files from a directory", "directory", envVar)
 	}
 
 	return &s
@@ -65,7 +65,8 @@ func (s *Server) Start() {
 	// the admin console always authenticates as the client the seeder provisions, so the
 	// secret is the only half of the credential a deployment supplies (#285).
 	if strings.TrimSpace(config.GetAdminConsole().OAuthClientSecret) == "" {
-		slog.Error("Missing admin console OAuth client configuration: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET must be set. If you're running the admin console for the first time, please look at the auth server logs for the generated credentials.")
+		slog.Error("the oauth client secret is not configured, so the admin console cannot start: on a first deployment the auth server logs the generated credentials",
+			"required", "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET")
 		os.Exit(1)
 	}
 	// The static branch and the application branch, in that order. Both are registered
@@ -88,19 +89,24 @@ func (s *Server) Start() {
 	keyFile := config.GetAdminConsole().KeyFile
 	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
 
-	slog.Info("listen host https: " + httpsHost)
-	slog.Info(fmt.Sprintf("listen port https: %v", httpsPort))
-	slog.Info("cert file: " + certFile)
-	slog.Info("key file: " + keyFile)
-	slog.Info(fmt.Sprintf("https enabled: %v", httpsEnabled))
+	// One record per listener where five and three lines used to be. A reader
+	// checking why HTTPS is off had to join "https enabled: false" to four
+	// separate lines to see which of the four settings was the empty one (#320).
+	slog.Info("https listener configuration",
+		"enabled", httpsEnabled,
+		"host", httpsHost,
+		"port", httpsPort,
+		"cert_file", certFile,
+		"key_file", keyFile)
 
 	httpHost := config.GetAdminConsole().ListenHostHttp
 	httpPort := config.GetAdminConsole().ListenPortHttp
 	httpEnabled := httpHost != "" && httpPort > 0
 
-	slog.Info("listen host http: " + httpHost)
-	slog.Info(fmt.Sprintf("listen port http: %v", httpPort))
-	slog.Info(fmt.Sprintf("http enabled: %v", httpEnabled))
+	slog.Info("http listener configuration",
+		"enabled", httpEnabled,
+		"host", httpHost,
+		"port", httpPort)
 
 	if httpEnabled && !httpsEnabled {
 		logHttpWithoutTlsWarning()
@@ -115,7 +121,7 @@ func (s *Server) Start() {
 				Addr:    fmt.Sprintf("%s:%d", httpsHost, httpsPort),
 				Handler: s.router,
 			}
-			slog.Info(fmt.Sprintf("starting HTTPS server on %s:%d", httpsHost, httpsPort))
+			slog.Info("starting the https listener", "host", httpsHost, "port", httpsPort)
 			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil {
 				errChan <- errs.Errorf("HTTPS server error: %v", err)
 			}
@@ -129,7 +135,7 @@ func (s *Server) Start() {
 				Addr:    fmt.Sprintf("%s:%d", httpHost, httpPort),
 				Handler: s.router,
 			}
-			slog.Info(fmt.Sprintf("starting HTTP server on %s:%d", httpHost, httpPort))
+			slog.Info("starting the http listener", "host", httpHost, "port", httpPort)
 			if err := httpServer.ListenAndServe(); err != nil {
 				errChan <- errs.Errorf("HTTP server error: %v", err)
 			}
@@ -138,14 +144,16 @@ func (s *Server) Start() {
 
 	// Exit if neither server is enabled
 	if !httpsEnabled && !httpEnabled {
-		slog.Error("no server configuration enabled - at least one of HTTP or HTTPS must be configured")
+		slog.Error("no listener is enabled, so the admin console cannot start: configure at least one of the http and https listeners")
 		os.Exit(1)
 	}
 
 	// Wait for any server errors and exit on first error
 	for i := 0; i < cap(errChan); i++ {
 		if err := <-errChan; err != nil {
-			slog.Error(err.Error())
+			// The error as a value, not as the message: it arrives from errs.Errorf, so
+			// %+v prints the frames the message text threw away (#320).
+			slog.Error("a listener failed", "error", err)
 			os.Exit(1)
 		}
 	}
@@ -215,11 +223,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// It stays before StripSlashes, which edits r.URL.Path in place, which is why the
 	// middleware renders the target before calling the next handler.
 	logHttpRequests := config.GetAdminConsole().LogHttpRequests
-	if logHttpRequests {
-		slog.Info("http request logging enabled")
-	} else {
-		slog.Info("http request logging disabled")
-	}
+	slog.Info("http request logging configured", "enabled", logHttpRequests)
 	s.router.Use(custom_middleware.MiddlewareRequestLogger(logHttpRequests))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's

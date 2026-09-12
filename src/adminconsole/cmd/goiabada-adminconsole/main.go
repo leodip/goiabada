@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/gob"
-	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -34,9 +33,10 @@ func main() {
 	}
 
 	slog.Info("admin console started")
-	slog.Info("goiabada version: " + constants.Version)
-	slog.Info("build date: " + constants.BuildDate)
-	slog.Info("git commit: " + constants.GitCommit)
+	slog.Info("build information",
+		"version", constants.Version,
+		"build_date", constants.BuildDate,
+		"git_commit", constants.GitCommit)
 	slog.Info("config loaded")
 
 	// Refuse a configuration carried over from a release where the client id and the issuer
@@ -44,15 +44,14 @@ func main() {
 	// behind is either ignored or points this module at a client the auth server never
 	// provisioned (#285).
 	if err := config.ValidateRemovedAdminConsoleVars(); err != nil {
-		slog.Error("configuration validation failed: " + err.Error())
+		slog.Error("the configuration sets variables that were removed, so the admin console cannot start",
+			"error", err)
 		os.Exit(1)
 	}
 
 	// Validate session keys EARLY - fail fast if missing or invalid
 	if err := config.ValidateAdminConsoleSessionKeys(); err != nil {
-		slog.Error("session key validation failed: " + err.Error())
-		slog.Error("Please set GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY and GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY")
-		slog.Error("Generate keys with: openssl rand -hex 64 (for authentication key) and openssl rand -hex 32 (for encryption key)")
+		logSessionKeysNotConfigured(err)
 		os.Exit(1)
 	}
 	slog.Info("session keys validated")
@@ -65,18 +64,19 @@ func main() {
 		logBootstrapCredentialsNotConfigured()
 		os.Exit(1)
 	}
-	slog.Info("OAuth credentials validated")
+	slog.Info("oauth credentials validated")
 
-	slog.Info("auth server base URL: " + config.GetAuthServer().BaseURL)
-	slog.Info("auth server internal base URL: " + config.GetAuthServer().InternalBaseURL)
-	slog.Info("admin console base URL: " + config.GetAdminConsole().BaseURL)
+	slog.Info("using configuration",
+		"auth_server_base_url", config.GetAuthServer().BaseURL,
+		"auth_server_internal_base_url", config.GetAuthServer().InternalBaseURL,
+		"admin_console_base_url", config.GetAdminConsole().BaseURL)
 
 	dir, err := os.Getwd()
 	if err != nil {
 		slog.Error("unable to determine the current working directory", "error", err)
 		os.Exit(1)
 	}
-	slog.Info("current working directory: " + dir)
+	slog.Info("current working directory", "directory", dir)
 
 	// trigger the load of timezones from OS (they will be cached)
 	_ = timezones.Get()
@@ -85,7 +85,7 @@ func main() {
 	// Load i18n message catalogs (and merge GOIABADA_I18N_OVERRIDES_DIR if set).
 	// Fail-fast: a malformed catalog or missing override dir is a config bug.
 	if _, err := i18n.LoadBundle(); err != nil {
-		slog.Error("i18n LoadBundle failed", "error", err)
+		slog.Error("unable to load the i18n message catalogs", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("i18n catalogs loaded")
@@ -93,11 +93,14 @@ func main() {
 	// gob registration
 	gob.Register(oauth.TokenResponse{})
 
-	slog.Info("current time zone is: " + time.Now().Location().String())
-	slog.Info("current local time is: " + time.Now().String())
-	slog.Info("current UTC time is: " + time.Now().UTC().String())
+	now := time.Now()
+	slog.Info("process clock",
+		"time_zone", now.Location().String(),
+		"local_time", now,
+		"utc_time", now.UTC())
 
-	slog.Info("cookie secure (derived from base URL): " + fmt.Sprintf("%t", config.GetAdminConsole().IsCookieSecure()))
+	slog.Info("cookie security derived from the base URL",
+		"cookie_secure", config.GetAdminConsole().IsCookieSecure())
 
 	// Decode the session keys from config, which validated them at startup. The decode
 	// errors are still checked: what they would otherwise become is a store keyed with two
@@ -187,6 +190,25 @@ func main() {
 //
 // One record where a 13-line banner used to be. The names are listed rather than
 // described, because the operator's next action is to set them (#320 decision 6).
+// logSessionKeysNotConfigured reports session keys the console cannot use, which
+// it needs before it can seal a cookie and therefore before it can serve anything.
+//
+// One record where three used to be, for the reason decision 6 collapses the
+// banners: the failure, the two variables to set and the command that generates
+// them are one instruction, and as three records a JSON deployment received them
+// unrelated, with the remedy in a message field nothing could query. It is a
+// function rather than three lines inside main so that the record has a seam to be
+// asserted at (#320).
+func logSessionKeysNotConfigured(err error) {
+	slog.Error("the admin console session keys are missing or malformed, so the admin console cannot start",
+		"error", err,
+		"required", []string{
+			"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY",
+			"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY",
+		},
+		"generate_with", "openssl rand -hex 64 (authentication key), openssl rand -hex 32 (encryption key)")
+}
+
 func logBootstrapCredentialsNotConfigured() {
 	slog.Error("bootstrap credentials are not configured, so the admin console cannot start: on a first deployment start the auth server first, which writes the bootstrap file and exits, then copy every credential into the two services' configuration and restart them",
 		"required", []string{
