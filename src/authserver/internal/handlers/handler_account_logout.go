@@ -115,7 +115,7 @@ func renderLoggedOut(w http.ResponseWriter, r *http.Request, httpHelper HttpHelp
 // isEncryptedIDTokenHint reports whether the hint is a compact JWE (5
 // dot-separated segments) rather than a compact JWS (3 segments). An encrypted
 // hint must be decrypted with the client's key before validation; a plain
-// signed hint is validated as-is. See OpenID Connect Core 1.0 Â§2 (an encrypted
+// signed hint is validated as-is. See OpenID Connect Core 1.0 §2 (an encrypted
 // ID Token is a Nested JWT).
 func isEncryptedIDTokenHint(hint string) bool {
 	return strings.Count(hint, ".") == 4
@@ -217,6 +217,24 @@ var nonIdTokenTypValues = map[string]bool{
 	"Offline":                       true, // offline refresh tokens; the constant is unexported
 }
 
+// rejectIdTokenHint is the one answer for a hint classifyIdTokenHint refuses: the record every
+// refusal writes, and the classification the caller falls back to a hintless logout on. The gate
+// rides as an attribute rather than inside the message, so the twenty rejections are one greppable
+// message a collector can group and count, and Warn rather than Error because every one of them is
+// a hint refused and handled (#320 decisions 4 and 5).
+//
+// A package function rather than a closure in classifyIdTokenHint, which it was until the review
+// of #320: sloglint reads the attribute keys at a call site only for a function it can name, and a
+// closure has no name to give it. It is registered under custom-funcs in .golangci.yml and in
+// slogSpreadSites in core/testutil, which together are what let it spread record below.
+func rejectIdTokenHint(ctx context.Context, gate string, args ...any) (hintClassification, error) {
+	record := make([]any, 0, len(args)+2)
+	record = append(record, "gate", gate)
+	record = append(record, args...)
+	slog.WarnContext(ctx, "id_token_hint rejected", record...)
+	return hintClassification{state: hintRejected}, nil
+}
+
 // classifyIdTokenHint decides whether a request's id_token_hint can be trusted, and returns which of
 // the three states it is in along with the client and session a confirmed hint names.
 //
@@ -255,24 +273,12 @@ func classifyIdTokenHint(
 	tokenParser TokenParser,
 ) (hintClassification, error) {
 
-	// The gate rides as an attribute rather than inside the message, so the twenty
-	// rejections below are one greppable message a collector can group and count, and Warn
-	// rather than Error because every one of them is a hint refused and handled: the caller
-	// falls back to a hintless logout (#320 decisions 4 and 5).
-	reject := func(gate string, args ...interface{}) (hintClassification, error) {
-		record := make([]interface{}, 0, len(args)+2)
-		record = append(record, "gate", gate)
-		record = append(record, args...)
-		slog.WarnContext(r.Context(), "id_token_hint rejected", record...)
-		return hintClassification{state: hintRejected}, nil
-	}
-
 	hint, present := httpHelper.LookupFromUrlQueryOrFormPost(r, "id_token_hint")
 	if !present {
 		return hintClassification{state: hintAbsent}, nil
 	}
 	if len(hint) == 0 {
-		return reject("presence", "reason", "id_token_hint was supplied with an empty value")
+		return rejectIdTokenHint(r.Context(), "presence", "reason", "id_token_hint was supplied with an empty value")
 	}
 
 	// Presence-aware, like the hint above and for the same reason: the client_id gate further down
@@ -286,19 +292,19 @@ func classifyIdTokenHint(
 	// selects no key whether it was supplied empty or left out.
 	if isEncryptedIDTokenHint(hint) {
 		if len(clientId) == 0 {
-			return reject("JWE key selection", "reason", "an encrypted id_token_hint needs client_id to select the key")
+			return rejectIdTokenHint(r.Context(), "JWE key selection", "reason", "an encrypted id_token_hint needs client_id to select the key")
 		}
 		decrypted, err := decryptIDTokenHint(r.Context(), hint, clientId, database)
 		if err != nil {
 			// decryptIDTokenHint has already logged which half failed.
-			return reject("JWE decryption")
+			return rejectIdTokenHint(r.Context(), "JWE decryption")
 		}
 		hint = decrypted
 	}
 
 	idToken, err := tokenParser.DecodeAndValidateTokenString(r.Context(), hint, nil, false)
 	if err != nil || idToken == nil {
-		return reject("parse and signature", "error", err)
+		return rejectIdTokenHint(r.Context(), "parse and signature", "error", err)
 	}
 
 	// Is this an ID Token at all? Without this gate a session-bound ACCESS token satisfies every
@@ -309,7 +315,7 @@ func classifyIdTokenHint(
 	// identifier, so GetClientByClientIdentifier resolves it under the collision. Confirming it would
 	// skip the consent page entirely and end that client's half of the session (#109).
 	if typ := idToken.GetStringClaim("typ"); nonIdTokenTypValues[typ] {
-		return reject("ID-Token shape", "reason", "typ names a token that is not an ID Token", "typ", typ)
+		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "typ names a token that is not an ID Token", "typ", typ)
 	}
 
 	// sub and iat are REQUIRED on an ID Token by OpenID Connect Core 1.0 section 2, and RP-Initiated
@@ -321,26 +327,26 @@ func classifyIdTokenHint(
 	// the owner of the session sid names.
 	subject := idToken.GetStringClaim("sub")
 	if len(subject) == 0 {
-		return reject("ID-Token shape", "reason", "sub is missing or empty")
+		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "sub is missing or empty")
 	}
 	if _, ok := idToken.GetIntClaim("iat"); !ok {
-		return reject("ID-Token shape", "reason", "iat is missing or is not an integral number")
+		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "iat is missing or is not an integral number")
 	}
 
 	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 	issuer := idToken.GetStringClaim("iss")
 	if len(issuer) == 0 {
-		return reject("iss", "reason", "iss is missing")
+		return rejectIdTokenHint(r.Context(), "iss", "reason", "iss is missing")
 	}
 	if issuer != settings.Issuer {
-		return reject("iss", "reason", "iss is not this server", "iss", issuer)
+		return rejectIdTokenHint(r.Context(), "iss", "reason", "iss is not this server", "iss", issuer)
 	}
 
 	// GetStringClaim yields "" for an aud that arrived as an array, which is right for a hint: an ID
 	// Token this server issues has exactly one audience, the client identifier.
 	clientIdentifier := idToken.GetStringClaim("aud")
 	if len(clientIdentifier) == 0 {
-		return reject("aud", "reason", "aud is missing, or is not a single string")
+		return rejectIdTokenHint(r.Context(), "aud", "reason", "aud is missing, or is not a single string")
 	}
 
 	// RP-Initiated Logout 1.0 section 2: "When both client_id and id_token_hint are present, the OP
@@ -361,7 +367,7 @@ func classifyIdTokenHint(
 	//
 	// Compared before the lookup so a mismatch costs no query.
 	if clientIdPresent && clientId != clientIdentifier {
-		return reject("client_id", "reason", "client_id does not match the aud the hint is signed over",
+		return rejectIdTokenHint(r.Context(), "client_id", "reason", "client_id does not match the aud the hint is signed over",
 			"client_identifier", clientId, "aud", clientIdentifier)
 	}
 
@@ -371,10 +377,10 @@ func classifyIdTokenHint(
 		// teardown, so a 500 here would put the End-User on a terminal page while still signed in,
 		// which is the defect #109 exists to remove. Rejecting instead widens the teardown from
 		// per-client to whole-session and forbids the redirect, which is the fail-safe direction.
-		return reject("aud", "reason", "the client lookup failed", "aud", clientIdentifier, "error", err)
+		return rejectIdTokenHint(r.Context(), "aud", "reason", "the client lookup failed", "aud", clientIdentifier, "error", err)
 	}
 	if client == nil {
-		return reject("aud", "reason", "aud names no client", "aud", clientIdentifier)
+		return rejectIdTokenHint(r.Context(), "aud", "reason", "aud names no client", "aud", clientIdentifier)
 	}
 
 	now := time.Now().UTC()
@@ -384,10 +390,10 @@ func classifyIdTokenHint(
 	if _, hasNbf := idToken.Claims["nbf"]; hasNbf {
 		nbf, ok := idToken.GetIntClaim("nbf")
 		if !ok {
-			return reject("nbf", "reason", "nbf is present and is not an integral number")
+			return rejectIdTokenHint(r.Context(), "nbf", "reason", "nbf is present and is not an integral number")
 		}
 		if time.Unix(nbf, 0).After(now) {
-			return reject("nbf", "reason", "nbf is in the future")
+			return rejectIdTokenHint(r.Context(), "nbf", "reason", "nbf is in the future")
 		}
 	}
 
@@ -396,12 +402,12 @@ func classifyIdTokenHint(
 	// below is bounded to avoid becoming.
 	exp, ok := idToken.GetIntClaim("exp")
 	if !ok {
-		return reject("exp", "reason", "exp is missing or is not an integral number")
+		return rejectIdTokenHint(r.Context(), "exp", "reason", "exp is missing or is not an integral number")
 	}
 
 	sid := idToken.GetStringClaim("sid")
 	if len(sid) == 0 {
-		return reject("sid", "reason", "sid is missing")
+		return rejectIdTokenHint(r.Context(), "sid", "reason", "sid is missing")
 	}
 
 	sessionIdentifier := ""
@@ -418,7 +424,7 @@ func classifyIdTokenHint(
 		// Not an error and not a 500, which is what it used to be. The spec's answer to a hint that
 		// does not belong to the current session is to ask the End-User, and a user whose session was
 		// reaped or replaced between signing in and logging out reaches this with nobody at fault.
-		return reject("sid", "reason", "sid names a different session than the browser's")
+		return rejectIdTokenHint(r.Context(), "sid", "reason", "sid names a different session than the browser's")
 	}
 
 	// One lookup, read by the expiry-tolerance branch below and by the ownership gate after it. It
@@ -436,7 +442,7 @@ func classifyIdTokenHint(
 
 	if time.Unix(exp, 0).Before(now) {
 		if userSession == nil {
-			return reject("expiry tolerance", "reason", "exp has passed and sid names no live session")
+			return rejectIdTokenHint(r.Context(), "expiry tolerance", "reason", "exp has passed and sid names no live session")
 		}
 		// "Recent session" has exactly one meaning in this codebase: the row is still there.
 		slog.InfoContext(r.Context(), "accepting an expired id_token_hint because its session is still live",
@@ -471,7 +477,7 @@ func classifyIdTokenHint(
 			return hintClassification{}, err
 		}
 		if user == nil || user.Id != userSession.UserId {
-			return reject("session ownership", "reason", "sid names a session that does not belong to sub")
+			return rejectIdTokenHint(r.Context(), "session ownership", "reason", "sid names a session that does not belong to sub")
 		}
 	}
 

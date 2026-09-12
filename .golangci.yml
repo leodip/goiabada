@@ -6,9 +6,12 @@
 # open PR. Listing the linters explicitly makes that an intentional, reviewable
 # commit instead.
 #
-# The set below is exactly golangci-lint 2.12.2's `standard` set, pinned as of
-# the CI/CD v2 stage 0 cleanup. The binary itself is pinned in
-# src/authserver/versions.yaml (tools.golangci-lint).
+# The first five below are exactly golangci-lint 2.12.2's `standard` set, pinned
+# as of the CI/CD v2 stage 0 cleanup. sloglint was added by #320 and is the one
+# deliberate widening: it holds the logging convention CLAUDE.md pattern 8
+# states, type-checked, and its settings below are that convention spelled in
+# its vocabulary. The binary itself is pinned in src/authserver/versions.yaml
+# (tools.golangci-lint).
 #
 # Note that golangci-lint's bundled staticcheck includes the QF (quickfix)
 # family, which the standalone `staticcheck` binary does not ship at all. This
@@ -23,3 +26,68 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+    - sloglint
+  settings:
+    sloglint:
+      # A slog call inside any function, at any enclosing depth, that has a
+      # context.Context or an *http.Request parameter is a *Context variant, so
+      # the installed handler can append request_id (#320 decision 2). "scope"
+      # is exactly that reading: sloglint walks the enclosing FuncDecl and
+      # FuncLit parameters and matches both types by their checked type.
+      context: scope
+      # The message is a string literal or a constant, so a record is greppable
+      # by its message and its values ride as attributes (#320 decision 4). A
+      # constant is admitted here and msg-style below reads literals only, so
+      # testutil.AssertSlogConvention refuses any message that is not a literal
+      # at the call: otherwise a constant is how an opener gets past every guard.
+      static-msg: true
+      # First rune lowercase (#320 decision 4). The component prefix and the
+      # "failed to" / "error " openers the same decision refuses are text
+      # sloglint has no option for, so testutil.AssertSlogConvention holds them.
+      msg-style: lowercased
+      # snake_case keys, one spelling per concept (#320 decision 3).
+      key-naming-case: snake
+      # err is spelled error, the name the JSON handler rewrites to keep the
+      # core/errs stack. request_id is never written by a call site: the
+      # handler injects it from the context, and a site writing its own puts
+      # the key in the record twice. core/logging, which IS the injector, is
+      # exempted under exclusions below (#320 decisions 2 and 3).
+      forbidden-keys:
+        - err
+        - request_id
+        - request-id
+      # Functions that take the caller's key/value run and hand it to one
+      # record. Registering them is what makes sloglint read the keys at their
+      # call sites, which is where 328 API 500s and 20 id_token_hint refusals
+      # write theirs. msg-pos is -1 because none of them takes a message; the
+      # run begins at args-pos. testutil.AssertSlogConvention checks this list
+      # against slogSpreadSites, so a forwarder cannot be registered on one
+      # side only.
+      custom-funcs:
+        - name: github.com/leodip/goiabada/authserver/internal/apiresponse.WriteInternalServerError
+          msg-pos: -1
+          args-pos: 3
+        - name: github.com/leodip/goiabada/authserver/internal/apiresponse.LogInternalServerError
+          msg-pos: -1
+          args-pos: 2
+        - name: github.com/leodip/goiabada/authserver/internal/handlers/apihandlers.writeInternalServerError
+          msg-pos: -1
+          args-pos: 3
+        - name: github.com/leodip/goiabada/authserver/internal/handlers.rejectIdTokenHint
+          msg-pos: -1
+          args-pos: 2
+  exclusions:
+    rules:
+      # Test files read records through testutil.CaptureSlog rather than
+      # writing them, and the integration harnesses log however they like.
+      # Mocks are generated scaffolding. Both match AssertNoLegacyErrors'
+      # notion of production code, so one answer holds for every guard.
+      - path: _test\.go
+        linters: [sloglint]
+      - path: /mocks/
+        linters: [sloglint]
+      # core/logging is the package that injects request_id, so it is the one
+      # place the forbidden key is written on purpose.
+      - path: core/logging/
+        linters: [sloglint]
+        text: request_id

@@ -1127,11 +1127,13 @@ func HandleAPIClientWebOriginsPut(
 			if errors.As(err, &stepFailure) {
 				failure = stepFailure
 			}
-			attrs := []any{"client_id", client.Id}
+			// Two calls rather than one over a conditionally built run, so every key this site
+			// writes is a literal at the call sloglint reads (#320).
 			if failure.origin != "" {
-				attrs = append(attrs, "origin", failure.origin)
+				writeInternalServerError(w, r, failure, "client_id", client.Id, "origin", failure.origin)
+			} else {
+				writeInternalServerError(w, r, failure, "client_id", client.Id)
 			}
-			writeInternalServerError(w, r, failure, attrs...)
 			return
 		}
 
