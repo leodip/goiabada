@@ -597,6 +597,9 @@ func (d *CommonDatabase) auditRevokedUserAuthState(userId int64, swept revocatio
 		// overrides of CreateAuditLog, so on those two engines it would take the id-reading
 		// implementation their drivers cannot satisfy and report every successful write as a
 		// failure. See insertAuditLogWithoutId.
+		// RequestId is deliberately left unset, for the same reason the console record above is
+		// written under context.Background(): this runs at startup and no request exists, so the
+		// row carries the empty string, which is the column's "not written on a request" (#328).
 		if err := d.insertAuditLogWithoutId(nil, &models.AuditLog{
 			AuditEvent: constants.AuditRevokedUserAuthState,
 			Details:    string(detailsJSON),

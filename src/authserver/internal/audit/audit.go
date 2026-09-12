@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/auditlog"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -72,6 +74,14 @@ func (al *AuditLogger) Log(ctx context.Context, auditEvent string, details map[s
 		auditLog := &models.AuditLog{
 			AuditEvent: auditEvent,
 			Details:    string(detailsJSON),
+			// Through FieldForLog, and not chi's raw string, so the row carries exactly what
+			// core/logging puts on the record: the id is client-chosen (an inbound X-Request-Id
+			// is adopted verbatim), so this is where it is escaped to printable ASCII and clipped
+			// with a counted marker. Storing the raw value instead would make the admin page and
+			// the log disagree on precisely the ids an attacker chose, which is the case the
+			// correlation has to survive (#328). An empty context yields "", which is what a row
+			// written off a request carries.
+			RequestId: logging.FieldForLog(chimiddleware.GetReqID(ctx)),
 			// CreatedAt set by CreateAuditLog
 		}
 

@@ -41,7 +41,7 @@ func TestMigrateVersion_NeverMigratedDatabase(t *testing.T) {
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "engine: sqlite")
-	assert.Contains(t, out.String(), "000044")
+	assert.Contains(t, out.String(), "000045")
 	assert.Contains(t, out.String(), "never been migrated")
 }
 
@@ -53,7 +53,7 @@ func TestMigrateVersion_ReportsWhatTheDatabaseRecords(t *testing.T) {
 	code := runMigrate([]string{"version"}, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
-	assert.Contains(t, out.String(), "the database records schema version 000044")
+	assert.Contains(t, out.String(), "the database records schema version 000045")
 	assert.NotContains(t, out.String(), "DIRTY")
 }
 
@@ -62,13 +62,13 @@ func TestMigrateVersion_ReportsWhatTheDatabaseRecords(t *testing.T) {
 func TestMigrateVersion_AnnouncesADirtyDatabase(t *testing.T) {
 	m, sqlDB := newTestMigrator(t)
 	require.NoError(t, m.Up())
-	markDirty(t, m, sqlDB, 44)
+	markDirty(t, m, sqlDB, 45)
 
 	var out bytes.Buffer
 	code := runMigrate([]string{"version"}, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
-	assert.Contains(t, out.String(), "000044")
+	assert.Contains(t, out.String(), "000045")
 	assert.Contains(t, out.String(), "DIRTY")
 	assert.Contains(t, out.String(), "did not finish")
 }
@@ -77,19 +77,19 @@ func TestMigrateTo_StepsUpToTheHeadAndPrintsThePlan(t *testing.T) {
 	m, _ := newTestMigrator(t)
 	var out bytes.Buffer
 
-	code := runMigrate([]string{"to", "44"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", "45"}, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code, out.String())
 	assert.Contains(t, out.String(), "current schema version: none (never migrated)")
-	assert.Contains(t, out.String(), "target schema version: 000044")
+	assert.Contains(t, out.String(), "target schema version: 000045")
 	// Lowest first going up, and the whole chain is listed rather than summarised.
 	assert.Contains(t, out.String(), "migrations to run, in order: 000001, ")
-	assert.Contains(t, out.String(), "000044")
-	assert.Contains(t, out.String(), "now at schema version 000044")
+	assert.Contains(t, out.String(), "000045")
+	assert.Contains(t, out.String(), "now at schema version 000045")
 
 	version, dirty, err := m.Version()
 	require.NoError(t, err)
-	assert.Equal(t, 44, version)
+	assert.Equal(t, 45, version)
 	assert.False(t, dirty)
 }
 
@@ -98,16 +98,16 @@ func TestMigrateTo_AlreadyThereIsNotAFailure(t *testing.T) {
 	require.NoError(t, m.Up())
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "000044"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", "000045"}, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
-	assert.Contains(t, out.String(), "already at schema version 000044")
+	assert.Contains(t, out.String(), "already at schema version 000045")
 	assert.NotContains(t, out.String(), "migrations to run")
 }
 
-// The direction the command exists for. rollbackFloor equals the head on this release, so the
-// floor is lowered here rather than in production: with the constant as written no step down is
-// reachable at all, and the test that matters most would be the one that could not run.
+// The direction the command exists for. rollbackFloor sits one below the head, so the only step
+// down production allows is a single one; the floor is lowered here rather than in production so
+// that the plan asserted is a multi-step one, which is where the order and the listing matter.
 func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
 	m, _ := newTestMigrator(t)
 	require.NoError(t, m.Up())
@@ -116,12 +116,12 @@ func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
 	code := runMigrate([]string{"to", "000041"}, m, 24, &out)
 
 	require.Equal(t, 0, code, out.String())
-	assert.Contains(t, out.String(), "current schema version: 000044")
+	assert.Contains(t, out.String(), "current schema version: 000045")
 	assert.Contains(t, out.String(), "target schema version: 000041")
 	// Highest first, these are the .down.sql files run from the top down, and the list is the
 	// versions THIS engine carries rather than a count: 000042 is a MySQL migration and SQLite
 	// steps straight from 000043 to 000041.
-	assert.Contains(t, out.String(), "migrations to run, in order: 000044, 000043\n")
+	assert.Contains(t, out.String(), "migrations to run, in order: 000045, 000044, 000043\n")
 	assert.Contains(t, out.String(), "now at schema version 000041")
 
 	version, dirty, err := m.Version()
@@ -158,12 +158,15 @@ func TestMigrateTo_RefusesATargetBelowTheRollbackFloor(t *testing.T) {
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "000030")
 	assert.Contains(t, out.String(), "rollback is supported between releases")
+	// 000044 is the FLOOR and not the head: it is the schema version of the release rollback is
+	// supported down to, and it moves only when a release makes a one-way data change, which
+	// 000045 is not.
 	assert.Contains(t, out.String(), "000044")
 
 	// It refused before touching anything.
 	version, _, err := m.Version()
 	require.NoError(t, err)
-	assert.Equal(t, 44, version)
+	assert.Equal(t, 45, version)
 }
 
 func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
@@ -175,7 +178,7 @@ func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "000099")
-	assert.Contains(t, out.String(), "000044")
+	assert.Contains(t, out.String(), "000045")
 	assert.Contains(t, out.String(), "newer release")
 }
 
@@ -184,14 +187,14 @@ func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
 func TestMigrateTo_RefusesADirtyDatabase(t *testing.T) {
 	m, sqlDB := newTestMigrator(t)
 	require.NoError(t, m.Up())
-	markDirty(t, m, sqlDB, 44)
+	markDirty(t, m, sqlDB, 45)
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "44"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", "45"}, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "dirty")
-	assert.Contains(t, out.String(), "000044")
+	assert.Contains(t, out.String(), "000045")
 	assert.NotContains(t, out.String(), "migrations to run")
 }
 

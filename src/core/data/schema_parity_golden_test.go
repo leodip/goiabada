@@ -103,8 +103,8 @@ func parityAllowlist() []parityRule {
 				"so a width there would be documentation the engine ignores. The other three " +
 				"enforce theirs, which is why this is recorded as a difference rather than " +
 				"folded onto unbounded: SQLite really does store a value SQL Server would refuse.",
-			Count:  91,
-			Digest: "2342129c9784da64",
+			Count:  92,
+			Digest: "4dbc0da396ffd7d1",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, schemadump.SQLite) &&
 					d.Says[schemadump.SQLite] == "string(no declared length)" &&

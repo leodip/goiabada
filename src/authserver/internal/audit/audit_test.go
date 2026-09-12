@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -514,6 +515,107 @@ func TestAuditLogger_ReadsTheSettingsRowWhenTheContextHasNone(t *testing.T) {
 			assert.Equal(t, "audit event", written[0].Message)
 			assert.Equal(t, "goiabada/req-0000008", written[0].Attrs["request_id"])
 			mockDB.AssertExpectations(t)
+		})
+	}
+}
+
+// TestAuditLogger_TheRowCarriesTheRequestIdTheLogCarries is the row half of #328, and decision 7
+// stated as an assertion: what CreateAuditLog is handed is not chi's raw id but the string
+// core/logging renders onto the record, so the value an administrator reads off the admin page is
+// the value they grep the log for.
+//
+// Every case enables both targets and compares the row's field against the console record's
+// request_id attribute rather than against a second expected value, because equality between the
+// two is the property, not the rendering itself. The expected renderings below are written out by
+// hand rather than taken from logging.FieldForLog, so a change to the clip or the escape fails
+// here instead of agreeing with itself.
+//
+// The id is client-chosen: chi's RequestID middleware adopts an inbound X-Request-Id header
+// verbatim, bounded only by the server's 1 MiB header cap, which is why the oversized and the
+// non-printable cases are here and not just the well-behaved one.
+func TestAuditLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
+	ids := []struct {
+		name     string
+		ctx      context.Context
+		expected string
+		// alsoOnTheRecord says the console record carries request_id at all, which it does not
+		// when there is no request: the injection skips an empty id rather than writing "".
+		alsoOnTheRecord bool
+	}{
+		{
+			name:            "an id of chi's own shape",
+			ctx:             requestContext("goiabada/req-0000042"),
+			expected:        "goiabada/req-0000042",
+			alsoOnTheRecord: true,
+		},
+		{
+			name:            "a proxy's correlation uuid, adopted from the header",
+			ctx:             requestContext("6d8f4a2e-0c3b-4a1e-9f77-2b5d1c8e4a90"),
+			expected:        "6d8f4a2e-0c3b-4a1e-9f77-2b5d1c8e4a90",
+			alsoOnTheRecord: true,
+		},
+		{
+			name:     "no request at all, which is what the startup backfill's row carries",
+			ctx:      context.Background(),
+			expected: "",
+		},
+		{
+			name:     "a request id the middleware never reached",
+			ctx:      requestContext(""),
+			expected: "",
+		},
+		{
+			// 300 bytes is past MaxLoggedField, so the stored value is the 128-byte prefix and
+			// the counted marker naming the true length. The marker is the reason the clip is
+			// FieldForLog's and not a plain truncation: two different 300-byte ids sharing a
+			// prefix stay different strings on the page and in the log.
+			name:            "an id past the log's clip",
+			ctx:             requestContext(strings.Repeat("x", 300)),
+			expected:        strings.Repeat("x", 128) + "[truncated, 128 of 300 bytes]",
+			alsoOnTheRecord: true,
+		},
+		{
+			// Nothing in net/http refuses a tab, a newline or a lone continuation byte in a
+			// header value, so an unauthenticated client can put one here. Escaped before it
+			// reaches the column, as it is before it reaches the record.
+			name:            "an id carrying bytes a header may hold and a column should not",
+			ctx:             requestContext("req\t42\nmore\x80"),
+			expected:        "req%0942%0Amore%80",
+			alsoOnTheRecord: true,
+		},
+	}
+
+	for _, tc := range ids {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := testutil.CaptureSlog(t)
+
+			var row *models.AuditLog
+			mockDB := mocks.NewDatabase(t)
+			mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+				AuditLogsInConsoleEnabled:  true,
+				AuditLogsInDatabaseEnabled: true,
+			}, nil)
+			mockDB.On("CreateAuditLog", mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) { row = args.Get(1).(*models.AuditLog) }).
+				Return(nil).Once()
+
+			NewAuditLogger(mockDB).Log(tc.ctx, "auth_failed_pwd",
+				map[string]interface{}{"email": "jane@example.com"})
+
+			mockDB.AssertExpectations(t)
+			require.NotNil(t, row, "the row handed to CreateAuditLog")
+			assert.Equal(t, tc.expected, row.RequestId,
+				"the persisted request id is the log's own rendering of it, not chi's raw string")
+
+			written := logs.Records()
+			require.Len(t, written, 1, "the console record")
+			if !tc.alsoOnTheRecord {
+				assert.NotContains(t, written[0].Attrs, "request_id",
+					"no id means no attribute, and the row's empty string says the same thing")
+				return
+			}
+			assert.Equal(t, row.RequestId, written[0].Attrs["request_id"],
+				"the whole point of the column: the page and the log show one string, not two")
 		})
 	}
 }
