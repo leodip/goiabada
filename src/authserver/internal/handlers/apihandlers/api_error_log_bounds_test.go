@@ -152,3 +152,65 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 	assert.Equal(t, filterId, attrs["filter_request_id"])
 	database.AssertExpectations(t)
 }
+
+// The group-annotation branch fails after the search has already succeeded, so its two records are
+// the only ones on this handler a case reaches by getting further in rather than by failing sooner.
+// Each binds the query at its own call, which is why the case above does not hold them: removing
+// either bound leaves every test before this line green.
+
+// searchThatSucceeds lets the search itself pass with one user, which is what carries a case past
+// the first error record and into the annotation branch.
+func searchThatSucceeds(database *mocks_data.Database, rawQuery string) {
+	database.On("SearchUsersPaginated", mock.Anything, rawQuery, 1, 10).
+		Return([]models.User{{Id: 42}}, 1, nil)
+}
+
+func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t *testing.T) {
+	rawQuery, wantQuery := oversized(t, forgedLine)
+
+	database := mocks_data.NewDatabase(t)
+	searchThatSucceeds(database, rawQuery)
+	database.On("GetGroupById", mock.Anything, int64(7)).
+		Return(nil, errs.New("engine is down"))
+
+	capture := testutil.CaptureSlog(t)
+	rr := httptest.NewRecorder()
+
+	HandleAPIUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
+		url.Values{"query": {rawQuery}, "annotateGroupMembership": {"7"}}))
+
+	require.Equal(t, http.StatusInternalServerError, rr.Code)
+	attrs := oneErrorRecord(t, capture)
+
+	assert.Equal(t, wantQuery, attrs["query"])
+	assert.Equal(t, int64(7), attrs["group_id"],
+		"the group the caller named is the server's own parsed int64 and is bounded by that")
+	assert.NotContains(t, capture.Text(), rawQuery,
+		"the search term never reaches the record whole, on this branch either")
+	database.AssertExpectations(t)
+}
+
+func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails(t *testing.T) {
+	rawQuery, wantQuery := oversized(t, forgedLine)
+
+	database := mocks_data.NewDatabase(t)
+	searchThatSucceeds(database, rawQuery)
+	database.On("GetGroupById", mock.Anything, int64(7)).Return(&models.Group{Id: 7}, nil)
+	database.On("UsersLoadGroups", mock.Anything, mock.Anything).
+		Return(errs.New("engine is down"))
+
+	capture := testutil.CaptureSlog(t)
+	rr := httptest.NewRecorder()
+
+	HandleAPIUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
+		url.Values{"query": {rawQuery}, "annotateGroupMembership": {"7"}}))
+
+	require.Equal(t, http.StatusInternalServerError, rr.Code)
+	attrs := oneErrorRecord(t, capture)
+
+	assert.Equal(t, wantQuery, attrs["query"])
+	assert.Equal(t, int64(1), attrs["user_count"],
+		"the one user the search returned; slog widens every integer, so the count reads int64")
+	assert.NotContains(t, capture.Text(), rawQuery)
+	database.AssertExpectations(t)
+}
