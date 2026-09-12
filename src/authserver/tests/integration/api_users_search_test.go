@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/leodip/goiabada/core/api"
@@ -11,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAPIUsersSearch_Success(t *testing.T) {
@@ -21,12 +23,7 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 	// and allow searching by query instead of paginating through all users
 	uniqueSuffix := fake.LetterN(10)
 	testUsers := createTestUsersWithSuffix(t, uniqueSuffix)
-	defer func() {
-		// Cleanup: Delete test users
-		for _, user := range testUsers {
-			_ = database.DeleteUser(nil, user.Id)
-		}
-	}()
+	defer func() { deleteTestUsers(t, testUsers) }()
 
 	// Debug: Verify test users were created
 	t.Logf("Created %d test users with suffix '%s':", len(testUsers), uniqueSuffix)
@@ -147,13 +144,8 @@ func TestAPIUsersSearch_WithPagination(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test users
-	testUsers := createTestUsers(t)
-	defer func() {
-		// Cleanup: Delete test users
-		for _, user := range testUsers {
-			_ = database.DeleteUser(nil, user.Id)
-		}
-	}()
+	testUsers := createTestUsersWithSuffix(t, fake.LetterN(10))
+	defer func() { deleteTestUsers(t, testUsers) }()
 
 	// Test: Search with pagination
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?page=1&size=2"
@@ -205,13 +197,8 @@ func TestAPIUsersSearch_InvalidParameters(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test users
-	testUsers := createTestUsers(t)
-	defer func() {
-		// Cleanup: Delete test users
-		for _, user := range testUsers {
-			_ = database.DeleteUser(nil, user.Id)
-		}
-	}()
+	testUsers := createTestUsersWithSuffix(t, fake.LetterN(10))
+	defer func() { deleteTestUsers(t, testUsers) }()
 
 	testCases := []struct {
 		name    string
@@ -255,13 +242,8 @@ func TestAPIUsersSearch_SizeLimit(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test users
-	testUsers := createTestUsers(t)
-	defer func() {
-		// Cleanup: Delete test users
-		for _, user := range testUsers {
-			_ = database.DeleteUser(nil, user.Id)
-		}
-	}()
+	testUsers := createTestUsersWithSuffix(t, fake.LetterN(10))
+	defer func() { deleteTestUsers(t, testUsers) }()
 
 	// Test: Maximum allowed size (200)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=200"
@@ -296,13 +278,8 @@ func TestAPIUsersSearch_NoResults(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test users
-	testUsers := createTestUsers(t)
-	defer func() {
-		// Cleanup: Delete test users
-		for _, user := range testUsers {
-			_ = database.DeleteUser(nil, user.Id)
-		}
-	}()
+	testUsers := createTestUsersWithSuffix(t, fake.LetterN(10))
+	defer func() { deleteTestUsers(t, testUsers) }()
 
 	// Test: Query that returns no users
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=nonexistent-user-12345"
@@ -330,13 +307,8 @@ func TestAPIUsersSearch_SpecialCharacters(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test users
-	testUsers := createTestUsers(t)
-	defer func() {
-		// Cleanup: Delete test users
-		for _, user := range testUsers {
-			_ = database.DeleteUser(nil, user.Id)
-		}
-	}()
+	testUsers := createTestUsersWithSuffix(t, fake.LetterN(10))
+	defer func() { deleteTestUsers(t, testUsers) }()
 
 	testCases := []struct {
 		name          string
@@ -374,28 +346,29 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Create multiple users for pagination testing
+	// Setup: Create multiple users for pagination testing. The suffix is what
+	// keeps the eight addresses out of the way of a leftover row from an earlier
+	// run: this test is the only caller of these addresses, so it cannot collide
+	// with a sibling, but goiabada_integration is never dropped on mysql,
+	// postgres or mssql, and a fixed address there collides with itself.
+	uniqueSuffix := fake.LetterN(10)
 	var testUsers []*models.User
 	for i := 1; i <= 8; i++ {
+		n := strconv.Itoa(i)
 		user := &models.User{
 			Subject:       fake.UUID(),
 			Enabled:       true,
-			Email:         "testuser" + string(rune('0'+i)) + "@pagination.test",
+			Email:         "testuser" + n + "." + uniqueSuffix + "@pagination.test",
 			GivenName:     "Test",
-			FamilyName:    "User" + string(rune('0'+i)),
+			FamilyName:    "User" + n,
 			EmailVerified: true,
 		}
 		err := database.CreateUser(nil, user)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		testUsers = append(testUsers, user)
 	}
 
-	defer func() {
-		// Cleanup: Delete test users
-		for _, user := range testUsers {
-			_ = database.DeleteUser(nil, user.Id)
-		}
-	}()
+	defer func() { deleteTestUsers(t, testUsers) }()
 
 	// Test: First page
 	url1 := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=5&page=1"
@@ -444,57 +417,21 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 	assert.LessOrEqual(t, len(searchResponse2.Users), 5, "Page 2 should have at most 5 users")
 }
 
-// createTestUsers creates test users in the database for search testing
-// Note: Uses fixed email addresses - prefer createTestUsersWithSuffix for tests
-// that need to search for specific users in a database with many existing users
-func createTestUsers(t *testing.T) []*models.User {
-	users := make([]*models.User, 0)
-
-	// Create user 1
-	user1 := &models.User{
-		Subject:       fake.UUID(),
-		Enabled:       true,
-		Email:         "john.doe@test.com",
-		GivenName:     "AAA John",
-		FamilyName:    "Doe",
-		EmailVerified: true,
-	}
-	err := database.CreateUser(nil, user1)
-	assert.NoError(t, err)
-	users = append(users, user1)
-
-	// Create user 2
-	user2 := &models.User{
-		Subject:       fake.UUID(),
-		Enabled:       true,
-		Email:         "jane.smith@test.com",
-		GivenName:     "AAA Jane",
-		FamilyName:    "Smith",
-		EmailVerified: true,
-	}
-	err = database.CreateUser(nil, user2)
-	assert.NoError(t, err)
-	users = append(users, user2)
-
-	// Create user 3
-	user3 := &models.User{
-		Subject:       fake.UUID(),
-		Enabled:       false, // Disabled user
-		Email:         "disabled@test.com",
-		GivenName:     "AAA Disabled",
-		FamilyName:    "User",
-		EmailVerified: false,
-	}
-	err = database.CreateUser(nil, user3)
-	assert.NoError(t, err)
-	users = append(users, user3)
-
-	return users
-}
-
-// createTestUsersWithSuffix creates test users with unique email addresses
-// using the provided suffix. This allows tests to search for specific users
-// using a query parameter, making tests reliable regardless of existing data.
+// createTestUsersWithSuffix creates the three search fixtures, with the suffix
+// carried in every address and given name so two calls never collide and a
+// caller can find exactly its own rows with a query parameter.
+//
+// The suffix is not cosmetic. This helper replaced one that used three fixed
+// addresses shared by five tests in this file, where a single missed cleanup
+// left rows behind that every later caller then collided with -- and, because
+// the inserts were asserted rather than required, each collision returned three
+// users that had never been created, so the failure surfaced in a test far from
+// whichever one first went wrong. run-tests.sh drops the sqlite file on exit but
+// never drops goiabada_integration on mysql, postgres or mssql, so there the
+// leftovers outlived the run that made them.
+//
+// The inserts are require.NoError for the same reason: a fixture that was not
+// built must stop its test rather than hand it phantom users.
 func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 	users := make([]*models.User, 0)
 
@@ -508,7 +445,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(nil, user1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	users = append(users, user1)
 
 	// Create user 2 - enabled user
@@ -521,7 +458,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 		EmailVerified: true,
 	}
 	err = database.CreateUser(nil, user2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	users = append(users, user2)
 
 	// Create user 3 - disabled user
@@ -534,8 +471,37 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 		EmailVerified: false,
 	}
 	err = database.CreateUser(nil, user3)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	users = append(users, user3)
 
 	return users
+}
+
+// TestAPIUsersSearch_FixtureIsIndependentAcrossCalls is the regression guard for
+// the defect createTestUsersWithSuffix replaced: two callers of the search
+// fixture overlapping in the database used to collide on three fixed addresses,
+// and the collision then cascaded, because a failed insert leaves Id == 0 and
+// the cleanup that followed deleted nothing while saying nothing.
+//
+// It builds the fixture twice with no cleanup in between, which is the shape a
+// missed cleanup leaves behind. Both calls must succeed and the six users must
+// be six distinct rows. Against the old fixed-address helper the second call
+// fails with UNIQUE constraint failed: users.email.
+func TestAPIUsersSearch_FixtureIsIndependentAcrossCalls(t *testing.T) {
+	first := createTestUsersWithSuffix(t, fake.LetterN(10))
+	defer func() { deleteTestUsers(t, first) }()
+
+	second := createTestUsersWithSuffix(t, fake.LetterN(10))
+	defer func() { deleteTestUsers(t, second) }()
+
+	ids := make(map[int64]bool)
+	emails := make(map[string]bool)
+	for _, user := range append(append([]*models.User{}, first...), second...) {
+		require.NotZero(t, user.Id, "every fixture user must have been inserted")
+		assert.False(t, ids[user.Id], "user id %d was handed out twice", user.Id)
+		assert.False(t, emails[user.Email], "address %q was handed out twice", user.Email)
+		ids[user.Id] = true
+		emails[user.Email] = true
+	}
+	assert.Len(t, ids, 6, "two calls of the fixture must produce six distinct users")
 }

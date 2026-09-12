@@ -37,7 +37,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@client-sessions-success.test",
+		Email:         uniqueEmail("testuser@client-sessions-success.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -211,7 +211,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@client-valid-sessions.test",
+		Email:         uniqueEmail("testuser@client-valid-sessions.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -300,7 +300,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@client-page.test",
+		Email:         uniqueEmail("testuser@client-page.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,

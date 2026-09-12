@@ -388,7 +388,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@updatemembercount.test",
+		Email:         uniqueEmail("testuser@updatemembercount.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,

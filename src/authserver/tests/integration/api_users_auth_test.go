@@ -26,7 +26,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@password.test",
+		Email:         uniqueEmail("testuser@password.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -75,7 +75,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@password-validation.test",
+		Email:         uniqueEmail("testuser@password-validation.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -147,17 +147,19 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Create test user with OTP enabled
+	// Setup: Create test user with OTP enabled. The address is the authenticator's
+	// account name as well as the user's, so it is drawn once.
+	otpEmail := uniqueEmail("testuser@otp.test")
 	secret, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "test",
-		AccountName: "testuser@otp.test",
+		AccountName: otpEmail,
 	})
 	assert.NoError(t, err)
 
 	testUser := &models.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
-		Email:              "testuser@otp.test",
+		Email:              otpEmail,
 		GivenName:          "Test",
 		FamilyName:         "User",
 		EmailVerified:      true,
@@ -264,7 +266,7 @@ func TestAPIUserOTPPut_EnableNotSupported(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@otp-enable.test",
+		Email:         uniqueEmail("testuser@otp-enable.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -312,7 +314,7 @@ func TestAPIUserOTPPut_OTPNotEnabled(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@otp-not-enabled.test",
+		Email:         uniqueEmail("testuser@otp-not-enabled.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -345,7 +347,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@session.test",
+		Email:         uniqueEmail("testuser@session.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,

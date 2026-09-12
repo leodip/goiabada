@@ -22,7 +22,7 @@ func TestAPIUserPermissionsGet_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@permissions.test",
+		Email:         uniqueEmail("testuser@permissions.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -130,7 +130,7 @@ func TestAPIUserPermissionsGet_NoPermissions(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@no-permissions.test",
+		Email:      uniqueEmail("testuser@no-permissions.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -163,7 +163,7 @@ func TestAPIUserPermissionsGet_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-permissions.test",
+		Email:      uniqueEmail("testuser@unauth-permissions.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -196,7 +196,7 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@permissions-put.test",
+		Email:         uniqueEmail("testuser@permissions-put.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -272,7 +272,7 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@remove-all-permissions.test",
+		Email:      uniqueEmail("testuser@remove-all-permissions.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -350,7 +350,7 @@ func TestAPIUserPermissionsPut_PermissionNotFound(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@perm-not-found.test",
+		Email:      uniqueEmail("testuser@perm-not-found.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -381,7 +381,7 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@invalid-body.test",
+		Email:      uniqueEmail("testuser@invalid-body.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -412,7 +412,7 @@ func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-put.test",
+		Email:      uniqueEmail("testuser@unauth-put.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}

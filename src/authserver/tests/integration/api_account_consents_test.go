@@ -152,7 +152,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	user2 := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "otheruser@consents.test",
+		Email:      uniqueEmail("otheruser@consents.test"),
 		GivenName:  "Other",
 		FamilyName: "User",
 	}

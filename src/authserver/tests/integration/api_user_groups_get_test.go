@@ -22,7 +22,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@user-groups.test",
+		Email:         uniqueEmail("testuser@user-groups.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -102,7 +102,7 @@ func TestAPIUserGroupsGet_NoGroups(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@no-groups.test",
+		Email:      uniqueEmail("testuser@no-groups.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -173,7 +173,7 @@ func TestAPIUserGroupsGet_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-groups.test",
+		Email:      uniqueEmail("testuser@unauth-groups.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
