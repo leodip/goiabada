@@ -16,6 +16,9 @@ src/
 - **Auth Server** (`src/authserver/go.mod`): Main auth endpoints, token issuance
 - **Admin Console** (`src/adminconsole/go.mod`): Admin management UI
 
+Which module owns what, and the rules that keep it that way, are in `ARCHITECTURE.md` at the
+repository root. It is enforced rather than descriptive: see **Architecture guard** under Testing.
+
 ## Key Directories
 
 ### Core (`src/core/`)
@@ -331,6 +334,16 @@ file under `src/` to gofmt's formatting through `core/testutil.AssertGofmted`. T
 repository-wide from each tier because `cmd/goiabada-setup` has no tier of its own. CI's Lint job
 checks the same thing per module, where an unformatted file also costs that module its vet,
 unparam and golangci-lint run.
+
+**Architecture guard**: `ARCHITECTURE.md` at the repository root records the allowed module edges,
+the intended final owner of every top-level `core` package, the temporary exceptions to those rules,
+and the third-party modules the admin console must not compile. Its three tables are data, not
+prose: `AssertArchitecture` in `core/testutil/architecture.go` parses them and checks them against
+the real import graph, and all three module unit tiers call it. The check runs in both directions,
+which is what makes the document a burn-down list rather than a wish — an edge the tables do not
+allow is a failure, and so is an exception left standing for an edge that no longer exists, so the
+issue that removes an edge has to remove its row with it (#332). A new top-level `core` package
+fails the tier until the table says where it belongs.
 
 **Schema golden files**: each engine's fully migrated catalog is recorded in
 `src/core/data/<engine>db/schema.golden`, and the data tier compares a freshly migrated database
