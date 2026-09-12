@@ -269,7 +269,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AuthTime: newAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
-			enums.AcrLevel1.String(), int64(3), (*int64)(nil)).
+			enums.AcrLevel1.String(), int64(3), (*int64)(nil), &pwdAuthTime).
 			Run(func(mock.Arguments) { sequence = append(sequence, "session-created") }).
 			Return(newSession, nil)
 
@@ -419,7 +419,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AuthTime: newAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
-			enums.AcrLevel1.String(), int64(3), (*int64)(nil)).Return(newSession, nil)
+			enums.AcrLevel1.String(), int64(3), (*int64)(nil), &pwdAuthTime).Return(newSession, nil)
 
 		user := &models.User{Id: 2, Enabled: true}
 		database.On("GetUserById", mock.Anything, int64(2)).Return(user, nil)
@@ -518,7 +518,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AuthTime: newAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd",
-			enums.AcrLevel1.String(), int64(3), (*int64)(nil)).Return(newSession, nil)
+			enums.AcrLevel1.String(), int64(3), (*int64)(nil), &pwdAuthTime).Return(newSession, nil)
 
 		user := &models.User{Id: 1, Enabled: true}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
@@ -636,8 +636,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.ErrorIs(t, stub.bodyErr, deleteError, "the body hands its error to the helper, which rolls back")
 		assertNotAttempted(t, database, "RevokeCodesBySessionIdentifier",
 			"GetRefreshTokensBySessionIdentifier", "UpdateRefreshToken", "UpdateUserSession")
+		// Nine mock.Anything, one per parameter. AssertNotCalled compares the whole argument
+		// list, so a count that does not match the method's never matches a call either and
+		// the assertion passes however often the method ran. It was seven here, one short of
+		// the eight parameters the method had, so it asserted nothing until now (#252).
 		userSessionManager.AssertNotCalled(t, "StartNewUserSession", mock.Anything, mock.Anything,
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+			mock.Anything, mock.Anything)
 		userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything, mock.Anything)
 		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
@@ -732,7 +737,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		startError := errors.New("the replacement session could not be created")
 		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
-			enums.AcrLevel1.String(), int64(3), (*int64)(nil)).Return(nil, startError)
+			enums.AcrLevel1.String(), int64(3), (*int64)(nil), &pwdAuthTime).Return(nil, startError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == startError.Error()
@@ -783,8 +788,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		// Re-auth case (e.g. prompt=login): AuthenticatedAt set by password handler
-		pwdAuthTime := time.Now().UTC()
+		// Re-auth case (e.g. prompt=login): AuthenticatedAt set by password handler.
+		//
+		// Deliberately 90 minutes old, which is the whole point of the case. The browser owns
+		// the hop from /auth/pwd to here, so the credential's instant and this handler's clock
+		// are two different times whenever the browser pauses, and only an old capture can tell
+		// the two apart. "now" would pass against either behaviour (#252 decision 8).
+		pwdAuthTime := time.Now().UTC().Add(-90 * time.Minute)
 		authContext := &oauth.AuthContext{
 			AuthState:       oauth.AuthStateAuthenticationCompleted,
 			ClientId:        "test-client",
@@ -801,7 +811,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
 		})).Return(authContext, nil)
 
-		oldAuthTime := time.Now().UTC().Add(-1 * time.Hour)
+		// The session's previous AuthTime, older still, so "the row was written" and "the row
+		// was written with the captured instant" are distinguishable.
+		oldAuthTime := time.Now().UTC().Add(-4 * time.Hour)
 		userSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
@@ -824,9 +836,11 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
-		// Re-auth: AuthTime is refreshed and session is updated
+		// Re-auth: AuthTime is refreshed and the session row is written. The value is the
+		// captured credential instant exactly, not merely something newer than what the row
+		// held: Equal here is what fails if the handler reads the clock instead.
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
-			return s.Id == userSession.Id && !s.AuthTime.IsZero() && s.AuthTime.After(oldAuthTime)
+			return s.Id == userSession.Id && s.AuthTime.Equal(pwdAuthTime)
 		})).Return(nil)
 
 		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
@@ -839,10 +853,11 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
+		// And the context carries that same instant onward, which is what /auth/issue stamps
+		// onto the code and the token issuer then signs as auth_time.
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateReadyToIssueCode &&
-				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
-				ac.AuthenticatedAt.After(oldAuthTime)
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(pwdAuthTime)
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -970,7 +985,11 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// This ceremony did level 1: handler_auth_pwd sets both of these. Without
 		// Level1AuthCompleted the #129 gate restarts level 1 rather than starting a
 		// session, so this subtest is also the positive control for that gate.
-		pwdAuthTime := time.Now().UTC()
+		//
+		// Deliberately 90 minutes old, so the StartNewUserSession expectation below pins that
+		// the handler forwards the captured credential instant rather than reading the clock:
+		// with "now" the assertion would pass against either behaviour (#252 decision 8).
+		pwdAuthTime := time.Now().UTC().Add(-90 * time.Minute)
 		authContext := &oauth.AuthContext{
 			AuthState:   oauth.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
@@ -1017,7 +1036,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: enums.AcrLevel1.String(),
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil)).Return(newUserSession, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil), &pwdAuthTime).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
@@ -1393,7 +1412,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			OtpConfigGeneration: 4,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd otp",
-			enums.AcrLevel2Optional.String(), int64(7), &captured).Return(newUserSession, nil)
+			enums.AcrLevel2Optional.String(), int64(7), &captured, &pwdAuthTime).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
@@ -2300,7 +2319,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: enums.AcrLevel1.String(),
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil)).Return(newUserSession, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil), &pwdAuthTime).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
@@ -2388,7 +2407,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: enums.AcrLevel1.String(),
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil)).Return(newUserSession, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String(), int64(7), (*int64)(nil), &pwdAuthTime).Return(newUserSession, nil)
 
 		auditLogger.On("Log", constants.AuditStartedNewUserSesson, mock.Anything).Return()
 
