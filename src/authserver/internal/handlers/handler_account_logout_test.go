@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -23,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -508,6 +510,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 	t.Run("Invalid client", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
+		logs := testutil.CaptureSlog(t)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "invalid_client").Return(nil, nil)
 
@@ -515,6 +518,15 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "client_id names no client")
+
+		// Warn, where this used to be Error. A client_id naming no client is a request refused
+		// and handled: the caller falls back to a hintless logout and the End-User is still
+		// signed out. Nothing here is the server failing at something it can do (#320 decision 5).
+		records := logs.Records()
+		require.Len(t, records, 1)
+		assert.Equal(t, slog.LevelWarn, records[0].Level)
+		assert.Equal(t, "invalid_client", records[0].Attrs["client_identifier"],
+			"the identifier that resolved to nothing, under the name decision 3 fixed for it")
 	})
 
 	t.Run("Not a valid JWE", func(t *testing.T) {
@@ -525,10 +537,20 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 
+		logs := testutil.CaptureSlog(t)
+
 		_, err := decryptIDTokenHint("not.a.valid.jwe.token", "test_client", database)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
+
+		// Warn for the same reason as the no-client case above: the hint is a value the relying
+		// party chose, and one this server cannot open is refused rather than failed on.
+		records := logs.Records()
+		require.Len(t, records, 1)
+		assert.Equal(t, slog.LevelWarn, records[0].Level)
+		require.Implements(t, (*error)(nil), records[0].Attrs["error"],
+			"the failure goes in as the error itself, so its stack reaches the log under both formats")
 	})
 
 	t.Run("Decryption failure (wrong key)", func(t *testing.T) {
@@ -1937,6 +1959,43 @@ func TestBuildPostLogoutRedirect(t *testing.T) {
 //
 // Nothing calls the classifier yet, so this is the only thing standing behind it until stage 4 wires
 // it into the pipeline (#109).
+// assertRejectionRecord holds the one record every rejected row above writes, at the level and in
+// the shape #320 gave it, against the gate the row already declares.
+//
+// Warn rather than Error: a rejected hint is a request refused and handled, since the caller falls
+// back to a hintless logout and the End-User is still signed out. Left at Error, these twenty gates
+// are the largest single source of expected entries in this server's error log, and an error log
+// carrying expected events has stopped being one (#320 decision 5).
+//
+// The gate rides as an attribute rather than inside the message, so all twenty group under one
+// greppable message and a collector can count them by gate. Asserting it against tc.gate is what
+// makes the table pay for it: a gate renamed in the classifier and not in the row fails here
+// rather than silently logging the wrong name.
+func assertRejectionRecord(t *testing.T, logs *testutil.SlogCapture, want hintState, wantErr bool, gate string) {
+	t.Helper()
+
+	var rejections []testutil.CapturedRecord
+	for _, record := range logs.Records() {
+		if record.Message == "id_token_hint rejected" {
+			rejections = append(rejections, record)
+		}
+	}
+
+	// A propagating failure is not a rejection: the classifier returns the error and its zero
+	// hintClassification, which the table declares as hintRejected because that is the zero
+	// value. Nothing called reject, so nothing is owed a record.
+	if want != hintRejected || wantErr {
+		assert.Empty(t, rejections, "a hint that was not rejected must not be logged as one")
+		return
+	}
+
+	require.Len(t, rejections, 1, "one record per rejection, whichever gate refused")
+	assert.Equal(t, slog.LevelWarn, rejections[0].Level,
+		"a refused hint is handled, not a server failure")
+	assert.Equal(t, gate, rejections[0].Attrs["gate"],
+		"the gate is an attribute, so the message stays one greppable literal")
+}
+
 func TestClassifyIdTokenHint(t *testing.T) {
 	const (
 		theIssuer    = "https://issuer.example"
@@ -2404,6 +2463,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			logs := testutil.CaptureSlog(t)
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
 			tokenParser := mocks_oauth.NewTokenParser(t)
@@ -2482,6 +2542,8 @@ func TestClassifyIdTokenHint(t *testing.T) {
 				assert.Nil(t, got.client, "a hint that was not confirmed must yield no client")
 				assert.Empty(t, got.sessionIdentifier, "a hint that was not confirmed must yield no session")
 			}
+
+			assertRejectionRecord(t, logs, tc.want, tc.wantErr, tc.gate)
 
 			httpHelper.AssertExpectations(t)
 			database.AssertExpectations(t)

@@ -152,7 +152,7 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 			}
 
 			if _, hasAuthTime := jwtToken.Claims["auth_time"]; !hasAuthTime {
-				slog.Warn("rejecting bearer token on a user-context endpoint: no auth_time claim, so the token was not issued for a user",
+				slog.WarnContext(r.Context(), "rejecting bearer token on a user-context endpoint: no auth_time claim, so the token was not issued for a user",
 					"sub", jwtToken.GetStringClaim("sub"))
 				// RFC 6750 §3.1 defines only invalid_request, invalid_token and
 				// insufficient_scope, none of which means "wrong token type". emitAuthError
@@ -238,7 +238,7 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 
 			sub := strings.TrimSpace(jwtToken.GetStringClaim("sub"))
 			if sub == "" {
-				slog.Warn("rejecting bearer token: user token has no sub claim")
+				slog.WarnContext(r.Context(), "rejecting bearer token: user token has no sub claim")
 				rejectInvalidToken(w, "Invalid token subject")
 				return
 			}
@@ -250,12 +250,12 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 				return
 			}
 			if user == nil {
-				slog.Warn("rejecting bearer token: subject does not resolve to a user")
+				slog.WarnContext(r.Context(), "rejecting bearer token: subject does not resolve to a user")
 				rejectInvalidToken(w, "Session has been terminated")
 				return
 			}
 			if !user.Enabled {
-				slog.Warn("rejecting bearer token: user account is disabled", "userId", user.Id)
+				slog.WarnContext(r.Context(), "rejecting bearer token: user account is disabled", "user_id", user.Id)
 				rejectInvalidToken(w, "Session has been terminated")
 				return
 			}
@@ -267,8 +267,8 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 				// the comparison, so it can never collide with a stored generation.
 				generation, ok := tokenGeneration(jwtToken)
 				if !ok || generation != user.AuthStateGeneration {
-					slog.Warn("rejecting bearer token: superseded authentication generation",
-						"userId", user.Id)
+					slog.WarnContext(r.Context(), "rejecting bearer token: superseded authentication generation",
+						"user_id", user.Id)
 					rejectInvalidToken(w, "Session has been terminated")
 					return
 				}
@@ -284,8 +284,8 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 			}
 
 			if session == nil {
-				slog.Warn("rejecting bearer token: underlying user session has been terminated",
-					"sid", sid)
+				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has been terminated",
+					"session_identifier", sid)
 				rejectInvalidToken(w, "Session has been terminated")
 				return
 			}
@@ -304,9 +304,9 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 			// presenter has already proven it holds the token, but the wording still reaches
 			// a caller, and a distinct message would say which sessions exist.
 			if session.UserId != user.Id {
-				slog.Warn("rejecting bearer token: session belongs to a different user",
-					"sid", sid, "sessionId", session.Id, "sessionUserId", session.UserId,
-					"userId", user.Id)
+				slog.WarnContext(r.Context(), "rejecting bearer token: session belongs to a different user",
+					"session_identifier", sid, "session_id", session.Id,
+					"session_user_id", session.UserId, "user_id", user.Id)
 				rejectInvalidToken(w, "Session has been terminated")
 				return
 			}
@@ -323,8 +323,8 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 				return
 			}
 			if !session.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
-				slog.Warn("rejecting bearer token: underlying user session has expired",
-					"sid", sid, "sessionId", session.Id)
+				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has expired",
+					"session_identifier", sid, "session_id", session.Id)
 				rejectInvalidToken(w, "Session has expired")
 				return
 			}
@@ -332,8 +332,8 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 			// The SESSION's generation, not the token's. See the asymmetry note above: the
 			// token's own claim is deliberately not consulted on this branch.
 			if session.AuthStateGeneration != user.AuthStateGeneration {
-				slog.Warn("rejecting bearer token: session is on a superseded authentication generation",
-					"sid", sid, "sessionId", session.Id, "userId", user.Id)
+				slog.WarnContext(r.Context(), "rejecting bearer token: session is on a superseded authentication generation",
+					"session_identifier", sid, "session_id", session.Id, "user_id", user.Id)
 				rejectInvalidToken(w, "Session has been terminated")
 				return
 			}

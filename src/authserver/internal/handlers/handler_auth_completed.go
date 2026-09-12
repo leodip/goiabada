@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -35,7 +34,7 @@ func HandleAuthCompletedGet(
 		if err != nil {
 			if errors.Is(err, customerrors.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
-				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
+				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
 				httpHelper.InternalServerError(w, r, err)
@@ -346,7 +345,7 @@ func HandleAuthCompletedGet(
 				// auth context. The client is owed an error response regardless: its redirect
 				// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
 				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
-				slog.Error("failed to clear the auth context, answering the client with server_error",
+				slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 					"error", err)
 				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
@@ -388,7 +387,7 @@ func HandleAuthCompletedGet(
 				// auth context. The client is owed an error response regardless: its redirect
 				// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
 				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
-				slog.Error("failed to clear the auth context, answering the client with server_error",
+				slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 					"error", err)
 				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))

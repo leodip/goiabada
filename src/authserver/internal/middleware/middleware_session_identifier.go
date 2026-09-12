@@ -22,7 +22,7 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database data.
 
 			sess, err := sessionStore.Get(r, constants.AuthServerSessionName)
 			if err != nil {
-				slog.Error("unable to get the session store", "error", err, "request_id", requestId)
+				slog.ErrorContext(ctx, "unable to get the session store", "error", err)
 				http.Error(w, errorMsg, http.StatusInternalServerError)
 				return
 			}
@@ -32,18 +32,18 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database data.
 
 				userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 				if err != nil {
-					slog.Error("unable to get the user session", "error", err, "request_id", requestId)
+					slog.ErrorContext(ctx, "unable to get the user session", "error", err)
 					http.Error(w, errorMsg, http.StatusInternalServerError)
 					return
 				}
 				if userSession == nil {
 					// session has been deleted from DB, clear only the session identifier
 					// but preserve other session data (like AuthContext for ongoing auth flows)
-					slog.Warn("session not found in the database, clearing the session identifier", "request-id", requestId)
+					slog.WarnContext(ctx, "session not found in the database, clearing the session identifier")
 					delete(sess.Values, constants.SessionKeySessionIdentifier)
 					err = sessionStore.Save(r, w, sess)
 					if err != nil {
-						slog.Error("unable to save the session", "error", err, "request_id", requestId)
+						slog.ErrorContext(ctx, "unable to save the session", "error", err)
 						http.Error(w, errorMsg, http.StatusInternalServerError)
 						return
 					}

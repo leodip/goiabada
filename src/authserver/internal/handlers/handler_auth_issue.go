@@ -38,7 +38,7 @@ func HandleIssueGet(
 		if err != nil {
 			if errors.Is(err, customerrors.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
-				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
+				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
 				httpHelper.InternalServerError(w, r, err)
@@ -103,8 +103,8 @@ func HandleIssueGet(
 			// The client identifier is a bounded stored value and is safe to log; the URI is
 			// not logged, matching the authorization endpoint's refusal, since the operator
 			// reads the offending value off the client's page.
-			slog.Warn("the redirect URI this ceremony would be answered at is no longer registered on the client, so nothing is issued and nothing is emitted",
-				"clientIdentifier", authContext.ClientId)
+			slog.WarnContext(r.Context(), "the redirect URI this ceremony would be answered at is no longer registered on the client, so nothing is issued and nothing is emitted",
+				"client_identifier", authContext.ClientId)
 
 			auditLogger.Log(constants.AuditIssuanceRefusedRedirectURI, map[string]interface{}{
 				"userId":   authContext.UserId,
@@ -123,7 +123,7 @@ func HandleIssueGet(
 				// code would be. So the page is rendered regardless and the browser keeps a
 				// replayable auth context, which is the lesser of the two: a replay arrives back
 				// at this same gate and is refused again for as long as the registration is gone.
-				slog.Error("failed to clear the auth context while withholding a redirect to a deregistered URI, rendering the refusal anyway",
+				slog.ErrorContext(r.Context(), "unable to clear the auth context while withholding a redirect to a deregistered URI, rendering the refusal anyway",
 					"error", err)
 			}
 
@@ -182,7 +182,7 @@ func HandleIssueGet(
 					// auth context. The client is owed an error response regardless: its redirect
 					// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
 					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
-					slog.Error("failed to clear the auth context, answering the client with server_error",
+					slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 						"error", err)
 					err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 						redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
@@ -355,9 +355,9 @@ func HandleIssueGet(
 		}
 
 		if effectiveScope == "" {
-			slog.Warn("the user holds none of the permissions behind the scopes this ceremony would grant, so nothing is issued",
-				"userId", authContext.UserId,
-				"clientIdentifier", authContext.ClientId)
+			slog.WarnContext(r.Context(), "the user holds none of the permissions behind the scopes this ceremony would grant, so nothing is issued",
+				"user_id", authContext.UserId,
+				"client_identifier", authContext.ClientId)
 
 			auditLogger.Log(constants.AuditIssuanceRefusedScopeDenied, map[string]interface{}{
 				"userId":   authContext.UserId,
@@ -377,7 +377,7 @@ func HandleIssueGet(
 				// URI was validated upstream and re-checked above, so OIDC Core 1.0 3.1.2.2
 				// with 3.1.2.6 applies, and RFC 6749 4.1.2.1 mints server_error for exactly
 				// this condition (#141).
-				slog.Error("failed to clear the auth context, answering the client with server_error",
+				slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 					"error", err)
 				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
@@ -484,9 +484,9 @@ func HandleIssueGet(
 				// client is told on an interstitial rather than by a redirect to an address nobody
 				// owns any more (#248 part 5).
 				if errors.Is(err, oauth.ErrIssuingClientGone) {
-					slog.Warn("the client this ceremony is issuing for no longer exists, refusing to issue a code",
-						"clientIdentifier", authContext.ClientId,
-						"sessionIdentifier", sessionIdentifier)
+					slog.WarnContext(r.Context(), "the client this ceremony is issuing for no longer exists, refusing to issue a code",
+						"client_identifier", authContext.ClientId,
+						"session_identifier", sessionIdentifier)
 					return errIssuanceRefused
 				}
 				return err
@@ -611,17 +611,17 @@ func refuseIssuanceUnusableSession(
 	if authContext.HasPromptValue("none") {
 		switch shape {
 		case sessionForeign:
-			slog.Warn("the session in this browser belongs to a different user, returning login_required instead of binding this silent ceremony to it",
-				"sessionIdentifier", sessionIdentifier,
-				"sessionUserId", ambientSession.UserId,
-				"ceremonyUserId", authContext.UserId)
+			slog.WarnContext(r.Context(), "the session in this browser belongs to a different user, returning login_required instead of binding this silent ceremony to it",
+				"session_identifier", sessionIdentifier,
+				"session_user_id", ambientSession.UserId,
+				"ceremony_user_id", authContext.UserId)
 		case sessionExpired:
-			slog.Warn("the session backing this silent ceremony is no longer within its idle timeout or maximum lifetime, returning login_required instead of issuing a code",
-				"sessionIdentifier", sessionIdentifier,
-				"sessionUserId", ambientSession.UserId)
+			slog.WarnContext(r.Context(), "the session backing this silent ceremony is no longer within its idle timeout or maximum lifetime, returning login_required instead of issuing a code",
+				"session_identifier", sessionIdentifier,
+				"session_user_id", ambientSession.UserId)
 		default:
-			slog.Warn("the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
-				"sessionIdentifier", sessionIdentifier)
+			slog.WarnContext(r.Context(), "the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
+				"session_identifier", sessionIdentifier)
 		}
 		// The clear goes FIRST, which is the order the restart below uses too. ClearAuthContext
 		// persists the deletion through a Set-Cookie on w, and redirToClientWithError commits the
@@ -646,7 +646,7 @@ func refuseIssuanceUnusableSession(
 			// The client is owed a response either way: its redirect URI was validated upstream,
 			// so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749 4.1.2.1 mints
 			// server_error for exactly this condition (#141).
-			slog.Error("failed to clear the auth context, answering the client with server_error",
+			slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 				"error", err)
 			err = redirToClientWithError(w, r, database, httpHelper, templateFS,
 				redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
@@ -668,17 +668,17 @@ func refuseIssuanceUnusableSession(
 
 	switch shape {
 	case sessionForeign:
-		slog.Warn("the session in this browser belongs to a different user, restarting level 1 instead of binding this ceremony to it",
-			"sessionIdentifier", sessionIdentifier,
-			"sessionUserId", ambientSession.UserId,
-			"ceremonyUserId", authContext.UserId)
+		slog.WarnContext(r.Context(), "the session in this browser belongs to a different user, restarting level 1 instead of binding this ceremony to it",
+			"session_identifier", sessionIdentifier,
+			"session_user_id", ambientSession.UserId,
+			"ceremony_user_id", authContext.UserId)
 	case sessionExpired:
-		slog.Warn("the session backing this ceremony is no longer within its idle timeout or maximum lifetime, restarting level 1 instead of issuing a code",
-			"sessionIdentifier", sessionIdentifier,
-			"sessionUserId", ambientSession.UserId)
+		slog.WarnContext(r.Context(), "the session backing this ceremony is no longer within its idle timeout or maximum lifetime, restarting level 1 instead of issuing a code",
+			"session_identifier", sessionIdentifier,
+			"session_user_id", ambientSession.UserId)
 	default:
-		slog.Warn("the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
-			"sessionIdentifier", sessionIdentifier)
+		slog.WarnContext(r.Context(), "the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
+			"session_identifier", sessionIdentifier)
 	}
 	authContext.AuthState = oauth.AuthStateRequiresLevel1
 	err := authHelper.SaveAuthContext(w, r, authContext)

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/leodip/goiabada/core/data"
@@ -31,7 +30,10 @@ func getClientDisplayInfo(database data.Database, client *models.Client) *Client
 	if client.ShowLogo {
 		hasLogo, err := database.ClientHasLogo(nil, client.Id)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("failed to check if client has logo, defaulting to false: %v", err))
+			// The error as a value, not through %v: %v prints err.Error() and drops the
+			// stack core/errs captured at the origin (#320, #279).
+			slog.Warn("unable to check whether the client has a logo, defaulting to false",
+				"client_identifier", client.ClientIdentifier, "error", err)
 		} else if hasLogo {
 			info.HasLogo = true
 			info.LogoURL = "/client/logo/" + client.ClientIdentifier

@@ -45,7 +45,9 @@ func jsonErrorConformed(httpHelper HttpHelper, w http.ResponseWriter, r *http.Re
 	var errorDetail *customerrors.ErrorDetail
 	if !errors.As(err, &errorDetail) {
 		requestId := middleware.GetReqID(r.Context())
-		slog.Error("internal server error", "error", errs.WithStack(err), "request_id", requestId)
+		// No request_id attribute: the installed handler reads it off the context. It is
+		// still read here because the description below carries it to the client (#320).
+		slog.ErrorContext(r.Context(), "internal server error", "error", errs.WithStack(err))
 		errorDetail = customerrors.NewErrorDetailWithHttpStatusCode("server_error",
 			fmt.Sprintf(genericServerErrorDescription, requestId), http.StatusInternalServerError)
 	}
@@ -308,8 +310,9 @@ func HandleTokenPost(
 				// This does not weaken reuse protection: a genuine *later* replay of an
 				// already-used code is still detected and fully revoked by the
 				// sequential-reuse path in the validator above (#77).
-				slog.Debug("authorization_code: code could not be claimed, rejecting redemption",
-					"codeId", validateResult.CodeEntity.Id)
+				slog.DebugContext(r.Context(), "code could not be claimed, rejecting the redemption",
+					"grant_type", "authorization_code",
+					"code_id", validateResult.CodeEntity.Id)
 				jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"Code is invalid.", http.StatusBadRequest))
 				return
@@ -406,8 +409,9 @@ func HandleTokenPost(
 						"flow":                     replayFlow,
 					})
 				} else {
-					slog.Debug("refresh_token: revoked token presented, no live family members to revoke",
-						"refreshTokenId", refreshToken.Id)
+					slog.DebugContext(r.Context(), "revoked refresh token presented, with no live family members to revoke",
+						"grant_type", "refresh_token",
+						"refresh_token_id", refreshToken.Id)
 				}
 
 				jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
@@ -485,8 +489,9 @@ func HandleTokenPost(
 				return
 			}
 			if !claimed {
-				slog.Debug("refresh_token: token was no longer live at claim time, rejecting",
-					"refreshTokenId", refreshToken.Id)
+				slog.DebugContext(r.Context(), "refresh token was no longer live at claim time, rejecting",
+					"grant_type", "refresh_token",
+					"refresh_token_id", refreshToken.Id)
 				jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"This refresh token has been revoked.", http.StatusBadRequest))
 				return
@@ -674,7 +679,7 @@ func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string,
 			// session-less auth code, fall back to revoking only the refresh
 			// tokens directly linked to this code so reuse still has teeth.
 			slog.Warn("auth code reuse on a code without a session identifier, falling back to code-id-scoped revocation",
-				"codeId", code.Id)
+				"code_id", code.Id)
 			refreshTokens, err = database.GetRefreshTokensByCodeId(tx, code.Id)
 		}
 		if err != nil {
