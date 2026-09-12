@@ -82,7 +82,7 @@
                         <td>
                             <a href="/admin/users/{{.UserId}}/details" class="link link-hover link-secondary">{{.UserEmail}}<br />{{if .UserFullName}}{{.UserFullName}}{{end}}</a>
                         </td>
-                        <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
+                        <td title="{{.UserAgent}}">{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
                             {{ if .IsCurrent }}
                                 <br /><span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.usersessions.current_label" }}</span>
                             {{end}}

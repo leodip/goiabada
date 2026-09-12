@@ -81,6 +81,7 @@ func HandleAPIUserSessionsGet(
 				DeviceName:        us.DeviceName,
 				DeviceType:        us.DeviceType,
 				DeviceOS:          us.DeviceOS,
+				UserAgent:         us.UserAgent,
 				UserId:            us.UserId,
 				IsValid:           isValid,
 			}

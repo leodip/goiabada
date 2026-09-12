@@ -17,6 +17,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/accounthandlers"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
@@ -414,4 +416,75 @@ func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 	assert.Contains(t, out, "requestId=%22%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E")
 	assert.Contains(t, out, "auditEvent=user_login")
 	assert.NotContains(t, out, "page=-1")
+}
+
+// The Device cell's tooltip, on all three session pages at once.
+//
+// The raw User-Agent is attacker-chosen: it is a request header copied into the row verbatim, so
+// the one thing that needs proving about showing it is that it stays an attribute value. A header
+// carrying a quote and an angle bracket is what would break out of title="..." if the cell were
+// ever built by concatenation or marked safe, and only rendered HTML can see that (#281 decision 6).
+//
+// The three pages are one case because they carry one edit between them: the same <td>, in three
+// files, and a tooltip added to two of the three is the shape this guards against.
+func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
+	const header = `Mozilla/5.0 "odd" <build>`
+	const escaped = `Mozilla/5.0 &#34;odd&#34; &lt;build&gt;`
+
+	for _, tc := range []struct {
+		name string
+		page string
+		bind map[string]interface{}
+	}{
+		{
+			name: "account",
+			page: "/account_user_sessions.html",
+			bind: map[string]interface{}{
+				"sessions": []accounthandlers.SessionInfo{{
+					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
+					DeviceOS: "Linux", UserAgent: header,
+				}},
+			},
+		},
+		{
+			name: "admin user",
+			page: "/admin_users_sessions.html",
+			bind: map[string]interface{}{
+				"user": &models.User{Id: 7, Email: "someone@example.com"},
+				"sessions": []adminuserhandlers.SessionInfo{{
+					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
+					DeviceOS: "Linux", UserAgent: header,
+				}},
+				"page":  "1",
+				"query": "",
+			},
+		},
+		{
+			name: "admin client",
+			page: "/admin_clients_usersessions.html",
+			bind: map[string]interface{}{
+				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+				"sessions": []adminclienthandlers.SessionInfo{{
+					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
+					DeviceName: "Chrome 120", DeviceType: "Desktop",
+					DeviceOS: "Linux", UserAgent: header,
+				}},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := render(t, tc.page, tc.bind)
+
+			// The tooltip is on the Device cell, which is also what carries the labels.
+			assert.Containsf(t, out, `<td title="`+escaped+`">Chrome 120 Desktop Linux`,
+				"%s: the Device cell carries no User-Agent tooltip", tc.page)
+
+			// And the header never reaches the page as markup. Counting the escaped form is
+			// what says so: one occurrence, and no unescaped one anywhere.
+			assert.Equal(t, 1, strings.Count(out, escaped),
+				"the header belongs in the tooltip and nowhere else")
+			assert.NotContains(t, out, header,
+				"the raw header must never reach the page unescaped")
+		})
+	}
 }

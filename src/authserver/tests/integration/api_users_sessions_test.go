@@ -108,6 +108,9 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		assert.Equal(t, "Test Device", session.DeviceName)
 		assert.Equal(t, "computer", session.DeviceType)
 		assert.Equal(t, "linux", session.DeviceOS)
+		// The raw header, byte for byte. The three Device* labels beside it are a parser's
+		// guess; this is what the row actually stored (#281 decision 6).
+		assert.Equal(t, testSessionUserAgent, session.UserAgent)
 		assert.True(t, session.IsValid)
 		assert.Equal(t, testUser.Id, session.UserId)
 		assert.Contains(t, session.ClientIdentifiers, testClient.ClientIdentifier)
@@ -548,6 +551,11 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 }
 
 // Helper function moved from utils_test.go: createTestUserSession
+// testSessionUserAgent is the raw header every fixture session carries. It is deliberately not
+// a string any parser recognises: what the three session endpoints must return is the header
+// itself, not a label derived from it (#281).
+const testSessionUserAgent = "goiabada-integration-fixture/1.0 (raw header)"
+
 func createTestUserSession(t *testing.T, userId int64, sessionIdentifier string) *models.UserSession {
 	session := &models.UserSession{
 		SessionIdentifier: sessionIdentifier,
@@ -560,6 +568,7 @@ func createTestUserSession(t *testing.T, userId int64, sessionIdentifier string)
 		DeviceName:        "Test Device",
 		DeviceType:        "computer",
 		DeviceOS:          "linux",
+		UserAgent:         testSessionUserAgent,
 		UserId:            userId,
 	}
 	err := database.CreateUserSession(nil, session)

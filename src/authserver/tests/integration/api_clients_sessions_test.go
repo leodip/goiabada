@@ -87,6 +87,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 		assert.Equal(t, "Test Device", s.DeviceName)
 		assert.Equal(t, "computer", s.DeviceType)
 		assert.Equal(t, "linux", s.DeviceOS)
+		assert.Equal(t, testSessionUserAgent, s.UserAgent)
 		assert.True(t, s.IsValid)
 		assert.Equal(t, testUser.Id, s.UserId)
 		assert.Contains(t, s.ClientIdentifiers, testClient.ClientIdentifier)

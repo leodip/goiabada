@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -331,4 +332,71 @@ func TestSessionTokenSource_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
 		assert.NotContains(t, err.Error(), "\n",
 			"a newline from the endpoint would forge a line in the admin console's log")
 	})
+}
+
+// GetUserSession is the one console hop that decodes a session rather than forwarding it: every
+// other page passes api.EnhancedUserSessionResponse values straight through, while this one
+// rebuilds a models.UserSession field by field. A field left out of that literal is invisible to
+// the compiler and to every page test, because the zero value of a string is a legal header.
+//
+// So the raw header is asserted at the wire, from a body the test wrote, which is also what pins
+// the decoded key: the client unmarshals into api.GetUserSessionResponse, so a json tag renamed
+// in core would show up here as an empty string rather than as a compile error (#281 decision 6).
+func TestAuthServerClient_GetUserSessionCopiesTheRawUserAgent(t *testing.T) {
+	const (
+		sessionIdentifier = "a-session-identifier"
+		header            = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "odd" <build>`
+	)
+
+	var gotPath, gotAuthorization string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuthorization = r.Header.Get("Authorization")
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(api.GetUserSessionResponse{
+			Session: api.UserSessionResponse{
+				Id:                7,
+				SessionIdentifier: sessionIdentifier,
+				IpAddress:         "203.0.113.7",
+				DeviceName:        "Chrome 120",
+				DeviceType:        "Desktop",
+				DeviceOS:          "Linux",
+				UserAgent:         header,
+				UserId:            42,
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	session, err := NewAuthServerClient(server.URL).GetUserSession("an-access-token", sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	assert.Equal(t, "/api/v1/admin/user-sessions/"+sessionIdentifier, gotPath)
+	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
+
+	assert.Equal(t, header, session.UserAgent)
+
+	// The three labels beside it still arrive, so a case that passes has not done so by the
+	// client having stopped copying the device fields altogether.
+	assert.Equal(t, "Chrome 120", session.DeviceName)
+	assert.Equal(t, "Desktop", session.DeviceType)
+	assert.Equal(t, "Linux", session.DeviceOS)
+}
+
+// A session created before the column existed carries an empty header, and the console must be
+// handed that rather than a decoding failure: the field is required on the wire and present as
+// an empty string, which decision 7 accepted as permanent for pre-upgrade rows.
+func TestAuthServerClient_GetUserSessionAcceptsALegacyEmptyUserAgent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"session":{"id":7,"sessionIdentifier":"legacy","userAgent":"","userId":42}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	session, err := NewAuthServerClient(server.URL).GetUserSession("an-access-token", "legacy")
+	require.NoError(t, err)
+	require.NotNil(t, session)
+	assert.Equal(t, "", session.UserAgent)
 }

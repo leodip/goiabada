@@ -424,7 +424,11 @@ type UserSessionResponse struct {
 	DeviceName        string     `json:"deviceName"`
 	DeviceType        string     `json:"deviceType"`
 	DeviceOS          string     `json:"deviceOS"`
-	UserId            int64      `json:"userId"`
+	// UserAgent is the request's User-Agent header as the browser sent it, repaired and
+	// bounded at the writer. No omitempty: a session created before the column existed
+	// carries an empty string, and that is an answer rather than an absence (#281).
+	UserAgent string `json:"userAgent"`
+	UserId    int64  `json:"userId"`
 }
 
 func ToUserSessionResponse(session *models.UserSession) *UserSessionResponse {
@@ -441,6 +445,7 @@ func ToUserSessionResponse(session *models.UserSession) *UserSessionResponse {
 		DeviceName:        session.DeviceName,
 		DeviceType:        session.DeviceType,
 		DeviceOS:          session.DeviceOS,
+		UserAgent:         session.UserAgent,
 		UserId:            session.UserId,
 	}
 
@@ -786,6 +791,7 @@ type EnhancedUserSessionResponse struct {
 	DeviceName                string     `json:"deviceName"`
 	DeviceType                string     `json:"deviceType"`
 	DeviceOS                  string     `json:"deviceOS"`
+	UserAgent                 string     `json:"userAgent"`
 	UserId                    int64      `json:"userId"`
 	StartedAt                 string     `json:"startedAt"`
 	DurationSinceStarted      string     `json:"durationSinceStarted"`
