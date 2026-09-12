@@ -11,7 +11,6 @@ require (
 	github.com/huandu/go-sqlbuilder v1.43.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/microsoft/go-mssqldb v1.10.0
-	github.com/mileusna/useragent v1.3.5
 	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/crypto v0.55.0
