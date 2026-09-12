@@ -99,6 +99,11 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		ipWithoutPort = r.RemoteAddr
 	}
 
+	// One parse of the request for all three display labels. They are derived from the
+	// Sec-CH-UA* Client Hints when the browser sends them and from the User-Agent otherwise,
+	// and nothing below reads them back: the sweep keys on UserAgent and IpAddress (#281).
+	deviceName, deviceType, deviceOS := useragent.Labels(r)
+
 	userSession := &models.UserSession{
 		SessionIdentifier: uuidutil.New(),
 		Started:           utcNow,
@@ -108,9 +113,9 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		AcrLevel:          acrLevel,
 		AuthTime:          authTime,
 		UserId:            userId,
-		DeviceName:        useragent.GetDeviceName(r),
-		DeviceType:        useragent.GetDeviceType(r),
-		DeviceOS:          useragent.GetDeviceOS(r),
+		DeviceName:        deviceName,
+		DeviceType:        deviceType,
+		DeviceOS:          deviceOS,
 		UserAgent:         useragent.Raw(r),
 
 		AuthStateGeneration: authStateGeneration,

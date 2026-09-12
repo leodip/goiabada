@@ -152,10 +152,13 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 		"a nil capture must land the session at generation 0, which is the fail-closed value: "+
 			"it owes a level 2 re-prompt as soon as the user's counter is above 0")
 
-	// Device fields come from the User-Agent.
-	assert.Equal(t, useragent.GetDeviceName(req), result.DeviceName)
-	assert.Equal(t, useragent.GetDeviceType(req), result.DeviceType)
-	assert.Equal(t, useragent.GetDeviceOS(req), result.DeviceOS)
+	// The three display labels are whatever useragent.Labels derives from this request, and
+	// the exhaustive table for that lives at useragent's own seam. Thin here on purpose: what
+	// this asserts is that the manager stores what Labels answered, not what Labels answers.
+	wantName, wantType, wantOS := useragent.Labels(req)
+	assert.Equal(t, wantName, result.DeviceName)
+	assert.Equal(t, wantType, result.DeviceType)
+	assert.Equal(t, wantOS, result.DeviceOS)
 	assert.NotEmpty(t, result.DeviceName)
 
 	// The raw header is stored beside them, and it is what the sweep below keys on. Unlike the
