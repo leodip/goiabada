@@ -22,7 +22,7 @@ func TestAPIUserAttributesGet_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@attributes.test",
+		Email:         uniqueEmail("testuser@attributes.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -85,7 +85,7 @@ func TestAPIUserAttributesGet_EmptyAttributes(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@empty-attrs.test",
+		Email:      uniqueEmail("testuser@empty-attrs.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -155,7 +155,7 @@ func TestAPIUserAttributesGet_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-attrs.test",
+		Email:      uniqueEmail("testuser@unauth-attrs.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -188,7 +188,7 @@ func TestAPIUserAttributeGet_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-get.test",
+		Email:      uniqueEmail("testuser@attr-get.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -270,7 +270,7 @@ func TestAPIUserAttributeGet_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-attr.test",
+		Email:      uniqueEmail("testuser@unauth-attr.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -308,7 +308,7 @@ func TestAPIUserAttributeCreatePost_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-create.test",
+		Email:      uniqueEmail("testuser@attr-create.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -371,7 +371,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-validation.test",
+		Email:      uniqueEmail("testuser@attr-validation.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -487,7 +487,7 @@ func TestAPIUserAttributeUpdatePut_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-update.test",
+		Email:      uniqueEmail("testuser@attr-update.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -567,7 +567,7 @@ func TestAPIUserAttributeUpdatePut_ValidationErrors(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-update-validation.test",
+		Email:      uniqueEmail("testuser@attr-update-validation.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -669,7 +669,7 @@ func TestAPIUserAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-invalid-body.test",
+		Email:      uniqueEmail("testuser@attr-invalid-body.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -705,7 +705,7 @@ func TestAPIUserAttributeUpdatePut_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-unauth-update.test",
+		Email:      uniqueEmail("testuser@attr-unauth-update.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -743,7 +743,7 @@ func TestAPIUserAttributeDelete_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-delete.test",
+		Email:      uniqueEmail("testuser@attr-delete.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -822,7 +822,7 @@ func TestAPIUserAttributeDelete_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-delete-unauth.test",
+		Email:      uniqueEmail("testuser@attr-delete-unauth.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -878,7 +878,7 @@ func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-angle.test",
+		Email:      uniqueEmail("testuser@attr-angle.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -931,7 +931,7 @@ func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@attr-verbatim.test",
+		Email:      uniqueEmail("testuser@attr-verbatim.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}

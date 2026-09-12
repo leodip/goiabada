@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@email.test",
+		Email:         uniqueEmail("testuser@email.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: false,
@@ -37,7 +38,7 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 
 	// Test: Update user email
 	updateReq := api.UpdateUserEmailRequest{
-		Email:         "newemail@email.test",
+		Email:         uniqueEmail("newemail@email.test"),
 		EmailVerified: true,
 	}
 
@@ -77,7 +78,7 @@ func TestAPIUserEmailPut_EmailNormalization(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@normalize.test",
+		Email:      uniqueEmail("testuser@normalize.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -87,9 +88,14 @@ func TestAPIUserEmailPut_EmailNormalization(t *testing.T) {
 		_ = database.DeleteUser(nil, testUser.Id)
 	}()
 
-	// Test: Update with email that needs normalization (uppercase, spaces)
+	// Test: Update with email that needs normalization (uppercase, spaces).
+	// The address is derived rather than spelled so it cannot collide with a row
+	// an earlier run left behind -- this update persists -- while the two things
+	// under test, the surrounding spaces and the upper case, are still applied to
+	// the whole of it.
+	normalizedEmail := uniqueEmail("normalized@email.test")
 	updateReq := api.UpdateUserEmailRequest{
-		Email:         "  NORMALIZED@EMAIL.TEST  ",
+		Email:         "  " + strings.ToUpper(normalizedEmail) + "  ",
 		EmailVerified: false,
 	}
 
@@ -106,23 +112,27 @@ func TestAPIUserEmailPut_EmailNormalization(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert: Email should be normalized (lowercase, trimmed)
-	assert.Equal(t, "normalized@email.test", updateResponse.User.Email)
+	assert.Equal(t, normalizedEmail, updateResponse.User.Email)
 
 	// Verify normalization in database
 	updatedUser, err := database.GetUserById(nil, testUser.Id)
 	assert.NoError(t, err)
-	assert.Equal(t, "normalized@email.test", updatedUser.Email)
+	assert.Equal(t, normalizedEmail, updatedUser.Email)
 }
 
 func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Create first user with existing email
+	// Setup: Create first user with existing email. Both addresses are used
+	// twice each -- the taken one as the update target, the other in the
+	// unchanged assertion -- so each is drawn once.
+	takenEmail := uniqueEmail("existing@duplicate.test")
+	keptEmail := uniqueEmail("testuser@duplicate.test")
 	existingUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "existing@duplicate.test",
+		Email:      takenEmail,
 		GivenName:  "Existing",
 		FamilyName: "User",
 	}
@@ -136,7 +146,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@duplicate.test",
+		Email:      keptEmail,
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -148,7 +158,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 
 	// Test: Try to update to existing email
 	updateReq := api.UpdateUserEmailRequest{
-		Email:         "existing@duplicate.test",
+		Email:         takenEmail,
 		EmailVerified: false,
 	}
 
@@ -162,7 +172,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 	// Verify original email unchanged in database
 	unchangedUser, err := database.GetUserById(nil, testUser.Id)
 	assert.NoError(t, err)
-	assert.Equal(t, "testuser@duplicate.test", unchangedUser.Email)
+	assert.Equal(t, keptEmail, unchangedUser.Email)
 }
 
 func TestAPIUserEmailPut_InvalidEmail(t *testing.T) {
@@ -173,7 +183,7 @@ func TestAPIUserEmailPut_InvalidEmail(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@invalid.test",
+		Email:      uniqueEmail("testuser@invalid.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -217,11 +227,13 @@ func TestAPIUserEmailPut_SetEmailVerified(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Create test user with unverified email and verification code
+	// Setup: Create test user with unverified email and verification code. The
+	// request below re-sends the same address, so it is drawn once.
+	verifiedEmail := uniqueEmail("testuser@verified.test")
 	testUser := &models.User{
 		Subject:                        fake.UUID(),
 		Enabled:                        true,
-		Email:                          "testuser@verified.test",
+		Email:                          verifiedEmail,
 		GivenName:                      "Test",
 		FamilyName:                     "User",
 		EmailVerified:                  false,
@@ -236,7 +248,7 @@ func TestAPIUserEmailPut_SetEmailVerified(t *testing.T) {
 
 	// Test: Set email as verified
 	updateReq := api.UpdateUserEmailRequest{
-		Email:         "testuser@verified.test",
+		Email:         verifiedEmail,
 		EmailVerified: true,
 	}
 
@@ -267,11 +279,13 @@ func TestAPIUserEmailPut_UnsetEmailVerified(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Create test user with verified email
+	// Setup: Create test user with verified email. The request below re-sends
+	// the same address, so it is drawn once.
+	unverifiedEmail := uniqueEmail("testuser@unverified.test")
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@unverified.test",
+		Email:         unverifiedEmail,
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -284,7 +298,7 @@ func TestAPIUserEmailPut_UnsetEmailVerified(t *testing.T) {
 
 	// Test: Unset email verification
 	updateReq := api.UpdateUserEmailRequest{
-		Email:         "testuser@unverified.test",
+		Email:         unverifiedEmail,
 		EmailVerified: false,
 	}
 
@@ -365,7 +379,7 @@ func TestAPIUserEmailPut_InvalidRequestBody(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@invalid-body.test",
+		Email:      uniqueEmail("testuser@invalid-body.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -396,7 +410,7 @@ func TestAPIUserEmailPut_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-email.test",
+		Email:      uniqueEmail("testuser@unauth-email.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -428,7 +442,7 @@ func TestAPIUserEmailPut_PartialUpdate(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "original@partial.test",
+		Email:         uniqueEmail("original@partial.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -441,7 +455,7 @@ func TestAPIUserEmailPut_PartialUpdate(t *testing.T) {
 
 	// Test: Update only email, keep verification status
 	updateReq := api.UpdateUserEmailRequest{
-		Email:         "updated@partial.test",
+		Email:         uniqueEmail("updated@partial.test"),
 		EmailVerified: true, // Keep verified
 	}
 

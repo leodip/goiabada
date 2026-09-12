@@ -47,7 +47,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@groupdelete.test",
+		Email:         uniqueEmail("testuser@groupdelete.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,

@@ -24,7 +24,7 @@ func TestAPIUserGet_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@get.test",
+		Email:         uniqueEmail("testuser@get.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -101,7 +101,7 @@ func TestAPIUserGet_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@unauth.test",
+		Email:         uniqueEmail("testuser@unauth.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -133,7 +133,7 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 
 	// Test: Create user with password (using simple password that meets PasswordPolicyLow - at least 6 chars)
 	createReq := api.CreateUserAdminRequest{
-		Email:           "newuser@create.test",
+		Email:           uniqueEmail("newuser@create.test"),
 		GivenName:       "New",
 		FamilyName:      "User",
 		EmailVerified:   true,
@@ -188,11 +188,13 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Create existing user
+	// Setup: Create existing user. The duplicate is the point of this test, so
+	// the address is drawn once and used twice rather than spelled twice.
+	duplicateEmail := uniqueEmail("duplicate@create.test")
 	existingUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "duplicate@create.test",
+		Email:         duplicateEmail,
 		GivenName:     "Existing",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -205,7 +207,7 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 
 	// Test: Try to create user with same email
 	createReq := api.CreateUserAdminRequest{
-		Email:           "duplicate@create.test",
+		Email:           duplicateEmail,
 		GivenName:       "New",
 		FamilyName:      "User",
 		EmailVerified:   true,
@@ -341,7 +343,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@enabled.test",
+		Email:         uniqueEmail("testuser@enabled.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -388,7 +390,7 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       false,
-		Email:         "disabled@enabled.test",
+		Email:         uniqueEmail("disabled@enabled.test"),
 		GivenName:     "Disabled",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -463,7 +465,7 @@ func TestAPIUserEnabledPut_InvalidRequestBody(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@invalid.test",
+		Email:         uniqueEmail("testuser@invalid.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -499,7 +501,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@delete.test",
+		Email:         uniqueEmail("testuser@delete.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -573,7 +575,7 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@delete-unauth.test",
+		Email:         uniqueEmail("testuser@delete-unauth.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,

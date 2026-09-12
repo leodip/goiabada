@@ -98,7 +98,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@phone.test",
+		Email:         uniqueEmail("testuser@phone.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -155,7 +155,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 	testUser := &models.User{
 		Subject:                       fake.UUID(),
 		Enabled:                       true,
-		Email:                         "testuser@phone-clear.test",
+		Email:                         uniqueEmail("testuser@phone-clear.test"),
 		GivenName:                     "Test",
 		FamilyName:                    "User",
 		EmailVerified:                 true,
@@ -212,7 +212,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@phone-validation.test",
+		Email:         uniqueEmail("testuser@phone-validation.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -353,7 +353,7 @@ func TestAPIUserPhonePut_InvalidRequestBody(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@phone-invalid-body.test",
+		Email:         uniqueEmail("testuser@phone-invalid-body.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -385,7 +385,7 @@ func TestAPIUserPhonePut_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@phone-unauth.test",
+		Email:         uniqueEmail("testuser@phone-unauth.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -418,7 +418,7 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@phone-verified.test",
+		Email:         uniqueEmail("testuser@phone-verified.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,

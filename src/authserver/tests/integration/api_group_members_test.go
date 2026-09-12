@@ -31,11 +31,13 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
 
-	// Setup: Create test users and add to group
+	// Setup: Create test users and add to group. The addresses are asserted
+	// below, so each is drawn once and read from the fixture rather than
+	// respelled as a literal.
 	testUser1 := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "member1@group.test",
+		Email:         uniqueEmail("member1@group.test"),
 		GivenName:     "Member",
 		FamilyName:    "One",
 		EmailVerified: true,
@@ -49,7 +51,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	testUser2 := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "member2@group.test",
+		Email:         uniqueEmail("member2@group.test"),
 		GivenName:     "Member",
 		FamilyName:    "Two",
 		EmailVerified: true,
@@ -100,8 +102,8 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	for _, member := range membersResponse.Members {
 		memberEmails[member.Email] = true
 	}
-	assert.True(t, memberEmails["member1@group.test"])
-	assert.True(t, memberEmails["member2@group.test"])
+	assert.True(t, memberEmails[testUser1.Email])
+	assert.True(t, memberEmails[testUser2.Email])
 }
 
 func TestAPIGroupMembersGet_EmptyGroup(t *testing.T) {
@@ -261,7 +263,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "newmember@group.test",
+		Email:      uniqueEmail("newmember@group.test"),
 		GivenName:  "New",
 		FamilyName: "Member",
 	}
@@ -319,7 +321,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "duplicate@group.test",
+		Email:      uniqueEmail("duplicate@group.test"),
 		GivenName:  "Duplicate",
 		FamilyName: "User",
 	}
@@ -442,7 +444,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "removeme@group.test",
+		Email:      uniqueEmail("removeme@group.test"),
 		GivenName:  "Remove",
 		FamilyName: "Me",
 	}
@@ -496,7 +498,7 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "notingroup@group.test",
+		Email:      uniqueEmail("notingroup@group.test"),
 		GivenName:  "Not",
 		FamilyName: "InGroup",
 	}

@@ -25,7 +25,7 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@consents.test",
+		Email:         uniqueEmail("testuser@consents.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -101,7 +101,7 @@ func TestAPIUserConsentsGet_EmptyConsents(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@empty-consents.test",
+		Email:      uniqueEmail("testuser@empty-consents.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -171,7 +171,7 @@ func TestAPIUserConsentsGet_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-consents.test",
+		Email:      uniqueEmail("testuser@unauth-consents.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -204,7 +204,7 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@consent-delete.test",
+		Email:         uniqueEmail("testuser@consent-delete.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -290,7 +290,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-consent-delete.test",
+		Email:      uniqueEmail("testuser@unauth-consent-delete.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -339,7 +339,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@consent-client-details.test",
+		Email:         uniqueEmail("testuser@consent-client-details.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,

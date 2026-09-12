@@ -22,7 +22,7 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@groups-update.test",
+		Email:         uniqueEmail("testuser@groups-update.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -116,7 +116,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@empty-groups.test",
+		Email:      uniqueEmail("testuser@empty-groups.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -181,7 +181,7 @@ func TestAPIUserGroupsPut_NonExistentGroup(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@invalid-group.test",
+		Email:      uniqueEmail("testuser@invalid-group.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -258,7 +258,7 @@ func TestAPIUserGroupsPut_InvalidRequestBody(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@invalid-body.test",
+		Email:      uniqueEmail("testuser@invalid-body.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -289,7 +289,7 @@ func TestAPIUserGroupsPut_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-update.test",
+		Email:      uniqueEmail("testuser@unauth-update.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}

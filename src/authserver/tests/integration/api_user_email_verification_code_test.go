@@ -23,7 +23,7 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	user := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "email-code-user@example.test",
+		Email:         uniqueEmail("email-code-user@example.test"),
 		GivenName:     "Email",
 		FamilyName:    "Code",
 		EmailVerified: false,
@@ -67,7 +67,7 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	user := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "verified-email-code@example.test",
+		Email:         uniqueEmail("verified-email-code@example.test"),
 		GivenName:     "Verified",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -175,7 +175,7 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 	user := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "regen-email-code@example.test",
+		Email:         uniqueEmail("regen-email-code@example.test"),
 		GivenName:     "Regen",
 		FamilyName:    "Code",
 		EmailVerified: false,

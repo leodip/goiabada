@@ -304,7 +304,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	testUser1 := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser1@membercount.test",
+		Email:         uniqueEmail("testuser1@membercount.test"),
 		GivenName:     "Test",
 		FamilyName:    "User1",
 		EmailVerified: true,
@@ -318,7 +318,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	testUser2 := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser2@membercount.test",
+		Email:         uniqueEmail("testuser2@membercount.test"),
 		GivenName:     "Test",
 		FamilyName:    "User2",
 		EmailVerified: true,

@@ -24,7 +24,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@sessions.test",
+		Email:         uniqueEmail("testuser@sessions.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -125,7 +125,7 @@ func TestAPIUserSessionsGet_EmptySessions(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@empty-sessions.test",
+		Email:         uniqueEmail("testuser@empty-sessions.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -196,7 +196,7 @@ func TestAPIUserSessionsGet_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@unauth-sessions.test",
+		Email:      uniqueEmail("testuser@unauth-sessions.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -228,7 +228,7 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@no-clients.test",
+		Email:         uniqueEmail("testuser@no-clients.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -272,7 +272,7 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@session-delete.test",
+		Email:         uniqueEmail("testuser@session-delete.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,
@@ -403,7 +403,7 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@session-delete-unauth.test",
+		Email:      uniqueEmail("testuser@session-delete-unauth.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -442,7 +442,7 @@ func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 	testUser := &models.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
-		Email:      "testuser@session-delete-invalid-token.test",
+		Email:      uniqueEmail("testuser@session-delete-invalid-token.test"),
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
@@ -480,7 +480,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 	testUser := &models.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
-		Email:         "testuser@valid-sessions.test",
+		Email:         uniqueEmail("testuser@valid-sessions.test"),
 		GivenName:     "Test",
 		FamilyName:    "User",
 		EmailVerified: true,

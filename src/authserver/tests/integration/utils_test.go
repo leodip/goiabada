@@ -1207,6 +1207,44 @@ func createTestResource(t *testing.T, identifier, description string) *models.Re
 	return resource
 }
 
+// deleteTestUsers removes fixture users and reports a delete that did nothing.
+//
+// The tier's older idiom was `_ = database.DeleteUser(nil, user.Id)`, which
+// hides the two ways a cleanup silently fails to clean up: an insert that never
+// happened leaves Id == 0, so the delete matches no row, and an engine that
+// refuses the delete says so only in the error. Either way the rows stay, and
+// with them every later fixture that reuses an address.
+func deleteTestUsers(t *testing.T, users []*models.User) {
+	t.Helper()
+	for _, user := range users {
+		if user == nil {
+			continue
+		}
+		assert.NotZero(t, user.Id, "fixture user %q was never created, so cleanup cannot delete it", user.Email)
+		assert.NoError(t, database.DeleteUser(nil, user.Id), "unable to delete fixture user %q", user.Email)
+	}
+}
+
+// uniqueEmail inserts a random run into addr's local part, so a fixture address
+// stays readable in a leftover row while no two calls of it can collide.
+//
+// It exists because this tier's fixtures spell their addresses as descriptive
+// literals, and a literal is only safe while every row carrying it is deleted
+// again. run-tests.sh drops the sqlite file on exit, but goiabada_integration on
+// mysql, postgres and mssql is never dropped, so one leaked row there fails the
+// same test on every run after it, with a UNIQUE violation raised from a fixture
+// rather than from the behaviour under test.
+func uniqueEmail(addr string) string {
+	local, domain, found := strings.Cut(addr, "@")
+	if !found {
+		panic("uniqueEmail: " + addr + " is not an address")
+	}
+	// The API rejects an address over 60 bytes (validators.email_validator), and
+	// fixtures reach that endpoint, so the run added here is short and the
+	// longest address in the tier stays well inside the limit.
+	return local + "-" + strings.ToLower(fake.LetterN(8)) + "@" + domain
+}
+
 // Helper function to create a test group
 func createTestGroup(t *testing.T) *models.Group {
 	group := &models.Group{
