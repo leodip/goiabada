@@ -9,7 +9,7 @@
 
 <script>
 
-    function endSessionClick(elem, evt, userSessionId, email, device, isCurrent) {
+    function endSessionClick(elem, evt, userSessionId, email, isCurrent) {
 
         let msg = "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" }}" + email + "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" }}";
         msg += "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_revocation_note" }}";

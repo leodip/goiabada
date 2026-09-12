@@ -10,6 +10,7 @@
 package useragent
 
 import (
+	"encoding/base64"
 	"net/http"
 	"regexp"
 	"strings"
@@ -62,7 +63,7 @@ func derive(r *http.Request) (name, deviceType, os string) {
 // fieldValue is the whole of a header field, which is not always its first line.
 //
 // A sender may split a list-valued field across several field lines (RFC 9110 5.3), and RFC
-// 8941 4.2 says a structured field's value is those lines joined with ", " before it is
+// 9651 4.2 says a structured field's value is those lines joined with ", " before it is
 // parsed. http.Header.Get answers the first line alone, so it would read a split Sec-CH-UA as
 // a shorter list than was sent -- picking a GREASE brand as the browser name when the real
 // brands were on the second line -- and would read two Sec-CH-UA-Platform lines as the first
@@ -76,7 +77,7 @@ func fieldValue(h http.Header, name string) string {
 
 type brand struct{ name, major string }
 
-// parseBrands reads the header as an RFC 8941 sf-list whose members are sf-strings with
+// parseBrands reads the header as an RFC 9651 sf-list whose members are sf-strings with
 // parameters, and answers false for anything that does not parse.
 //
 // A refusal here is not an error: RFC 8942 2.2 says a server "MUST ignore hints they do not
@@ -86,7 +87,10 @@ type brand struct{ name, major string }
 // below, a brand written Chro\me would have been stored as the browser name Chro\me.
 func parseBrands(h string) ([]brand, bool) {
 	var out []brand
-	i := skipOWS(h, 0)
+	// RFC 9651 4.2 step 2 discards leading SP, not OWS, before the field type's own parser
+	// runs; OWS is what 4.2.1 discards *between* list members. A tab here is therefore a
+	// field that does not parse rather than whitespace to step over.
+	i := skipSP(h, 0)
 	if i == len(h) {
 		return nil, false
 	}
@@ -116,7 +120,7 @@ func parseBrands(h string) ([]brand, bool) {
 			return out, true
 		}
 		// A member is its string, then its parameters, then a comma or the end of the
-		// field. Anything else is not an sf-list (RFC 8941 3.1), and a reader that
+		// field. Anything else is not an sf-list (RFC 9651 3.1), and a reader that
 		// skipped to the next comma instead would silently accept a truncated header.
 		if h[i] != ',' {
 			return nil, false
@@ -125,7 +129,7 @@ func parseBrands(h string) ([]brand, bool) {
 	}
 }
 
-// parseString reads one RFC 8941 3.3.3 sf-string at s[i], returning its unescaped value and
+// parseString reads one RFC 9651 3.3.3 sf-string at s[i], returning its unescaped value and
 // the index just past its closing quote. Three ways it refuses, each of them that section
 // read as written: an escape of anything but a quote or a backslash, since "other characters
 // after \ MUST cause parsing to fail"; an unescaped byte outside
@@ -156,14 +160,14 @@ func parseString(s string, i int) (string, int, bool) {
 	return "", 0, false
 }
 
-// parseParam reads one ";"-led parameter, i pointing just past the semicolon, per RFC 8941
+// parseParam reads one ";"-led parameter, i pointing just past the semicolon, per RFC 9651
 // 3.1.2: parameters = *( ";" *SP parameter ), parameter = param-key [ "=" param-value ],
 // param-value = bare-item. A parameter with no "=" is boolean true and is read as valueless
 // here, because the only key this package looks at is v.
 //
 // Both halves are the structured-field grammar and not the wider HTTP one, which is what makes
 // parseBrands's promise -- a header that does not parse is treated as absent -- true rather
-// than nearly true. A key is lowercase (RFC 8941's key production), so "V" is not "v" written
+// than nearly true. A key is lowercase (RFC 9651's key production), so "V" is not "v" written
 // differently, it is not a key at all; and a value is a bare item, so v=@junk is a malformed
 // header rather than the version "@junk". Reading either loosely accepts a Sec-CH-UA that no
 // structured-field parser would, and then labels the session from it, when RFC 8942 2.2 says a
@@ -188,14 +192,29 @@ func parseParam(h string, i int) (key, value string, next int, ok bool) {
 	return key, value, next, true
 }
 
-// parseBareItem reads one RFC 8941 3.3 bare item and answers its text as sent, together with
+// parseBareItem reads one RFC 9651 3.3 bare item and answers its text as sent, together with
 // the index just past it.
 //
-// Only the v parameter is ever looked at and in practice it is always an sf-string, so the
-// other five forms are here to be recognised rather than to be used: a header carrying a
+// RFC 9651 rather than RFC 8941, which it obsoletes: UA-CH 3.1, 3.7 and 3.9 now define all
+// three hints against 9651, and 4.2.3.1 there dispatches on eight leading characters rather
+// than six, "@" starting a Date (3.3.7) and "%" a Display String (3.3.8). Reading the older
+// set refuses those two forms, and since a refusal means "fall back to the User-Agent", a
+// valid current field would have been answered with a label derived from a header Chromium
+// freezes -- the exact outcome decision 2 of #281 exists to avoid.
+//
+// Only the v parameter is ever looked at and UA-CH 3.1 says its value is a String, so the
+// other seven forms are here to be recognised rather than to be used: a header carrying a
 // well-formed integer or token parameter is a valid structured field, and RFC 8942 2.2 asks
 // that such a hint be honoured rather than refused for spelling a value in a form this
 // package happens not to read.
+//
+// Every form but the string answers the source text as sent rather than a decoded value, and
+// for the Display String that is load-bearing rather than merely consistent: 4.2.10 rejects
+// anything outside VCHAR and SP in the *encoded* text but places no limit on what the
+// pct-encoded octets decode to, so %"%00" is a valid field whose value is a NUL byte.
+// Answering the span keeps every byte that can reach a label inside VCHAR and SP, which is
+// what it was before this form was recognised at all -- and PostgreSQL refuses a text value
+// carrying U+0000 outright, so a decoded value could have failed the session insert.
 func parseBareItem(s string, i int) (string, int, bool) {
 	if i >= len(s) {
 		return "", 0, false
@@ -211,6 +230,10 @@ func parseBareItem(s string, i int) (string, int, bool) {
 		return "", 0, false
 	case c == ':':
 		return parseByteSequence(s, i)
+	case c == '@':
+		return parseDate(s, i)
+	case c == '%':
+		return parseDisplayString(s, i)
 	case c == '-' || isDigit(c):
 		return parseNumber(s, i)
 	// sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" ).
@@ -223,10 +246,67 @@ func parseBareItem(s string, i int) (string, int, bool) {
 	return "", 0, false
 }
 
-// parseNumber reads an RFC 8941 3.3.1 sf-integer or 3.3.2 sf-decimal. The digit counts are the
+// parseDate reads an RFC 9651 3.3.7 sf-date, "@" followed by an sf-integer. 4.2.9 step 4
+// fails parsing when what follows is a Decimal, so the point that parseNumber would have
+// accepted is what separates @1659578233 from @1659578233.5 here.
+func parseDate(s string, i int) (string, int, bool) {
+	n, next, ok := parseNumber(s, i+1)
+	if !ok || strings.Contains(n, ".") {
+		return "", 0, false
+	}
+	return s[i:next], next, true
+}
+
+// parseDisplayString reads an RFC 9651 3.3.8 sf-displaystring, per the 4.2.10 algorithm:
+// %"..." whose body is VCHAR or SP, in which "%" introduces two lowercase hex digits and
+// every other character including "\" stands for itself, and whose pct-decoded octets must
+// together be valid UTF-8.
+//
+// The backslash is not an escape here, which is the one place this differs from parseString
+// and the reason the two are not shared: 4.2.10's loop appends it like any other character,
+// so %"a\"" closes at the quote after the backslash where "a\"" would not.
+func parseDisplayString(s string, i int) (string, int, bool) {
+	if i+1 >= len(s) || s[i+1] != '"' {
+		return "", 0, false
+	}
+	start := i
+	var decoded strings.Builder
+	for i += 2; i < len(s); {
+		switch c := s[i]; {
+		// 4.2.10: "If char is in the range %x00-1f or %x7f-ff [...] fail parsing."
+		case c < 0x20 || c >= 0x7f:
+			return "", 0, false
+		case c == '%':
+			if i+2 >= len(s) || !isLCHexDig(s[i+1]) || !isLCHexDig(s[i+2]) {
+				return "", 0, false
+			}
+			decoded.WriteByte(hexVal(s[i+1])<<4 | hexVal(s[i+2]))
+			i += 3
+		case c == '"':
+			if !utf8.ValidString(decoded.String()) {
+				return "", 0, false
+			}
+			return s[start : i+1], i + 1, true
+		default:
+			decoded.WriteByte(c)
+			i++
+		}
+	}
+	return "", 0, false
+}
+
+// parseNumber reads an RFC 9651 3.3.1 sf-integer or 3.3.2 sf-decimal. The digit counts are the
 // grammar's own -- at most 15 integer digits, or at most 12 before the point and one to three
 // after it -- and they are the whole difference between a bare item and a run of digits.
 func parseNumber(s string, i int) (string, int, bool) {
+	// Bounds-checked here rather than at the callers, because the two of them reach it
+	// differently: parseBareItem has already read s[i] and cannot be past the end, while
+	// parseDate steps over an "@" that may have been the last byte of the field. A reader
+	// that leaves this to the caller is one new caller away from panicking on a header
+	// anyone can send (#281).
+	if i >= len(s) {
+		return "", 0, false
+	}
 	start := i
 	if s[i] == '-' {
 		i++
@@ -259,9 +339,21 @@ func parseNumber(s string, i int) (string, int, bool) {
 	return s[start:i], i, true
 }
 
-// parseByteSequence reads an RFC 8941 3.3.5 sf-binary, base64 between two colons. The value is
+// parseByteSequence reads an RFC 9651 3.3.5 sf-binary, base64 between two colons. The value is
 // returned with its colons, since nothing reads it: what matters is that a well-formed one
 // parses, and that an unterminated one does not swallow the rest of the field.
+//
+// The alphabet check of 4.2.7 step 6 is not the whole gate, and reading it as though it were
+// is the easy mistake: step 7 then requires the content to be base64-decoded and says "if
+// base64 decoding fails, parsing fails". A run of alphabet characters need not decode -- :A:
+// is six bits, which is no whole byte, and :=A==: spells padding where content belongs -- so
+// without the decode a malformed hint parses, and parseBrands's promise that a field either
+// parses or is ignored in favour of the User-Agent (RFC 8942 2.2) would hold for every form
+// but this one.
+//
+// Padding is synthesized rather than demanded, which is what step 7 asks for: the trailing
+// "=" are dropped and the rest decoded unpadded, so :QQ: and :QQ==: are the same byte and an
+// "=" anywhere but the end is still refused.
 func parseByteSequence(s string, i int) (string, int, bool) {
 	start := i
 	for i++; i < len(s) && s[i] != ':'; i++ {
@@ -272,9 +364,14 @@ func parseByteSequence(s string, i int) (string, int, bool) {
 	if i == len(s) {
 		return "", 0, false
 	}
+	if _, err := base64.RawStdEncoding.DecodeString(strings.TrimRight(s[start+1:i], "=")); err != nil {
+		return "", 0, false
+	}
 	return s[start : i+1], i + 1, true
 }
 
+// OWS is what RFC 9651 4.2.1 discards around the commas of a list, and the only place in this
+// reader where a tab is whitespace rather than a parse failure.
 func skipOWS(s string, i int) int {
 	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
 		i++
@@ -282,8 +379,9 @@ func skipOWS(s string, i int) int {
 	return i
 }
 
-// RFC 8941 3.1.2 separates a parameter from the ";" before it with *SP, not OWS: a tab there
-// is not whitespace to skip, it is a header that does not parse.
+// RFC 9651 3.1.2 separates a parameter from the ";" before it with *SP, not OWS: a tab there
+// is not whitespace to skip, it is a header that does not parse. 4.2's own step 2 and step 6,
+// which bracket the whole field, are *SP too.
 func skipSP(s string, i int) int {
 	for i < len(s) && s[i] == ' ' {
 		i++
@@ -299,7 +397,7 @@ func isTokenChar(c byte) bool {
 	return isDigit(c) || isAlpha(c) || strings.IndexByte("!#$%&'*+-.^_`|~", c) >= 0
 }
 
-// RFC 8941 3.1.2: key = ( lcalpha / "*" ) *( lcalpha / DIGIT / "_" / "-" / "." / "*" ).
+// RFC 9651 3.1.2: key = ( lcalpha / "*" ) *( lcalpha / DIGIT / "_" / "-" / "." / "*" ).
 func isKeyStart(c byte) bool { return c >= 'a' && c <= 'z' || c == '*' }
 
 func isKeyChar(c byte) bool {
@@ -310,12 +408,27 @@ func isBase64Char(c byte) bool {
 	return isDigit(c) || isAlpha(c) || c == '+' || c == '/' || c == '='
 }
 
+// RFC 9651 3.3.8: pct-encoded = "%" lc-hexdig lc-hexdig, lc-hexdig = DIGIT / %x61-66. Upper
+// case is not the same digit spelled differently, it is a field that does not parse.
+func isLCHexDig(c byte) bool { return isDigit(c) || (c >= 'a' && c <= 'f') }
+
+func hexVal(c byte) byte {
+	if isDigit(c) {
+		return c - '0'
+	}
+	return c - 'a' + 10
+}
+
 // platform reads Sec-CH-UA-Platform through the same sf-string reader, so an unquoted value,
 // an invalid escape or anything trailing the closing quote leaves the platform absent rather
 // than half read. "Unknown" is one of the values UA-CH 3.9 lists and means absent here.
+//
+// Both edges are *SP and not OWS, per RFC 9651 4.2 steps 2 and 6: an Item has no parser of
+// its own that discards OWS the way 4.2.1 does between list members, so the whole of an
+// Item field's top-level whitespace is these two sites.
 func platform(h string) string {
-	p, next, ok := parseString(h, skipOWS(h, 0))
-	if !ok || skipOWS(h, next) != len(h) || p == "Unknown" {
+	p, next, ok := parseString(h, skipSP(h, 0))
+	if !ok || skipSP(h, next) != len(h) || p == "Unknown" {
 		return ""
 	}
 	return p
