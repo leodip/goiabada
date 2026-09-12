@@ -452,6 +452,153 @@ func queryArgs() []any {
 }
 `)
 
+	// ---- rule 6, the two boundaries it closes by refusal ---------------------------------------
+
+	// How the callee resolves. A dot import leaves the forwarder call with no selector, so the
+	// keys on the line below it are read by nothing; the import is the finding, exactly as it is
+	// for log/slog, and the camelCase key it hides needs no row of its own.
+	write("core/caught/forwarder_dot_import.go", `package caught
+
+import (
+	"net/http"
+
+	. "github.com/leodip/goiabada/authserver/internal/apiresponse"
+)
+
+func dotForwarder(w http.ResponseWriter, r *http.Request, err error) {
+	WriteInternalServerError(w, r, err, "clientId", 1)
+}
+`)
+
+	// The same function one indirection out. Whatever calls the value writes its keys against a
+	// local name, and rule 6 resolves a call by import path or by scope, so neither finds it.
+	// Both spellings, because a forwarder is reached qualified from outside its package and bare
+	// from inside the scope it is listed under.
+	write("authserver/internal/handlers/apihandlers/forwarder_value.go", `package apihandlers
+
+import (
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+)
+
+func qualifiedValue() func(http.ResponseWriter, *http.Request, error, ...any) {
+	return apiresponse.WriteInternalServerError
+}
+
+func bareValue() func(http.ResponseWriter, *http.Request, error, ...any) {
+	return writeInternalServerError
+}
+`)
+
+	// How the run is built. The two readable declarations that are not the := composite the tree
+	// happens to use: a var with a value, whose keys are read, and an append whose base is the
+	// composite rather than the run, whose keys are read too. Both used to be silent.
+	write("core/caught/run_var_decl.go", `package caught
+
+import "log/slog"
+
+func varDeclaredRun() {
+	var attrs = []any{"clientId", 1}
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	write("core/caught/run_append_base.go", `package caught
+
+import "log/slog"
+
+func appendBaseRun() {
+	attrs := append([]any{"clientId", 1}, "group_id", 2)
+	slog.Info("a thing happened", attrs...)
+}
+`)
+
+	// And the four this rule refuses rather than reads, each reported where the run reaches the
+	// record. An alias and a builder's return put the keys in an expression the walk has not
+	// followed; a spread of a slice that is not the enclosing variadic parameter carries a run
+	// from anywhere at all; and a closure writing to the run is seen by neither reading, since
+	// this one does not descend into the closure and the closure has no spread site in view.
+	write("core/caught/run_alias.go", `package caught
+
+import "log/slog"
+
+func aliasedRun() {
+	attrs := []any{"clientId", 1}
+	other := attrs
+	slog.Info("a thing happened", other...)
+}
+`)
+	write("core/caught/run_builder.go", `package caught
+
+import "log/slog"
+
+func builtElsewhere() []any { return []any{"clientId", 1} }
+
+func builderRun() {
+	attrs := builtElsewhere()
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	write("core/caught/run_foreign_spread.go", `package caught
+
+import "log/slog"
+
+func foreignSpreadRun(extra []any) {
+	attrs := []any{"client_id", 1}
+	attrs = append(attrs, extra...)
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	write("core/caught/run_closure_write.go", `package caught
+
+import "log/slog"
+
+func closureWrittenRun() {
+	attrs := []any{"client_id", 1}
+	add := func() { attrs = append(attrs, "groupId", 2) }
+	add()
+	slog.Info("a thing happened", attrs...)
+}
+`)
+
+	// A run that is not a name at all: nothing to collect assignments for, so the expression is
+	// the finding.
+	write("core/caught/run_expression.go", `package caught
+
+import "log/slog"
+
+func expressionRun() {
+	slog.Info("a thing happened", attrsFromNowhere()...)
+}
+
+func attrsFromNowhere() []any { return []any{"clientId", 1} }
+`)
+
+	// The shapes the tree actually uses, which the refusals above must leave alone: the 500
+	// writer's and the request logger's make-then-append, and a var declared empty and appended
+	// to. Each is a near miss of a caught row rather than an obviously innocent line.
+	write("core/passed/run_make_appends.go", `package passed
+
+import "log/slog"
+
+func madeAndAppended() {
+	attrs := make([]any, 0, 4)
+	attrs = append(attrs, "client_id", 1)
+	attrs = append(attrs, "group_id", 2)
+	slog.Info("a thing happened", attrs...)
+}
+`)
+	write("core/passed/run_var_empty.go", `package passed
+
+import "log/slog"
+
+func varDeclaredEmpty() {
+	var attrs []any
+	attrs = append(attrs, "client_id", 1)
+	slog.Info("a thing happened", attrs...)
+}
+`)
+
 	// ---- the evasions, and the parser boundary ------------------------------------------------
 
 	// One pair of brackets, and the callee is no longer a bare selector. The third evasion.
@@ -536,7 +683,7 @@ func broken( {
 
 	violations, files, err := findSlogViolations(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 35, files,
+	assert.Equal(t, 46, files,
 		"every parseable, production-reachable fixture outside a mocks directory and a _test.go file is parsed")
 	assert.Equal(t, []string{
 		`authserver/internal/handlers/apihandlers/forwarded_keys.go:10 attribute key "clientId"`,
@@ -544,6 +691,8 @@ func broken( {
 		`authserver/internal/handlers/apihandlers/forwarded_keys.go:18 attribute key "permissionId"`,
 		`authserver/internal/handlers/apihandlers/forwarded_slice.go:6 attribute key "clientId"`,
 		`authserver/internal/handlers/apihandlers/forwarded_slice.go:8 attribute key "originHeader"`,
+		`authserver/internal/handlers/apihandlers/forwarder_value.go:10 apiresponse.WriteInternalServerError as a value`,
+		`authserver/internal/handlers/apihandlers/forwarder_value.go:14 writeInternalServerError as a value`,
 		`authserver/internal/handlers/handler_account_logout.go:14 attribute key "badReason"`,
 		`core/caught/build_linux.go:7 message "Capitalised" does not start with a lowercase letter`,
 		`core/caught/context_aliased.go:9 slog.Info inside a function taking a context.Context or an *http.Request`,
@@ -557,6 +706,7 @@ func broken( {
 		`core/caught/emission_value.go:8 slog.Info as a value`,
 		`core/caught/emission_value.go:10 slog.LogAttrs as a value`,
 		`core/caught/forwarder_anonymous.go:8 an unnamed function literal forwards a variadic ...any into a record`,
+		`core/caught/forwarder_dot_import.go:6 dot import of "github.com/leodip/goiabada/authserver/internal/apiresponse"`,
 		`core/caught/forwarder_unlisted.go:5 logWithAttrs forwards a variadic ...any into a record`,
 		`core/caught/handler_install.go:6 slog.New`,
 		`core/caught/handler_install.go:6 slog.SetDefault`,
@@ -601,16 +751,23 @@ func broken( {
 		`core/caught/message_text.go:15 message "error while reaching the database" starts with "error "`,
 		`core/caught/message_variable.go:5 message is not a string literal`,
 		`core/caught/paren_callee.go:5 message "Capitalised" does not start with a lowercase letter`,
+		`core/caught/run_alias.go:8 attribute run "other" is built in a form this rule cannot read`,
+		`core/caught/run_append_base.go:6 attribute key "clientId"`,
+		`core/caught/run_builder.go:9 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_closure_write.go:9 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_expression.go:6 attribute run spread into a record is not a named slice`,
+		`core/caught/run_foreign_spread.go:8 attribute run "attrs" is built in a form this rule cannot read`,
+		`core/caught/run_var_decl.go:6 attribute key "clientId"`,
 		`core/testutil/another_install.go:5 slog.New`,
 		`core/testutil/another_install.go:5 slog.SetDefault`,
 	}, describeSlog(violations))
 
 	// The per-module scoping the sweep stages leaned on: the same rule, one subtree at a time.
-	// Eight of core/passed's twelve fixtures are parsed: the mocks file, the test file and the
+	// Ten of core/passed's fourteen fixtures are parsed: the mocks file, the test file and the
 	// !production file are exempt, and the unparseable one is not counted.
 	scoped, scopedFiles, err := findSlogViolations(root, []string{"core/passed"})
 	require.NoError(t, err)
-	assert.Equal(t, 8, scopedFiles)
+	assert.Equal(t, 10, scopedFiles)
 	assert.Empty(t, describeSlog(scoped), "the caught subtree is outside the named directory")
 }
 
