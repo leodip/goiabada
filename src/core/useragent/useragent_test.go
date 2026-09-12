@@ -177,7 +177,7 @@ func TestLabels_ClientHints(t *testing.T) {
 			},
 			wantName: "Chrome 120", wantType: "Desktop", wantOS: "Windows",
 		},
-		// The four rows below carry a valid parameter on a key nothing reads, paired with a
+		// The five rows below carry a valid parameter on a key nothing reads, paired with a
 		// Firefox User-Agent so the answer says which path ran. Each is a bare-item form that
 		// a reader of the obsolete RFC 8941 set refuses, and refusing means falling through to
 		// a User-Agent Chromium freezes -- reporting Firefox on Linux for a Chrome on Windows,
@@ -231,6 +231,108 @@ func TestLabels_ClientHints(t *testing.T) {
 			name: "an empty byte sequence parameter",
 			headers: map[string]string{
 				"Sec-CH-UA":          `"Google Chrome";v="120";other=::`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome 120", wantType: "Desktop", wantOS: "Windows",
+		},
+		// The rows below put those same bare-item forms on v itself, where UA-CH 4.1.4 has
+		// already decided the answer: it sets param_value to version, "a string", and
+		// NavigatorUABrandVersion declares version a DOMString. A v of any other type is
+		// therefore a parameter this package cannot use, not a version spelled unusually, and
+		// the brand is displayed without one. Each row still expects the hints path to have
+		// run -- the field parses, only its v is unusable -- which the Firefox User-Agent
+		// beside it is there to prove: "Chrome" means the hints were read, "Firefox 121" would
+		// mean the whole header was refused.
+		{
+			name: "a v parameter that is a date is not a version",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v=@1659578233`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			// The display string is the form that made this worth fixing rather than tidying:
+			// its source span carries pct-encoding, so "12%2e3" holds no literal "." to cut at
+			// and the whole of %"12%2e3" would have been displayed as the major version.
+			name: "a v parameter that is a display string is not a version",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v=%"12%2e3"`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			name: "a v parameter that is a boolean is not a version",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v=?1`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			name: "a v parameter that is a byte sequence is not a version",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v=:MTI=:`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			// A valueless parameter is boolean true (RFC 9651 3.1.2), which is the one non-
+			// string form that read as "no version" before this rule existed, by accident: the
+			// empty value it answered cut to the empty string.
+			name: "a valueless v parameter is not a version",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			name: "a v parameter that is a token is not a version",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v=v120`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			// An integer is the form most likely to be sent by something hand-rolling the
+			// header, and it is still not a String, so it is still not a version.
+			name: "a v parameter that is an integer is not a version",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v=120`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			// Parameters are a dictionary (RFC 9651 3.1.2), so a repeated key is the later
+			// value and not the first one. A reader that only assigned on a string would keep
+			// "120" here, which is the earlier v.
+			name: "a repeated v whose later value is not a string leaves no version",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v="120";v=?1`,
+				"Sec-CH-UA-Platform": `"Windows"`,
+				"User-Agent":         firefoxLinux,
+			},
+			wantName: "Chrome", wantType: "Desktop", wantOS: "Windows",
+		},
+		{
+			// And the same dictionary rule the other way: the later string wins over the
+			// earlier unusable value.
+			name: "a repeated v whose later value is a string is the version",
+			headers: map[string]string{
+				"Sec-CH-UA":          `"Google Chrome";v=?1;v="120"`,
 				"Sec-CH-UA-Platform": `"Windows"`,
 				"User-Agent":         firefoxLinux,
 			},
