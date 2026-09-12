@@ -1887,48 +1887,173 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// and this is deliberately the same rule applied to the one value the lint cannot see.
 	conventional := regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-	keyFields := map[string]string{}
-	collectTierKeyFields(reflect.ValueOf(newTestMiddleware(nil, true)), keyFields)
+	var tiers []foundTier
+	collectTierKeyFields(reflect.ValueOf(newTestMiddleware(nil, true)), "middleware",
+		&tiers, map[visitedValue]bool{})
 
 	// The count is asserted because a walk that silently stopped matching would pass over an
-	// empty map exactly as it passes over a conformant one.
-	if len(keyFields) != 13 {
-		t.Fatalf("walked %d tiers, expected the 13 the constructor builds: %v", len(keyFields), keyFields)
+	// empty set exactly as it passes over a conformant one. It counts instances rather than
+	// distinct names, so a second tier carrying a name an earlier one already used is a
+	// fourteenth tier here rather than a replacement for the thirteenth.
+	if len(tiers) != 13 {
+		t.Fatalf("walked %d tiers, expected the 13 the constructor builds: %v", len(tiers), tiers)
 	}
-	for name, keyField := range keyFields {
-		if keyField == "" {
+	for _, found := range tiers {
+		if found.keyField == "" {
 			// An account tier's bucket names a person, so it is logged nowhere and carries no
 			// key at all. That emptiness is its own invariant and newFailureTier holds it.
 			continue
 		}
-		if !conventional.MatchString(keyField) {
-			t.Errorf("tier %q logs its bucket under %q, which is not a snake_case attribute key; "+
-				"the record would carry a name nothing else in the tree spells that way", name, keyField)
+		if !conventional.MatchString(found.keyField) {
+			t.Errorf("tier %q at %s logs its bucket under %q, which is not a snake_case attribute "+
+				"key; the record would carry a name nothing else in the tree spells that way",
+				found.name, found.where, found.keyField)
 		}
-		if keyField == "request_id" || keyField == "request-id" || keyField == "err" {
-			t.Errorf("tier %q logs its bucket under the reserved key %q", name, keyField)
+		if found.keyField == "request_id" || found.keyField == "request-id" || found.keyField == "err" {
+			t.Errorf("tier %q at %s logs its bucket under the reserved key %q",
+				found.name, found.where, found.keyField)
 		}
 	}
+}
+
+// TestCollectTierKeyFields_ReachesEveryContainerKind is the walk above held to its own claim,
+// because the constructor cannot hold it to one: every tier the production middleware builds sits
+// behind a pointer or a struct field, so a walk that reached nothing else would pass the test
+// beside this one on all thirteen and be silent the day a tier arrives in a slice. Six kinds, a
+// duplicated name and a cycle, in a shape built here rather than found.
+//
+// The duplicate is the half that is not about traversal: two tiers can carry one name, and a
+// census keyed by name would report three where there are four, so an invalid key would be
+// overwritten by the conformant one declared after it and the count would still be right.
+func TestCollectTierKeyFields_ReachesEveryContainerKind(t *testing.T) {
+	type holder struct {
+		direct    tier
+		behind    *tier
+		inSlice   []tier
+		inArray   [1]*tier
+		inMap     map[string]*tier
+		anonymous any
+		itself    *holder
+	}
+
+	// itself points back at the value being walked, which is the shape ratelimit's own types
+	// have: without the seen set the walk below does not terminate.
+	subject := &holder{
+		direct:    tier{name: "direct", keyField: "client_id"},
+		behind:    &tier{name: "behind", keyField: "user_id"},
+		inSlice:   []tier{{name: "in_slice", keyField: "clientId"}},
+		inArray:   [1]*tier{{name: "in_array", keyField: "session_id"}},
+		inMap:     map[string]*tier{"only": {name: "in_map", keyField: "code_id"}},
+		anonymous: &tier{name: "direct", keyField: "keyId"},
+	}
+	subject.itself = subject
+
+	var found []foundTier
+	collectTierKeyFields(reflect.ValueOf(subject), "holder", &found, map[visitedValue]bool{})
+
+	keys := map[string]string{}
+	for _, one := range found {
+		keys[one.where] = one.name + "/" + one.keyField
+	}
+	want := map[string]string{
+		"holder.direct":     "direct/client_id",
+		"holder.behind":     "behind/user_id",
+		"holder.inSlice[0]": "in_slice/clientId",
+		"holder.inArray[0]": "in_array/session_id",
+		"holder.inMap[0]":   "in_map/code_id",
+		"holder.anonymous":  "direct/keyId",
+	}
+	if !reflect.DeepEqual(want, keys) {
+		t.Errorf("the walk reached %v, expected %v; a kind it does not traverse holds a tier "+
+			"whose key nothing here reads", keys, want)
+	}
+	// Six entries for six tiers, two of which are named "direct": the count is of instances, and
+	// a census keyed by name would have five, with the conformant key standing in for the
+	// camelCase one beside it.
+	if len(found) != 6 {
+		t.Errorf("the walk recorded %d tiers, expected 6: %v", len(found), found)
+	}
+}
+
+// foundTier is one tier the walk reached, with the path it was reached by. A slice of these
+// rather than a map keyed by name, because nothing stops two tiers carrying one name and
+// collapsing them would let a later conformant key stand in for an earlier invalid one while the
+// count above still read 13.
+type foundTier struct {
+	where    string
+	name     string
+	keyField string
+}
+
+// visitedValue bounds the walk. A value that points back at itself, which ratelimit's do, is
+// otherwise a walk with no end; the type rides along with the address because a pointer and a map
+// header can hold the same one.
+type visitedValue struct {
+	address uintptr
+	holder  reflect.Type
 }
 
 // collectTierKeyFields walks a value for the tier structs inside it and records each one's name
 // against the attribute key it logs its bucket under. Reading an unexported field through reflect
 // is allowed; only Interface and Set are not, and this needs neither. The walk stops at a tier
-// rather than descending into its limiter, which is both what bounds it and what keeps it off the
-// pointers ratelimit keeps back to itself.
-func collectTierKeyFields(v reflect.Value, into map[string]string) {
+// rather than descending into its limiter, which is what bounds the interesting half of it.
+//
+// Every kind that can hold a tier is traversed, not the pointer and struct fields the constructor
+// happens to use today: a tier behind a slice, an array, a map or an interface is as reachable
+// from reportTrip as a named field is, and a walk that skipped one would be silent about exactly
+// the tier nobody thought to look for, which is the failure this test exists to prevent.
+func collectTierKeyFields(v reflect.Value, where string, into *[]foundTier, seen map[visitedValue]bool) {
+	// once reports whether this is the first arrival at a value with an identity of its own, so
+	// the three reference kinds are each walked at most one time.
+	once := func() bool {
+		if v.IsNil() {
+			return false
+		}
+		mark := visitedValue{address: v.Pointer(), holder: v.Type()}
+		if seen[mark] {
+			return false
+		}
+		seen[mark] = true
+		return true
+	}
+
 	switch v.Kind() {
 	case reflect.Pointer:
+		if once() {
+			collectTierKeyFields(v.Elem(), where, into, seen)
+		}
+	case reflect.Interface:
 		if !v.IsNil() {
-			collectTierKeyFields(v.Elem(), into)
+			collectTierKeyFields(v.Elem(), where, into, seen)
 		}
 	case reflect.Struct:
 		if v.Type() == reflect.TypeOf(tier{}) {
-			into[v.FieldByName("name").String()] = v.FieldByName("keyField").String()
+			*into = append(*into, foundTier{where: where,
+				name:     v.FieldByName("name").String(),
+				keyField: v.FieldByName("keyField").String()})
 			return
 		}
 		for i := 0; i < v.NumField(); i++ {
-			collectTierKeyFields(v.Field(i), into)
+			collectTierKeyFields(v.Field(i), where+"."+v.Type().Field(i).Name, into, seen)
+		}
+	case reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			collectTierKeyFields(v.Index(i), where+"["+strconv.Itoa(i)+"]", into, seen)
+		}
+	case reflect.Slice:
+		if !once() {
+			return
+		}
+		for i := 0; i < v.Len(); i++ {
+			collectTierKeyFields(v.Index(i), where+"["+strconv.Itoa(i)+"]", into, seen)
+		}
+	case reflect.Map:
+		if !once() {
+			return
+		}
+		at := 0
+		for iter := v.MapRange(); iter.Next(); at++ {
+			collectTierKeyFields(iter.Value(), where+"["+strconv.Itoa(at)+"]", into, seen)
 		}
 	}
 }
