@@ -86,7 +86,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 		user.EmailVerificationCodeEncrypted = encrypted
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 		if err := database.UpdateUser(nil, user); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "Failed to update user with verification code"), "userId", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to update user with verification code"), "user_id", user.Id)
 			return
 		}
 
@@ -99,7 +99,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 		emailReq := r.WithContext(i18n.EmailContext(r.Context(), user.Locale))
 		buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "Failed to render email template"), "userId", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to render email template"), "user_id", user.Id)
 			return
 		}
 
@@ -109,7 +109,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 			HtmlBody: buf.String(),
 		}
 		if err := emailSender.SendEmail(r.Context(), input); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "Failed to send verification email"), "userId", user.Id, "email", user.Email)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to send verification email"), "user_id", user.Id, "email", user.Email)
 			return
 		}
 

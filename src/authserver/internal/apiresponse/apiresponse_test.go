@@ -115,7 +115,7 @@ func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 
 	WriteInternalServerError(rr, requestWithId(t),
 		errs.Wrap(errors.New("connection refused"), "failed to load the client"),
-		"clientId", int64(7))
+		"client_id", int64(7))
 
 	records := capture.Records()
 
@@ -134,7 +134,11 @@ func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, "internal server error", records[0].Message)
 	assert.Equal(t, requestId, records[0].Attrs["request_id"])
-	assert.Equal(t, int64(7), records[0].Attrs["clientId"])
+	// snake_case, like every other key in the tree. The caller's attributes reach the record
+	// through a variadic parameter, so this key is written at the call site and read nowhere
+	// else: until rule 6 of the slog lint followed the wrapper, 179 of the 328 calls that pass
+	// through here still spelled it clientId (#320 decision 3).
+	assert.Equal(t, int64(7), records[0].Attrs["client_id"])
 	assert.ErrorContains(t, loggedError(t, records[0]), "failed to load the client: connection refused")
 }
 
