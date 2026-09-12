@@ -19,6 +19,14 @@ type UserSession struct {
 	DeviceName        string       `db:"device_name"`
 	DeviceType        string       `db:"device_type"`
 	DeviceOS          string       `db:"device_os"`
+	// UserAgent is the request's User-Agent header as the browser sent it, repaired to
+	// valid UTF-8 and cut to 512 bytes by useragent.Bound. With IpAddress it is the key
+	// StartNewUserSession sweeps on: two logins are the same device when both match.
+	//
+	// The three Device* fields above it are display only. They are a parser's guess at a
+	// browser name, so keying the sweep on them meant every change of parser or of label
+	// format silently changed which sessions superseded which (#281).
+	UserAgent string `db:"user_agent"`
 	// AuthStateGeneration records the user's generation when this session was
 	// created. Tagged dont-update so an ordinary full-row UpdateUserSession cannot
 	// regress it: it is written on insert and afterwards only by

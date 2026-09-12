@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/useragent"
 	"github.com/leodip/goiabada/core/uuidutil"
 )
 
@@ -110,13 +111,19 @@ func (ci *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *CreateCodeInput) (*model
 		Scope:               scope,
 		State:               input.State,
 		Nonce:               input.Nonce,
-		UserAgent:           input.UserAgent,
-		ResponseMode:        responseMode,
-		IpAddress:           input.IpAddress,
-		AcrLevel:            input.AcrLevel,
-		AuthMethods:         input.AuthMethods,
-		SessionIdentifier:   input.SessionIdentifier,
-		Used:                false,
+		// The header is bounded here, at the one writer of codes.user_agent, rather than where
+		// it is read off the request: a browser sending more than the 512 bytes the column
+		// holds otherwise makes this insert fail, and /auth/issue answers 500 to it after a
+		// completed ceremony. PostgreSQL and MySQL refuse the length, and both also refuse a
+		// stray latin1 byte, which RFC 9110 10.1.5 permits in a User-Agent; Bound handles both
+		// (#281).
+		UserAgent:         useragent.Bound(input.UserAgent, 512),
+		ResponseMode:      responseMode,
+		IpAddress:         input.IpAddress,
+		AcrLevel:          input.AcrLevel,
+		AuthMethods:       input.AuthMethods,
+		SessionIdentifier: input.SessionIdentifier,
+		Used:              false,
 		// From the AuthContext, which captured it when this ceremony authenticated.
 		// Redemption compares it against the user's current value, so a code issued by a
 		// ceremony that straddled a credential change is rejected (#106 decision 11).

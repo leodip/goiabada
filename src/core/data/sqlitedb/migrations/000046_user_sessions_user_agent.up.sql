@@ -1,0 +1,19 @@
+-- The raw User-Agent header on the session row, and the new key of the "same device" sweep (#281).
+--
+-- user_sessions.user_agent holds the request's User-Agent header exactly as the browser sent it,
+-- repaired to valid UTF-8 and cut to 512 bytes on a rune boundary by useragent.Bound. 512 mirrors
+-- codes.user_agent, so one bound serves both writers and two values the sweep compares were cut at
+-- the same point.
+--
+-- From here StartNewUserSession decides that two logins came from the same device by comparing this
+-- column and ip_address, and nothing else. It used to compare device_name, device_type and
+-- device_os, which are a parser's guess at a browser name: any change of parser or of label format
+-- silently changes which sessions supersede which, and Chromium's frozen User-Agent makes the OS
+-- label wrong for most visitors anyway. The three label columns stay, and become display only.
+--
+-- Rows created before this migration read '' and there is nothing to backfill them from: the header
+-- they were built from was never stored. Two consequences, both accepted rather than worked around.
+-- A later login from one of those devices does not sweep its legacy row, which then expires on its
+-- own by idle timeout or max lifetime. And a client that sends no User-Agent at all matches every
+-- legacy row on the same address, which is how a header-less client is treated today in any case.
+ALTER TABLE user_sessions ADD COLUMN user_agent TEXT NOT NULL DEFAULT '';

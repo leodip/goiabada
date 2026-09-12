@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,6 +95,78 @@ func TestCreateAuthCode(t *testing.T) {
 	assert.WithinDuration(t, time.Now(), code.AuthenticatedAt, time.Second)
 
 	mockDB.AssertExpectations(t)
+}
+
+// TestCreateAuthCode_BoundsTheUserAgent is decision 5 of #281, and the defect it closes was live:
+// codes.user_agent is varchar(512) on three engines and a User-Agent of 513 bytes or more made
+// CreateCode fail, so /auth/issue answered 500 to that browser after a completed ceremony. The
+// bound sits at this one writer of the column rather than at the handler that reads the header, so
+// every future caller is covered by it.
+//
+// What reaches CreateCode is captured rather than read off the returned struct: the column is what
+// refuses the value, and the database is what sees it.
+func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
+	testCases := []struct {
+		name      string
+		userAgent string
+		want      string
+	}{
+		{
+			name:      "a 600-byte header reaches the column at 512 bytes",
+			userAgent: strings.Repeat("a", 600),
+			want:      strings.Repeat("a", 512),
+		},
+		{
+			// RFC 9110 10.1.5 admits obs-text, and PostgreSQL and MySQL both refuse the insert
+			// outright rather than storing the byte.
+			name:      "a lone latin1 byte is repaired to U+FFFD",
+			userAgent: "\xe9 Chrome",
+			want:      "\uFFFD Chrome",
+		},
+		{
+			name:      "a header inside the width is stored verbatim",
+			userAgent: "curl/8.5.0",
+			want:      "curl/8.5.0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			codeIssuer := NewCodeIssuer(mockDB)
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+
+			var persisted string
+			mockDB.On("CreateCode", mock.Anything, mock.AnythingOfType("*models.Code")).Run(
+				func(args mock.Arguments) {
+					persisted = args.Get(1).(*models.Code).UserAgent
+				}).Return(nil)
+
+			_, err := codeIssuer.CreateAuthCode(nil, &CreateCodeInput{
+				AuthContext: AuthContext{
+					ClientId:       "test-client",
+					UserId:         123,
+					ConsentedScope: "openid",
+					Scope:          "openid",
+					RedirectURI:    "https://example.com/callback",
+					UserAgent:      tc.userAgent,
+					ResponseMode:   "query",
+					IpAddress:      "127.0.0.1",
+					AcrLevel:       string(enums.AcrLevel1),
+					AuthMethods:    "pwd",
+				},
+				SessionIdentifier: "session123",
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, persisted)
+			assert.LessOrEqual(t, len(persisted), 512,
+				"codes.user_agent is varchar(512) on three engines: a longer value is refused, not truncated")
+			mockDB.AssertExpectations(t)
+		})
+	}
 }
 
 func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {

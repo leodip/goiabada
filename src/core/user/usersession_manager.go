@@ -111,6 +111,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		DeviceName:        useragent.GetDeviceName(r),
 		DeviceType:        useragent.GetDeviceType(r),
 		DeviceOS:          useragent.GetDeviceOS(r),
+		UserAgent:         useragent.Raw(r),
 
 		AuthStateGeneration: authStateGeneration,
 		OtpConfigGeneration: observedOtpConfigGeneration,
@@ -126,7 +127,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// RunInTransaction so a deadlock reruns the body (#301). The body is safe to rerun: the id
 	// CreateUserSession assigns is reassigned by the next attempt, and the association loop
 	// ranges by value, so nothing an attempt wrote onto a copy is read by the attempt after it.
-	// The device-and-ip sweep and the cookie write below run only after the commit.
+	// The same-device sweep and the cookie write below run only after the commit.
 	err := u.database.RunInTransaction(func(tx *sql.Tx) error {
 		if err := u.database.CreateUserSession(tx, userSession); err != nil {
 			return err
@@ -149,12 +150,22 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		return nil, err
 	}
 
-	// delete other sessions from this same device & ip
+	// Delete this user's other sessions from the same device: same raw User-Agent header, same
+	// address. Nothing here reads DeviceName, DeviceType or DeviceOS, which are a parser's guess
+	// at a browser name and now display only. Keying on them meant a coarser label collapsed two
+	// machines behind one address into one device, and a change of parser or of label format
+	// silently changed which sessions superseded which. The header is compared as sent, bounded
+	// by useragent.Bound on both sides, so the comparison is between two values cut at the same
+	// point (#281).
+	//
+	// Two consequences of pre-upgrade rows carrying an empty header, both accepted rather than
+	// worked around: a login that sends a header does not match one, so a legacy row survives
+	// this login and expires on its own by idle timeout or max lifetime; and a client that sends
+	// no header matches every legacy row on its address, which is how a header-less client is
+	// treated today in any case.
 	for _, us := range allUserSessions {
 		if us.SessionIdentifier != userSession.SessionIdentifier &&
-			us.DeviceName == userSession.DeviceName &&
-			us.DeviceType == userSession.DeviceType &&
-			us.DeviceOS == userSession.DeviceOS &&
+			us.UserAgent == userSession.UserAgent &&
 			us.IpAddress == ipWithoutPort {
 			err = u.database.DeleteUserSession(nil, us.Id)
 			if err != nil {
