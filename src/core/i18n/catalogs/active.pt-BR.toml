@@ -1374,6 +1374,8 @@
 "adminconsole.admin_settings.audit_log_viewer.clear_link" = "Limpar"
 "adminconsole.admin_settings.audit_log_viewer.col_timestamp" = "Carimbo de tempo"
 "adminconsole.admin_settings.audit_log_viewer.col_event" = "Evento"
+"adminconsole.admin_settings.audit_log_viewer.col_request_id" = "Id da requisição"
+"adminconsole.admin_settings.audit_log_viewer.request_id_placeholder" = "Filtrar por id da requisição"
 "adminconsole.admin_settings.audit_log_viewer.col_details" = "Detalhes"
 "adminconsole.admin_settings.audit_log_viewer.empty" = "Nenhum log de auditoria encontrado."
 

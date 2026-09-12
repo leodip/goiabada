@@ -100,4 +100,5 @@ type AuditLogsPageResult struct {
 	Page       int
 	PageSize   int
 	AuditEvent string
+	RequestId  string
 }

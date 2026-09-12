@@ -3,6 +3,7 @@ package adminsettingshandlers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -162,13 +163,14 @@ func HandleAdminSettingsAuditLogViewerGet(
 		// Parse pagination parameters
 		pageStr := r.URL.Query().Get("page")
 		auditEvent := r.URL.Query().Get("auditEvent")
+		requestId := r.URL.Query().Get("requestId")
 
 		pageInt := pagination.ParsePage(pageStr)
 
 		const pageSize = 20
 
 		// Fetch audit logs
-		auditLogsResp, err := apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, "")
+		auditLogsResp, err := apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -179,7 +181,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		// that highlights a full one (#305).
 		if clamped := pagination.ClampPage(auditLogsResp.Total, pageSize, pageInt); clamped != pageInt {
 			pageInt = clamped
-			auditLogsResp, err = apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, "")
+			auditLogsResp, err = apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
 			if err != nil {
 				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
@@ -192,15 +194,18 @@ func HandleAdminSettingsAuditLogViewerGet(
 			Page:       pageInt,
 			PageSize:   pageSize,
 			AuditEvent: auditEvent,
+			RequestId:  requestId,
 		}
 
 		p := pagination.New(auditLogsResp.Total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
-			"pageResult":      pageResult,
-			"paginator":       p,
-			"selectedEvent":   auditEvent,
-			"auditEventTypes": constants.AuditEventTypes,
+			"pageResult":        pageResult,
+			"paginator":         p,
+			"selectedEvent":     auditEvent,
+			"selectedRequestId": requestId,
+			"paginatorLink":     auditLogViewerLink(auditEvent, requestId),
+			"auditEventTypes":   constants.AuditEventTypes,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html", bind)
@@ -209,4 +214,25 @@ func HandleAdminSettingsAuditLogViewerGet(
 			return
 		}
 	}
+}
+
+// auditLogViewerLink is the base URL the paginator appends "page" to, carrying whichever filters
+// are set. It is built here rather than with printf in the template because a request id is
+// client-chosen: one holding an "&" pasted into a URL string splits into a second parameter when
+// addUrlParam parses it, so "?requestId=x&page=9" would put page=9 in front of every page link and
+// the handler would read that one. url.Values escapes it once (#328).
+func auditLogViewerLink(auditEvent string, requestId string) string {
+	const path = "/admin/settings/audit-log-viewer"
+
+	query := url.Values{}
+	if auditEvent != "" {
+		query.Set("auditEvent", auditEvent)
+	}
+	if requestId != "" {
+		query.Set("requestId", requestId)
+	}
+	if len(query) == 0 {
+		return path
+	}
+	return path + "?" + query.Encode()
 }

@@ -84,13 +84,14 @@ func (c *AuthServerClient) UpdateSettingsAuditLogs(accessToken string, request *
 func (c *AuthServerClient) GetAuditLogsPaginated(accessToken string, page, pageSize int, auditEvent string,
 	requestId string) (*api.GetAuditLogsResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/audit-logs?page=%d&size=%d", c.baseURL, page, pageSize)
+	// Both filters are escaped. The request id is whatever the client put in X-Request-Id, so it
+	// can carry an & or a # and would otherwise be read as another parameter or truncate the
+	// query; auditEvent rides along on the same rule, since a filter built by hand from a string
+	// is where that mistake gets made next, even though its values come from a fixed list (#328).
 	if auditEvent != "" {
-		fullURL += fmt.Sprintf("&auditEvent=%s", auditEvent)
+		fullURL += fmt.Sprintf("&auditEvent=%s", url.QueryEscape(auditEvent))
 	}
 	if requestId != "" {
-		// Escaped, unlike auditEvent above: the request id is whatever the client put in
-		// X-Request-Id, so it can carry an & or a # and would otherwise be read as another
-		// parameter or truncate the query (#328).
 		fullURL += fmt.Sprintf("&requestId=%s", url.QueryEscape(requestId))
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"testing"
 
@@ -35,6 +36,8 @@ type auditPagingApiClient struct {
 	// events records the auditEvent filter each call carried, which the
 	// re-query must not drop.
 	events []string
+	// requestIds records the same for the request id filter (#328).
+	requestIds []string
 }
 
 func (c *auditPagingApiClient) GetAuditLogsPaginated(accessToken string, page, pageSize int,
@@ -42,6 +45,7 @@ func (c *auditPagingApiClient) GetAuditLogsPaginated(accessToken string, page, p
 
 	c.asked = append(c.asked, page)
 	c.events = append(c.events, auditEvent)
+	c.requestIds = append(c.requestIds, requestId)
 
 	return &api.GetAuditLogsResponse{
 		AuditLogs: logsOnPage(c.total, page, pageSize),
@@ -226,6 +230,156 @@ func TestHandleAdminSettingsAuditLogViewerGet_EveryTotalLandsOnAPageWithRows(t *
 			if total > 0 {
 				require.NotEmpty(t, result.AuditLogs, "total=%d: the last page has no rows", total)
 			}
+		})
+	}
+}
+
+// renderAuditLogsWithQuery renders the viewer for a whole query string, which the
+// page-size cases above do not need and the filter cases do.
+func renderAuditLogsWithQuery(t *testing.T, rawQuery string, total int) (map[string]interface{}, *auditPagingApiClient) {
+	t.Helper()
+
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { t.Errorf("the handler answered 500: %v", args.Get(2)) }).Maybe()
+	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything,
+		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html", mock.Anything).
+		Return(nil).Maybe()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/settings/audit-log-viewer?"+rawQuery, nil)
+	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
+		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+
+	apiClient := &auditPagingApiClient{total: total}
+	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+	var bind map[string]interface{}
+	for _, call := range httpHelper.Calls {
+		if call.Method == "RenderTemplate" {
+			bind = call.Arguments.Get(4).(map[string]interface{})
+		}
+	}
+	require.NotNil(t, bind, "the handler rendered nothing for ?%s", rawQuery)
+	return bind, apiClient
+}
+
+// TestHandleAdminSettingsAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage
+// is seam 8's handler half: the query parameter added in stage 3 has to be read here
+// and handed back to the page, or the input the operator typed into empties itself on
+// every render and the filter looks broken while the rows are right (#328).
+func TestHandleAdminSettingsAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage(t *testing.T) {
+	testCases := []struct {
+		name      string
+		rawQuery  string
+		wantEvent string
+		wantId    string
+		wantLink  string
+	}{
+		{
+			name:     "no filter at all",
+			rawQuery: "page=1",
+			wantLink: "/admin/settings/audit-log-viewer",
+		},
+		{
+			name:      "the event alone",
+			rawQuery:  "auditEvent=user_login",
+			wantEvent: "user_login",
+			wantLink:  "/admin/settings/audit-log-viewer?auditEvent=user_login",
+		},
+		{
+			name:     "the request id alone",
+			rawQuery: "requestId=host%2FPpg6bHPK5f-000012",
+			wantId:   "host/Ppg6bHPK5f-000012",
+			wantLink: "/admin/settings/audit-log-viewer?requestId=host%2FPpg6bHPK5f-000012",
+		},
+		{
+			name:      "both",
+			rawQuery:  "auditEvent=user_login&requestId=host%2FPpg6bHPK5f-000012",
+			wantEvent: "user_login",
+			wantId:    "host/Ppg6bHPK5f-000012",
+			wantLink:  "/admin/settings/audit-log-viewer?auditEvent=user_login&requestId=host%2FPpg6bHPK5f-000012",
+		},
+		{
+			// The id is whatever the client sent in X-Request-Id. An "&" in it
+			// concatenated into the paginator's base link would become a second
+			// parameter, and "page" would then be read from the attacker's half.
+			name:     "an id carrying a query separator",
+			rawQuery: "requestId=" + url.QueryEscape("x&page=9"),
+			wantId:   "x&page=9",
+			wantLink: "/admin/settings/audit-log-viewer?requestId=x%26page%3D9",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			bind, apiClient := renderAuditLogsWithQuery(t, tc.rawQuery, 50)
+
+			assert.Equal(t, []string{tc.wantId}, apiClient.requestIds,
+				"the request id the API was asked for")
+			assert.Equal(t, []string{tc.wantEvent}, apiClient.events,
+				"the event the API was asked for")
+
+			assert.Equal(t, tc.wantId, bind["selectedRequestId"], "selectedRequestId")
+			assert.Equal(t, tc.wantEvent, bind["selectedEvent"], "selectedEvent")
+			assert.Equal(t, tc.wantLink, bind["paginatorLink"], "paginatorLink")
+
+			result, ok := bind["pageResult"].(AuditLogsPageResult)
+			require.True(t, ok, "pageResult")
+			assert.Equal(t, tc.wantId, result.RequestId, "pageResult.RequestId")
+			assert.Equal(t, tc.wantEvent, result.AuditEvent, "pageResult.AuditEvent")
+		})
+	}
+}
+
+// TestHandleAdminSettingsAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery is
+// the event filter's case from #305 for the second filter: the clamp repeats the whole
+// call, and one that forgot the id would page through the unfiltered log while the input
+// still showed an id.
+func TestHandleAdminSettingsAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery(t *testing.T) {
+	_, apiClient := renderAuditLogsWithQuery(t, "page=99&auditEvent=user_login&requestId=an-id", 50)
+
+	require.Equal(t, 2, len(apiClient.asked), "the clamp should have cost a second query")
+	assert.Equal(t, []string{"an-id", "an-id"}, apiClient.requestIds,
+		"the request id filter was dropped on the way")
+	assert.Equal(t, []string{"user_login", "user_login"}, apiClient.events,
+		"the event filter was dropped on the way")
+}
+
+// TestAuditLogViewerLink owns the base URL the paginator appends "page" to. It is the
+// one string on the page built from a client-chosen value, so every byte a request id
+// can carry is escaped here: addUrlParam parses this string, and anything it reads as a
+// separator becomes a parameter the handler would believe over its own.
+func TestAuditLogViewerLink(t *testing.T) {
+	testCases := []struct {
+		name       string
+		auditEvent string
+		requestId  string
+		want       string
+	}{
+		{"neither", "", "", "/admin/settings/audit-log-viewer"},
+		{"the event alone", "user_login", "", "/admin/settings/audit-log-viewer?auditEvent=user_login"},
+		{"the id alone", "", "an-id", "/admin/settings/audit-log-viewer?requestId=an-id"},
+		{"both", "user_login", "an-id", "/admin/settings/audit-log-viewer?auditEvent=user_login&requestId=an-id"},
+		{"an ampersand", "", "x&page=9", "/admin/settings/audit-log-viewer?requestId=x%26page%3D9"},
+		{"a fragment marker", "", "x#y", "/admin/settings/audit-log-viewer?requestId=x%23y"},
+		{"a space", "", "x y", "/admin/settings/audit-log-viewer?requestId=x+y"},
+		{"a quote and a tag", "", `"><script>`, "/admin/settings/audit-log-viewer?requestId=%22%3E%3Cscript%3E"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			link := auditLogViewerLink(tc.auditEvent, tc.requestId)
+			assert.Equal(t, tc.want, link)
+
+			// What the paginator then does with it: the page number must be the
+			// only "page" in the result, and the filters must survive the round
+			// trip byte for byte.
+			parsed, err := url.Parse(link)
+			require.NoError(t, err)
+			assert.Equal(t, tc.requestId, parsed.Query().Get("requestId"), "the id did not round-trip")
+			assert.Equal(t, tc.auditEvent, parsed.Query().Get("auditEvent"), "the event did not round-trip")
+			assert.Empty(t, parsed.Query()["page"], "the link already carries a page")
+			assert.Empty(t, parsed.Fragment, "part of the link fell into a fragment")
 		})
 	}
 }

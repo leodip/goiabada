@@ -1425,6 +1425,8 @@
 "adminconsole.admin_settings.audit_log_viewer.clear_link" = "Clear"
 "adminconsole.admin_settings.audit_log_viewer.col_timestamp" = "Timestamp"
 "adminconsole.admin_settings.audit_log_viewer.col_event" = "Event"
+"adminconsole.admin_settings.audit_log_viewer.col_request_id" = "Request id"
+"adminconsole.admin_settings.audit_log_viewer.request_id_placeholder" = "Filter by request id"
 "adminconsole.admin_settings.audit_log_viewer.col_details" = "Details"
 "adminconsole.admin_settings.audit_log_viewer.empty" = "No audit logs found."
 

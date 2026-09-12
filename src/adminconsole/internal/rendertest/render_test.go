@@ -11,11 +11,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	web "github.com/leodip/goiabada/adminconsole/web"
@@ -362,5 +364,54 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 	assert.NotContains(t, out, `href="/admin/users?page=4"`)
 
 	// The -1 sentinel must never reach addUrlParam: it means "ellipsis", not a page.
+	assert.NotContains(t, out, "page=-1")
+}
+
+// TestRender_AdminSettingsAuditLogViewer is seam 8's rendering half (#328). The page test
+// above the handler drives a mocked HttpHelper and therefore renders nothing, so the three
+// things that can only go wrong in HTML are proved here: the fourth column carries each
+// row's request id, an entry written off a request shows a dash rather than an empty cell,
+// and an id echoed back into the filter input is escaped. The id is whatever a client put
+// in X-Request-Id, so the escaping is the one thing on this page standing between a stored
+// id and script in an administrator's browser.
+func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
+	out := render(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
+		"pageResult": adminsettingshandlers.AuditLogsPageResult{
+			AuditLogs: []api.AuditLogResponse{
+				{Id: 1, CreatedAt: "2026-09-12T10:00:00Z", AuditEvent: "user_login",
+					Details: `{"email":"alice@example.com"}`, RequestId: "host/Ppg6bHPK5f-000012"},
+				{Id: 2, CreatedAt: "2026-09-12T10:00:01Z", AuditEvent: "revoked_user_auth_state",
+					Details: `{}`, RequestId: ""},
+			},
+			Total:      73,
+			Page:       4,
+			PageSize:   20,
+			AuditEvent: "user_login",
+			RequestId:  `"><script>alert(1)</script>`,
+		},
+		"paginator":         pagination.New(73, 20, 4, 5),
+		"selectedEvent":     "user_login",
+		"selectedRequestId": `"><script>alert(1)</script>`,
+		"paginatorLink": "/admin/settings/audit-log-viewer?auditEvent=user_login&requestId=" +
+			url.QueryEscape(`"><script>alert(1)</script>`),
+		"auditEventTypes": []string{"user_login", "revoked_user_auth_state"},
+	})
+
+	// The column exists and is localized: pt-BR, like every other page in this file.
+	assert.Contains(t, out, "Id da requisição")
+
+	// Each row's id, and the dash standing for "not written on a request".
+	assert.Contains(t, out, "host/Ppg6bHPK5f-000012")
+	assert.Contains(t, out, ">-</td>")
+
+	// The id typed into the filter comes back into the input escaped. The raw sequence
+	// would close the value attribute and open a script element; the escaped one cannot.
+	assert.NotContains(t, out, `<script>alert(1)</script>`)
+	assert.Contains(t, out, "&#34;&gt;&lt;script&gt;alert(1)&lt;/script&gt;")
+
+	// The paginator's links carry both filters, escaped, and the page number is the only
+	// "page" in them: an id holding "&page=" would otherwise win over the real one.
+	assert.Contains(t, out, "requestId=%22%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E")
+	assert.Contains(t, out, "auditEvent=user_login")
 	assert.NotContains(t, out, "page=-1")
 }
