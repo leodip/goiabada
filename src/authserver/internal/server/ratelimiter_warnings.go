@@ -56,6 +56,6 @@ func rateLimiterConfigWarnings(enabled, trustProxyHeaders bool, trustedProxies [
 // auth server whose error log carries expected events has no error log left.
 func emitRateLimiterConfigWarnings(enabled, trustProxyHeaders bool, trustedProxies []string) {
 	for _, warning := range rateLimiterConfigWarnings(enabled, trustProxyHeaders, trustedProxies) {
-		slog.Warn(warning)
+		slog.Warn("rate limiter configuration warning", "warning", warning)
 	}
 }

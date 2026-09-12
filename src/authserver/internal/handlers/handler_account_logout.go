@@ -132,23 +132,31 @@ func isEncryptedIDTokenHint(hint string) bool {
 func decryptIDTokenHint(idTokenHint, clientID string, database data.Database) (string, error) {
 	client, err := database.GetClientByClientIdentifier(nil, clientID)
 	if err != nil {
-		slog.Error("logout: client lookup failed", "clientId", clientID, "err", err)
+		slog.Error("unable to look up the client an id_token_hint names, so the hint cannot be decrypted",
+			"client_identifier", clientID, "error", err)
 		return "", errs.Wrap(err, "unable to look up the client named by client_id")
 	}
 	if client == nil {
-		slog.Error("logout: client_id names no client", "clientId", clientID)
+		// Warn, not Error: a client_id naming no client is a request refused and handled,
+		// and the caller treats the logout as hintless. Nothing here is the server failing
+		// to do what it was asked (#320 decision 5).
+		slog.Warn("client_id names no client, so an id_token_hint cannot be decrypted",
+			"client_identifier", clientID)
 		return "", errs.New("client_id names no client")
 	}
 
 	clientSecret, err := encryption.DecryptData(client.ClientSecretEncrypted)
 	if err != nil {
-		slog.Error("logout: client secret decrypt failed", "err", err)
+		slog.Error("unable to decrypt the client secret, so an id_token_hint cannot be decrypted",
+			"error", err)
 		return "", errs.Wrap(err, "unable to decrypt the client secret")
 	}
 
 	decryptedToken, err := encryption.DecryptIDTokenHintJWE(idTokenHint, clientSecret)
 	if err != nil {
-		slog.Error("logout: id_token_hint decrypt failed", "err", err)
+		// Warn for the same reason as the no-client branch: the hint is a value the relying
+		// party chose, and one this server cannot open is refused rather than failed on.
+		slog.Warn("unable to decrypt the id_token_hint", "error", err)
 		return "", errs.Wrap(err, "unable to decrypt the id_token_hint")
 	}
 
@@ -246,8 +254,15 @@ func classifyIdTokenHint(
 	tokenParser TokenParser,
 ) (hintClassification, error) {
 
+	// The gate rides as an attribute rather than inside the message, so the twenty
+	// rejections below are one greppable message a collector can group and count, and Warn
+	// rather than Error because every one of them is a hint refused and handled: the caller
+	// falls back to a hintless logout (#320 decisions 4 and 5).
 	reject := func(gate string, args ...interface{}) (hintClassification, error) {
-		slog.Error("logout: id_token_hint rejected at the "+gate+" gate", args...)
+		record := make([]interface{}, 0, len(args)+2)
+		record = append(record, "gate", gate)
+		record = append(record, args...)
+		slog.WarnContext(r.Context(), "id_token_hint rejected", record...)
 		return hintClassification{state: hintRejected}, nil
 	}
 
@@ -282,7 +297,7 @@ func classifyIdTokenHint(
 
 	idToken, err := tokenParser.DecodeAndValidateTokenString(hint, nil, false)
 	if err != nil || idToken == nil {
-		return reject("parse and signature", "err", err)
+		return reject("parse and signature", "error", err)
 	}
 
 	// Is this an ID Token at all? Without this gate a session-bound ACCESS token satisfies every
@@ -346,7 +361,7 @@ func classifyIdTokenHint(
 	// Compared before the lookup so a mismatch costs no query.
 	if clientIdPresent && clientId != clientIdentifier {
 		return reject("client_id", "reason", "client_id does not match the aud the hint is signed over",
-			"clientId", clientId, "aud", clientIdentifier)
+			"client_identifier", clientId, "aud", clientIdentifier)
 	}
 
 	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
@@ -355,7 +370,7 @@ func classifyIdTokenHint(
 		// teardown, so a 500 here would put the End-User on a terminal page while still signed in,
 		// which is the defect #109 exists to remove. Rejecting instead widens the teardown from
 		// per-client to whole-session and forbids the redirect, which is the fail-safe direction.
-		return reject("aud", "reason", "the client lookup failed", "aud", clientIdentifier, "err", err)
+		return reject("aud", "reason", "the client lookup failed", "aud", clientIdentifier, "error", err)
 	}
 	if client == nil {
 		return reject("aud", "reason", "aud names no client", "aud", clientIdentifier)
@@ -423,7 +438,7 @@ func classifyIdTokenHint(
 			return reject("expiry tolerance", "reason", "exp has passed and sid names no live session")
 		}
 		// "Recent session" has exactly one meaning in this codebase: the row is still there.
-		slog.Info("logout: accepting an expired id_token_hint because its session is still live",
+		slog.InfoContext(r.Context(), "accepting an expired id_token_hint because its session is still live",
 			"aud", clientIdentifier)
 	}
 
@@ -795,17 +810,18 @@ func clientForPostLogoutRedirect(clientId string, database data.Database) *model
 		// the OP MUST NOT perform post-logout redirection unless the OP has other means of
 		// confirming the legitimacy of the post-logout redirection target". With neither a hint nor
 		// a client_id there are no such means.
-		slog.Warn("logout: post_logout_redirect_uri supplied with no id_token_hint and no client_id, not redirecting")
+		slog.Warn("post_logout_redirect_uri supplied with no id_token_hint and no client_id, not redirecting")
 		return nil
 	}
 
 	client, err := database.GetClientByClientIdentifier(nil, clientId)
 	if err != nil {
-		slog.Error("logout: client lookup failed, not redirecting", "clientId", clientId, "err", err)
+		slog.Error("unable to look up the client named by client_id, not redirecting",
+			"client_identifier", clientId, "error", err)
 		return nil
 	}
 	if client == nil {
-		slog.Warn("logout: client_id names no client, not redirecting", "clientId", clientId)
+		slog.Warn("client_id names no client, not redirecting", "client_identifier", clientId)
 		return nil
 	}
 
@@ -851,14 +867,14 @@ func postLogoutRedirectLocation(
 	// unbounded caller-controlled input, and the client identifier is the bounded value that finds
 	// the offending row (#122).
 	if !urlutil.IsAbsoluteRedirectURI(postLogoutRedirectURI) {
-		slog.Warn("logout: post_logout_redirect_uri is not an absolute URI, not redirecting",
-			"clientIdentifier", client.ClientIdentifier)
+		slog.WarnContext(r.Context(), "post_logout_redirect_uri is not an absolute URI, not redirecting",
+			"client_identifier", client.ClientIdentifier)
 		return ""
 	}
 
 	if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
-		slog.Error("logout: load redirect URIs failed, not redirecting",
-			"clientIdentifier", client.ClientIdentifier, "err", err)
+		slog.ErrorContext(r.Context(), "unable to load the client's redirect URIs, not redirecting",
+			"client_identifier", client.ClientIdentifier, "error", err)
 		return ""
 	}
 
@@ -870,8 +886,8 @@ func postLogoutRedirectLocation(
 		}
 	}
 	if !registered {
-		slog.Warn("logout: post_logout_redirect_uri is not registered for this client, not redirecting",
-			"clientIdentifier", client.ClientIdentifier)
+		slog.WarnContext(r.Context(), "post_logout_redirect_uri is not registered for this client, not redirecting",
+			"client_identifier", client.ClientIdentifier)
 		return ""
 	}
 
@@ -880,8 +896,8 @@ func postLogoutRedirectLocation(
 	state, statePresent := httpHelper.LookupFromUrlQueryOrFormPost(r, "state")
 	location, err := buildPostLogoutRedirect(postLogoutRedirectURI, state, statePresent)
 	if err != nil {
-		slog.Error("logout: could not build the post-logout redirect, not redirecting",
-			"clientIdentifier", client.ClientIdentifier, "err", err)
+		slog.ErrorContext(r.Context(), "unable to build the post-logout redirect, not redirecting",
+			"client_identifier", client.ClientIdentifier, "error", err)
 		return ""
 	}
 

@@ -99,9 +99,12 @@ func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error,
 // and keeps the shape on the wire (#279, plan finding 9).
 func LogInternalServerError(r *http.Request, err error, attrs ...any) string {
 	requestId := middleware.GetReqID(r.Context())
-	record := make([]any, 0, len(attrs)+4)
-	record = append(record, "error", errs.WithStack(err), "request_id", requestId)
+	// No request_id attribute: the installed handler reads it off the context this call
+	// passes it, so naming it here would write it twice. requestId is still read, because
+	// the caller puts it on the wire for whoever hit the error (#320 decision 2).
+	record := make([]any, 0, len(attrs)+2)
+	record = append(record, "error", errs.WithStack(err))
 	record = append(record, attrs...)
-	slog.Error("internal server error", record...)
+	slog.ErrorContext(r.Context(), "internal server error", record...)
 	return requestId
 }

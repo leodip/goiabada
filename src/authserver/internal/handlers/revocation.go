@@ -225,7 +225,7 @@ func RevokeUserAuthState(db data.Database, tx *sql.Tx, userId int64, exceptSid s
 	// list. The field names the exempted grant origin, not a surviving session row.
 	if exceptSid != "" && !preservedSessionFound {
 		slog.Warn("revocation exempted a grant origin whose session row no longer exists",
-			"userId", userId, "exceptSid", exceptSid)
+			"user_id", userId, "except_session_identifier", exceptSid)
 	}
 
 	return result, nil

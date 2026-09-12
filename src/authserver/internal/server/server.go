@@ -59,18 +59,18 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessionstor
 
 	if envVar := config.GetAuthServer().StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
-		slog.Info("using embedded static files directory")
+		slog.Info("using the embedded static files")
 	} else {
 		s.staticFS = os.DirFS(envVar)
-		slog.Info(fmt.Sprintf("using static files directory %v", envVar))
+		slog.Info("using static files from a directory", "directory", envVar)
 	}
 
 	if envVar := config.GetAuthServer().TemplateDir; len(envVar) == 0 {
 		s.templateFS = web.TemplateFS()
-		slog.Info("using embedded template files directory")
+		slog.Info("using the embedded template files")
 	} else {
 		s.templateFS = os.DirFS(envVar)
-		slog.Info(fmt.Sprintf("using template files directory %v", envVar))
+		slog.Info("using template files from a directory", "directory", envVar)
 	}
 
 	return &s
@@ -102,19 +102,24 @@ func (s *Server) Start(ctx context.Context) {
 	keyFile := config.GetAuthServer().KeyFile
 	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
 
-	slog.Info("listen host https: " + httpsHost)
-	slog.Info(fmt.Sprintf("listen port https: %v", httpsPort))
-	slog.Info("cert file: " + certFile)
-	slog.Info("key file: " + keyFile)
-	slog.Info(fmt.Sprintf("https enabled: %v", httpsEnabled))
+	// One record per listener where five and three lines used to be. A reader
+	// checking why HTTPS is off had to join "https enabled: false" to four
+	// separate lines to see which of the four settings was the empty one (#320).
+	slog.InfoContext(ctx, "https listener configuration",
+		"enabled", httpsEnabled,
+		"host", httpsHost,
+		"port", httpsPort,
+		"cert_file", certFile,
+		"key_file", keyFile)
 
 	httpHost := config.GetAuthServer().ListenHostHttp
 	httpPort := config.GetAuthServer().ListenPortHttp
 	httpEnabled := httpHost != "" && httpPort > 0
 
-	slog.Info("listen host http: " + httpHost)
-	slog.Info(fmt.Sprintf("listen port http: %v", httpPort))
-	slog.Info(fmt.Sprintf("http enabled: %v", httpEnabled))
+	slog.InfoContext(ctx, "http listener configuration",
+		"enabled", httpEnabled,
+		"host", httpHost,
+		"port", httpPort)
 
 	if httpEnabled && !httpsEnabled {
 		logHttpWithoutTlsWarning()
@@ -134,7 +139,7 @@ func (s *Server) Start(ctx context.Context) {
 		}
 		httpServers = append(httpServers, httpsServer)
 		go func() {
-			slog.Info(fmt.Sprintf("starting HTTPS server on %s:%d", httpsHost, httpsPort))
+			slog.InfoContext(ctx, "starting the https listener", "host", httpsHost, "port", httpsPort)
 			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil &&
 				!errors.Is(err, http.ErrServerClosed) {
 				errChan <- errs.Errorf("HTTPS server error: %v", err)
@@ -150,7 +155,7 @@ func (s *Server) Start(ctx context.Context) {
 		}
 		httpServers = append(httpServers, httpServer)
 		go func() {
-			slog.Info(fmt.Sprintf("starting HTTP server on %s:%d", httpHost, httpPort))
+			slog.InfoContext(ctx, "starting the http listener", "host", httpHost, "port", httpPort)
 			if err := httpServer.ListenAndServe(); err != nil &&
 				!errors.Is(err, http.ErrServerClosed) {
 				errChan <- errs.Errorf("HTTP server error: %v", err)
@@ -160,7 +165,7 @@ func (s *Server) Start(ctx context.Context) {
 
 	// Exit if neither server is enabled
 	if len(httpServers) == 0 {
-		slog.Error("no server configuration enabled - at least one of HTTP or HTTPS must be configured")
+		slog.ErrorContext(ctx, "no listener is enabled, so the auth server cannot start: configure at least one of the http and https listeners")
 		os.Exit(1)
 	}
 
@@ -168,11 +173,13 @@ func (s *Server) Start(ctx context.Context) {
 	case err := <-errChan:
 		// A listener failed. Still shut down cleanly so the worker is not left
 		// holding a half-finished delete, then exit non-zero.
-		slog.Error(err.Error())
+		// The error as a value, not as the message: it arrives from errs.Errorf, so
+		// %+v prints the frames the message text threw away (#320).
+		slog.ErrorContext(ctx, "a listener failed", "error", err)
 		s.shutdown(httpServers)
 		os.Exit(1)
 	case <-ctx.Done():
-		slog.Info("shutdown signal received")
+		slog.InfoContext(ctx, "shutdown signal received")
 		s.shutdown(httpServers)
 	}
 }
@@ -197,7 +204,7 @@ func (s *Server) shutdown(httpServers []*http.Server) {
 
 	for _, httpServer := range httpServers {
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			slog.Error("error shutting down listener", "addr", httpServer.Addr, "error", err)
+			slog.Error("unable to shut down a listener", "address", httpServer.Addr, "error", err)
 		}
 	}
 	slog.Info("listeners drained")
@@ -269,11 +276,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// It stays before StripSlashes, which edits r.URL.Path in place, which is why the
 	// middleware renders the target before calling the next handler.
 	logHttpRequests := config.GetAuthServer().LogHttpRequests
-	if logHttpRequests {
-		slog.Info("http request logging enabled")
-	} else {
-		slog.Info("http request logging disabled")
-	}
+	slog.Info("http request logging configured", "enabled", logHttpRequests)
 	s.router.Use(custom_middleware.MiddlewareRequestLogger(logHttpRequests))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -25,7 +24,7 @@ func HandleAuthLevel2Get(
 		if err != nil {
 			if errors.Is(err, customerrors.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
-				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
+				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
 				httpHelper.InternalServerError(w, r, err)

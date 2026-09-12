@@ -26,7 +26,7 @@ func (al *AuditLogger) Log(auditEvent string, details map[string]interface{}) {
 		var err error
 		settings, err = al.database.GetSettingsById(nil, 1)
 		if err != nil {
-			slog.Error("failed to read settings for audit logging", "error", err, "event", auditEvent)
+			slog.Error("unable to read the settings row for audit logging", "error", err, "event", auditEvent)
 			return
 		}
 	} else {
@@ -43,7 +43,7 @@ func (al *AuditLogger) Log(auditEvent string, details map[string]interface{}) {
 		// Marshal details to JSON
 		detailsJSON, err := json.Marshal(details)
 		if err != nil {
-			slog.Error("failed to marshal audit event details for DB", "error", err, "event", auditEvent)
+			slog.Error("unable to marshal the audit event details for the database", "error", err, "event", auditEvent)
 			return
 		}
 
@@ -55,7 +55,7 @@ func (al *AuditLogger) Log(auditEvent string, details map[string]interface{}) {
 
 		err = al.database.CreateAuditLog(nil, auditLog)
 		if err != nil {
-			slog.Error("failed to persist audit log to database", "error", err, "event", auditEvent)
+			slog.Error("unable to persist the audit log to the database", "error", err, "event", auditEvent)
 			// Non-blocking: do not return error to caller
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -126,6 +127,11 @@ func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 		"refer to the server logs. Request Id: "+requestId, description)
 
 	require.Len(t, records, 1, "exactly one record, which is the point of the primitive")
+	// The level is pinned rather than merely observed. Nothing in the text of a call holds a
+	// level, and this is the one record that means the server failed at something it can do
+	// and somebody has to look: lowered to Warn it would sit among the refusals an auth
+	// server produces all day and nobody would find it again (#320 decision 5).
+	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, "internal server error", records[0].Message)
 	assert.Equal(t, requestId, records[0].Attrs["request_id"])
 	assert.Equal(t, int64(7), records[0].Attrs["clientId"])
@@ -198,8 +204,10 @@ func TestLogInternalServerError_LogsAndWritesNothing(t *testing.T) {
 	assert.Equal(t, "https://a.example.com", records[0].Attrs["uri"])
 }
 
-// A request outside the request-id middleware still answers and still logs; chi's helper returns
-// the empty string there, so the attribute is present and empty rather than missing.
+// A request outside the request-id middleware still answers and still logs. The attribute is
+// absent rather than empty: the writer stopped naming it at #320 decision 2, and the handler that
+// injects it writes nothing when chi's helper returns the empty string, so an empty request_id can
+// no longer reach a record and be mistaken for a correlated one.
 func TestWriteInternalServerError_WithoutARequestId(t *testing.T) {
 	rr := httptest.NewRecorder()
 	capture := testutil.CaptureSlog(t)
@@ -211,5 +219,5 @@ func TestWriteInternalServerError_WithoutARequestId(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	require.Len(t, records, 1)
-	assert.Equal(t, "", records[0].Attrs["request_id"])
+	assert.NotContains(t, records[0].Attrs, "request_id")
 }

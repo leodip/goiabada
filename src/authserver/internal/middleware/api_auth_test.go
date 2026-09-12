@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRequireBearerTokenScope(t *testing.T) {
@@ -1461,6 +1463,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.label, func(t *testing.T) {
+			logs := testutil.CaptureSlog(t)
 			mockDB := mocks_data.NewDatabase(t)
 			now := time.Now().UTC()
 
@@ -1552,7 +1555,46 @@ func TestRequireValidSession_Table(t *testing.T) {
 				assert.Equal(t, "INVALID_TOKEN", body.ErrorCode, "error_code")
 				assert.Equal(t, tc.wantDescription, body.ErrorDescription, "error_description")
 			}
+
+			assertBearerRejectionsAreWarnings(t, logs, tc.wantStatus)
 		})
+	}
+}
+
+// assertBearerRejectionsAreWarnings pins the level of every bearer rejection this middleware
+// writes, across every row of the table above, which is where all nine of them are reached.
+//
+// It is a pin rather than a moved level: these were already Warn and they stay Warn. Decision 5
+// names them as the sites its rule most protects, and nothing in the text of a record can hold a
+// level, so without this a later edit could raise the whole set to Error and no test would notice.
+// That raise is the plausible one: each of these lines refuses a caller, which reads like a fault
+// until you notice that an expired session and a revoked grant produce them by design, and that
+// this endpoint is reachable by anyone holding any token. At Error they would be the loudest thing
+// in the log and none of them would need anybody to act.
+//
+// The empty half matters as much: a row that lets the request through must write no rejection at
+// all, or an operator counting refusals would be counting successes too.
+func assertBearerRejectionsAreWarnings(t *testing.T, logs *testutil.SlogCapture, wantStatus int) {
+	t.Helper()
+
+	var rejections []testutil.CapturedRecord
+	for _, record := range logs.Records() {
+		if strings.HasPrefix(record.Message, "rejecting bearer token") {
+			rejections = append(rejections, record)
+		}
+	}
+
+	if wantStatus == http.StatusUnauthorized {
+		require.NotEmpty(t, rejections,
+			"a refusal an operator cannot find in the log is a refusal they cannot explain")
+	} else {
+		assert.Empty(t, rejections,
+			"nothing was refused here, so nothing may be logged as a refusal")
+	}
+
+	for _, record := range rejections {
+		assert.Equal(t, slog.LevelWarn, record.Level,
+			"a refused token is a condition met and handled, not a server failure: %q", record.Message)
 	}
 }
 
@@ -1601,6 +1643,8 @@ func TestRequireUserBoundToken(t *testing.T) {
 			},
 		}
 
+		logs := testutil.CaptureSlog(t)
+
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, token))
 
@@ -1616,6 +1660,12 @@ func TestRequireUserBoundToken(t *testing.T) {
 		// RFC 6750 §3.1 has no code for "wrong token type", so the 403 reuses
 		// insufficient_scope in the header while ErrorCode carries the precise reason.
 		assert.Contains(t, rr.Header().Get("WWW-Authenticate"), `error="insufficient_scope"`)
+
+		// The ninth bearer rejection, and the only one outside RequireValidSession's table.
+		// Pinned at Warn for the same reason as the other eight: a client_credentials token
+		// arriving at a user endpoint is an integration mistake the server refuses and
+		// handles, and every deployment running a machine client makes it eventually.
+		assertBearerRejectionsAreWarnings(t, logs, http.StatusUnauthorized)
 	})
 
 	t.Run("rejects when no bearer token is in context", func(t *testing.T) {

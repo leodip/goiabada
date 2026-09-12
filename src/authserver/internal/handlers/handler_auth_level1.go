@@ -27,7 +27,7 @@ func HandleAuthLevel1Get(
 		if err != nil {
 			if errors.Is(err, customerrors.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
-				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
+				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
 				httpHelper.InternalServerError(w, r, err)
@@ -67,7 +67,7 @@ func HandleAuthLevel1CompletedGet(
 		if err != nil {
 			if errors.Is(err, customerrors.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
-				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
+				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
 				httpHelper.InternalServerError(w, r, err)

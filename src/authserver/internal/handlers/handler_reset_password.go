@@ -502,8 +502,8 @@ func HandleResetPasswordPost(
 		// already changed and telling the caller the reset failed would be false. The stale
 		// marker it leaves behind resolves to nothing on its next use.
 		if err := ClearLinkMarker(httpSession, w, r); err != nil {
-			slog.Error("unable to clear the reset password link marker after a completed reset",
-				"userId", user.Id, "error", err)
+			slog.ErrorContext(r.Context(), "unable to clear the reset password link marker after a completed reset",
+				"user_id", user.Id, "error", err)
 		}
 
 		bind := map[string]interface{}{

@@ -112,7 +112,7 @@ func rejectCeremonyMismatch(httpHelper HttpHelper, auditLogger AuditLogger, w ht
 func rejectAuthStateMismatch(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request,
 	requiredState string, actualState string) {
 
-	slog.Warn("auth state mismatch, refusing the request",
+	slog.WarnContext(r.Context(), "auth state mismatch, refusing the request",
 		"required_state", requiredState, "actual_state", actualState)
 
 	bind := map[string]interface{}{

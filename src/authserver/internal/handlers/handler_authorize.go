@@ -900,7 +900,7 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, database data
 	err := authHelper.ClearAuthContext(w, r)
 	if err != nil {
 		// The clear failed, so Save wrote no cookie and the browser still holds the auth context.
-		slog.Error("failed to clear the auth context, answering the client with server_error",
+		slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 			"error", err)
 
 		fallback := input
@@ -933,7 +933,7 @@ func clientProvenance(database data.Database, clientIdentifier string) *models.C
 	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
 	if err != nil {
 		slog.Error("unable to load the client while answering it with an error, treating its provenance as unresolved",
-			"clientIdentifier", clientIdentifier, "error", err)
+			"client_identifier", clientIdentifier, "error", err)
 		return nil
 	}
 	return client
@@ -1042,7 +1042,7 @@ func redirectWillBeEmitted(database data.Database, client *models.Client, redire
 		// matching checkRedirectURIEmittable, which records where a refusal happened and
 		// deliberately never records the value (#159).
 		slog.Error("unable to load the client's redirect URIs while answering it with an error, withholding the redirect",
-			"clientIdentifier", client.ClientIdentifier, "site", site, "error", err)
+			"client_identifier", client.ClientIdentifier, "site", site, "error", err)
 		return false
 	}
 
@@ -1060,7 +1060,7 @@ func redirectWillBeEmitted(database data.Database, client *models.Client, redire
 
 	if !urlutil.RedirectURIIsRegistered(registered, redirectURI, allowLoopbackPortFlexibility) {
 		slog.Warn("the redirect URI this client would be answered at is no longer registered on it, so the redirect is withheld",
-			"clientIdentifier", client.ClientIdentifier, "site", site)
+			"client_identifier", client.ClientIdentifier, "site", site)
 		return false
 	}
 

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/gob"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -40,9 +39,10 @@ func main() {
 	}
 
 	slog.Info("auth server started")
-	slog.Info("goiabada version: " + constants.Version)
-	slog.Info("build date: " + constants.BuildDate)
-	slog.Info("git commit: " + constants.GitCommit)
+	slog.Info("build information",
+		"version", constants.Version,
+		"build_date", constants.BuildDate,
+		"git_commit", constants.GitCommit)
 	slog.Info("config loaded")
 
 	// The `migrate` subcommand is dispatched here: after the configuration is loaded, because it
@@ -58,28 +58,33 @@ func main() {
 	// migration, which needs the key. The key is supplied from the environment
 	// and never co-located with the ciphertext (issue #83).
 	if err := config.ValidateAESEncryptionKey(); err != nil {
-		slog.Error("data encryption key validation failed: " + err.Error())
-		slog.Error("Set GOIABADA_AES_ENCRYPTION_KEY. Generate with: openssl rand -hex 32")
-		slog.Error("WARNING: back this key up separately from the database. If it is lost, all encrypted secrets and signing keys are unrecoverable.")
+		// One record where three used to be, for the same reason decision 6 collapses the
+		// banners: the two lines after the failure were prose an operator had to read as a
+		// unit, and a JSON deployment received them as three unrelated records with the
+		// remedy in a message field nothing could query (#320).
+		slog.Error("the data encryption key is missing or malformed, so the auth server cannot start: set GOIABADA_AES_ENCRYPTION_KEY, and back it up separately from the database because every encrypted secret and signing key is unrecoverable without it",
+			"error", err,
+			"generate_with", "openssl rand -hex 32")
 		os.Exit(1)
 	}
 	if err := encryption.InitDataCipher(config.GetAESEncryptionKey()); err != nil {
-		slog.Error("failed to initialize data cipher: " + err.Error())
+		slog.Error("unable to initialize the data cipher", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("data encryption key validated")
 
-	slog.Info("auth server base URL: " + config.GetAuthServer().BaseURL)
-	slog.Info("auth server internal base URL: " + config.GetAuthServer().InternalBaseURL)
-	slog.Info("admin console base URL: " + config.GetAdminConsole().BaseURL)
-	slog.Info("debug API requests: " + fmt.Sprintf("%t", config.GetAuthServer().DebugAPIRequests))
+	slog.Info("using configuration",
+		"auth_server_base_url", config.GetAuthServer().BaseURL,
+		"auth_server_internal_base_url", config.GetAuthServer().InternalBaseURL,
+		"admin_console_base_url", config.GetAdminConsole().BaseURL,
+		"debug_api_requests", config.GetAuthServer().DebugAPIRequests)
 
 	dir, err := os.Getwd()
 	if err != nil {
 		slog.Error("unable to determine the working directory", "error", err)
 		os.Exit(1)
 	}
-	slog.Info("current working directory: " + dir)
+	slog.Info("current working directory", "directory", dir)
 
 	// trigger the load of timezones from OS (they will be cached)
 	_ = timezones.Get()
@@ -88,7 +93,7 @@ func main() {
 	// Load i18n message catalogs (and merge GOIABADA_I18N_OVERRIDES_DIR if set).
 	// Fail-fast: a malformed catalog or missing override dir is a config bug.
 	if _, err := i18n.LoadBundle(); err != nil {
-		slog.Error("i18n LoadBundle failed", "error", err)
+		slog.Error("unable to load the i18n message catalogs", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("i18n catalogs loaded")
@@ -96,9 +101,11 @@ func main() {
 	// gob registration
 	gob.Register(oauth.TokenResponse{})
 
-	slog.Info("current time zone is: " + time.Now().Location().String())
-	slog.Info("current local time is: " + time.Now().String())
-	slog.Info("current UTC time is: " + time.Now().UTC().String())
+	now := time.Now()
+	slog.Info("process clock",
+		"time_zone", now.Location().String(),
+		"local_time", now,
+		"utc_time", now.UTC())
 
 	database, err := data.NewDatabase(config.GetDatabase(), config.GetAuthServer().LogSQL)
 	if err != nil {
@@ -124,7 +131,7 @@ func main() {
 		if providedOAuthSecret != "" {
 			// New flow: OAuth client secret provided via goiabada-setup
 			// Session keys should also be configured - seed and continue running
-			slog.Info("OAuth client secret provided - using single-step setup mode")
+			slog.Info("using single-step setup mode, because an oauth client secret is configured")
 
 			databaseSeeder := data.NewDatabaseSeeder(
 				database,
@@ -182,7 +189,8 @@ func main() {
 	}
 	slog.Info("session keys validated")
 
-	slog.Info("cookie secure (derived from base URL): " + fmt.Sprintf("%t", config.GetAuthServer().IsCookieSecure()))
+	slog.Info("cookie security derived from the base URL",
+		"cookie_secure", config.GetAuthServer().IsCookieSecure())
 
 	// Decode the session keys from config, which validated them at startup. The decode
 	// errors are still checked: what they would otherwise become is a store keyed with two

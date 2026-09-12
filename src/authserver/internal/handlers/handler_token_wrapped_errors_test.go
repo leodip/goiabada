@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -169,6 +171,10 @@ func TestJsonErrorConformed_LogsStructuredOnTheGenericBranch(t *testing.T) {
 
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	req := httptest.NewRequest("POST", "/token", nil)
+	// The id goes on the context, where chi's RequestID middleware puts it in the running
+	// server, because that is the only place the writer can read it from now: the call site
+	// stopped naming request_id and the installed handler injects it (#320 decision 2).
+	req = req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, "req-token-500"))
 	rr := httptest.NewRecorder()
 	captured := expectJsonErrorWithDetail(httpHelper)
 
@@ -187,7 +193,8 @@ func TestJsonErrorConformed_LogsStructuredOnTheGenericBranch(t *testing.T) {
 	logged, ok := attrs["error"].(error)
 	require.True(t, ok, "the error travels as an error value, not as text: got %T", attrs["error"])
 	assert.Contains(t, logged.Error(), "the key store is unreachable")
-	assert.Contains(t, attrs, "request_id")
+	assert.Equal(t, "req-token-500", attrs["request_id"],
+		"injected by the handler from the request's context, with no call site naming it")
 
 	detail, ok := (*captured).(*customerrors.ErrorDetail)
 	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)

@@ -1583,9 +1583,9 @@ func assertWarnedForeignSession(t *testing.T, logs *testutil.SlogCapture, ceremo
 		return
 	}
 	attrs := record.Attrs
-	assert.Equal(t, foreignSessionUserId, attrs["sessionUserId"],
+	assert.Equal(t, foreignSessionUserId, attrs["session_user_id"],
 		"the ambient session's owner, on the record that names the refusal")
-	assert.Equal(t, ceremonyUserId, attrs["ceremonyUserId"],
+	assert.Equal(t, ceremonyUserId, attrs["ceremony_user_id"],
 		"the user this ceremony authenticated, on that same record")
 	// #129's sentence, which is the wrong one here: the row resolved.
 	noRecordSays(t, logs, "is gone")
@@ -4145,7 +4145,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			// that did not resolve.
 			record, ok := warningSaying(t, logs, "no longer within its idle timeout or maximum lifetime")
 			if ok {
-				assert.Equal(t, liveSessionIdentifier, record.Attrs["sessionIdentifier"])
+				assert.Equal(t, liveSessionIdentifier, record.Attrs["session_identifier"])
 			}
 			noRecordSays(t, logs, "belongs to a different user")
 			noRecordSays(t, logs, "is gone")

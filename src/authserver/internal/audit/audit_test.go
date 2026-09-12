@@ -187,7 +187,7 @@ func TestAuditLogger_SettingsError(t *testing.T) {
 
 	// Verify error was logged
 	output := logs.Text()
-	assert.Contains(t, output, "failed to read settings for audit logging")
+	assert.Contains(t, output, "unable to read the settings row for audit logging")
 
 	// Verify CreateAuditLog was not called
 	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything)
@@ -220,7 +220,7 @@ func TestAuditLogger_DBPersistence_CreateError(t *testing.T) {
 
 	// Verify error was logged
 	output := logs.Text()
-	assert.Contains(t, output, "failed to persist audit log to database")
+	assert.Contains(t, output, "unable to persist the audit log to the database")
 
 	// Verify CreateAuditLog was called (even though it failed)
 	mockDB.AssertExpectations(t)
@@ -252,7 +252,7 @@ func TestAuditLogger_DBPersistence_JSONMarshalError(t *testing.T) {
 
 	// Verify error was logged
 	output := logs.Text()
-	assert.Contains(t, output, "failed to marshal audit event details for DB")
+	assert.Contains(t, output, "unable to marshal the audit event details for the database")
 
 	// Verify CreateAuditLog was not called
 	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything)
