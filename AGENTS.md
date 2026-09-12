@@ -177,8 +177,10 @@ row the second pass creates, so a restarted ceremony can mint `amr` values the s
 earned (#140 fixes this; delete this sentence when it lands). No other field is recomputed at every hop
 either; each is instead overwritten before anything reads it again on every path out of a restart —
 `AuthenticatedAt` and `OtpConfigGeneration` at `/auth/pwd`, `AcrLevel` by `SetAcrLevel` at
-`/auth/completed`, `OTPKeyURL` on every arm of `/auth/otp`, the only hops that read it — while
-`ConsentedScope` is coherent by construction rather than by rule. The request-derived fields are
+`/auth/completed` — while `ConsentedScope` is coherent by construction rather than by rule, and
+`OTPKeyURL` by reachability: the enrolment arm of `HandleAuthOtpGet` deliberately keeps a parseable
+key rather than replacing it (#242 part 3), but it is set only while the ceremony sits at
+`level2_otp`, and the one transition out of that state clears it. The request-derived fields are
 written once and only at `/auth/authorize` — the composite literal in `HandleAuthorizeGet` plus
 `TargetAcrLevel`, set immediately after validation and nowhere else — which #248 pins with a test.
 
