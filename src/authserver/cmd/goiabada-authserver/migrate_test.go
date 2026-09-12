@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"fmt"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,6 +35,19 @@ func newTestMigrator(t *testing.T) (*migrator.Migrator, *sql.DB) {
 	return m, db.DB
 }
 
+// head is the highest version the embedded migration set carries, and headf the way this command
+// prints it. Derived from the migrator rather than written down: every migration added to the
+// repository moves it, and #281 stage 1 found six assertions in this file spelling the old number.
+// rollbackFloor is NOT the head and is deliberately still a literal: it is the version this release
+// ships with and it moves only when a release introduces a one-way data change (see migrate.go).
+func head(m *migrator.Migrator) int {
+	return m.Head()
+}
+
+func headf(m *migrator.Migrator) string {
+	return fmt.Sprintf("%06d", head(m))
+}
+
 func TestMigrateVersion_NeverMigratedDatabase(t *testing.T) {
 	m, _ := newTestMigrator(t)
 	var out bytes.Buffer
@@ -41,7 +56,7 @@ func TestMigrateVersion_NeverMigratedDatabase(t *testing.T) {
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "engine: sqlite")
-	assert.Contains(t, out.String(), "000045")
+	assert.Contains(t, out.String(), headf(m))
 	assert.Contains(t, out.String(), "never been migrated")
 }
 
@@ -53,7 +68,7 @@ func TestMigrateVersion_ReportsWhatTheDatabaseRecords(t *testing.T) {
 	code := runMigrate([]string{"version"}, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
-	assert.Contains(t, out.String(), "the database records schema version 000045")
+	assert.Contains(t, out.String(), "the database records schema version "+headf(m))
 	assert.NotContains(t, out.String(), "DIRTY")
 }
 
@@ -62,13 +77,13 @@ func TestMigrateVersion_ReportsWhatTheDatabaseRecords(t *testing.T) {
 func TestMigrateVersion_AnnouncesADirtyDatabase(t *testing.T) {
 	m, sqlDB := newTestMigrator(t)
 	require.NoError(t, m.Up())
-	markDirty(t, m, sqlDB, 45)
+	markDirty(t, m, sqlDB, head(m))
 
 	var out bytes.Buffer
 	code := runMigrate([]string{"version"}, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
-	assert.Contains(t, out.String(), "000045")
+	assert.Contains(t, out.String(), headf(m))
 	assert.Contains(t, out.String(), "DIRTY")
 	assert.Contains(t, out.String(), "did not finish")
 }
@@ -77,19 +92,19 @@ func TestMigrateTo_StepsUpToTheHeadAndPrintsThePlan(t *testing.T) {
 	m, _ := newTestMigrator(t)
 	var out bytes.Buffer
 
-	code := runMigrate([]string{"to", "45"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", strconv.Itoa(head(m))}, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code, out.String())
 	assert.Contains(t, out.String(), "current schema version: none (never migrated)")
-	assert.Contains(t, out.String(), "target schema version: 000045")
+	assert.Contains(t, out.String(), "target schema version: "+headf(m))
 	// Lowest first going up, and the whole chain is listed rather than summarised.
 	assert.Contains(t, out.String(), "migrations to run, in order: 000001, ")
-	assert.Contains(t, out.String(), "000045")
-	assert.Contains(t, out.String(), "now at schema version 000045")
+	assert.Contains(t, out.String(), headf(m))
+	assert.Contains(t, out.String(), "now at schema version "+headf(m))
 
 	version, dirty, err := m.Version()
 	require.NoError(t, err)
-	assert.Equal(t, 45, version)
+	assert.Equal(t, head(m), version)
 	assert.False(t, dirty)
 }
 
@@ -98,10 +113,10 @@ func TestMigrateTo_AlreadyThereIsNotAFailure(t *testing.T) {
 	require.NoError(t, m.Up())
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "000045"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", headf(m)}, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
-	assert.Contains(t, out.String(), "already at schema version 000045")
+	assert.Contains(t, out.String(), "already at schema version "+headf(m))
 	assert.NotContains(t, out.String(), "migrations to run")
 }
 
@@ -116,12 +131,13 @@ func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
 	code := runMigrate([]string{"to", "000041"}, m, 24, &out)
 
 	require.Equal(t, 0, code, out.String())
-	assert.Contains(t, out.String(), "current schema version: 000045")
+	assert.Contains(t, out.String(), "current schema version: "+headf(m))
 	assert.Contains(t, out.String(), "target schema version: 000041")
 	// Highest first, these are the .down.sql files run from the top down, and the list is the
 	// versions THIS engine carries rather than a count: 000042 is a MySQL migration and SQLite
-	// steps straight from 000043 to 000041.
-	assert.Contains(t, out.String(), "migrations to run, in order: 000045, 000044, 000043\n")
+	// steps straight from 000043 to 000041. Spelled out rather than derived, because the CHAIN
+	// is what is under test here: a migration added on one engine alone must not appear in it.
+	assert.Contains(t, out.String(), "migrations to run, in order: 000046, 000045, 000044, 000043\n")
 	assert.Contains(t, out.String(), "now at schema version 000041")
 
 	version, dirty, err := m.Version()
@@ -158,15 +174,13 @@ func TestMigrateTo_RefusesATargetBelowTheRollbackFloor(t *testing.T) {
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "000030")
 	assert.Contains(t, out.String(), "rollback is supported between releases")
-	// 000044 is the FLOOR and not the head: it is the schema version of the release rollback is
-	// supported down to, and it moves only when a release makes a one-way data change, which
-	// 000045 is not.
-	assert.Contains(t, out.String(), "000044")
+	assert.Contains(t, out.String(), fmt.Sprintf("%06d", rollbackFloor),
+		"the refusal names the FLOOR it enforces, which is not the head and does not move with it")
 
 	// It refused before touching anything.
 	version, _, err := m.Version()
 	require.NoError(t, err)
-	assert.Equal(t, 45, version)
+	assert.Equal(t, head(m), version)
 }
 
 func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
@@ -178,7 +192,7 @@ func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "000099")
-	assert.Contains(t, out.String(), "000045")
+	assert.Contains(t, out.String(), headf(m))
 	assert.Contains(t, out.String(), "newer release")
 }
 
@@ -187,14 +201,14 @@ func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
 func TestMigrateTo_RefusesADirtyDatabase(t *testing.T) {
 	m, sqlDB := newTestMigrator(t)
 	require.NoError(t, m.Up())
-	markDirty(t, m, sqlDB, 45)
+	markDirty(t, m, sqlDB, head(m))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "45"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", strconv.Itoa(head(m))}, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "dirty")
-	assert.Contains(t, out.String(), "000045")
+	assert.Contains(t, out.String(), headf(m))
 	assert.NotContains(t, out.String(), "migrations to run")
 }
 

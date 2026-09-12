@@ -10,6 +10,16 @@ import (
 	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
+// testUserAgent and testUserAgentUpdated are raw User-Agent headers, not parsed labels: the
+// column stores what the browser sent. Two distinct values so the create round trip and the
+// update path each compare something other than two empty strings (#281).
+const (
+	testUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+		"(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	testUserAgentUpdated = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1"
+)
+
 func TestCreateUserSession(t *testing.T) {
 	user := createTestUser(t)
 	userSession := createTestUserSession(t, user.Id)
@@ -47,6 +57,7 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession.DeviceName = "Updated Device"
 	userSession.DeviceType = "tablet"
 	userSession.DeviceOS = "iOS"
+	userSession.UserAgent = testUserAgentUpdated
 	userSession.UserId = user.Id // This shouldn't change, but we'll update it to ensure it's not accidentally modified
 
 	time.Sleep(timestampTick)
@@ -333,6 +344,7 @@ func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *mode
 		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
+		UserAgent:         testUserAgent,
 		UserId:            userId,
 	}
 	err := db.CreateUserSession(nil, userSession)
@@ -412,6 +424,12 @@ func assertUserSessionEqual(t *testing.T, expected, actual *models.UserSession) 
 	}
 	if actual.DeviceOS != expected.DeviceOS {
 		t.Errorf("Expected DeviceOS %s, got %s", expected.DeviceOS, actual.DeviceOS)
+	}
+	// The raw header, compared exactly: StartNewUserSession decides two logins came from the
+	// same device by comparing this string and the IP, so a value the storage round trip alters
+	// changes which sessions supersede which (#281).
+	if actual.UserAgent != expected.UserAgent {
+		t.Errorf("Expected UserAgent %s, got %s", expected.UserAgent, actual.UserAgent)
 	}
 	if actual.UserId != expected.UserId {
 		t.Errorf("Expected UserId %d, got %d", expected.UserId, actual.UserId)

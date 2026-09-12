@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,6 +37,10 @@ const testSessionName = "test-session"
 // rather than empty.
 const chromeUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
 	"(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+// firefoxUserAgent is the second device of the sweep table: a different browser on a different OS,
+// so the raw header differs from chromeUserAgent well before its end.
+const firefoxUserAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0"
 
 type startSessionMocks struct {
 	db      *mocks_data.Database
@@ -152,6 +157,30 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	assert.Equal(t, useragent.GetDeviceType(req), result.DeviceType)
 	assert.Equal(t, useragent.GetDeviceOS(req), result.DeviceOS)
 	assert.NotEmpty(t, result.DeviceName)
+
+	// The raw header is stored beside them, and it is what the sweep below keys on. Unlike the
+	// three labels it is the string the browser sent, not a parse of it.
+	assert.Equal(t, chromeUserAgent, result.UserAgent)
+}
+
+// The header reaches the row through useragent.Bound, so a browser sending more than the column
+// holds cannot make the insert fail. 600 bytes rather than 513, so a cut at the wrong width shows
+// up in the assertion rather than being off by one.
+func TestStartNewUserSession_BoundsTheUserAgentToTheColumnWidth(t *testing.T) {
+	m := newStartSessionMocks(t)
+	overlong := strings.Repeat("a", 600)
+	req := newSessionRequest("192.168.1.50:54321", overlong)
+
+	captured := m.expectSuccessfulPersist(123, nil)
+
+	result, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, someCredentialInstant())
+
+	assert.NoError(t, err)
+	assert.Same(t, *captured, result)
+	assert.Len(t, result.UserAgent, 512, "the persisted header must be cut to the column width")
+	assert.True(t, strings.HasPrefix(overlong, result.UserAgent),
+		"the cut must keep the start of the header the browser sent, not rewrite it")
 }
 
 func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
@@ -249,9 +278,57 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 		Id:                42,
 		SessionIdentifier: "an-older-session",
 		IpAddress:         "192.168.1.50",
-		DeviceName:        useragent.GetDeviceName(req),
-		DeviceType:        useragent.GetDeviceType(req),
-		DeviceOS:          useragent.GetDeviceOS(req),
+		UserAgent:         chromeUserAgent,
+	}
+
+	m.expectSuccessfulPersist(123, []models.UserSession{stale})
+	m.db.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil).Once()
+
+	_, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, someCredentialInstant())
+
+	assert.NoError(t, err)
+}
+
+// The reversal, and the whole of decision 1: a row whose three labels disagree with the request on
+// every one of them is still the same device when the raw header and the address match, so it is
+// deleted. Under the pre-#281 key this session survived, because the sweep compared the labels.
+func TestStartNewUserSession_DeletesAMatchingHeaderWhoseLabelsDiffer(t *testing.T) {
+	m := newStartSessionMocks(t)
+	req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
+
+	stale := models.UserSession{
+		Id:                42,
+		SessionIdentifier: "an-older-session",
+		IpAddress:         "192.168.1.50",
+		UserAgent:         chromeUserAgent, // the header the request sends, so the device matches
+		DeviceName:        "Some Other Browser",
+		DeviceType:        "Mobile",
+		DeviceOS:          "Linux",
+	}
+
+	m.expectSuccessfulPersist(123, []models.UserSession{stale})
+	m.db.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil).Once()
+
+	_, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), req, 123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, someCredentialInstant())
+
+	assert.NoError(t, err)
+}
+
+// Decision 7, the half that sweeps rather than the half that keeps: a header-less client matches a
+// pre-upgrade row on the same address, because both read as the empty string, and the older session
+// is swept exactly as it would have been before the upgrade.
+func TestStartNewUserSession_AnEmptyHeaderMatchesAnEmptyHeader(t *testing.T) {
+	m := newStartSessionMocks(t)
+	req := newSessionRequest("192.168.1.50:54321", "")
+	req.Header.Del("User-Agent")
+
+	stale := models.UserSession{
+		Id:                42,
+		SessionIdentifier: "a-legacy-session",
+		IpAddress:         "192.168.1.50",
+		UserAgent:         "",
 	}
 
 	m.expectSuccessfulPersist(123, []models.UserSession{stale})
@@ -266,41 +343,50 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 // Anything that differs in device or IP is a separate login and must survive.
 // NewDatabase(t) fails on an unexpected DeleteUserSession, which is the assertion.
 func TestStartNewUserSession_KeepsSessionsFromOtherDevicesOrIps(t *testing.T) {
-	req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
-	matchingName := useragent.GetDeviceName(req)
-	matchingType := useragent.GetDeviceType(req)
-	matchingOS := useragent.GetDeviceOS(req)
-
+	// Every case below is compared against a request sending chromeUserAgent from 192.168.1.50.
 	testCases := []struct {
 		name    string
 		session models.UserSession
 	}{
 		{
-			name: "different ip",
+			name: "same header, other ip",
 			session: models.UserSession{
 				Id: 42, SessionIdentifier: "other", IpAddress: "10.0.0.9",
-				DeviceName: matchingName, DeviceType: matchingType, DeviceOS: matchingOS,
+				UserAgent: chromeUserAgent,
 			},
 		},
 		{
-			name: "different device name",
+			name: "other header, same ip",
 			session: models.UserSession{
 				Id: 42, SessionIdentifier: "other", IpAddress: "192.168.1.50",
-				DeviceName: "Some Other Browser", DeviceType: matchingType, DeviceOS: matchingOS,
+				UserAgent: firefoxUserAgent,
 			},
 		},
 		{
-			name: "different device type",
+			// Decision 7: a pre-upgrade row carries no header and there is nothing to backfill
+			// it from, so a login that sends one does not sweep it. It expires on its own.
+			name: "a legacy row with no header, against a request that sends one",
 			session: models.UserSession{
-				Id: 42, SessionIdentifier: "other", IpAddress: "192.168.1.50",
-				DeviceName: matchingName, DeviceType: "Mobile", DeviceOS: matchingOS,
+				Id: 42, SessionIdentifier: "legacy", IpAddress: "192.168.1.50",
+				UserAgent: "",
 			},
 		},
 		{
-			name: "different device os",
+			// The labels are display only from here, so matching on all three is not matching.
+			name: "the three labels match but the header does not",
 			session: models.UserSession{
 				Id: 42, SessionIdentifier: "other", IpAddress: "192.168.1.50",
-				DeviceName: matchingName, DeviceType: matchingType, DeviceOS: "Linux",
+				UserAgent:  firefoxUserAgent,
+				DeviceName: "Chrome 120.0.0.0", DeviceType: "Desktop", DeviceOS: "Windows 10.0",
+			},
+		},
+		{
+			// Exact-version equality is stricter than the old key, never looser: two builds of
+			// one browser are two devices, where the old labels collapsed them into one.
+			name: "the same browser at a different build",
+			session: models.UserSession{
+				Id: 42, SessionIdentifier: "other", IpAddress: "192.168.1.50",
+				UserAgent: strings.Replace(chromeUserAgent, "Chrome/120.0.0.0", "Chrome/121.0.0.0", 1),
 			},
 		},
 	}
@@ -342,9 +428,9 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 				Id:                99,
 				SessionIdentifier: newIdentifier,
 				IpAddress:         "192.168.1.50",
-				DeviceName:        useragent.GetDeviceName(req),
-				DeviceType:        useragent.GetDeviceType(req),
-				DeviceOS:          useragent.GetDeviceOS(req),
+				// The new key, so this row reaches the self-identifier guard rather than
+				// being skipped by a mismatch and passing vacuously.
+				UserAgent: useragent.Raw(req),
 			}}, nil
 		}).Once()
 	m.store.On("Get", mock.Anything, testSessionName).Return(m.session, nil).Once()
@@ -418,9 +504,8 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 					Id:                42,
 					SessionIdentifier: "an-older-session",
 					IpAddress:         "192.168.1.50",
-					DeviceName:        useragent.GetDeviceName(req),
-					DeviceType:        useragent.GetDeviceType(req),
-					DeviceOS:          useragent.GetDeviceOS(req),
+					// The new key, so the sweep still reaches the delete that fails here.
+					UserAgent: useragent.Raw(req),
 				}}, nil).Once()
 				m.db.On("DeleteUserSession", mock.Anything, int64(42)).Return(dbErr).Once()
 			},

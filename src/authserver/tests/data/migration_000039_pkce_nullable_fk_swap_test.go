@@ -341,6 +341,14 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 	assert.Equalf(t, 1, countRefreshTokens000039(t, h, token.Id),
 		"the refused delete must leave the token in place on %s", dbType())
 
+	// The Go layer is exercised at the HEAD schema rather than at this migration's, because
+	// models.User and its neighbours always name every column the head declares: a column added
+	// by any later migration, user_sessions.user_agent at 000045 for one, makes DeleteUser's
+	// session sweep select a column an older catalog does not have. Everything asserted above
+	// this line is what 000039 changed, and none of it is reversed between here and the head, so
+	// the claim below is the same claim with the schema the code actually runs against (#281).
+	require.NoError(t, h.Migrator.Up(), "migrate to the head before exercising the Go layer")
+
 	// And the invariant that makes all of this unobservable: DeleteUser clears the
 	// user's refresh tokens inside the same transaction, so the supported path still
 	// works. cascade_delete_test.go asserts the same thing across every dependent table.
