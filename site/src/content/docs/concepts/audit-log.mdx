@@ -39,7 +39,7 @@ The worker runs every 12 hours and deletes in batches of 1000 (up to 100,000 per
 Two pages are available in the admin console under **Settings**:
 
 - **Audit log settings**: toggle the console and database targets, and configure retention.
-- **Audit log viewer**: browse persisted events with event type filtering and pagination. Each entry shows the event name, timestamp, and a JSON details payload.
+- **Audit log viewer**: browse persisted events with event type and request id filtering, and pagination. Each entry shows the event name, timestamp, request id, and a JSON details payload.
 
 The viewer reads directly from the `audit_logs` table, so it only shows events captured while database persistence was enabled.
 
@@ -48,7 +48,7 @@ The viewer reads directly from the `audit_logs` table, so it only shows events c
 The same configuration and viewer are available via the admin REST API:
 
 - `GET/PUT /api/v1/admin/settings/audit-logs`: read or update logging targets and retention.
-- `GET /api/v1/admin/audit-logs`: paginated viewer endpoint with optional `auditEvent` filter.
+- `GET /api/v1/admin/audit-logs`: paginated viewer endpoint with optional `auditEvent` and `requestId` filters.
 
 See [REST API › Audit log settings](/integration/rest-api/#audit-log-settings) for full details.
 

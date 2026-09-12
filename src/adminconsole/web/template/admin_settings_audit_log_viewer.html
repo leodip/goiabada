@@ -12,12 +12,20 @@
 <script>
     function filterAuditLogs(element, event) {
         event.preventDefault();
+        // URLSearchParams escapes each value: a request id is whatever the client put in
+        // X-Request-Id, so it can carry an & or a # that string concatenation would turn
+        // into another parameter or a fragment.
+        var params = new URLSearchParams();
         var selectedEvent = document.getElementById("auditEventFilter").value;
         if (selectedEvent) {
-            window.location.href = "/admin/settings/audit-log-viewer?auditEvent=" + selectedEvent;
-        } else {
-            window.location.href = "/admin/settings/audit-log-viewer";
+            params.set("auditEvent", selectedEvent);
         }
+        var requestId = document.getElementById("requestIdFilter").value.trim();
+        if (requestId) {
+            params.set("requestId", requestId);
+        }
+        var query = params.toString();
+        window.location.href = "/admin/settings/audit-log-viewer" + (query ? "?" + query : "");
     }
 </script>
 {{end}}
@@ -26,7 +34,7 @@
 
 <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
     <div class="table">
-        <div class="table-cell w-9/12">
+        <div class="table-cell w-5/12">
             <select id="auditEventFilter" class="w-full select select-bordered">
                 <option value="">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.all_events" }}</option>
                 {{range .auditEventTypes}}
@@ -34,9 +42,14 @@
                 {{end}}
             </select>
         </div>
+        <div class="table-cell w-5/12 pl-4">
+            <input type="text" id="requestIdFilter" class="w-full input input-bordered"
+                placeholder="{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.request_id_placeholder" }}"
+                value="{{ .selectedRequestId }}" />
+        </div>
         <div class="table-cell w-full whitespace-nowrap">
             <button onclick="filterAuditLogs(this, event);" class="ml-4 btn btn-sm btn-secondary">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.filter_button" }}</button>
-            {{if .selectedEvent}}
+            {{if or .selectedEvent .selectedRequestId}}
                 <a class="ml-2 link link-secondary link-hover" href="/admin/settings/audit-log-viewer">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.clear_link" }}</a>
             {{end}}
         </div>
@@ -50,6 +63,7 @@
                 <tr>
                     <th>{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_timestamp" }}</th>
                     <th>{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_event" }}</th>
+                    <th>{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_request_id" }}</th>
                     <th>{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_details" }}</th>
                 </tr>
             </thead>
@@ -58,12 +72,13 @@
                     <tr>
                         <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
                         <td><span class="badge badge-neutral">{{.AuditEvent}}</span></td>
+                        <td class="whitespace-nowrap">{{if .RequestId}}{{.RequestId}}{{else}}-{{end}}</td>
                         <td class="audit-details" data-details="{{.Details}}"></td>
                     </tr>
                 {{end}}
                 {{if eq (len .pageResult.AuditLogs) 0}}
                     <tr>
-                        <td colspan="3" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.empty" }}</span></td>
+                        <td colspan="4" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.empty" }}</span></td>
                     </tr>
                 {{end}}
             </tbody>
@@ -75,11 +90,7 @@
     <div>
     </div>
     <div class="mr-14">
-        {{if .selectedEvent}}
-            {{template "paginator" (args .paginator (printf "/admin/settings/audit-log-viewer?auditEvent=%v" .selectedEvent)) }}
-        {{else}}
-            {{template "paginator" (args .paginator "/admin/settings/audit-log-viewer") }}
-        {{end}}
+        {{template "paginator" (args .paginator .paginatorLink) }}
     </div>
 </div>
 
