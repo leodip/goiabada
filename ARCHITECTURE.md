@@ -99,7 +99,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/imaging` | authserver | #348 |
 | `core/locales` | kernel | — |
 | `core/logging` | kernel | — |
-| `core/middleware` | split | #335 |
+| `core/middleware` | split | #336 |
 | `core/mocks` | kernel | — |
 | `core/models` | authserver | #359 |
 | `core/oauth` | split | #338 |
@@ -221,6 +221,7 @@ then.
 | `github.com/microsoft/go-mssqldb` | SQL Server driver | yes | #353 |
 | `github.com/huandu/go-sqlbuilder` | SQL construction | yes | #353 |
 | `github.com/pquerna/otp` | TOTP generation | no | — |
+| `github.com/go-chi/cors` | CORS policy is the auth server's | no | — |
 
 Every driver arrives the same way, through one edge:
 
@@ -229,9 +230,9 @@ adminconsole/cmd/goiabada-adminconsole -> core/oauth -> core/data -> core/data/<
 ```
 
 `core/data/database.go` imports all four engine packages, so importing `core/data` at all compiles
-every driver. Three of the core packages the admin console imports reach `core/data`: `core/oauth`,
-`core/middleware` and `core/validators`. Closing one path changes
-nothing on its own, which is why the table asserts reachability rather than counting edges.
+every driver. Two of the core packages the admin console imports reach `core/data`: `core/oauth`
+and `core/validators`. Closing one path changes nothing on its own, which is why the table asserts
+reachability rather than counting edges.
 
 All five rows say #353 rather than #359, which is worth explaining because the ordering does not
 suggest it. `core/data/database.go` is the only production file in `core` that imports an engine
