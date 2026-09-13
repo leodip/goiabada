@@ -109,6 +109,10 @@ func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T)
 	// Sorted by origin, so the list reads as one answer rather than as a per-client grouping,
 	// and another client's origin appears in it. That last row is the whole point: it is the
 	// one an administrator could not see before.
+	// Compared whole against the positional []row literal below, so both fields are read by that
+	// comparison and neither by selector.
+	//
+	//nolint:unused // read whole by comparison, never by selector
 	type row struct{ origin, client string }
 	var got []row
 	for i := 0; i < effective.Len(); i++ {

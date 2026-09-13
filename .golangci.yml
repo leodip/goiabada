@@ -28,6 +28,25 @@ linters:
     - unused
     - sloglint
   settings:
+    unused:
+      # A field the constructor writes and nothing ever reads is dead, and the
+      # default (field-writes-are-uses: true) calls the write a use, so the
+      # check is silent on exactly the shape #333 was filed about. It had hidden
+      # four production fields: the unread `database` on AddressValidator and on
+      # PhoneValidator, UserSessionManager's `codeIssuer` -- which was the whole
+      # of the production core/user -> core/oauth edge -- and SettingsCache's
+      # `lastFetchErr`. All four are gone; this setting is what stops the fifth.
+      # A field that is genuinely consumed whole rather than by selector, a
+      # reflection fixture or a struct compared against a positional literal,
+      # keeps a //nolint:unused naming why the linter cannot see the use.
+      field-writes-are-uses: false
+      # exported-is-used is deliberately NOT set here. Measured on a tree that
+      # still contained all nine dead interfaces #333 deleted, it reported zero
+      # findings in all three modules, so it is inert in this build and the line
+      # would be one nobody could attribute a behaviour to. The dead-interface
+      # half of #333 is held by a guard in core/testutil instead, which resolves
+      # references by package rather than by name and so cannot be fooled the
+      # way a bare-name census was.
     sloglint:
       # A slog call inside any function, at any enclosing depth, that has a
       # context.Context or an *http.Request parameter is a *Context variant, so

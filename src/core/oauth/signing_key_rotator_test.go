@@ -36,7 +36,6 @@ var rotatorTx = &sql.Tx{}
 // bodyErr, which is exactly when the helper rolls back.
 type rotatorTransaction struct {
 	bodyErr error
-	bodyRan bool
 }
 
 // expectRotatorTransaction registers one RunInTransaction call. commitErr, when not nil, is
@@ -44,7 +43,6 @@ type rotatorTransaction struct {
 func expectRotatorTransaction(database *mocks_data.Database, commitErr error) *rotatorTransaction {
 	stub := &rotatorTransaction{}
 	database.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
-		stub.bodyRan = true
 		stub.bodyErr = fn(rotatorTx)
 		if stub.bodyErr != nil {
 			return stub.bodyErr

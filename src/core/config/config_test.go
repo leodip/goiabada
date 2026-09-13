@@ -828,6 +828,10 @@ var logEnvVars = []string{
 	"GOIABADA_ADMINCONSOLE_LOG_FORMAT",
 }
 
+// logSettings is compared whole against a positional literal in the `want:` of twelve cases, so
+// every field is read by that comparison and none of them by selector.
+//
+//nolint:unused // read whole by comparison, never by selector
 type logSettings struct {
 	authLevel   string
 	authFormat  string
