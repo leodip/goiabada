@@ -579,7 +579,7 @@ func TestNewUserSessionManager_StoresItsDependencies(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	store := mocks_sessionstore.NewStore(t)
 
-	manager := NewUserSessionManager(nil, store, "some-session", db)
+	manager := NewUserSessionManager(store, "some-session", db)
 
 	assert.NotNil(t, manager)
 	assert.Same(t, db, manager.database)

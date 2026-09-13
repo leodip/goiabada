@@ -52,7 +52,7 @@ func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *te
 		Return(nil, errors.New("the database is down")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountAddressPut(database, validators.NewAddressValidator(database), auditLogger)
+	handler := HandleAPIAccountAddressPut(database, validators.NewAddressValidator(), auditLogger)
 
 	capture := testutil.CaptureSlog(t)
 
@@ -88,7 +88,7 @@ func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedOwnAddress, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountAddressPut(database, validators.NewAddressValidator(database), auditLogger)
+	handler := HandleAPIAccountAddressPut(database, validators.NewAddressValidator(), auditLogger)
 
 	capture := testutil.CaptureSlog(t)
 

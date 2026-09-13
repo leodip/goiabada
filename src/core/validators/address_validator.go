@@ -2,18 +2,14 @@ package validators
 
 import (
 	"github.com/leodip/goiabada/core/countries"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
 type AddressValidator struct {
-	database data.Database
 }
 
-func NewAddressValidator(database data.Database) *AddressValidator {
-	return &AddressValidator{
-		database: database,
-	}
+func NewAddressValidator() *AddressValidator {
+	return &AddressValidator{}
 }
 
 type ValidateAddressInput struct {

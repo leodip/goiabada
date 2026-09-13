@@ -13,11 +13,10 @@ const (
 )
 
 type SettingsCache struct {
-	client       *apiclient.SettingsClient
-	mu           sync.RWMutex
-	cachedData   *dtos.PublicSettingsResponse
-	cachedAt     time.Time
-	lastFetchErr error
+	client     *apiclient.SettingsClient
+	mu         sync.RWMutex
+	cachedData *dtos.PublicSettingsResponse
+	cachedAt   time.Time
 }
 
 func NewSettingsCache(authServerBaseURL string) *SettingsCache {
@@ -48,7 +47,6 @@ func (c *SettingsCache) Invalidate() {
 
 	c.cachedData = nil
 	c.cachedAt = time.Time{}
-	c.lastFetchErr = nil
 }
 
 // fetchAndCache fetches settings from the authserver and caches them
@@ -64,14 +62,12 @@ func (c *SettingsCache) fetchAndCache() (*dtos.PublicSettingsResponse, error) {
 	// Fetch from authserver
 	settings, err := c.client.GetPublicSettings()
 	if err != nil {
-		c.lastFetchErr = err
 		return nil, err
 	}
 
 	// Update cache
 	c.cachedData = settings
 	c.cachedAt = time.Now()
-	c.lastFetchErr = nil
 
 	return settings, nil
 }

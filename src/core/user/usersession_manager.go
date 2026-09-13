@@ -14,22 +14,19 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/useragent"
 	"github.com/leodip/goiabada/core/uuidutil"
 )
 
 type UserSessionManager struct {
-	codeIssuer   *oauth.CodeIssuer
 	sessionStore sessionstore.Store
 	sessionName  string
 	database     data.Database
 }
 
-func NewUserSessionManager(codeIssuer *oauth.CodeIssuer, sessionStore sessionstore.Store, sessionName string, database data.Database) *UserSessionManager {
+func NewUserSessionManager(sessionStore sessionstore.Store, sessionName string, database data.Database) *UserSessionManager {
 	return &UserSessionManager{
-		codeIssuer:   codeIssuer,
 		sessionStore: sessionStore,
 		sessionName:  sessionName,
 		database:     database,
