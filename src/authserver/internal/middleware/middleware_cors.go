@@ -3,6 +3,7 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/cors"
 	"github.com/leodip/goiabada/core/data"
@@ -11,7 +12,9 @@ import (
 func MiddlewareCors(database data.Database) func(next http.Handler) http.Handler {
 	return cors.Handler(cors.Options{
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
-			switch r.URL.Path {
+			// StripSlashes runs below this middleware, so the slashed form of a covered path
+			// routes but would not receive the same CORS decision without normalizing here (#335).
+			switch strings.TrimSuffix(r.URL.Path, "/") {
 			case "/.well-known/openid-configuration", "/certs":
 				// always allow the discovery URL
 				return true

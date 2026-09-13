@@ -27,6 +27,13 @@ func TestMiddlewareCors(t *testing.T) {
 			setupMock:     func(db *mocks_data.Database) {},
 		},
 		{
+			name:          "Allow CORS for openid-configuration with trailing slash",
+			path:          "/.well-known/openid-configuration/",
+			origin:        "http://example.com",
+			expectedAllow: true,
+			setupMock:     func(db *mocks_data.Database) {},
+		},
+		{
 			name:          "Allow CORS for certs",
 			path:          "/certs",
 			origin:        "http://example.com",
@@ -34,8 +41,24 @@ func TestMiddlewareCors(t *testing.T) {
 			setupMock:     func(db *mocks_data.Database) {},
 		},
 		{
+			name:          "Allow CORS for certs with trailing slash",
+			path:          "/certs/",
+			origin:        "http://example.com",
+			expectedAllow: true,
+			setupMock:     func(db *mocks_data.Database) {},
+		},
+		{
 			name:          "Allow CORS for auth/token with valid origin",
 			path:          "/auth/token",
+			origin:        "http://allowed.com",
+			expectedAllow: true,
+			setupMock: func(db *mocks_data.Database) {
+				db.On("WebOriginExists", mock.Anything, "http://allowed.com").Return(true, nil)
+			},
+		},
+		{
+			name:          "Allow CORS for auth/token with trailing slash and valid origin",
+			path:          "/auth/token/",
 			origin:        "http://allowed.com",
 			expectedAllow: true,
 			setupMock: func(db *mocks_data.Database) {
@@ -52,8 +75,26 @@ func TestMiddlewareCors(t *testing.T) {
 			},
 		},
 		{
+			name:          "Allow CORS for auth/logout with trailing slash and valid origin",
+			path:          "/auth/logout/",
+			origin:        "http://allowed.com",
+			expectedAllow: true,
+			setupMock: func(db *mocks_data.Database) {
+				db.On("WebOriginExists", mock.Anything, "http://allowed.com").Return(true, nil)
+			},
+		},
+		{
 			name:          "Allow CORS for userinfo with valid origin",
 			path:          "/userinfo",
+			origin:        "http://allowed.com",
+			expectedAllow: true,
+			setupMock: func(db *mocks_data.Database) {
+				db.On("WebOriginExists", mock.Anything, "http://allowed.com").Return(true, nil)
+			},
+		},
+		{
+			name:          "Allow CORS for userinfo with trailing slash and valid origin",
+			path:          "/userinfo/",
 			origin:        "http://allowed.com",
 			expectedAllow: true,
 			setupMock: func(db *mocks_data.Database) {
@@ -90,6 +131,20 @@ func TestMiddlewareCors(t *testing.T) {
 		{
 			name:          "Disallow CORS for unknown path",
 			path:          "/unknown",
+			origin:        "http://example.com",
+			expectedAllow: false,
+			setupMock:     func(db *mocks_data.Database) {},
+		},
+		{
+			name:          "Disallow CORS for root path",
+			path:          "/",
+			origin:        "http://example.com",
+			expectedAllow: false,
+			setupMock:     func(db *mocks_data.Database) {},
+		},
+		{
+			name:          "Disallow CORS for path below auth/token",
+			path:          "/auth/token/foo",
 			origin:        "http://example.com",
 			expectedAllow: false,
 			setupMock:     func(db *mocks_data.Database) {},
