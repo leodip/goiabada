@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -11,10 +10,8 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -24,10 +21,9 @@ import (
 // Level is the one rule in that decision the lint cannot hold: it is not decidable from the text
 // of a call, so nothing stops somebody raising a handled refusal to Error or lowering a server
 // fault to Warn one site at a time until the level means nothing. What holds it is a case per
-// site, here, at the sites the decision names: a rate limiter doing its job, a CSRF refusal, a
-// settings read that failed, a CORS configuration that could not be read. Three are pinned where
-// they already were and one moved (the invalid-issuer clear, pinned at Warn beside its own case
-// in middleware_jwt_test.go).
+// site: a rate limiter doing its job, a CSRF refusal and the request log. The settings and CORS
+// records live with their middleware in authserver; the invalid-issuer clear is pinned at Warn
+// beside its own case in middleware_jwt_test.go.
 //
 // Each case also asserts request_id, which is decision 2 measured end to end rather than by
 // reading the call site: the attribute is on the record because chi's RequestID ran ahead of the
@@ -121,73 +117,6 @@ func TestSlogConvention_CsrfRefusalIsWarnWithALiteralMessage(t *testing.T) {
 	assert.Equal(t, "auth.example.com", record.Attrs["request_host"])
 	assert.Equal(t, "https://evil.example.com", record.Attrs["origin_header"])
 	assert.Equal(t, "cross-site", record.Attrs["sec_fetch_site"])
-	requestIdOf(t, record)
-}
-
-// An unreadable settings row is a server fault: every page's layout reads those settings, so the
-// deployment is answering 500 to everything until somebody acts. Error, and pinned.
-func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
-
-	mockDB := mocks_data.NewDatabase(t)
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(nil, errors.New("database error"))
-
-	rr := httptest.NewRecorder()
-	chimiddleware.RequestID(MiddlewareSettings(mockDB)(http.HandlerFunc(
-		func(http.ResponseWriter, *http.Request) {
-			t.Error("the handler must not be reached when the settings cannot be read")
-		}))).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
-
-	require.Equal(t, http.StatusInternalServerError, rr.Code)
-
-	record := theOneRecord(t, logged)
-	assert.Equal(t, slog.LevelError, record.Level)
-	assert.Equal(t, "unable to load the settings", record.Message)
-	requestId := requestIdOf(t, record)
-
-	// The id on the record is the one the reader is shown, which is the whole point of
-	// correlating them: an operator handed this number by a user greps the log for it.
-	assert.Contains(t, rr.Body.String(), requestId)
-
-	// Exactly once. The call site used to name request_id itself and now does not, so a
-	// restored attribute would write it twice and a collector keying on it would see a
-	// duplicate field rather than an error.
-	assert.Equal(t, 1, strings.Count(logged.Text(), "request_id="),
-		"request_id comes from the handler alone, never also from the call site")
-}
-
-// Fail-closed, and loud: an unreadable web origins list is not an empty one, and the middleware
-// answers false rather than letting script on any origin read a token response. Somebody has to
-// act, so Error.
-func TestSlogConvention_CorsConfigurationFailureIsError(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
-
-	mockDB := mocks_data.NewDatabase(t)
-	mockDB.On("WebOriginExists", mock.Anything, "https://app.example.com").
-		Return(false, errors.New("the database is unreachable"))
-
-	req := httptest.NewRequest(http.MethodGet, "/userinfo", nil)
-	req.Header.Set("Origin", "https://app.example.com")
-
-	rr := httptest.NewRecorder()
-	reached := false
-	chimiddleware.RequestID(MiddlewareCors(mockDB)(http.HandlerFunc(
-		func(w http.ResponseWriter, _ *http.Request) {
-			reached = true
-			w.WriteHeader(http.StatusOK)
-		}))).ServeHTTP(rr, req)
-
-	// The request still runs; what is withheld is the header that would let script read it.
-	assert.True(t, reached)
-	assert.Empty(t, rr.Header().Get("Access-Control-Allow-Origin"),
-		"an unreadable origin list must not approve the origin")
-
-	record := theOneRecord(t, logged)
-	assert.Equal(t, slog.LevelError, record.Level)
-	assert.Equal(t, "unable to load the cors configuration", record.Message)
-	err, isError := record.Attrs["error"].(error)
-	require.True(t, isError, "the error attribute must be an error value, not a string")
-	assert.Contains(t, err.Error(), "the database is unreachable")
 	requestIdOf(t, record)
 }
 

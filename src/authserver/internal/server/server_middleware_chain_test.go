@@ -46,7 +46,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/middleware.MiddlewareCsrf.func1",
 	}
 	wantApp := append(append([]string{}, wantRoot...),
-		"github.com/leodip/goiabada/core/middleware.MiddlewareSettings.func1",
+		"github.com/leodip/goiabada/authserver/internal/middleware.MiddlewareSettings.func1",
 		"github.com/leodip/goiabada/core/middleware.MiddlewareCookieReset.func1",
 		"github.com/leodip/goiabada/authserver/internal/middleware.MiddlewareSessionIdentifier.func1",
 		"github.com/leodip/goiabada/core/i18n.MiddlewareLocale.func1",

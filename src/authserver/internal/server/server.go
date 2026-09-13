@@ -241,7 +241,7 @@ func (s *Server) initMiddleware() chi.Router {
 	slog.Info("initializing middleware")
 
 	// CORS
-	s.router.Use(custom_middleware.MiddlewareCors(s.database))
+	s.router.Use(authserver_middleware.MiddlewareCors(s.database))
 
 	// Request ID
 	s.router.Use(middleware.RequestID)
@@ -313,7 +313,7 @@ func (s *Server) initMiddleware() chi.Router {
 
 	app := s.router.With(
 		// Adds settings to the request context
-		custom_middleware.MiddlewareSettings(s.database),
+		authserver_middleware.MiddlewareSettings(s.database),
 
 		// Clear the session cookie and redirect if unable to decode it, and delete
 		// whatever the chunked cookie store left in this browser
