@@ -1,4 +1,4 @@
-package sessionstore
+package sessionbackend
 
 import (
 	"context"
@@ -10,23 +10,33 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // dbBackend keeps browser sessions in the database this deployment already runs. It is
 // what the auth server uses directly, and it is also what the session endpoint runs on
-// behalf of the admin console, with the owner hard-wired at construction so no request
-// can name another application's rows (#266).
+// behalf of the admin console.
 type dbBackend struct {
 	database data.Database
 	owner    string
 	now      func() time.Time
 }
 
-// NewDatabaseBackend returns a Backend over the given database, scoped to one owner.
-// The owner is fixed here rather than passed per call precisely so that it cannot be
-// got wrong by a caller: it is the only thing keeping the two applications' sessions
-// apart in a table that holds both.
-func NewDatabaseBackend(database data.Database, owner string) Backend {
+// NewAuthServerBackend returns a database backend scoped to the auth server's rows.
+func NewAuthServerBackend(database data.Database) sessionstore.Backend {
+	return newBackend(database, constants.AuthServerSessionName)
+}
+
+// NewAdminConsoleBackend returns a database backend scoped to the admin console's rows.
+//
+// One table holds both applications' sessions, and the owner is all that keeps them
+// apart. Fixing it in these constructors rather than accepting it from a caller makes
+// it impossible for the session endpoint to select the auth server's rows (#334).
+func NewAdminConsoleBackend(database data.Database) sessionstore.Backend {
+	return newBackend(database, constants.AdminConsoleSessionName)
+}
+
+func newBackend(database data.Database, owner string) *dbBackend {
 	return &dbBackend{
 		database: database,
 		owner:    owner,
@@ -34,17 +44,17 @@ func NewDatabaseBackend(database data.Database, owner string) Backend {
 	}
 }
 
-func (b *dbBackend) Load(ctx context.Context, id string) (*Record, error) {
+func (b *dbBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
 	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(nil, b.owner,
 		hashSessionId(id), b.now())
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the browser session")
 	}
 	if browserSession == nil {
-		return nil, ErrNotFound
+		return nil, sessionstore.ErrNotFound
 	}
 
-	return &Record{
+	return &sessionstore.Record{
 		Data:         []byte(browserSession.Data),
 		LastAccessed: browserSession.LastAccessed,
 		ExpiresAt:    browserSession.ExpiresAt,
@@ -61,7 +71,7 @@ func (b *dbBackend) Create(ctx context.Context, id string, data []byte, authenti
 
 	// A row being created now was created now, so the absolute deadline is measured
 	// from this instant without reading anything back.
-	expiresAt := ExpiresAt(now, now, authenticated, idleTimeout, maxLifetime)
+	expiresAt := sessionstore.ExpiresAt(now, now, authenticated, idleTimeout, maxLifetime)
 
 	browserSession := &models.BrowserSession{
 		Owner:         b.owner,
@@ -93,7 +103,7 @@ func (b *dbBackend) Update(ctx context.Context, id string, data []byte, authenti
 		return time.Time{}, errs.Wrap(err, "unable to update the browser session")
 	}
 	if !updated {
-		return time.Time{}, ErrNotFound
+		return time.Time{}, sessionstore.ErrNotFound
 	}
 
 	return expiresAt, nil
@@ -113,7 +123,7 @@ func (b *dbBackend) Touch(ctx context.Context, id string, authenticated bool) (t
 		return time.Time{}, errs.Wrap(err, "unable to touch the browser session")
 	}
 	if !touched {
-		return time.Time{}, ErrNotFound
+		return time.Time{}, sessionstore.ErrNotFound
 	}
 
 	return expiresAt, nil
@@ -139,7 +149,7 @@ func (b *dbBackend) Delete(ctx context.Context, id string) error {
 // /auth/authorize in a loop takes, so it deliberately costs no read at all.
 func (b *dbBackend) expiryFor(ctx context.Context, hash string, authenticated bool, now time.Time) (time.Time, error) {
 	if !authenticated {
-		return ExpiresAt(now, now, false, 0, 0), nil
+		return sessionstore.ExpiresAt(now, now, false, 0, 0), nil
 	}
 
 	idleTimeout, maxLifetime, err := b.lifetimes(ctx)
@@ -152,7 +162,7 @@ func (b *dbBackend) expiryFor(ctx context.Context, hash string, authenticated bo
 		return time.Time{}, errs.Wrap(err, "unable to read the browser session")
 	}
 	if browserSession == nil {
-		return time.Time{}, ErrNotFound
+		return time.Time{}, sessionstore.ErrNotFound
 	}
 
 	// created_at is written by CreateBrowserSession on every insert, so an invalid one
@@ -163,7 +173,7 @@ func (b *dbBackend) expiryFor(ctx context.Context, hash string, authenticated bo
 		createdAt = browserSession.CreatedAt.Time
 	}
 
-	return ExpiresAt(now, createdAt, true, idleTimeout, maxLifetime), nil
+	return sessionstore.ExpiresAt(now, createdAt, true, idleTimeout, maxLifetime), nil
 }
 
 // lifetimes returns the deployment's session deadlines.
