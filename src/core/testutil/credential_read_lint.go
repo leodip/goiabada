@@ -83,18 +83,24 @@ import (
 func AssertNoCredentialQueryFallback(t *testing.T, names []string, dirs ...string) {
 	t.Helper()
 
-	root := SourceRoot(t)
+	assertNoCredentialQueryFallback(t, SourceRoot(t), names, dirs)
+}
+
+// assertNoCredentialQueryFallback is the reporting half, taking the root as a parameter and failing
+// through a Reporter so a rule test can drive it against a fixture tree. See Reporter in guard.go.
+func assertNoCredentialQueryFallback(r Reporter, root string, names, dirs []string) {
+	r.Helper()
 
 	reads, perDir, err := findCredentialQueryReads(root, names, dirs)
 	if err != nil {
-		t.Fatalf("walking %s: %v", root, err)
+		r.Fatalf("walking %s: %v", root, err)
 	}
 
-	for _, r := range reads {
-		t.Errorf("%s:%d: reads %s with %s, which merges the URL query behind the request body, so "+
+	for _, read := range reads {
+		r.Errorf("%s:%d: reads %s with %s, which merges the URL query behind the request body, so "+
 			"the value is accepted from the request target and leaks into history, Referer and "+
 			"every proxy log in front of the deployment; use %s (#202)",
-			r.file, r.line, r.name, r.accessor, r.use)
+			read.file, read.line, read.name, read.accessor, read.use)
 	}
 
 	// A walk that covers nothing passes while guarding nothing. Each directory the caller named is
@@ -102,12 +108,12 @@ func AssertNoCredentialQueryFallback(t *testing.T, names []string, dirs ...strin
 	// than shrinking the guard in silence.
 	for _, dir := range dirs {
 		if perDir[dir] == 0 {
-			t.Errorf("walked no non-test Go files under %s; the guard is not checking the "+
+			r.Errorf("walked no non-test Go files under %s; the guard is not checking the "+
 				"credential reads that live there", dir)
 		}
 	}
 	if len(dirs) == 0 && perDir[""] == 0 {
-		t.Fatalf("walked no non-test Go files under %s", root)
+		r.Fatalf("walked no non-test Go files under %s", root)
 	}
 }
 

@@ -68,16 +68,22 @@ import (
 func AssertNoLegacyErrors(t *testing.T, dirs ...string) {
 	t.Helper()
 
-	root := SourceRoot(t)
+	assertNoLegacyErrors(t, SourceRoot(t), dirs)
+}
+
+// assertNoLegacyErrors is the reporting half, taking the root as a parameter and failing through a
+// Reporter so a rule test can drive it against a fixture tree. See Reporter in guard.go.
+func assertNoLegacyErrors(r Reporter, root string, dirs []string) {
+	r.Helper()
 
 	uses, files, err := findLegacyErrorUses(root, dirs)
 	if err != nil {
-		t.Fatalf("walking %s: %v", root, err)
+		r.Fatalf("walking %s: %v", root, err)
 	}
 	// A root that somehow held no Go files walks nothing and would otherwise pass, which is the
 	// one way a guard like this fails silently in the direction that matters.
 	if files == 0 {
-		t.Fatalf("walked no non-test Go files under %s (dirs: %s)", root, strings.Join(dirs, ", "))
+		r.Fatalf("walked no non-test Go files under %s (dirs: %s)", root, strings.Join(dirs, ", "))
 	}
 	if len(uses) == 0 {
 		return
@@ -87,7 +93,7 @@ func AssertNoLegacyErrors(t *testing.T, dirs ...string) {
 	for _, u := range uses {
 		lines = append(lines, u.file+":"+strconv.Itoa(u.line)+": "+u.what+" -- "+u.fix)
 	}
-	t.Errorf("%d legacy error construction(s) in %d non-test file(s):\n\t%s\n\n"+
+	r.Errorf("%d legacy error construction(s) in %d non-test file(s):\n\t%s\n\n"+
 		"Construct every error through github.com/leodip/goiabada/core/errs, which captures one "+
 		"stack per error tree at the origin, and match with errors.Is / errors.As. A package-level "+
 		"sentinel is the one exception and keeps stdlib errors.New (#279).",

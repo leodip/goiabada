@@ -75,17 +75,24 @@ import (
 func AssertSlogConvention(t *testing.T, dirs ...string) {
 	t.Helper()
 
-	root := SourceRoot(t)
+	assertSlogConvention(t, SourceRoot(t), dirs)
+}
+
+// assertSlogConvention is the reporting half, taking the root as a parameter and failing through a
+// Reporter so a rule test can drive it against a fixture tree. See Reporter in guard.go.
+func assertSlogConvention(r Reporter, root string, dirs []string) {
+	r.Helper()
+
 	golangci := filepath.Join(filepath.Dir(root), golangciConfigName)
 
 	violations, files, err := findSlogViolations(root, golangci, dirs)
 	if err != nil {
-		t.Fatalf("walking %s: %v", root, err)
+		r.Fatalf("walking %s: %v", root, err)
 	}
 	// A root that somehow held no Go files walks nothing and would otherwise pass, which is the
 	// one way a guard like this fails silently in the direction that matters.
 	if files == 0 {
-		t.Fatalf("walked no non-test Go files under %s (dirs: %s)", root, strings.Join(dirs, ", "))
+		r.Fatalf("walked no non-test Go files under %s (dirs: %s)", root, strings.Join(dirs, ", "))
 	}
 	if len(violations) == 0 {
 		return
@@ -95,7 +102,7 @@ func AssertSlogConvention(t *testing.T, dirs ...string) {
 	for _, v := range violations {
 		lines = append(lines, v.file+":"+strconv.Itoa(v.line)+": "+v.what+" -- "+v.fix)
 	}
-	t.Errorf("%d slog convention violation(s) in %d non-test file(s):\n\t%s\n\n"+
+	r.Errorf("%d slog convention violation(s) in %d non-test file(s):\n\t%s\n\n"+
 		"A message is a string literal at the call and opens with neither a component prefix nor "+
 		"\"failed to\" or \"error \"; "+
 		"core/logging owns the handler and testutil.CaptureSlog is how a test reads records; a "+

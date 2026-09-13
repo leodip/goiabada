@@ -65,22 +65,28 @@ import (
 func AssertNoDeadInterfaces(t *testing.T, dirs ...string) {
 	t.Helper()
 
-	root := SourceRoot(t)
+	assertNoDeadInterfaces(t, SourceRoot(t), dirs)
+}
+
+// assertNoDeadInterfaces is the reporting half, taking the root as a parameter and failing through
+// a Reporter so a rule test can drive it against a fixture tree. See Reporter in guard.go.
+func assertNoDeadInterfaces(r Reporter, root string, dirs []string) {
+	r.Helper()
 
 	dead, blocked, files, err := findDeadInterfaces(root, dirs)
 	if err != nil {
-		t.Fatalf("walking %s: %v", root, err)
+		r.Fatalf("walking %s: %v", root, err)
 	}
 	// A walk that reached no files passes vacuously, which is the one way a guard like this stops
 	// guarding without anything going red.
 	if files == 0 {
-		t.Fatalf("walked no Go files under %s (dirs: %s)", root, strings.Join(dirs, ", "))
+		r.Fatalf("walked no Go files under %s (dirs: %s)", root, strings.Join(dirs, ", "))
 	}
 
 	// A shape this walk cannot resolve is reported rather than skipped: a false failure gets
 	// investigated, a false pass is a guard that has quietly stopped guarding.
 	for _, b := range blocked {
-		t.Errorf("%s:%d: %s", b.file, b.line, b.why)
+		r.Errorf("%s:%d: %s", b.file, b.line, b.why)
 	}
 
 	if len(dead) == 0 {
@@ -91,7 +97,7 @@ func AssertNoDeadInterfaces(t *testing.T, dirs ...string) {
 	for _, d := range dead {
 		lines = append(lines, d.file+":"+strconv.Itoa(d.line)+": "+d.pkg+"."+d.name)
 	}
-	t.Errorf("%d interface declaration(s) nothing in the module references:\n\t%s\n\n"+
+	r.Errorf("%d interface declaration(s) nothing in the module references:\n\t%s\n\n"+
 		"Delete the declaration, along with any import that existed only to spell its method "+
 		"signatures, or reference it from the code that was supposed to be consuming it. An "+
 		"interface no code names abstracts nothing: it holds imports open, it reads to the next "+
